@@ -123,9 +123,9 @@ class ShaFile(object):
   def from_file(cls, filename):
     """Get the contents of a SHA file on disk"""
     size = os.path.getsize(filename)
-    f = open(filename, 'rb+')
+    f = open(filename, 'rb')
     try:
-      map = mmap.mmap(f.fileno(), size)
+      map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
       shafile = cls._parse_file(map)
       shafile._parse_text()
       return shafile

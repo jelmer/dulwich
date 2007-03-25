@@ -97,25 +97,25 @@ class Repository(object):
 
     XXX: work out how to handle merges.
     """
-    commit = self.get_commit(head)
-    if commit is None:
-      raise MissingCommitError(head)
-    history = [commit]
-    parents = commit.parents()
-    parent_commits = [[]] * len(parents)
-    i = 0
-    for parent in parents:
-      parent_commits[i] = self.revision_history(parent)
-      i += 1
-    for commit_list in parent_commits:
-      for parent_commit in commit_list:
-        if parent_commit in history:
-          continue
-        j = 0
-        for main_commit in history:
-          if main_commit.commit_time() < parent_commit.commit_time():
-            break
-          j += 1
-        history.insert(j, parent_commit)
+    # We build the list backwards, as parents are more likely to be older
+    # than children
+    pending_commits = [head]
+    history = []
+    while pending_commits != []:
+      head = pending_commits.pop(0)
+      commit = self.get_commit(head)
+      if commit is None:
+        raise MissingCommitError(head)
+      if commit in history:
+        continue
+      i = 0
+      for known_commit in history:
+        if known_commit.commit_time() > commit.commit_time():
+          break
+        i += 1
+      history.insert(i, commit)
+      parents = commit.parents()
+      pending_commits += parents
+    history.reverse()
     return history
 

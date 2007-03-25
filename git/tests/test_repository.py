@@ -111,3 +111,13 @@ class RepositoryTests(unittest.TestCase):
     self.assertRaises(errors.MissingCommitError, r.revision_history,
                       missing_sha)
 
+  def test_out_of_order_merge(self):
+    """Test that revision history is ordered by date, not parent order."""
+    r = self.open_repo('ooo_merge')
+    history = r.revision_history(r.head())
+    shas = [c.sha().hexdigest() for c in history]
+    self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
+                            'f507291b64138b875c28e03469025b1ea20bc614',
+                            'fb5b0425c7ce46959bec94d54b9a157645e114f5',
+                            'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
+

@@ -24,6 +24,11 @@ import os
 import sha
 import zlib
 
+from errors import (NotCommitError,
+                    NotTreeError,
+                    NotBlobError,
+                    )
+
 blob_id = "blob"
 tree_id = "tree"
 commit_id = "commit"
@@ -156,7 +161,8 @@ class Blob(ShaFile):
   @classmethod
   def from_file(cls, filename):
     blob = ShaFile.from_file(filename)
-    assert blob._type == cls._type, "%s is not a blob object" % filename
+    if blob._type != cls._type:
+      raise NotBlobError(filename)
     return blob
 
   @classmethod
@@ -175,7 +181,8 @@ class Tree(ShaFile):
   @classmethod
   def from_file(cls, filename):
     tree = ShaFile.from_file(filename)
-    assert tree._type == cls._type, "%s is not a tree object" % filename
+    if tree._type != cls._type:
+      raise NotTreeError(filename)
     return tree
 
   def entries(self):
@@ -216,7 +223,8 @@ class Commit(ShaFile):
   @classmethod
   def from_file(cls, filename):
     commit = ShaFile.from_file(filename)
-    assert commit._type == cls._type, "%s is not a commit object" % filename
+    if commit._type != cls._type:
+      raise NotCommitError(filename)
     return commit
 
   def _parse_text(self):

@@ -18,7 +18,11 @@
 
 import os
 
-from objects import ShaFile
+from objects import (ShaFile,
+                     Commit,
+                     Tree,
+                     Blob,
+                     )
 
 objectdir = 'objects'
 symref = 'ref: '
@@ -59,12 +63,24 @@ class Repository(object):
   def head(self):
     return self.ref('HEAD')
 
-  def get_object(self, sha):
-    assert len(sha) == 40, "Incorrect sha length"
+  def _get_object(self, sha, cls):
+    assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
     dir = sha[:2]
     file = sha[2:]
     path = os.path.join(self.object_dir(), dir, file)
     if not os.path.exists(path):
       return None
-    return ShaFile.from_file(path)
+    return cls.from_file(path)
+
+  def get_object(self, sha):
+    return self._get_object(sha, ShaFile)
+
+  def get_commit(self, sha):
+    return self._get_object(sha, Commit)
+
+  def get_tree(self, sha):
+    return self._get_object(sha, Tree)
+
+  def get_blob(self, sha):
+    return self._get_object(sha, Blob)
 

@@ -18,6 +18,7 @@
 
 import os
 
+from errors import MissingCommitError
 from objects import (ShaFile,
                      Commit,
                      Tree,
@@ -69,6 +70,7 @@ class Repository(object):
     file = sha[2:]
     path = os.path.join(self.object_dir(), dir, file)
     if not os.path.exists(path):
+      # Should this raise instead?
       return None
     return cls.from_file(path)
 
@@ -96,6 +98,8 @@ class Repository(object):
     XXX: work out how to handle merges.
     """
     commit = self.get_commit(head)
+    if commit is None:
+      raise MissingCommitError(head)
     history = [commit]
     parents = commit.parents()
     parent_commits = [[]] * len(parents)

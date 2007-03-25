@@ -69,6 +69,11 @@ class BlobReadTests(unittest.TestCase):
     self.assertEqual(b.text(), string)
     self.assertEqual(b.sha().hexdigest(), c_sha)
 
+  def test_eq(self):
+    blob1 = self.get_blob(a_sha)
+    blob2 = self.get_blob(a_sha)
+    self.assertEqual(blob1, blob2)
+
   def test_read_tree_from_file(self):
     t = self.get_tree(tree_sha)
     self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
@@ -80,9 +85,10 @@ class BlobReadTests(unittest.TestCase):
     self.assertEqual(c.tree(), tree_sha)
     self.assertEqual(c.parents(), ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
     self.assertEqual(c.author(),
-        'James Westby <jw+debian@jameswestby.net> 1174759230 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
     self.assertEqual(c.committer(),
-        'James Westby <jw+debian@jameswestby.net> 1174759230 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
+    self.assertEqual(c.commit_time(), 1174759230)
     self.assertEqual(c.message(), 'Test commit\n')
 
   def test_read_commit_no_parents(self):
@@ -91,9 +97,10 @@ class BlobReadTests(unittest.TestCase):
     self.assertEqual(c.tree(), '90182552c4a85a45ec2a835cadc3451bebdfe870')
     self.assertEqual(c.parents(), [])
     self.assertEqual(c.author(),
-        'James Westby <jw+debian@jameswestby.net> 1174758034 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
     self.assertEqual(c.committer(),
-        'James Westby <jw+debian@jameswestby.net> 1174758034 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
+    self.assertEqual(c.commit_time(), 1174758034)
     self.assertEqual(c.message(), 'Test commit\n')
 
   def test_read_commit_two_parents(self):
@@ -103,8 +110,9 @@ class BlobReadTests(unittest.TestCase):
     self.assertEqual(c.parents(), ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                    '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'])
     self.assertEqual(c.author(),
-        'James Westby <jw+debian@jameswestby.net> 1174773719 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
     self.assertEqual(c.committer(),
-        'James Westby <jw+debian@jameswestby.net> 1174773719 +0000')
+        'James Westby <jw+debian@jameswestby.net>')
+    self.assertEqual(c.commit_time(), 1174773719)
     self.assertEqual(c.message(), 'Merge ../b\n')
 

@@ -90,3 +90,21 @@ class RepositoryTests(unittest.TestCase):
     r = self.open_repo('a')
     self.assertRaises(NotBlobError, r.get_blob, r.head())
 
+  def test_linear_history(self):
+    r = self.open_repo('a')
+    history = r.revision_history(r.head())
+    shas = [c.sha().hexdigest() for c in history]
+    self.assertEqual(shas, [r.head(),
+                            '2a72d929692c41d8554c07f6301757ba18a65d91'])
+
+  def test_merge_history(self):
+    r = self.open_repo('simple_merge')
+    history = r.revision_history(r.head())
+    shas = [c.sha().hexdigest() for c in history]
+    self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
+                            'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                            '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
+                            '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
+                            '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
+
+

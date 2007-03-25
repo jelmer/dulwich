@@ -84,3 +84,34 @@ class Repository(object):
   def get_blob(self, sha):
     return self._get_object(sha, Blob)
 
+  def revision_history(self, head):
+    """Returns a list of the commits reachable from head.
+
+    Returns a list of commit objects. the first of which will be the commit
+    of head, then following theat will be the parents.
+
+    Raises NotCommitError if any no commits are referenced, including if the
+    head parameter isn't the sha of a commit.
+
+    XXX: work out how to handle merges.
+    """
+    commit = self.get_commit(head)
+    history = [commit]
+    parents = commit.parents()
+    parent_commits = [[]] * len(parents)
+    i = 0
+    for parent in parents:
+      parent_commits[i] = self.revision_history(parent)
+      i += 1
+    for commit_list in parent_commits:
+      for parent_commit in commit_list:
+        if parent_commit in history:
+          continue
+        j = 0
+        for main_commit in history:
+          if main_commit.commit_time() < parent_commit.commit_time():
+            break
+          j += 1
+        history.insert(j, parent_commit)
+    return history
+

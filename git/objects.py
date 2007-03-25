@@ -46,10 +46,7 @@ def sha_to_hex(sha):
   """Takes a string and returns the hex of the sha within"""
   hexsha = ''
   for c in sha:
-    if ord(c) < 16:
-      hexsha += "0%x" % ord(c)
-    else:
-      hexsha += "%x" % ord(c)
+    hexsha += "%02x" % ord(c)
   assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % \
          len(hexsha)
   return hexsha
@@ -148,6 +145,14 @@ class ShaFile(object):
     ressha.update(self._header())
     ressha.update(self._text)
     return ressha
+
+  def __eq__(self, other):
+    """Return true id the sha of the two objects match.
+
+    The __le__ etc methods aren't overriden as they make no sense,
+    certainly at this level.
+    """
+    return self.sha().digest() == other.sha().digest()
 
 class Blob(ShaFile):
   """A Git Blob object."""
@@ -259,8 +264,13 @@ class Commit(ShaFile):
            "%s must be followed by space not %s" % (author_id, text[count])
       count += 1
       self._author = ''
-      while text[count] != '\n':
+      while text[count] != '>':
+        assert text[count] != '\n', "Malformed author information"
         self._author += text[count]
+        count += 1
+      self._author += text[count]
+      count += 1
+      while text[count] != '\n':
         count += 1
       count += 1
     self._committer = None
@@ -270,12 +280,22 @@ class Commit(ShaFile):
            "%s must be followed by space not %s" % (committer_id, text[count])
       count += 1
       self._committer = ''
-      while text[count] != '\n':
+      while text[count] != '>':
+        assert text[count] != '\n', "Malformed committer information"
         self._committer += text[count]
+        count += 1
+      self._committer += text[count]
+      count += 1
+      assert text[count] == ' ', "Invalid commit object, " \
+           "commiter information must be followed by space not %s" % text[count]
+      count += 1
+      self._commit_time = int(text[count:count+10])
+      while text[count] != '\n':
         count += 1
       count += 1
     assert text[count] == '\n', "There must be a new line after the headers"
     count += 1
+    # XXX: There can be an encoding field.
     self._message = text[count:]
 
   def tree(self):
@@ -297,6 +317,13 @@ class Commit(ShaFile):
   def message(self):
     """Returns the commit message"""
     return self._message
+
+  def commit_time(self):
+    """Returns the timestamp of the commit.
+    
+    Returns it as the number of seconds since the epoch.
+    """
+    return self._commit_time
 
 type_map = {
   blob_id : Blob,

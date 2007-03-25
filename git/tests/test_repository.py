@@ -19,11 +19,10 @@
 import os
 import unittest
 
-from git.errors import (NotCommitError,
-                        NotTreeError,
-                        NotBlobError,
-                        )
+from git import errors
 from git.repository import Repository
+
+missing_sha = 'b91fa4d900g17e99b433218e988c4eb4a3e9a097'
 
 class RepositoryTests(unittest.TestCase):
 
@@ -53,7 +52,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_object_non_existant(self):
     r = self.open_repo('a')
-    obj = r.get_object('b91fa4d900g17e99b433218e988c4eb4a3e9a097')
+    obj = r.get_object(missing_sha)
     self.assertEqual(obj, None)
 
   def test_get_commit(self):
@@ -63,7 +62,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_commit_not_commit(self):
     r = self.open_repo('a')
-    self.assertRaises(NotCommitError,
+    self.assertRaises(errors.NotCommitError,
                       r.get_commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
 
   def test_get_tree(self):
@@ -75,7 +74,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_tree_not_tree(self):
     r = self.open_repo('a')
-    self.assertRaises(NotTreeError, r.get_tree, r.head())
+    self.assertRaises(errors.NotTreeError, r.get_tree, r.head())
 
   def test_get_blob(self):
     r = self.open_repo('a')
@@ -88,7 +87,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_blob(self):
     r = self.open_repo('a')
-    self.assertRaises(NotBlobError, r.get_blob, r.head())
+    self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
 
   def test_linear_history(self):
     r = self.open_repo('a')
@@ -107,4 +106,8 @@ class RepositoryTests(unittest.TestCase):
                             '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
                             '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
 
+  def test_revision_history_missing_commit(self):
+    r = self.open_repo('simple_merge')
+    self.assertRaises(errors.MissingCommitError, r.revision_history,
+                      missing_sha)
 

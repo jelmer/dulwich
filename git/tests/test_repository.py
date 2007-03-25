@@ -19,6 +19,10 @@
 import os
 import unittest
 
+from git.errors import (NotCommitError,
+                        NotTreeError,
+                        NotBlobError,
+                        )
 from git.repository import Repository
 
 class RepositoryTests(unittest.TestCase):
@@ -51,4 +55,38 @@ class RepositoryTests(unittest.TestCase):
     r = self.open_repo('a')
     obj = r.get_object('b91fa4d900g17e99b433218e988c4eb4a3e9a097')
     self.assertEqual(obj, None)
+
+  def test_get_commit(self):
+    r = self.open_repo('a')
+    obj = r.get_commit(r.head())
+    self.assertEqual(obj._type, 'commit')
+
+  def test_get_commit_not_commit(self):
+    r = self.open_repo('a')
+    self.assertRaises(NotCommitError,
+                      r.get_commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
+
+  def test_get_tree(self):
+    r = self.open_repo('a')
+    commit = r.get_commit(r.head())
+    tree = r.get_tree(commit.tree())
+    self.assertEqual(tree._type, 'tree')
+    self.assertEqual(tree.sha().hexdigest(), commit.tree())
+
+  def test_get_tree_not_tree(self):
+    r = self.open_repo('a')
+    self.assertRaises(NotTreeError, r.get_tree, r.head())
+
+  def test_get_blob(self):
+    r = self.open_repo('a')
+    commit = r.get_commit(r.head())
+    tree = r.get_tree(commit.tree())
+    blob_sha = tree.entries()[0][2]
+    blob = r.get_blob(blob_sha)
+    self.assertEqual(blob._type, 'blob')
+    self.assertEqual(blob.sha().hexdigest(), blob_sha)
+
+  def test_get_blob(self):
+    r = self.open_repo('a')
+    self.assertRaises(NotBlobError, r.get_blob, r.head())
 

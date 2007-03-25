@@ -1,0 +1,39 @@
+This is the python-git project.
+
+It aims to give an interface to git repos that doesn't call out to git
+directly. It is probably going to be implemented in pure python.
+
+Currently can read blobs, trees and commits from the files. It reads both
+legacy and new headers. However it is untested for anything but the simple
+case.
+
+Can also understand a little about the repository format.
+
+The testsuite uses the nosetests program from Turbogears, as I got annoyed
+trying to set up unittest.
+
+Open up a repo by passing it the path to the .git dir. You can then ask for
+HEAD with repo.head() or a ref with repo.ref(name). Both return the SHA id
+they currently point to. You can then grab this object with
+repo.get_object(sha).
+
+For the actual objects the ShaFile.from_file(filename) will return the object
+stored in the file whatever it is. To ensure you get the correct type then
+call {Blob,Tree,Commit}.from_file(filename). I will add repo methods to do
+this for you with file lookup soon.
+
+There is also support for creating blobs. Blob.from_string(string) will create
+a blob object from the string. You can then call blob.sha() to get the sha
+object for this blob, and hexdigest() on that will get its ID. There is
+currently no method that allows you to write it out though.
+
+Everything is currently done with assertions, where much of it should probably
+be exceptions. This was merely done for expediency. If you hit an assertion,
+it either means you have done something wrong, there is corruption, or
+you are trying an unsupported operation.
+
+If you have any comments or questions you can contact me at 
+jw+debian@jameswestby.net
+
+James Westby
+

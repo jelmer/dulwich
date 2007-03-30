@@ -18,12 +18,19 @@
 
 import unittest
 import test_objects
+import test_repository
+import test_pack
 
 def test_suite():
-  test_modules = [test_objects]
+  test_modules = [test_objects, test_repository, test_pack]
   loader = unittest.TestLoader()
   suite = unittest.TestSuite()
   for mod in test_modules:
     suite.addTest(loader.loadTestsFromModule(mod))
   return suite
+
+if __name__ == '__main__':
+  suite = test_suite()
+  from unittest import TextTestRunner
+  TextTestRunner().run(suite)
 

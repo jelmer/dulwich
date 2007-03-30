@@ -132,6 +132,19 @@ class ShaFile(object):
     finally:
       f.close()
 
+  @classmethod
+  def from_raw_string(cls, type, string):
+    """Creates an object of the indicated type from the raw string given.
+
+    Type is the numeric type of an object. String is the raw uncompressed
+    contents.
+    """
+    real_class = num_type_map[type]
+    obj = real_class()
+    obj._text = string
+    obj._update_contents()
+    return obj
+
   def _header(self):
     return "%s %lu\0" % (self._type, len(self._contents))
 

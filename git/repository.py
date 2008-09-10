@@ -33,7 +33,13 @@ class Repository(object):
   ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
 
   def __init__(self, root):
-    self._basedir = root
+    controldir = os.path.join(root, ".git")
+    if os.path.exists(os.path.join(controldir, "objects")):
+      self.bare = False
+      self._basedir = controldir
+    else:
+      self.bare = True
+      self._basedir = root
 
   def basedir(self):
     return self._basedir

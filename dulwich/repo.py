@@ -1,5 +1,6 @@
-# repository.py -- For dealing wih git repositories.
+# repo.py -- For dealing wih git repositories.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,6 +19,7 @@
 
 import os
 
+from commit import Commit
 from errors import MissingCommitError
 from objects import (ShaFile,
                      Commit,
@@ -28,7 +30,15 @@ from objects import (ShaFile,
 objectdir = 'objects'
 symref = 'ref: '
 
-class Repository(object):
+
+class Tag(object):
+
+    def __init__(self, name, ref):
+        self.name = name
+        self.commit = Commit(ref)
+
+
+class Repo(object):
 
   ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
 
@@ -40,6 +50,8 @@ class Repository(object):
     else:
       self.bare = True
       self._basedir = root
+    self.path = controldir
+    self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
 
   def basedir(self):
     return self._basedir
@@ -67,6 +79,18 @@ class Repository(object):
       if os.path.exists(file):
         return self._get_ref(file)
 
+  def get_tags(self):
+    ret = {}
+    for name in os.listdir(os.path.join(self.basedir(), 'refs', 'tags')):
+      ret[name] = self._get_ref(os.path.join(self.basedir(), 'refs', 'tags', name))
+    return ret
+
+  def heads(self):
+    ret = {}
+    for name in os.listdir(os.path.join(self.basedir(), 'refs', 'heads')):
+      ret[name] = self._get_ref(os.path.join(self.basedir(), 'refs', 'heads', name))
+    return ret
+
   def head(self):
     return self.ref('HEAD')
 
@@ -83,7 +107,7 @@ class Repository(object):
   def get_object(self, sha):
     return self._get_object(sha, ShaFile)
 
-  def get_commit(self, sha):
+  def commit(self, sha):
     return self._get_object(sha, Commit)
 
   def get_tree(self, sha):
@@ -109,7 +133,7 @@ class Repository(object):
     history = []
     while pending_commits != []:
       head = pending_commits.pop(0)
-      commit = self.get_commit(head)
+      commit = self.commit(head)
       if commit is None:
         raise MissingCommitError(head)
       if commit in history:
@@ -124,4 +148,22 @@ class Repository(object):
       pending_commits += parents
     history.reverse()
     return history
+
+  @classmethod
+  def init_bare(cls, path, mkdir=True):
+      for d in [["objects"], 
+                ["objects", "info"], 
+                ["objects", "pack"],
+                ["branches"],
+                ["refs"],
+                ["refs", "tags"],
+                ["refs", "heads"],
+                ["hooks"],
+                ["info"]]:
+          os.mkdir(os.path.join(path, *d))
+      open(os.path.join(path, 'HEAD'), 'w').write("ref: refs/heads/master\n")
+      open(os.path.join(path, 'description'), 'w').write("Unnamed repository")
+      open(os.path.join(path, 'info', 'excludes'), 'w').write("")
+
+  create = init_bare
 

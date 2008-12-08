@@ -19,9 +19,11 @@
 import os
 import unittest
 
-from dulwich.pack import (PackIndex,
-                      PackData,
-                      )
+from dulwich.pack import (
+        PackIndex,
+        PackData,
+        hex_to_sha,
+        )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
 
@@ -75,3 +77,8 @@ class TestPackData(PackTests):
     self.assertEqual(obj._type, 'commit')
     self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
+
+class TestHexToSha(unittest.TestCase):
+
+    def test_simple(self):
+        self.assertEquals(703710, hex_to_sha("abcde"))

@@ -1,10 +1,11 @@
 # test_pack.py -- Tests for the handling of git packs.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License.
+# of the License, or (at your option) any later version of the license.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,6 +24,7 @@ from dulwich.pack import (
         PackIndex,
         PackData,
         hex_to_sha,
+        multi_ord,
         )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -82,3 +84,9 @@ class TestHexToSha(unittest.TestCase):
 
     def test_simple(self):
         self.assertEquals(703710, hex_to_sha("abcde"))
+
+
+class TestMultiOrd(unittest.TestCase):
+
+    def test_simple(self):
+        self.assertEquals(418262508645L, multi_ord("abcde", 0, 5))

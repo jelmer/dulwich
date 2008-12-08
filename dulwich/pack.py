@@ -34,6 +34,10 @@ a pointer in to the corresponding packfile.
 
 import mmap
 import os
+import sys
+
+supports_mmap_offset = (sys.version_info[0] >= 3 or 
+        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 from objects import (ShaFile,
                      _decompress,
@@ -41,13 +45,23 @@ from objects import (ShaFile,
 
 hex_to_sha = lambda hex: int(hex, 16)
 
+def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
+    if offset+size > MAX_MMAP_SIZE and not supports_mmap_offset:
+        raise AssertionError("%s is larger than 256 meg, and this version "
+            "of Python does not support the offset argument to mmap().")
+    if supports_mmap_offset:
+        return mmap.mmap(f.fileno(), size, access=access, offset=offset), 0
+    else:
+        return mmap.mmap(f.fileno(), size, access=access), offset
+
+
 def multi_ord(map, start, count):
   value = 0
   for i in range(count):
     value = value * 256 + ord(map[start+i])
   return value
 
-max_size = 256 * 1024 * 1024
+MAX_MMAP_SIZE = 256 * 1024 * 1024
 
 class PackIndex(object):
   """An index in to a packfile.
@@ -82,10 +96,6 @@ class PackIndex(object):
     self._size = os.path.getsize(filename)
     assert self._size > self.header_size, "%s is too small to be a packfile" % \
         filename
-    assert self._size < max_size, "%s is larger than 256 meg, and it " \
-        "might not be a good idea to mmap it. If you want to go ahead " \
-        "delete this check, or get python to support mmap offsets so that " \
-        "I can map the files sensibly"
 
   def object_index(self, sha):
     """Return the index in to the corresponding packfile for the object.
@@ -99,7 +109,7 @@ class PackIndex(object):
          "like that" % self._filename
     f = open(self._filename, 'rb')
     try:
-      map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
+      map, _ = simple_mmap(f, 0, size)
       return self._object_index(map, sha)
     finally:
       f.close()
@@ -163,10 +173,6 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
-    assert self._size < max_size, "%s is larger than 256 meg, and it " \
-        "might not be a good idea to mmap it. If you want to go ahead " \
-        "delete this check, or get python to support mmap offsets so that " \
-        "I can map the files sensibly"
 
   def get_object_at(self, offset):
     """Given an offset in to the packfile return the object that is there.
@@ -182,7 +188,7 @@ class PackData(object):
          "like that" % self._filename
     f = open(self._filename, 'rb')
     try:
-      map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
+      map, offset = simple_mmap(f, offset, size)
       return self._get_object_at(map, offset)
     finally:
       f.close()

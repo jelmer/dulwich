@@ -19,7 +19,7 @@
 import os
 import unittest
 
-from git.pack import (PackIndex,
+from dulwich.pack import (PackIndex,
                       PackData,
                       )
 

@@ -19,7 +19,7 @@
 import os
 import unittest
 
-from git.objects import (Blob,
+from dulwich.objects import (Blob,
                          Tree,
                          Commit,
                          )

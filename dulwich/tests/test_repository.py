@@ -19,8 +19,8 @@
 import os
 import unittest
 
-from git import errors
-from git.repository import Repository
+from dulwich import errors
+from dulwich.repository import Repository
 
 missing_sha = 'b91fa4d900g17e99b433218e988c4eb4a3e9a097'
 

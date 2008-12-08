@@ -20,14 +20,14 @@ import os
 import unittest
 
 from dulwich import errors
-from dulwich.repository import Repository
+from dulwich.repo import Repo
 
 missing_sha = 'b91fa4d900g17e99b433218e988c4eb4a3e9a097'
 
 class RepositoryTests(unittest.TestCase):
 
   def open_repo(self, name):
-    return Repository(os.path.join(os.path.dirname(__file__),
+    return Repo(os.path.join(os.path.dirname(__file__),
                       'data/repos', name, '.git'))
 
   def test_simple_props(self):
@@ -55,19 +55,19 @@ class RepositoryTests(unittest.TestCase):
     obj = r.get_object(missing_sha)
     self.assertEqual(obj, None)
 
-  def test_get_commit(self):
+  def test_commit(self):
     r = self.open_repo('a')
-    obj = r.get_commit(r.head())
+    obj = r.commit(r.head())
     self.assertEqual(obj._type, 'commit')
 
-  def test_get_commit_not_commit(self):
+  def test_commit_not_commit(self):
     r = self.open_repo('a')
     self.assertRaises(errors.NotCommitError,
-                      r.get_commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
+                      r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
 
   def test_get_tree(self):
     r = self.open_repo('a')
-    commit = r.get_commit(r.head())
+    commit = r.commit(r.head())
     tree = r.get_tree(commit.tree())
     self.assertEqual(tree._type, 'tree')
     self.assertEqual(tree.sha().hexdigest(), commit.tree())
@@ -78,7 +78,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_blob(self):
     r = self.open_repo('a')
-    commit = r.get_commit(r.head())
+    commit = r.commit(r.head())
     tree = r.get_tree(commit.tree())
     blob_sha = tree.entries()[0][2]
     blob = r.get_blob(blob_sha)

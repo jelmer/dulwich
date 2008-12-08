@@ -1,5 +1,5 @@
-# __init__.py -- The git module of python-git
-# Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
+# commit.py -- commit for python-git
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,4 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import repo
+class Commit(object):
+
+    def __init__(self, id):
+        self.id = id

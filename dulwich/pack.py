@@ -39,15 +39,7 @@ from objects import (ShaFile,
                      _decompress,
                      )
 
-def hex_to_sha(hex):
-  """Converts a hex value to the number it represents"""
-  mapping = { '0' : 0, '1' : 1, '2' : 2, '3' : 3, '4' : 4, '5' : 5, '6' : 6,
-              '7' : 7, '8' : 8, '9' : 9, 'a' : 10, 'b' : 11, 'c' : 12,
-              'd' : 13, 'e' : 14, 'f' : 15}
-  value = 0
-  for c in hex:
-    value = (16 * value) + mapping[c]
-  return value
+hex_to_sha = lambda hex: int(hex, 16)
 
 def multi_ord(map, start, count):
   value = 0

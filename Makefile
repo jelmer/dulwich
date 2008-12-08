@@ -2,7 +2,7 @@ PYTHON = python
 SETUP = $(PYTHON) setup.py
 TRIAL = trial
 
-all: build build-inplace
+all: build 
 
 build::
 	$(SETUP) build

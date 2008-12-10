@@ -50,9 +50,24 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
         raise AssertionError("%s is larger than 256 meg, and this version "
             "of Python does not support the offset argument to mmap().")
     if supports_mmap_offset:
-        return mmap.mmap(f.fileno(), size, access=access, offset=offset), 0
+        return mmap.mmap(f.fileno(), size, access=access, offset=offset)
     else:
-        return mmap.mmap(f.fileno(), size, access=access), offset
+        class SkipOffset(object):
+            
+            def __init__(self, data, offset):
+                self.data = data
+                self.offset = offset
+
+            def __getslice__(self, i, j):
+                return self.data[i+offset:j+offset]
+
+            def __getitem__(self, i):
+                return self.data[i+offset]
+
+        data = mmap.mmap(f.fileno(), size, access=access)
+        if offset == 0:
+            return data
+        return SkipOffset(data, offset)
 
 
 def multi_ord(map, start, count):
@@ -109,7 +124,7 @@ class PackIndex(object):
          "like that" % self._filename
     f = open(self._filename, 'rb')
     try:
-      map, _ = simple_mmap(f, 0, size)
+      map = simple_mmap(f, 0, size)
       return self._object_index(map, sha)
     finally:
       f.close()
@@ -200,24 +215,24 @@ class PackData(object):
          "like that" % self._filename
     f = open(self._filename, 'rb')
     try:
-      map, offset = simple_mmap(f, offset, size)
-      return self._get_object_at(map, offset)
+      map = simple_mmap(f, offset, size)
+      return self._get_object_at(map)
     finally:
       f.close()
 
-  def _get_object_at(self, map, offset):
-    first_byte = ord(map[offset])
+  def _get_object_at(self, map):
+    first_byte = ord(map[0])
     sign_extend = first_byte & 0x80
     type = (first_byte >> 4) & 0x07
     size = first_byte & 0x0f
     cur_offset = 0
     while sign_extend > 0:
-      byte = ord(map[offset+cur_offset+1])
+      byte = ord(map[cur_offset+1])
       sign_extend = byte & 0x80
       size_part = byte & 0x7f
       size += size_part << ((cur_offset * 7) + 4)
       cur_offset += 1
-    raw_base = offset+cur_offset+1
+    raw_base = cur_offset+1
     # The size is the inflated size, so we have no idea what the deflated size
     # is, so for now give it as much as we have. It should really iterate
     # feeding it more data if it doesn't decompress, but as we have the whole

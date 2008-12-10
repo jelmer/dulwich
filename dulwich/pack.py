@@ -114,6 +114,15 @@ class PackIndex(object):
     finally:
       f.close()
 
+  def __getitem__(self, sha):
+      ret = self.object_index(sha)
+      if ret is None:
+          raise KeyError
+      return ret
+
+  def __repr__(self):
+      return "PackIndex(%r)" % self._filename
+
   def _object_index(self, map, hexsha):
     """See object_index"""
     first_byte = hex_to_sha(hexsha[:2])
@@ -173,6 +182,9 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
+
+  def __repr__(self):
+      return "PackData(%r)" % self._filename
 
   def get_object_at(self, offset):
     """Given an offset in to the packfile return the object that is there.

@@ -68,17 +68,21 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
             def __getitem__(self, i):
                 return self.array[i+self.offset]
 
-        mem = mmap.mmap(f.fileno(), size, access=access)
+            def __len__(self):
+                return len(self.array) - self.offset
+
+        mem = mmap.mmap(f.fileno(), size+offset, access=access)
         if offset == 0:
             return mem
         return ArraySkipper(mem, offset)
 
 
 def multi_ord(map, start, count):
-  value = 0
-  for i in range(count):
-    value = value * 0x100 + ord(map[start+i])
-  return value
+    value = 0
+    for i in range(count):
+        value = value * 0x100 + ord(map[start+i])
+    return value
+
 
 class PackIndex(object):
   """An index in to a packfile.
@@ -94,8 +98,7 @@ class PackIndex(object):
   the start and end offset and then bisect in to find if the value is present.
   """
 
-  header_record_size = 4
-  header_size = 256 * header_record_size
+  PACK_INDEX_HEADER_SIZE = 0x100 * 4
   index_size = 4
   sha_bytes = 20
   record_size = sha_bytes + index_size
@@ -111,8 +114,32 @@ class PackIndex(object):
     # Take the size now, so it can be checked each time we map the file to
     # ensure that it hasn't changed.
     self._size = os.path.getsize(filename)
-    assert self._size > self.header_size, "%s is too small to be a packfile" % \
-        filename
+    self._fan_out_table = self._read_fan_out_table()
+
+  def __len__(self):
+    ret = 0
+    for v in self._fan_out_table.itervalues():
+        ret += v
+    return v
+
+  def _read_fan_out_table(self):
+    f = open(self._filename, 'r')
+    try:
+        contents = f.read(256 * 4)
+    finally:
+        f.close()
+    ret = {}
+    for i in range(0x100):
+        (ret[i],) = struct.unpack(">L", contents[i*4:(i+1)*4])
+    return ret
+
+  def file_sha1(self):
+    """Return the SHA1 file stored for this header file itself."""
+    f = open(self._filename, 'r')
+    try:
+        return simple_mmap(f, self._size-20, 20)
+    finally:
+        f.close()
 
   def object_index(self, sha):
     """Return the index in to the corresponding packfile for the object.
@@ -131,24 +158,27 @@ class PackIndex(object):
     finally:
       f.close()
 
+  def _entry_offset(self, i):
+      return self.PACK_INDEX_HEADER_SIZE + (i * self.record_size)
+
   def _object_index(self, map, hexsha):
-    """See object_index"""
-    first_byte = hex_to_sha(hexsha[:2])
-    header_offset = self.header_record_size * first_byte
-    start = multi_ord(map, header_offset-self.header_record_size, self.header_record_size)
-    end = multi_ord(map, header_offset, self.header_record_size)
-    sha = hex_to_sha(hexsha)
-    while start < end:
-      i = (start + end)/2
-      offset = self.header_size + (i * self.record_size)
-      file_sha = multi_ord(map, offset + self.index_size, self.sha_bytes)
-      if file_sha == sha:
-        return multi_ord(map, offset, self.index_size)
-      elif file_sha < sha:
-        start = offset + 1
-      else:
-        end = offset - 1
-    return None
+      """See object_index"""
+      first_byte = hex_to_sha(hexsha[:2])
+      header_offset = 4 * first_byte
+      start = multi_ord(map, header_offset-4, 4)
+      end = multi_ord(map, header_offset, 4)
+      sha = hex_to_sha(hexsha)
+      while start < end:
+        i = (start + end)/2
+        offset = self._entry_offset(i)
+        file_sha = multi_ord(map, offset + self.index_size, self.sha_bytes)
+        if file_sha == sha:
+          return multi_ord(map, offset, self.index_size)
+        elif file_sha < sha:
+          start = offset + 1
+        else:
+          end = offset - 1
+      return None
 
 
 class PackData(object):
@@ -249,3 +279,19 @@ class PackData(object):
     obj = ShaFile.from_raw_string(type, uncomp)
     return obj
 
+
+def write_pack(filename, objects):
+    """Write a new pack file.
+
+    :param filename: The filename of the new pack file.
+    :param objects: List of objects to write.
+    """
+    f = open(filename, 'w')
+    try:
+        f.write("PACK")               # Pack header
+        f.write(struct.pack(">L", 2)) # Pack version
+        f.write(struct.pack(">L", len(objects))) # Number of objects in pack
+        for o in objects:
+            pass # FIXME: Write object
+    finally:
+        f.close()

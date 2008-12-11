@@ -18,24 +18,13 @@
 # MA  02110-1301, USA.
 
 
-from dulwich.pack import PackData, PackIndex, sha_to_hex
+from dulwich.pack import Pack, sha_to_hex
 import sys
 
 basename = sys.argv[1]
-print "Index file:"
-print "-----------"
-x = PackIndex(basename + ".idx")
+x = Pack(basename)
 if not x.check():
 	print "CHECKSUM DOES NOT MATCH"
 print "Length: %d" % len(x)
-print "Entries in index:"
-for name, offset, crc in x.iterentries():
-	print "\t%s: %d" % (sha_to_hex(name), offset)
-print ""
-
-x = PackData(basename + ".pack")
-print "Pack file:"
-print "----------"
-if not x.check():
-	print "CHECKSUM DOES NOT MATCH"
-print "Number of objects: %d" % len(x)
+for name in x:
+	print "\t%s: %s" % (name, x._idx.object_index(name))

@@ -35,6 +35,7 @@ a pointer in to the corresponding packfile.
 
 import mmap
 import os
+import struct
 import sys
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or 
@@ -189,6 +190,22 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
+    self._read_header()
+
+  def _read_header(self):
+    f = open(self._filename, 'rb')
+    try:
+        header = f.read(12)
+    finally:
+        f.close()
+    assert header[:4] == "PACK"
+    (version,) = struct.unpack_from(">L", header, 4)
+    assert version in (2, 3), "Version was %d" % version
+    (self._num_objects,) = struct.unpack_from(">L", header, 8)
+
+  def __len__(self):
+      """Returns the number of objects in this pack."""
+      return self._num_objects
 
   def get_object_at(self, offset):
     """Given an offset in to the packfile return the object that is there.

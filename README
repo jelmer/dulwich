@@ -1,4 +1,4 @@
-This is the python-git project.
+This is the dulwich project.
 
 It aims to give an interface to git repos that doesn't call out to git
 directly. It is probably going to be implemented in pure python.

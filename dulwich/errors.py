@@ -1,4 +1,4 @@
-# errors.py -- errors for python-git
+# errors.py -- errors for dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # 
 # This program is free software; you can redistribute it and/or

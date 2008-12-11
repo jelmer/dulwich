@@ -1,5 +1,6 @@
 # pack.py -- For dealing wih packed git objects.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
+# Copryight (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # The code is loosely based on that in the sha1_file.c file from git itself,
 # which is Copyright (C) Linus Torvalds, 2005 and distributed under the
 # GPL version 2.
@@ -45,6 +46,8 @@ from objects import (ShaFile,
 
 hex_to_sha = lambda hex: int(hex, 16)
 
+MAX_MMAP_SIZE = 256 * 1024 * 1024
+
 def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     if offset+size > MAX_MMAP_SIZE and not supports_mmap_offset:
         raise AssertionError("%s is larger than 256 meg, and this version "
@@ -73,10 +76,8 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
 def multi_ord(map, start, count):
   value = 0
   for i in range(count):
-    value = value * 256 + ord(map[start+i])
+    value = value * 0x100 + ord(map[start+i])
   return value
-
-MAX_MMAP_SIZE = 256 * 1024 * 1024
 
 class PackIndex(object):
   """An index in to a packfile.
@@ -84,7 +85,7 @@ class PackIndex(object):
   Given a sha id of an object a pack index can tell you the location in the
   packfile of that object if it has it.
 
-  To do the looup it opens the file, and indexes first 256 4 byte groups
+  To do the loop it opens the file, and indexes first 256 4 byte groups
   with the first byte of the sha id. The value in the four byte group indexed
   is the end of the group that shares the same starting byte. Subtract one
   from the starting byte and index again to find the start of the group.
@@ -198,6 +199,7 @@ class PackData(object):
 
     Currently only non-delta objects are supported.
     """
+    assert isinstance(offset, long) or isinstance(offset, int)
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack data %s has changed size, I don't " \
          "like that" % self._filename

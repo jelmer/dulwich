@@ -1,4 +1,4 @@
-# commit.py -- commit for python-git
+# commit.py -- commit for dulwich
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or

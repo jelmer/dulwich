@@ -52,6 +52,7 @@ def sha_to_hex(sha):
          len(hexsha)
   return hexsha
 
+
 class ShaFile(object):
   """A git SHA file."""
 
@@ -228,7 +229,7 @@ class Tree(ShaFile):
     return tree
 
   def entries(self):
-    """Reutrn a list of tuples describing the tree entries"""
+    """Return a list of tuples describing the tree entries"""
     return self._entries
 
   def _parse_text(self):

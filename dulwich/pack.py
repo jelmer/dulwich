@@ -113,10 +113,6 @@ class PackIndex(object):
   the start and end offset and then bisect in to find if the value is present.
   """
 
-  PACK_INDEX_HEADER_SIZE = 0x100 * 4
-  sha_bytes = 20
-  record_size = sha_bytes + 4
-
   def __init__(self, filename):
     """Create a pack index object.
 
@@ -155,7 +151,7 @@ class PackIndex(object):
           CRC32 checksum (if known)."""
     if self.version == 1:
         (offset, name) = struct.unpack_from(">L20s", self._contents, 
-            self.PACK_INDEX_HEADER_SIZE + (i * self.record_size))
+            (0x100 * 4) + (i * 24))
         return (name, offset, None)
     else:
         return (self._unpack_name(i), self._unpack_offset(i), 
@@ -288,7 +284,7 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
-    self._read_header()
+    self._header_size = self._read_header()
 
   def _read_header(self):
     f = open(self._filename, 'rb')
@@ -302,6 +298,7 @@ class PackData(object):
     (version,) = struct.unpack_from(">L", header, 4)
     assert version in (2, 3), "Version was %d" % version
     (self._num_objects,) = struct.unpack_from(">L", header, 8)
+    return 12 # Header size
 
   def __len__(self):
       """Returns the number of objects in this pack."""
@@ -314,6 +311,16 @@ class PackData(object):
         return hashlib.sha1(map[:-20]).digest()
     finally:
         f.close()
+
+  def iterentries(self):
+    """Yields (name, offset, crc32 checksum)."""
+    offset = self._header_size
+    f = open(self._filename, 'rb')
+    f.close()
+    for i in len(self):
+        map = simple_mmap(f, offset, self._size-offset)
+        (type, raw, size, total_size) = self._unpack_object(map)
+        offset += total_size
 
   def check(self):
     return (self.calculate_checksum() == self._stored_checksum)
@@ -332,11 +339,11 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
       map = simple_mmap(f, offset, size-offset)
-      return self._get_object_at(map)
+      return self._unpack_object(map)[:3]
     finally:
       f.close()
 
-  def _get_object_at(self, map):
+  def _unpack_object(self, map):
     first_byte = ord(map[0])
     sign_extend = first_byte & 0x80
     type = (first_byte >> 4) & 0x07
@@ -349,7 +356,7 @@ class PackData(object):
       size += size_part << ((cur_offset * 7) + 4)
       cur_offset += 1
     raw_base = cur_offset+1
-    return type, map[raw_base:], size
+    return type, map[raw_base:], size, cur_offset+size
 
 
 class SHA1Writer(object):
@@ -415,6 +422,62 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     f.close()
 
 
+def apply_delta(src_buf, delta):
+    """Based on the similar function in git's patch-delta.c."""
+    data = str(delta)
+    def pop():
+        ret = delta[0]
+        delta = delta[1:]
+        return ret
+    def get_delta_header_size(buf):
+        size = 0
+        i = 0
+        while True:
+            cmd = pop()
+            size |= (cmd & ~0x80) << i
+            i += 7
+            if not cmd & 0x80:
+                break
+        return size
+    src_size = get_delta_header_size()
+    dest_size = get_delta_header_size()
+    while delta:
+        cmd = pop()
+        if cmd & 0x80:
+            cp_off = 0
+            cp_size = 0
+            if cmd & 0x01: cp_off = pop()
+            if cmd & 0x02: cp_off |= (pop() << 8)
+            if cmd & 0x04: cp_off |= (pop() << 16)
+            if cmd & 0x08: cp_off |= (pop() << 24)
+            if cmd & 0x10: cp_size = pop()
+            if cmd & 0x20: cp_size |= (pop() << 8)
+            if cmd & 0x40: cp_size |= (pop() << 16)
+            if cp_size == 0: cp_size = 0x10000
+            if (cp_off + cp_size < cp_size or
+                cp_off + cp_size > src_size or
+                cp_size > dest_size):
+                break
+            out += text[cp_off:cp_off+cp_size]
+            dest_size -= cp_size
+        elif cmd != 0:
+            if cmd > dest_size:
+                break
+            out += data[:cmd]
+            data = data[cmd:]
+            dest_size -= cmd
+        else:
+            raise AssertionError("Invalid opcode 0")
+    
+    if data != []:
+        raise AssertionError("data not empty")
+
+    if dest_size != 0:
+        raise AssertionError("dest size not empty")
+
+    return out
+
+
 def write_pack_index_v2(filename, entries, pack_checksum):
     """Write a new pack index file.
 
@@ -475,8 +538,7 @@ class Pack(object):
         """Check whether this pack contains a particular SHA1."""
         return (self._idx.object_index(sha1) is not None)
 
-    def __getitem__(self, sha1):
-        """Retrieve the specified SHA1."""
+    def _get_text(self, sha1):
         offset = self._idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
@@ -501,6 +563,9 @@ class Pack(object):
             # thing then just use it.
             uncomp = _decompress(raw)
             assert len(uncomp) == size
-            obj = ShaFile.from_raw_string(type, uncomp)
-            return obj
-        return 
+            return type, uncomp
+
+    def __getitem__(self, sha1):
+        """Retrieve the specified SHA1."""
+        type, uncomp = self._get_text(sha1)
+        return ShaFile.from_raw_string(type, uncomp)

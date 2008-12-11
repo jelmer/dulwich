@@ -33,6 +33,7 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
+from collections import defaultdict
 import hashlib
 import mmap
 import os
@@ -334,9 +335,12 @@ def write_pack_index(filename, entries):
         f.write(data)
     entries = sort(entries, cmp=cmp_entry)
     f = open(filename, 'w')
+    fan_out_table = defaultdict(lambda: 0)
+    for (offset, name) in entries:
+        fan_out_table[name[0]] += 1
     # Fan-out table
     for i in range(0x100):
-        write(struct.pack(">L", 0))
+        write(struct.pack(">L", fan_out_table[i]))
     for (offset, name) in entries:
         write(struct.pack(">L20s", offset, name))
     f.write(sha1.digest())

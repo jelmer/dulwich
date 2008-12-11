@@ -33,6 +33,7 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
+import hashlib
 import mmap
 import os
 import struct
@@ -70,6 +71,9 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
 
             def __len__(self):
                 return len(self.array) - self.offset
+
+            def __str__(self):
+                return str(self.array[self.offset:])
 
         mem = mmap.mmap(f.fileno(), size+offset, access=access)
         if offset == 0:
@@ -133,11 +137,23 @@ class PackIndex(object):
         (ret[i],) = struct.unpack(">L", contents[i*4:(i+1)*4])
     return ret
 
-  def file_sha1(self):
-    """Return the SHA1 file stored for this header file itself."""
+  def check(self):
+    """Check that the stored checksum matches the actual checksum."""
+    return self.get_checksum() == self.get_stored_checksum()
+
+  def get_checksum(self):
     f = open(self._filename, 'r')
     try:
-        return simple_mmap(f, self._size-20, 20)
+        contents = simple_mmap(f, 0, self._size-20)
+        return hashlib.sha1(contents).digest()
+    finally:
+        f.close()
+
+  def get_stored_checksum(self):
+    """Return the SHA1 checksum stored for this header file itself."""
+    f = open(self._filename, 'r')
+    try:
+        return str(simple_mmap(f, self._size-20, 20))
     finally:
         f.close()
 
@@ -252,7 +268,7 @@ class PackData(object):
          "like that" % self._filename
     f = open(self._filename, 'rb')
     try:
-      map = simple_mmap(f, offset, size)
+      map = simple_mmap(f, offset, size-offset)
       return self._get_object_at(map)
     finally:
       f.close()

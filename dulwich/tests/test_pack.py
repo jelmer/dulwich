@@ -87,9 +87,13 @@ class TestPackData(PackTests):
     p = self.get_pack_index(pack1_sha)
     self.assertEquals(3, len(p))
 
-  def test_file_sha1(self):
+  def test_get_stored_checksum(self):
     p = self.get_pack_index(pack1_sha)
-    self.assertEquals("bla", p.file_sha1())
+    self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksum()))
+
+  def test_check(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals(True, p.check())
 
 
 class TestHexToSha(unittest.TestCase):

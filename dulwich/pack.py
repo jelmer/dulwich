@@ -230,17 +230,21 @@ class PackIndex(object):
 
   def _object_index(self, sha):
       """See object_index"""
-      start = self._fan_out_table[ord(sha[0])-1]
-      end = self._fan_out_table[ord(sha[0])]
+      idx = ord(sha[0])
+      if idx == 0:
+          start = 0
+      else:
+          start = self._fan_out_table[idx-1]
+      end = self._fan_out_table[idx]
       while start < end:
         i = (start + end)/2
         file_sha = self._unpack_name(i)
-        if file_sha == sha:
-          return self._unpack_offset(i)
-        elif file_sha < sha:
+        if file_sha < sha:
           start = i + 1
-        else:
+        elif file_sha > sha:
           end = i - 1
+        else:
+          return self._unpack_offset(i)
       return None
 
 
@@ -322,7 +326,7 @@ class PackData(object):
 
     Currently only non-delta objects are supported.
     """
-    assert isinstance(offset, long) or isinstance(offset, int)
+    assert isinstance(offset, long) or isinstance(offset, int), "offset was %r" % offset
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack data %s has changed size, I don't " \
          "like that" % self._filename
@@ -477,4 +481,7 @@ class Pack(object):
         return (self._idx.object_index(sha1) is not None)
 
     def __getitem__(self, sha1):
-        return self._pack.get_object_at(self._idx.object_index(sha1))
+        offset = self._idx.object_index(sha1)
+        if offset is None:
+            raise KeyError(sha1)
+        return self._pack.get_object_at(offset)

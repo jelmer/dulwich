@@ -39,6 +39,7 @@ import mmap
 import os
 import struct
 import sys
+import zlib
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or 
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
@@ -46,6 +47,17 @@ supports_mmap_offset = (sys.version_info[0] >= 3 or
 from objects import (ShaFile,
                      _decompress,
                      )
+
+def read_zlib(data, offset, dec_size):
+    obj = zlib.decompressobj()
+    x = ""
+    fed = 0
+    while obj.unused_data == "":
+        fed += 1024
+        x += obj.decompress(data[offset+fed-1024:offset+fed])
+    assert len(x) == dec_size
+    return x, fed-len(obj.unused_data)
+
 
 def hex_to_sha(hex):
   ret = ""
@@ -319,7 +331,7 @@ class PackData(object):
     f.close()
     for i in len(self):
         map = simple_mmap(f, offset, self._size-offset)
-        (type, raw, size, total_size) = self._unpack_object(map)
+        (type, obj, total_size) = self._unpack_object(map)
         offset += total_size
 
   def check(self):
@@ -339,7 +351,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
       map = simple_mmap(f, offset, size-offset)
-      return self._unpack_object(map)[:3]
+      return self._unpack_object(map)[:2]
     finally:
       f.close()
 
@@ -356,7 +368,27 @@ class PackData(object):
       size += size_part << ((cur_offset * 7) + 4)
       cur_offset += 1
     raw_base = cur_offset+1
-    return type, map[raw_base:], size, cur_offset+size
+    if type == 6: # offset delta
+        # FIXME: Parse size
+        raise AssertionError("OFS_DELTA not yet supported")
+        uncomp, comp_len = read_zlib(map, raw_base, size)
+        assert size == len(uncomp)
+        return type, (uncomp, offset), comp_len+raw_base
+    elif type == 7: # ref delta
+        basename = map[cur_offset:cur_offset+20]
+        raw_base += 20
+        uncomp, comp_len = read_zlib(map, raw_base, size)
+        assert size == len(uncomp)
+        # text = apply_delta(base, uncomp)
+        return type, (uncomp, basename), comp_len+raw_base
+    else:
+        # The size is the inflated size, so we have no idea what the deflated size
+        # is, so for now give it as much as we have. It should really iterate
+        # feeding it more data if it doesn't decompress, but as we have the whole
+        # thing then just use it.
+        uncomp, comp_len = read_zlib(map, raw_base, size)
+        assert len(uncomp) == size
+        return type, uncomp, comp_len+raw_base
 
 
 class SHA1Writer(object):
@@ -544,28 +576,9 @@ class Pack(object):
         if offset is None:
             raise KeyError(sha1)
 
-        type, raw, size =  self._pack.get_object_at(offset)
-        if type == 6: # offset delta
-            # FIXME: Parse size
-            raw_base = cur_offset+1
-            uncomp = _decompress(raw[raw_offset:])
-            assert size == len(uncomp)
-            raise AssertionError("OFS_DELTA not yet supported")
-        elif type == 7: # ref delta
-            basename = raw[:20]
-            uncomp = _decompress(raw[20:])
-            assert size == len(uncomp)
-            type, base = self._get_text(sha_to_hex(basename))
-            text = apply_delta(base, uncomp)
-            return type, text
-        else:
-            # The size is the inflated size, so we have no idea what the deflated size
-            # is, so for now give it as much as we have. It should really iterate
-            # feeding it more data if it doesn't decompress, but as we have the whole
-            # thing then just use it.
-            uncomp = _decompress(raw)
-            assert len(uncomp) == size
-            return type, uncomp
+        type, obj =  self._pack.get_object_at(offset)
+        # FIXME: delta objects
+        return type, obj
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

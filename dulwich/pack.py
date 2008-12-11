@@ -185,9 +185,9 @@ class PackIndex(object):
         yield self._unpack_entry(i)
 
   def _read_fan_out_table(self, start_offset):
-    ret = [0] * 0x100
+    ret = []
     for i in range(0x100):
-        (ret[i],) = struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])
+        ret.append(struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])[0])
     return ret
 
   def check(self):
@@ -334,22 +334,40 @@ class PackData(object):
     return obj
 
 
+class SHA1Writer(f):
+    
+    def __init__(self, f):
+        self.f = f
+        self.sha1 = hashlib.sha1("")
+
+    def write(self, data):
+        self.sha1.update(data)
+        self.f.write(data)
+
+    def close(self):
+        sha = self.sha1.digest()
+        assert len(sha) == 20
+        self.f.write(sha)
+        self.f.close()
+        return sha
+
+
 def write_pack(filename, objects):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
-    :return: List with (name, offset, crc32 checksum) entries.
+    :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
     f = open(filename, 'w')
-    try:
-        f.write("PACK")               # Pack header
-        f.write(struct.pack(">L", 2)) # Pack version
-        f.write(struct.pack(">L", len(objects))) # Number of objects in pack
-        for o in objects:
-            pass # FIXME: Write object
-    finally:
-        f.close()
+    entries = []
+    f = SHA1Writer(f)
+    f.write("PACK")               # Pack header
+    f.write(struct.pack(">L", 2)) # Pack version
+    f.write(struct.pack(">L", len(objects))) # Number of objects in pack
+    for o in objects:
+        pass # FIXME: Write object
+    return entries, f.close()
 
 
 def write_pack_index_v1(filename, entries, pack_checksum):
@@ -361,24 +379,21 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     :param pack_checksum: Checksum of the pack file.
     """
     # Sort entries first
-    sha1 = hashlib.sha1("")
-    def write(data):
-        sha1.update(data)
-        f.write(data)
+
     entries = sorted(entries)
     f = open(filename, 'w')
+    f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
-        write(struct.pack(">L", fan_out_table[i]))
+        f.write(struct.pack(">L", fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
-        write(struct.pack(">L20s", offset, name))
+        f.write(struct.pack(">L20s", offset, name))
     assert len(pack_checksum) == 20
-    write(pack_checksum)
-    f.write(sha1.digest())
+    f.write(pack_checksum)
     f.close()
 
 
@@ -391,31 +406,27 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     :param pack_checksum: Checksum of the pack file.
     """
     # Sort entries first
-    sha1 = hashlib.sha1("")
-    def write(data):
-        sha1.update(data)
-        f.write(data)
     entries = sorted(entries)
     f = open(filename, 'w')
-    write('\377tOc')
-    write(struct.pack(">L", 2))
+    f = SHA1Writer(f)
+    f.write('\377tOc')
+    f.write(struct.pack(">L", 2))
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
-        write(struct.pack(">L", fan_out_table[i]))
+        f.write(struct.pack(">L", fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
-        write(name)
+        f.write(name)
     for (name, offset, entry_checksum) in entries:
-        write(struct.pack(">L", entry_checksum))
+        f.write(struct.pack(">L", entry_checksum))
     for (name, offset, entry_checksum) in entries:
         # FIXME: handle if MSBit is set in offset
-        write(struct.pack(">L", offset))
+        f.write(struct.pack(">L", offset))
     # FIXME: handle table for pack files > 8 Gb
     assert len(pack_checksum) == 20
-    write(pack_checksum)
-    f.write(sha1.digest())
+    f.write(pack_checksum)
     f.close()
 

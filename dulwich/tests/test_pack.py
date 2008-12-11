@@ -25,7 +25,8 @@ from dulwich.pack import (
         PackData,
         hex_to_sha,
         multi_ord,
-        write_pack_index,
+        write_pack_index_v1,
+        write_pack_index_v2,
         write_pack,
         )
 
@@ -115,12 +116,46 @@ class TestMultiOrd(unittest.TestCase):
         self.assertEquals(418262508645L, multi_ord("abcde", 0, 5))
 
 
-class TestPackIndexWriting(unittest.TestCase):
+class TestPackIndexWriting(object):
 
     def test_empty(self):
         pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
-        write_pack_index("empty.idx", [], pack_checksum)
+        self._write_fn("empty.idx", [], pack_checksum)
         idx = PackIndex("empty.idx")
         self.assertTrue(idx.check())
         self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
         self.assertEquals(0, len(idx))
+
+    def test_single(self):
+        pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
+        my_entries = [('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, 42)]
+        self._write_fn("single.idx", my_entries, pack_checksum)
+        idx = PackIndex("single.idx")
+        self.assertTrue(idx.check())
+        self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
+        self.assertEquals(1, len(idx))
+        actual_entries = list(idx.iterentries())
+        self.assertEquals(len(my_entries), len(actual_entries))
+        for a, b in zip(my_entries, actual_entries):
+            self.assertEquals(a[0], b[0])
+            self.assertEquals(a[1], b[1])
+            if self._has_crc32_checksum:
+                self.assertEquals(a[2], b[2])
+            else:
+                self.assertTrue(b[2] is None)
+
+
+class TestPackIndexWritingv1(unittest.TestCase, TestPackIndexWriting):
+
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        self._has_crc32_checksum = False
+        self._write_fn = write_pack_index_v1
+
+
+class TestPackIndexWritingv2(unittest.TestCase, TestPackIndexWriting):
+
+    def setUp(self):
+        unittest.TestCase.setUp(self)
+        self._has_crc32_checksum = True
+        self._write_fn = write_pack_index_v2

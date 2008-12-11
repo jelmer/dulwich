@@ -79,6 +79,10 @@ class TestPackData(PackTests):
     self.assertEqual(obj._type, 'commit')
     self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
+  def test_len(self):
+    p = self.get_pack_data(pack1_sha)
+    self.assertEquals(3, len(p))
+
 
 class TestHexToSha(unittest.TestCase):
 

@@ -346,6 +346,6 @@ def write_pack_index(filename, entries, pack_checksum):
     for (offset, name) in entries:
         write(struct.pack(">L20s", offset, name))
     assert len(pack_checksum) == 20
-    f.write(pack_checksum)
+    write(pack_checksum)
     f.write(sha1.digest())
     f.close()

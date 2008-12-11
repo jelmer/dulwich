@@ -53,10 +53,12 @@ def read_zlib(data, offset, dec_size):
     x = ""
     fed = 0
     while obj.unused_data == "":
-        fed += 1024
-        x += obj.decompress(data[offset+fed-1024:offset+fed])
+        add = data[offset+fed:offset+fed+1024]
+        fed += len(add)
+        x += obj.decompress(add)
     assert len(x) == dec_size
-    return x, fed-len(obj.unused_data)
+    comp_len = fed-len(obj.unused_data)
+    return x, comp_len
 
 
 def hex_to_sha(hex):
@@ -324,15 +326,16 @@ class PackData(object):
     finally:
         f.close()
 
-  def iterentries(self):
+  def iterobjects(self):
     """Yields (name, offset, crc32 checksum)."""
     offset = self._header_size
     f = open(self._filename, 'rb')
-    f.close()
-    for i in len(self):
+    for i in range(len(self)):
         map = simple_mmap(f, offset, self._size-offset)
         (type, obj, total_size) = self._unpack_object(map)
+        yield type, obj
         offset += total_size
+    f.close()
 
   def check(self):
     return (self.calculate_checksum() == self._stored_checksum)

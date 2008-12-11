@@ -236,7 +236,8 @@ class PackIndex(object):
       else:
           start = self._fan_out_table[idx-1]
       end = self._fan_out_table[idx]
-      while start < end:
+      assert start <= end
+      while start <= end:
         i = (start + end)/2
         file_sha = self._unpack_name(i)
         if file_sha < sha:
@@ -323,8 +324,6 @@ class PackData(object):
     Using the associated index the location of an object can be looked up, and
     then the packfile can be asked directly for that object using this
     function.
-
-    Currently only non-delta objects are supported.
     """
     assert isinstance(offset, long) or isinstance(offset, int), "offset was %r" % offset
     size = os.path.getsize(self._filename)
@@ -466,21 +465,25 @@ class Pack(object):
         assert len(self._idx) == len(self._pack)
 
     def __len__(self):
+        """Number of entries in this pack."""
         return len(self._idx)
 
     def __repr__(self):
         return "Pack(%r)" % self._basename
 
     def __iter__(self):
+        """Iterate over all the sha1s of the objects in this pack."""
         return iter(self._idx)
 
     def check(self):
         return self._idx.check() and self._pack.check()
 
     def __contains__(self, sha1):
+        """Check whether this pack contains a particular SHA1."""
         return (self._idx.object_index(sha1) is not None)
 
     def __getitem__(self, sha1):
+        """Retrieve the specified SHA1."""
         offset = self._idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)

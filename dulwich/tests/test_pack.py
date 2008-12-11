@@ -131,6 +131,7 @@ class TestPackIndexWriting(object):
         my_entries = [('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, 42)]
         self._write_fn("single.idx", my_entries, pack_checksum)
         idx = PackIndex("single.idx")
+        self.assertEquals(idx.version, self._expected_version)
         self.assertTrue(idx.check())
         self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
         self.assertEquals(1, len(idx))
@@ -150,6 +151,7 @@ class TestPackIndexWritingv1(unittest.TestCase, TestPackIndexWriting):
     def setUp(self):
         unittest.TestCase.setUp(self)
         self._has_crc32_checksum = False
+        self._expected_version = 1
         self._write_fn = write_pack_index_v1
 
 
@@ -158,4 +160,5 @@ class TestPackIndexWritingv2(unittest.TestCase, TestPackIndexWriting):
     def setUp(self):
         unittest.TestCase.setUp(self)
         self._has_crc32_checksum = True
+        self._expected_version = 2
         self._write_fn = write_pack_index_v2

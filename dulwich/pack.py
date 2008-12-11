@@ -349,14 +349,7 @@ class PackData(object):
       size += size_part << ((cur_offset * 7) + 4)
       cur_offset += 1
     raw_base = cur_offset+1
-    # The size is the inflated size, so we have no idea what the deflated size
-    # is, so for now give it as much as we have. It should really iterate
-    # feeding it more data if it doesn't decompress, but as we have the whole
-    # thing then just use it.
-    raw = map[raw_base:]
-    uncomp = _decompress(raw)
-    obj = ShaFile.from_raw_string(type, uncomp)
-    return obj
+    return type, map[raw_base:], size
 
 
 class SHA1Writer(object):
@@ -487,4 +480,27 @@ class Pack(object):
         offset = self._idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
-        return self._pack.get_object_at(offset)
+
+        type, raw, size =  self._pack.get_object_at(offset)
+        if type == 6: # offset delta
+            # FIXME: Parse size
+            raw_base = cur_offset+1
+            uncomp = _decompress(raw[raw_offset:])
+            assert size == len(uncomp)
+            raise AssertionError("OFS_DELTA not yet supported")
+        elif type == 7: # ref delta
+            basename = raw[:20]
+            uncomp = _decompress(raw[20:])
+            assert size == len(uncomp)
+            base = self[sha_to_hex(basename)]
+            raise AssertionError("REF_DELTA not yet supported")
+        else:
+            # The size is the inflated size, so we have no idea what the deflated size
+            # is, so for now give it as much as we have. It should really iterate
+            # feeding it more data if it doesn't decompress, but as we have the whole
+            # thing then just use it.
+            uncomp = _decompress(raw)
+            assert len(uncomp) == size
+            obj = ShaFile.from_raw_string(type, uncomp)
+            return obj
+        return 

@@ -27,4 +27,4 @@ if not x.check():
 	print "CHECKSUM DOES NOT MATCH"
 print "Length: %d" % len(x)
 for name in x:
-	print "\t%s: %s" % (name, x._idx.object_index(name))
+	print "\t%s: %s" % (name, x[name])

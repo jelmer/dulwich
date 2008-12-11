@@ -98,20 +98,6 @@ class TestPackData(PackTests):
   def test_create_pack(self):
     p = self.get_pack_data(pack1_sha)
 
-  def test_get_object_at(self):
-    """Tests random access for non-delta objects"""
-    p = self.get_pack_data(pack1_sha)
-    idx = self.get_pack_index(pack1_sha)
-    obj = p.get_object_at(idx.object_index(a_sha))
-    self.assertEqual(obj._type, 'blob')
-    self.assertEqual(obj.sha().hexdigest(), a_sha)
-    obj = p.get_object_at(idx.object_index(tree_sha))
-    self.assertEqual(obj._type, 'tree')
-    self.assertEqual(obj.sha().hexdigest(), tree_sha)
-    obj = p.get_object_at(idx.object_index(commit_sha))
-    self.assertEqual(obj._type, 'commit')
-    self.assertEqual(obj.sha().hexdigest(), commit_sha)
-
   def test_pack_len(self):
     p = self.get_pack_data(pack1_sha)
     self.assertEquals(3, len(p))
@@ -138,6 +124,20 @@ class TestPack(PackTests):
     def test_iter(self):
         p = self.get_pack(pack1_sha)
         self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
+
+    def test_get_object_at(self):
+        """Tests random access for non-delta objects"""
+        p = self.get_pack(pack1_sha)
+        obj = p[a_sha]
+        self.assertEqual(obj._type, 'blob')
+        self.assertEqual(obj.sha().hexdigest(), a_sha)
+        obj = p[tree_sha]
+        self.assertEqual(obj._type, 'tree')
+        self.assertEqual(obj.sha().hexdigest(), tree_sha)
+        obj = p[commit_sha]
+        self.assertEqual(obj._type, 'commit')
+        self.assertEqual(obj.sha().hexdigest(), commit_sha)
+
 
 
 class TestHexToSha(unittest.TestCase):

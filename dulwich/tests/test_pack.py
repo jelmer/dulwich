@@ -25,6 +25,8 @@ from dulwich.pack import (
         PackData,
         hex_to_sha,
         multi_ord,
+        write_pack_index,
+        write_pack,
         )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -110,3 +112,10 @@ class TestMultiOrd(unittest.TestCase):
 
     def test_simple(self):
         self.assertEquals(418262508645L, multi_ord("abcde", 0, 5))
+
+
+class TestPackIndexWriting(unittest.TestCase):
+
+    def test_empty(self):
+        write_pack_index("empty.idx", [])
+        PackIndex("empty.idx").check()

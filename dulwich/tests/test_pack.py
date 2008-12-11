@@ -95,11 +95,15 @@ class TestPackData(PackTests):
     p = self.get_pack_index(pack1_sha)
     self.assertEquals(True, p.check())
 
+  def test_iterentries(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals([(178, 'og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8'), (138, '\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa'), (12, '\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12')], list(p.iterentries()))
+
 
 class TestHexToSha(unittest.TestCase):
 
     def test_simple(self):
-        self.assertEquals(703710, hex_to_sha("abcde"))
+        self.assertEquals('\xab\xcd\x0e', hex_to_sha("abcde"))
 
 
 class TestMultiOrd(unittest.TestCase):

@@ -154,6 +154,9 @@ class ShaFile(object):
     """The raw bytes of this object"""
     return self._contents
 
+  def crc32(self):
+    return zlib.crc32(self._text)
+
   def sha(self):
     """The SHA1 object that is the name of this object."""
     ressha = sha.new()

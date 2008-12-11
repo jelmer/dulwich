@@ -306,6 +306,7 @@ def write_pack(filename, objects):
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
+    :return: List with (offset, name) entries.
     """
     f = open(filename, 'w')
     try:
@@ -316,3 +317,27 @@ def write_pack(filename, objects):
             pass # FIXME: Write object
     finally:
         f.close()
+
+
+def write_pack_index(filename, entries):
+    """Write a new pack index file.
+
+    :param filename: The filename of the new pack index file.
+    :param entries: List of tuples with offset_in_pack and object name (sha).
+    """
+    # Sort entries first
+    def cmp_entry((offset1, name1), (offset2, name2)):
+        return cmp(name1, name2)
+    sha1 = hashlib.sha1("")
+    def write(data):
+        sha1.update(data)
+        f.write(data)
+    entries = sort(entries, cmp=cmp_entry)
+    f = open(filename, 'w')
+    # Fan-out table
+    for i in range(0x100):
+        write(struct.pack(">L", 0))
+    for (offset, name) in entries:
+        write(struct.pack(">L20s", offset, name))
+    f.write(sha1.digest())
+    f.close()

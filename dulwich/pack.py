@@ -359,16 +359,14 @@ class PackData(object):
 
   def iterentries(self):
     found = {}
-    postponed = []
-    for offset, type, obj in self.iterobjects():
-      postponed.append((type, obj))
+    postponed = list(self.iterobjects())
     while postponed:
-      (type, obj) = postponed.pop()
+      (offset, type, obj) = postponed.pop()
       try:
         type, obj = resolve_object(offset, type, obj, found.__getitem__, 
             self.get_object_at)
       except KeyError:
-        postponed.append((type, obj))
+        postponed.append((offset, type, obj))
       else:
         shafile = ShaFile.from_raw_string(type, obj)
         sha = shafile.sha().digest()

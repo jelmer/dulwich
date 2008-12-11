@@ -46,7 +46,11 @@ from objects import (ShaFile,
                      _decompress,
                      )
 
-hex_to_sha = lambda hex: int(hex, 16)
+def hex_to_sha(hex):
+  ret = ""
+  for i in range(0, len(hex), 2):
+    ret += chr(int(hex[i:i+2], 16))
+  return ret
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024
 
@@ -103,9 +107,8 @@ class PackIndex(object):
   """
 
   PACK_INDEX_HEADER_SIZE = 0x100 * 4
-  index_size = 4
   sha_bytes = 20
-  record_size = sha_bytes + index_size
+  record_size = sha_bytes + 4
 
   def __init__(self, filename):
     """Create a pack index object.
@@ -118,23 +121,38 @@ class PackIndex(object):
     # Take the size now, so it can be checked each time we map the file to
     # ensure that it hasn't changed.
     self._size = os.path.getsize(filename)
+    self._file = open(filename, 'r')
+    self._contents = simple_mmap(self._file, 0, self._size)
     self._fan_out_table = self._read_fan_out_table()
 
+  def close(self):
+    self._file.close()
+
   def __len__(self):
+    """Return the number of entries in this pack index."""
     ret = 0
     for v in self._fan_out_table.itervalues():
         ret += v
     return v
 
+  def _unpack_entry(self, i):
+    """Unpack the i-th entry in the index file.
+
+    :return: Tuple with offset in pack file and object name (SHA)."""
+    return struct.unpack_from(">L20s", self._contents, self._entry_offset(i))
+
+  def iterentries(self):
+    """Iterate over the entries in this pack index.
+   
+    Will yield tuples with offset and object name.
+    """
+    for i in range(len(self)):
+        yield self._unpack_entry(i)
+
   def _read_fan_out_table(self):
-    f = open(self._filename, 'r')
-    try:
-        contents = f.read(256 * 4)
-    finally:
-        f.close()
     ret = {}
     for i in range(0x100):
-        (ret[i],) = struct.unpack(">L", contents[i*4:(i+1)*4])
+        (ret[i],) = struct.unpack(">L", self._contents[i*4:(i+1)*4])
     return ret
 
   def check(self):
@@ -144,18 +162,13 @@ class PackIndex(object):
   def get_checksum(self):
     f = open(self._filename, 'r')
     try:
-        contents = simple_mmap(f, 0, self._size-20)
-        return hashlib.sha1(contents).digest()
+        return hashlib.sha1(self._contents[:-20]).digest()
     finally:
         f.close()
 
   def get_stored_checksum(self):
     """Return the SHA1 checksum stored for this header file itself."""
-    f = open(self._filename, 'r')
-    try:
-        return str(simple_mmap(f, self._size-20, 20))
-    finally:
-        f.close()
+    return str(self._contents[-20:])
 
   def object_index(self, sha):
     """Return the index in to the corresponding packfile for the object.
@@ -167,33 +180,25 @@ class PackIndex(object):
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack index %s has changed size, I don't " \
          "like that" % self._filename
-    f = open(self._filename, 'rb')
-    try:
-      map = simple_mmap(f, 0, size)
-      return self._object_index(map, sha)
-    finally:
-      f.close()
+    return self._object_index(sha)
 
   def _entry_offset(self, i):
       return self.PACK_INDEX_HEADER_SIZE + (i * self.record_size)
 
-  def _object_index(self, map, hexsha):
+  def _object_index(self, hexsha):
       """See object_index"""
-      first_byte = hex_to_sha(hexsha[:2])
-      header_offset = 4 * first_byte
-      start = multi_ord(map, header_offset-4, 4)
-      end = multi_ord(map, header_offset, 4)
       sha = hex_to_sha(hexsha)
+      start = self._fan_out_table[ord(sha[0])-1]
+      end = self._fan_out_table[ord(sha[0])]
       while start < end:
         i = (start + end)/2
-        offset = self._entry_offset(i)
-        file_sha = multi_ord(map, offset + self.index_size, self.sha_bytes)
+        pack_offset, file_sha = self._unpack_entry(i)
         if file_sha == sha:
-          return multi_ord(map, offset, self.index_size)
+          return pack_offset
         elif file_sha < sha:
-          start = offset + 1
+          start = self._entry_offset(i) + 1
         else:
-          end = offset - 1
+          end = self._entry_offset(i) - 1
       return None
 
 

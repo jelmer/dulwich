@@ -95,8 +95,12 @@ class TestPackData(PackTests):
     self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksums()[1]))
     self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_stored_checksums()[0]))
 
-  def test_check(self):
+  def test_index_check(self):
     p = self.get_pack_index(pack1_sha)
+    self.assertEquals(True, p.check())
+
+  def test_index_check(self):
+    p = self.get_pack_data(pack1_sha)
     self.assertEquals(True, p.check())
 
   def test_iterentries(self):

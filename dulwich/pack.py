@@ -280,6 +280,8 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
         header = f.read(12)
+        f.seek(self._size-20)
+        self._stored_checksum = f.read(20)
     finally:
         f.close()
     assert header[:4] == "PACK"
@@ -290,6 +292,17 @@ class PackData(object):
   def __len__(self):
       """Returns the number of objects in this pack."""
       return self._num_objects
+
+  def calculate_checksum(self):
+    f = open(self._filename, 'rb')
+    try:
+        map = simple_mmap(f, 0, self._size)
+        return hashlib.sha1(map[:-20]).digest()
+    finally:
+        f.close()
+
+  def check(self):
+    return (self.calculate_checksum() == self._stored_checksum)
 
   def get_object_at(self, offset):
     """Given an offset in to the packfile return the object that is there.
@@ -334,7 +347,7 @@ class PackData(object):
     return obj
 
 
-class SHA1Writer(f):
+class SHA1Writer(object):
     
     def __init__(self, f):
         self.f = f

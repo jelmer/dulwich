@@ -333,7 +333,7 @@ def write_pack_index(filename, entries):
     def write(data):
         sha1.update(data)
         f.write(data)
-    entries = sort(entries, cmp=cmp_entry)
+    entries = sorted(entries, cmp=cmp_entry)
     f = open(filename, 'w')
     fan_out_table = defaultdict(lambda: 0)
     for (offset, name) in entries:

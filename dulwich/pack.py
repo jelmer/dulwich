@@ -425,34 +425,35 @@ def write_pack_index_v1(filename, entries, pack_checksum):
 def apply_delta(src_buf, delta):
     """Based on the similar function in git's patch-delta.c."""
     data = str(delta)
-    def pop():
+    def pop(delta):
         ret = delta[0]
         delta = delta[1:]
-        return ret
-    def get_delta_header_size(buf):
+        return ord(ret), delta
+    def get_delta_header_size(delta):
         size = 0
         i = 0
-        while True:
-            cmd = pop()
+        while delta:
+            cmd, delta = pop(delta)
             size |= (cmd & ~0x80) << i
             i += 7
             if not cmd & 0x80:
                 break
-        return size
-    src_size = get_delta_header_size()
-    dest_size = get_delta_header_size()
+        return size, delta
+    src_size, delta = get_delta_header_size(delta)
+    dest_size, delta = get_delta_header_size(delta)
     while delta:
-        cmd = pop()
+        cmd, delta = pop(delta)
         if cmd & 0x80:
             cp_off = 0
+            for i in range(4):
+                if cmd & (1 << i): 
+                    x, delta = pop(delta)
+                    cp_off |= x << (x << (i * 8))
             cp_size = 0
-            if cmd & 0x01: cp_off = pop()
-            if cmd & 0x02: cp_off |= (pop() << 8)
-            if cmd & 0x04: cp_off |= (pop() << 16)
-            if cmd & 0x08: cp_off |= (pop() << 24)
-            if cmd & 0x10: cp_size = pop()
-            if cmd & 0x20: cp_size |= (pop() << 8)
-            if cmd & 0x40: cp_size |= (pop() << 16)
+            for i in range(3):
+                if cmd & (1 << (2 << 3+i)): 
+                    x, delta = pop(delta)
+                    cp_size |= x << (x << (i * 8))
             if cp_size == 0: cp_size = 0x10000
             if (cp_off + cp_size < cp_size or
                 cp_off + cp_size > src_size or
@@ -470,7 +471,7 @@ def apply_delta(src_buf, delta):
             raise AssertionError("Invalid opcode 0")
     
     if data != []:
-        raise AssertionError("data not empty")
+        raise AssertionError("data not empty: %r" % data)
 
     if dest_size != 0:
         raise AssertionError("dest size not empty")
@@ -554,8 +555,9 @@ class Pack(object):
             basename = raw[:20]
             uncomp = _decompress(raw[20:])
             assert size == len(uncomp)
-            base = self[sha_to_hex(basename)]
-            raise AssertionError("REF_DELTA not yet supported")
+            type, base = self._get_text(sha_to_hex(basename))
+            text = apply_delta(base, uncomp)
+            return type, text
         else:
             # The size is the inflated size, so we have no idea what the deflated size
             # is, so for now give it as much as we have. It should really iterate

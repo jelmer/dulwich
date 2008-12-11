@@ -124,7 +124,13 @@ class PackIndex(object):
     self._size = os.path.getsize(filename)
     self._file = open(filename, 'r')
     self._contents = simple_mmap(self._file, 0, self._size)
-    self._fan_out_table = self._read_fan_out_table()
+    if struct.unpack(">L", self._contents[:4]) != '\377tOc':
+        self._version = 1
+        self._fan_out_table = self._read_fan_out_table(0)
+    else:
+        self._version = struct.unpack_from(">L", self._contents, 4)
+        assert self._version in (2,)
+        self._fan_out_table = self._read_fan_out_table(8)
 
   def close(self):
     self._file.close()
@@ -139,21 +145,24 @@ class PackIndex(object):
   def _unpack_entry(self, i):
     """Unpack the i-th entry in the index file.
 
-    :return: Tuple with offset in pack file and object name (SHA)."""
-    return struct.unpack_from(">L20s", self._contents, self._entry_offset(i))
+    :return: Tuple with object name (SHA), offset in pack file and 
+          CRC32 checksum (if known)."""
+    (offset, name) = struct.unpack_from(">L20s", self._contents, 
+                        self.PACK_INDEX_HEADER_SIZE + (i * self.record_size))
+    return (name, offset, None)
 
   def iterentries(self):
     """Iterate over the entries in this pack index.
    
-    Will yield tuples with offset and object name.
+    Will yield tuples with object name, offset in packfile and crc32 checksum.
     """
     for i in range(len(self)):
         yield self._unpack_entry(i)
 
-  def _read_fan_out_table(self):
+  def _read_fan_out_table(self, start_offset):
     ret = {}
     for i in range(0x100):
-        (ret[i],) = struct.unpack(">L", self._contents[i*4:(i+1)*4])
+        (ret[i],) = struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])
     return ret
 
   def check(self):
@@ -185,7 +194,7 @@ class PackIndex(object):
     return self._object_index(sha)
 
   def _entry_offset(self, i):
-      return self.PACK_INDEX_HEADER_SIZE + (i * self.record_size)
+      return 
 
   def _object_index(self, hexsha):
       """See object_index"""
@@ -194,13 +203,13 @@ class PackIndex(object):
       end = self._fan_out_table[ord(sha[0])]
       while start < end:
         i = (start + end)/2
-        pack_offset, file_sha = self._unpack_entry(i)
+        file_sha , pack_offset, crc32_checksum = self._unpack_entry(i)
         if file_sha == sha:
           return pack_offset
         elif file_sha < sha:
-          start = self._entry_offset(i) + 1
+          start = i + 1
         else:
-          end = self._entry_offset(i) - 1
+          end = i - 1
       return None
 
 
@@ -308,7 +317,7 @@ def write_pack(filename, objects):
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
-    :return: List with (offset, name) entries.
+    :return: List with (name, offset, crc32 checksum) entries.
     """
     f = open(filename, 'w')
     try:
@@ -325,25 +334,24 @@ def write_pack_index(filename, entries, pack_checksum):
     """Write a new pack index file.
 
     :param filename: The filename of the new pack index file.
-    :param entries: List of tuples with offset_in_pack and object name (sha).
+    :param entries: List of tuples with object name (sha), offset_in_pack,  and
+            crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
     # Sort entries first
-    def cmp_entry((offset1, name1), (offset2, name2)):
-        return cmp(name1, name2)
     sha1 = hashlib.sha1("")
     def write(data):
         sha1.update(data)
         f.write(data)
-    entries = sorted(entries, cmp=cmp_entry)
+    entries = sorted(entries)
     f = open(filename, 'w')
     fan_out_table = defaultdict(lambda: 0)
-    for (offset, name) in entries:
+    for (name, offset, entry_checksum) in entries:
         fan_out_table[name[0]] += 1
     # Fan-out table
     for i in range(0x100):
         write(struct.pack(">L", fan_out_table[i]))
-    for (offset, name) in entries:
+    for (name, offset, entry_checksum) in entries:
         write(struct.pack(">L20s", offset, name))
     assert len(pack_checksum) == 20
     write(pack_checksum)

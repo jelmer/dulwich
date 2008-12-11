@@ -1,4 +1,4 @@
-# __init__.py -- The git module of python-git
+# __init__.py -- The git module of dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # 
 # This program is free software; you can redistribute it and/or

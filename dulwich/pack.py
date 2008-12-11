@@ -113,6 +113,19 @@ def multi_ord(map, start, count):
     return value
 
 
+def resolve_object(offset, type, obj, get_ref, get_offset):
+  if type == 6: # offset delta
+     (delta_offset, delta) = obj
+     base_text = get_offset(offset-delta_offset)
+     pass # FIXME
+  elif type == 7: # ref delta
+     (basename, delta) = obj
+     base_text = get_ref(basename)
+     pass # FIXME
+  else:
+     return type, obj
+
+
 class PackIndex(object):
   """An index in to a packfile.
 
@@ -241,7 +254,9 @@ class PackIndex(object):
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack index %s has changed size, I don't " \
          "like that" % self._filename
-    return self._object_index(hex_to_sha(sha))
+    if len(sha) == 40:
+        sha = hex_to_sha(sha)
+    return self._object_index(sha)
 
   def _object_index(self, sha):
       """See object_index"""
@@ -344,11 +359,16 @@ class PackData(object):
 
   def iterentries(self):
     found = {}
+    postponed = []
     for offset, type, obj in self.iterobjects():
-      if type == 6: # offset delta
-         pass # FIXME
-      elif type == 7:
-         pass # FIXME
+      postponed.append((type, obj))
+    while postponed:
+      (type, obj) = postponed.pop()
+      try:
+        type, obj = resolve_object(offset, type, obj, found.__getitem__, 
+            self.get_object_at)
+      except KeyError:
+        postponed.append((type, obj))
       else:
         shafile = ShaFile.from_raw_string(type, obj)
         sha = shafile.sha().digest()
@@ -606,8 +626,8 @@ class Pack(object):
             raise KeyError(sha1)
 
         type, obj =  self._pack.get_object_at(offset)
-        # FIXME: delta objects
-        return type, obj
+        return resolve_object(offset, type, obj, self._get_text, 
+            self._pack.get_object_at)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

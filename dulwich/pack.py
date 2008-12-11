@@ -124,12 +124,12 @@ class PackIndex(object):
     self._size = os.path.getsize(filename)
     self._file = open(filename, 'r')
     self._contents = simple_mmap(self._file, 0, self._size)
-    if struct.unpack(">L", self._contents[:4]) != '\377tOc':
-        self._version = 1
+    if self._contents[:4] != '\377tOc':
+        self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
     else:
-        self._version = struct.unpack_from(">L", self._contents, 4)
-        assert self._version in (2,)
+        (self.version, ) = struct.unpack_from(">L", self._contents, 4)
+        assert self.version in (2,), "Version was %d" % self.version
         self._fan_out_table = self._read_fan_out_table(8)
         self._name_table_offset = 8 + 0x100 * 4
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
@@ -147,7 +147,7 @@ class PackIndex(object):
 
     :return: Tuple with object name (SHA), offset in pack file and 
           CRC32 checksum (if known)."""
-    if self._version == 1:
+    if self.version == 1:
         (offset, name) = struct.unpack_from(">L20s", self._contents, 
             self.PACK_INDEX_HEADER_SIZE + (i * self.record_size))
         return (name, offset, None)
@@ -156,25 +156,25 @@ class PackIndex(object):
                 self._unpack_crc32_checksum(i))
 
   def _unpack_name(self, i):
-    if self._version == 1:
+    if self.version == 1:
         return self._unpack_entry(i)[0]
     else:
         return struct.unpack_from("20s", self._contents, 
-                                  self._name_table_offset + i * 20)
+                                  self._name_table_offset + i * 20)[0]
 
   def _unpack_offset(self, i):
-    if self._version == 1:
+    if self.version == 1:
         return self._unpack_entry(i)[1]
     else:
         return struct.unpack_from(">L", self._contents, 
-                                  self._pack_offset_table_offset + i * 4)
+                                  self._pack_offset_table_offset + i * 4)[0]
 
   def _unpack_crc32_checksum(self, i):
-    if self._version == 1:
+    if self.version == 1:
         return None
     else:
         return struct.unpack_from(">L", self._contents, 
-                                  self._crc32_table_offset + i * 4)
+                                  self._crc32_table_offset + i * 4)[0]
 
   def iterentries(self):
     """Iterate over the entries in this pack index.

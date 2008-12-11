@@ -167,6 +167,7 @@ class ShaFile(object):
     """
     return self.sha().digest() == other.sha().digest()
 
+
 class Blob(ShaFile):
   """A Git Blob object."""
 
@@ -190,6 +191,7 @@ class Blob(ShaFile):
     shafile._text = string
     shafile._update_contents()
     return shafile
+
 
 class Tree(ShaFile):
   """A Git tree object"""

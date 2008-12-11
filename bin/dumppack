@@ -1,0 +1,41 @@
+#!/usr/bin/python
+# dumppack - Simple pack dumper for dulwich
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# of the License.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+
+from dulwich.pack import PackData, PackIndex, sha_to_hex
+import sys
+
+basename = sys.argv[1]
+print "Index file:"
+print "-----------"
+x = PackIndex(basename + ".idx")
+if not x.check():
+	print "CHECKSUM DOES NOT MATCH"
+print "Length: %d" % len(x)
+print "Entries in index:"
+for name, offset, crc in x.iterentries():
+	print "\t%s: %d" % (sha_to_hex(name), offset)
+print ""
+
+x = PackData(basename + ".pack")
+print "Pack file:"
+print "----------"
+if not x.check():
+	print "CHECKSUM DOES NOT MATCH"
+print "Number of objects: %d" % len(x)

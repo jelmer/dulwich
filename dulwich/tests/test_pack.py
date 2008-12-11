@@ -20,7 +20,11 @@
 import os
 import unittest
 
+from dulwich.objects import (
+        Tree,
+        )
 from dulwich.pack import (
+        Pack,
         PackIndex,
         PackData,
         hex_to_sha,
@@ -49,6 +53,9 @@ class PackTests(unittest.TestCase):
     """Returns a PackData object from the datadir with the given sha"""
     return PackData(os.path.join(self.datadir, 'pack-%s.pack' % sha))
 
+  def get_pack(self, sha):
+    return Pack(os.path.join(self.datadir, 'pack-%s' % sha))
+
 
 class PackIndexTests(PackTests):
   """Class that tests the index of packfiles"""
@@ -60,6 +67,25 @@ class PackIndexTests(PackTests):
     self.assertEqual(p.object_index(a_sha), 178)
     self.assertEqual(p.object_index(tree_sha), 138)
     self.assertEqual(p.object_index(commit_sha), 12)
+
+  def test_index_len(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals(3, len(p))
+
+  def test_get_stored_checksum(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksums()[1]))
+    self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_stored_checksums()[0]))
+
+  def test_index_check(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals(True, p.check())
+
+
+  def test_iterentries(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, None), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, None), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, None)], list(p.iterentries()))
+
 
 
 class TestPackData(PackTests):
@@ -86,26 +112,24 @@ class TestPackData(PackTests):
     p = self.get_pack_data(pack1_sha)
     self.assertEquals(3, len(p))
 
-  def test_index_len(self):
-    p = self.get_pack_index(pack1_sha)
-    self.assertEquals(3, len(p))
-
-  def test_get_stored_checksum(self):
-    p = self.get_pack_index(pack1_sha)
-    self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksums()[1]))
-    self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_stored_checksums()[0]))
-
-  def test_index_check(self):
-    p = self.get_pack_index(pack1_sha)
-    self.assertEquals(True, p.check())
-
   def test_index_check(self):
     p = self.get_pack_data(pack1_sha)
     self.assertEquals(True, p.check())
 
-  def test_iterentries(self):
-    p = self.get_pack_index(pack1_sha)
-    self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, None), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, None), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, None)], list(p.iterentries()))
+
+class TestPack(PackTests):
+
+    def test_len(self):
+        p = self.get_pack(pack1_sha)
+        self.assertEquals(3, len(p))
+
+    def test_contains(self):
+        p = self.get_pack(pack1_sha)
+        self.assertTrue(tree_sha in p)
+
+    def test_get(self):
+        p = self.get_pack(pack1_sha)
+        self.assertEquals(type(p[tree_sha]), Tree)
 
 
 class TestHexToSha(unittest.TestCase):

@@ -30,6 +30,7 @@ from errors import (NotCommitError,
                     )
 
 blob_id = "blob"
+tag_id = "tag"
 tree_id = "tree"
 commit_id = "commit"
 parent_id = "parent"
@@ -176,6 +177,27 @@ class Blob(ShaFile):
   def text(self):
     """The text contained within the blob object."""
     return self._text
+
+  @classmethod
+  def from_file(cls, filename):
+    blob = ShaFile.from_file(filename)
+    if blob._type != cls._type:
+      raise NotBlobError(filename)
+    return blob
+
+  @classmethod
+  def from_string(cls, string):
+    """Create a blob from a string."""
+    shafile = cls()
+    shafile._text = string
+    shafile._update_contents()
+    return shafile
+
+
+class Tag(ShaFile):
+  """A Git Tag object."""
+
+  _type = tag_id
 
   @classmethod
   def from_file(cls, filename):
@@ -344,11 +366,15 @@ type_map = {
   blob_id : Blob,
   tree_id : Tree,
   commit_id : Commit,
+  tag_id: Tag,
 }
 
 num_type_map = {
-  1 : Commit,
-  2 : Tree,
-  3 : Blob,
+  0: None,
+  1: Commit,
+  2: Tree,
+  3: Blob,
+  4: Tag,
+  # 5 Is reserved for further expansion
 }
 

@@ -449,3 +449,26 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     f.write(pack_checksum)
     f.close()
 
+
+class Pack(object):
+
+    def __init__(self, basename):
+        self._basename = basename
+        self._idx = PackIndex(basename + ".idx")
+        self._pack = PackData(basename + ".pack")
+        assert len(self._idx) == len(self._pack)
+
+    def __len__(self):
+        return len(self._idx)
+
+    def __repr__(self):
+        return "Pack(%r)" % self._basename
+
+    def check(self):
+        return self._idx.check() and self._pack.check()
+
+    def __contains__(self, sha1):
+        return (self._idx.object_index(sha1) is not None)
+
+    def __getitem__(self, sha1):
+        return self._pack.get_object_at(self._idx.object_index(sha1))

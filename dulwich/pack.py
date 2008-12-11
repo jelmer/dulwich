@@ -131,25 +131,50 @@ class PackIndex(object):
         self._version = struct.unpack_from(">L", self._contents, 4)
         assert self._version in (2,)
         self._fan_out_table = self._read_fan_out_table(8)
+        self._name_table_offset = 8 + 0x100 * 4
+        self._crc32_table_offset = self._name_table_offset + 20 * len(self)
+        self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
 
   def close(self):
     self._file.close()
 
   def __len__(self):
     """Return the number of entries in this pack index."""
-    ret = 0
-    for v in self._fan_out_table.itervalues():
-        ret += v
-    return v
+    return self._fan_out_table[-1]
 
   def _unpack_entry(self, i):
     """Unpack the i-th entry in the index file.
 
     :return: Tuple with object name (SHA), offset in pack file and 
           CRC32 checksum (if known)."""
-    (offset, name) = struct.unpack_from(">L20s", self._contents, 
-                        self.PACK_INDEX_HEADER_SIZE + (i * self.record_size))
-    return (name, offset, None)
+    if self._version == 1:
+        (offset, name) = struct.unpack_from(">L20s", self._contents, 
+            self.PACK_INDEX_HEADER_SIZE + (i * self.record_size))
+        return (name, offset, None)
+    else:
+        return (self._unpack_name(i), self._unpack_offset(i), 
+                self._unpack_crc32_checksum(i))
+
+  def _unpack_name(self, i):
+    if self._version == 1:
+        return self._unpack_entry(i)[0]
+    else:
+        return struct.unpack_from("20s", self._contents, 
+                                  self._name_table_offset + i * 20)
+
+  def _unpack_offset(self, i):
+    if self._version == 1:
+        return self._unpack_entry(i)[1]
+    else:
+        return struct.unpack_from(">L", self._contents, 
+                                  self._pack_offset_table_offset + i * 4)
+
+  def _unpack_crc32_checksum(self, i):
+    if self._version == 1:
+        return None
+    else:
+        return struct.unpack_from(">L", self._contents, 
+                                  self._crc32_table_offset + i * 4)
 
   def iterentries(self):
     """Iterate over the entries in this pack index.
@@ -160,7 +185,7 @@ class PackIndex(object):
         yield self._unpack_entry(i)
 
   def _read_fan_out_table(self, start_offset):
-    ret = {}
+    ret = [0] * 0x100
     for i in range(0x100):
         (ret[i],) = struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])
     return ret
@@ -193,9 +218,6 @@ class PackIndex(object):
          "like that" % self._filename
     return self._object_index(sha)
 
-  def _entry_offset(self, i):
-      return 
-
   def _object_index(self, hexsha):
       """See object_index"""
       sha = hex_to_sha(hexsha)
@@ -203,9 +225,9 @@ class PackIndex(object):
       end = self._fan_out_table[ord(sha[0])]
       while start < end:
         i = (start + end)/2
-        file_sha , pack_offset, crc32_checksum = self._unpack_entry(i)
+        file_sha = self._unpack_name(i)
         if file_sha == sha:
-          return pack_offset
+          return self._unpack_offset(i)
         elif file_sha < sha:
           start = i + 1
         else:
@@ -330,7 +352,7 @@ def write_pack(filename, objects):
         f.close()
 
 
-def write_pack_index(filename, entries, pack_checksum):
+def write_pack_index_v1(filename, entries, pack_checksum):
     """Write a new pack index file.
 
     :param filename: The filename of the new pack index file.
@@ -347,13 +369,53 @@ def write_pack_index(filename, entries, pack_checksum):
     f = open(filename, 'w')
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
-        fan_out_table[name[0]] += 1
+        fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
         write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
         write(struct.pack(">L20s", offset, name))
     assert len(pack_checksum) == 20
     write(pack_checksum)
     f.write(sha1.digest())
     f.close()
+
+
+def write_pack_index_v2(filename, entries, pack_checksum):
+    """Write a new pack index file.
+
+    :param filename: The filename of the new pack index file.
+    :param entries: List of tuples with object name (sha), offset_in_pack,  and
+            crc32_checksum.
+    :param pack_checksum: Checksum of the pack file.
+    """
+    # Sort entries first
+    sha1 = hashlib.sha1("")
+    def write(data):
+        sha1.update(data)
+        f.write(data)
+    entries = sorted(entries)
+    f = open(filename, 'w')
+    write('\377tOc')
+    write(struct.pack(">L", 2))
+    fan_out_table = defaultdict(lambda: 0)
+    for (name, offset, entry_checksum) in entries:
+        fan_out_table[ord(name[0])] += 1
+    # Fan-out table
+    for i in range(0x100):
+        write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
+    for (name, offset, entry_checksum) in entries:
+        write(name)
+    for (name, offset, entry_checksum) in entries:
+        write(struct.pack(">L", entry_checksum))
+    for (name, offset, entry_checksum) in entries:
+        # FIXME: handle if MSBit is set in offset
+        write(struct.pack(">L", offset))
+    # FIXME: handle table for pack files > 8 Gb
+    assert len(pack_checksum) == 20
+    write(pack_checksum)
+    f.write(sha1.digest())
+    f.close()
+

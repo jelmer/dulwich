@@ -151,6 +151,11 @@ class PackIndex(object):
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
         self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
 
+  def __eq__(self, other):
+    return (type(self) == type(other) and 
+            self._fan_out_table == other._fan_out_table and
+            list(self.iterentries()) == list(other.iterentries()))
+
   def close(self):
     self._file.close()
 
@@ -333,9 +338,30 @@ class PackData(object):
     for i in range(len(self)):
         map = simple_mmap(f, offset, self._size-offset)
         (type, obj, total_size) = self._unpack_object(map)
-        yield type, obj
+        yield offset, type, obj
         offset += total_size
     f.close()
+
+  def iterentries(self):
+    found = {}
+    for offset, type, obj in self.iterobjects():
+      if type == 6: # offset delta
+         pass # FIXME
+      elif type == 7:
+         pass # FIXME
+      else:
+        shafile = ShaFile.from_raw_string(type, obj)
+        sha = shafile.sha().digest()
+        found[sha] = (type, obj)
+        yield sha, offset, shafile.crc32()
+
+  def create_index_v1(self, filename):
+    entries = list(self.iterentries())
+    write_pack_index_v1(filename, entries, self.calculate_checksum())
+
+  def create_index_v2(self, filename):
+    entries = list(self.iterentries())
+    write_pack_index_v1(filename, entries, self.calculate_checksum())
 
   def check(self):
     return (self.calculate_checksum() == self._stored_checksum)

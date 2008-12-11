@@ -108,7 +108,22 @@ class TestPackData(PackTests):
 
   def test_iterobjects(self):
     p = self.get_pack_data(pack1_sha)
-    self.assertEquals([(1, 'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\nauthor James Westby <jw+debian@jameswestby.net> 1174945067 +0100\ncommitter James Westby <jw+debian@jameswestby.net> 1174945067 +0100\n\nTest commit\n'), (2, '100644 a\x00og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8'), (3, 'test 1\n')], list(p.iterobjects()))
+    self.assertEquals([(12, 1, 'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\nauthor James Westby <jw+debian@jameswestby.net> 1174945067 +0100\ncommitter James Westby <jw+debian@jameswestby.net> 1174945067 +0100\n\nTest commit\n'), (138, 2, '100644 a\x00og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8'), (178, 3, 'test 1\n')], list(p.iterobjects()))
+
+  def test_create_index_v1(self):
+    p = self.get_pack_data(pack1_sha)
+    p.create_index_v1("v1test.idx")
+    idx1 = PackIndex("v1test.idx")
+    idx2 = self.get_pack_index(pack1_sha)
+    self.assertEquals(idx1, idx2)
+
+  def test_create_index_v2(self):
+    p = self.get_pack_data(pack1_sha)
+    p.create_index_v2("v2test.idx")
+    idx1 = PackIndex("v2test.idx")
+    idx2 = self.get_pack_index(pack1_sha)
+    self.assertEquals(idx1, idx2)
+
 
 
 class TestPack(PackTests):

@@ -158,18 +158,19 @@ class PackIndex(object):
 
   def check(self):
     """Check that the stored checksum matches the actual checksum."""
-    return self.get_checksum() == self.get_stored_checksum()
+    return self.calculate_checksum() == self.get_stored_checksums()[1]
 
-  def get_checksum(self):
+  def calculate_checksum(self):
     f = open(self._filename, 'r')
     try:
         return hashlib.sha1(self._contents[:-20]).digest()
     finally:
         f.close()
 
-  def get_stored_checksum(self):
-    """Return the SHA1 checksum stored for this header file itself."""
-    return str(self._contents[-20:])
+  def get_stored_checksums(self):
+    """Return the SHA1 checksums stored for the corresponding packfile and 
+    this header file itself."""
+    return str(self._contents[-40:-20]), str(self._contents[-20:])
 
   def object_index(self, sha):
     """Return the index in to the corresponding packfile for the object.
@@ -320,11 +321,12 @@ def write_pack(filename, objects):
         f.close()
 
 
-def write_pack_index(filename, entries):
+def write_pack_index(filename, entries, pack_checksum):
     """Write a new pack index file.
 
     :param filename: The filename of the new pack index file.
     :param entries: List of tuples with offset_in_pack and object name (sha).
+    :param pack_checksum: Checksum of the pack file.
     """
     # Sort entries first
     def cmp_entry((offset1, name1), (offset2, name2)):
@@ -343,5 +345,7 @@ def write_pack_index(filename, entries):
         write(struct.pack(">L", fan_out_table[i]))
     for (offset, name) in entries:
         write(struct.pack(">L20s", offset, name))
+    assert len(pack_checksum) == 20
+    f.write(pack_checksum)
     f.write(sha1.digest())
     f.close()

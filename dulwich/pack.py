@@ -182,6 +182,10 @@ class PackIndex(object):
         return struct.unpack_from(">L", self._contents, 
                                   self._crc32_table_offset + i * 4)[0]
 
+  def __iter__(self):
+    for i in range(len(self)):
+        yield sha_to_hex(self._unpack_name(i))
+
   def iterentries(self):
     """Iterate over the entries in this pack index.
    
@@ -222,11 +226,10 @@ class PackIndex(object):
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack index %s has changed size, I don't " \
          "like that" % self._filename
-    return self._object_index(sha)
+    return self._object_index(hex_to_sha(sha))
 
-  def _object_index(self, hexsha):
+  def _object_index(self, sha):
       """See object_index"""
-      sha = hex_to_sha(hexsha)
       start = self._fan_out_table[ord(sha[0])-1]
       end = self._fan_out_table[ord(sha[0])]
       while start < end:
@@ -463,6 +466,9 @@ class Pack(object):
 
     def __repr__(self):
         return "Pack(%r)" % self._basename
+
+    def __iter__(self):
+        return iter(self._idx)
 
     def check(self):
         return self._idx.check() and self._pack.check()

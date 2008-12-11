@@ -86,6 +86,9 @@ class PackIndexTests(PackTests):
     p = self.get_pack_index(pack1_sha)
     self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, None), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, None), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, None)], list(p.iterentries()))
 
+  def test_iter(self):
+    p = self.get_pack_index(pack1_sha)
+    self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
 
 
 class TestPackData(PackTests):
@@ -130,6 +133,10 @@ class TestPack(PackTests):
     def test_get(self):
         p = self.get_pack(pack1_sha)
         self.assertEquals(type(p[tree_sha]), Tree)
+
+    def test_iter(self):
+        p = self.get_pack(pack1_sha)
+        self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
 
 
 class TestHexToSha(unittest.TestCase):

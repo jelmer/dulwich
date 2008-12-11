@@ -118,6 +118,9 @@ class TestMultiOrd(unittest.TestCase):
 class TestPackIndexWriting(unittest.TestCase):
 
     def test_empty(self):
-        write_pack_index("empty.idx", [], 
-                'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7')
-        PackIndex("empty.idx").check()
+        pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
+        write_pack_index("empty.idx", [], pack_checksum)
+        idx = PackIndex("empty.idx")
+        self.assertTrue(idx.check())
+        self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
+        self.assertEquals(0, len(idx))

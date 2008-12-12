@@ -56,3 +56,10 @@ class ObjectMissing(Exception):
 
   def __init__(self, sha, *args, **kwargs):
     Exception.__init__(self, "%s is not in the pack" % sha)
+
+
+class ApplyDeltaError(Exception):
+    """Indicates that applying a delta failed."""
+    
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)

@@ -18,6 +18,7 @@
 # MA  02110-1301, USA.
 
 
+from dulwich.errors import ApplyDeltaError
 from dulwich.pack import Pack, sha_to_hex
 import sys
 
@@ -31,3 +32,5 @@ for name in x:
 		print "\t%s: %s" % (name, x[name])
 	except KeyError, k:
 		print "\t%s: Unable to resolve base %s" % (name, k)
+	except ApplyDeltaError:
+		print "\t%s: Unable to apply delta" % name

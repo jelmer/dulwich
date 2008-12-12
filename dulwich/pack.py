@@ -406,8 +406,11 @@ class PackData(object):
     entries = list(self.iterentries())
     write_pack_index_v1(filename, entries, self.calculate_checksum())
 
+  def get_stored_checksum(self):
+    return self._stored_checksum
+
   def check(self):
-    return (self.calculate_checksum() == self._stored_checksum)
+    return (self.calculate_checksum() == self.get_stored_checksum())
 
   def get_object_at(self, offset):
     """Given an offset in to the packfile return the object that is there.
@@ -526,7 +529,6 @@ def apply_delta(src_buf, delta):
     """Based on the similar function in git's patch-delta.c."""
     assert isinstance(src_buf, str), "was %r" % (src_buf,)
     assert isinstance(delta, str)
-    data = str(delta)
     out = ""
     def pop(delta):
         ret = delta[0]
@@ -544,6 +546,7 @@ def apply_delta(src_buf, delta):
         return size, delta
     src_size, delta = get_delta_header_size(delta)
     dest_size, delta = get_delta_header_size(delta)
+    assert src_size == len(src_buf)
     while delta:
         cmd, delta = pop(delta)
         if cmd & 0x80:
@@ -551,33 +554,30 @@ def apply_delta(src_buf, delta):
             for i in range(4):
                 if cmd & (1 << i): 
                     x, delta = pop(delta)
-                    cp_off |= x << (x << (i * 8))
+                    cp_off |= x << (i * 8)
             cp_size = 0
             for i in range(3):
-                if cmd & (1 << (2 << 3+i)): 
+                if cmd & (1 << (4+i)): 
                     x, delta = pop(delta)
-                    cp_size |= x << (x << (i * 8))
-            if cp_size == 0: cp_size = 0x10000
+                    cp_size |= x << (i * 8)
+            if cp_size == 0: 
+                cp_size = 0x10000
             if (cp_off + cp_size < cp_size or
                 cp_off + cp_size > src_size or
                 cp_size > dest_size):
                 break
             out += src_buf[cp_off:cp_off+cp_size]
-            dest_size -= cp_size
         elif cmd != 0:
-            if cmd > dest_size:
-                break
-            out += data[:cmd]
-            data = data[cmd:]
-            dest_size -= cmd
+            out += delta[:cmd]
+            delta = delta[cmd:]
         else:
             raise ApplyDeltaError("Invalid opcode 0")
     
-    if data != []:
-        raise ApplyDeltaError("data not empty: %r" % data)
+    if delta != "":
+        raise ApplyDeltaError("delta not empty: %r" % delta)
 
-    if dest_size != 0:
-        raise ApplyDeltaError("dest size not empty")
+    if dest_size != len(out):
+        raise ApplyDeltaError("dest size incorrect")
 
     return out
 
@@ -637,6 +637,9 @@ class Pack(object):
 
     def check(self):
         return self._idx.check() and self._pack.check()
+
+    def get_stored_checksum(self):
+        return self._pack.get_stored_checksum()
 
     def __contains__(self, sha1):
         """Check whether this pack contains a particular SHA1."""

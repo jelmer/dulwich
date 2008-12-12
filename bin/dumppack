@@ -24,13 +24,14 @@ import sys
 
 basename = sys.argv[1]
 x = Pack(basename)
+print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
 if not x.check():
-	print "CHECKSUM DOES NOT MATCH"
+    print "CHECKSUM DOES NOT MATCH"
 print "Length: %d" % len(x)
 for name in x:
-	try:
-		print "\t%s: %s" % (name, x[name])
-	except KeyError, k:
-		print "\t%s: Unable to resolve base %s" % (name, k)
-	except ApplyDeltaError:
-		print "\t%s: Unable to apply delta" % name
+    try:
+        print "\t%s: %s" % (name, x[name])
+    except KeyError, k:
+        print "\t%s: Unable to resolve base %s" % (name, k)
+    except ApplyDeltaError, e:
+        print "\t%s: Unable to apply delta: %r" % (name, e)

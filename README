@@ -1,16 +1,12 @@
-This is the dulwich project.
+This is the dulwich project. 
 
 It aims to give an interface to git repos that doesn't call out to git
-directly. It is probably going to be implemented in pure python.
+directly but instead uses pure Python.
 
 Currently can read blobs, trees and commits from the files. It reads both
-legacy and new headers. However it is untested for anything but the simple
-case.
+legacy and new headers. It can write out new indexes as well.
 
 Can also understand a little about the repository format.
-
-The testsuite uses the nosetests program from Turbogears, as I got annoyed
-trying to set up unittest.
 
 Open up a repo by passing it the path to the .git dir. You can then ask for
 HEAD with repo.head() or a ref with repo.ref(name). Both return the SHA id
@@ -32,8 +28,6 @@ be exceptions. This was merely done for expediency. If you hit an assertion,
 it either means you have done something wrong, there is corruption, or
 you are trying an unsupported operation.
 
-If you have any comments or questions you can contact me at 
-jw+debian@jameswestby.net
-
-James Westby
-
+The project is named after the part of London that Mr. and Mrs. Git live in 
+in the particular Monty Python sketch. It is based on the Python-Git module 
+that James Westby <jw+debian@jameswestby.net> released in 2007.

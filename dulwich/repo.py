@@ -26,16 +26,18 @@ from objects import (ShaFile,
                      Tree,
                      Blob,
                      )
+from pack import load_packs
 
-objectdir = 'objects'
-symref = 'ref: '
+OBJECTDIR = 'objects'
+PACKDIR = 'pack'
+SYMREF = 'ref: '
 
 
 class Tag(object):
 
     def __init__(self, name, ref):
         self.name = name
-        self.commit = Commit(ref)
+        self.ref = ref
 
 
 class Repo(object):
@@ -52,19 +54,28 @@ class Repo(object):
       self._basedir = root
     self.path = controldir
     self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
+    self._packs = None
 
   def basedir(self):
     return self._basedir
 
   def object_dir(self):
-    return os.path.join(self.basedir(), objectdir)
+    return os.path.join(self.basedir(), OBJECTDIR)
+
+  def pack_dir(self):
+    return os.path.join(self.object_dir(), PACKDIR)
+
+  def _get_packs(self):
+    if self._packs is None:
+        self._packs = list(load_packs(self.pack_dir()))
+    return self._packs
 
   def _get_ref(self, file):
     f = open(file, 'rb')
     try:
       contents = f.read()
-      if contents.startswith(symref):
-        ref = contents[len(symref):]
+      if contents.startswith(SYMREF):
+        ref = contents[len(SYMREF):]
         if ref[-1] == '\n':
           ref = ref[:-1]
         return self.ref(ref)
@@ -98,11 +109,16 @@ class Repo(object):
     assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
     dir = sha[:2]
     file = sha[2:]
+    # Check from object dir
     path = os.path.join(self.object_dir(), dir, file)
-    if not os.path.exists(path):
-      # Should this raise instead?
-      return None
-    return cls.from_file(path)
+    if os.path.exists(path):
+      return cls.from_file(path)
+    # Check from packs
+    for pack in self._get_packs():
+        if sha in pack:
+            return pack[sha]
+    # Should this raise instead?
+    return None
 
   def get_object(self, sha):
     return self._get_object(sha, ShaFile)

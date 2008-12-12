@@ -670,3 +670,8 @@ class Pack(object):
         """Retrieve the specified SHA1."""
         type, uncomp = self._get_text(sha1)
         return ShaFile.from_raw_string(type, uncomp)
+
+
+def load_packs(path):
+    for name in os.listdir(path):
+        yield Pack(os.path.join(path, name.rstrip(".pack")))

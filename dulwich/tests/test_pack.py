@@ -160,6 +160,10 @@ class TestPack(PackTests):
         self.assertEqual(obj._type, 'commit')
         self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
+    def test_copy(self):
+        p = self.get_pack(pack1_sha)
+        write_pack("testcopy", list(p.iterobjects()))
+        self.assertEquals(p, Pack("testcopy"))
 
 
 class TestHexToSha(unittest.TestCase):

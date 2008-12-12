@@ -88,6 +88,9 @@ class ShaFile(object):
     object._update_contents()
     return object
 
+  def as_raw_string(self):
+    return self._num_type, self._text
+
   @classmethod
   def _parse_object(cls, map):
     """Parse a new style object , creating it and setting object._text"""
@@ -143,6 +146,7 @@ class ShaFile(object):
     """
     real_class = num_type_map[type]
     obj = real_class()
+    obj._num_type = type
     obj._text = string
     obj._update_contents()
     return obj
@@ -276,7 +280,7 @@ class Commit(ShaFile):
   def _parse_text(self):
     text = self._text
     count = 0
-    assert text.startswith(tree_id), "Invlid commit object, " \
+    assert text.startswith(tree_id), "Invalid commit object, " \
          "must start with %s" % tree_id
     count += len(tree_id)
     assert text[count] == ' ', "Invalid commit object, " \

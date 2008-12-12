@@ -44,9 +44,18 @@ import zlib
 from objects import (
         ShaFile,
         )
+from errors import ApplyDeltaError
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or 
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
+
+
+def take_msb_bytes(map, offset):
+    ret = []
+    while len(ret) == 0 or ret[-1] & 0x80:
+        ret.append(ord(map[offset]))
+        offset += 1
+    return ret
 
 
 def read_zlib(data, offset, dec_size):
@@ -64,12 +73,14 @@ def read_zlib(data, offset, dec_size):
 
 
 def hex_to_sha(hex):
+  """Convert a hex string to a binary sha string."""
   ret = ""
   for i in range(0, len(hex), 2):
     ret += chr(int(hex[i:i+2], 16))
   return ret
 
 def sha_to_hex(sha):
+  """Convert a binary sha string to a hex sha string."""
   ret = ""
   for i in sha:
       ret += "%02x" % ord(i)
@@ -117,17 +128,25 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
 
 
 def resolve_object(offset, type, obj, get_ref, get_offset):
-  if type == 6: # offset delta
-     (delta_offset, delta) = obj
-     base_text = get_offset(offset-delta_offset)
-     pass # FIXME
-  elif type == 7: # ref delta
-     (basename, delta) = obj
-     base_text = get_ref(basename)
-     pass # FIXME
-  else:
+  """Resolve an object, possibly resolving deltas when necessary."""
+  if not type in (6, 7): # Not a delta
      return type, obj
 
+  if type == 6: # offset delta
+     (delta_offset, delta) = obj
+     assert isinstance(delta_offset, int)
+     assert isinstance(delta, str)
+     offset = offset-delta_offset
+     type, base_obj = get_offset(offset)
+     assert isinstance(type, int)
+  elif type == 7: # ref delta
+     (basename, delta) = obj
+     assert isinstance(basename, str) and len(basename) == 20
+     assert isinstance(delta, str)
+     type, base_obj= get_ref(basename)
+     assert isinstance(type, int)
+  type, base_text = resolve_object(offset, type, base_obj, get_ref, get_offset)
+  return type, apply_delta(base_text, delta)
 
 class PackIndex(object):
   """An index in to a packfile.
@@ -365,6 +384,9 @@ class PackData(object):
     postponed = list(self.iterobjects())
     while postponed:
       (offset, type, obj) = postponed.pop()
+      assert isinstance(offset, int)
+      assert isinstance(type, int)
+      assert isinstance(obj, tuple) or isinstance(obj, str)
       try:
         type, obj = resolve_object(offset, type, obj, found.__getitem__, 
             self.get_object_at)
@@ -394,7 +416,9 @@ class PackData(object):
     then the packfile can be asked directly for that object using this
     function.
     """
-    assert isinstance(offset, long) or isinstance(offset, int), "offset was %r" % offset
+    assert isinstance(offset, long) or isinstance(offset, int),\
+            "offset was %r" % offset
+    assert offset >= self._header_size
     size = os.path.getsize(self._filename)
     assert size == self._size, "Pack data %s has changed size, I don't " \
          "like that" % self._filename
@@ -406,38 +430,29 @@ class PackData(object):
       f.close()
 
   def _unpack_object(self, map):
-    first_byte = ord(map[0])
-    sign_extend = first_byte & 0x80
-    type = (first_byte >> 4) & 0x07
-    size = first_byte & 0x0f
-    cur_offset = 0
-    while sign_extend > 0:
-      byte = ord(map[cur_offset+1])
-      sign_extend = byte & 0x80
-      size_part = byte & 0x7f
-      size += size_part << ((cur_offset * 7) + 4)
-      cur_offset += 1
-    raw_base = cur_offset+1
+    bytes = take_msb_bytes(map, 0)
+    type = (bytes[0] >> 4) & 0x07
+    size = bytes[0] & 0x0f
+    for i, byte in enumerate(bytes[1:]):
+      size += (byte & 0x7f) << ((i * 7) + 4)
+    raw_base = len(bytes)
     if type == 6: # offset delta
-        first_byte = ord(map[raw_base])
-        sign_extend = first_byte & 0x80
-        delta_base_offset = first_byte & 0x7f
-        cur_offset = 0
-        while sign_extend > 0:
-          byte = ord(map[raw_base+cur_offset+1])
-          sign_extend = byte & 0x80
-          delta_base_offset_part = byte & 0x7f
-          delta_base_offset += delta_base_offset_part << ((cur_offset * 7) + 4)
-          cur_offset += 1
+        bytes = take_msb_bytes(map, raw_base)
+        assert not (bytes[-1] & 0x80)
+        delta_base_offset = bytes[0] & 0x7f
+        for byte in bytes[1:]:
+            delta_base_offset += 1
+            delta_base_offset <<= 7
+            delta_base_offset += (byte & 0x7f)
+        raw_base+=len(bytes)
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert size == len(uncomp)
-        return type, (uncomp, delta_bsae_offset), comp_len+raw_base
+        return type, (delta_base_offset, uncomp), comp_len+raw_base
     elif type == 7: # ref delta
-        basename = map[cur_offset:cur_offset+20]
-        raw_base += 20
-        uncomp, comp_len = read_zlib(map, raw_base, size)
+        basename = map[raw_base:raw_base+20]
+        uncomp, comp_len = read_zlib(map, raw_base+20, size)
         assert size == len(uncomp)
-        return type, (uncomp, basename), comp_len+raw_base
+        return type, (basename, uncomp), comp_len+raw_base
     else:
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert len(uncomp) == size
@@ -509,7 +524,10 @@ def write_pack_index_v1(filename, entries, pack_checksum):
 
 def apply_delta(src_buf, delta):
     """Based on the similar function in git's patch-delta.c."""
+    assert isinstance(src_buf, str), "was %r" % (src_buf,)
+    assert isinstance(delta, str)
     data = str(delta)
+    out = ""
     def pop(delta):
         ret = delta[0]
         delta = delta[1:]
@@ -544,7 +562,7 @@ def apply_delta(src_buf, delta):
                 cp_off + cp_size > src_size or
                 cp_size > dest_size):
                 break
-            out += text[cp_off:cp_off+cp_size]
+            out += src_buf[cp_off:cp_off+cp_size]
             dest_size -= cp_size
         elif cmd != 0:
             if cmd > dest_size:
@@ -553,13 +571,13 @@ def apply_delta(src_buf, delta):
             data = data[cmd:]
             dest_size -= cmd
         else:
-            raise AssertionError("Invalid opcode 0")
+            raise ApplyDeltaError("Invalid opcode 0")
     
     if data != []:
-        raise AssertionError("data not empty: %r" % data)
+        raise ApplyDeltaError("data not empty: %r" % data)
 
     if dest_size != 0:
-        raise AssertionError("dest size not empty")
+        raise ApplyDeltaError("dest size not empty")
 
     return out
 
@@ -630,6 +648,7 @@ class Pack(object):
             raise KeyError(sha1)
 
         type, obj = self._pack.get_object_at(offset)
+        assert isinstance(offset, int)
         return resolve_object(offset, type, obj, self._get_text, 
             self._pack.get_object_at)
 

@@ -35,6 +35,7 @@ a pointer in to the corresponding packfile.
 
 from collections import defaultdict
 import hashlib
+from itertools import izip
 import mmap
 import os
 import struct
@@ -187,9 +188,16 @@ class PackIndex(object):
         self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
 
   def __eq__(self, other):
-    return (type(self) == type(other) and 
-            self._fan_out_table == other._fan_out_table and
-            list(self.iterentries()) == list(other.iterentries()))
+    if type(self) != type(other):
+        return False
+
+    if self._fan_out_table != other._fan_out_table:
+        return False
+
+    for (name1, _, _), (name2, _, _) in izip(self.iterentries(), other.iterentries()):
+        if name1 != name2:
+            return False
+    return True
 
   def close(self):
     self._file.close()
@@ -369,7 +377,6 @@ class PackData(object):
         f.close()
 
   def iterobjects(self):
-    """Yields (name, offset, crc32 checksum)."""
     offset = self._header_size
     f = open(self._filename, 'rb')
     for i in range(len(self)):
@@ -479,8 +486,50 @@ class SHA1Writer(object):
         self.f.close()
         return sha
 
+    def tell(self):
+        return self.f.tell()
+
+
+def write_pack_object(f, type, object):
+    """Write pack object to a file.
+
+    :param f: File to write to
+    :param o: Object to write
+    """
+    ret = f.tell()
+    if type == 6: # ref delta
+        (delta_base_offset, object) = object
+    elif type == 7: # offset delta
+        (basename, object) = object
+    size = len(object)
+    c = (type << 4) | (size & 15)
+    size >>= 4
+    while size:
+        f.write(chr(c | 0x80))
+        c = size & 0x7f
+        size >>= 7
+    f.write(chr(c))
+    if type == 6: # offset delta
+        ret = [delta_base_offset & 0x7f]
+        delta_base_offset >>= 7
+        while delta_base_offset:
+            delta_base_offset -= 1
+            ret.insert(0, 0x80 | (delta_base_offset & 0x7f))
+            delta_base_offset >>= 7
+        f.write("".join([chr(x) for x in ret]))
+    elif type == 7: # ref delta
+        assert len(basename) == 20
+        f.write(basename)
+    f.write(zlib.compress(object))
+    return f.tell()
+
 
 def write_pack(filename, objects):
+    entries, data_sum = write_pack_data(filename + ".pack", objects)
+    write_pack_index_v2(filename + ".idx", entries, data_sum)
+
+
+def write_pack_data(filename, objects):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
@@ -494,7 +543,12 @@ def write_pack(filename, objects):
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", len(objects))) # Number of objects in pack
     for o in objects:
-        pass # FIXME: Write object
+        sha1 = o.sha().digest()
+        crc32 = o.crc32()
+        # FIXME: Delta !
+        t, o = o.as_raw_string()
+        offset = write_pack_object(f, t, o)
+        entries.append((sha1, offset, crc32))
     return entries, f.close()
 
 
@@ -635,6 +689,9 @@ class Pack(object):
             self._data.close()
         self._idx.close()
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self._idx == other._idx
+
     def __len__(self):
         """Number of entries in this pack."""
         return len(self._idx)
@@ -670,6 +727,13 @@ class Pack(object):
         """Retrieve the specified SHA1."""
         type, uncomp = self._get_text(sha1)
         return ShaFile.from_raw_string(type, uncomp)
+
+    def iterobjects(self):
+        for offset, type, obj in self._get_data().iterobjects():
+            assert isinstance(offset, int)
+            yield ShaFile.from_raw_string(
+                    *resolve_object(offset, type, obj, self._get_text, 
+                self._get_data().get_object_at))
 
 
 def load_packs(path):

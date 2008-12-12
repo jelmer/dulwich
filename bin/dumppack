@@ -27,4 +27,7 @@ if not x.check():
 	print "CHECKSUM DOES NOT MATCH"
 print "Length: %d" % len(x)
 for name in x:
-	print "\t%s: %s" % (name, x[name])
+	try:
+		print "\t%s: %s" % (name, x[name])
+	except KeyError, k:
+		print "\t%s: Unable to resolve base %s" % (name, k)

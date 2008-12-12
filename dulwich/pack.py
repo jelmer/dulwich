@@ -41,19 +41,21 @@ import struct
 import sys
 import zlib
 
+from objects import (
+        ShaFile,
+        )
+
 supports_mmap_offset = (sys.version_info[0] >= 3 or 
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
-from objects import (ShaFile,
-                     _decompress,
-                     )
 
 def read_zlib(data, offset, dec_size):
     obj = zlib.decompressobj()
     x = ""
     fed = 0
     while obj.unused_data == "":
-        add = data[offset+fed:offset+fed+1024]
+        base = offset+fed
+        add = data[base:base+1024]
         fed += len(add)
         x += obj.decompress(add)
     assert len(x) == dec_size
@@ -76,6 +78,14 @@ def sha_to_hex(sha):
 MAX_MMAP_SIZE = 256 * 1024 * 1024
 
 def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
+    """Simple wrapper for mmap() which always supports the offset parameter.
+
+    :param f: File object.
+    :param offset: Offset in the file, from the beginning of the file.
+    :param size: Size of the mmap'ed area
+    :param access: Access mechanism.
+    :return: MMAP'd area.
+    """
     if offset+size > MAX_MMAP_SIZE and not supports_mmap_offset:
         raise AssertionError("%s is larger than 256 meg, and this version "
             "of Python does not support the offset argument to mmap().")
@@ -104,13 +114,6 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
         if offset == 0:
             return mem
         return ArraySkipper(mem, offset)
-
-
-def multi_ord(map, start, count):
-    value = 0
-    for i in range(count):
-        value = value * 0x100 + ord(map[start+i])
-    return value
 
 
 def resolve_object(offset, type, obj, get_ref, get_offset):
@@ -416,23 +419,26 @@ class PackData(object):
       cur_offset += 1
     raw_base = cur_offset+1
     if type == 6: # offset delta
-        # FIXME: Parse size
-        raise AssertionError("OFS_DELTA not yet supported")
+        first_byte = ord(map[raw_base])
+        sign_extend = first_byte & 0x80
+        delta_base_offset = first_byte & 0x7f
+        cur_offset = 0
+        while sign_extend > 0:
+          byte = ord(map[raw_base+cur_offset+1])
+          sign_extend = byte & 0x80
+          delta_base_offset_part = byte & 0x7f
+          delta_base_offset += delta_base_offset_part << ((cur_offset * 7) + 4)
+          cur_offset += 1
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert size == len(uncomp)
-        return type, (uncomp, offset), comp_len+raw_base
+        return type, (uncomp, delta_bsae_offset), comp_len+raw_base
     elif type == 7: # ref delta
         basename = map[cur_offset:cur_offset+20]
         raw_base += 20
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert size == len(uncomp)
-        # text = apply_delta(base, uncomp)
         return type, (uncomp, basename), comp_len+raw_base
     else:
-        # The size is the inflated size, so we have no idea what the deflated size
-        # is, so for now give it as much as we have. It should really iterate
-        # feeding it more data if it doesn't decompress, but as we have the whole
-        # thing then just use it.
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert len(uncomp) == size
         return type, uncomp, comp_len+raw_base
@@ -623,7 +629,7 @@ class Pack(object):
         if offset is None:
             raise KeyError(sha1)
 
-        type, obj =  self._pack.get_object_at(offset)
+        type, obj = self._pack.get_object_at(offset)
         return resolve_object(offset, type, obj, self._get_text, 
             self._pack.get_object_at)
 

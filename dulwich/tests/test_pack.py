@@ -28,7 +28,6 @@ from dulwich.pack import (
         PackIndex,
         PackData,
         hex_to_sha,
-        multi_ord,
         sha_to_hex,
         write_pack_index_v1,
         write_pack_index_v2,
@@ -170,12 +169,6 @@ class TestHexToSha(unittest.TestCase):
 
     def test_reverse(self):
         self.assertEquals("abcdef", sha_to_hex('\xab\xcd\xef'))
-
-
-class TestMultiOrd(unittest.TestCase):
-
-    def test_simple(self):
-        self.assertEquals(418262508645L, multi_ord("abcde", 0, 5))
 
 
 class TestPackIndexWriting(object):

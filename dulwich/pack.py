@@ -621,8 +621,19 @@ class Pack(object):
     def __init__(self, basename):
         self._basename = basename
         self._idx = PackIndex(basename + ".idx")
-        self._pack = PackData(basename + ".pack")
-        assert len(self._idx) == len(self._pack)
+        self._data = None
+
+    def _get_data(self):
+        if self._data is None:
+            self._data = PackData(self._basename + ".pack")
+            assert len(self._idx) == len(self._data)
+            assert self._idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
+        return self._data
+
+    def close(self):
+        if self._data is not None:
+            self._data.close()
+        self._idx.close()
 
     def __len__(self):
         """Number of entries in this pack."""
@@ -636,10 +647,10 @@ class Pack(object):
         return iter(self._idx)
 
     def check(self):
-        return self._idx.check() and self._pack.check()
+        return self._idx.check() and self._get_data().check()
 
     def get_stored_checksum(self):
-        return self._pack.get_stored_checksum()
+        return self._get_data().get_stored_checksum()
 
     def __contains__(self, sha1):
         """Check whether this pack contains a particular SHA1."""
@@ -650,10 +661,10 @@ class Pack(object):
         if offset is None:
             raise KeyError(sha1)
 
-        type, obj = self._pack.get_object_at(offset)
+        type, obj = self._get_data().get_object_at(offset)
         assert isinstance(offset, int)
         return resolve_object(offset, type, obj, self._get_text, 
-            self._pack.get_object_at)
+            self._get_data().get_object_at)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

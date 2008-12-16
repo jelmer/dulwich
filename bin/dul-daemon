@@ -1,0 +1,44 @@
+#!/usr/bin/python
+# dul-daemon - Simple git-daemon a like
+# Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# of the License.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+import sys
+from dulwich.server import Backend, TCPGitServer
+
+class GitBackend(Backend):
+
+    def __init__(self, gitdir):
+        self.gitdir = gitdir
+
+    def get_refs(self):
+        return [['refs/heads/foo', '768fbb786f3a0a2a97ed980f3ce730e9e984f436']]
+
+    def has_revision(self, sha):
+        return False
+
+    def apply_pack(self, refs, read):
+        read()
+
+    def generate_pack(self, want, have, write, progress):
+        pass
+
+
+if __name__ == "__main__":
+    backend = GitBackend(sys.argv[1])
+    server = TCPGitServer(backend, ('localhost', 9418))
+    server.serve_forever()

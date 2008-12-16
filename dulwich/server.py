@@ -17,24 +17,36 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-# import dulwich as git
-
 
 class Backend(object):
 
-    def __init__(self):
-        pass
-
     def get_refs(self):
+        """Get all the refs in the repository
+
+        Returns a list of tuple(name, sha)
+        """
         raise NotImplementedError
 
-    def has_revision(self):
+    def has_revision(self, sha):
+        """ Is a given sha in this repository? """
         raise NotImplementedError
 
     def apply_pack(self, refs, read):
+        """ Import a set of changes into a repository and update the refs
+
+        refs is a list of tuple(name, sha)
+        read is a callback to read from the incoming pack
+        """
         raise NotImplementedError
 
     def generate_pack(self, want, have, write, progress):
+        """ Generate a pack containing all commits a client is missing
+
+        want is a list of sha's the client desires
+        have is a list of sha's the client has (allowing us to send the minimal pack)
+        write is a callback to write pack data to the client
+        progress is a callback to send progress messages to the client
+        """
         raise NotImplementedError
 
 

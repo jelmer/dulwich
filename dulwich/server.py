@@ -108,10 +108,10 @@ class UploadPackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\0x0a" % (refs[0][1], refs[0][0]))
+        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
         for i in range(1, len(refs)-1):
             ref = refs[i]
-            self.write_pkt_line("%s %s\0x0a" % (ref[1], ref[0]))
+            self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         # i'm done...
         self.write("0000")
@@ -157,7 +157,7 @@ class UploadPackHandler(Handler):
         #if True: # False: #self.no_progress == False:
         #    self.write_sideband(2, "Bazaar is preparing your pack, plz hold.\n")
 
-        #    for x in range(1,200):
+        #    for x in range(1,200)
         #        self.write_sideband(2, "Counting objects: %d\x0d" % x*2)
         #    self.write_sideband(2, "Counting objects: 200, done.\n")
 
@@ -173,10 +173,10 @@ class ReceivePackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\0x0a" % (refs[0][1], refs[0][0]))
+        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
         for i in range(1, len(refs)-1):
             ref = refs[i]
-            self.write_pkt_line("%s %s\0x0a" % (ref[1], ref[0]))
+            self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         self.write("0000")
 

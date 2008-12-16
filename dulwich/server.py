@@ -131,7 +131,7 @@ class UploadPackHandler(Handler):
         #        self.write_sideband(2, "Compressiong objects: %d (%d/%d)\x0d" % (x, x*2, 200))
         #    self.write_sideband(2, "Compressing objects: 100% (200/200), done.\n")
 
-        self.backend.generate_pack(want, need, self.write)
+        self.backend.generate_pack(want_revs, have_revs, self.write, None)
 
 
 class ReceivePackHandler(Handler):
@@ -159,9 +159,12 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):
 
     def __init__(self, request, client_address, server):
         SocketServer.StreamRequestHandler.__init__(self, request, client_address, server)
-        Handler.__init__(self, server.backend, self.rfile.read, self.wfile.write)
 
     def handle(self):
+        #FIXME: StreamRequestHandler seems to be the thing that calls handle(),
+        #so we can't call this in a sane place??
+        Handler.__init__(self, self.server.backend, self.rfile.read, self.wfile.write)
+
         request = self.read_pkt_line()
 
         # up until the space is the command to run, everything after is parameters

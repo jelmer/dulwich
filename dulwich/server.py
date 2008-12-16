@@ -21,31 +21,37 @@ import SocketServer
 class Backend(object):
 
     def get_refs(self):
-        """Get all the refs in the repository
+        """
+        Get all the refs in the repository
 
-        Returns a list of tuple(name, sha)
+        :return: list of tuple(name, sha)
         """
         raise NotImplementedError
 
     def has_revision(self, sha):
-        """ Is a given sha in this repository? """
+        """
+        Is a given sha in this repository?
+
+        :return: True or False
+        """
         raise NotImplementedError
 
     def apply_pack(self, refs, read):
         """ Import a set of changes into a repository and update the refs
 
-        refs is a list of tuple(name, sha)
-        read is a callback to read from the incoming pack
+        :param refs: list of tuple(name, sha)
+        :param read: callback to read from the incoming pack
         """
         raise NotImplementedError
 
     def generate_pack(self, want, have, write, progress):
-        """ Generate a pack containing all commits a client is missing
+        """
+        Generate a pack containing all commits a client is missing
 
-        want is a list of sha's the client desires
-        have is a list of sha's the client has (allowing us to send the minimal pack)
-        write is a callback to write pack data to the client
-        progress is a callback to send progress messages to the client
+        :param want: is a list of sha's the client desires
+        :param have: is a list of sha's the client has (allowing us to send the minimal pack)
+        :param write: is a callback to write pack data to the client
+        :param progress: is a callback to send progress messages to the client
         """
         raise NotImplementedError
 
@@ -59,7 +65,9 @@ class Handler(object):
 
     def read_pkt_line(self):
         """
-        reads a 'git line' of info from the stream
+        Reads a 'pkt line' from the remote git process
+
+        :return: The next string from the stream
         """
         size = int(self.read(4), 16)
         if size == 0:
@@ -67,9 +75,20 @@ class Handler(object):
         return self.read(size-4)
 
     def write_pkt_line(self, line):
+        """
+        Sends a 'pkt line' to the remote git process
+
+        :param line: A string containing the data to send
+        """
         self.write("%04x%s" % (len(line)+4, line))
 
     def write_sideband(self, channel, blob):
+        """
+        Write data to the sideband (a git multiplexing method)
+
+        :param channel: int specifying which channel to write to
+        :param blob: a blob of data (as a string) to send on this channel
+        """
         # a pktline can be a max of 65535. a sideband line can therefore be
         # 65535-5 = 65530
         # WTF: Why have the len in ASCII, but the channel in binary.
@@ -78,6 +97,9 @@ class Handler(object):
             blob = blob[65530:]
 
     def handle(self):
+        """
+        Deal with the request
+        """
         raise NotImplementedError
 
 

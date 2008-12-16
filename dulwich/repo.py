@@ -37,7 +37,7 @@ class Tag(object):
 
     def __init__(self, name, ref):
         self.name = name
-        self.ref = ref
+        self.commit = Commit()
 
 
 class Repo(object):

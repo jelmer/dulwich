@@ -17,24 +17,42 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-# import dulwich as git
-
 
 class Backend(object):
 
-    def __init__(self):
-        pass
-
     def get_refs(self):
+        """
+        Get all the refs in the repository
+
+        :return: list of tuple(name, sha)
+        """
         raise NotImplementedError
 
-    def has_revision(self):
+    def has_revision(self, sha):
+        """
+        Is a given sha in this repository?
+
+        :return: True or False
+        """
         raise NotImplementedError
 
     def apply_pack(self, refs, read):
+        """ Import a set of changes into a repository and update the refs
+
+        :param refs: list of tuple(name, sha)
+        :param read: callback to read from the incoming pack
+        """
         raise NotImplementedError
 
     def generate_pack(self, want, have, write, progress):
+        """
+        Generate a pack containing all commits a client is missing
+
+        :param want: is a list of sha's the client desires
+        :param have: is a list of sha's the client has (allowing us to send the minimal pack)
+        :param write: is a callback to write pack data to the client
+        :param progress: is a callback to send progress messages to the client
+        """
         raise NotImplementedError
 
 
@@ -47,17 +65,33 @@ class Handler(object):
 
     def read_pkt_line(self):
         """
-        reads a 'git line' of info from the stream
+        Reads a 'pkt line' from the remote git process
+
+        :return: The next string from the stream
         """
-        size = int(self.read(4), 16)
+        sizestr = self.read(4)
+        if not sizestr:
+            return None
+        size = int(sizestr, 16)
         if size == 0:
             return None
         return self.read(size-4)
 
     def write_pkt_line(self, line):
+        """
+        Sends a 'pkt line' to the remote git process
+
+        :param line: A string containing the data to send
+        """
         self.write("%04x%s" % (len(line)+4, line))
 
     def write_sideband(self, channel, blob):
+        """
+        Write data to the sideband (a git multiplexing method)
+
+        :param channel: int specifying which channel to write to
+        :param blob: a blob of data (as a string) to send on this channel
+        """
         # a pktline can be a max of 65535. a sideband line can therefore be
         # 65535-5 = 65530
         # WTF: Why have the len in ASCII, but the channel in binary.
@@ -66,6 +100,9 @@ class Handler(object):
             blob = blob[65530:]
 
     def handle(self):
+        """
+        Deal with the request
+        """
         raise NotImplementedError
 
 
@@ -74,10 +111,11 @@ class UploadPackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\0x0a" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)-1):
-            ref = refs[i]
-            self.write_pkt_line("%s %s\0x0a" % (ref[1], ref[0]))
+        if refs:
+            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         # i'm done...
         self.write("0000")
@@ -91,7 +129,7 @@ class UploadPackHandler(Handler):
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
         while want and want[:4] == 'want':
-            want_rev = want[5:]
+            want_rev = want[5:40]
             # FIXME: This check probably isnt needed?
             if self.backend.has_revision(want_rev):
                want_revs.append(want_rev)
@@ -123,7 +161,7 @@ class UploadPackHandler(Handler):
         #if True: # False: #self.no_progress == False:
         #    self.write_sideband(2, "Bazaar is preparing your pack, plz hold.\n")
 
-        #    for x in range(1,200):
+        #    for x in range(1,200)
         #        self.write_sideband(2, "Counting objects: %d\x0d" % x*2)
         #    self.write_sideband(2, "Counting objects: 200, done.\n")
 
@@ -139,10 +177,11 @@ class ReceivePackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\0x0a" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)-1):
-            ref = refs[i]
-            self.write_pkt_line("%s %s\0x0a" % (ref[1], ref[0]))
+        if refs:
+            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         self.write("0000")
 
@@ -151,6 +190,9 @@ class ReceivePackHandler(Handler):
         while ref:
             client_refs.append(ref.split())
             ref = self.read_pkt_line()
+
+        if len(client_refs) == 0:
+            return None
 
         self.backend.apply_pack(client_refs, self.read)
 

@@ -125,7 +125,7 @@ class UploadPackHandler(Handler):
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
         while want and want[:4] == 'want':
-            want_rev = want[5:]
+            want_rev = want[5:40]
             # FIXME: This check probably isnt needed?
             if self.backend.has_revision(want_rev):
                want_revs.append(want_rev)

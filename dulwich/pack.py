@@ -390,7 +390,7 @@ class PackData(object):
     found = {}
     postponed = list(self.iterobjects())
     while postponed:
-      (offset, type, obj) = postponed.pop()
+      (offset, type, obj) = postponed.pop(0)
       assert isinstance(offset, int)
       assert isinstance(type, int)
       assert isinstance(obj, tuple) or isinstance(obj, str)

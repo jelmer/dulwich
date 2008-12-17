@@ -17,28 +17,59 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import sys
+import os, sys, tempfile
 from dulwich.server import Backend, TCPGitServer
+from dulwich.repo import Repo
+from dulwich.pack import PackData, Pack
 
 class GitBackend(Backend):
 
-    def __init__(self, gitdir):
+    def __init__(self, gitdir=None):
         self.gitdir = gitdir
 
+        if not self.gitdir:
+            self.gitdir = tempfile.mkdtemp()
+            Repo.create(self.gitdir)
+
+        self.repo = Repo(self.gitdir)
+
     def get_refs(self):
-        return [['refs/heads/foo', '768fbb786f3a0a2a97ed980f3ce730e9e984f436']]
+        refs = []
+        if self.repo.head():
+            refs.append(('HEAD', self.repo.head()))
+        for refsha in self.repo.heads().items():
+            refs.append(refsha)
+        return refs
 
     def has_revision(self, sha):
         return False
 
     def apply_pack(self, refs, read):
-        read()
+        # store the incoming pack in the repository
+        fd, name = tempfile.mkstemp(suffix='pack', prefix='', dir=self.repo.pack_dir())
+        os.write(fd, read())
+        os.close(fd)
+
+        # strip '.pack' off our filename
+        basename = name[:-5]
+
+        # generate an index for it
+        pd = PackData(name)
+        pd.create_index_v2(basename+".idx")
+
+        # FIXME: Update heads
+
+        print "pack applied"
 
     def generate_pack(self, want, have, write, progress):
         pass
 
 
 if __name__ == "__main__":
-    backend = GitBackend(sys.argv[1])
+    gitdir = None
+    if len(sys.argv) > 1:
+        gitdir = sys.argv[1]
+
+    backend = GitBackend(gitdir)
     server = TCPGitServer(backend, ('localhost', 9418))
     server.serve_forever()

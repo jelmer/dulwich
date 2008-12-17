@@ -92,14 +92,16 @@ class Repo(object):
 
   def get_tags(self):
     ret = {}
-    for name in os.listdir(os.path.join(self.basedir(), 'refs', 'tags')):
-      ret[name] = self._get_ref(os.path.join(self.basedir(), 'refs', 'tags', name))
+    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'tags')):
+      for name in files:
+        ret[name] = self._get_ref(os.path.join(root, name))
     return ret
 
   def heads(self):
     ret = {}
-    for name in os.listdir(os.path.join(self.basedir(), 'refs', 'heads')):
-      ret[name] = self._get_ref(os.path.join(self.basedir(), 'refs', 'heads', name))
+    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'heads')):
+      for name in files:
+        ret[name] = self._get_ref(os.path.join(root, name))
     return ret
 
   def head(self):

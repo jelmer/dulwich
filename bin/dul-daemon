@@ -19,14 +19,16 @@
 
 import sys
 from dulwich.server import Backend, TCPGitServer
+from dulwich.repo import Repo
 
 class GitBackend(Backend):
 
     def __init__(self, gitdir):
         self.gitdir = gitdir
+        self.repository = Repo(gitdir)
 
     def get_refs(self):
-        return [['refs/heads/foo', '768fbb786f3a0a2a97ed980f3ce730e9e984f436']]
+	return [tuple(refsha) for refsha in self.repository.heads().items()]
 
     def has_revision(self, sha):
         return False

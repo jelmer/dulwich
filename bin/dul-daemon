@@ -42,7 +42,7 @@ class GitBackend(Backend):
         return refs
 
     def has_revision(self, sha):
-        return False
+        return self.repo.get_object(sha) != None
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository

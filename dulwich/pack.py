@@ -462,7 +462,7 @@ class PackData(object):
         basename = map[raw_base:raw_base+20]
         uncomp, comp_len = read_zlib(map, raw_base+20, size)
         assert size == len(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base
+        return type, (basename, uncomp), comp_len+raw_base+20
     else:
         uncomp, comp_len = read_zlib(map, raw_base, size)
         assert len(uncomp) == size

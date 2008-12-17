@@ -191,9 +191,11 @@ class ReceivePackHandler(Handler):
             client_refs.append(ref.split())
             ref = self.read_pkt_line()
 
+        # client might hang up without sending us any refs
         if len(client_refs) == 0:
             return None
 
+        # backend can now deal with this refs and read a pack using self.read
         self.backend.apply_pack(client_refs, self.read)
 
 

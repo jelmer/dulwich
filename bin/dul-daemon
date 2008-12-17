@@ -59,6 +59,8 @@ class GitBackend(Backend):
 
         # FIXME: Update heads
 
+        print "pack applied"
+
     def generate_pack(self, want, have, write, progress):
         pass
 

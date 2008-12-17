@@ -109,7 +109,7 @@ class UploadPackHandler(Handler):
         refs = self.backend.get_refs()
 
         self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)-1):
+        for i in range(1, len(refs)):
             ref = refs[i]
             self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
@@ -174,7 +174,7 @@ class ReceivePackHandler(Handler):
         refs = self.backend.get_refs()
 
         self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)-1):
+        for i in range(1, len(refs)):
             ref = refs[i]
             self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 

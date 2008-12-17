@@ -69,7 +69,10 @@ class Handler(object):
 
         :return: The next string from the stream
         """
-        size = int(self.read(4), 16)
+        sizestr = self.read(4)
+        if not sizestr:
+            return None
+        size = int(sizestr, 16)
         if size == 0:
             return None
         return self.read(size-4)
@@ -108,10 +111,11 @@ class UploadPackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)):
-            ref = refs[i]
-            self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+        if refs:
+            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         # i'm done...
         self.write("0000")
@@ -173,10 +177,11 @@ class ReceivePackHandler(Handler):
     def handle(self):
         refs = self.backend.get_refs()
 
-        self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
-        for i in range(1, len(refs)):
-            ref = refs[i]
-            self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+        if refs:
+            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
 
         self.write("0000")
 
@@ -185,6 +190,9 @@ class ReceivePackHandler(Handler):
         while ref:
             client_refs.append(ref.split())
             ref = self.read_pkt_line()
+
+        if len(client_refs) == 0:
+            return None
 
         self.backend.apply_pack(client_refs, self.read)
 

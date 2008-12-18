@@ -37,8 +37,8 @@ class GitBackend(Backend):
         refs = []
         if self.repo.head():
             refs.append(('HEAD', self.repo.head()))
-        for refsha in self.repo.heads().items():
-            refs.append(refsha)
+        for ref, sha in self.repo.heads().items():
+            refs.append(('refs/heads/'+ref,sha))
         return refs
 
     def has_revision(self, sha):

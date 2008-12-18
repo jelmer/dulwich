@@ -738,4 +738,5 @@ class Pack(object):
 
 def load_packs(path):
     for name in os.listdir(path):
-        yield Pack(os.path.join(path, name.rstrip(".pack")))
+        if name.endswith(".pack"):
+            yield Pack(os.path.join(path, name.rstrip(".pack")))

@@ -92,7 +92,7 @@ class Repo(object):
 
   def set_ref(self, name, value):
     file = os.path.join(self.basedir(), name)
-    open(file, 'w').write(value)
+    open(file, 'w').write(value+"\n")
 
   def remove_ref(self, name):
     file = os.path.join(self.basedir(), name)

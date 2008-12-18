@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os, sys, tempfile
+import os, sys, tempfile, struct
 from dulwich.server import Backend, TCPGitServer
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
@@ -66,12 +66,33 @@ class GitBackend(Backend):
         print "pack applied"
 
     def generate_pack(self, want, have, write, progress):
-        progress("dul-daemon says what")
+        progress("dul-daemon says what\n")
+
+        sha_queue = []
 
         commits_to_send = want[:]
-        count = 0
-        
+        for sha in commits_to_send:
+            sha_queue.append(sha)
 
+            c = self.repo.commit(sha)
+            for p in c.parents():
+                commits_to_send.append(p)
+
+            progress("counting objects: %d\r" % len(sha_queue))
+
+        progress("counting objects: %d, done.\n" % len(sha_queue))
+
+        write("PACK")
+        write(struct.pack(">L", 2)
+        write(struct.pack(">L", len(sha_queue)) 
+
+        for sha in sha_queue:
+            obj = self.repo.get_object(sha)
+            #write_pack_object(write_obj)
+
+        # calculate sha1 of pack
+        write("0" * 20)
+        
 
 if __name__ == "__main__":
     gitdir = None

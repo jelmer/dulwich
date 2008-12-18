@@ -112,7 +112,9 @@ class GitBackend(Backend):
 
         # send sha1 of pack
         write(w.digest)
-        
+
+        progress("how was that, then?\n")
+
 
 if __name__ == "__main__":
     gitdir = None

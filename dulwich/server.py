@@ -129,7 +129,7 @@ class UploadPackHandler(Handler):
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
         while want and want[:4] == 'want':
-            want_rev = want[5:40]
+            want_rev = want[5:45]
             # FIXME: This check probably isnt needed?
             if self.backend.has_revision(want_rev):
                want_revs.append(want_rev)
@@ -141,7 +141,7 @@ class UploadPackHandler(Handler):
         have_revs = []
         have = self.read_pkt_line()
         while have and have[:4] == 'have':
-            have_ref = have[6:40]
+            have_ref = have[6:46]
             if self.backend.has_revision(hav_rev):
                 self.write_pkt_line("ACK %s continue\n" % sha)
                 last_sha = sha

@@ -23,6 +23,7 @@ from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
 
 import sha
+from dulwich.pack import write_pack_object
 class PackWriteWrapper(object):
 
     def __init__(self, write):
@@ -102,8 +103,8 @@ class GitBackend(Backend):
 
         w = PackWriteWrapper(write)
         w.write("PACK")
-        w.write(struct.pack(">L", 2)
-        w.write(struct.pack(">L", len(sha_queue)) 
+        w.write(struct.pack(">L", 2))
+        w.write(struct.pack(">L", len(sha_queue)))
 
         for type, sha in sha_queue:
             obj = self.repo.get_object(sha)

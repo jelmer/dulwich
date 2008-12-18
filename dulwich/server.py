@@ -158,17 +158,6 @@ class UploadPackHandler(Handler):
         # The exchange finishes with a NAK
         self.write_pkt_line("NAK\n")
       
-        #if True: # False: #self.no_progress == False:
-        #    self.write_sideband(2, "Bazaar is preparing your pack, plz hold.\n")
-
-        #    for x in range(1,200)
-        #        self.write_sideband(2, "Counting objects: %d\x0d" % x*2)
-        #    self.write_sideband(2, "Counting objects: 200, done.\n")
-
-        #    for x in range(1,100):
-        #        self.write_sideband(2, "Compressiong objects: %d (%d/%d)\x0d" % (x, x*2, 200))
-        #    self.write_sideband(2, "Compressing objects: 100% (200/200), done.\n")
-
         self.backend.generate_pack(want_revs, have_revs, self.write, None)
 
 

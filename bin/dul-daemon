@@ -107,11 +107,11 @@ class GitBackend(Backend):
         w.write(struct.pack(">L", len(sha_queue)))
 
         for t, sha in sha_queue:
-            obj = self.repo.get_object(sha)
+            ty, obj = self.repo.get_object(sha).as_raw_string()
             write_pack_object(w, t, obj)
 
         # send sha1 of pack
-        write(w.digest())
+        write(w.digest)
         
 
 if __name__ == "__main__":

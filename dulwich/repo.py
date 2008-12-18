@@ -90,7 +90,7 @@ class Repo(object):
       if os.path.exists(file):
         return self._get_ref(file)
 
-  def set_ref(self, name, vale):
+  def set_ref(self, name, value):
     file = os.path.join(self.basedir(), name)
     open(file, 'w').write(value)
 

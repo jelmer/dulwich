@@ -149,6 +149,7 @@ class ShaFile(object):
     obj._num_type = type
     obj._text = string
     obj._update_contents()
+    obj._parse_text()
     return obj
 
   def _header(self):

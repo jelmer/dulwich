@@ -46,7 +46,7 @@ class GitBackend(Backend):
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='pack', prefix='', dir=self.repo.pack_dir())
+        fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.repo.pack_dir())
         os.write(fd, read())
         os.close(fd)
 
@@ -57,12 +57,20 @@ class GitBackend(Backend):
         pd = PackData(name)
         pd.create_index_v2(basename+".idx")
 
-        # FIXME: Update heads
+        for oldsha, sha, ref in refs:
+            if ref == "0" * 40:
+                self.repo.remove_ref(ref)
+            else:
+                self.repo.set_ref(ref, sha)
 
         print "pack applied"
 
     def generate_pack(self, want, have, write, progress):
-        pass
+        progress("dul-daemon says what")
+
+        commits_to_send = want[:]
+        count = 0
+        
 
 
 if __name__ == "__main__":

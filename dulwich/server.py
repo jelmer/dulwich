@@ -160,6 +160,9 @@ class UploadPackHandler(Handler):
       
         self.backend.generate_pack(want_revs, have_revs, lambda x: self.write_sideband(1, x), lambda x: self.write_sideband(2, x))
 
+        # we are done
+        self.write("0000")
+
 
 class ReceivePackHandler(Handler):
 

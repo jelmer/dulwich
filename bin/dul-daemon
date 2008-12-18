@@ -22,6 +22,24 @@ from dulwich.server import Backend, TCPGitServer
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
 
+import sha
+class PackWriteWrapper(object):
+
+    def __init__(self, write):
+        self.writefn = write
+        self.sha = sha.sha()
+
+    def write(self, blob):
+        self.sha.update(blob)
+        self.writefn(blob)
+
+    def tell(self):
+        pass
+
+    @property
+    def digest(self):
+        return self.sha.digest()
+
 class GitBackend(Backend):
 
     def __init__(self, gitdir=None):
@@ -82,16 +100,17 @@ class GitBackend(Backend):
 
         progress("counting objects: %d, done.\n" % len(sha_queue))
 
-        write("PACK")
-        write(struct.pack(">L", 2)
-        write(struct.pack(">L", len(sha_queue)) 
+        w = PackWriteWrapper(write)
+        w.write("PACK")
+        w.write(struct.pack(">L", 2)
+        w.write(struct.pack(">L", len(sha_queue)) 
 
-        for sha in sha_queue:
+        for type, sha in sha_queue:
             obj = self.repo.get_object(sha)
-            #write_pack_object(write_obj)
+            write_pack_object(w, type, object)
 
-        # calculate sha1 of pack
-        write("0" * 20)
+        # send sha1 of pack
+        write(w.digest())
         
 
 if __name__ == "__main__":

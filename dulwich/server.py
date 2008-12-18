@@ -158,7 +158,7 @@ class UploadPackHandler(Handler):
         # The exchange finishes with a NAK
         self.write_pkt_line("NAK\n")
       
-        self.backend.generate_pack(want_revs, have_revs, self.write, None)
+        self.backend.generate_pack(want_revs, have_revs, lambda x: self.write_sideband(1, x), lambda x: self.write_sideband(2, x))
 
 
 class ReceivePackHandler(Handler):

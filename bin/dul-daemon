@@ -90,7 +90,7 @@ class GitBackend(Backend):
 
         commits_to_send = want[:]
         for sha in commits_to_send:
-            sha_queue.append(sha)
+            sha_queue.append((1,sha))
 
             c = self.repo.commit(sha)
             for p in c.parents():

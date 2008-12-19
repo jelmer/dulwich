@@ -99,6 +99,23 @@ class Handler(object):
             self.write_pkt_line("%s%s" % (chr(channel), blob[:65530]))
             blob = blob[65530:]
 
+    def capabilities(self):
+        return "multi_ack side-band-64k thin-pack ofs-delta"
+
+    def handshake(self, blob):
+        """
+        Compare remote capabilites with our own and alter protocol accordingly
+
+        :param blob: space seperated list of capabilities (i.e. wire format)
+        """
+        if not "\x00" in blob:
+            return blob
+        blob, caps = blob.split("\x00")
+
+        caps = caps.split()
+
+        return blob
+
     def handle(self):
         """
         Deal with the request
@@ -112,7 +129,7 @@ class UploadPackHandler(Handler):
         refs = self.backend.get_refs()
 
         if refs:
-            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            self.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
@@ -125,7 +142,9 @@ class UploadPackHandler(Handler):
         want = self.read_pkt_line()
         if want == None:
             return
-       
+
+        want = self.handshake(want)
+
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
         while want and want[:4] == 'want':
@@ -170,7 +189,7 @@ class ReceivePackHandler(Handler):
         refs = self.backend.get_refs()
 
         if refs:
-            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            self.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
@@ -179,13 +198,17 @@ class ReceivePackHandler(Handler):
 
         client_refs = []
         ref = self.read_pkt_line()
+
+        # if ref is none then client doesnt want to send us anything..
+        if ref is None:
+            return
+
+        ref = self.handshake(ref)
+
+        # client will now send us a list of (oldsha, newsha, ref)
         while ref:
             client_refs.append(ref.split())
             ref = self.read_pkt_line()
-
-        # client might hang up without sending us any refs
-        if len(client_refs) == 0:
-            return None
 
         # backend can now deal with this refs and read a pack using self.read
         self.backend.apply_pack(client_refs, self.read)

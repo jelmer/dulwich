@@ -190,6 +190,9 @@ class ReceivePackHandler(Handler):
         # backend can now deal with this refs and read a pack using self.read
         self.backend.apply_pack(client_refs, self.read)
 
+        # when we have read all the pack from the client, it assumes everything worked OK
+        # there is NO ack from the server before it reports victory.
+
 
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):
 

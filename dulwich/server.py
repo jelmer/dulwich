@@ -100,6 +100,7 @@ class Handler(object):
             blob = blob[65530:]
 
     def capabilities(self):
+        # FIXME: Capabilities are different for pushing...
         return "multi_ack side-band-64k thin-pack ofs-delta"
 
     def handshake(self, blob):
@@ -112,6 +113,7 @@ class Handler(object):
             return blob
         blob, caps = blob.split("\x00")
 
+        # FIXME: Do something with this..
         caps = caps.split()
 
         return blob
@@ -193,6 +195,8 @@ class ReceivePackHandler(Handler):
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+        else:
+            self.write_pkt_line("0000000000000000000000000000000000000000 capabilities^{} %s" % self.capabilities())
 
         self.write("0000")
 

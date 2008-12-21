@@ -100,8 +100,7 @@ class Handler(object):
             blob = blob[65530:]
 
     def capabilities(self):
-        # FIXME: Capabilities are different for pushing...
-        return "multi_ack side-band-64k thin-pack ofs-delta"
+        return " ".join(self.default_capabilities())
 
     def handshake(self, blob):
         """
@@ -126,6 +125,9 @@ class Handler(object):
 
 
 class UploadPackHandler(Handler):
+
+    def default_capabilities(self):
+        return ("multi_ack", "side-band-64k", "thin-pack", "ofs-delta")
 
     def handle(self):
         refs = self.backend.get_refs()
@@ -186,6 +188,9 @@ class UploadPackHandler(Handler):
 
 
 class ReceivePackHandler(Handler):
+
+    def default_capabilities(self):
+        return ("report-status", "delete-refs")
 
     def handle(self):
         refs = self.backend.get_refs()

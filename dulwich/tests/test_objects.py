@@ -83,7 +83,7 @@ class BlobReadTests(unittest.TestCase):
     sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'
     c = self.commit(sha)
     self.assertEqual(c.tree(), tree_sha)
-    self.assertEqual(c.parents(), ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
+    self.assertEqual(c.parents, ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
     self.assertEqual(c.author(),
         'James Westby <jw+debian@jameswestby.net>')
     self.assertEqual(c.committer(),
@@ -95,7 +95,7 @@ class BlobReadTests(unittest.TestCase):
     sha = '0d89f20333fbb1d2f3a94da77f4981373d8f4310'
     c = self.commit(sha)
     self.assertEqual(c.tree(), '90182552c4a85a45ec2a835cadc3451bebdfe870')
-    self.assertEqual(c.parents(), [])
+    self.assertEqual(c.parents, [])
     self.assertEqual(c.author(),
         'James Westby <jw+debian@jameswestby.net>')
     self.assertEqual(c.committer(),
@@ -107,7 +107,7 @@ class BlobReadTests(unittest.TestCase):
     sha = '5dac377bdded4c9aeb8dff595f0faeebcc8498cc'
     c = self.commit(sha)
     self.assertEqual(c.tree(), 'd80c186a03f423a81b39df39dc87fd269736ca86')
-    self.assertEqual(c.parents(), ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+    self.assertEqual(c.parents, ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                    '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'])
     self.assertEqual(c.author(),
         'James Westby <jw+debian@jameswestby.net>')

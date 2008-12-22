@@ -162,7 +162,7 @@ class Repo(object):
           break
         i += 1
       history.insert(i, commit)
-      parents = commit.parents()
+      parents = commit.parents
       pending_commits += parents
     history.reverse()
     return history

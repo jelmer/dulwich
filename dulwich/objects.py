@@ -347,6 +347,7 @@ class Commit(ShaFile):
     """Returns the tree that is the state of this commit"""
     return self._tree
 
+  @property
   def parents(self):
     """Return a list of parents of this commit."""
     return self._parents

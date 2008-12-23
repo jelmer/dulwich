@@ -57,7 +57,7 @@ class Backend(object):
 
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
-import sha
+import sha, tempfile, os
 from dulwich.pack import write_pack_object
 
 class PackWriteWrapper(object):

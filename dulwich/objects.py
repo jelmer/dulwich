@@ -56,10 +56,6 @@ def sha_to_hex(sha):
 class ShaFile(object):
   """A git SHA file."""
 
-  def _update_contents(self):
-    """Update the _contents from the _text"""
-    self._contents = [ord(c) for c in self._text]
-
   @classmethod
   def _parse_legacy_object(cls, map):
     """Parse a legacy object, creating it and setting object._text"""
@@ -85,7 +81,6 @@ class ShaFile(object):
     assert text[0] == "\0", "Size not followed by null"
     text = text[1:]
     object._text = text
-    object._update_contents()
     return object
 
   def as_raw_string(self):
@@ -107,7 +102,6 @@ class ShaFile(object):
       used += 1
     raw = map[used:]
     object._text = _decompress(raw)
-    object._update_contents()
     return object
 
   @classmethod
@@ -148,16 +142,11 @@ class ShaFile(object):
     obj = real_class()
     obj._num_type = type
     obj._text = string
-    obj._update_contents()
     obj._parse_text()
     return obj
 
   def _header(self):
-    return "%s %lu\0" % (self._type, len(self._contents))
-
-  def contents(self):
-    """The raw bytes of this object"""
-    return self._contents
+    return "%s %lu\0" % (self._type, len(self._text))
 
   def crc32(self):
     return zlib.crc32(self._text)
@@ -168,6 +157,10 @@ class ShaFile(object):
     ressha.update(self._header())
     ressha.update(self._text)
     return ressha
+
+  @property
+  def id(self):
+      return self.sha().hexdigest()
 
   def __eq__(self, other):
     """Return true id the sha of the two objects match.
@@ -183,7 +176,8 @@ class Blob(ShaFile):
 
   _type = blob_id
 
-  def text(self):
+  @property
+  def data(self):
     """The text contained within the blob object."""
     return self._text
 
@@ -199,7 +193,6 @@ class Blob(ShaFile):
     """Create a blob from a string."""
     shafile = cls()
     shafile._text = string
-    shafile._update_contents()
     return shafile
 
 
@@ -220,7 +213,6 @@ class Tag(ShaFile):
     """Create a blob from a string."""
     shafile = cls()
     shafile._text = string
-    shafile._update_contents()
     return shafile
 
 
@@ -344,26 +336,32 @@ class Commit(ShaFile):
     # XXX: There can be an encoding field.
     self._message = text[count:]
 
+  @property
   def tree(self):
     """Returns the tree that is the state of this commit"""
     return self._tree
 
+  @property
   def parents(self):
     """Return a list of parents of this commit."""
     return self._parents
 
+  @property
   def author(self):
     """Returns the name of the author of the commit"""
     return self._author
 
+  @property
   def committer(self):
     """Returns the name of the committer of the commit"""
     return self._committer
 
+  @property
   def message(self):
     """Returns the commit message"""
     return self._message
 
+  @property
   def commit_time(self):
     """Returns the timestamp of the commit.
     

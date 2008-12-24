@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import select
 import socket
 
 
@@ -30,13 +31,24 @@ class SimpleFetchGraphWalker(object):
 
     def __init__(self, local_heads, get_parents):
         self.heads = set(local_heads)
+        self.get_parents = get_parents
+        self.parents = {}
 
     def ack(self, ref):
-        pass
+        if ref in self.heads:
+            self.heads.remove(ref)
+        if not ref in self.parents:
+            return
+        for p in self.parents[ref]:
+            self.ack(p)
 
     def next(self):
         if self.heads:
-            return self.heads.pop()
+            ret = self.heads.pop()
+            ps = self.get_parents(ret)
+            self.parents[ret] = ps
+            self.heads.update(ps)
+            return ret
         return None
 
 
@@ -86,7 +98,7 @@ class GitClient(object):
         self.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
 
     def capabilities(self):
-        return "4b multi_ack side-band-64k thin-pack ofs-delta"
+        return "multi_ack side-band-64k thin-pack ofs-delta"
 
     def read_refs(self):
         server_capabilities = None
@@ -132,20 +144,25 @@ class GitClient(object):
         self.write_pkt_line("want %s %s\n" % (wants[0], self.capabilities()))
         for want in wants[1:]:
             self.write_pkt_line("want %s\n" % want)
+        self.write_pkt_line(None)
         have = graph_walker.next()
         while have:
             self.write_pkt_line("have %s\n" % have)
             if len(select.select([self.fileno], [], [], 0)[0]) > 0:
                 pkt = self.read_pkt_line()
-                if pkt[:3] == "ACK":
-                    graph_walker.ack(pkt.split(" ")[1])
+                parts = pkt.rstrip("\n").split(" ")
+                if parts[0] == "ACK":
+                    graph_walker.ack(parts[1])
+                    assert parts[2] == "continue"
             have = graph_walker.next()
-        self.write_pkt_line(None)
         self.write_pkt_line("done\n")
         pkt = self.read_pkt_line()
-        while pkt != "NAK\n":
-            if pkt[:3] == "ACK":
+        while pkt:
+            parts = pkt.rstrip("\n").split(" ")
+            if parts[0] == "ACK":
                 graph_walker.ack(pkt.split(" ")[1])
+            if len(parts) < 3 or parts[2] != "continue":
+                break
             pkt = self.read_pkt_line()
         for pkt in self.read_pkt_seq():
             channel = ord(pkt[0])

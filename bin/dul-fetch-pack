@@ -27,18 +27,20 @@ client = TCPGitClient(host)
 all = True
 
 if all:
-	determine_wants = lambda x: x.values()
+    determine_wants = lambda x: x.values()
 else:
-	determinw_wants = lambda x: sys.argv[1:]
+    determine_wants = lambda x: sys.argv[1:]
 
 r = Repo(".")
 
 # FIXME: Will just fetch everything..
-graphwalker = SimpleFetchGraphWalker([], None)
+graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
 
 f, commit = r.add_pack()
 try:
-	client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
-finally:
-	f.close()
-	commit()
+    client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
+    f.close()
+    commit()
+except:
+    f.close()
+    raise

@@ -157,17 +157,7 @@ class GitBackend(Backend):
 
         progress("counting objects: %d, done.\n" % len(sha_queue))
 
-        w = PackWriteWrapper(write)
-        w.write("PACK")
-        w.write(struct.pack(">L", 2))
-        w.write(struct.pack(">L", len(sha_queue)))
-
-        for t, sha in sha_queue:
-            ty, obj = self.repo.get_object(sha).as_raw_string()
-            write_pack_object(w, t, obj)
-
-        # send sha1 of pack
-        write(w.digest)
+        write_pack_data(write, (self.repo.get_object(sha).as_raw_string() for sha in sha_queue))
 
         progress("how was that, then?\n")
 

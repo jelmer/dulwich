@@ -70,6 +70,30 @@ class Protocol(object):
             self.write_pkt_line("%s%s" % (chr(channel), blob[:65530]))
             blob = blob[65530:]
 
+    def send_cmd(self, cmd, *args):
+        """
+        Send a command and some arguments to a git server
+
+        Only used for git://
+
+        :param cmd: The remote service to access
+        :param args: List of arguments to send to remove service
+        """
+        self.proto.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
+
+    def read_cmd(self):
+        """
+        Read a command and some arguments from the git client
+
+        Only used for git://
+
+        :return: A tuple of (command, [list of arguments])
+        """
+        line = self.read_pkt_line()
+        splice_at = line.find(" ")
+        cmd, args = line[:splice_at], line[splice_at+1:]
+        return cmd, args.split(chr(0))
+ 
 
 def extract_capabilities(text):
     if not "\0" in text:

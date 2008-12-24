@@ -171,6 +171,10 @@ class TestPack(PackTests):
         self.assertEquals("James Westby <jw+debian@jameswestby.net>", commit.author)
         self.assertEquals([], commit.parents)
 
+    def test_name(self):
+        p = self.get_pack(pack1_sha)
+        self.assertEquals(pack1_sha, p.name())
+
 
 class TestHexToSha(unittest.TestCase):
 

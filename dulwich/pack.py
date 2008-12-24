@@ -35,9 +35,10 @@ a pointer in to the corresponding packfile.
 
 from collections import defaultdict
 import hashlib
-from itertools import izip
+from itertools import imap, izip
 import mmap
 import os
+import sha
 import struct
 import sys
 import zlib
@@ -241,8 +242,17 @@ class PackIndex(object):
                                   self._crc32_table_offset + i * 4)[0]
 
   def __iter__(self):
+      return imap(sha_to_hex, self._itersha())
+
+  def _itersha(self):
     for i in range(len(self)):
-        yield sha_to_hex(self._unpack_name(i))
+        yield self._unpack_name(i)
+
+  def objects_sha1(self):
+    sha = hashlib.sha1()
+    for name in self._itersha():
+        sha.update(name)
+    return sha.hexdigest()
 
   def iterentries(self):
     """Iterate over the entries in this pack index.
@@ -681,13 +691,18 @@ class Pack(object):
 
     def __init__(self, basename):
         self._basename = basename
+        self._data_path = self._basename + ".pack"
+        self._idx_path = self._basename + ".idx"
         self._data = None
         self._idx = None
+
+    def name(self):
+        return self.idx.objects_sha1()
 
     @property
     def data(self):
         if self._data is None:
-            self._data = PackData(self._basename + ".pack")
+            self._data = PackData(self._data_path)
             assert len(self.idx) == len(self._data)
             assert self.idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
         return self._data
@@ -695,7 +710,7 @@ class Pack(object):
     @property
     def idx(self):
         if self._idx is None:
-            self._idx = PackIndex(self._basename + ".idx")
+            self._idx = PackIndex(self._idx_path)
         return self._idx
 
     def close(self):

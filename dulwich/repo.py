@@ -128,7 +128,7 @@ class Repo(object):
   def commit(self, sha):
     return self._get_object(sha, Commit)
 
-  def get_tree(self, sha):
+  def tree(self, sha):
     return self._get_object(sha, Tree)
 
   def get_blob(self, sha):

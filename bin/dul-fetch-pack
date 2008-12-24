@@ -36,8 +36,9 @@ r = Repo(".")
 # FIXME: Will just fetch everything..
 graphwalker = SimpleFetchGraphWalker([], None)
 
-f = r.add_pack()
+f, commit = r.add_pack()
 try:
 	client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
 finally:
 	f.close()
+	commit()

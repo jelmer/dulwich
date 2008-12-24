@@ -74,6 +74,13 @@ def read_zlib(data, offset, dec_size):
     return x, comp_len
 
 
+def iter_sha1(iter):
+    sha = hashlib.sha1()
+    for name in iter:
+        sha.update(name)
+    return sha.hexdigest()
+
+
 def hex_to_sha(hex):
   """Convert a hex string to a binary sha string."""
   ret = ""
@@ -249,10 +256,7 @@ class PackIndex(object):
         yield self._unpack_name(i)
 
   def objects_sha1(self):
-    sha = hashlib.sha1()
-    for name in self._itersha():
-        sha.update(name)
-    return sha.hexdigest()
+    return iter_sha1(self._itersha())
 
   def iterentries(self):
     """Iterate over the entries in this pack index.
@@ -415,16 +419,17 @@ class PackData(object):
         found[sha] = (type, obj)
         yield sha, offset, shafile.crc32()
 
+  def sorted_entries(self):
+    ret = list(self.iterentries())
+    ret.sort()
+    return ret
+
   def create_index_v1(self, filename):
-    entries = list(self.iterentries())
-    # Sort entries first
-    entries = sorted(entries)
+    entries = self.sorted_entries()
     write_pack_index_v1(filename, entries, self.calculate_checksum())
 
   def create_index_v2(self, filename):
-    entries = list(self.iterentries())
-    # Sort entries first
-    entries = sorted(entries)
+    entries = self.sorted_entries()
     write_pack_index_v2(filename, entries, self.calculate_checksum())
 
   def get_stored_checksum(self):

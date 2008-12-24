@@ -18,14 +18,7 @@
 
 import select
 import socket
-from dulwich.protocol import Protocol, TCP_GIT_PORT
-
-def extract_capabilities(text):
-    if not "\0" in text:
-        return text
-    capabilities = text.split("\0")
-    return (capabilities[0], capabilities[1:])
-
+from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
 
 class SimpleFetchGraphWalker(object):
 

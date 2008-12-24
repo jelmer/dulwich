@@ -528,16 +528,16 @@ def write_pack_object(f, type, object):
     return f.tell()
 
 
-def write_pack(filename, objects):
+def write_pack(filename, objects, num_objects):
     f = open(filename + ".pack", 'w')
     try:
-        entries, data_sum = write_pack_data(f, objects)
+        entries, data_sum = write_pack_data(f, objects, num_objects)
     except:
         f.close()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
-def write_pack_data(f, objects):
+def write_pack_data(f, objects, num_objects):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
@@ -548,7 +548,7 @@ def write_pack_data(f, objects):
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
-    f.write(struct.pack(">L", len(objects))) # Number of objects in pack
+    f.write(struct.pack(">L", num_objects)) # Number of objects in pack
     for o in objects:
         sha1 = o.sha().digest()
         crc32 = o.crc32()

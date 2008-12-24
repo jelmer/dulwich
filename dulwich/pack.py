@@ -479,10 +479,14 @@ class SHA1Writer(object):
         self.sha1.update(data)
         self.f.write(data)
 
-    def close(self):
+    def write_sha(self):
         sha = self.sha1.digest()
         assert len(sha) == 20
         self.f.write(sha)
+        return sha
+
+    def close(self):
+        sha = self.write_sha()
         self.f.close()
         return sha
 
@@ -525,18 +529,21 @@ def write_pack_object(f, type, object):
 
 
 def write_pack(filename, objects):
-    entries, data_sum = write_pack_data(filename + ".pack", objects)
+    f = open(filename + ".pack", 'w')
+    try:
+        entries, data_sum = write_pack_data(f, objects)
+    except:
+        f.close()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
-def write_pack_data(filename, objects):
+def write_pack_data(f, objects):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
-    f = open(filename, 'w')
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header
@@ -549,7 +556,7 @@ def write_pack_data(filename, objects):
         t, o = o.as_raw_string()
         offset = write_pack_object(f, t, o)
         entries.append((sha1, offset, crc32))
-    return entries, f.close()
+    return entries, f.write_sha()
 
 
 def write_pack_index_v1(filename, entries, pack_checksum):

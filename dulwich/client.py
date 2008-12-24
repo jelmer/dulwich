@@ -70,7 +70,6 @@ class GitClient(object):
         return refs, server_capabilities
 
     def send_pack(self, path):
-        self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
         refs, server_capabilities = self.read_refs()
         changed_refs = [] # FIXME
         if not changed_refs:
@@ -90,8 +89,6 @@ class GitClient(object):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
-        self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
-
         (refs, server_capabilities) = self.read_refs()
        
         wants = determine_wants(refs)
@@ -140,3 +137,11 @@ class TCPGitClient(GitClient):
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)
         super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, host)
+
+    def send_pack(self, path):
+        self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
+        super(TCPGitClient, self).send_pack(path)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
+        super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)

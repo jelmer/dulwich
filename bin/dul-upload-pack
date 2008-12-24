@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# dul-daemon - Simple git-daemon a like
+# dul-upload-pack - git-upload-pack in python
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
 # 
 # This program is free software; you can redistribute it and/or
@@ -17,7 +17,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.server import GitBackend, TCPGitServer
+import sys
+from dulwich.server import GitBackend, UploadPackHandler
+
+def send_fn(data):
+    sys.stdout.write(data)
+    sys.stdout.flush()
 
 if __name__ == "__main__":
     gitdir = None
@@ -25,5 +30,5 @@ if __name__ == "__main__":
         gitdir = sys.argv[1]
 
     backend = GitBackend(gitdir)
-    server = TCPGitServer(backend, ('localhost', 9418))
-    server.serve_forever()
+    handler = UploadPackHandler(backend, sys.stdin.read, send_fn)
+    handler.handle()

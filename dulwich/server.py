@@ -272,8 +272,8 @@ class UploadPackHandler(Handler):
         while have and have[:4] == 'have':
             have_ref = have[6:46]
             if self.backend.has_revision(hav_rev):
-                self.write_pkt_line("ACK %s continue\n" % sha)
-                last_sha = sha
+                self.write_pkt_line("ACK %s continue\n" % have_ref)
+                last_sha = have_ref
                 have_revs.append(rev_id)
             have = self.read_pkt_line()
 

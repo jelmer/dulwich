@@ -90,6 +90,16 @@ class Repo(object):
       if os.path.exists(file):
         return self._get_ref(file)
 
+  def set_ref(self, name, value):
+    file = os.path.join(self.basedir(), name)
+    open(file, 'w').write(value+"\n")
+
+  def remove_ref(self, name):
+    file = os.path.join(self.basedir(), name)
+    if os.path.exists(file):
+      os.remove(file)
+      return
+
   def get_tags(self):
     ret = {}
     for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'tags')):

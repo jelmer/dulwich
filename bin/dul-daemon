@@ -17,10 +17,29 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os, sys, tempfile
+import os, sys, tempfile, struct
 from dulwich.server import Backend, TCPGitServer
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
+
+import sha
+from dulwich.pack import write_pack_object
+class PackWriteWrapper(object):
+
+    def __init__(self, write):
+        self.writefn = write
+        self.sha = sha.sha()
+
+    def write(self, blob):
+        self.sha.update(blob)
+        self.writefn(blob)
+
+    def tell(self):
+        pass
+
+    @property
+    def digest(self):
+        return self.sha.digest()
 
 class GitBackend(Backend):
 
@@ -37,16 +56,16 @@ class GitBackend(Backend):
         refs = []
         if self.repo.head():
             refs.append(('HEAD', self.repo.head()))
-        for refsha in self.repo.heads().items():
-            refs.append(refsha)
+        for ref, sha in self.repo.heads().items():
+            refs.append(('refs/heads/'+ref,sha))
         return refs
 
     def has_revision(self, sha):
-        return False
+        return self.repo.get_object(sha) != None
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='pack', prefix='', dir=self.repo.pack_dir())
+        fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.repo.pack_dir())
         os.write(fd, read())
         os.close(fd)
 
@@ -57,12 +76,64 @@ class GitBackend(Backend):
         pd = PackData(name)
         pd.create_index_v2(basename+".idx")
 
-        # FIXME: Update heads
+        for oldsha, sha, ref in refs:
+            if ref == "0" * 40:
+                self.repo.remove_ref(ref)
+            else:
+                self.repo.set_ref(ref, sha)
 
         print "pack applied"
 
     def generate_pack(self, want, have, write, progress):
-        pass
+        progress("dul-daemon says what\n")
+
+        sha_queue = []
+
+        commits_to_send = want[:]
+        for sha in commits_to_send:
+            if sha in sha_queue:
+                continue
+
+            sha_queue.append((1,sha))
+
+            c = self.repo.commit(sha)
+            for p in c.parents():
+                if not p in commits_to_send:
+                    commits_to_send.append(p)
+
+            def parse_tree(tree, sha_queue):
+                for mode, name, x in tree.entries():
+                    if not x in sha_queue:
+                        try:
+                            t = self.repo.get_tree(x)
+                            sha_queue.append((2, x))
+                            parse_tree(t, sha_queue)
+                        except:
+                            sha_queue.append((3, x))
+
+            treesha = c.tree()
+            if treesha not in sha_queue:
+                sha_queue.append((2, treesha))
+                t = self.repo.get_tree(treesha)
+                parse_tree(t, sha_queue)
+
+            progress("counting objects: %d\r" % len(sha_queue))
+
+        progress("counting objects: %d, done.\n" % len(sha_queue))
+
+        w = PackWriteWrapper(write)
+        w.write("PACK")
+        w.write(struct.pack(">L", 2))
+        w.write(struct.pack(">L", len(sha_queue)))
+
+        for t, sha in sha_queue:
+            ty, obj = self.repo.get_object(sha).as_raw_string()
+            write_pack_object(w, t, obj)
+
+        # send sha1 of pack
+        write(w.digest)
+
+        progress("how was that, then?\n")
 
 
 if __name__ == "__main__":

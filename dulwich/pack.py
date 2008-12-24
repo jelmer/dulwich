@@ -149,6 +149,7 @@ def resolve_object(offset, type, obj, get_ref, get_offset):
   type, base_text = resolve_object(offset, type, base_obj, get_ref, get_offset)
   return type, apply_delta(base_text, delta)
 
+
 class PackIndex(object):
   """An index in to a packfile.
 
@@ -170,7 +171,6 @@ class PackIndex(object):
     it whenever required.
     """
     self._filename = filename
-    assert os.path.exists(filename), "%s is not a pack index" % filename
     # Take the size now, so it can be checked each time we map the file to
     # ensure that it hasn't changed.
     self._size = os.path.getsize(filename)
@@ -674,54 +674,61 @@ class Pack(object):
 
     def __init__(self, basename):
         self._basename = basename
-        self._idx = PackIndex(basename + ".idx")
         self._data = None
+        self._idx = None
 
-    def _get_data(self):
+    @property
+    def data(self):
         if self._data is None:
             self._data = PackData(self._basename + ".pack")
-            assert len(self._idx) == len(self._data)
-            assert self._idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
+            assert len(self.idx) == len(self._data)
+            assert self.idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
         return self._data
+
+    @property
+    def idx(self):
+        if self._idx is None:
+            self._idx = PackIndex(self._basename + ".idx")
+        return self._idx
 
     def close(self):
         if self._data is not None:
             self._data.close()
-        self._idx.close()
+        self.idx.close()
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._idx == other._idx
+        return type(self) == type(other) and self.idx == other.idx
 
     def __len__(self):
         """Number of entries in this pack."""
-        return len(self._idx)
+        return len(self.idx)
 
     def __repr__(self):
         return "Pack(%r)" % self._basename
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""
-        return iter(self._idx)
+        return iter(self.idx)
 
     def check(self):
-        return self._idx.check() and self._get_data().check()
+        return self.idx.check() and self.data.check()
 
     def get_stored_checksum(self):
-        return self._get_data().get_stored_checksum()
+        return self.data.get_stored_checksum()
 
     def __contains__(self, sha1):
         """Check whether this pack contains a particular SHA1."""
-        return (self._idx.object_index(sha1) is not None)
+        return (self.idx.object_index(sha1) is not None)
 
     def _get_text(self, sha1):
-        offset = self._idx.object_index(sha1)
+        offset = self.idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
 
-        type, obj = self._get_data().get_object_at(offset)
+        type, obj = self.data.get_object_at(offset)
         assert isinstance(offset, int)
         return resolve_object(offset, type, obj, self._get_text, 
-            self._get_data().get_object_at)
+            self.data.get_object_at)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
@@ -729,14 +736,14 @@ class Pack(object):
         return ShaFile.from_raw_string(type, uncomp)
 
     def iterobjects(self):
-        for offset, type, obj in self._get_data().iterobjects():
+        for offset, type, obj in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
                     *resolve_object(offset, type, obj, self._get_text, 
-                self._get_data().get_object_at))
+                self.data.get_object_at))
 
 
 def load_packs(path):
     for name in os.listdir(path):
         if name.endswith(".pack"):
-            yield Pack(os.path.join(path, name.rstrip(".pack")))
+            yield Pack(os.path.join(path, name[:-len(".pack")]))

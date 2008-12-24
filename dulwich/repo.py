@@ -26,7 +26,7 @@ from objects import (ShaFile,
                      Tree,
                      Blob,
                      )
-from pack import load_packs
+from pack import load_packs, iter_sha1, PackData, write_pack_index_v2
 import tempfile
 
 OBJECTDIR = 'objects'
@@ -67,8 +67,18 @@ class Repo(object):
     return os.path.join(self.object_dir(), PACKDIR)
 
   def add_pack(self):
-    fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.pack_dir()) 
-    return os.fdopen(fd, 'w')
+    fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+    f = os.fdopen(fd, 'w')
+    def commit():
+       self._move_in_pack(path)
+    return f, commit
+
+  def _move_in_pack(self, path):
+    p = PackData(path)
+    entries = p.sorted_entries()
+    basename = os.path.join(self.pack_dir(), "pack-%s" % iter_sha1(entry[0] for entry in entries))
+    write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
+    os.rename(path, basename + ".pack")
 
   def _get_packs(self):
     if self._packs is None:

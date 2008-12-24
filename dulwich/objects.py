@@ -364,6 +364,10 @@ class Commit(ShaFile):
     """
     return self._commit_time
 
+  @property
+  def id(self):
+      return self.sha().hexdigest()
+
 type_map = {
   blob_id : Blob,
   tree_id : Tree,

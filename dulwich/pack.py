@@ -362,6 +362,7 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
+    assert self._size >= 12, "%s is too small for a packfile" % filename
     self._header_size = self._read_header()
 
   def _read_header(self):
@@ -774,5 +775,5 @@ def load_packs(path):
     if not os.path.exists(path):
         return
     for name in os.listdir(path):
-        if name.endswith(".pack"):
+        if name.startswith("pack-") and name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))

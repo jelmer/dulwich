@@ -150,6 +150,9 @@ class Repo(object):
   def get_object(self, sha):
     return self._get_object(sha, ShaFile)
 
+  def get_parents(self, sha):
+    return self.commit(sha).parents
+
   def commit(self, sha):
     return self._get_object(sha, Commit)
 

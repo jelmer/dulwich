@@ -158,6 +158,10 @@ class ShaFile(object):
     ressha.update(self._text)
     return ressha
 
+  @property
+  def id(self):
+      return self.sha().hexdigest()
+
   def __eq__(self, other):
     """Return true id the sha of the two objects match.
 
@@ -364,10 +368,6 @@ class Commit(ShaFile):
     Returns it as the number of seconds since the epoch.
     """
     return self._commit_time
-
-  @property
-  def id(self):
-      return self.sha().hexdigest()
 
 type_map = {
   blob_id : Blob,

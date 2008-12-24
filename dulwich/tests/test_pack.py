@@ -168,7 +168,7 @@ class TestPack(PackTests):
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)
         commit = p[commit_sha]
-        self.assertEquals("James Westby <jw+debian@jameswestby.net>", commit.author())
+        self.assertEquals("James Westby <jw+debian@jameswestby.net>", commit.author)
         self.assertEquals([], commit.parents)
 
 

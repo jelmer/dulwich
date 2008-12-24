@@ -54,9 +54,6 @@ class GitClient(object):
         self.fileno = fileno
         self.host = host
 
-    def send_cmd(self, name, *args):
-        self.proto.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
-
     def capabilities(self):
         return "multi_ack side-band-64k thin-pack ofs-delta"
 
@@ -73,7 +70,7 @@ class GitClient(object):
         return refs, server_capabilities
 
     def send_pack(self, path):
-        self.send_cmd("git-receive-pack", path, "host=%s" % self.host)
+        self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
         refs, server_capabilities = self.read_refs()
         changed_refs = [] # FIXME
         if not changed_refs:
@@ -93,7 +90,7 @@ class GitClient(object):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
-        self.send_cmd("git-upload-pack", path, "host=%s" % self.host)
+        self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
 
         (refs, server_capabilities) = self.read_refs()
        

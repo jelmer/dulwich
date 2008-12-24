@@ -99,6 +99,25 @@ class Handler(object):
             self.write_pkt_line("%s%s" % (chr(channel), blob[:65530]))
             blob = blob[65530:]
 
+    def capabilities(self):
+        # FIXME: Capabilities are different for pushing...
+        return "multi_ack side-band-64k thin-pack ofs-delta"
+
+    def handshake(self, blob):
+        """
+        Compare remote capabilites with our own and alter protocol accordingly
+
+        :param blob: space seperated list of capabilities (i.e. wire format)
+        """
+        if not "\x00" in blob:
+            return blob
+        blob, caps = blob.split("\x00")
+
+        # FIXME: Do something with this..
+        caps = caps.split()
+
+        return blob
+
     def handle(self):
         """
         Deal with the request
@@ -112,7 +131,7 @@ class UploadPackHandler(Handler):
         refs = self.backend.get_refs()
 
         if refs:
-            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            self.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
@@ -125,11 +144,13 @@ class UploadPackHandler(Handler):
         want = self.read_pkt_line()
         if want == None:
             return
-       
+
+        want = self.handshake(want)
+
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
         while want and want[:4] == 'want':
-            want_rev = want[5:40]
+            want_rev = want[5:45]
             # FIXME: This check probably isnt needed?
             if self.backend.has_revision(want_rev):
                want_revs.append(want_rev)
@@ -141,7 +162,7 @@ class UploadPackHandler(Handler):
         have_revs = []
         have = self.read_pkt_line()
         while have and have[:4] == 'have':
-            have_ref = have[6:40]
+            have_ref = have[6:46]
             if self.backend.has_revision(hav_rev):
                 self.write_pkt_line("ACK %s continue\n" % sha)
                 last_sha = sha
@@ -158,18 +179,10 @@ class UploadPackHandler(Handler):
         # The exchange finishes with a NAK
         self.write_pkt_line("NAK\n")
       
-        #if True: # False: #self.no_progress == False:
-        #    self.write_sideband(2, "Bazaar is preparing your pack, plz hold.\n")
+        self.backend.generate_pack(want_revs, have_revs, lambda x: self.write_sideband(1, x), lambda x: self.write_sideband(2, x))
 
-        #    for x in range(1,200)
-        #        self.write_sideband(2, "Counting objects: %d\x0d" % x*2)
-        #    self.write_sideband(2, "Counting objects: 200, done.\n")
-
-        #    for x in range(1,100):
-        #        self.write_sideband(2, "Compressiong objects: %d (%d/%d)\x0d" % (x, x*2, 200))
-        #    self.write_sideband(2, "Compressing objects: 100% (200/200), done.\n")
-
-        self.backend.generate_pack(want_revs, have_revs, self.write, None)
+        # we are done
+        self.write("0000")
 
 
 class ReceivePackHandler(Handler):
@@ -178,23 +191,34 @@ class ReceivePackHandler(Handler):
         refs = self.backend.get_refs()
 
         if refs:
-            self.write_pkt_line("%s %s\x00multi_ack side-band-64k thin-pack ofs-delta\n" % (refs[0][1], refs[0][0]))
+            self.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+        else:
+            self.write_pkt_line("0000000000000000000000000000000000000000 capabilities^{} %s" % self.capabilities())
 
         self.write("0000")
 
         client_refs = []
         ref = self.read_pkt_line()
+
+        # if ref is none then client doesnt want to send us anything..
+        if ref is None:
+            return
+
+        ref = self.handshake(ref)
+
+        # client will now send us a list of (oldsha, newsha, ref)
         while ref:
             client_refs.append(ref.split())
             ref = self.read_pkt_line()
 
-        if len(client_refs) == 0:
-            return None
-
+        # backend can now deal with this refs and read a pack using self.read
         self.backend.apply_pack(client_refs, self.read)
+
+        # when we have read all the pack from the client, it assumes everything worked OK
+        # there is NO ack from the server before it reports victory.
 
 
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):

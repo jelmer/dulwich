@@ -18,7 +18,7 @@
 
 import select
 import socket
-from dulwich.protocol import Protocol
+from dulwich.protocol import Protocol, TCP_GIT_PORT
 
 def extract_capabilities(text):
     if not "\0" in text:
@@ -144,7 +144,7 @@ class GitClient(object):
 
 class TCPGitClient(GitClient):
 
-    def __init__(self, host, port=9418):
+    def __init__(self, host, port=TCP_GIT_PORT):
         self._socket = socket.socket()
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)

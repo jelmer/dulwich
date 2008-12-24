@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+TCP_GIT_PORT = 9418
 
 class Protocol(object):
 

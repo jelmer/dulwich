@@ -25,5 +25,5 @@ if __name__ == "__main__":
         gitdir = sys.argv[1]
 
     backend = GitBackend(gitdir)
-    server = TCPGitServer(backend, ('localhost', 9418))
+    server = TCPGitServer(backend, 'localhost')
     server.serve_forever()

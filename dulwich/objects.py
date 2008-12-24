@@ -331,6 +331,7 @@ class Commit(ShaFile):
     # XXX: There can be an encoding field.
     self._message = text[count:]
 
+  @property
   def tree(self):
     """Returns the tree that is the state of this commit"""
     return self._tree
@@ -340,18 +341,22 @@ class Commit(ShaFile):
     """Return a list of parents of this commit."""
     return self._parents
 
+  @property
   def author(self):
     """Returns the name of the author of the commit"""
     return self._author
 
+  @property
   def committer(self):
     """Returns the name of the committer of the commit"""
     return self._committer
 
+  @property
   def message(self):
     """Returns the commit message"""
     return self._message
 
+  @property
   def commit_time(self):
     """Returns the timestamp of the commit.
     

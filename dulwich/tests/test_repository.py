@@ -68,9 +68,9 @@ class RepositoryTests(unittest.TestCase):
   def test_get_tree(self):
     r = self.open_repo('a')
     commit = r.commit(r.head())
-    tree = r.get_tree(commit.tree())
+    tree = r.get_tree(commit.tree)
     self.assertEqual(tree._type, 'tree')
-    self.assertEqual(tree.sha().hexdigest(), commit.tree())
+    self.assertEqual(tree.sha().hexdigest(), commit.tree)
 
   def test_get_tree_not_tree(self):
     r = self.open_repo('a')

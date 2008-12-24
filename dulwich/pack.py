@@ -417,11 +417,15 @@ class PackData(object):
 
   def create_index_v1(self, filename):
     entries = list(self.iterentries())
+    # Sort entries first
+    entries = sorted(entries)
     write_pack_index_v1(filename, entries, self.calculate_checksum())
 
   def create_index_v2(self, filename):
     entries = list(self.iterentries())
-    write_pack_index_v1(filename, entries, self.calculate_checksum())
+    # Sort entries first
+    entries = sorted(entries)
+    write_pack_index_v2(filename, entries, self.calculate_checksum())
 
   def get_stored_checksum(self):
     return self._stored_checksum
@@ -544,6 +548,7 @@ def write_pack(filename, objects, num_objects):
         entries, data_sum = write_pack_data(f, objects, num_objects)
     except:
         f.close()
+    entries.sort()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
@@ -577,9 +582,6 @@ def write_pack_index_v1(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    # Sort entries first
-
-    entries = sorted(entries)
     f = open(filename, 'w')
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
@@ -661,8 +663,6 @@ def write_pack_index_v2(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    # Sort entries first
-    entries = sorted(entries)
     f = open(filename, 'w')
     f = SHA1Writer(f)
     f.write('\377tOc')

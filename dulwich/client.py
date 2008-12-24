@@ -37,10 +37,9 @@ class SimpleFetchGraphWalker(object):
     def ack(self, ref):
         if ref in self.heads:
             self.heads.remove(ref)
-        if not ref in self.parents:
-            return
-        for p in self.parents[ref]:
-            self.ack(p)
+        if ref in self.parents:
+            for p in self.parents[ref]:
+                self.ack(p)
 
     def next(self):
         if self.heads:

@@ -17,7 +17,10 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-from dulwich.protocol import Protocol
+from dulwich.protocol import Protocol, TCP_GIT_PORT
+from dulwich.repo import Repo
+from dulwich.pack import PackData, Pack, write_pack_data, extract_capabilities
+import os, sha, tempfile
 
 class Backend(object):
 
@@ -56,10 +59,6 @@ class Backend(object):
         """
         raise NotImplementedError
 
-from dulwich.repo import Repo
-from dulwich.pack import PackData, Pack
-import sha, tempfile, os
-from dulwich.pack import write_pack_data
 
 class GitBackend(Backend):
 
@@ -155,21 +154,6 @@ class Handler(object):
     def capabilities(self):
         return " ".join(self.default_capabilities())
 
-    def handshake(self, blob):
-        """
-        Compare remote capabilites with our own and alter protocol accordingly
-
-        :param blob: space seperated list of capabilities (i.e. wire format)
-        """
-        if not "\x00" in blob:
-            return blob
-        blob, caps = blob.split("\x00")
-
-        # FIXME: Do something with this..
-        caps = caps.split()
-
-        return blob
-
 
 class UploadPackHandler(Handler):
 
@@ -194,7 +178,7 @@ class UploadPackHandler(Handler):
         if want == None:
             return
 
-        want = self.handshake(want)
+        want, client_capabilities = extract_capabilities(want)
 
         # Keep reading the list of demands until we hit another "0000" 
         want_revs = []
@@ -211,7 +195,7 @@ class UploadPackHandler(Handler):
         have_revs = []
         have = self.proto.read_pkt_line()
         while have and have[:4] == 'have':
-            have_ref = have[6:46]
+            have_ref = have[5:45]
             if self.backend.has_revision(have_ref):
                 self.proto.write_pkt_line("ACK %s continue\n" % have_ref)
                 last_sha = have_ref
@@ -259,7 +243,7 @@ class ReceivePackHandler(Handler):
         if ref is None:
             return
 
-        ref = self.handshake(ref)
+        ref, client_capabilities = extract_capabilities(ref)
 
         # client will now send us a list of (oldsha, newsha, ref)
         while ref:
@@ -309,7 +293,7 @@ class TCPGitServer(SocketServer.TCPServer):
     allow_reuse_address = True
     serve = SocketServer.TCPServer.serve_forever
 
-    def __init__(self, backend, addr):
+    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT):
         self.backend = backend
         SocketServer.TCPServer.__init__(self, addr, TCPGitRequestHandler)
 

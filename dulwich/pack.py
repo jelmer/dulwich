@@ -152,7 +152,7 @@ def resolve_object(offset, type, obj, get_ref, get_offset):
      (basename, delta) = obj
      assert isinstance(basename, str) and len(basename) == 20
      assert isinstance(delta, str)
-     type, base_obj= get_ref(basename)
+     type, base_obj = get_ref(basename)
      assert isinstance(type, int)
   type, base_text = resolve_object(offset, type, base_obj, get_ref, get_offset)
   return type, apply_delta(base_text, delta)
@@ -403,22 +403,35 @@ class PackData(object):
 
   def iterentries(self):
     found = {}
-    postponed = list(self.iterobjects())
-    while postponed:
-      (offset, type, obj) = postponed.pop(0)
+    at = {}
+    postponed = defaultdict(list)
+    class Postpone(Exception):
+        """Raised to postpone delta resolving."""
+        
+    def get_ref_text(sha):
+        if sha in found:
+            return found[sha]
+        raise Postpone, (sha, )
+    todo = list(self.iterobjects())
+    while todo:
+      (offset, type, obj) = todo.pop(0)
+      at[offset] = (type, obj)
       assert isinstance(offset, int)
       assert isinstance(type, int)
       assert isinstance(obj, tuple) or isinstance(obj, str)
       try:
-        type, obj = resolve_object(offset, type, obj, found.__getitem__, 
-            self.get_object_at)
-      except KeyError:
-        postponed.append((offset, type, obj))
+        type, obj = resolve_object(offset, type, obj, get_ref_text,
+            at.__getitem__)
+      except Postpone, (sha, ):
+        postponed[sha].append((offset, type, obj))
       else:
         shafile = ShaFile.from_raw_string(type, obj)
         sha = shafile.sha().digest()
         found[sha] = (type, obj)
         yield sha, offset, shafile.crc32()
+        todo += postponed.get(sha, [])
+    if postponed:
+        raise KeyError([sha_to_hex(h) for h in postponed.keys()])
 
   def sorted_entries(self):
     ret = list(self.iterentries())
@@ -683,7 +696,7 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         f.write(name)
     for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">L", entry_checksum))
+        f.write(struct.pack(">l", entry_checksum))
     for (name, offset, entry_checksum) in entries:
         # FIXME: handle if MSBit is set in offset
         f.write(struct.pack(">L", offset))

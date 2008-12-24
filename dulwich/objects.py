@@ -56,10 +56,6 @@ def sha_to_hex(sha):
 class ShaFile(object):
   """A git SHA file."""
 
-  def _update_contents(self):
-    """Update the _contents from the _text"""
-    self._contents = [ord(c) for c in self._text]
-
   @classmethod
   def _parse_legacy_object(cls, map):
     """Parse a legacy object, creating it and setting object._text"""
@@ -85,7 +81,6 @@ class ShaFile(object):
     assert text[0] == "\0", "Size not followed by null"
     text = text[1:]
     object._text = text
-    object._update_contents()
     return object
 
   def as_raw_string(self):
@@ -107,7 +102,6 @@ class ShaFile(object):
       used += 1
     raw = map[used:]
     object._text = _decompress(raw)
-    object._update_contents()
     return object
 
   @classmethod
@@ -148,15 +142,10 @@ class ShaFile(object):
     obj = real_class()
     obj._num_type = type
     obj._text = string
-    obj._update_contents()
     return obj
 
   def _header(self):
-    return "%s %lu\0" % (self._type, len(self._contents))
-
-  def contents(self):
-    """The raw bytes of this object"""
-    return self._contents
+    return "%s %lu\0" % (self._type, len(self._text))
 
   def crc32(self):
     return zlib.crc32(self._text)
@@ -198,7 +187,6 @@ class Blob(ShaFile):
     """Create a blob from a string."""
     shafile = cls()
     shafile._text = string
-    shafile._update_contents()
     return shafile
 
 
@@ -219,7 +207,6 @@ class Tag(ShaFile):
     """Create a blob from a string."""
     shafile = cls()
     shafile._text = string
-    shafile._update_contents()
     return shafile
 
 

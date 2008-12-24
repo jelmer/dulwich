@@ -17,6 +17,7 @@
 # MA  02110-1301, USA.
 
 import SocketServer
+from dulwich.protocol import Protocol
 
 class Backend(object):
 
@@ -58,24 +59,7 @@ class Backend(object):
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack
 import sha, tempfile, os
-from dulwich.pack import write_pack_object
-
-class PackWriteWrapper(object):
-
-    def __init__(self, write):
-        self.writefn = write
-        self.sha = sha.sha()
-
-    def write(self, blob):
-        self.sha.update(blob)
-        self.writefn(blob)
-
-    def tell(self):
-        pass
-
-    @property
-    def digest(self):
-        return self.sha.digest()
+from dulwich.pack import write_pack_data
 
 class GitBackend(Backend):
 

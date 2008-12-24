@@ -27,6 +27,7 @@ from objects import (ShaFile,
                      Blob,
                      )
 from pack import load_packs
+import tempfile
 
 OBJECTDIR = 'objects'
 PACKDIR = 'pack'
@@ -64,6 +65,10 @@ class Repo(object):
 
   def pack_dir(self):
     return os.path.join(self.object_dir(), PACKDIR)
+
+  def add_pack(self):
+    fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.pack_dir()) 
+    return os.fdopen(fd, 'w')
 
   def _get_packs(self):
     if self._packs is None:

@@ -18,14 +18,7 @@
 
 import select
 import socket
-from dulwich.protocol import Protocol
-
-def extract_capabilities(text):
-    if not "\0" in text:
-        return text
-    capabilities = text.split("\0")
-    return (capabilities[0], capabilities[1:])
-
+from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
 
 class SimpleFetchGraphWalker(object):
 
@@ -37,10 +30,9 @@ class SimpleFetchGraphWalker(object):
     def ack(self, ref):
         if ref in self.heads:
             self.heads.remove(ref)
-        if not ref in self.parents:
-            return
-        for p in self.parents[ref]:
-            self.ack(p)
+        if ref in self.parents:
+            for p in self.parents[ref]:
+                self.ack(p)
 
     def next(self):
         if self.heads:
@@ -145,7 +137,7 @@ class GitClient(object):
 
 class TCPGitClient(GitClient):
 
-    def __init__(self, host, port=9418):
+    def __init__(self, host, port=TCP_GIT_PORT):
         self._socket = socket.socket()
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)

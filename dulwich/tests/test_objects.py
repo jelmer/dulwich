@@ -48,25 +48,25 @@ class BlobReadTests(unittest.TestCase):
 
   def test_decompress_simple_blob(self):
     b = self.get_blob(a_sha)
-    self.assertEqual(b.text(), 'test 1\n')
+    self.assertEqual(b.data, 'test 1\n')
     self.assertEqual(b.sha().hexdigest(), a_sha)
 
   def test_parse_empty_blob_object(self):
     sha = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
     b = self.get_blob(sha)
-    self.assertEqual(b.text(), '')
+    self.assertEqual(b.data, '')
     self.assertEqual(b.sha().hexdigest(), sha)
 
   def test_create_blob_from_string(self):
     string = 'test 2\n'
     b = Blob.from_string(string)
-    self.assertEqual(b.text(), string)
+    self.assertEqual(b.data, string)
     self.assertEqual(b.sha().hexdigest(), b_sha)
 
   def test_parse_legacy_blob(self):
     string = 'test 3\n'
     b = self.get_blob(c_sha)
-    self.assertEqual(b.text(), string)
+    self.assertEqual(b.data, string)
     self.assertEqual(b.sha().hexdigest(), c_sha)
 
   def test_eq(self):

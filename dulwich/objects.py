@@ -172,7 +172,8 @@ class Blob(ShaFile):
 
   _type = blob_id
 
-  def text(self):
+  @property
+  def data(self):
     """The text contained within the blob object."""
     return self._text
 

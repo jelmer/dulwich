@@ -261,15 +261,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
         proto = Protocol(self.rfile.read, self.wfile.write)
-
-        request = proto.read_pkt_line()
-
-        # up until the space is the command to run, everything after is parameters
-        splice_point = request.find(' ')
-        command, params = request[:splice_point], request[splice_point+1:]
-
-        # params are null seperated
-        params = params.split(chr(0))
+        cmd, args = proto.read_cmd()
 
         # switch case to handle the specific git command
         if command == 'git-upload-pack':

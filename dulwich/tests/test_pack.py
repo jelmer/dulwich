@@ -165,6 +165,12 @@ class TestPack(PackTests):
         write_pack("testcopy", list(p.iterobjects()))
         self.assertEquals(p, Pack("testcopy"))
 
+    def test_commit_obj(self):
+        p = self.get_pack(pack1_sha)
+        commit = p[commit_sha]
+        self.assertEquals("James Westby <jw+debian@jameswestby.net>", commit.author())
+        self.assertEquals([], commit.parents)
+
 
 class TestHexToSha(unittest.TestCase):
 

@@ -142,6 +142,7 @@ class ShaFile(object):
     obj = real_class()
     obj._num_type = type
     obj._text = string
+    obj._parse_text()
     return obj
 
   def _header(self):

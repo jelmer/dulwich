@@ -35,9 +35,10 @@ a pointer in to the corresponding packfile.
 
 from collections import defaultdict
 import hashlib
-from itertools import izip
+from itertools import imap, izip
 import mmap
 import os
+import sha
 import struct
 import sys
 import zlib
@@ -71,6 +72,13 @@ def read_zlib(data, offset, dec_size):
     assert len(x) == dec_size
     comp_len = fed-len(obj.unused_data)
     return x, comp_len
+
+
+def iter_sha1(iter):
+    sha = hashlib.sha1()
+    for name in iter:
+        sha.update(name)
+    return sha.hexdigest()
 
 
 def hex_to_sha(hex):
@@ -241,8 +249,14 @@ class PackIndex(object):
                                   self._crc32_table_offset + i * 4)[0]
 
   def __iter__(self):
+      return imap(sha_to_hex, self._itersha())
+
+  def _itersha(self):
     for i in range(len(self)):
-        yield sha_to_hex(self._unpack_name(i))
+        yield self._unpack_name(i)
+
+  def objects_sha1(self):
+    return iter_sha1(self._itersha())
 
   def iterentries(self):
     """Iterate over the entries in this pack index.
@@ -348,6 +362,7 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
+    assert self._size >= 12, "%s is too small for a packfile" % filename
     self._header_size = self._read_header()
 
   def _read_header(self):
@@ -405,13 +420,18 @@ class PackData(object):
         found[sha] = (type, obj)
         yield sha, offset, shafile.crc32()
 
+  def sorted_entries(self):
+    ret = list(self.iterentries())
+    ret.sort()
+    return ret
+
   def create_index_v1(self, filename):
-    entries = list(self.iterentries())
+    entries = self.sorted_entries()
     write_pack_index_v1(filename, entries, self.calculate_checksum())
 
   def create_index_v2(self, filename):
-    entries = list(self.iterentries())
-    write_pack_index_v1(filename, entries, self.calculate_checksum())
+    entries = self.sorted_entries()
+    write_pack_index_v2(filename, entries, self.calculate_checksum())
 
   def get_stored_checksum(self):
     return self._stored_checksum
@@ -534,6 +554,7 @@ def write_pack(filename, objects, num_objects):
         entries, data_sum = write_pack_data(f, objects, num_objects)
     except:
         f.close()
+    entries.sort()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
@@ -567,9 +588,6 @@ def write_pack_index_v1(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    # Sort entries first
-
-    entries = sorted(entries)
     f = open(filename, 'w')
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
@@ -651,8 +669,6 @@ def write_pack_index_v2(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    # Sort entries first
-    entries = sorted(entries)
     f = open(filename, 'w')
     f = SHA1Writer(f)
     f.write('\377tOc')
@@ -681,13 +697,18 @@ class Pack(object):
 
     def __init__(self, basename):
         self._basename = basename
+        self._data_path = self._basename + ".pack"
+        self._idx_path = self._basename + ".idx"
         self._data = None
         self._idx = None
+
+    def name(self):
+        return self.idx.objects_sha1()
 
     @property
     def data(self):
         if self._data is None:
-            self._data = PackData(self._basename + ".pack")
+            self._data = PackData(self._data_path)
             assert len(self.idx) == len(self._data)
             assert self.idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
         return self._data
@@ -695,7 +716,7 @@ class Pack(object):
     @property
     def idx(self):
         if self._idx is None:
-            self._idx = PackIndex(self._basename + ".idx")
+            self._idx = PackIndex(self._idx_path)
         return self._idx
 
     def close(self):
@@ -754,5 +775,5 @@ def load_packs(path):
     if not os.path.exists(path):
         return
     for name in os.listdir(path):
-        if name.endswith(".pack"):
+        if name.startswith("pack-") and name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))

@@ -1,0 +1,43 @@
+#!/usr/bin/python
+# dul-daemon - Simple git smart server client
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# or (at your option) a later version of the License.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+from dulwich.repo import Repo
+import sys
+
+(host, path) = sys.argv[1].split(":", 1)
+client = TCPGitClient(host)
+
+all = True
+
+if all:
+	determine_wants = lambda x: x.values()
+else:
+	determinw_wants = lambda x: sys.argv[1:]
+
+r = Repo(".")
+
+# FIXME: Will just fetch everything..
+graphwalker = SimpleFetchGraphWalker([], None)
+
+f = r.add_pack()
+try:
+	client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
+finally:
+	f.close()

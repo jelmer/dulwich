@@ -420,7 +420,7 @@ class PackData(object):
       assert isinstance(type, int)
       assert isinstance(obj, tuple) or isinstance(obj, str)
       try:
-        type, obj = resolve_object(offset, type, obj, get_ref_delta,
+        type, obj = resolve_object(offset, type, obj, get_ref_text,
             at.__getitem__)
       except Postpone, (sha, ):
         postponed[sha].append((offset, type, obj))

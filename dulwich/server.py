@@ -274,7 +274,7 @@ class UploadPackHandler(Handler):
             if self.backend.has_revision(have_ref):
                 self.write_pkt_line("ACK %s continue\n" % have_ref)
                 last_sha = have_ref
-                have_revs.append(rev_id)
+                have_revs.append(have_ref)
             have = self.read_pkt_line()
 
         # At some point client will stop sending commits and will tell us it is done

@@ -17,7 +17,7 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-from dulwich.protocol import Protocol
+from dulwich.protocol import Protocol, TCP_GIT_PORT
 
 class Backend(object):
 
@@ -309,7 +309,7 @@ class TCPGitServer(SocketServer.TCPServer):
     allow_reuse_address = True
     serve = SocketServer.TCPServer.serve_forever
 
-    def __init__(self, backend, addr):
+    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT):
         self.backend = backend
         SocketServer.TCPServer.__init__(self, addr, TCPGitRequestHandler)
 

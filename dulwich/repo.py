@@ -138,7 +138,7 @@ class Repo(object):
   def commit(self, sha):
     return self._get_object(sha, Commit)
 
-  def get_tree(self, sha):
+  def tree(self, sha):
     return self._get_object(sha, Tree)
 
   def get_blob(self, sha):
@@ -168,11 +168,11 @@ class Repo(object):
         continue
       i = 0
       for known_commit in history:
-        if known_commit.commit_time() > commit.commit_time():
+        if known_commit.commit_time > commit.commit_time:
           break
         i += 1
       history.insert(i, commit)
-      parents = commit.parents()
+      parents = commit.parents
       pending_commits += parents
     history.reverse()
     return history

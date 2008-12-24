@@ -48,25 +48,25 @@ class BlobReadTests(unittest.TestCase):
 
   def test_decompress_simple_blob(self):
     b = self.get_blob(a_sha)
-    self.assertEqual(b.text(), 'test 1\n')
+    self.assertEqual(b.data, 'test 1\n')
     self.assertEqual(b.sha().hexdigest(), a_sha)
 
   def test_parse_empty_blob_object(self):
     sha = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
     b = self.get_blob(sha)
-    self.assertEqual(b.text(), '')
+    self.assertEqual(b.data, '')
     self.assertEqual(b.sha().hexdigest(), sha)
 
   def test_create_blob_from_string(self):
     string = 'test 2\n'
     b = Blob.from_string(string)
-    self.assertEqual(b.text(), string)
+    self.assertEqual(b.data, string)
     self.assertEqual(b.sha().hexdigest(), b_sha)
 
   def test_parse_legacy_blob(self):
     string = 'test 3\n'
     b = self.get_blob(c_sha)
-    self.assertEqual(b.text(), string)
+    self.assertEqual(b.data, string)
     self.assertEqual(b.sha().hexdigest(), c_sha)
 
   def test_eq(self):
@@ -82,37 +82,37 @@ class BlobReadTests(unittest.TestCase):
   def test_read_commit_from_file(self):
     sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'
     c = self.commit(sha)
-    self.assertEqual(c.tree(), tree_sha)
-    self.assertEqual(c.parents(), ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
-    self.assertEqual(c.author(),
+    self.assertEqual(c.tree, tree_sha)
+    self.assertEqual(c.parents, ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
+    self.assertEqual(c.author,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.committer(),
+    self.assertEqual(c.committer,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.commit_time(), 1174759230)
-    self.assertEqual(c.message(), 'Test commit\n')
+    self.assertEqual(c.commit_time, 1174759230)
+    self.assertEqual(c.message, 'Test commit\n')
 
   def test_read_commit_no_parents(self):
     sha = '0d89f20333fbb1d2f3a94da77f4981373d8f4310'
     c = self.commit(sha)
-    self.assertEqual(c.tree(), '90182552c4a85a45ec2a835cadc3451bebdfe870')
-    self.assertEqual(c.parents(), [])
-    self.assertEqual(c.author(),
+    self.assertEqual(c.tree, '90182552c4a85a45ec2a835cadc3451bebdfe870')
+    self.assertEqual(c.parents, [])
+    self.assertEqual(c.author,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.committer(),
+    self.assertEqual(c.committer,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.commit_time(), 1174758034)
-    self.assertEqual(c.message(), 'Test commit\n')
+    self.assertEqual(c.commit_time, 1174758034)
+    self.assertEqual(c.message, 'Test commit\n')
 
   def test_read_commit_two_parents(self):
     sha = '5dac377bdded4c9aeb8dff595f0faeebcc8498cc'
     c = self.commit(sha)
-    self.assertEqual(c.tree(), 'd80c186a03f423a81b39df39dc87fd269736ca86')
-    self.assertEqual(c.parents(), ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+    self.assertEqual(c.tree, 'd80c186a03f423a81b39df39dc87fd269736ca86')
+    self.assertEqual(c.parents, ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                    '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'])
-    self.assertEqual(c.author(),
+    self.assertEqual(c.author,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.committer(),
+    self.assertEqual(c.committer,
         'James Westby <jw+debian@jameswestby.net>')
-    self.assertEqual(c.commit_time(), 1174773719)
-    self.assertEqual(c.message(), 'Merge ../b\n')
+    self.assertEqual(c.commit_time, 1174773719)
+    self.assertEqual(c.message, 'Merge ../b\n')
 

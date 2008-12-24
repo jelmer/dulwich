@@ -257,17 +257,12 @@ class ReceivePackHandler(Handler):
         # there is NO ack from the server before it reports victory.
 
 
-class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):
-
-    def __init__(self, request, client_address, server):
-        SocketServer.StreamRequestHandler.__init__(self, request, client_address, server)
+class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
-        #FIXME: StreamRequestHandler seems to be the thing that calls handle(),
-        #so we can't call this in a sane place??
-        Handler.__init__(self, self.server.backend, self.rfile.read, self.wfile.write)
+        proto = Protocol(self.rfile.read, self.wfile.write)
 
-        request = self.proto.read_pkt_line()
+        request = proto.read_pkt_line()
 
         # up until the space is the command to run, everything after is parameters
         splice_point = request.find(' ')

@@ -63,7 +63,7 @@ class GitClient(object):
         self.host = host
 
     def send_cmd(self, name, *args):
-        self.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
+        self.proto.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
 
     def capabilities(self):
         return "multi_ack side-band-64k thin-pack ofs-delta"

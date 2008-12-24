@@ -37,6 +37,12 @@ class Protocol(object):
             return None
         return self.read(size-4)
 
+    def read_pkt_seq(self):
+        pkt = self.read_pkt_line()
+        while pkt:
+            yield pkt
+            pkt = self.read_pkt_line()
+
     def write_pkt_line(self, line):
         """
         Sends a 'pkt line' to the remote git process

@@ -65,21 +65,21 @@ class RepositoryTests(unittest.TestCase):
     self.assertRaises(errors.NotCommitError,
                       r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
 
-  def test_get_tree(self):
+  def test_tree(self):
     r = self.open_repo('a')
     commit = r.commit(r.head())
-    tree = r.get_tree(commit.tree)
+    tree = r.tree(commit.tree)
     self.assertEqual(tree._type, 'tree')
     self.assertEqual(tree.sha().hexdigest(), commit.tree)
 
-  def test_get_tree_not_tree(self):
+  def test_tree_not_tree(self):
     r = self.open_repo('a')
-    self.assertRaises(errors.NotTreeError, r.get_tree, r.head())
+    self.assertRaises(errors.NotTreeError, r.tree, r.head())
 
   def test_get_blob(self):
     r = self.open_repo('a')
     commit = r.commit(r.head())
-    tree = r.get_tree(commit.tree())
+    tree = r.tree(commit.tree())
     blob_sha = tree.entries()[0][2]
     blob = r.get_blob(blob_sha)
     self.assertEqual(blob._type, 'blob')

@@ -744,6 +744,8 @@ class Pack(object):
 
 
 def load_packs(path):
+    if not os.path.exists(path):
+        return
     for name in os.listdir(path):
         if name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))

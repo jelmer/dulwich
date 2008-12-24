@@ -24,6 +24,7 @@ import sys
 
 basename = sys.argv[1]
 x = Pack(basename)
+print "Object names checksum: %s" % x.name()
 print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
 if not x.check():
     print "CHECKSUM DOES NOT MATCH"

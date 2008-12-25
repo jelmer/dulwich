@@ -116,7 +116,7 @@ class ShaFile(object):
     """Don't call this directly"""
 
   def _parse_text(self):
-    """For subclasses to do initialistion time parsing"""
+    """For subclasses to do initialisation time parsing"""
 
   @classmethod
   def from_file(cls, filename):
@@ -161,6 +161,9 @@ class ShaFile(object):
   @property
   def id(self):
       return self.sha().hexdigest()
+
+  def __repr__(self):
+    return "<%s %s>" % (self.__class__.__name__, self.id)
 
   def __eq__(self, other):
     """Return true id the sha of the two objects match.

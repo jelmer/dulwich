@@ -88,12 +88,14 @@ def hex_to_sha(hex):
     ret += chr(int(hex[i:i+2], 16))
   return ret
 
+
 def sha_to_hex(sha):
   """Convert a binary sha string to a hex sha string."""
   ret = ""
   for i in sha:
       ret += "%02x" % ord(i)
   return ret
+
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024
 

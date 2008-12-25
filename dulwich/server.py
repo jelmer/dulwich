@@ -17,7 +17,7 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
+from dulwich.protocol import Protocol, ProtocolFile, TCP_GIT_PORT, extract_capabilities
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack, write_pack_data
 import os, sha, tempfile
@@ -84,7 +84,7 @@ class GitBackend(Backend):
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.repo.pack_dir())
+        fd, name = tempfile.mkstemp(suffix='.pack', prefix='pack-', dir=self.repo.pack_dir())
         os.write(fd, read())
         os.close(fd)
 
@@ -113,10 +113,10 @@ class GitBackend(Backend):
             if sha in sha_queue:
                 continue
 
-            sha_queue.append((1,sha))
+            sha_queue.append(sha)
 
             c = self.repo.commit(sha)
-            for p in c.parents():
+            for p in c.parents:
                 if not p in commits_to_send:
                     commits_to_send.append(p)
 
@@ -124,23 +124,23 @@ class GitBackend(Backend):
                 for mode, name, x in tree.entries():
                     if not x in sha_queue:
                         try:
-                            t = self.repo.get_tree(x)
-                            sha_queue.append((2, x))
+                            t = self.repo.tree(x)
+                            sha_queue.append(x)
                             parse_tree(t, sha_queue)
                         except:
-                            sha_queue.append((3, x))
+                            sha_queue.append(x)
 
-            treesha = c.tree()
+            treesha = c.tree
             if treesha not in sha_queue:
-                sha_queue.append((2, treesha))
-                t = self.repo.get_tree(treesha)
+                sha_queue.append(treesha)
+                t = self.repo.tree(treesha)
                 parse_tree(t, sha_queue)
 
             progress("counting objects: %d\r" % len(sha_queue))
 
         progress("counting objects: %d, done.\n" % len(sha_queue))
 
-        write_pack_data(write, (self.repo.get_object(sha).as_raw_string() for sha in sha_queue))
+        write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha) for sha in sha_queue), len(sha_queue))
 
         progress("how was that, then?\n")
 
@@ -257,24 +257,11 @@ class ReceivePackHandler(Handler):
         # there is NO ack from the server before it reports victory.
 
 
-class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):
-
-    def __init__(self, request, client_address, server):
-        SocketServer.StreamRequestHandler.__init__(self, request, client_address, server)
+class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
-        #FIXME: StreamRequestHandler seems to be the thing that calls handle(),
-        #so we can't call this in a sane place??
-        Handler.__init__(self, self.server.backend, self.rfile.read, self.wfile.write)
-
-        request = self.proto.read_pkt_line()
-
-        # up until the space is the command to run, everything after is parameters
-        splice_point = request.find(' ')
-        command, params = request[:splice_point], request[splice_point+1:]
-
-        # params are null seperated
-        params = params.split(chr(0))
+        proto = Protocol(self.rfile.read, self.wfile.write)
+        command, args = proto.read_cmd()
 
         # switch case to handle the specific git command
         if command == 'git-upload-pack':
@@ -284,7 +271,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler, Handler):
         else:
             return
 
-        h = cls(self.backend, self.proto.read, self.proto.write)
+        h = cls(self.server.backend, self.rfile.read, self.wfile.write)
         h.handle()
 
 
@@ -295,6 +282,6 @@ class TCPGitServer(SocketServer.TCPServer):
 
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT):
         self.backend = backend
-        SocketServer.TCPServer.__init__(self, addr, TCPGitRequestHandler)
+        SocketServer.TCPServer.__init__(self, (listen_addr, port), TCPGitRequestHandler)
 
 

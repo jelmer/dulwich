@@ -185,7 +185,7 @@ class TestHexToSha(unittest.TestCase):
         self.assertEquals("abcdef", sha_to_hex('\xab\xcd\xef'))
 
 
-class TestPackIndexWriting(object):
+class BaseTestPackIndexWriting(object):
 
     def test_empty(self):
         pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
@@ -216,7 +216,7 @@ class TestPackIndexWriting(object):
                 self.assertTrue(b[2] is None)
 
 
-class TestPackIndexWritingv1(unittest.TestCase, TestPackIndexWriting):
+class TestPackIndexWritingv1(unittest.TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
@@ -225,7 +225,7 @@ class TestPackIndexWritingv1(unittest.TestCase, TestPackIndexWriting):
         self._write_fn = write_pack_index_v1
 
 
-class TestPackIndexWritingv2(unittest.TestCase, TestPackIndexWriting):
+class TestPackIndexWritingv2(unittest.TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
         unittest.TestCase.setUp(self)

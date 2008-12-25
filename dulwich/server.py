@@ -17,7 +17,7 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
+from dulwich.protocol import Protocol, ProtocolFile, TCP_GIT_PORT, extract_capabilities
 from dulwich.repo import Repo
 from dulwich.pack import PackData, Pack, write_pack_data
 import os, sha, tempfile
@@ -140,7 +140,7 @@ class GitBackend(Backend):
 
         progress("counting objects: %d, done.\n" % len(sha_queue))
 
-        write_pack_data(write, (self.repo.get_object(sha).as_raw_string() for sha in sha_queue))
+        write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha).as_raw_string() for sha in sha_queue), len(sha_queue))
 
         progress("how was that, then?\n")
 

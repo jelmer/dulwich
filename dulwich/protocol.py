@@ -19,6 +19,22 @@
 
 TCP_GIT_PORT = 9418
 
+class ProtocolFile(object):
+    """
+    Some network ops are like file ops. The file ops expect to operate on
+    file objects, so provide them with a dummy file.
+    """
+
+    def __init__(self, read, write):
+        self.read = read
+        self.write = write
+
+    def tell(self):
+        pass
+
+    def close(self):
+        pass
+
 class Protocol(object):
 
     def __init__(self, read, write):

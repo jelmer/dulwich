@@ -113,7 +113,7 @@ class GitBackend(Backend):
             if sha in sha_queue:
                 continue
 
-            sha_queue.append((1,sha))
+            sha_queue.append(sha)
 
             c = self.repo.commit(sha)
             for p in c.parents:
@@ -125,14 +125,14 @@ class GitBackend(Backend):
                     if not x in sha_queue:
                         try:
                             t = self.repo.tree(x)
-                            sha_queue.append((2, x))
+                            sha_queue.append(x)
                             parse_tree(t, sha_queue)
                         except:
-                            sha_queue.append((3, x))
+                            sha_queue.append(x)
 
             treesha = c.tree
             if treesha not in sha_queue:
-                sha_queue.append((2, treesha))
+                sha_queue.append(treesha)
                 t = self.repo.tree(treesha)
                 parse_tree(t, sha_queue)
 
@@ -140,7 +140,7 @@ class GitBackend(Backend):
 
         progress("counting objects: %d, done.\n" % len(sha_queue))
 
-        write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha).as_raw_string() for sha in sha_queue), len(sha_queue))
+        write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha) for sha in sha_queue), len(sha_queue))
 
         progress("how was that, then?\n")
 

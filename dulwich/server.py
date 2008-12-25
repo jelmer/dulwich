@@ -84,7 +84,7 @@ class GitBackend(Backend):
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='.pack', prefix='', dir=self.repo.pack_dir())
+        fd, name = tempfile.mkstemp(suffix='.pack', prefix='pack-', dir=self.repo.pack_dir())
         os.write(fd, read())
         os.close(fd)
 

@@ -97,7 +97,7 @@ class Protocol(object):
 
 def extract_capabilities(text):
     if not "\0" in text:
-        return text
+        return text, None
     capabilities = text.split("\0")
     return (capabilities[0], capabilities[1:])
 

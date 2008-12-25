@@ -20,7 +20,7 @@
 import os
 
 from commit import Commit
-from errors import MissingCommitError
+from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError
 from objects import (ShaFile,
                      Commit,
                      Tree,
@@ -120,10 +120,20 @@ class Repo(object):
     return self.ref('HEAD')
 
   def _get_object(self, sha, cls):
-    return self.object_store.get_object(sha, cls)
+    ret = self.get_object(sha)
+    if ret._type != cls._type:
+        if cls is Commit:
+            raise NotCommitError(ret)
+        elif cls is Blob:
+            raise NotBlobError(ret)
+        elif cls is Tree:
+            raise NotTreeError(ret)
+        else:
+            raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
+    return ret
 
   def get_object(self, sha):
-    return self._get_object(sha, ShaFile)
+    return self.object_store[sha]
 
   def get_parents(self, sha):
     return self.commit(sha).parents
@@ -154,8 +164,9 @@ class Repo(object):
     history = []
     while pending_commits != []:
       head = pending_commits.pop(0)
-      commit = self.commit(head)
-      if commit is None:
+      try:
+          commit = self.commit(head)
+      except KeyError:
         raise MissingCommitError(head)
       if commit in history:
         continue
@@ -204,20 +215,33 @@ class ObjectStore(object):
             self._packs = list(load_packs(self.pack_dir()))
         return self._packs
 
-    def get_object(self, sha, cls):
-        assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
+    def _get_shafile(self, sha):
         dir = sha[:2]
         file = sha[2:]
         # Check from object dir
         path = os.path.join(self.path, dir, file)
         if os.path.exists(path):
-          return cls.from_file(path)
-        # Check from packs
+          return ShaFile.from_file(path)
+        return None
+
+    def get_raw(self, sha):
         for pack in self.packs:
             if sha in pack:
-                return pack[sha]
-        # Should this raise instead?
-        return None
+                return pack.get_raw(sha, self.get_raw)
+        # FIXME: Are pack deltas ever against on-disk shafiles ?
+        ret = self._get_shafile(sha)
+        if ret is not None:
+            return ret.as_raw_string()
+        raise KeyError(sha)
+
+    def __getitem__(self, sha):
+        assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
+        ret = self._get_shafile(sha)
+        if ret is not None:
+            return ret
+        # Check from packs
+        type, uncomp = self.get_raw(sha)
+        return ShaFile.from_raw_string(type, uncomp)
 
     def move_in_pack(self, path):
         p = PackData(path)

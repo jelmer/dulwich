@@ -684,7 +684,7 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     """
     f = open(filename, 'w')
     f = SHA1Writer(f)
-    f.write('\377tOc')
+    f.write('\377tOc') # Magic!
     f.write(struct.pack(">L", 2))
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
@@ -761,26 +761,28 @@ class Pack(object):
         """Check whether this pack contains a particular SHA1."""
         return (self.idx.object_index(sha1) is not None)
 
-    def _get_text(self, sha1):
+    def get_raw(self, sha1, resolve_ref=None):
+        if resolve_ref is None:
+            resolve_ref = self.get_raw
         offset = self.idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
 
         type, obj = self.data.get_object_at(offset)
         assert isinstance(offset, int)
-        return resolve_object(offset, type, obj, self._get_text, 
+        return resolve_object(offset, type, obj, resolve_ref,
             self.data.get_object_at)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
-        type, uncomp = self._get_text(sha1)
+        type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp)
 
     def iterobjects(self):
         for offset, type, obj in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
-                    *resolve_object(offset, type, obj, self._get_text, 
+                    *resolve_object(offset, type, obj, self.get_raw, 
                 self.data.get_object_at))
 
 

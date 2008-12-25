@@ -34,13 +34,13 @@ if not ":" in args[0]:
 	print "Usage: dul-fetch-pack host:path"
 	sys.exit(1)
 
-(host, path) = args[0].split(":", 1)
+(host, path) = args.pop(0).split(":", 1)
 client = TCPGitClient(host)
 
 if "--all" in opts:
     determine_wants = lambda x: x.values()
 else:
-    determine_wants = lambda x: sys.argv[1:]
+    determine_wants = lambda x: args
 
 r = Repo(".")
 

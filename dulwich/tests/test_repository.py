@@ -52,8 +52,7 @@ class RepositoryTests(unittest.TestCase):
 
   def test_get_object_non_existant(self):
     r = self.open_repo('a')
-    obj = r.get_object(missing_sha)
-    self.assertEqual(obj, None)
+    self.assertRaises(KeyError, r.get_object, missing_sha)
 
   def test_commit(self):
     r = self.open_repo('a')

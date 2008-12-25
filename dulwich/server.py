@@ -261,7 +261,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
         proto = Protocol(self.rfile.read, self.wfile.write)
-        cmd, args = proto.read_cmd()
+        command, args = proto.read_cmd()
 
         # switch case to handle the specific git command
         if command == 'git-upload-pack':
@@ -271,7 +271,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
         else:
             return
 
-        h = cls(self.backend, self.proto.read, self.proto.write)
+        h = cls(self.server.backend, self.rfile.read, self.wfile.write)
         h.handle()
 
 

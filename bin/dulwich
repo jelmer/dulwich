@@ -1,0 +1,88 @@
+#!/usr/bin/python
+# dul-daemon - Simple git smart server client
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# or (at your option) a later version of the License.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+import sys
+from getopt import getopt
+
+def cmd_fetch_pack(args):
+	from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+	from dulwich.repo import Repo
+	opts, args = getopt(args, "", ["all"])
+	opts = dict(opts)
+	if not ":" in args[0]:
+		print "Usage: dulwich fetch-pack [--all] host:path [REF...]"
+		sys.exit(1)
+	(host, path) = args.pop(0).split(":", 1)
+	client = TCPGitClient(host)
+	if "--all" in opts:
+		determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
+	else:
+		determine_wants = lambda x: [y for y in args if not y in r.object_store]
+	r = Repo(".")
+	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
+	f, commit = r.object_store.add_pack()
+	try:
+		client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
+		f.close()
+		commit()
+	except:
+		f.close()
+		raise
+
+def cmd_dump_pack(args):
+	from dulwich.errors import ApplyDeltaError
+	from dulwich.pack import Pack, sha_to_hex
+	import os
+	import sys
+
+	opts, args = getopt(args, "", [])
+
+	if args == []:
+		print "Usage: dulwich dump-pack FILENAME"
+		sys.exit(1)
+
+	basename, _ = os.path.splitext(args[0])
+	x = Pack(basename)
+	print "Object names checksum: %s" % x.name()
+	print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
+	if not x.check():
+		print "CHECKSUM DOES NOT MATCH"
+	print "Length: %d" % len(x)
+	for name in x:
+		try:
+			print "\t%s" % x[name]
+		except KeyError, k:
+			print "\t%s: Unable to resolve base %s" % (name, k)
+		except ApplyDeltaError, e:
+			print "\t%s: Unable to apply delta: %r" % (name, e)
+
+commands = {
+	"fetch-pack": cmd_fetch_pack,
+	"dump-pack": cmd_dump_pack,
+	}
+
+if len(sys.argv) < 2:
+	print "Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys()))
+	sys.exit(1)
+
+cmd = sys.argv[1]
+if not cmd in commands:
+	print "No such subcommand: %s" % cmd
+	sys.exit(1)
+commands[cmd](sys.argv[2:])

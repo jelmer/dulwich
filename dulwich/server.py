@@ -19,7 +19,7 @@
 import SocketServer
 from dulwich.protocol import Protocol, ProtocolFile, TCP_GIT_PORT, extract_capabilities
 from dulwich.repo import Repo
-from dulwich.pack import PackData, Pack, write_pack_data
+from dulwich.pack import PackData, Pack, write_pack_data, generate_pack_contents
 import os, sha, tempfile
 
 class Backend(object):
@@ -105,43 +105,8 @@ class GitBackend(Backend):
 
     def generate_pack(self, want, have, write, progress):
         progress("dul-daemon says what\n")
-
-        sha_queue = []
-
-        commits_to_send = want[:]
-        for sha in commits_to_send:
-            if sha in sha_queue:
-                continue
-
-            sha_queue.append(sha)
-
-            c = self.repo.commit(sha)
-            for p in c.parents:
-                if not p in commits_to_send:
-                    commits_to_send.append(p)
-
-            def parse_tree(tree, sha_queue):
-                for mode, name, x in tree.entries():
-                    if not x in sha_queue:
-                        try:
-                            t = self.repo.tree(x)
-                            sha_queue.append(x)
-                            parse_tree(t, sha_queue)
-                        except:
-                            sha_queue.append(x)
-
-            treesha = c.tree
-            if treesha not in sha_queue:
-                sha_queue.append(treesha)
-                t = self.repo.tree(treesha)
-                parse_tree(t, sha_queue)
-
-            progress("counting objects: %d\r" % len(sha_queue))
-
-        progress("counting objects: %d, done.\n" % len(sha_queue))
-
+        sha_queue = generate_pack_contents(want, have, self.repo.get_object) 
         write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha) for sha in sha_queue), len(sha_queue))
-
         progress("how was that, then?\n")
 
 

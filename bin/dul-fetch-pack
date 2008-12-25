@@ -38,9 +38,9 @@ if not ":" in args[0]:
 client = TCPGitClient(host)
 
 if "--all" in opts:
-    determine_wants = lambda x: x.values()
+    determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
 else:
-    determine_wants = lambda x: args
+    determine_wants = lambda x: [y for y in args if not y in r.object_store]
 
 r = Repo(".")
 

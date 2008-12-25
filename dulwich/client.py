@@ -75,10 +75,17 @@ class GitClient(object):
             self.proto.write_pkt_line(None)
             return
         self.proto.write_pkt_line("%s %s %s\0%s" % (changed_refs[0][0], changed_refs[0][1], changed_refs[0][2], self.capabilities()))
+        want = []
+        have = []
         for changed_ref in changed_refs[:]:
             self.proto.write_pkt_line("%s %s %s" % changed_refs)
+            want.append(changed_refs[1])
+            if changed_refs[0] != "0"*40:
+                have.append(changed_refs[0])
         self.proto.write_pkt_line(None)
-        # FIXME: Send pack
+        # FIXME: This is implementation specific
+        # shas = generate_pack_contents(want, have, None)
+        # write_pack_data(self.write, shas, len(shas))
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Retrieve a pack from a git smart server.

@@ -790,3 +790,47 @@ def load_packs(path):
     for name in os.listdir(path):
         if name.startswith("pack-") and name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))
+
+
+def generate_pack_contents(want, have, get_object):
+    """
+    Given a list of desired commits and a list of restraining commits,
+    work out what objects to send
+
+    :param want: list of sha's we want to send
+    :param have: list of sha's recepient has (or when to stop for a shallow pack)
+    :param get_object: callback to get a commit or tree object
+    :return: a list of commits
+    """    
+    sha_queue = []
+    commits_to_send = want[:]
+    for sha in commits_to_send:
+        if sha in sha_queue:
+            continue
+
+        sha_queue.append(sha)
+
+        c = get_object(sha)
+        for p in c.parents:
+            if not p in commits_to_send:
+                commits_to_send.append(p)
+
+        def parse_tree(tree, sha_queue):
+            for mode, name, x in tree.entries():
+                if not x in sha_queue:
+                    sha_queue.append(x)
+                    t = get_object(x)
+                    if t._type == 'tree':
+                        parse_tree(t, sha_queue)
+
+        treesha = c.tree
+        if treesha not in sha_queue:
+            sha_queue.append(treesha)
+            t = get_object(treesha)
+            parse_tree(t, sha_queue)
+
+        #progress("counting objects: %d\r" % len(sha_queue))
+
+    #progress("counting objects: %d, done.\n" % len(sha_queue))
+
+    return sha_queue

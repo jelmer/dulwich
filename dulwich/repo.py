@@ -70,7 +70,8 @@ class Repo(object):
     fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
     f = os.fdopen(fd, 'w')
     def commit():
-       self._move_in_pack(path)
+       if os.path.getsize(path) > 0:
+           self._move_in_pack(path)
     return f, commit
 
   def _move_in_pack(self, path):

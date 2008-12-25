@@ -116,7 +116,7 @@ class GitBackend(Backend):
             sha_queue.append((1,sha))
 
             c = self.repo.commit(sha)
-            for p in c.parents():
+            for p in c.parents:
                 if not p in commits_to_send:
                     commits_to_send.append(p)
 
@@ -124,16 +124,16 @@ class GitBackend(Backend):
                 for mode, name, x in tree.entries():
                     if not x in sha_queue:
                         try:
-                            t = self.repo.get_tree(x)
+                            t = self.repo.tree(x)
                             sha_queue.append((2, x))
                             parse_tree(t, sha_queue)
                         except:
                             sha_queue.append((3, x))
 
-            treesha = c.tree()
+            treesha = c.tree
             if treesha not in sha_queue:
                 sha_queue.append((2, treesha))
-                t = self.repo.get_tree(treesha)
+                t = self.repo.tree(treesha)
                 parse_tree(t, sha_queue)
 
             progress("counting objects: %d\r" % len(sha_queue))

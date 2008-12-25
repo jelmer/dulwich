@@ -401,7 +401,7 @@ class PackData(object):
         offset += total_size
     f.close()
 
-  def iterentries(self):
+  def iterentries(self, ext_resolve_ref=None):
     found = {}
     at = {}
     postponed = defaultdict(list)
@@ -411,6 +411,11 @@ class PackData(object):
     def get_ref_text(sha):
         if sha in found:
             return found[sha]
+        if ext_resolve_ref:
+            try:
+                return ext_resolve_ref(sha)
+            except KeyError:
+                pass
         raise Postpone, (sha, )
     todo = list(self.iterobjects())
     while todo:
@@ -433,8 +438,8 @@ class PackData(object):
     if postponed:
         raise KeyError([sha_to_hex(h) for h in postponed.keys()])
 
-  def sorted_entries(self):
-    ret = list(self.iterentries())
+  def sorted_entries(self, resolve_ext_ref=None):
+    ret = list(self.iterentries(resolve_ext_ref))
     ret.sort()
     return ret
 

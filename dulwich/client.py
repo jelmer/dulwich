@@ -49,10 +49,9 @@ class GitClient(object):
 
     """
 
-    def __init__(self, fileno, read, write, host):
+    def __init__(self, fileno, read, write):
         self.proto = Protocol(read, write)
         self.fileno = fileno
-        self.host = host
 
     def capabilities(self):
         return "multi_ack side-band-64k thin-pack ofs-delta"
@@ -136,7 +135,8 @@ class TCPGitClient(GitClient):
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)
-        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, host)
+        self.host = host
+        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write)
 
     def send_pack(self, path):
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)

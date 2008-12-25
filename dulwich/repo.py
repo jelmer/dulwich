@@ -209,6 +209,14 @@ class ObjectStore(object):
     def pack_dir(self):
         return os.path.join(self.path, PACKDIR)
 
+    def __contains__(self, sha):
+        # TODO: This can be more efficient
+        try:
+            self[sha]
+            return True
+        except KeyError:
+            return False
+
     @property
     def packs(self):
         if self._packs is None:

@@ -35,6 +35,7 @@ class ProtocolFile(object):
     def close(self):
         pass
 
+
 class Protocol(object):
 
     def __init__(self, read, write):
@@ -95,7 +96,7 @@ class Protocol(object):
         :param cmd: The remote service to access
         :param args: List of arguments to send to remove service
         """
-        self.proto.write_pkt_line("%s %s" % (name, "".join(["%s\0" % a for a in args])))
+        self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
 
     def read_cmd(self):
         """

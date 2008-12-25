@@ -20,7 +20,7 @@
 import os
 
 from commit import Commit
-from errors import MissingCommitError
+from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError
 from objects import (ShaFile,
                      Commit,
                      Tree,
@@ -55,7 +55,7 @@ class Repo(object):
       self._basedir = root
     self.path = controldir
     self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
-    self._packs = None
+    self._object_store = None
 
   def basedir(self):
     return self._basedir
@@ -63,28 +63,14 @@ class Repo(object):
   def object_dir(self):
     return os.path.join(self.basedir(), OBJECTDIR)
 
+  @property
+  def object_store(self):
+    if self._object_store is None:
+        self._object_store = ObjectStore(self.object_dir())
+    return self._object_store
+
   def pack_dir(self):
     return os.path.join(self.object_dir(), PACKDIR)
-
-  def add_pack(self):
-    fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
-    f = os.fdopen(fd, 'w')
-    def commit():
-       if os.path.getsize(path) > 0:
-           self._move_in_pack(path)
-    return f, commit
-
-  def _move_in_pack(self, path):
-    p = PackData(path)
-    entries = p.sorted_entries()
-    basename = os.path.join(self.pack_dir(), "pack-%s" % iter_sha1(entry[0] for entry in entries))
-    write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
-    os.rename(path, basename + ".pack")
-
-  def _get_packs(self):
-    if self._packs is None:
-        self._packs = list(load_packs(self.pack_dir()))
-    return self._packs
 
   def _get_ref(self, file):
     f = open(file, 'rb')
@@ -134,22 +120,20 @@ class Repo(object):
     return self.ref('HEAD')
 
   def _get_object(self, sha, cls):
-    assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
-    dir = sha[:2]
-    file = sha[2:]
-    # Check from object dir
-    path = os.path.join(self.object_dir(), dir, file)
-    if os.path.exists(path):
-      return cls.from_file(path)
-    # Check from packs
-    for pack in self._get_packs():
-        if sha in pack:
-            return pack[sha]
-    # Should this raise instead?
-    return None
+    ret = self.get_object(sha)
+    if ret._type != cls._type:
+        if cls is Commit:
+            raise NotCommitError(ret)
+        elif cls is Blob:
+            raise NotBlobError(ret)
+        elif cls is Tree:
+            raise NotTreeError(ret)
+        else:
+            raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
+    return ret
 
   def get_object(self, sha):
-    return self._get_object(sha, ShaFile)
+    return self.object_store[sha]
 
   def get_parents(self, sha):
     return self.commit(sha).parents
@@ -180,8 +164,9 @@ class Repo(object):
     history = []
     while pending_commits != []:
       head = pending_commits.pop(0)
-      commit = self.commit(head)
-      if commit is None:
+      try:
+          commit = self.commit(head)
+      except KeyError:
         raise MissingCommitError(head)
       if commit in history:
         continue
@@ -214,3 +199,69 @@ class Repo(object):
 
   create = init_bare
 
+
+class ObjectStore(object):
+
+    def __init__(self, path):
+        self.path = path
+        self._packs = None
+
+    def pack_dir(self):
+        return os.path.join(self.path, PACKDIR)
+
+    def __contains__(self, sha):
+        # TODO: This can be more efficient
+        try:
+            self[sha]
+            return True
+        except KeyError:
+            return False
+
+    @property
+    def packs(self):
+        if self._packs is None:
+            self._packs = list(load_packs(self.pack_dir()))
+        return self._packs
+
+    def _get_shafile(self, sha):
+        dir = sha[:2]
+        file = sha[2:]
+        # Check from object dir
+        path = os.path.join(self.path, dir, file)
+        if os.path.exists(path):
+          return ShaFile.from_file(path)
+        return None
+
+    def get_raw(self, sha):
+        for pack in self.packs:
+            if sha in pack:
+                return pack.get_raw(sha, self.get_raw)
+        # FIXME: Are pack deltas ever against on-disk shafiles ?
+        ret = self._get_shafile(sha)
+        if ret is not None:
+            return ret.as_raw_string()
+        raise KeyError(sha)
+
+    def __getitem__(self, sha):
+        assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
+        ret = self._get_shafile(sha)
+        if ret is not None:
+            return ret
+        # Check from packs
+        type, uncomp = self.get_raw(sha)
+        return ShaFile.from_raw_string(type, uncomp)
+
+    def move_in_pack(self, path):
+        p = PackData(path)
+        entries = p.sorted_entries(self.get_raw)
+        basename = os.path.join(self.pack_dir(), "pack-%s" % iter_sha1(entry[0] for entry in entries))
+        write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
+        os.rename(path, basename + ".pack")
+
+    def add_pack(self):
+        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        f = os.fdopen(fd, 'w')
+        def commit():
+            if os.path.getsize(path) > 0:
+                self.move_in_pack(path)
+        return f, commit

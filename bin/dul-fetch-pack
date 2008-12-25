@@ -34,20 +34,20 @@ if not ":" in args[0]:
 	print "Usage: dul-fetch-pack host:path"
 	sys.exit(1)
 
-(host, path) = args[0].split(":", 1)
+(host, path) = args.pop(0).split(":", 1)
 client = TCPGitClient(host)
 
 if "--all" in opts:
-    determine_wants = lambda x: x.values()
+    determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
 else:
-    determine_wants = lambda x: sys.argv[1:]
+    determine_wants = lambda x: [y for y in args if not y in r.object_store]
 
 r = Repo(".")
 
 # FIXME: Will just fetch everything..
 graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
 
-f, commit = r.add_pack()
+f, commit = r.object_store.add_pack()
 try:
     client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
     f.close()

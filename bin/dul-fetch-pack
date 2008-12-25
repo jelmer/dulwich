@@ -20,13 +20,24 @@
 from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
 from dulwich.repo import Repo
 import sys
+from getopt import getopt
 
-(host, path) = sys.argv[1].split(":", 1)
+opts, args = getopt(sys.argv[1:], "", ["all"])
+
+opts = dict(opts)
+
+if args == []:
+	print "Usage: dul-fetch-pack host:path"
+	sys.exit(1)
+
+if not ":" in args[0]:
+	print "Usage: dul-fetch-pack host:path"
+	sys.exit(1)
+
+(host, path) = args[0].split(":", 1)
 client = TCPGitClient(host)
 
-all = True
-
-if all:
+if "--all" in opts:
     determine_wants = lambda x: x.values()
 else:
     determine_wants = lambda x: sys.argv[1:]

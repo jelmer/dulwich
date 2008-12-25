@@ -29,13 +29,13 @@ from errors import (NotCommitError,
                     NotBlobError,
                     )
 
-blob_id = "blob"
-tag_id = "tag"
-tree_id = "tree"
-commit_id = "commit"
-parent_id = "parent"
-author_id = "author"
-committer_id = "committer"
+BLOB_ID = "blob"
+TAG_ID = "tag"
+TREE_ID = "tree"
+COMMIT_ID = "commit"
+PARENT_ID = "parent"
+AUTHOR_ID = "author"
+COMMITTER_ID = "committer"
 
 def _decompress(string):
     dcomp = zlib.decompressobj()
@@ -174,7 +174,7 @@ class ShaFile(object):
 class Blob(ShaFile):
   """A Git Blob object."""
 
-  _type = blob_id
+  _type = BLOB_ID
 
   @property
   def data(self):
@@ -199,7 +199,7 @@ class Blob(ShaFile):
 class Tag(ShaFile):
   """A Git Tag object."""
 
-  _type = tag_id
+  _type = TAG_ID
 
   @classmethod
   def from_file(cls, filename):
@@ -219,7 +219,7 @@ class Tag(ShaFile):
 class Tree(ShaFile):
   """A Git tree object"""
 
-  _type = tree_id
+  _type = TREE_ID
 
   @classmethod
   def from_file(cls, filename):
@@ -261,7 +261,7 @@ class Tree(ShaFile):
 class Commit(ShaFile):
   """A git commit object"""
 
-  _type = commit_id
+  _type = COMMIT_ID
 
   @classmethod
   def from_file(cls, filename):
@@ -273,11 +273,11 @@ class Commit(ShaFile):
   def _parse_text(self):
     text = self._text
     count = 0
-    assert text.startswith(tree_id), "Invalid commit object, " \
-         "must start with %s" % tree_id
-    count += len(tree_id)
+    assert text.startswith(TREE_ID), "Invalid commit object, " \
+         "must start with %s" % TREE_ID
+    count += len(TREE_ID)
     assert text[count] == ' ', "Invalid commit object, " \
-         "%s must be followed by space not %s" % (tree_id, text[count])
+         "%s must be followed by space not %s" % (TREE_ID, text[count])
     count += 1
     self._tree = text[count:count+40]
     count = count + 40
@@ -285,10 +285,10 @@ class Commit(ShaFile):
          "tree sha must be followed by newline"
     count += 1
     self._parents = []
-    while text[count:].startswith(parent_id):
-      count += len(parent_id)
+    while text[count:].startswith(PARENT_ID):
+      count += len(PARENT_ID)
       assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (parent_id, text[count])
+           "%s must be followed by space not %s" % (PARENT_ID, text[count])
       count += 1
       self._parents.append(text[count:count+40])
       count += 40
@@ -296,10 +296,10 @@ class Commit(ShaFile):
            "parent sha must be followed by newline"
       count += 1
     self._author = None
-    if text[count:].startswith(author_id):
-      count += len(author_id)
+    if text[count:].startswith(AUTHOR_ID):
+      count += len(AUTHOR_ID)
       assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (author_id, text[count])
+           "%s must be followed by space not %s" % (AUTHOR_ID, text[count])
       count += 1
       self._author = ''
       while text[count] != '>':
@@ -312,10 +312,10 @@ class Commit(ShaFile):
         count += 1
       count += 1
     self._committer = None
-    if text[count:].startswith(committer_id):
-      count += len(committer_id)
+    if text[count:].startswith(COMMITTER_ID):
+      count += len(COMMITTER_ID)
       assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (committer_id, text[count])
+           "%s must be followed by space not %s" % (COMMITTER_ID, text[count])
       count += 1
       self._committer = ''
       while text[count] != '>':
@@ -370,10 +370,10 @@ class Commit(ShaFile):
     return self._commit_time
 
 type_map = {
-  blob_id : Blob,
-  tree_id : Tree,
-  commit_id : Commit,
-  tag_id: Tag,
+  BLOB_ID : Blob,
+  TREE_ID : Tree,
+  COMMIT_ID : Commit,
+  TAG_ID: Tag,
 }
 
 num_type_map = {

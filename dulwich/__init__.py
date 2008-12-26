@@ -17,5 +17,6 @@
 # MA  02110-1301, USA.
 
 import client
+import protocol
 import repo
 import server

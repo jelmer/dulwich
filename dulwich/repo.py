@@ -61,7 +61,6 @@ class Repo(object):
     return self._basedir
 
   def fetch_objects(self, determine_wants, graph_walker, progress):
-    sha_done = set()
     wants = determine_wants(self.heads())
     commits_to_send = []
     ref = graph_walker.next()
@@ -70,12 +69,12 @@ class Repo(object):
         if ref in self.object_store:
             graph_walker.ack(ref)
         ref = graph_walker.next()
+    sha_done = set()
     for sha in commits_to_send:
         if sha in sha_done:
             continue
 
         c = self.commit(sha)
-        yield c
         sha_done.add(sha)
 
         def parse_tree(tree, sha_done):
@@ -83,21 +82,21 @@ class Repo(object):
                 if not x in sha_done:
                     try:
                         t = self.tree(x)
-                        yield t
                         sha_done.add(x)
                         parse_tree(t, sha_done)
                     except:
-                        yield self.get_object(x)
                         sha_done.append(x)
 
         treesha = c.tree
         if treesha not in sha_done:
             t = self.tree(treesha)
-            yield t
             sha_done.add(treesha)
             parse_tree(t, sha_done)
 
         progress("counting objects: %d\r" % len(sha_done))
+
+        for sha in sha_done:
+            yield self.get_object(sha)
 
   def object_dir(self):
     return os.path.join(self.basedir(), OBJECTDIR)

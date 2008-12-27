@@ -119,7 +119,7 @@ class Repo(object):
         if ref[-1] == '\n':
           ref = ref[:-1]
         return self.ref(ref)
-      assert len(contents) == 41, 'Invalid ref'
+      assert len(contents) == 41, 'Invalid ref in %s' % file
       return contents[:-1]
     finally:
       f.close()
@@ -129,6 +129,15 @@ class Repo(object):
       file = os.path.join(self.basedir(), dir, name)
       if os.path.exists(file):
         return self._get_ref(file)
+
+  def get_refs(self):
+    ret = {"HEAD": self.head()}
+    for dir in ["refs/heads", "refs/tags"]:
+        for name in os.listdir(os.path.join(self.basedir(), dir)):
+          path = os.path.join(self.basedir(), dir, name)
+          if os.path.isfile(path):
+            ret["/".join([dir, name])] = self._get_ref(path)
+    return ret
 
   def set_ref(self, name, value):
     file = os.path.join(self.basedir(), name)

@@ -49,16 +49,16 @@ class Repo(object):
     controldir = os.path.join(root, ".git")
     if os.path.exists(os.path.join(controldir, "objects")):
       self.bare = False
-      self._basedir = controldir
+      self._controldir = controldir
     else:
       self.bare = True
-      self._basedir = root
-    self.path = controldir
+      self._controldir = root
+    self.path = root
     self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
     self._object_store = None
 
-  def basedir(self):
-    return self._basedir
+  def controldir(self):
+    return self._controldir
 
   def fetch_objects(self, determine_wants, graph_walker, progress):
     wants = determine_wants(self.heads())
@@ -99,7 +99,7 @@ class Repo(object):
             yield self.get_object(sha)
 
   def object_dir(self):
-    return os.path.join(self.basedir(), OBJECTDIR)
+    return os.path.join(self.controldir(), OBJECTDIR)
 
   @property
   def object_store(self):
@@ -126,39 +126,39 @@ class Repo(object):
 
   def ref(self, name):
     for dir in self.ref_locs:
-      file = os.path.join(self.basedir(), dir, name)
+      file = os.path.join(self.controldir(), dir, name)
       if os.path.exists(file):
         return self._get_ref(file)
 
   def get_refs(self):
     ret = {"HEAD": self.head()}
     for dir in ["refs/heads", "refs/tags"]:
-        for name in os.listdir(os.path.join(self.basedir(), dir)):
-          path = os.path.join(self.basedir(), dir, name)
+        for name in os.listdir(os.path.join(self.controldir(), dir)):
+          path = os.path.join(self.controldir(), dir, name)
           if os.path.isfile(path):
             ret["/".join([dir, name])] = self._get_ref(path)
     return ret
 
   def set_ref(self, name, value):
-    file = os.path.join(self.basedir(), name)
+    file = os.path.join(self.controldir(), name)
     open(file, 'w').write(value+"\n")
 
   def remove_ref(self, name):
-    file = os.path.join(self.basedir(), name)
+    file = os.path.join(self.controldir(), name)
     if os.path.exists(file):
       os.remove(file)
       return
 
   def get_tags(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'tags')):
+    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'tags')):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret
 
   def heads(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'heads')):
+    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'heads')):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret

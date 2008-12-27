@@ -28,7 +28,7 @@ class Backend(object):
         """
         Get all the refs in the repository
 
-        :return: list of tuple(name, sha)
+        :return: dict of name -> sha
         """
         raise NotImplementedError
 
@@ -61,12 +61,7 @@ class GitBackend(Backend):
         self.repo = Repo(self.gitdir)
 
     def get_refs(self):
-        refs = []
-        if self.repo.head():
-            refs.append(('HEAD', self.repo.head()))
-        for ref, sha in self.repo.heads().items():
-            refs.append(('refs/heads/'+ref,sha))
-        return refs
+        return self.repo.get_refs()
 
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
@@ -172,7 +167,7 @@ class ReceivePackHandler(Handler):
         return ("report-status", "delete-refs")
 
     def handle(self):
-        refs = self.backend.get_refs()
+        refs = self.backend.get_refs().items()
 
         if refs:
             self.proto.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))

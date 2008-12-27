@@ -62,7 +62,14 @@ class Repo(object):
 
   def fetch_objects(self, determine_wants, graph_walker, progress):
     sha_done = set()
-    commits_to_send = want[:]
+    wants = determine_wants(self.heads())
+    commits_to_send = []
+    ref = graph_walker.next()
+    while ref:
+        commits_to_send.append(ref)
+        if ref in self.object_store:
+            graph_walker.ack(ref)
+        ref = graph_walker.next()
     for sha in commits_to_send:
         if sha in sha_done:
             continue
@@ -70,10 +77,6 @@ class Repo(object):
         c = self.commit(sha)
         yield c
         sha_done.add(sha)
-
-        for p in c.parents:
-            if not p in commits_to_send:
-                commits_to_send.append(p)
 
         def parse_tree(tree, sha_done):
             for mode, name, x in tree.entries():

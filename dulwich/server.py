@@ -32,14 +32,6 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def has_revision(self, sha):
-        """
-        Is a given sha in this repository?
-
-        :return: True or False
-        """
-        raise NotImplementedError
-
     def apply_pack(self, refs, read):
         """ Import a set of changes into a repository and update the refs
 
@@ -48,13 +40,10 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def generate_pack(self, want, have, write, progress):
+    def fetch_objects(self, determine_wants, graph_waker, progress):
         """
-        Generate a pack containing all commits a client is missing
+        Yield the objects required for a list of commits.
 
-        :param want: is a list of sha's the client desires
-        :param have: is a list of sha's the client has (allowing us to send the minimal pack)
-        :param write: is a callback to write pack data to the client
         :param progress: is a callback to send progress messages to the client
         """
         raise NotImplementedError
@@ -79,9 +68,6 @@ class GitBackend(Backend):
             refs.append(('refs/heads/'+ref,sha))
         return refs
 
-    def has_revision(self, sha):
-        return self.repo.get_object(sha) != None
-
     def apply_pack(self, refs, read):
         # store the incoming pack in the repository
         fd, name = tempfile.mkstemp(suffix='.pack', prefix='pack-', dir=self.repo.pack_dir())
@@ -103,47 +89,6 @@ class GitBackend(Backend):
 
         print "pack applied"
 
-    def generate_pack(self, want, have, write, progress):
-        progress("dul-daemon says what\n")
-
-        sha_queue = []
-
-        commits_to_send = want[:]
-        for sha in commits_to_send:
-            if sha in sha_queue:
-                continue
-
-            sha_queue.append(sha)
-
-            c = self.repo.commit(sha)
-            for p in c.parents:
-                if not p in commits_to_send:
-                    commits_to_send.append(p)
-
-            def parse_tree(tree, sha_queue):
-                for mode, name, x in tree.entries():
-                    if not x in sha_queue:
-                        try:
-                            t = self.repo.tree(x)
-                            sha_queue.append(x)
-                            parse_tree(t, sha_queue)
-                        except:
-                            sha_queue.append(x)
-
-            treesha = c.tree
-            if treesha not in sha_queue:
-                sha_queue.append(treesha)
-                t = self.repo.tree(treesha)
-                parse_tree(t, sha_queue)
-
-            progress("counting objects: %d\r" % len(sha_queue))
-
-        progress("counting objects: %d, done.\n" % len(sha_queue))
-
-        write_pack_data(ProtocolFile(None, write), (self.repo.get_object(sha) for sha in sha_queue), len(sha_queue))
-
-        progress("how was that, then?\n")
-
 
 class Handler(object):
 
@@ -161,59 +106,62 @@ class UploadPackHandler(Handler):
         return ("multi_ack", "side-band-64k", "thin-pack", "ofs-delta")
 
     def handle(self):
-        refs = self.backend.get_refs()
+        def determine_wants(heads):
+            keys = heads.keys()
+            if keys:
+                self.proto.write_pkt_line("%s %s\x00%s\n" % (keys[0], heads[keys[0]], self.capabilities()))
+                for k in keys[1:]:
+                    self.proto.write_pkt_line("%s %s\n" % (k, heads[k]))
 
-        if refs:
-            self.proto.write_pkt_line("%s %s\x00%s\n" % (refs[0][1], refs[0][0], self.capabilities()))
-            for i in range(1, len(refs)):
-                ref = refs[i]
-                self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+            # i'm done..
+            self.proto.write("0000")
 
-        # i'm done..
-        self.proto.write("0000")
-
-        # Now client will either send "0000", meaning that it doesnt want to pull.
-        # or it will start sending want want want commands
-        want = self.proto.read_pkt_line()
-        if want == None:
-            return
-
-        want, client_capabilities = extract_capabilities(want)
-
-        # Keep reading the list of demands until we hit another "0000" 
-        want_revs = []
-        while want and want[:4] == 'want':
-            want_rev = want[5:45]
-            # FIXME: This check probably isnt needed?
-            if self.backend.has_revision(want_rev):
-               want_revs.append(want_rev)
+            # Now client will either send "0000", meaning that it doesnt want to pull.
+            # or it will start sending want want want commands
             want = self.proto.read_pkt_line()
-        
-        # Client will now tell us which commits it already has - if we have them we ACK them
-        # this allows client to stop looking at that commits parents (main reason why git pull is fast)
-        last_sha = None
-        have_revs = []
-        have = self.proto.read_pkt_line()
-        while have and have[:4] == 'have':
-            have_ref = have[5:45]
-            if self.backend.has_revision(have_ref):
+            if want == None:
+                return []
+
+            want, self.client_capabilities = extract_capabilities(want)
+
+            want_revs = []
+            while want and want[:4] == 'want':
+                want_rev = want[5:45]
+                # FIXME: This check probably isnt needed?
+                want_revs.append(want_rev)
+                want = self.proto.read_pkt_line()
+            return want_revs
+
+        progress = lambda x: self.proto.write_sideband(2, x)
+
+        class ProtocolGraphWalker(object):
+
+            def __init__(self):
+                self._last_sha = None
+
+            def ack(self, have_ref):
                 self.proto.write_pkt_line("ACK %s continue\n" % have_ref)
-                last_sha = have_ref
-                have_revs.append(have_ref)
-            have = self.proto.read_pkt_line()
 
-        # At some point client will stop sending commits and will tell us it is done
-        assert(have[:4] == "done")
+            def next(self):
+                have = self.proto.read_pkt_line()
+                if have[:4] == 'have':
+                    return have[5:45]
 
-        # Oddness: Git seems to resend the last ACK, without the "continue" statement
-        if last_sha:
-            self.proto.write_pkt_line("ACK %s\n" % last_sha)
+                if have[:4] == 'done':
+                    return None
 
-        # The exchange finishes with a NAK
-        self.proto.write_pkt_line("NAK\n")
-      
-        self.backend.generate_pack(want_revs, have_revs, lambda x: self.proto.write_sideband(1, x), lambda x: self.proto.write_sideband(2, x))
+                if self._last_sha:
+                    # Oddness: Git seems to resend the last ACK, without the "continue" statement
+                    self.proto.write_pkt_line("ACK %s\n" % self._last_sha)
 
+                # The exchange finishes with a NAK
+                self.proto.write_pkt_line("NAK\n")
+
+        objects = list(self.backend.fetch_objects(determine_wants, graph_walker, progress))
+        progress("dul-daemon says what\n")
+        progress("counting objects: %d, done.\n" % len(objects))
+        write_pack_data(ProtocolFile(None, write), objects, len(objects))
+        progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
 

@@ -60,6 +60,42 @@ class Repo(object):
   def basedir(self):
     return self._basedir
 
+  def fetch_objects(self, determine_wants, graph_walker, progress):
+    sha_done = set()
+    commits_to_send = want[:]
+    for sha in commits_to_send:
+        if sha in sha_done:
+            continue
+
+        c = self.commit(sha)
+        yield c
+        sha_done.add(sha)
+
+        for p in c.parents:
+            if not p in commits_to_send:
+                commits_to_send.append(p)
+
+        def parse_tree(tree, sha_done):
+            for mode, name, x in tree.entries():
+                if not x in sha_done:
+                    try:
+                        t = self.tree(x)
+                        yield t
+                        sha_done.add(x)
+                        parse_tree(t, sha_done)
+                    except:
+                        yield self.get_object(x)
+                        sha_done.append(x)
+
+        treesha = c.tree
+        if treesha not in sha_done:
+            t = self.tree(treesha)
+            yield t
+            sha_done.add(treesha)
+            parse_tree(t, sha_done)
+
+        progress("counting objects: %d\r" % len(sha_done))
+
   def object_dir(self):
     return os.path.join(self.basedir(), OBJECTDIR)
 

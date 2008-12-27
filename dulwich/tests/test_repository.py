@@ -41,6 +41,13 @@ class RepositoryTests(unittest.TestCase):
     self.assertEqual(r.ref('master'),
                      'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
+  def test_get_refs(self):
+    r = self.open_repo('a')
+    self.assertEquals({
+        'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097', 
+        'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
+        }, r.get_refs())
+
   def test_head(self):
     r = self.open_repo('a')
     self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')

@@ -162,8 +162,8 @@ class TestPack(PackTests):
 
     def test_copy(self):
         p = self.get_pack(pack1_sha)
-        write_pack("testcopy", p.iterobjects(), len(p))
-        self.assertEquals(p, Pack("testcopy"))
+        write_pack("Elch", p.iterobjects(), len(p))
+        self.assertEquals(p, Pack("Elch"))
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)

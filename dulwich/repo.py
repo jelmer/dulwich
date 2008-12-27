@@ -219,6 +219,9 @@ class Repo(object):
     history.reverse()
     return history
 
+  def __repr__(self):
+      return "<Repo at %r>" % self.path
+
   @classmethod
   def init_bare(cls, path, mkdir=True):
       for d in [["objects"], 

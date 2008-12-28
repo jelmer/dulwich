@@ -45,6 +45,32 @@ def cmd_fetch_pack(args):
 		f.close()
 		raise
 
+
+def cmd_log(args):
+	from dulwich.repo import Repo
+	opts, args = getopt(args, "", [])
+	r = Repo(".")
+	todo = [r.head()]
+	done = set()
+	while todo:
+		sha = todo.pop()
+		assert isinstance(sha, str)
+		if sha in done:
+			continue
+		done.add(sha)
+		commit = r.commit(sha)
+		print "-" * 50
+		print "commit: %s" % sha
+		if len(commit.parents) > 1:
+			print "merge: %s" % "...".join(commit.parents[1:])
+		print "author: %s" % commit.author
+		print "committer: %s" % commit.committer
+		print ""
+		print commit.message
+		print ""
+		todo.extend([p for p in commit.parents if p not in done])
+
+
 def cmd_dump_pack(args):
 	from dulwich.errors import ApplyDeltaError
 	from dulwich.pack import Pack, sha_to_hex
@@ -75,6 +101,7 @@ def cmd_dump_pack(args):
 commands = {
 	"fetch-pack": cmd_fetch_pack,
 	"dump-pack": cmd_dump_pack,
+	"log": cmd_log,
 	}
 
 if len(sys.argv) < 2:

@@ -269,6 +269,7 @@ class ObjectStore(object):
 
     @property
     def packs(self):
+        """List with pack objects."""
         if self._packs is None:
             self._packs = list(load_packs(self.pack_dir()))
         return self._packs
@@ -283,6 +284,11 @@ class ObjectStore(object):
         return None
 
     def get_raw(self, sha):
+        """Obtain the raw text for an object.
+        
+        :param sha: Sha for the object.
+        :return: tuple with object type and object contents.
+        """
         for pack in self.packs:
             if sha in pack:
                 return pack.get_raw(sha, self.get_raw)
@@ -302,13 +308,26 @@ class ObjectStore(object):
         return ShaFile.from_raw_string(type, uncomp)
 
     def move_in_pack(self, path):
+        """Move a specific file containing a pack into the pack directory.
+
+        :note: The file should be on the same file system as the 
+            packs directory.
+
+        :param path: Path to the pack file.
+        """
         p = PackData(path)
         entries = p.sorted_entries(self.get_raw)
-        basename = os.path.join(self.pack_dir(), "pack-%s" % iter_sha1(entry[0] for entry in entries))
+        basename = os.path.join(self.pack_dir(), 
+            "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
         os.rename(path, basename + ".pack")
 
     def add_pack(self):
+        """Add a new pack to this object store. 
+
+        :return: Fileobject to write to and a commit function to 
+            call when the pack is finished.
+        """
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():

@@ -63,3 +63,10 @@ class ApplyDeltaError(Exception):
     
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
+
+class NotGitRepository(Exception):
+    """Indicates that no Git repository was found."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)

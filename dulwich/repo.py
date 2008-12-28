@@ -20,7 +20,7 @@
 import os
 
 from commit import Commit
-from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError
+from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError, NotGitRepository
 from objects import (ShaFile,
                      Commit,
                      Tree,
@@ -46,13 +46,14 @@ class Repo(object):
   ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
 
   def __init__(self, root):
-    controldir = os.path.join(root, ".git")
-    if os.path.exists(os.path.join(controldir, "objects")):
+    if os.path.isdir(os.path.join(root, ".git", "objects")):
       self.bare = False
-      self._controldir = controldir
-    else:
+      self._controldir = os.path.join(root, ".git")
+    elif os.path.isdir(os.path.join(root, "objects")):
       self.bare = True
       self._controldir = root
+    else:
+      raise NotGitRepository(root)
     self.path = root
     self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
     self._object_store = None

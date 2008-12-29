@@ -85,7 +85,7 @@ class GitBackend(Backend):
         print "pack applied"
 
     def fetch_objects(self, determine_wants, graph_waker, progress):
-        for sha in generate_pack_contents(determine_wants(), have, self.repo.get_object):
+        for sha in generate_pack_contents(determine_wants(self.get_refs()), have, self.repo.get_object):
             yield self.repo.get_object(sha)
 
 

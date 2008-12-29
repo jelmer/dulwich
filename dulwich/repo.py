@@ -20,13 +20,25 @@
 import os
 
 from commit import Commit
-from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError, NotGitRepository
-from objects import (ShaFile,
-                     Commit,
-                     Tree,
-                     Blob,
-                     )
-from pack import load_packs, iter_sha1, PackData, write_pack_index_v2
+from errors import (
+        MissingCommitError, 
+        NotBlobError, 
+        NotCommitError, 
+        NotGitRepository,
+        NotTreeError, 
+        )
+from objects import (
+        ShaFile,
+        Commit,
+        Tree,
+        Blob,
+        )
+from pack import (
+        iter_sha1, 
+        load_packs, 
+        write_pack_index_v2,
+        PackData, 
+        )
 import tempfile
 
 OBJECTDIR = 'objects'
@@ -73,20 +85,24 @@ class Repo(object):
         updated progress strings.
     """
     wants = determine_wants(self.heads())
-    commits_to_send = wants
+    commits_to_send = set(wants)
+    sha_done = set()
     ref = graph_walker.next()
     while ref:
-        commits_to_send.add(ref)
+        sha_done.add(ref)
         if ref in self.object_store:
             graph_walker.ack(ref)
         ref = graph_walker.next()
-    sha_done = set()
-    for sha in commits_to_send:
+    while commits_to_send:
+        sha = commits_to_send.pop()
         if sha in sha_done:
             continue
 
         c = self.commit(sha)
+        assert isinstance(c, Commit)
         sha_done.add(sha)
+
+        commits_to_send.update([p for p in c.parents if not p in sha_done])
 
         def parse_tree(tree, sha_done):
             for mode, name, x in tree.entries():
@@ -191,6 +207,7 @@ class Repo(object):
     return self.ref('HEAD')
 
   def _get_object(self, sha, cls):
+    assert len(sha) in (20, 40)
     ret = self.get_object(sha)
     if ret._type != cls._type:
         if cls is Commit:

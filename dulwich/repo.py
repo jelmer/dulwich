@@ -155,7 +155,9 @@ class Repo(object):
         return self._get_ref(file)
 
   def get_refs(self):
-    ret = {"HEAD": self.head()}
+    ret = {}
+    if self.head():
+        ret['HEAD'] = self.head()
     for dir in ["refs/heads", "refs/tags"]:
         for name in os.listdir(os.path.join(self.controldir(), dir)):
           path = os.path.join(self.controldir(), dir, name)

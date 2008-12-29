@@ -33,13 +33,20 @@ class RepositoryTests(unittest.TestCase):
   def test_simple_props(self):
     r = self.open_repo('a')
     basedir = os.path.join(os.path.dirname(__file__), 'data/repos/a/.git')
-    self.assertEqual(r.basedir(), basedir)
+    self.assertEqual(r.controldir(), basedir)
     self.assertEqual(r.object_dir(), os.path.join(basedir, 'objects'))
 
   def test_ref(self):
     r = self.open_repo('a')
     self.assertEqual(r.ref('master'),
                      'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
+
+  def test_get_refs(self):
+    r = self.open_repo('a')
+    self.assertEquals({
+        'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097', 
+        'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
+        }, r.get_refs())
 
   def test_head(self):
     r = self.open_repo('a')

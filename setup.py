@@ -19,4 +19,5 @@ setup(name='dulwich',
       in one of the Monty Python sketches.
       """,
       packages=['dulwich', 'dulwich.tests'],
+      scripts=['bin/dulwich', 'bin/dul-daemon'],
       )

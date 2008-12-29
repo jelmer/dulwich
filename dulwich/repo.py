@@ -20,7 +20,7 @@
 import os
 
 from commit import Commit
-from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError
+from errors import MissingCommitError, NotBlobError, NotTreeError, NotCommitError, NotGitRepository
 from objects import (ShaFile,
                      Commit,
                      Tree,
@@ -46,22 +46,84 @@ class Repo(object):
   ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
 
   def __init__(self, root):
-    controldir = os.path.join(root, ".git")
-    if os.path.exists(os.path.join(controldir, "objects")):
+    if os.path.isdir(os.path.join(root, ".git", "objects")):
       self.bare = False
-      self._basedir = controldir
-    else:
+      self._controldir = os.path.join(root, ".git")
+    elif os.path.isdir(os.path.join(root, "objects")):
       self.bare = True
-      self._basedir = root
-    self.path = controldir
+      self._controldir = root
+    else:
+      raise NotGitRepository(root)
+    self.path = root
     self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
     self._object_store = None
 
-  def basedir(self):
-    return self._basedir
+  def controldir(self):
+    return self._controldir
+
+  def find_missing_objects(self, determine_wants, graph_walker, progress):
+    """Fetch the missing objects required for a set of revisions.
+
+    :param determine_wants: Function that takes a dictionary with heads 
+        and returns the list of heads to fetch.
+    :param graph_walker: Object that can iterate over the list of revisions 
+        to fetch and has an "ack" method that will be called to acknowledge 
+        that a revision is present.
+    :param progress: Simple progress function that will be called with 
+        updated progress strings.
+    """
+    wants = determine_wants(self.heads())
+    commits_to_send = wants
+    ref = graph_walker.next()
+    while ref:
+        commits_to_send.add(ref)
+        if ref in self.object_store:
+            graph_walker.ack(ref)
+        ref = graph_walker.next()
+    sha_done = set()
+    for sha in commits_to_send:
+        if sha in sha_done:
+            continue
+
+        c = self.commit(sha)
+        sha_done.add(sha)
+
+        def parse_tree(tree, sha_done):
+            for mode, name, x in tree.entries():
+                if not x in sha_done:
+                    try:
+                        t = self.tree(x)
+                        sha_done.add(x)
+                        parse_tree(t, sha_done)
+                    except:
+                        sha_done.add(x)
+
+        treesha = c.tree
+        if treesha not in sha_done:
+            t = self.tree(treesha)
+            sha_done.add(treesha)
+            parse_tree(t, sha_done)
+
+        progress("counting objects: %d\r" % len(sha_done))
+    return sha_done
+
+  def fetch_objects(self, determine_wants, graph_walker, progress):
+    """Fetch the missing objects required for a set of revisions.
+
+    :param determine_wants: Function that takes a dictionary with heads 
+        and returns the list of heads to fetch.
+    :param graph_walker: Object that can iterate over the list of revisions 
+        to fetch and has an "ack" method that will be called to acknowledge 
+        that a revision is present.
+    :param progress: Simple progress function that will be called with 
+        updated progress strings.
+    """
+    shas = self.find_missing_objects(determine_wants, graph_walker, progress)
+    for sha in shas:
+        yield self.get_object(sha)
 
   def object_dir(self):
-    return os.path.join(self.basedir(), OBJECTDIR)
+    return os.path.join(self.controldir(), OBJECTDIR)
 
   @property
   def object_store(self):
@@ -81,37 +143,46 @@ class Repo(object):
         if ref[-1] == '\n':
           ref = ref[:-1]
         return self.ref(ref)
-      assert len(contents) == 41, 'Invalid ref'
+      assert len(contents) == 41, 'Invalid ref in %s' % file
       return contents[:-1]
     finally:
       f.close()
 
   def ref(self, name):
     for dir in self.ref_locs:
-      file = os.path.join(self.basedir(), dir, name)
+      file = os.path.join(self.controldir(), dir, name)
       if os.path.exists(file):
         return self._get_ref(file)
 
+  def get_refs(self):
+    ret = {"HEAD": self.head()}
+    for dir in ["refs/heads", "refs/tags"]:
+        for name in os.listdir(os.path.join(self.controldir(), dir)):
+          path = os.path.join(self.controldir(), dir, name)
+          if os.path.isfile(path):
+            ret["/".join([dir, name])] = self._get_ref(path)
+    return ret
+
   def set_ref(self, name, value):
-    file = os.path.join(self.basedir(), name)
+    file = os.path.join(self.controldir(), name)
     open(file, 'w').write(value+"\n")
 
   def remove_ref(self, name):
-    file = os.path.join(self.basedir(), name)
+    file = os.path.join(self.controldir(), name)
     if os.path.exists(file):
       os.remove(file)
       return
 
   def get_tags(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'tags')):
+    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'tags')):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret
 
   def heads(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.basedir(), 'refs', 'heads')):
+    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'heads')):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret
@@ -181,6 +252,9 @@ class Repo(object):
     history.reverse()
     return history
 
+  def __repr__(self):
+      return "<Repo at %r>" % self.path
+
   @classmethod
   def init_bare(cls, path, mkdir=True):
       for d in [["objects"], 
@@ -219,6 +293,7 @@ class ObjectStore(object):
 
     @property
     def packs(self):
+        """List with pack objects."""
         if self._packs is None:
             self._packs = list(load_packs(self.pack_dir()))
         return self._packs
@@ -233,6 +308,11 @@ class ObjectStore(object):
         return None
 
     def get_raw(self, sha):
+        """Obtain the raw text for an object.
+        
+        :param sha: Sha for the object.
+        :return: tuple with object type and object contents.
+        """
         for pack in self.packs:
             if sha in pack:
                 return pack.get_raw(sha, self.get_raw)
@@ -252,13 +332,26 @@ class ObjectStore(object):
         return ShaFile.from_raw_string(type, uncomp)
 
     def move_in_pack(self, path):
+        """Move a specific file containing a pack into the pack directory.
+
+        :note: The file should be on the same file system as the 
+            packs directory.
+
+        :param path: Path to the pack file.
+        """
         p = PackData(path)
         entries = p.sorted_entries(self.get_raw)
-        basename = os.path.join(self.pack_dir(), "pack-%s" % iter_sha1(entry[0] for entry in entries))
+        basename = os.path.join(self.pack_dir(), 
+            "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
         os.rename(path, basename + ".pack")
 
     def add_pack(self):
+        """Add a new pack to this object store. 
+
+        :return: Fileobject to write to and a commit function to 
+            call when the pack is finished.
+        """
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():

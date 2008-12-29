@@ -111,7 +111,7 @@ class TestPackData(PackTests):
 
   def test_iterentries(self):
     p = self.get_pack_data(pack1_sha)
-    self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, -1718046665), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, -901046474), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, 1185722901)], list(p.iterentries()))
+    self.assertEquals(set([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, -1718046665), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, -901046474), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, 1185722901)]), set(p.iterentries()))
 
   def test_create_index_v1(self):
     p = self.get_pack_data(pack1_sha)
@@ -162,8 +162,8 @@ class TestPack(PackTests):
 
     def test_copy(self):
         p = self.get_pack(pack1_sha)
-        write_pack("testcopy", p.iterobjects(), len(p))
-        self.assertEquals(p, Pack("testcopy"))
+        write_pack("Elch", p.iterobjects(), len(p))
+        self.assertEquals(p, Pack("Elch"))
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)

@@ -88,12 +88,14 @@ def hex_to_sha(hex):
     ret += chr(int(hex[i:i+2], 16))
   return ret
 
+
 def sha_to_hex(sha):
   """Convert a binary sha string to a hex sha string."""
   ret = ""
   for i in sha:
       ret += "%02x" % ord(i)
   return ret
+
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024
 
@@ -362,8 +364,9 @@ class PackData(object):
     self._filename = filename
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
-    assert self._size >= 12, "%s is too small for a packfile" % filename
-    self._header_size = self._read_header()
+    self._header_size = 12
+    assert self._size >= self._header_size, "%s is too small for a packfile" % filename
+    self._read_header()
 
   def _read_header(self):
     f = open(self._filename, 'rb')
@@ -377,7 +380,6 @@ class PackData(object):
     (version,) = struct.unpack_from(">L", header, 4)
     assert version in (2, 3), "Version was %d" % version
     (self._num_objects,) = struct.unpack_from(">L", header, 8)
-    return 12 # Header size
 
   def __len__(self):
       """Returns the number of objects in this pack."""

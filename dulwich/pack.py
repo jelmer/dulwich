@@ -325,6 +325,49 @@ class PackIndex(object):
       return None
 
 
+def read_pack_header(f):
+    header = f.read(12)
+    assert header[:4] == "PACK"
+    (version,) = struct.unpack_from(">L", header, 4)
+    assert version in (2, 3), "Version was %d" % version
+    (num_objects,) = struct.unpack_from(">L", header, 8)
+    return (version, num_objects)
+
+
+def read_pack_tail(f):
+    return (f.read(20),)
+
+
+def _unpack_object(map):
+    bytes = take_msb_bytes(map, 0)
+    type = (bytes[0] >> 4) & 0x07
+    size = bytes[0] & 0x0f
+    for i, byte in enumerate(bytes[1:]):
+      size += (byte & 0x7f) << ((i * 7) + 4)
+    raw_base = len(bytes)
+    if type == 6: # offset delta
+        bytes = take_msb_bytes(map, raw_base)
+        assert not (bytes[-1] & 0x80)
+        delta_base_offset = bytes[0] & 0x7f
+        for byte in bytes[1:]:
+            delta_base_offset += 1
+            delta_base_offset <<= 7
+            delta_base_offset += (byte & 0x7f)
+        raw_base+=len(bytes)
+        uncomp, comp_len = read_zlib(map, raw_base, size)
+        assert size == len(uncomp)
+        return type, (delta_base_offset, uncomp), comp_len+raw_base
+    elif type == 7: # ref delta
+        basename = map[raw_base:raw_base+20]
+        uncomp, comp_len = read_zlib(map, raw_base+20, size)
+        assert size == len(uncomp)
+        return type, (basename, uncomp), comp_len+raw_base+20
+    else:
+        uncomp, comp_len = read_zlib(map, raw_base, size)
+        assert len(uncomp) == size
+        return type, uncomp, comp_len+raw_base
+
+
 class PackData(object):
   """The data contained in a packfile.
 
@@ -371,15 +414,12 @@ class PackData(object):
   def _read_header(self):
     f = open(self._filename, 'rb')
     try:
-        header = f.read(12)
+        (version, self._num_objects) = \
+                read_pack_header(f)
         f.seek(self._size-20)
-        self._stored_checksum = f.read(20)
+        (self._stored_checksum,) = read_pack_tail(f)
     finally:
         f.close()
-    assert header[:4] == "PACK"
-    (version,) = struct.unpack_from(">L", header, 4)
-    assert version in (2, 3), "Version was %d" % version
-    (self._num_objects,) = struct.unpack_from(">L", header, 8)
 
   def __len__(self):
       """Returns the number of objects in this pack."""
@@ -398,7 +438,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     for i in range(len(self)):
         map = simple_mmap(f, offset, self._size-offset)
-        (type, obj, total_size) = self._unpack_object(map)
+        (type, obj, total_size) = _unpack_object(map)
         yield offset, type, obj
         offset += total_size
     f.close()
@@ -475,38 +515,9 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
       map = simple_mmap(f, offset, size-offset)
-      return self._unpack_object(map)[:2]
+      return _unpack_object(map)[:2]
     finally:
       f.close()
-
-  def _unpack_object(self, map):
-    bytes = take_msb_bytes(map, 0)
-    type = (bytes[0] >> 4) & 0x07
-    size = bytes[0] & 0x0f
-    for i, byte in enumerate(bytes[1:]):
-      size += (byte & 0x7f) << ((i * 7) + 4)
-    raw_base = len(bytes)
-    if type == 6: # offset delta
-        bytes = take_msb_bytes(map, raw_base)
-        assert not (bytes[-1] & 0x80)
-        delta_base_offset = bytes[0] & 0x7f
-        for byte in bytes[1:]:
-            delta_base_offset += 1
-            delta_base_offset <<= 7
-            delta_base_offset += (byte & 0x7f)
-        raw_base+=len(bytes)
-        uncomp, comp_len = read_zlib(map, raw_base, size)
-        assert size == len(uncomp)
-        return type, (delta_base_offset, uncomp), comp_len+raw_base
-    elif type == 7: # ref delta
-        basename = map[raw_base:raw_base+20]
-        uncomp, comp_len = read_zlib(map, raw_base+20, size)
-        assert size == len(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base+20
-    else:
-        uncomp, comp_len = read_zlib(map, raw_base, size)
-        assert len(uncomp) == size
-        return type, uncomp, comp_len+raw_base
 
 
 class SHA1Writer(object):

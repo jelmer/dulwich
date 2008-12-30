@@ -17,6 +17,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+from errors import HangupException
+
 TCP_GIT_PORT = 9418
 
 class ProtocolFile(object):
@@ -50,7 +52,7 @@ class Protocol(object):
         """
         sizestr = self.read(4)
         if not sizestr:
-            return None
+            raise HangupException()
         size = int(sizestr, 16)
         if size == 0:
             return None

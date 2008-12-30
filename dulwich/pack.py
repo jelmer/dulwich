@@ -338,7 +338,7 @@ def read_pack_tail(f):
     return (f.read(20),)
 
 
-def _unpack_object(map):
+def unpack_object(map):
     bytes = take_msb_bytes(map, 0)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
@@ -438,7 +438,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     for i in range(len(self)):
         map = simple_mmap(f, offset, self._size-offset)
-        (type, obj, total_size) = _unpack_object(map)
+        (type, obj, total_size) = unpack_object(map)
         yield offset, type, obj
         offset += total_size
     f.close()
@@ -515,7 +515,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
       map = simple_mmap(f, offset, size-offset)
-      return _unpack_object(map)[:2]
+      return unpack_object(map)[:2]
     finally:
       f.close()
 

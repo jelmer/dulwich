@@ -70,3 +70,14 @@ class NotGitRepository(Exception):
 
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
+
+class GitProtocolError(Exception):
+    """Git protocol exception."""
+    
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class HangupException(GitProtocolError):
+    """Hangup exception."""

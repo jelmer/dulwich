@@ -98,6 +98,23 @@ def cmd_dump_pack(args):
 		except ApplyDeltaError, e:
 			print "\t%s: Unable to apply delta: %r" % (name, e)
 
+
+def cmd_dump_index(args):
+	from dulwich.index import Index
+
+	opts, args = getopt(args, "", [])
+
+	if args == []:
+		print "Usage: dulwich dump-pack FILENAME"
+		sys.exit(1)
+
+	filename = args[0]
+	idx = Index(filename)
+
+	for o in idx:
+		print o[0]
+
+
 def cmd_init(args):
 	from dulwich.repo import Repo
 	import os
@@ -162,6 +179,7 @@ def cmd_clone(args):
 commands = {
 	"fetch-pack": cmd_fetch_pack,
 	"dump-pack": cmd_dump_pack,
+	"dump-index": cmd_dump_index,
 	"init": cmd_init,
 	"log": cmd_log,
 	"clone": cmd_clone,

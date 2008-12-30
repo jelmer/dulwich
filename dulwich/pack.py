@@ -799,3 +799,4 @@ def load_packs(path):
     for name in os.listdir(path):
         if name.startswith("pack-") and name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))
+

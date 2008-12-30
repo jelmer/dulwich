@@ -84,7 +84,7 @@ class Repo(object):
     :param progress: Simple progress function that will be called with 
         updated progress strings.
     """
-    wants = determine_wants(self.heads())
+    wants = determine_wants(self.get_refs())
     commits_to_send = set(wants)
     sha_done = set()
     ref = graph_walker.next()
@@ -171,7 +171,9 @@ class Repo(object):
         return self._get_ref(file)
 
   def get_refs(self):
-    ret = {"HEAD": self.head()}
+    ret = {}
+    if self.head():
+        ret['HEAD'] = self.head()
     for dir in ["refs/heads", "refs/tags"]:
         for name in os.listdir(os.path.join(self.controldir(), dir)):
           path = os.path.join(self.controldir(), dir, name)

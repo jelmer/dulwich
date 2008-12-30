@@ -268,6 +268,12 @@ class Repo(object):
       return "<Repo at %r>" % self.path
 
   @classmethod
+  def init(cls, path, mkdir=True):
+      controldir = os.path.join(path, ".git")
+      os.mkdir(controldir)
+      cls.init_bare(controldir)
+
+  @classmethod
   def init_bare(cls, path, mkdir=True):
       for d in [["objects"], 
                 ["objects", "info"], 

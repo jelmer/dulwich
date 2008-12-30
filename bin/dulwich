@@ -98,10 +98,73 @@ def cmd_dump_pack(args):
 		except ApplyDeltaError, e:
 			print "\t%s: Unable to apply delta: %r" % (name, e)
 
+def cmd_init(args):
+	from dulwich.repo import Repo
+	import os
+	import sys
+	opts, args = getopt(args, "", ["--bare"])
+	opts = dict(opts)
+
+	if args == []:
+		path = os.getcwd()
+	else:
+		path = args[0]
+
+	if not os.path.exists(path):
+		os.mkdir(path)
+
+	if "--bare" in opts:
+		Repo.init_bare(path)
+	else:
+		Repo.init(path)
+
+
+def cmd_clone(args):
+	from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+	from dulwich.repo import Repo
+	import os
+	import sys
+	opts, args = getopt(args, "", [])
+	opts = dict(opts)
+
+	if args == []:
+		print "usage: dulwich clone host:path [PATH]"
+		sys.exit(1)
+
+	if not ":" in args[0]:
+		print "Usage: dulwich clone host:path [PATH]"
+		sys.exit(1)
+	(host, host_path) = args.pop(0).split(":", 1)
+	client = TCPGitClient(host)
+
+	if len(args) > 0:
+		path = args.pop(0)
+	else:
+		path = host_path.split("/")[-1]
+
+	if not os.path.exists(path):
+		os.mkdir(path)
+	Repo.init(path)
+	r = Repo(path)
+	determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
+	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
+	f, commit = r.object_store.add_pack()
+	try:
+		client.fetch_pack(host_path, determine_wants, graphwalker, f.write, 
+				          sys.stdout.write)
+		f.close()
+		commit()
+	except:
+		f.close()
+		raise
+
+
 commands = {
 	"fetch-pack": cmd_fetch_pack,
 	"dump-pack": cmd_dump_pack,
+	"init": cmd_init,
 	"log": cmd_log,
+	"clone": cmd_clone,
 	}
 
 if len(sys.argv) < 2:

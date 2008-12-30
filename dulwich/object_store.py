@@ -26,6 +26,7 @@ from pack import (
         write_pack_index_v2,
         PackData, 
         )
+import tempfile
 PACKDIR = 'pack'
 
 class ObjectStore(object):
@@ -112,3 +113,10 @@ class ObjectStore(object):
             if os.path.getsize(path) > 0:
                 self.move_in_pack(path)
         return f, commit
+
+    def add_objects(self, objects):
+        if len(objects) == 0:
+            return
+        f, commit = self.add_pack()
+        write_pack_data(f, objects, len(objects))
+        commit()

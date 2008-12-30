@@ -29,5 +29,12 @@ class ObjectStoreTests(TestCase):
         o = ObjectStore("foo")
         self.assertEquals([], o.packs)
 
+    def test_add_objects_empty(self):
+        o = ObjectStore("foo")
+        o.add_objects([])
 
-
+    def test_add_commit(self):
+        o = ObjectStore("foo")
+        # TODO: Argh, no way to construct Git commit objects without 
+        # access to a serialized form.
+        o.add_objects([])

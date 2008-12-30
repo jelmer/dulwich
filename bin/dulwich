@@ -98,9 +98,30 @@ def cmd_dump_pack(args):
 		except ApplyDeltaError, e:
 			print "\t%s: Unable to apply delta: %r" % (name, e)
 
+def cmd_init(args):
+	from dulwich.repo import Repo
+	import os
+	import sys
+	opts, args = getopt(args, "", ["--bare"])
+	opts = dict(opts)
+
+	if args == []:
+		path = os.getcwd()
+	else:
+		path = args[0]
+
+	if not os.path.exists(path):
+		os.mkdir(path)
+
+	if "--bare" in opts:
+		Repo.init_bare(path)
+	else:
+		Repo.init(path)
+
 commands = {
 	"fetch-pack": cmd_fetch_pack,
 	"dump-pack": cmd_dump_pack,
+	"init": cmd_init,
 	"log": cmd_log,
 	}
 

@@ -84,7 +84,7 @@ class Repo(object):
     :param progress: Simple progress function that will be called with 
         updated progress strings.
     """
-    wants = determine_wants(self.heads())
+    wants = determine_wants(self.get_refs())
     commits_to_send = set(wants)
     sha_done = set()
     ref = graph_walker.next()

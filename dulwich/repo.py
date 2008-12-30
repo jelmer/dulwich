@@ -34,7 +34,6 @@ from objects import (
         Tree,
         Blob,
         )
-import tempfile
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '

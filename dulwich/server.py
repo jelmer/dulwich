@@ -63,17 +63,9 @@ class GitBackend(Backend):
         self.get_refs = self.repo.get_refs
 
     def apply_pack(self, refs, read):
-        # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='.pack', prefix='pack-', dir=self.repo.pack_dir())
-        os.write(fd, read())
-        os.close(fd)
-
-        # strip '.pack' off our filename
-        basename = name[:-5]
-
-        # generate an index for it
-        pd = PackData(name)
-        pd.create_index_v2(basename+".idx")
+        fd, commit = self.repo.object_store.add_pack()
+        fd.write(read())
+        commit()
 
         for oldsha, sha, ref in refs:
             if ref == "0" * 40:

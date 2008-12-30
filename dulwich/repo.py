@@ -34,7 +34,6 @@ from objects import (
         Tree,
         Blob,
         )
-import tempfile
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '
@@ -267,6 +266,12 @@ class Repo(object):
 
   def __repr__(self):
       return "<Repo at %r>" % self.path
+
+  @classmethod
+  def init(cls, path, mkdir=True):
+      controldir = os.path.join(path, ".git")
+      os.mkdir(controldir)
+      cls.init_bare(controldir)
 
   @classmethod
   def init_bare(cls, path, mkdir=True):

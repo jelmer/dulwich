@@ -65,6 +65,7 @@ class GitBackend(Backend):
     def apply_pack(self, refs, read):
         fd, commit = self.repo.object_store.add_pack()
         fd.write(read())
+        fd.close()
         commit()
 
         for oldsha, sha, ref in refs:

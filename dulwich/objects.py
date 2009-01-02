@@ -52,6 +52,13 @@ def sha_to_hex(sha):
          len(hexsha)
   return hexsha
 
+def hex_to_sha(hex):
+  """Takes a hex sha and returns a binary sha"""
+  sha = ''
+  for i in range(0,19):
+    sha += chr(int(hex[i:i+2], 16))
+  assert len(sha) == 20, "Incorrent length of sha1"
+  return sha
 
 class ShaFile(object):
   """A git SHA file."""
@@ -224,6 +231,9 @@ class Tree(ShaFile):
 
   _type = TREE_ID
 
+  def __init__(self):
+    self._entries = []
+
   @classmethod
   def from_file(cls, filename):
     tree = ShaFile.from_file(filename)
@@ -231,13 +241,15 @@ class Tree(ShaFile):
       raise NotTreeError(filename)
     return tree
 
+  def add(self, mode, name, hexsha):
+    self._entries.append((mode, name, hexsha))
+
   def entries(self):
     """Return a list of tuples describing the tree entries"""
     return self._entries
 
   def _parse_text(self):
     """Grab the entries in the tree"""
-    self._entries = []
     count = 0
     while count < len(self._text):
       mode = 0
@@ -258,8 +270,14 @@ class Tree(ShaFile):
       chr = self._text[count]
       sha = self._text[count:count+20]
       hexsha = sha_to_hex(sha)
-      self._entries.append((mode, name, hexsha))
+      self.add(mode, name, hexsha)
       count = count + 20
+
+  def serialize(self):
+    self._text = ""
+    for mode, name, hexsha in self._entries:
+        self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
+
 
 class Commit(ShaFile):
   """A git commit object"""
@@ -339,6 +357,9 @@ class Commit(ShaFile):
     # XXX: There can be an encoding field.
     self._message = text[count:]
 
+  def serialize(self):
+    pass
+
   @property
   def tree(self):
     """Returns the tree that is the state of this commit"""
@@ -371,6 +392,7 @@ class Commit(ShaFile):
     Returns it as the number of seconds since the epoch.
     """
     return self._commit_time
+
 
 type_map = {
   BLOB_ID : Blob,

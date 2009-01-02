@@ -362,8 +362,8 @@ class Commit(ShaFile):
     self._text += "%s %s\n" % (TREE_ID, self._tree)
     for p in self._parents:
       self._text += "%s %s\n" % (PARENT_ID, p)
-    self._text += "%s %s\n" % (AUTHOR_ID, self._author)
-    self._text += "%s %s\n" % (COMMITTER_ID, self._committer)
+    self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
+    self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
     self._text += message
 
   @property

@@ -185,6 +185,7 @@ class Blob(ShaFile):
   """A Git Blob object."""
 
   _type = BLOB_ID
+  _num_type = 3
 
   @property
   def data(self):
@@ -230,6 +231,7 @@ class Tree(ShaFile):
   """A Git tree object"""
 
   _type = TREE_ID
+  _num_type = 2
 
   def __init__(self):
     self._entries = []
@@ -283,6 +285,7 @@ class Commit(ShaFile):
   """A git commit object"""
 
   _type = COMMIT_ID
+  _num_type = 1
 
   @classmethod
   def from_file(cls, filename):

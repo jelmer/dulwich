@@ -358,7 +358,13 @@ class Commit(ShaFile):
     self._message = text[count:]
 
   def serialize(self):
-    pass
+    self._text = ""
+    self._text += "%s %s\n" % (TREE_ID, self._tree)
+    for p in self._parents:
+      self._text += "%s %s\n" % (PARENT_ID, p)
+    self._text += "%s %s\n" % (AUTHOR_ID, self._author)
+    self._text += "%s %s\n" % (COMMITTER_ID, self._committer)
+    self._text += message
 
   @property
   def tree(self):

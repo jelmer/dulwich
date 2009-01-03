@@ -112,7 +112,7 @@ class Protocol(object):
         splice_at = line.find(" ")
         cmd, args = line[:splice_at], line[splice_at+1:]
         return cmd, args.split(chr(0))
- 
+
 
 def extract_capabilities(text):
     if not "\0" in text:

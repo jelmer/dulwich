@@ -287,6 +287,9 @@ class Commit(ShaFile):
   _type = COMMIT_ID
   _num_type = 1
 
+  def __init__(self):
+    self._parents = []
+
   @classmethod
   def from_file(cls, filename):
     commit = ShaFile.from_file(filename)
@@ -367,7 +370,7 @@ class Commit(ShaFile):
       self._text += "%s %s\n" % (PARENT_ID, p)
     self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
     self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
-    self._text += message
+    self._text += self._message
 
   @property
   def tree(self):

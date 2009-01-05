@@ -370,6 +370,7 @@ class Commit(ShaFile):
       self._text += "%s %s\n" % (PARENT_ID, p)
     self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
     self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
+    self._text += "\n" # There must be a new line after the headers
     self._text += self._message
 
   @property

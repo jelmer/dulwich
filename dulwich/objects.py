@@ -247,8 +247,9 @@ class Tag(ShaFile):
         self._object_type += text[count]
         count += 1
     count += 1
-    assert self._object_type in (COMMIT_ID,), "Invalid tag object, " \
+    assert self._object_type in (COMMIT_ID, BLOB_ID, TREE_ID, TAG_ID), "Invalid tag object, " \
         "unexpected object type %s" % self._object_type
+    self._object_type = type_map[self._object_type]
 
     assert text[count:].startswith(TAG_ID), "Invalid tag object, " \
         "object type must be followed by %s" % (TAG_ID)

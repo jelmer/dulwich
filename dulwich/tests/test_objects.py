@@ -86,7 +86,7 @@ class BlobReadTests(unittest.TestCase):
 
   def test_read_tag_from_file(self):
     t = self.get_tag(tag_sha)
-    self.assertEqual(t.object, ('commit', '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
+    self.assertEqual(t.object, (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
     self.assertEqual(t.name,'signed')
     self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
     self.assertEqual(t.tag_time, 1231203091)

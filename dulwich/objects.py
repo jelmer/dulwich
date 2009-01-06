@@ -36,6 +36,9 @@ COMMIT_ID = "commit"
 PARENT_ID = "parent"
 AUTHOR_ID = "author"
 COMMITTER_ID = "committer"
+OBJECT_ID = "object"
+TYPE_ID = "type"
+TAGGER_ID = "tagger"
 
 def _decompress(string):
     dcomp = zlib.decompressobj()
@@ -217,6 +220,98 @@ class Tag(ShaFile):
     shafile = cls()
     shafile._text = string
     return shafile
+
+  def _parse_text(self):
+    """Grab the metadata attached to the tag"""
+    text = self._text
+    count = 0
+    assert text.startswith(OBJECT_ID), "Invalid tag object, " \
+         "must start with %s" % OBJECT_ID
+    count += len(OBJECT_ID)
+    assert text[count] == ' ', "Invalid tag object, " \
+         "%s must be followed by space not %s" % (OBJECT_ID, text[count])
+    count += 1
+    self._object_sha = text[count:count+40]
+    count += 40
+    assert text[count] == '\n', "Invalid tag object, " \
+         "%s sha must be followed by newline" % OBJECT_ID
+    count += 1
+    assert text[count:].startswith(TYPE_ID), "Invalid tag object, " \
+         "%s sha must be followed by %s" % (OBJECT_ID, TYPE_ID)
+    count += len(TYPE_ID)
+    assert text[count] == ' ', "Invalid tag object, " \
+        "%s must be followed by space not %s" % (TAG_ID, text[count])
+    count += 1
+    self._object_type = ""
+    while text[count] != '\n':
+        self._object_type += text[count]
+        count += 1
+    count += 1
+    assert self._object_type in (COMMIT_ID,), "Invalid tag object, " \
+        "unexpected object type %s" % self._object_type
+
+    assert text[count:].startswith(TAG_ID), "Invalid tag object, " \
+        "object type must be followed by %s" % (TAG_ID)
+    count += len(TAG_ID)
+    assert text[count] == ' ', "Invalid tag object, " \
+        "%s must be followed by space not %s" % (TAG_ID, text[count])
+    count += 1
+    self._name = ""
+    while text[count] != '\n':
+        self._name += text[count]
+        count += 1
+    count += 1
+
+    assert text[count:].startswith(TAGGER_ID), "Invalid tag object, " \
+        "%s must be followed by %s" % (TAG_ID, TAGGER_ID)
+    count += len(TAGGER_ID)
+    assert text[count] == ' ', "Invalid tag object, " \
+        "%s must be followed by space not %s" % (TAGGER_ID, text[count])
+    count += 1
+    self._tagger = ""
+    while text[count] != '>':
+        assert text[count] != '\n', "Malformed tagger information"
+        self._tagger += text[count]
+        count += 1
+    self._tagger += text[count]
+    count += 1
+    assert text[count] == ' ', "Invalid tag object, " \
+        "tagger information must be followed by space not %s" % text[count]
+    count += 1
+    self._tag_time = int(text[count:count+10])
+    while text[count] != '\n':
+        count += 1
+    count += 1
+    assert text[count] == '\n', "There must be a new line after the headers"
+    count += 1
+    self._message = text[count:]
+
+  @property
+  def object(self):
+    """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
+    return (self._object_type, self._object_sha)
+
+  @property
+  def name(self):
+    """Returns the name of this tag"""
+    return self._name
+
+  @property
+  def tagger(self):
+    """Returns the name of the person who created this tag"""
+    return self._tagger
+
+  @property
+  def tag_time(self):
+    """Returns the creation timestamp of the tag.
+
+    Returns it as the number of seconds since the epoch"""
+    return self._tag_time
+
+  @property
+  def message(self):
+    """Returns the message attached to this tag"""
+    return self._message
 
 
 class Tree(ShaFile):

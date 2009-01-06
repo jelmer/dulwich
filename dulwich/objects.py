@@ -52,6 +52,13 @@ def sha_to_hex(sha):
          len(hexsha)
   return hexsha
 
+def hex_to_sha(hex):
+  """Takes a hex sha and returns a binary sha"""
+  sha = ''
+  for i in range(0,20):
+    sha += chr(int(hex[i*2:i*2+2], 16))
+  assert len(sha) == 20, "Incorrent length of sha1: %d" % len(sha)
+  return sha
 
 class ShaFile(object):
   """A git SHA file."""
@@ -178,6 +185,7 @@ class Blob(ShaFile):
   """A Git Blob object."""
 
   _type = BLOB_ID
+  _num_type = 3
 
   @property
   def data(self):
@@ -223,6 +231,10 @@ class Tree(ShaFile):
   """A Git tree object"""
 
   _type = TREE_ID
+  _num_type = 2
+
+  def __init__(self):
+    self._entries = []
 
   @classmethod
   def from_file(cls, filename):
@@ -231,13 +243,15 @@ class Tree(ShaFile):
       raise NotTreeError(filename)
     return tree
 
+  def add(self, mode, name, hexsha):
+    self._entries.append((mode, name, hexsha))
+
   def entries(self):
     """Return a list of tuples describing the tree entries"""
     return self._entries
 
   def _parse_text(self):
     """Grab the entries in the tree"""
-    self._entries = []
     count = 0
     while count < len(self._text):
       mode = 0
@@ -258,13 +272,23 @@ class Tree(ShaFile):
       chr = self._text[count]
       sha = self._text[count:count+20]
       hexsha = sha_to_hex(sha)
-      self._entries.append((mode, name, hexsha))
+      self.add(mode, name, hexsha)
       count = count + 20
+
+  def serialize(self):
+    self._text = ""
+    for mode, name, hexsha in self._entries:
+        self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
+
 
 class Commit(ShaFile):
   """A git commit object"""
 
   _type = COMMIT_ID
+  _num_type = 1
+
+  def __init__(self):
+    self._parents = []
 
   @classmethod
   def from_file(cls, filename):
@@ -339,6 +363,16 @@ class Commit(ShaFile):
     # XXX: There can be an encoding field.
     self._message = text[count:]
 
+  def serialize(self):
+    self._text = ""
+    self._text += "%s %s\n" % (TREE_ID, self._tree)
+    for p in self._parents:
+      self._text += "%s %s\n" % (PARENT_ID, p)
+    self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
+    self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
+    self._text += "\n" # There must be a new line after the headers
+    self._text += self._message
+
   @property
   def tree(self):
     """Returns the tree that is the state of this commit"""
@@ -371,6 +405,7 @@ class Commit(ShaFile):
     Returns it as the number of seconds since the epoch.
     """
     return self._commit_time
+
 
 type_map = {
   BLOB_ID : Blob,

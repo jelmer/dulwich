@@ -19,8 +19,8 @@
 import SocketServer
 from dulwich.protocol import Protocol, ProtocolFile, TCP_GIT_PORT, extract_capabilities
 from dulwich.repo import Repo
-from dulwich.pack import PackData, Pack, write_pack_data
-import os, sha, tempfile
+from dulwich.pack import write_pack_data
+import tempfile
 
 class Backend(object):
 
@@ -63,17 +63,10 @@ class GitBackend(Backend):
         self.get_refs = self.repo.get_refs
 
     def apply_pack(self, refs, read):
-        # store the incoming pack in the repository
-        fd, name = tempfile.mkstemp(suffix='.pack', prefix='pack-', dir=self.repo.pack_dir())
-        os.write(fd, read())
-        os.close(fd)
-
-        # strip '.pack' off our filename
-        basename = name[:-5]
-
-        # generate an index for it
-        pd = PackData(name)
-        pd.create_index_v2(basename+".idx")
+        fd, commit = self.repo.object_store.add_pack()
+        fd.write(read())
+        fd.close()
+        commit()
 
         for oldsha, sha, ref in refs:
             if ref == "0" * 40:

@@ -19,7 +19,7 @@
 from objects import (
         ShaFile,
         )
-import os
+import os, tempfile
 from pack import (
         iter_sha1, 
         load_packs, 

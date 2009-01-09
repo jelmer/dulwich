@@ -99,6 +99,9 @@ class TestPackDeltas(unittest.TestCase):
   test_string2 = "The answer was falling down the pipe"
   test_string3 = "zzzzz"
 
+  test_string_empty = ""
+  test_string_big = "Z" * 8192
+
   def _test_roundtrip(self, base, target):
     self.assertEquals(target,
       apply_delta(base, create_delta(base, target)))
@@ -111,6 +114,9 @@ class TestPackDeltas(unittest.TestCase):
 
   def test_rewrite(self):
     self._test_roundtrip(self.test_string1, self.test_string3)
+
+  def test_overflow(self):
+    self._test_roundtrip(self.test_string_empty, self.test_string_big)
 
 
 class TestPackData(PackTests):

@@ -179,10 +179,10 @@ class TestPack(PackTests):
 class TestHexToSha(unittest.TestCase):
 
     def test_simple(self):
-        self.assertEquals('\xab\xcd\xef', hex_to_sha("abcdef"))
+        self.assertEquals('\xab\xcd' * 10, hex_to_sha("abcd" * 10))
 
     def test_reverse(self):
-        self.assertEquals("abcdef", sha_to_hex('\xab\xcd\xef'))
+        self.assertEquals("abcd" * 10, sha_to_hex('\xab\xcd' * 10))
 
 
 class BaseTestPackIndexWriting(object):

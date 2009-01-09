@@ -42,6 +42,7 @@ import sha
 import struct
 import sys
 import zlib
+import difflib
 
 from objects import (
         ShaFile,
@@ -619,6 +620,70 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
     f.close()
+
+
+def create_delta(base_buf, target_buf):
+    """Use python difflib to work out how to transform base_buf to target_buf"""
+    assert isinstance(base_buf, str)
+    assert isinstance(target_buf, str)
+    out_buf = ""
+
+    # write delta header
+    def size(l):
+        r = ""
+        while l & 0x80:
+            r += chr(l | 0x80)
+            l >>= 7
+        return r
+    out_buf += size(len(base_buf))
+    out_buf += size(len(target_buf))
+
+    # write out delta opcodes
+    seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
+    for opcode, i1, i2, j1, j2 in seq.get_opcodes():
+        # Git patch opcodes don't care about deletes!
+        #if opcode == "replace" or opcode == "delete":
+        #    pass
+
+        if opcode == "equal":
+            # If they are equal, unpacker will use data from base_buf
+            # Write out an opcode that says what range to use
+            scratch = ""
+            op = 0x80
+            o = i1
+            s = i2 - i1
+
+            if o & 0x000000ff:
+                scratch += chr(o >> 0)
+                op |= 0x01
+            if o & 0x0000ff00:
+                scratch += chr(o >> 8)
+                op |= 0x02
+            if o & 0x00ff0000:
+                scratch += chr(o >> 16)
+                op |= 0x02
+            if o & 0xff000000:
+                scratch += chr(o >> 24)
+                op |= 0x08
+            if s & 0x00ff:
+                scratch += chr(o >> 0)
+                op |= 0x10
+            if s & 0xff00:
+                scratch += chr(o >> 8)
+                op |= 0x20
+
+            out_buf += chr(op)
+            out_buf += scratch
+
+
+        if opcode == "replace" or opcode == "add":
+            # If we are replacing a range or adding one, then we just
+            # output it to the stream (prefixed by its size)
+            #FIXME: Will need to break this into multiple chunks
+            out_buf += chr(j2-j1)
+            out_buf += target_buf[j1:j2]
+
+    return out_buf
 
 
 def apply_delta(src_buf, delta):

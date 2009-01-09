@@ -631,9 +631,10 @@ def create_delta(base_buf, target_buf):
     # write delta header
     def size(l):
         r = ""
-        while l & 0x80:
+        while l >= 0x80:
             r += chr(l | 0x80)
             l >>= 7
+        r += chr(l)
         return r
     out_buf += size(len(base_buf))
     out_buf += size(len(target_buf))
@@ -707,7 +708,7 @@ def apply_delta(src_buf, delta):
         return size, delta
     src_size, delta = get_delta_header_size(delta)
     dest_size, delta = get_delta_header_size(delta)
-    assert src_size == len(src_buf)
+    assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
     while delta:
         cmd, delta = pop(delta)
         if cmd & 0x80:

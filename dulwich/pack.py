@@ -667,17 +667,17 @@ def create_delta(base_buf, target_buf):
                 scratch += chr(o >> 24)
                 op |= 0x08
             if s & 0x00ff:
-                scratch += chr(o >> 0)
+                scratch += chr(s >> 0)
                 op |= 0x10
             if s & 0xff00:
-                scratch += chr(o >> 8)
+                scratch += chr(s >> 8)
                 op |= 0x20
 
             out_buf += chr(op)
             out_buf += scratch
 
 
-        if opcode == "replace" or opcode == "add":
+        if opcode == "replace" or opcode == "insert":
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
             #FIXME: Will need to break this into multiple chunks

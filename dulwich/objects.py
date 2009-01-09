@@ -1,5 +1,6 @@
 # objects.py -- Acces to base git objects
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # The header parsing code is based on that from git itself, which is
 # Copyright (C) 2005 Linus Torvalds
 # and licensed under v2 of the GPL.
@@ -55,8 +56,8 @@ def sha_to_hex(sha):
 def hex_to_sha(hex):
   """Takes a hex sha and returns a binary sha"""
   sha = ''
-  for i in range(0,20):
-    sha += chr(int(hex[i*2:i*2+2], 16))
+  for i in range(0, len(hex), 2):
+    sha += chr(int(hex[i:i+2], 16))
   assert len(sha) == 20, "Incorrent length of sha1: %d" % len(sha)
   return sha
 

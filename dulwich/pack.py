@@ -45,6 +45,8 @@ import zlib
 
 from objects import (
         ShaFile,
+        hex_to_sha,
+        sha_to_hex,
         )
 from errors import ApplyDeltaError
 
@@ -79,22 +81,6 @@ def iter_sha1(iter):
     for name in iter:
         sha.update(name)
     return sha.hexdigest()
-
-
-def hex_to_sha(hex):
-  """Convert a hex string to a binary sha string."""
-  ret = ""
-  for i in range(0, len(hex), 2):
-    ret += chr(int(hex[i:i+2], 16))
-  return ret
-
-
-def sha_to_hex(sha):
-  """Convert a binary sha string to a hex sha string."""
-  ret = ""
-  for i in sha:
-      ret += "%02x" % ord(i)
-  return ret
 
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024

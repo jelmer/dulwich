@@ -629,15 +629,18 @@ def create_delta(base_buf, target_buf):
     out_buf = ""
 
     # write delta header
-    def size(l):
-        r = ""
-        while l >= 0x80:
-            r += chr(l | 0x80)
-            l >>= 7
-        r += chr(l)
-        return r
-    out_buf += size(len(base_buf))
-    out_buf += size(len(target_buf))
+    def encode_size(size):
+        ret = ""
+        c = size & 0x7f
+        size >>= 7
+        while size:
+            ret += chr(c | 0x80)
+            c = size & 0x7f
+            size >>= 7
+        ret += chr(c)
+        return ret
+    out_buf += encode_size(len(base_buf))
+    out_buf += encode_size(len(target_buf))
 
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)

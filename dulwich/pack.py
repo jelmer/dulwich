@@ -684,8 +684,15 @@ def create_delta(base_buf, target_buf):
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
             #FIXME: Will need to break this into multiple chunks
-            out_buf += chr(j2-j1)
-            out_buf += target_buf[j1:j2]
+            s = j2 - j1
+            o = j1
+            while s > 127:
+                out_buf += chr(127)
+                out_buf += target_buf[o:o+127]
+                s -= 127
+                o += 127
+            out_buf += chr(s)
+            out_buf += target_buf[o:o+s]
 
     return out_buf
 

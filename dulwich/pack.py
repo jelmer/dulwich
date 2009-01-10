@@ -654,27 +654,18 @@ def create_delta(base_buf, target_buf):
             # Write out an opcode that says what range to use
             scratch = ""
             op = 0x80
-            o = i1
-            s = i2 - i1
 
-            if o & 0x000000ff:
-                scratch += chr(o >> 0)
-                op |= 0x01
-            if o & 0x0000ff00:
-                scratch += chr(o >> 8)
-                op |= 0x02
-            if o & 0x00ff0000:
-                scratch += chr(o >> 16)
-                op |= 0x02
-            if o & 0xff000000:
-                scratch += chr(o >> 24)
-                op |= 0x08
-            if s & 0x00ff:
-                scratch += chr(s >> 0)
-                op |= 0x10
-            if s & 0xff00:
-                scratch += chr(s >> 8)
-                op |= 0x20
+            o = i1
+            for i in range(4):
+                if o & 0x000000ff << i*8:
+                    scratch += chr(o >> i)
+                    op |= 1 << i
+
+            s = i2 - i1
+            for i in range(2):
+                if s & 0x000000ff << i*8:
+                    scratch += chr(s >> i)
+                    op |= 1 << (4+i)
 
             out_buf += chr(op)
             out_buf += scratch

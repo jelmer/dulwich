@@ -657,13 +657,13 @@ def create_delta(base_buf, target_buf):
 
             o = i1
             for i in range(4):
-                if o & 0x000000ff << i*8:
+                if o & 0xff << i*8:
                     scratch += chr(o >> i)
                     op |= 1 << i
 
             s = i2 - i1
             for i in range(2):
-                if s & 0x000000ff << i*8:
+                if s & 0xff << i*8:
                     scratch += chr(s >> i)
                     op |= 1 << (4+i)
 

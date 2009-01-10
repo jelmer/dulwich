@@ -674,7 +674,6 @@ def create_delta(base_buf, target_buf):
         if opcode == "replace" or opcode == "insert":
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
-            #FIXME: Will need to break this into multiple chunks
             s = j2 - j1
             o = j1
             while s > 127:

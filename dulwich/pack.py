@@ -583,23 +583,18 @@ def write_pack_data(f, objects, num_objects):
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
-    def sort_fn(x,y):
-        for i in range(1, 6):
-            if x[i] < y[i]:
-                return -1
-            elif x[i] > y[i]:
-                return 1
-        return 0
+    recency = []
     magic = []
     for o in objects:
         magic.append( (o, o._num_type, "filename", 1, len(o.as_raw_string()[1])) )
-    magic.sort(cmp=sort_fn)
+        recency.append(o)
+    magic.sort()
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in objects:
+    for o in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
         # FIXME: Delta !

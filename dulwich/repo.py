@@ -50,7 +50,7 @@ class Tags(object):
     
     def __setitem__(self, name, ref):
         self.tags[name] = ref
-        f = open(os.path.join(self.tagdir(), name), 'wb')
+        f = open(os.path.join(self.tagdir, name), 'wb')
         try:
             f.write("%s\n" % ref)
         finally:

@@ -41,11 +41,20 @@ SYMREF = 'ref: '
 
 class Tags(object):
 
-    def __init__(self, tags):
+    def __init__(self, tagdir, tags):
+        self.tagdir = tagdir
         self.tags = tags
 
     def __getitem__(self, name):
         return self.tags[name]
+    
+    def __setitem__(self, name, ref):
+        self.tags[name] = ref
+        f = open(os.path.join(self.tagdir(), name), 'wb')
+        try:
+            f.write("%s\n" % ref)
+        finally:
+            f.close()
 
     def __len__(self):
         return len(self.tags)
@@ -69,7 +78,7 @@ class Repo(object):
     else:
       raise NotGitRepository(root)
     self.path = root
-    self.tags = Tags(self.get_tags())
+    self.tags = Tags(self.tagdir(), self.get_tags())
     self._object_store = None
 
   def controldir(self):
@@ -193,9 +202,12 @@ class Repo(object):
       os.remove(file)
       return
 
+  def tagdir(self):
+    return os.path.join(self.controldir(), 'refs', 'tags')
+
   def get_tags(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'tags')):
+    for root, dirs, files in os.walk(self.tagdir()):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret

@@ -570,7 +570,7 @@ def write_pack(filename, objects, num_objects):
     f = open(filename + ".pack", 'w')
     try:
         entries, data_sum = write_pack_data(f, objects, num_objects)
-    except:
+    finally:
         f.close()
     entries.sort()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
@@ -583,6 +583,17 @@ def write_pack_data(f, objects, num_objects):
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
+    def sort_fn(x,y):
+        for i in range(1, 6):
+            if x[i] < y[i]:
+                return -1
+            elif x[i] > y[i]:
+                return 1
+        return 0
+    magic = []
+    for o in objects:
+        magic.append( (o, o._num_type, "filename", 1, len(o.as_raw_string()[1])) )
+    magic.sort(cmp=sort_fn)
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header

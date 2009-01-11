@@ -45,10 +45,7 @@ class Tags(object):
         self.tags = tags
 
     def __getitem__(self, name):
-        for n in self.tags:
-            if n.name == name:
-                return n.ref
-        raise KeyError(name)
+        return self.tags[name]
 
     def __len__(self):
         return len(self.tags)

@@ -46,6 +46,21 @@ class Tag(object):
         self.ref = ref
 
 
+class Tags(object):
+
+    def __init__(self, tags):
+        self.tags = tags
+
+    def __getitem__(self, name):
+        for n in self.tags:
+            if n.name == name:
+                return n.ref
+        raise KeyError(name)
+
+    def __len__(self):
+        return len(self.tags)
+
+
 class Repo(object):
 
   ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
@@ -60,7 +75,7 @@ class Repo(object):
     else:
       raise NotGitRepository(root)
     self.path = root
-    self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
+    self.tags = Tags(self.get_tags())
     self._object_store = None
 
   def controldir(self):

@@ -583,12 +583,19 @@ def write_pack_data(f, objects, num_objects):
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
-    recency = []
+    recency = list(objects)
+    # Build a list of objects ordered by the magic Linus heuristic
+    # This helps us find good objects to diff against us
     magic = []
-    for o in objects:
-        magic.append( (o, o._num_type, "filename", 1, len(o.as_raw_string()[1])) )
-        recency.append(o)
+    for o in recency:
+        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
     magic.sort()
+    # Build a map of objects and their index in magic - so we can find preceeding objects
+    # to diff against
+    offs = {}
+    for i in range(len(magic)):
+        offs[magic[i][4]] = i
+    # Write the pack
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header

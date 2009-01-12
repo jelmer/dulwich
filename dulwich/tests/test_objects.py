@@ -22,12 +22,14 @@ import unittest
 from dulwich.objects import (Blob,
                          Tree,
                          Commit,
+                         Tag
                          )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
 b_sha = '2969be3e8ee1c0222396a5611407e4769f14e54b'
 c_sha = '954a536f7819d40e6f637f849ee187dd10066349'
 tree_sha = '70c190eb48fa8bbb50ddc692a17b44cb781af7f6'
+tag_sha = '71033db03a03c6a36721efcf1968dd8f8e0cf023'
 
 class BlobReadTests(unittest.TestCase):
   """Test decompression of blobs"""
@@ -42,6 +44,9 @@ class BlobReadTests(unittest.TestCase):
 
   def get_tree(self, sha):
     return self.get_sha_file(Tree, 'trees', sha)
+
+  def get_tag(self, sha):
+    return self.get_sha_file(Tag, 'tags', sha)
 
   def commit(self, sha):
     return self.get_sha_file(Commit, 'commits', sha)
@@ -78,6 +83,15 @@ class BlobReadTests(unittest.TestCase):
     t = self.get_tree(tree_sha)
     self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
     self.assertEqual(t.entries()[1], (33188, 'b', b_sha))
+
+  def test_read_tag_from_file(self):
+    t = self.get_tag(tag_sha)
+    self.assertEqual(t.object, (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
+    self.assertEqual(t.name,'signed')
+    self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
+    self.assertEqual(t.tag_time, 1231203091)
+    self.assertEqual(t.message, 'This is a signed tag\n-----BEGIN PGP SIGNATURE-----\nVersion: GnuPG v1.4.9 (GNU/Linux)\n\niEYEABECAAYFAkliqx8ACgkQqSMmLy9u/kcx5ACfakZ9NnPl02tOyYP6pkBoEkU1\n5EcAn0UFgokaSvS371Ym/4W9iJj6vh3h\n=ql7y\n-----END PGP SIGNATURE-----\n')
+
 
   def test_read_commit_from_file(self):
     sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'

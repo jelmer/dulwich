@@ -570,30 +570,50 @@ def write_pack(filename, objects, num_objects):
     f = open(filename + ".pack", 'w')
     try:
         entries, data_sum = write_pack_data(f, objects, num_objects)
-    except:
+    finally:
         f.close()
     entries.sort()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
-def write_pack_data(f, objects, num_objects):
+def write_pack_data(f, objects, num_objects, window=10):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
+    recency = list(objects)
+    # FIXME: Somehow limit delta depth
+    # FIXME: Make thin-pack optional (its not used when cloning a pack)
+    # Build a list of objects ordered by the magic Linus heuristic
+    # This helps us find good objects to diff against us
+    magic = []
+    for o in recency:
+        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+    magic.sort()
+    # Build a map of objects and their index in magic - so we can find preceeding objects
+    # to diff against
+    offs = {}
+    for i in range(len(magic)):
+        offs[magic[i][4]] = i
+    # Write the pack
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in objects:
+    for o in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
-        # FIXME: Delta !
-        t, o = o.as_raw_string()
-        offset = write_pack_object(f, t, o)
+        t, raw = o.as_raw_string()
+        winner = raw
+        for i in range(1, window+1):
+            base = magic[offs[sha1] - i]
+            delta = create_delta(base, raw)
+            if len(delta) < len(winner):
+                winner = delta
+        offset = write_pack_object(f, t, raw)
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 

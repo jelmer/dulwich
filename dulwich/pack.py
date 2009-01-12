@@ -576,7 +576,7 @@ def write_pack(filename, objects, num_objects):
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
-def write_pack_data(f, objects, num_objects):
+def write_pack_data(f, objects, num_objects, window=10):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
@@ -606,7 +606,7 @@ def write_pack_data(f, objects, num_objects):
         crc32 = o.crc32()
         t, raw = o.as_raw_string()
         winner = raw
-        for i in range(10):
+        for i in range(1, window+1):
             base = magic[offs[sha1] - i]
             delta = create_delta(base, raw)
             if len(delta) < len(winner):

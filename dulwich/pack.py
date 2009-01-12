@@ -606,15 +606,19 @@ def write_pack_data(f, objects, num_objects, window=10):
     for o in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
-        t, raw = o.as_raw_string()
+        orig_t, raw = o.as_raw_string()
         winner = raw
-        for i in range(offs[o]-window, window):
-            if i < 0 or i >= len(offs): continue
-            _, base = magic[i][4].as_raw_string()
-            delta = create_delta(base, raw)
-            if len(delta) < len(winner):
-                winner = delta
-        offset = write_pack_object(f, t, raw)
+        t = orig_t
+        #for i in range(offs[o]-window, window):
+        #    if i < 0 or i >= len(offs): continue
+        #    b = magic[i][4]
+        #    if b._num_type != orig_t: continue
+        #    _, base = b.as_raw_string()
+        #    delta = create_delta(base, raw)
+        #    if len(delta) < len(winner):
+        #        winner = delta
+        #        t = 6 if magic[i][2] == 1 else 7
+        offset = write_pack_object(f, t, winner)
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 

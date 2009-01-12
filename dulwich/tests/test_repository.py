@@ -127,3 +127,6 @@ class RepositoryTests(unittest.TestCase):
                             'fb5b0425c7ce46959bec94d54b9a157645e114f5',
                             'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
 
+  def test_get_tags_empty(self):
+   r = self.open_repo('ooo_merge')
+   self.assertEquals({}, r.get_tags())

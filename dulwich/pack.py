@@ -648,7 +648,6 @@ def create_delta(base_buf, target_buf):
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ""
-
     # write delta header
     def encode_size(size):
         ret = ""
@@ -662,36 +661,29 @@ def create_delta(base_buf, target_buf):
         return ret
     out_buf += encode_size(len(base_buf))
     out_buf += encode_size(len(target_buf))
-
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
         #if opcode == "replace" or opcode == "delete":
         #    pass
-
         if opcode == "equal":
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
             scratch = ""
             op = 0x80
-
             o = i1
             for i in range(4):
                 if o & 0xff << i*8:
                     scratch += chr(o >> i)
                     op |= 1 << i
-
             s = i2 - i1
             for i in range(2):
                 if s & 0xff << i*8:
                     scratch += chr(s >> i)
                     op |= 1 << (4+i)
-
             out_buf += chr(op)
             out_buf += scratch
-
-
         if opcode == "replace" or opcode == "insert":
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
@@ -704,7 +696,6 @@ def create_delta(base_buf, target_buf):
                 o += 127
             out_buf += chr(s)
             out_buf += target_buf[o:o+s]
-
     return out_buf
 
 

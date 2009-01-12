@@ -584,6 +584,8 @@ def write_pack_data(f, objects, num_objects, window=10):
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
     recency = list(objects)
+    # FIXME: Somehow limit delta depth
+    # FIXME: Make thin-pack optional (its not used when cloning a pack)
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []

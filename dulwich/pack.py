@@ -608,8 +608,9 @@ def write_pack_data(f, objects, num_objects, window=10):
         crc32 = o.crc32()
         t, raw = o.as_raw_string()
         winner = raw
-        for i in range(1, window+1):
-            base = magic[offs[sha1] - i]
+        for i in range(offs[o]-window, window):
+            if i < 0 or i >= len(offs): continue
+            _, base = magic[i][4].as_raw_string()
             delta = create_delta(base, raw)
             if len(delta) < len(winner):
                 winner = delta

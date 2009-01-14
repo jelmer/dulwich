@@ -42,6 +42,7 @@ import sha
 import struct
 import sys
 import zlib
+import difflib
 
 from objects import (
         ShaFile,
@@ -569,30 +570,55 @@ def write_pack(filename, objects, num_objects):
     f = open(filename + ".pack", 'w')
     try:
         entries, data_sum = write_pack_data(f, objects, num_objects)
-    except:
+    finally:
         f.close()
     entries.sort()
     write_pack_index_v2(filename + ".idx", entries, data_sum)
 
 
-def write_pack_data(f, objects, num_objects):
+def write_pack_data(f, objects, num_objects, window=10):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
     :param objects: List of objects to write.
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
+    recency = list(objects)
+    # FIXME: Somehow limit delta depth
+    # FIXME: Make thin-pack optional (its not used when cloning a pack)
+    # Build a list of objects ordered by the magic Linus heuristic
+    # This helps us find good objects to diff against us
+    magic = []
+    for o in recency:
+        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+    magic.sort()
+    # Build a map of objects and their index in magic - so we can find preceeding objects
+    # to diff against
+    offs = {}
+    for i in range(len(magic)):
+        offs[magic[i][4]] = i
+    # Write the pack
     entries = []
     f = SHA1Writer(f)
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in objects:
+    for o in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
-        # FIXME: Delta !
-        t, o = o.as_raw_string()
-        offset = write_pack_object(f, t, o)
+        orig_t, raw = o.as_raw_string()
+        winner = raw
+        t = orig_t
+        #for i in range(offs[o]-window, window):
+        #    if i < 0 or i >= len(offs): continue
+        #    b = magic[i][4]
+        #    if b._num_type != orig_t: continue
+        #    _, base = b.as_raw_string()
+        #    delta = create_delta(base, raw)
+        #    if len(delta) < len(winner):
+        #        winner = delta
+        #        t = 6 if magic[i][2] == 1 else 7
+        offset = write_pack_object(f, t, winner)
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 
@@ -621,6 +647,62 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     f.close()
 
 
+def create_delta(base_buf, target_buf):
+    """Use python difflib to work out how to transform base_buf to target_buf"""
+    assert isinstance(base_buf, str)
+    assert isinstance(target_buf, str)
+    out_buf = ""
+    # write delta header
+    def encode_size(size):
+        ret = ""
+        c = size & 0x7f
+        size >>= 7
+        while size:
+            ret += chr(c | 0x80)
+            c = size & 0x7f
+            size >>= 7
+        ret += chr(c)
+        return ret
+    out_buf += encode_size(len(base_buf))
+    out_buf += encode_size(len(target_buf))
+    # write out delta opcodes
+    seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
+    for opcode, i1, i2, j1, j2 in seq.get_opcodes():
+        # Git patch opcodes don't care about deletes!
+        #if opcode == "replace" or opcode == "delete":
+        #    pass
+        if opcode == "equal":
+            # If they are equal, unpacker will use data from base_buf
+            # Write out an opcode that says what range to use
+            scratch = ""
+            op = 0x80
+            o = i1
+            for i in range(4):
+                if o & 0xff << i*8:
+                    scratch += chr(o >> i)
+                    op |= 1 << i
+            s = i2 - i1
+            for i in range(2):
+                if s & 0xff << i*8:
+                    scratch += chr(s >> i)
+                    op |= 1 << (4+i)
+            out_buf += chr(op)
+            out_buf += scratch
+        if opcode == "replace" or opcode == "insert":
+            # If we are replacing a range or adding one, then we just
+            # output it to the stream (prefixed by its size)
+            s = j2 - j1
+            o = j1
+            while s > 127:
+                out_buf += chr(127)
+                out_buf += target_buf[o:o+127]
+                s -= 127
+                o += 127
+            out_buf += chr(s)
+            out_buf += target_buf[o:o+s]
+    return out_buf
+
+
 def apply_delta(src_buf, delta):
     """Based on the similar function in git's patch-delta.c."""
     assert isinstance(src_buf, str), "was %r" % (src_buf,)
@@ -642,7 +724,7 @@ def apply_delta(src_buf, delta):
         return size, delta
     src_size, delta = get_delta_header_size(delta)
     dest_size, delta = get_delta_header_size(delta)
-    assert src_size == len(src_buf)
+    assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
     while delta:
         cmd, delta = pop(delta)
         if cmd & 0x80:

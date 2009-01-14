@@ -145,10 +145,10 @@ class UploadPackHandler(Handler):
                 self.proto.write_pkt_line("NAK\n")
 
         graph_walker = ProtocolGraphWalker(self.proto)
-        objects = list(self.backend.fetch_objects(determine_wants, graph_walker, progress))
+        num_objects, objects_iter = self.backend.fetch_objects(determine_wants, graph_walker, progress)
         progress("dul-daemon says what\n")
         progress("counting objects: %d, done.\n" % len(objects))
-        write_pack_data(ProtocolFile(None, write), objects, len(objects))
+        write_pack_data(ProtocolFile(None, write), objects_iter, num_objects)
         progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")

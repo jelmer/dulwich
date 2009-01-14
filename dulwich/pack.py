@@ -590,7 +590,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     # This helps us find good objects to diff against us
     magic = []
     for o in recency:
-        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+        magic.append( (o.type, "filename", 1, -len(o.as_raw_string()[1]), o) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against
@@ -612,7 +612,7 @@ def write_pack_data(f, objects, num_objects, window=10):
         #for i in range(offs[o]-window, window):
         #    if i < 0 or i >= len(offs): continue
         #    b = magic[i][4]
-        #    if b._num_type != orig_t: continue
+        #    if b.type != orig_t: continue
         #    _, base = b.as_raw_string()
         #    delta = create_delta(base, raw)
         #    if len(delta) < len(winner):

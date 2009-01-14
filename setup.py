@@ -4,12 +4,14 @@
 
 from distutils.core import setup
 
+dulwich_version_string = '0.1.0'
+
 setup(name='dulwich',
       description='Pure-Python Git Library',
       keywords='git',
-      version='0.0.1',
+      version=dulwich_version_string,
       url='http://launchpad.net/dulwich',
-      download_url='http://launchpad.net/dulwich',
+      download_url='http://samba.org/~jelmer/dulwich/dulwich-%s.tar.gz' % dulwich_version_string,
       license='GPL',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',

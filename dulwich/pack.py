@@ -848,8 +848,6 @@ class Pack(object):
         return (self.idx.object_index(sha1) is not None)
 
     def get_raw(self, sha1, resolve_ref=None):
-        if resolve_ref is None:
-            resolve_ref = self.get_raw
         offset = self.idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
@@ -864,12 +862,16 @@ class Pack(object):
         type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp)
 
-    def iterobjects(self):
+    def iterobjects(self, get_raw=None):
+        if get_raw is None:
+            def get_raw(x):
+                raise KeyError(x)
         for offset, type, obj in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
-                    *resolve_object(offset, type, obj, self.get_raw, 
-                self.data.get_object_at))
+                    *resolve_object(offset, type, obj, 
+                        get_raw, 
+                    self.data.get_object_at))
 
 
 def load_packs(path):

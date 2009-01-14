@@ -63,7 +63,7 @@ class GitBackend(Backend):
         self.get_refs = self.repo.get_refs
 
     def apply_pack(self, refs, read):
-        fd, commit = self.repo.object_store.add_pack()
+        fd, commit = self.repo.object_store.add_thin_pack()
         fd.write(read())
         fd.close()
         commit()

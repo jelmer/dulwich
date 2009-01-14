@@ -106,13 +106,13 @@ class Repo(object):
             graph_walker.ack(ref)
         ref = graph_walker.next()
     while commits_to_send:
-        sha = commits_to_send.pop()
+        sha = (commits_to_send.pop(), None)
         if sha in sha_done:
             continue
 
         c = self.commit(sha)
         assert isinstance(c, Commit)
-        sha_done.add(sha)
+        sha_done.add((sha, None))
 
         commits_to_send.update([p for p in c.parents if not p in sha_done])
 
@@ -122,12 +122,12 @@ class Repo(object):
                     continue
                 if mode & stat.S_IFDIR:
                     parse_tree(self.tree(sha), sha_done)
-                sha_done.add(sha)
+                sha_done.add((sha, name))
 
         treesha = c.tree
         if c.tree not in sha_done:
             parse_tree(self.tree(c.tree), sha_done)
-            sha_done.add(c.tree)
+            sha_done.add((c.tree, None))
 
         progress("counting objects: %d\r" % len(sha_done))
     return sha_done
@@ -144,8 +144,8 @@ class Repo(object):
         updated progress strings.
     """
     shas = self.find_missing_objects(determine_wants, graph_walker, progress)
-    for sha in shas:
-        yield self.get_object(sha)
+    for sha, path in shas:
+        yield self.get_object(sha), path
 
   def object_dir(self):
     return os.path.join(self.controldir(), OBJECTDIR)

@@ -18,7 +18,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
+import os, stat
 
 from commit import Commit
 from errors import (
@@ -117,20 +117,17 @@ class Repo(object):
         commits_to_send.update([p for p in c.parents if not p in sha_done])
 
         def parse_tree(tree, sha_done):
-            for mode, name, x in tree.entries():
-                if not x in sha_done:
-                    try:
-                        t = self.tree(x)
-                        sha_done.add(x)
-                        parse_tree(t, sha_done)
-                    except:
-                        sha_done.add(x)
+            for mode, name, sha in tree.entries():
+                if sha in sha_done:
+                    continue
+                if mode & stat.S_IFDIR:
+                    parse_tree(self.tree(sha), sha_done)
+                sha_done.add(sha)
 
         treesha = c.tree
-        if treesha not in sha_done:
-            t = self.tree(treesha)
-            sha_done.add(treesha)
-            parse_tree(t, sha_done)
+        if c.tree not in sha_done:
+            parse_tree(self.tree(c.tree), sha_done)
+            sha_done.add(c.tree)
 
         progress("counting objects: %d\r" % len(sha_done))
     return sha_done

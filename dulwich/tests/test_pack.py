@@ -32,6 +32,8 @@ from dulwich.pack import (
         write_pack_index_v1,
         write_pack_index_v2,
         write_pack,
+        apply_delta,
+        create_delta,
         )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -89,6 +91,32 @@ class PackIndexTests(PackTests):
   def test_iter(self):
     p = self.get_pack_index(pack1_sha)
     self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
+
+
+class TestPackDeltas(unittest.TestCase):
+
+  test_string1 = "The answer was flailing in the wind"
+  test_string2 = "The answer was falling down the pipe"
+  test_string3 = "zzzzz"
+
+  test_string_empty = ""
+  test_string_big = "Z" * 8192
+
+  def _test_roundtrip(self, base, target):
+    self.assertEquals(target,
+      apply_delta(base, create_delta(base, target)))
+
+  def test_nochange(self):
+    self._test_roundtrip(self.test_string1, self.test_string1)
+
+  def test_change(self):
+    self._test_roundtrip(self.test_string1, self.test_string2)
+
+  def test_rewrite(self):
+    self._test_roundtrip(self.test_string1, self.test_string3)
+
+  def test_overflow(self):
+    self._test_roundtrip(self.test_string_empty, self.test_string_big)
 
 
 class TestPackData(PackTests):

@@ -589,8 +589,8 @@ def write_pack_data(f, objects, num_objects, window=10):
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
-    for o in recency:
-        magic.append( (o.type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+    for obj, path in recency:
+        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()[1]), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against

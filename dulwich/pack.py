@@ -603,7 +603,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in recency:
+    for o, path in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
         orig_t, raw = o.as_raw_string()

@@ -101,7 +101,6 @@ class Repo(object):
     sha_done = set()
     ref = graph_walker.next()
     while ref:
-        sha_done.add(ref)
         if ref in self.object_store:
             graph_walker.ack(ref)
         ref = graph_walker.next()
@@ -118,7 +117,7 @@ class Repo(object):
 
         def parse_tree(tree, sha_done):
             for mode, name, sha in tree.entries():
-                if sha in sha_done:
+                if (sha, name) in sha_done:
                     continue
                 if mode & stat.S_IFDIR:
                     parse_tree(self.tree(sha), sha_done)

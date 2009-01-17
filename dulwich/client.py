@@ -152,3 +152,59 @@ class TCPGitClient(GitClient):
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
         super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+
+
+class SSHSubprocess(object):
+    """A socket-like object that talks to an ssh subprocess via pipes."""
+
+    def __init__(self, proc):
+        self.proc = proc
+
+    def send(self, data):
+        return os.write(self.proc.stdin.fileno(), data)
+
+    def recv(self, count):
+        return os.read(self.proc.stdout.fileno(), count)
+
+    def close(self):
+        self.proc.stdin.close()
+        self.proc.stdout.close()
+        self.proc.wait()
+
+
+class SSHVendor(object):
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        #FIXME: This has no way to deal with passwords..
+        args = ['ssh', '-x']
+        if port is not None:
+            args.extend(['-p', str(port)])
+        if username is not None:
+            host = "%s@%s" % (username, host)
+        args.append(host)
+        proc = subprocess.Popen(args + command,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        return SSHSubprocess(proc)
+
+# Can be overridden by users
+get_ssh_vendor = SSHVendor
+
+
+class SSHGitClient(GitClient):
+
+    def __init__(self, host, port=None):
+        self.host = host
+        self.port = port
+
+    def send_pack(self, path):
+        remote = get_ssh_vendor().connect_ssh(self.host, "git-receive-pack %s" % path, port=self.port)
+        client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
+        client.send_pack(path)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        remote = get_ssh_vendor().connect_ssh(self.host, "git-upload-pack %s" % path, port=self.port)
+        client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
+        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+
+

@@ -148,9 +148,7 @@ class SSHVendor(object):
             args.extend(['-p', str(port)])
         if username is not None:
             host = "%s@%s" % (username, host)
-            args.append(host)
-        else:
-            args.append(host)
+        args.append(host)
         proc = subprocess.Popen(args + command,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)

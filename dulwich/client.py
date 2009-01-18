@@ -16,8 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import os
 import select
 import socket
+import subprocess
 from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
 
 class SimpleFetchGraphWalker(object):
@@ -198,12 +200,12 @@ class SSHGitClient(GitClient):
         self.port = port
 
     def send_pack(self, path):
-        remote = get_ssh_vendor().connect_ssh(self.host, "git-receive-pack %s" % path, port=self.port)
+        remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
         client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
         client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
-        remote = get_ssh_vendor().connect_ssh(self.host, "git-upload-pack %s" % path, port=self.port)
+        remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
         client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
         client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 

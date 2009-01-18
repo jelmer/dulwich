@@ -16,8 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import os
 import select
 import socket
+import subprocess
 from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
 
 class SimpleFetchGraphWalker(object):
@@ -152,3 +154,48 @@ class TCPGitClient(GitClient):
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
         super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+
+
+class SubprocessSocket(object):
+    """A socket-like object that talks to an ssh subprocess via pipes."""
+
+    def __init__(self, proc):
+        self.proc = proc
+
+    def send(self, data):
+        return os.write(self.proc.stdin.fileno(), data)
+
+    def recv(self, count):
+        return os.read(self.proc.stdout.fileno(), count)
+
+    def close(self):
+        self.proc.stdin.close()
+        self.proc.stdout.close()
+        self.proc.wait()
+
+    def get_filelike_channels(self):
+        return (self.proc.stdout, self.proc.stdin)
+
+
+class SubprocessGitClient(GitClient):
+
+    def __init__(self, host, port=None):
+        self.host = host
+        self.port = port
+
+    def _connect(self, service, *args):
+        argv = [service] + list(args)
+        proc = subprocess.Popen(argv,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        socket = SubprocessSocket(proc)
+        return GitClient(proc.stdin.fileno(), socket.recv, socket.send)
+
+    def send_pack(self, path):
+        client = self._connect("git-receive-pack", path)
+        client.send_pack(path)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        client = self._connect("git-upload-pack", path)
+        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+

@@ -137,7 +137,7 @@ def cmd_init(args):
 
 
 def cmd_clone(args):
-	from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+	from dulwich.client import TCPGitClient, SubprocessGitClient, SimpleFetchGraphWalker
 	from dulwich.repo import Repo
 	import os
 	import sys
@@ -148,12 +148,12 @@ def cmd_clone(args):
 		print "usage: dulwich clone host:path [PATH]"
 		sys.exit(1)
 
-	if not ":" in args[0]:
-		print "Usage: dulwich clone host:path [PATH]"
-		sys.exit(1)
+	#if not ":" in args[0]:
+	#	print "Usage: dulwich clone host:path [PATH]"
+	#	sys.exit(1)
 	(host, host_path) = args.pop(0).split(":", 1)
-	client = TCPGitClient(host)
-
+	#client = TCPGitClient(host)
+	client = SubprocessGitClient(host)
 	if len(args) > 0:
 		path = args.pop(0)
 	else:

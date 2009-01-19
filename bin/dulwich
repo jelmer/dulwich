@@ -34,13 +34,7 @@ def cmd_fetch_pack(args):
 	from dulwich.repo import Repo
 	opts, args = getopt(args, "", ["all"])
 	opts = dict(opts)
-	if not ":" in args[0]:
-		print "Usage: dulwich fetch-pack [--all] host:path [REF...]"
-		sys.exit(1)
         client, path = get_transport_and_path(args.pop(0))
-        if not client:
-            print "Must be git:// or git+ssh://"
-            sys.exit(1)
 	if "--all" in opts:
 		determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
 	else:
@@ -159,13 +153,7 @@ def cmd_clone(args):
 		print "usage: dulwich clone host:path [PATH]"
 		sys.exit(1)
 
-	if not ":" in args[0]:
-		print "Usage: dulwich clone host:path [PATH]"
-		sys.exit(1)
         client, host_path = get_transport_and_path(args.pop(0))
-        if not client:
-            print "Must be git:// or git+ssh://"
-            sys.exit(1)
 
 	if len(args) > 0:
 		path = args.pop(0)

@@ -158,6 +158,9 @@ class TCPGitClient(GitClient):
 
 class SubprocessGitClient(GitClient):
 
+    def __init__(self):
+        pass
+
     def _connect(self, service, *args):
         argv = [service] + list(args)
         proc = subprocess.Popen(argv, bufsize=0,

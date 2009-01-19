@@ -158,13 +158,9 @@ class TCPGitClient(GitClient):
 
 class SubprocessGitClient(GitClient):
 
-    def __init__(self, host, port=None):
-        self.host = host
-        self.port = port
-
     def _connect(self, service, *args):
         argv = [service] + list(args)
-        proc = subprocess.Popen(argv,
+        proc = subprocess.Popen(argv, bufsize=0,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, env={'GIT_TRACE':'2'})
         def write_fn(date):

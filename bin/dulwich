@@ -21,12 +21,13 @@ import sys
 from getopt import getopt
 
 def get_transport_and_path(uri):
-    from dulwich.client import TCPGitClient, SSHGitClient
+    from dulwich.client import TCPGitClient, SSHGitClient, SubprocessGitClient
     for handler, transport in (("git://", TCPGitClient), ("git+ssh://", SSHGitClient)):
         if uri.startswith(handler):
             host, path = uri[len(handler):].split("/", 1)
             return transport(host), "/"+path
-    return None, None
+    # if its not git or git+ssh, try a local url..
+    return SubprocessGitClient(), uri
 
 def cmd_fetch_pack(args):
 	from dulwich.client import SimpleFetchGraphWalker

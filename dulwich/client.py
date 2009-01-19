@@ -98,7 +98,6 @@ class GitClient(object):
         :param progress: Callback for progress reports (strings)
         """
         (refs, server_capabilities) = self.read_refs()
-       
         wants = determine_wants(refs)
         if not wants:
             self.proto.write_pkt_line(None)
@@ -159,17 +158,19 @@ class TCPGitClient(GitClient):
 class SubprocessGitClient(GitClient):
 
     def __init__(self):
-        pass
+        self.proc = None
 
     def _connect(self, service, *args):
         argv = [service] + list(args)
-        proc = subprocess.Popen(argv, bufsize=0,
+        self.proc = subprocess.Popen(argv, bufsize=0,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE, env={'GIT_TRACE':'2'})
-        def write_fn(date):
-            proc.stdout.write(data)
-            proc.stdout.flush()
-        return GitClient(proc.stdin.fileno(), proc.stdin.read, write_fn)
+                                stdout=subprocess.PIPE)
+        def read_fn(size):
+            return self.proc.stdout.read(size)
+        def write_fn(data):
+            self.proc.stdin.write(data)
+            self.proc.stdin.flush()
+        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)
@@ -225,11 +226,11 @@ class SSHGitClient(GitClient):
 
     def send_pack(self, path):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
-        client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
+        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
         client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
-        client = GitClient(remote.proc.stdin.fileno(), remote.recv, remote.send)
+        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
         client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 

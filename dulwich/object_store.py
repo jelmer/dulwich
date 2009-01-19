@@ -3,8 +3,8 @@
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# of the License.
+# as published by the Free Software Foundation; either version 2
+# or (at your option) a later version of the License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +18,7 @@
 
 from objects import (
         ShaFile,
+        hex_to_sha,
         )
 import os, tempfile
 from pack import (
@@ -27,6 +28,7 @@ from pack import (
         PackData, 
         )
 import tempfile
+import urllib2
 PACKDIR = 'pack'
 
 class ObjectStore(object):
@@ -86,6 +88,23 @@ class ObjectStore(object):
         type, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type, uncomp)
 
+    def move_in_thin_pack(self, path):
+        """Move a specific file containing a pack into the pack directory.
+
+        :note: The file should be on the same file system as the 
+            packs directory.
+
+        :param path: Path to the pack file.
+        """
+        p = PackData(path)
+        temppath = os.path.join(self.pack_dir(), sha_to_hex(urllib2.randombytes(20))+".temppack")
+        write_pack(temppath, p.iterobjects(self.get_raw), len(p))
+        pack_sha = PackIndex(temppath+".idx").objects_sha1()
+        os.rename(temppath+".pack", 
+            os.path.join(self.pack_dir(), "pack-%s.pack" % pack_sha))
+        os.rename(temppath+".idx", 
+            os.path.join(self.pack_dir(), "pack-%s.idx" % pack_sha))
+
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
 
@@ -95,11 +114,24 @@ class ObjectStore(object):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        entries = p.sorted_entries(self.get_raw)
+        entries = p.sorted_entries()
         basename = os.path.join(self.pack_dir(), 
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
         os.rename(path, basename + ".pack")
+
+    def add_thin_pack(self):
+        """Add a new thin pack to this object store.
+
+        Thin packs are packs that contain deltas with parents that exist 
+        in a different pack.
+        """
+        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        f = os.fdopen(fd, 'w')
+        def commit():
+            if os.path.getsize(path) > 0:
+                self.move_in_thin_pack(path)
+        return f, commit
 
     def add_pack(self):
         """Add a new pack to this object store. 

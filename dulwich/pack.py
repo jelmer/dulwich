@@ -589,8 +589,8 @@ def write_pack_data(f, objects, num_objects, window=10):
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
-    for o in recency:
-        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+    for obj, path in recency:
+        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()[1]), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against
@@ -603,17 +603,22 @@ def write_pack_data(f, objects, num_objects, window=10):
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in recency:
+    for o, path in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
-        t, raw = o.as_raw_string()
+        orig_t, raw = o.as_raw_string()
         winner = raw
-        for i in range(1, window+1):
-            base = magic[offs[sha1] - i]
-            delta = create_delta(base, raw)
-            if len(delta) < len(winner):
-                winner = delta
-        offset = write_pack_object(f, t, raw)
+        t = orig_t
+        #for i in range(offs[o]-window, window):
+        #    if i < 0 or i >= len(offs): continue
+        #    b = magic[i][4]
+        #    if b.type != orig_t: continue
+        #    _, base = b.as_raw_string()
+        #    delta = create_delta(base, raw)
+        #    if len(delta) < len(winner):
+        #        winner = delta
+        #        t = 6 if magic[i][2] == 1 else 7
+        offset = write_pack_object(f, t, winner)
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 
@@ -647,7 +652,6 @@ def create_delta(base_buf, target_buf):
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ""
-
     # write delta header
     def encode_size(size):
         ret = ""
@@ -661,36 +665,29 @@ def create_delta(base_buf, target_buf):
         return ret
     out_buf += encode_size(len(base_buf))
     out_buf += encode_size(len(target_buf))
-
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
         #if opcode == "replace" or opcode == "delete":
         #    pass
-
         if opcode == "equal":
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
             scratch = ""
             op = 0x80
-
             o = i1
             for i in range(4):
-                if o & 0x000000ff << i*8:
+                if o & 0xff << i*8:
                     scratch += chr(o >> i)
                     op |= 1 << i
-
             s = i2 - i1
             for i in range(2):
-                if s & 0x000000ff << i*8:
+                if s & 0xff << i*8:
                     scratch += chr(s >> i)
                     op |= 1 << (4+i)
-
             out_buf += chr(op)
             out_buf += scratch
-
-
         if opcode == "replace" or opcode == "insert":
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
@@ -703,7 +700,6 @@ def create_delta(base_buf, target_buf):
                 o += 127
             out_buf += chr(s)
             out_buf += target_buf[o:o+s]
-
     return out_buf
 
 
@@ -852,8 +848,6 @@ class Pack(object):
         return (self.idx.object_index(sha1) is not None)
 
     def get_raw(self, sha1, resolve_ref=None):
-        if resolve_ref is None:
-            resolve_ref = self.get_raw
         offset = self.idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
@@ -868,12 +862,16 @@ class Pack(object):
         type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp)
 
-    def iterobjects(self):
+    def iterobjects(self, get_raw=None):
+        if get_raw is None:
+            def get_raw(x):
+                raise KeyError(x)
         for offset, type, obj in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
-                    *resolve_object(offset, type, obj, self.get_raw, 
-                self.data.get_object_at))
+                    *resolve_object(offset, type, obj, 
+                        get_raw, 
+                    self.data.get_object_at))
 
 
 def load_packs(path):

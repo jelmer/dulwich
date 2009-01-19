@@ -191,7 +191,7 @@ class SSHSubprocess(object):
         return os.write(self.proc.stdin.fileno(), data)
 
     def recv(self, count):
-        return os.read(self.proc.stdout.fileno(), count)
+        return self.proc.stdout.read(count)
 
     def close(self):
         self.proc.stdin.close()

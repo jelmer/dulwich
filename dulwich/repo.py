@@ -5,7 +5,8 @@
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License.
+# of the License or (at your option) any later version of 
+# the License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,7 +18,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
+import os, stat
 
 from commit import Commit
 from errors import (
@@ -39,11 +40,29 @@ OBJECTDIR = 'objects'
 SYMREF = 'ref: '
 
 
-class Tag(object):
+class Tags(object):
 
-    def __init__(self, name, ref):
-        self.name = name
-        self.ref = ref
+    def __init__(self, tagdir, tags):
+        self.tagdir = tagdir
+        self.tags = tags
+
+    def __getitem__(self, name):
+        return self.tags[name]
+    
+    def __setitem__(self, name, ref):
+        self.tags[name] = ref
+        f = open(os.path.join(self.tagdir, name), 'wb')
+        try:
+            f.write("%s\n" % ref)
+        finally:
+            f.close()
+
+    def __len__(self):
+        return len(self.tags)
+
+    def iteritems(self):
+        for k in self.tags:
+            yield k, self[k]
 
 
 class Repo(object):
@@ -60,7 +79,7 @@ class Repo(object):
     else:
       raise NotGitRepository(root)
     self.path = root
-    self.tags = [Tag(name, ref) for name, ref in self.get_tags().items()]
+    self.tags = Tags(self.tagdir(), self.get_tags())
     self._object_store = None
 
   def controldir(self):
@@ -82,36 +101,32 @@ class Repo(object):
     sha_done = set()
     ref = graph_walker.next()
     while ref:
-        sha_done.add(ref)
         if ref in self.object_store:
             graph_walker.ack(ref)
         ref = graph_walker.next()
     while commits_to_send:
-        sha = commits_to_send.pop()
+        sha = (commits_to_send.pop(), None)
         if sha in sha_done:
             continue
 
         c = self.commit(sha)
         assert isinstance(c, Commit)
-        sha_done.add(sha)
+        sha_done.add((sha, None))
 
         commits_to_send.update([p for p in c.parents if not p in sha_done])
 
         def parse_tree(tree, sha_done):
-            for mode, name, x in tree.entries():
-                if not x in sha_done:
-                    try:
-                        t = self.tree(x)
-                        sha_done.add(x)
-                        parse_tree(t, sha_done)
-                    except:
-                        sha_done.add(x)
+            for mode, name, sha in tree.entries():
+                if (sha, name) in sha_done:
+                    continue
+                if mode & stat.S_IFDIR:
+                    parse_tree(self.tree(sha), sha_done)
+                sha_done.add((sha, name))
 
         treesha = c.tree
-        if treesha not in sha_done:
-            t = self.tree(treesha)
-            sha_done.add(treesha)
-            parse_tree(t, sha_done)
+        if c.tree not in sha_done:
+            parse_tree(self.tree(c.tree), sha_done)
+            sha_done.add((c.tree, None))
 
         progress("counting objects: %d\r" % len(sha_done))
     return sha_done
@@ -126,10 +141,10 @@ class Repo(object):
         that a revision is present.
     :param progress: Simple progress function that will be called with 
         updated progress strings.
+    :return: tuple with number of objects, iterator over objects
     """
     shas = self.find_missing_objects(determine_wants, graph_walker, progress)
-    for sha in shas:
-        yield self.get_object(sha)
+    return (len(shas), ((self.get_object(sha), path) for sha, path in shas))
 
   def object_dir(self):
     return os.path.join(self.controldir(), OBJECTDIR)
@@ -184,9 +199,12 @@ class Repo(object):
       os.remove(file)
       return
 
+  def tagdir(self):
+    return os.path.join(self.controldir(), 'refs', 'tags')
+
   def get_tags(self):
     ret = {}
-    for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'tags')):
+    for root, dirs, files in os.walk(self.tagdir()):
       for name in files:
         ret[name] = self._get_ref(os.path.join(root, name))
     return ret

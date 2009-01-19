@@ -4,7 +4,7 @@
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License.
+# or (at your option) any later version of the License.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -63,7 +63,7 @@ class GitBackend(Backend):
         self.get_refs = self.repo.get_refs
 
     def apply_pack(self, refs, read):
-        fd, commit = self.repo.object_store.add_pack()
+        fd, commit = self.repo.object_store.add_thin_pack()
         fd.write(read())
         fd.close()
         commit()
@@ -145,10 +145,15 @@ class UploadPackHandler(Handler):
                 self.proto.write_pkt_line("NAK\n")
 
         graph_walker = ProtocolGraphWalker(self.proto)
-        objects = list(self.backend.fetch_objects(determine_wants, graph_walker, progress))
+        num_objects, objects_iter = self.backend.fetch_objects(determine_wants, graph_walker, progress)
+
+        # Do they want any objects?
+        if num_objects == 0:
+            return
+
         progress("dul-daemon says what\n")
-        progress("counting objects: %d, done.\n" % len(objects))
-        write_pack_data(ProtocolFile(None, write), objects, len(objects))
+        progress("counting objects: %d, done.\n" % num_objects)
+        write_pack_data(ProtocolFile(None, write), objects_iter, num_objects)
         progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")

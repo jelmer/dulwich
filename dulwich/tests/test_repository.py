@@ -4,7 +4,8 @@
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License.
+# of the License or (at your option) any later version of 
+# the License.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -127,3 +128,6 @@ class RepositoryTests(unittest.TestCase):
                             'fb5b0425c7ce46959bec94d54b9a157645e114f5',
                             'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
 
+  def test_get_tags_empty(self):
+   r = self.open_repo('ooo_merge')
+   self.assertEquals({}, r.get_tags())

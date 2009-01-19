@@ -156,27 +156,6 @@ class TCPGitClient(GitClient):
         super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 
 
-class SubprocessSocket(object):
-    """A socket-like object that talks to an ssh subprocess via pipes."""
-
-    def __init__(self, proc):
-        self.proc = proc
-
-    def send(self, data):
-        return os.write(self.proc.stdin.fileno(), data)
-
-    def recv(self, count):
-        return os.read(self.proc.stdout.fileno(), count)
-
-    def close(self):
-        self.proc.stdin.close()
-        self.proc.stdout.close()
-        self.proc.wait()
-
-    def get_filelike_channels(self):
-        return (self.proc.stdout, self.proc.stdin)
-
-
 class SubprocessGitClient(GitClient):
 
     def __init__(self, host, port=None):
@@ -187,9 +166,11 @@ class SubprocessGitClient(GitClient):
         argv = [service] + list(args)
         proc = subprocess.Popen(argv,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
-        socket = SubprocessSocket(proc)
-        return GitClient(proc.stdin.fileno(), socket.recv, socket.send)
+                                stdout=subprocess.PIPE, env={'GIT_TRACE':'2'})
+        def write_fn(date):
+            proc.stdout.write(data)
+            proc.stdout.flush()
+        return GitClient(proc.stdin.fileno(), proc.stdin.read, write_fn)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)

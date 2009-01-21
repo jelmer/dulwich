@@ -21,6 +21,7 @@ import select
 import socket
 import subprocess
 from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
+from dulwich.pack import write_pack_data
 
 class SimpleFetchGraphWalker(object):
 
@@ -70,7 +71,7 @@ class GitClient(object):
                 refs[ref] = sha
         return refs, server_capabilities
 
-    def send_pack(self, path):
+    def send_pack(self, path, generate_pack_contents):
         refs, server_capabilities = self.read_refs()
         changed_refs = [] # FIXME
         if not changed_refs:
@@ -85,9 +86,8 @@ class GitClient(object):
             if changed_refs[0] != "0"*40:
                 have.append(changed_refs[0])
         self.proto.write_pkt_line(None)
-        # FIXME: This is implementation specific
-        # shas = generate_pack_contents(want, have, None)
-        # write_pack_data(self.write, shas, len(shas))
+        shas = generate_pack_contents(want, have, None)
+        write_pack_data(self.write, shas, len(shas))
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Retrieve a pack from a git smart server.

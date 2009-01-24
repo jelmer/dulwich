@@ -105,8 +105,8 @@ class Repo(object):
             graph_walker.ack(ref)
         ref = graph_walker.next()
     while commits_to_send:
-        sha = (commits_to_send.pop(), None)
-        if sha in sha_done:
+        sha = commits_to_send.pop()
+        if (sha, None) in sha_done:
             continue
 
         c = self.commit(sha)

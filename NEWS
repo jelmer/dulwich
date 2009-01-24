@@ -1,3 +1,9 @@
+0.1.1	UNRELEASED
+
+ BUG FIXES
+
+  * Fixed regression in Repo.find_missing_objects()
+
 0.1.0	2009-01-24
 
  * Initial release.

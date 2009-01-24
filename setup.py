@@ -4,7 +4,7 @@
 
 from distutils.core import setup
 
-dulwich_version_string = '0.1.0'
+dulwich_version_string = '0.1.1'
 
 setup(name='dulwich',
       description='Pure-Python Git Library',

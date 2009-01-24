@@ -16,9 +16,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import os
 import select
 import socket
+import subprocess
 from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
+from dulwich.pack import write_pack_data
 
 class SimpleFetchGraphWalker(object):
 
@@ -68,7 +71,7 @@ class GitClient(object):
                 refs[ref] = sha
         return refs, server_capabilities
 
-    def send_pack(self, path):
+    def send_pack(self, path, generate_pack_contents):
         refs, server_capabilities = self.read_refs()
         changed_refs = [] # FIXME
         if not changed_refs:
@@ -83,9 +86,8 @@ class GitClient(object):
             if changed_refs[0] != "0"*40:
                 have.append(changed_refs[0])
         self.proto.write_pkt_line(None)
-        # FIXME: This is implementation specific
-        # shas = generate_pack_contents(want, have, None)
-        # write_pack_data(self.write, shas, len(shas))
+        shas = generate_pack_contents(want, have, None)
+        write_pack_data(self.write, shas, len(shas))
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Retrieve a pack from a git smart server.
@@ -96,7 +98,6 @@ class GitClient(object):
         :param progress: Callback for progress reports (strings)
         """
         (refs, server_capabilities) = self.read_refs()
-       
         wants = determine_wants(refs)
         if not wants:
             self.proto.write_pkt_line(None)
@@ -152,3 +153,84 @@ class TCPGitClient(GitClient):
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
         super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+
+
+class SubprocessGitClient(GitClient):
+
+    def __init__(self):
+        self.proc = None
+
+    def _connect(self, service, *args):
+        argv = [service] + list(args)
+        self.proc = subprocess.Popen(argv, bufsize=0,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        def read_fn(size):
+            return self.proc.stdout.read(size)
+        def write_fn(data):
+            self.proc.stdin.write(data)
+            self.proc.stdin.flush()
+        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn)
+
+    def send_pack(self, path):
+        client = self._connect("git-receive-pack", path)
+        client.send_pack(path)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        client = self._connect("git-upload-pack", path)
+        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+
+
+class SSHSubprocess(object):
+    """A socket-like object that talks to an ssh subprocess via pipes."""
+
+    def __init__(self, proc):
+        self.proc = proc
+
+    def send(self, data):
+        return os.write(self.proc.stdin.fileno(), data)
+
+    def recv(self, count):
+        return self.proc.stdout.read(count)
+
+    def close(self):
+        self.proc.stdin.close()
+        self.proc.stdout.close()
+        self.proc.wait()
+
+
+class SSHVendor(object):
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        #FIXME: This has no way to deal with passwords..
+        args = ['ssh', '-x']
+        if port is not None:
+            args.extend(['-p', str(port)])
+        if username is not None:
+            host = "%s@%s" % (username, host)
+        args.append(host)
+        proc = subprocess.Popen(args + command,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        return SSHSubprocess(proc)
+
+# Can be overridden by users
+get_ssh_vendor = SSHVendor
+
+
+class SSHGitClient(GitClient):
+
+    def __init__(self, host, port=None):
+        self.host = host
+        self.port = port
+
+    def send_pack(self, path):
+        remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
+        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
+        client.send_pack(path)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
+        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
+        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+

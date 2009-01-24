@@ -589,8 +589,8 @@ def write_pack_data(f, objects, num_objects, window=10):
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
-    for o in recency:
-        magic.append( (o._num_type, "filename", 1, -len(o.as_raw_string()[1]), o) )
+    for obj, path in recency:
+        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()[1]), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against
@@ -603,7 +603,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     f.write("PACK")               # Pack header
     f.write(struct.pack(">L", 2)) # Pack version
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
-    for o in recency:
+    for o, path in recency:
         sha1 = o.sha().digest()
         crc32 = o.crc32()
         orig_t, raw = o.as_raw_string()
@@ -612,7 +612,7 @@ def write_pack_data(f, objects, num_objects, window=10):
         #for i in range(offs[o]-window, window):
         #    if i < 0 or i >= len(offs): continue
         #    b = magic[i][4]
-        #    if b._num_type != orig_t: continue
+        #    if b.type != orig_t: continue
         #    _, base = b.as_raw_string()
         #    delta = create_delta(base, raw)
         #    if len(delta) < len(winner):

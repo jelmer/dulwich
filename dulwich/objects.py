@@ -173,6 +173,10 @@ class ShaFile(object):
   def id(self):
       return self.sha().hexdigest()
 
+  @property
+  def type(self):
+      return self._num_type
+
   def __repr__(self):
     return "<%s %s>" % (self.__class__.__name__, self.id)
 

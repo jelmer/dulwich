@@ -20,16 +20,21 @@
 import sys
 from getopt import getopt
 
+def get_transport_and_path(uri):
+    from dulwich.client import TCPGitClient, SSHGitClient, SubprocessGitClient
+    for handler, transport in (("git://", TCPGitClient), ("git+ssh://", SSHGitClient)):
+        if uri.startswith(handler):
+            host, path = uri[len(handler):].split("/", 1)
+            return transport(host), "/"+path
+    # if its not git or git+ssh, try a local url..
+    return SubprocessGitClient(), uri
+
 def cmd_fetch_pack(args):
-	from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+	from dulwich.client import SimpleFetchGraphWalker
 	from dulwich.repo import Repo
 	opts, args = getopt(args, "", ["all"])
 	opts = dict(opts)
-	if not ":" in args[0]:
-		print "Usage: dulwich fetch-pack [--all] host:path [REF...]"
-		sys.exit(1)
-	(host, path) = args.pop(0).split(":", 1)
-	client = TCPGitClient(host)
+        client, path = get_transport_and_path(args.pop(0))
 	if "--all" in opts:
 		determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
 	else:
@@ -137,7 +142,7 @@ def cmd_init(args):
 
 
 def cmd_clone(args):
-	from dulwich.client import TCPGitClient, SimpleFetchGraphWalker
+	from dulwich.client import SimpleFetchGraphWalker
 	from dulwich.repo import Repo
 	import os
 	import sys
@@ -148,11 +153,7 @@ def cmd_clone(args):
 		print "usage: dulwich clone host:path [PATH]"
 		sys.exit(1)
 
-	if not ":" in args[0]:
-		print "Usage: dulwich clone host:path [PATH]"
-		sys.exit(1)
-	(host, host_path) = args.pop(0).split(":", 1)
-	client = TCPGitClient(host)
+        client, host_path = get_transport_and_path(args.pop(0))
 
 	if len(args) > 0:
 		path = args.pop(0)

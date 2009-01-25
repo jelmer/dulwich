@@ -32,6 +32,7 @@ from object_store import ObjectStore
 from objects import (
         ShaFile,
         Commit,
+        Tag,
         Tree,
         Blob,
         )
@@ -244,6 +245,9 @@ class Repo(object):
 
   def tree(self, sha):
     return self._get_object(sha, Tree)
+
+  def tag(self, sha):
+    return self._get_object(sha, Tag)
 
   def get_blob(self, sha):
     return self._get_object(sha, Blob)

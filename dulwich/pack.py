@@ -1,14 +1,11 @@
 # pack.py -- For dealing wih packed git objects.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copryight (C) 2008 Jelmer Vernooij <jelmer@samba.org>
-# The code is loosely based on that in the sha1_file.c file from git itself,
-# which is Copyright (C) Linus Torvalds, 2005 and distributed under the
-# GPL version 2.
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License.
+# of the License or (at your option) a later version.
 # 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of

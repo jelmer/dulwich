@@ -55,14 +55,26 @@ class ObjectStore(object):
             self._packs = list(load_packs(self.pack_dir()))
         return self._packs
 
-    def _get_shafile(self, sha):
+    def _get_shafile_path(self, sha):
         dir = sha[:2]
         file = sha[2:]
         # Check from object dir
-        path = os.path.join(self.path, dir, file)
+        return os.path.join(self.path, dir, file)
+
+    def _get_shafile(self, sha):
+        path = self._get_shafile_path(sha)
         if os.path.exists(path):
           return ShaFile.from_file(path)
         return None
+
+    def _add_shafile(self, sha, o):
+        path = self._get_shafile_path(sha)
+        f = os.path.open(path, 'w')
+        try:
+            f.write(o._header())
+            f.write(o._text)
+        finally:
+            f.close()
 
     def get_raw(self, sha):
         """Obtain the raw text for an object.
@@ -87,6 +99,11 @@ class ObjectStore(object):
         # Check from packs
         type, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type, uncomp)
+
+    def add_objects(self, num_objects, objects):
+        # TODO: If numb_objects is high enough, write a pack?
+        for sha, o in objects:
+            self._add_shafile(sha, o)
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.

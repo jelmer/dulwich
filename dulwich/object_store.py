@@ -16,19 +16,21 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from objects import (
-        ShaFile,
+from dulwich.objects import (
         hex_to_sha,
+        ShaFile,
         )
-import os, tempfile
-from pack import (
+from dulwich.pack import (
         iter_sha1, 
         load_packs, 
         write_pack_index_v2,
         PackData, 
         )
+
+import os
 import tempfile
 import urllib2
+
 PACKDIR = 'pack'
 
 class ObjectStore(object):

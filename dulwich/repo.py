@@ -144,8 +144,8 @@ class Repo(object):
         updated progress strings.
     :return: tuple with number of objects, iterator over objects
     """
-    shas = self.find_missing_objects(determine_wants, graph_walker, progress)
-    return (len(shas), ((self.get_object(sha), path) for sha, path in shas))
+    return self.object_store.iter_shas(
+        self.find_missing_objects(determine_wants, graph_walker, progress))
 
   def object_dir(self):
     return os.path.join(self.controldir(), OBJECTDIR)
@@ -312,6 +312,4 @@ class Repo(object):
       open(os.path.join(path, 'info', 'excludes'), 'w').write("")
 
   create = init_bare
-
-
 

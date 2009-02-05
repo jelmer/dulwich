@@ -39,6 +39,9 @@ class ObjectStore(object):
         self.path = path
         self._packs = None
 
+    def iter_shas(self, shas):
+        return ObjectIterator(self, shas)
+
     def pack_dir(self):
         return os.path.join(self.path, PACKDIR)
 
@@ -171,3 +174,28 @@ class ObjectStore(object):
         f, commit = self.add_pack()
         write_pack_data(f, objects, len(objects))
         commit()
+
+
+class ObjectImporter(object):
+
+    def __init__(self, count):
+        self.count = count
+
+    def add_object(self, object):
+        raise NotImplementedError(self.add_object)
+
+    def finish(self, object):
+        raise NotImplementedError(self.finish)
+
+
+class ObjectIterator(object):
+
+    def __init__(self, store, shas):
+        self.store = store
+        self.shas = shas
+
+    def __iter__(self):
+        return ((self.store.get_object(sha), path) for sha, path in self.shas)
+
+    def __len__(self):
+        return len(self.shas)

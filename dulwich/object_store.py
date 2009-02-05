@@ -40,7 +40,7 @@ class ObjectStore(object):
         self._packs = None
 
     def iter_shas(self, shas):
-        return ObjectIterator(self, shas)
+        return ObjectStoreIterator(self, shas)
 
     def pack_dir(self):
         return os.path.join(self.path, PACKDIR)
@@ -190,12 +190,18 @@ class ObjectImporter(object):
 
 class ObjectIterator(object):
 
+    def iterobjects(self):
+        raise NotImplementedError(self.iterobjects)
+
+
+class ObjectStoreIterator(ObjectIterator):
+
     def __init__(self, store, shas):
         self.store = store
         self.shas = shas
 
     def __iter__(self):
-        return ((self.store.get_object(sha), path) for sha, path in self.shas)
+        return ((self.store[sha], path) for sha, path in self.shas)
 
     def iterobjects(self):
         for o, path in self:
@@ -213,3 +219,5 @@ class ObjectIterator(object):
 
     def __len__(self):
         return len(self.shas)
+
+

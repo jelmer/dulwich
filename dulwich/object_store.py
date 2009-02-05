@@ -197,5 +197,19 @@ class ObjectIterator(object):
     def __iter__(self):
         return ((self.store.get_object(sha), path) for sha, path in self.shas)
 
+    def iterobjects(self):
+        for o, path in self:
+            yield o
+
+    def __contains__(self, needle):
+        # FIXME: This could be more efficient
+        for sha, path in self.shas:
+            if sha == needle:
+                return True
+        return False
+
+    def __getitem__(self, key):
+        return self.store[key]
+
     def __len__(self):
         return len(self.shas)

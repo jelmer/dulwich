@@ -23,6 +23,7 @@ from dulwich.objects import (
 from dulwich.pack import (
         iter_sha1, 
         load_packs, 
+        write_pack_data,
         write_pack_index_v2,
         PackData, 
         )
@@ -104,11 +105,6 @@ class ObjectStore(object):
         # Check from packs
         type, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type, uncomp)
-
-    def add_objects(self, num_objects, objects):
-        # TODO: If numb_objects is high enough, write a pack?
-        for sha, o in objects:
-            self._add_shafile(sha, o)
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.

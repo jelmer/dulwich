@@ -577,7 +577,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     """Write a new pack file.
 
     :param filename: The filename of the new pack file.
-    :param objects: List of objects to write.
+    :param objects: List of objects to write (tuples with object and path)
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
     recency = list(objects)

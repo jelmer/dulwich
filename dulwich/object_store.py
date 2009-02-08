@@ -18,11 +18,13 @@
 
 from dulwich.objects import (
         hex_to_sha,
+        sha_to_hex,
         ShaFile,
         )
 from dulwich.pack import (
         iter_sha1, 
         load_packs, 
+        write_pack,
         write_pack_data,
         write_pack_index_v2,
         PackData, 

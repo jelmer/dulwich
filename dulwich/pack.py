@@ -67,6 +67,8 @@ def read_zlib(data, offset, dec_size):
     while obj.unused_data == "":
         base = offset+fed
         add = data[base:base+1024]
+        if len(add) < 1024:
+            add += "Z"
         fed += len(add)
         x += obj.decompress(add)
     assert len(x) == dec_size

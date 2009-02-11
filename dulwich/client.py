@@ -59,12 +59,12 @@ class GitClient(object):
         self.proto = Protocol(read, write)
         self.fileno = fileno
         if capabilities is None:
-            self.capabilities = DEFAULT_CAPABILITIES
+            self._capabilities = DEFAULT_CAPABILITIES
         else:
-            self.capabilities = capabilities
+            self._capabilities = capabilities
 
     def capabilities(self):
-        return " ".join(self.capabilities)
+        return " ".join(self._capabilities)
 
     def read_refs(self):
         server_capabilities = None
@@ -166,7 +166,7 @@ class SubprocessGitClient(GitClient):
 
     def __init__(self, capabilities=None):
         self.proc = None
-        self.capabilities = capabilities
+        self._capabilities = capabilities
 
     def _connect(self, service, *args):
         argv = [service] + list(args)
@@ -178,7 +178,7 @@ class SubprocessGitClient(GitClient):
         def write_fn(data):
             self.proc.stdin.write(data)
             self.proc.stdin.flush()
-        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, capabilities=self.capabilities)
+        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, capabilities=self._capabilities)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)

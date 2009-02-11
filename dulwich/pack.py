@@ -394,7 +394,7 @@ class PackData(object):
     assert os.path.exists(filename), "%s is not a packfile" % filename
     self._size = os.path.getsize(filename)
     self._header_size = 12
-    assert self._size >= self._header_size, "%s is too small for a packfile" % filename
+    assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
     self._read_header()
 
   def _read_header(self):
@@ -471,12 +471,12 @@ class PackData(object):
     ret.sort()
     return ret
 
-  def create_index_v1(self, filename):
-    entries = self.sorted_entries()
+  def create_index_v1(self, filename, resolve_ext_ref=None):
+    entries = self.sorted_entries(resolve_ext_ref)
     write_pack_index_v1(filename, entries, self.calculate_checksum())
 
-  def create_index_v2(self, filename):
-    entries = self.sorted_entries()
+  def create_index_v2(self, filename, resolve_ext_ref=None):
+    entries = self.sorted_entries(resolve_ext_ref)
     write_pack_index_v2(filename, entries, self.calculate_checksum())
 
   def get_stored_checksum(self):

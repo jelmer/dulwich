@@ -47,17 +47,24 @@ class SimpleFetchGraphWalker(object):
         return None
 
 
+DEFAULT_CAPABILITIES = ["multi_ack", "side-band-64k", "thin-pack", "ofs-delta"]
+
+
 class GitClient(object):
     """Git smart server client.
 
     """
 
-    def __init__(self, fileno, read, write):
+    def __init__(self, fileno, read, write, capabilities=None):
         self.proto = Protocol(read, write)
         self.fileno = fileno
+        if capabilities is None:
+            self.capabilities = DEFAULT_CAPABILITIES
+        else:
+            self.capabilities = capabilities
 
     def capabilities(self):
-        return "multi_ack side-band-64k thin-pack ofs-delta"
+        return " ".join(self.capabilities)
 
     def read_refs(self):
         server_capabilities = None

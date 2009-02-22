@@ -707,35 +707,37 @@ def apply_delta(src_buf, delta):
     assert isinstance(src_buf, str), "was %r" % (src_buf,)
     assert isinstance(delta, str)
     out = ""
-    def pop(delta):
-        ret = delta[0]
-        delta = delta[1:]
-        return ord(ret), delta
-    def get_delta_header_size(delta):
+    index = 0
+    delta_length = len(delta)
+    def pop(delta, index):
+        ret = delta[index]
+        index += 1
+        return ord(ret), index
+    def get_delta_header_size(delta, index):
         size = 0
         i = 0
         while delta:
-            cmd, delta = pop(delta)
+            cmd, index = pop(delta, index)
             size |= (cmd & ~0x80) << i
             i += 7
             if not cmd & 0x80:
                 break
-        return size, delta
-    src_size, delta = get_delta_header_size(delta)
-    dest_size, delta = get_delta_header_size(delta)
+        return size, index
+    src_size, index = get_delta_header_size(delta, index)
+    dest_size, index = get_delta_header_size(delta, index)
     assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
-    while delta:
-        cmd, delta = pop(delta)
+    while index < delta_length:
+        cmd, index = pop(delta, index)
         if cmd & 0x80:
             cp_off = 0
             for i in range(4):
                 if cmd & (1 << i): 
-                    x, delta = pop(delta)
+                    x, index = pop(delta, index)
                     cp_off |= x << (i * 8)
             cp_size = 0
             for i in range(3):
                 if cmd & (1 << (4+i)): 
-                    x, delta = pop(delta)
+                    x, index = pop(delta, index)
                     cp_size |= x << (i * 8)
             if cp_size == 0: 
                 cp_size = 0x10000
@@ -745,13 +747,13 @@ def apply_delta(src_buf, delta):
                 break
             out += src_buf[cp_off:cp_off+cp_size]
         elif cmd != 0:
-            out += delta[:cmd]
-            delta = delta[cmd:]
+            out += delta[index:cmd]
+            index += cmd
         else:
             raise ApplyDeltaError("Invalid opcode 0")
     
-    if delta != "":
-        raise ApplyDeltaError("delta not empty: %r" % delta)
+    if index != delta_length - 1:
+        raise ApplyDeltaError("delta not empty: %r" % delta[index:])
 
     if dest_size != len(out):
         raise ApplyDeltaError("dest size incorrect")

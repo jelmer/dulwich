@@ -747,12 +747,12 @@ def apply_delta(src_buf, delta):
                 break
             out += src_buf[cp_off:cp_off+cp_size]
         elif cmd != 0:
-            out += delta[index:cmd]
+            out += delta[index:index+cmd]
             index += cmd
         else:
             raise ApplyDeltaError("Invalid opcode 0")
     
-    if index != delta_length - 1:
+    if index != delta_length:
         raise ApplyDeltaError("delta not empty: %r" % delta[index:])
 
     if dest_size != len(out):

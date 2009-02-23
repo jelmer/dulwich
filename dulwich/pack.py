@@ -706,7 +706,7 @@ def apply_delta(src_buf, delta):
     """Based on the similar function in git's patch-delta.c."""
     assert isinstance(src_buf, str), "was %r" % (src_buf,)
     assert isinstance(delta, str)
-    out = ""
+    out = []
     index = 0
     delta_length = len(delta)
     def pop(delta, index):
@@ -745,9 +745,9 @@ def apply_delta(src_buf, delta):
                 cp_off + cp_size > src_size or
                 cp_size > dest_size):
                 break
-            out += src_buf[cp_off:cp_off+cp_size]
+            out.append(src_buf[cp_off:cp_off+cp_size])
         elif cmd != 0:
-            out += delta[index:index+cmd]
+            out.append(delta[index:index+cmd])
             index += cmd
         else:
             raise ApplyDeltaError("Invalid opcode 0")
@@ -755,6 +755,7 @@ def apply_delta(src_buf, delta):
     if index != delta_length:
         raise ApplyDeltaError("delta not empty: %r" % delta[index:])
 
+    out = ''.join(out)
     if dest_size != len(out):
         raise ApplyDeltaError("dest size incorrect")
 

@@ -98,7 +98,7 @@ class Repo(object):
         updated progress strings.
     """
     wants = determine_wants(self.get_refs())
-    commits_to_send = set(wants)
+    objects_to_send = set(wants)
     sha_done = set()
 
     def parse_tree(tree, sha_done):
@@ -120,15 +120,15 @@ class Repo(object):
         if ref in self.object_store:
             graph_walker.ack(ref)
         ref = graph_walker.next()
-    while commits_to_send:
-        sha = commits_to_send.pop()
+    while objects_to_send:
+        sha = objects_to_send.pop()
         if (sha, None) in sha_done:
             continue
 
         c = self.object_store[sha]
         if isinstance(c, Commit):
             parse_commit(c, sha_done)
-            commits_to_send.update([p for p in c.parents if not p in sha_done])
+            objects_to_send.update([p for p in c.parents if not p in sha_done])
         sha_done.add((sha, None))
 
         progress("counting objects: %d\r" % len(sha_done))

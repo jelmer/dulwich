@@ -100,6 +100,21 @@ class Repo(object):
     wants = determine_wants(self.get_refs())
     commits_to_send = set(wants)
     sha_done = set()
+
+    def parse_tree(tree, sha_done):
+        for mode, name, sha in tree.entries():
+            if (sha, name) in sha_done:
+                continue
+            if mode & stat.S_IFDIR:
+                parse_tree(self.tree(sha), sha_done)
+            sha_done.add((sha, name))
+
+    def parse_commit(commit, sha_done):
+        treesha = c.tree
+        if c.tree not in sha_done:
+            parse_tree(self.tree(c.tree), sha_done)
+            sha_done.add((c.tree, None))
+
     ref = graph_walker.next()
     while ref:
         if ref in self.object_store:
@@ -110,24 +125,11 @@ class Repo(object):
         if (sha, None) in sha_done:
             continue
 
-        c = self.commit(sha)
-        assert isinstance(c, Commit)
+        c = self.object_store[sha]
+        if isinstance(c, Commit):
+            parse_commit(c, sha_done)
+            commits_to_send.update([p for p in c.parents if not p in sha_done])
         sha_done.add((sha, None))
-
-        commits_to_send.update([p for p in c.parents if not p in sha_done])
-
-        def parse_tree(tree, sha_done):
-            for mode, name, sha in tree.entries():
-                if (sha, name) in sha_done:
-                    continue
-                if mode & stat.S_IFDIR:
-                    parse_tree(self.tree(sha), sha_done)
-                sha_done.add((sha, name))
-
-        treesha = c.tree
-        if c.tree not in sha_done:
-            parse_tree(self.tree(c.tree), sha_done)
-            sha_done.add((c.tree, None))
 
         progress("counting objects: %d\r" % len(sha_done))
     return sha_done

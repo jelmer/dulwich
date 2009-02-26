@@ -48,145 +48,145 @@ def _decompress(string):
     return dcomped
 
 def sha_to_hex(sha):
-  """Takes a string and returns the hex of the sha within"""
-  hexsha = ''
-  for c in sha:
-    hexsha += "%02x" % ord(c)
-  assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % \
-         len(hexsha)
-  return hexsha
+    """Takes a string and returns the hex of the sha within"""
+    hexsha = ''
+    for c in sha:
+        hexsha += "%02x" % ord(c)
+    assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % \
+           len(hexsha)
+    return hexsha
 
 def hex_to_sha(hex):
-  """Takes a hex sha and returns a binary sha"""
-  sha = ''
-  for i in range(0, len(hex), 2):
-    sha += chr(int(hex[i:i+2], 16))
-  assert len(sha) == 20, "Incorrent length of sha1: %d" % len(sha)
-  return sha
+    """Takes a hex sha and returns a binary sha"""
+    sha = ''
+    for i in range(0, len(hex), 2):
+        sha += chr(int(hex[i:i+2], 16))
+    assert len(sha) == 20, "Incorrent length of sha1: %d" % len(sha)
+    return sha
 
 class ShaFile(object):
-  """A git SHA file."""
-
-  @classmethod
-  def _parse_legacy_object(cls, map):
-    """Parse a legacy object, creating it and setting object._text"""
-    text = _decompress(map)
-    object = None
-    for posstype in type_map.keys():
-      if text.startswith(posstype):
-        object = type_map[posstype]()
-        text = text[len(posstype):]
-        break
-    assert object is not None, "%s is not a known object type" % text[:9]
-    assert text[0] == ' ', "%s is not a space" % text[0]
-    text = text[1:]
-    size = 0
-    i = 0
-    while text[0] >= '0' and text[0] <= '9':
-      if i > 0 and size == 0:
-        assert False, "Size is not in canonical format"
-      size = (size * 10) + int(text[0])
-      text = text[1:]
-      i += 1
-    object._size = size
-    assert text[0] == "\0", "Size not followed by null"
-    text = text[1:]
-    object._text = text
-    return object
-
-  def as_raw_string(self):
-    return self._num_type, self._text
-
-  @classmethod
-  def _parse_object(cls, map):
-    """Parse a new style object , creating it and setting object._text"""
-    used = 0
-    byte = ord(map[used])
-    used += 1
-    num_type = (byte >> 4) & 7
-    try:
-      object = num_type_map[num_type]()
-    except KeyError:
-      assert False, "Not a known type: %d" % num_type
-    while((byte & 0x80) != 0):
-      byte = ord(map[used])
-      used += 1
-    raw = map[used:]
-    object._text = _decompress(raw)
-    return object
-
-  @classmethod
-  def _parse_file(cls, map):
-    word = (ord(map[0]) << 8) + ord(map[1])
-    if ord(map[0]) == 0x78 and (word % 31) == 0:
-      return cls._parse_legacy_object(map)
-    else:
-      return cls._parse_object(map)
-
-  def __init__(self):
-    """Don't call this directly"""
-
-  def _parse_text(self):
-    """For subclasses to do initialisation time parsing"""
-
-  @classmethod
-  def from_file(cls, filename):
-    """Get the contents of a SHA file on disk"""
-    size = os.path.getsize(filename)
-    f = open(filename, 'rb')
-    try:
-      map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-      shafile = cls._parse_file(map)
-      shafile._parse_text()
-      return shafile
-    finally:
-      f.close()
-
-  @classmethod
-  def from_raw_string(cls, type, string):
-    """Creates an object of the indicated type from the raw string given.
-
-    Type is the numeric type of an object. String is the raw uncompressed
-    contents.
-    """
-    real_class = num_type_map[type]
-    obj = real_class()
-    obj._num_type = type
-    obj._text = string
-    obj._parse_text()
-    return obj
-
-  def _header(self):
-    return "%s %lu\0" % (self._type, len(self._text))
-
-  def crc32(self):
-    return zlib.crc32(self._text)
-
-  def sha(self):
-    """The SHA1 object that is the name of this object."""
-    ressha = sha.new()
-    ressha.update(self._header())
-    ressha.update(self._text)
-    return ressha
-
-  @property
-  def id(self):
-      return self.sha().hexdigest()
-
-  @property
-  def type(self):
-      return self._num_type
-
-  def __repr__(self):
-    return "<%s %s>" % (self.__class__.__name__, self.id)
-
-  def __eq__(self, other):
-    """Return true id the sha of the two objects match.
-
-    The __le__ etc methods aren't overriden as they make no sense,
-    certainly at this level.
-    """
-    return self.sha().digest() == other.sha().digest()
+    """A git SHA file."""
+  
+    @classmethod
+    def _parse_legacy_object(cls, map):
+        """Parse a legacy object, creating it and setting object._text"""
+        text = _decompress(map)
+        object = None
+        for posstype in type_map.keys():
+            if text.startswith(posstype):
+                object = type_map[posstype]()
+                text = text[len(posstype):]
+                break
+        assert object is not None, "%s is not a known object type" % text[:9]
+        assert text[0] == ' ', "%s is not a space" % text[0]
+        text = text[1:]
+        size = 0
+        i = 0
+        while text[0] >= '0' and text[0] <= '9':
+            if i > 0 and size == 0:
+                assert False, "Size is not in canonical format"
+            size = (size * 10) + int(text[0])
+            text = text[1:]
+            i += 1
+        object._size = size
+        assert text[0] == "\0", "Size not followed by null"
+        text = text[1:]
+        object._text = text
+        return object
+  
+    def as_raw_string(self):
+        return self._num_type, self._text
+  
+    @classmethod
+    def _parse_object(cls, map):
+        """Parse a new style object , creating it and setting object._text"""
+        used = 0
+        byte = ord(map[used])
+        used += 1
+        num_type = (byte >> 4) & 7
+        try:
+            object = num_type_map[num_type]()
+        except KeyError:
+            assert False, "Not a known type: %d" % num_type
+        while((byte & 0x80) != 0):
+            byte = ord(map[used])
+            used += 1
+        raw = map[used:]
+        object._text = _decompress(raw)
+        return object
+  
+    @classmethod
+    def _parse_file(cls, map):
+        word = (ord(map[0]) << 8) + ord(map[1])
+        if ord(map[0]) == 0x78 and (word % 31) == 0:
+            return cls._parse_legacy_object(map)
+        else:
+            return cls._parse_object(map)
+  
+    def __init__(self):
+        """Don't call this directly"""
+  
+    def _parse_text(self):
+        """For subclasses to do initialisation time parsing"""
+  
+    @classmethod
+    def from_file(cls, filename):
+        """Get the contents of a SHA file on disk"""
+        size = os.path.getsize(filename)
+        f = open(filename, 'rb')
+        try:
+            map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
+            shafile = cls._parse_file(map)
+            shafile._parse_text()
+            return shafile
+        finally:
+            f.close()
+  
+    @classmethod
+    def from_raw_string(cls, type, string):
+        """Creates an object of the indicated type from the raw string given.
+    
+        Type is the numeric type of an object. String is the raw uncompressed
+        contents.
+        """
+        real_class = num_type_map[type]
+        obj = real_class()
+        obj._num_type = type
+        obj._text = string
+        obj._parse_text()
+        return obj
+  
+    def _header(self):
+        return "%s %lu\0" % (self._type, len(self._text))
+  
+    def crc32(self):
+        return zlib.crc32(self._text)
+  
+    def sha(self):
+        """The SHA1 object that is the name of this object."""
+        ressha = sha.new()
+        ressha.update(self._header())
+        ressha.update(self._text)
+        return ressha
+  
+    @property
+    def id(self):
+        return self.sha().hexdigest()
+  
+    @property
+    def type(self):
+        return self._num_type
+  
+    def __repr__(self):
+        return "<%s %s>" % (self.__class__.__name__, self.id)
+  
+    def __eq__(self, other):
+        """Return true id the sha of the two objects match.
+  
+        The __le__ etc methods aren't overriden as they make no sense,
+        certainly at this level.
+        """
+        return self.sha().digest() == other.sha().digest()
 
 
 class Blob(ShaFile):

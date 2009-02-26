@@ -17,45 +17,45 @@
 # MA  02110-1301, USA.
 
 class WrongObjectException(Exception):
-  """Baseclass for all the _ is not a _ exceptions on objects.
-
-  Do not instantiate directly.
-
-  Subclasses should define a _type attribute that indicates what
-  was expected if they were raised.
-  """
-
-  def __init__(self, sha, *args, **kwargs):
-    string = "%s is not a %s" % (sha, self._type)
-    Exception.__init__(self, string)
+    """Baseclass for all the _ is not a _ exceptions on objects.
+  
+    Do not instantiate directly.
+  
+    Subclasses should define a _type attribute that indicates what
+    was expected if they were raised.
+    """
+  
+    def __init__(self, sha, *args, **kwargs):
+        string = "%s is not a %s" % (sha, self._type)
+        Exception.__init__(self, string)
 
 class NotCommitError(WrongObjectException):
-  """Indicates that the sha requested does not point to a commit."""
-
-  _type = 'commit'
+    """Indicates that the sha requested does not point to a commit."""
+  
+    _type = 'commit'
 
 class NotTreeError(WrongObjectException):
-  """Indicates that the sha requested does not point to a tree."""
-
-  _type = 'tree'
+    """Indicates that the sha requested does not point to a tree."""
+  
+    _type = 'tree'
 
 class NotBlobError(WrongObjectException):
-  """Indicates that the sha requested does not point to a blob."""
-
-  _type = 'blob'
+    """Indicates that the sha requested does not point to a blob."""
+  
+    _type = 'blob'
 
 class MissingCommitError(Exception):
-  """Indicates that a commit was not found in the repository"""
-
-  def __init__(self, sha, *args, **kwargs):
-    Exception.__init__(self, "%s is not in the revision store" % sha)
+    """Indicates that a commit was not found in the repository"""
+  
+    def __init__(self, sha, *args, **kwargs):
+        Exception.__init__(self, "%s is not in the revision store" % sha)
 
 
 class ObjectMissing(Exception):
-  """Indicates that a requested object is missing."""
-
-  def __init__(self, sha, *args, **kwargs):
-    Exception.__init__(self, "%s is not in the pack" % sha)
+    """Indicates that a requested object is missing."""
+  
+    def __init__(self, sha, *args, **kwargs):
+        Exception.__init__(self, "%s is not in the pack" % sha)
 
 
 class ApplyDeltaError(Exception):

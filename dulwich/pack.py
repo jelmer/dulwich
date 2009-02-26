@@ -125,190 +125,190 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
 
 
 def resolve_object(offset, type, obj, get_ref, get_offset):
-  """Resolve an object, possibly resolving deltas when necessary."""
-  if not type in (6, 7): # Not a delta
-     return type, obj
-
-  if type == 6: # offset delta
-     (delta_offset, delta) = obj
-     assert isinstance(delta_offset, int)
-     assert isinstance(delta, str)
-     offset = offset-delta_offset
-     type, base_obj = get_offset(offset)
-     assert isinstance(type, int)
-  elif type == 7: # ref delta
-     (basename, delta) = obj
-     assert isinstance(basename, str) and len(basename) == 20
-     assert isinstance(delta, str)
-     type, base_obj = get_ref(basename)
-     assert isinstance(type, int)
-  type, base_text = resolve_object(offset, type, base_obj, get_ref, get_offset)
-  return type, apply_delta(base_text, delta)
+    """Resolve an object, possibly resolving deltas when necessary."""
+    if not type in (6, 7): # Not a delta
+        return type, obj
+  
+    if type == 6: # offset delta
+        (delta_offset, delta) = obj
+        assert isinstance(delta_offset, int)
+        assert isinstance(delta, str)
+        offset = offset-delta_offset
+        type, base_obj = get_offset(offset)
+        assert isinstance(type, int)
+    elif type == 7: # ref delta
+        (basename, delta) = obj
+        assert isinstance(basename, str) and len(basename) == 20
+        assert isinstance(delta, str)
+        type, base_obj = get_ref(basename)
+        assert isinstance(type, int)
+    type, base_text = resolve_object(offset, type, base_obj, get_ref, get_offset)
+    return type, apply_delta(base_text, delta)
 
 
 class PackIndex(object):
-  """An index in to a packfile.
-
-  Given a sha id of an object a pack index can tell you the location in the
-  packfile of that object if it has it.
-
-  To do the loop it opens the file, and indexes first 256 4 byte groups
-  with the first byte of the sha id. The value in the four byte group indexed
-  is the end of the group that shares the same starting byte. Subtract one
-  from the starting byte and index again to find the start of the group.
-  The values are sorted by sha id within the group, so do the math to find
-  the start and end offset and then bisect in to find if the value is present.
-  """
-
-  def __init__(self, filename):
-    """Create a pack index object.
-
-    Provide it with the name of the index file to consider, and it will map
-    it whenever required.
+    """An index in to a packfile.
+  
+    Given a sha id of an object a pack index can tell you the location in the
+    packfile of that object if it has it.
+  
+    To do the loop it opens the file, and indexes first 256 4 byte groups
+    with the first byte of the sha id. The value in the four byte group indexed
+    is the end of the group that shares the same starting byte. Subtract one
+    from the starting byte and index again to find the start of the group.
+    The values are sorted by sha id within the group, so do the math to find
+    the start and end offset and then bisect in to find if the value is present.
     """
-    self._filename = filename
-    # Take the size now, so it can be checked each time we map the file to
-    # ensure that it hasn't changed.
-    self._size = os.path.getsize(filename)
-    self._file = open(filename, 'r')
-    self._contents = simple_mmap(self._file, 0, self._size)
-    if self._contents[:4] != '\377tOc':
-        self.version = 1
-        self._fan_out_table = self._read_fan_out_table(0)
-    else:
-        (self.version, ) = struct.unpack_from(">L", self._contents, 4)
-        assert self.version in (2,), "Version was %d" % self.version
-        self._fan_out_table = self._read_fan_out_table(8)
-        self._name_table_offset = 8 + 0x100 * 4
-        self._crc32_table_offset = self._name_table_offset + 20 * len(self)
-        self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
-
-  def __eq__(self, other):
-    if type(self) != type(other):
-        return False
-
-    if self._fan_out_table != other._fan_out_table:
-        return False
-
-    for (name1, _, _), (name2, _, _) in izip(self.iterentries(), other.iterentries()):
-        if name1 != name2:
-            return False
-    return True
-
-  def close(self):
-    self._file.close()
-
-  def __len__(self):
-    """Return the number of entries in this pack index."""
-    return self._fan_out_table[-1]
-
-  def _unpack_entry(self, i):
-    """Unpack the i-th entry in the index file.
-
-    :return: Tuple with object name (SHA), offset in pack file and 
-          CRC32 checksum (if known)."""
-    if self.version == 1:
-        (offset, name) = struct.unpack_from(">L20s", self._contents, 
-            (0x100 * 4) + (i * 24))
-        return (name, offset, None)
-    else:
-        return (self._unpack_name(i), self._unpack_offset(i), 
-                self._unpack_crc32_checksum(i))
-
-  def _unpack_name(self, i):
-    if self.version == 1:
-        return self._unpack_entry(i)[0]
-    else:
-        return struct.unpack_from("20s", self._contents, 
-                                  self._name_table_offset + i * 20)[0]
-
-  def _unpack_offset(self, i):
-    if self.version == 1:
-        return self._unpack_entry(i)[1]
-    else:
-        return struct.unpack_from(">L", self._contents, 
-                                  self._pack_offset_table_offset + i * 4)[0]
-
-  def _unpack_crc32_checksum(self, i):
-    if self.version == 1:
-        return None
-    else:
-        return struct.unpack_from(">L", self._contents, 
-                                  self._crc32_table_offset + i * 4)[0]
-
-  def __iter__(self):
-      return imap(sha_to_hex, self._itersha())
-
-  def _itersha(self):
-    for i in range(len(self)):
-        yield self._unpack_name(i)
-
-  def objects_sha1(self):
-    return iter_sha1(self._itersha())
-
-  def iterentries(self):
-    """Iterate over the entries in this pack index.
-   
-    Will yield tuples with object name, offset in packfile and crc32 checksum.
-    """
-    for i in range(len(self)):
-        yield self._unpack_entry(i)
-
-  def _read_fan_out_table(self, start_offset):
-    ret = []
-    for i in range(0x100):
-        ret.append(struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])[0])
-    return ret
-
-  def check(self):
-    """Check that the stored checksum matches the actual checksum."""
-    return self.calculate_checksum() == self.get_stored_checksums()[1]
-
-  def calculate_checksum(self):
-    f = open(self._filename, 'r')
-    try:
-        return hashlib.sha1(self._contents[:-20]).digest()
-    finally:
-        f.close()
-
-  def get_stored_checksums(self):
-    """Return the SHA1 checksums stored for the corresponding packfile and 
-    this header file itself."""
-    return str(self._contents[-40:-20]), str(self._contents[-20:])
-
-  def object_index(self, sha):
-    """Return the index in to the corresponding packfile for the object.
-
-    Given the name of an object it will return the offset that object lives
-    at within the corresponding pack file. If the pack file doesn't have the
-    object then None will be returned.
-    """
-    size = os.path.getsize(self._filename)
-    assert size == self._size, "Pack index %s has changed size, I don't " \
-         "like that" % self._filename
-    if len(sha) == 40:
-        sha = hex_to_sha(sha)
-    return self._object_index(sha)
-
-  def _object_index(self, sha):
-      """See object_index"""
-      idx = ord(sha[0])
-      if idx == 0:
-          start = 0
-      else:
-          start = self._fan_out_table[idx-1]
-      end = self._fan_out_table[idx]
-      assert start <= end
-      while start <= end:
-        i = (start + end)/2
-        file_sha = self._unpack_name(i)
-        if file_sha < sha:
-          start = i + 1
-        elif file_sha > sha:
-          end = i - 1
+  
+    def __init__(self, filename):
+        """Create a pack index object.
+    
+        Provide it with the name of the index file to consider, and it will map
+        it whenever required.
+        """
+        self._filename = filename
+        # Take the size now, so it can be checked each time we map the file to
+        # ensure that it hasn't changed.
+        self._size = os.path.getsize(filename)
+        self._file = open(filename, 'r')
+        self._contents = simple_mmap(self._file, 0, self._size)
+        if self._contents[:4] != '\377tOc':
+            self.version = 1
+            self._fan_out_table = self._read_fan_out_table(0)
         else:
-          return self._unpack_offset(i)
-      return None
+            (self.version, ) = struct.unpack_from(">L", self._contents, 4)
+            assert self.version in (2,), "Version was %d" % self.version
+            self._fan_out_table = self._read_fan_out_table(8)
+            self._name_table_offset = 8 + 0x100 * 4
+            self._crc32_table_offset = self._name_table_offset + 20 * len(self)
+            self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
+  
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+    
+        if self._fan_out_table != other._fan_out_table:
+            return False
+    
+        for (name1, _, _), (name2, _, _) in izip(self.iterentries(), other.iterentries()):
+            if name1 != name2:
+                return False
+        return True
+  
+    def close(self):
+        self._file.close()
+  
+    def __len__(self):
+        """Return the number of entries in this pack index."""
+        return self._fan_out_table[-1]
+  
+    def _unpack_entry(self, i):
+        """Unpack the i-th entry in the index file.
+    
+        :return: Tuple with object name (SHA), offset in pack file and 
+              CRC32 checksum (if known)."""
+        if self.version == 1:
+            (offset, name) = struct.unpack_from(">L20s", self._contents, 
+                (0x100 * 4) + (i * 24))
+            return (name, offset, None)
+        else:
+            return (self._unpack_name(i), self._unpack_offset(i), 
+                    self._unpack_crc32_checksum(i))
+  
+    def _unpack_name(self, i):
+        if self.version == 1:
+            return self._unpack_entry(i)[0]
+        else:
+            return struct.unpack_from("20s", self._contents, 
+                                      self._name_table_offset + i * 20)[0]
+  
+    def _unpack_offset(self, i):
+        if self.version == 1:
+            return self._unpack_entry(i)[1]
+        else:
+            return struct.unpack_from(">L", self._contents, 
+                                      self._pack_offset_table_offset + i * 4)[0]
+  
+    def _unpack_crc32_checksum(self, i):
+        if self.version == 1:
+            return None
+        else:
+            return struct.unpack_from(">L", self._contents, 
+                                      self._crc32_table_offset + i * 4)[0]
+  
+    def __iter__(self):
+        return imap(sha_to_hex, self._itersha())
+  
+    def _itersha(self):
+        for i in range(len(self)):
+            yield self._unpack_name(i)
+  
+    def objects_sha1(self):
+        return iter_sha1(self._itersha())
+  
+    def iterentries(self):
+        """Iterate over the entries in this pack index.
+       
+        Will yield tuples with object name, offset in packfile and crc32 checksum.
+        """
+        for i in range(len(self)):
+            yield self._unpack_entry(i)
+  
+    def _read_fan_out_table(self, start_offset):
+        ret = []
+        for i in range(0x100):
+            ret.append(struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])[0])
+        return ret
+  
+    def check(self):
+        """Check that the stored checksum matches the actual checksum."""
+        return self.calculate_checksum() == self.get_stored_checksums()[1]
+  
+    def calculate_checksum(self):
+        f = open(self._filename, 'r')
+        try:
+            return hashlib.sha1(self._contents[:-20]).digest()
+        finally:
+            f.close()
+  
+    def get_stored_checksums(self):
+        """Return the SHA1 checksums stored for the corresponding packfile and 
+        this header file itself."""
+        return str(self._contents[-40:-20]), str(self._contents[-20:])
+  
+    def object_index(self, sha):
+        """Return the index in to the corresponding packfile for the object.
+    
+        Given the name of an object it will return the offset that object lives
+        at within the corresponding pack file. If the pack file doesn't have the
+        object then None will be returned.
+        """
+        size = os.path.getsize(self._filename)
+        assert size == self._size, "Pack index %s has changed size, I don't " \
+             "like that" % self._filename
+        if len(sha) == 40:
+            sha = hex_to_sha(sha)
+        return self._object_index(sha)
+  
+    def _object_index(self, sha):
+        """See object_index"""
+        idx = ord(sha[0])
+        if idx == 0:
+            start = 0
+        else:
+            start = self._fan_out_table[idx-1]
+        end = self._fan_out_table[idx]
+        assert start <= end
+        while start <= end:
+            i = (start + end)/2
+            file_sha = self._unpack_name(i)
+            if file_sha < sha:
+                start = i + 1
+            elif file_sha > sha:
+                end = i - 1
+            else:
+                return self._unpack_offset(i)
+        return None
 
 
 def read_pack_header(f):
@@ -329,7 +329,7 @@ def unpack_object(map):
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
-      size += (byte & 0x7f) << ((i * 7) + 4)
+        size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type == 6: # offset delta
         bytes = take_msb_bytes(map, raw_base)
@@ -355,155 +355,155 @@ def unpack_object(map):
 
 
 class PackData(object):
-  """The data contained in a packfile.
-
-  Pack files can be accessed both sequentially for exploding a pack, and
-  directly with the help of an index to retrieve a specific object.
-
-  The objects within are either complete or a delta aginst another.
-
-  The header is variable length. If the MSB of each byte is set then it
-  indicates that the subsequent byte is still part of the header.
-  For the first byte the next MS bits are the type, which tells you the type
-  of object, and whether it is a delta. The LS byte is the lowest bits of the
-  size. For each subsequent byte the LS 7 bits are the next MS bits of the
-  size, i.e. the last byte of the header contains the MS bits of the size.
-
-  For the complete objects the data is stored as zlib deflated data.
-  The size in the header is the uncompressed object size, so to uncompress
-  you need to just keep feeding data to zlib until you get an object back,
-  or it errors on bad data. This is done here by just giving the complete
-  buffer from the start of the deflated object on. This is bad, but until I
-  get mmap sorted out it will have to do.
-
-  Currently there are no integrity checks done. Also no attempt is made to try
-  and detect the delta case, or a request for an object at the wrong position.
-  It will all just throw a zlib or KeyError.
-  """
-
-  def __init__(self, filename):
-    """Create a PackData object that represents the pack in the given filename.
-
-    The file must exist and stay readable until the object is disposed of. It
-    must also stay the same size. It will be mapped whenever needed.
-
-    Currently there is a restriction on the size of the pack as the python
-    mmap implementation is flawed.
+    """The data contained in a packfile.
+  
+    Pack files can be accessed both sequentially for exploding a pack, and
+    directly with the help of an index to retrieve a specific object.
+  
+    The objects within are either complete or a delta aginst another.
+  
+    The header is variable length. If the MSB of each byte is set then it
+    indicates that the subsequent byte is still part of the header.
+    For the first byte the next MS bits are the type, which tells you the type
+    of object, and whether it is a delta. The LS byte is the lowest bits of the
+    size. For each subsequent byte the LS 7 bits are the next MS bits of the
+    size, i.e. the last byte of the header contains the MS bits of the size.
+  
+    For the complete objects the data is stored as zlib deflated data.
+    The size in the header is the uncompressed object size, so to uncompress
+    you need to just keep feeding data to zlib until you get an object back,
+    or it errors on bad data. This is done here by just giving the complete
+    buffer from the start of the deflated object on. This is bad, but until I
+    get mmap sorted out it will have to do.
+  
+    Currently there are no integrity checks done. Also no attempt is made to try
+    and detect the delta case, or a request for an object at the wrong position.
+    It will all just throw a zlib or KeyError.
     """
-    self._filename = filename
-    assert os.path.exists(filename), "%s is not a packfile" % filename
-    self._size = os.path.getsize(filename)
-    self._header_size = 12
-    assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
-    self._read_header()
-
-  def _read_header(self):
-    f = open(self._filename, 'rb')
-    try:
-        (version, self._num_objects) = \
-                read_pack_header(f)
-        f.seek(self._size-20)
-        (self._stored_checksum,) = read_pack_tail(f)
-    finally:
+  
+    def __init__(self, filename):
+        """Create a PackData object that represents the pack in the given filename.
+    
+        The file must exist and stay readable until the object is disposed of. It
+        must also stay the same size. It will be mapped whenever needed.
+    
+        Currently there is a restriction on the size of the pack as the python
+        mmap implementation is flawed.
+        """
+        self._filename = filename
+        assert os.path.exists(filename), "%s is not a packfile" % filename
+        self._size = os.path.getsize(filename)
+        self._header_size = 12
+        assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
+        self._read_header()
+  
+    def _read_header(self):
+        f = open(self._filename, 'rb')
+        try:
+            (version, self._num_objects) = \
+                    read_pack_header(f)
+            f.seek(self._size-20)
+            (self._stored_checksum,) = read_pack_tail(f)
+        finally:
+            f.close()
+  
+    def __len__(self):
+        """Returns the number of objects in this pack."""
+        return self._num_objects
+  
+    def calculate_checksum(self):
+        f = open(self._filename, 'rb')
+        try:
+            map = simple_mmap(f, 0, self._size)
+            return hashlib.sha1(map[:-20]).digest()
+        finally:
+            f.close()
+  
+    def iterobjects(self):
+        offset = self._header_size
+        f = open(self._filename, 'rb')
+        for i in range(len(self)):
+            map = simple_mmap(f, offset, self._size-offset)
+            (type, obj, total_size) = unpack_object(map)
+            yield offset, type, obj
+            offset += total_size
         f.close()
-
-  def __len__(self):
-      """Returns the number of objects in this pack."""
-      return self._num_objects
-
-  def calculate_checksum(self):
-    f = open(self._filename, 'rb')
-    try:
-        map = simple_mmap(f, 0, self._size)
-        return hashlib.sha1(map[:-20]).digest()
-    finally:
-        f.close()
-
-  def iterobjects(self):
-    offset = self._header_size
-    f = open(self._filename, 'rb')
-    for i in range(len(self)):
-        map = simple_mmap(f, offset, self._size-offset)
-        (type, obj, total_size) = unpack_object(map)
-        yield offset, type, obj
-        offset += total_size
-    f.close()
-
-  def iterentries(self, ext_resolve_ref=None):
-    found = {}
-    at = {}
-    postponed = defaultdict(list)
-    class Postpone(Exception):
-        """Raised to postpone delta resolving."""
-        
-    def get_ref_text(sha):
-        if sha in found:
-            return found[sha]
-        if ext_resolve_ref:
+  
+    def iterentries(self, ext_resolve_ref=None):
+        found = {}
+        at = {}
+        postponed = defaultdict(list)
+        class Postpone(Exception):
+            """Raised to postpone delta resolving."""
+          
+        def get_ref_text(sha):
+            if sha in found:
+                return found[sha]
+            if ext_resolve_ref:
+                try:
+                    return ext_resolve_ref(sha)
+                except KeyError:
+                    pass
+            raise Postpone, (sha, )
+        todo = list(self.iterobjects())
+        while todo:
+            (offset, type, obj) = todo.pop(0)
+            at[offset] = (type, obj)
+            assert isinstance(offset, int)
+            assert isinstance(type, int)
+            assert isinstance(obj, tuple) or isinstance(obj, str)
             try:
-                return ext_resolve_ref(sha)
-            except KeyError:
-                pass
-        raise Postpone, (sha, )
-    todo = list(self.iterobjects())
-    while todo:
-      (offset, type, obj) = todo.pop(0)
-      at[offset] = (type, obj)
-      assert isinstance(offset, int)
-      assert isinstance(type, int)
-      assert isinstance(obj, tuple) or isinstance(obj, str)
-      try:
-        type, obj = resolve_object(offset, type, obj, get_ref_text,
-            at.__getitem__)
-      except Postpone, (sha, ):
-        postponed[sha].append((offset, type, obj))
-      else:
-        shafile = ShaFile.from_raw_string(type, obj)
-        sha = shafile.sha().digest()
-        found[sha] = (type, obj)
-        yield sha, offset, shafile.crc32()
-        todo += postponed.get(sha, [])
-    if postponed:
-        raise KeyError([sha_to_hex(h) for h in postponed.keys()])
-
-  def sorted_entries(self, resolve_ext_ref=None):
-    ret = list(self.iterentries(resolve_ext_ref))
-    ret.sort()
-    return ret
-
-  def create_index_v1(self, filename, resolve_ext_ref=None):
-    entries = self.sorted_entries(resolve_ext_ref)
-    write_pack_index_v1(filename, entries, self.calculate_checksum())
-
-  def create_index_v2(self, filename, resolve_ext_ref=None):
-    entries = self.sorted_entries(resolve_ext_ref)
-    write_pack_index_v2(filename, entries, self.calculate_checksum())
-
-  def get_stored_checksum(self):
-    return self._stored_checksum
-
-  def check(self):
-    return (self.calculate_checksum() == self.get_stored_checksum())
-
-  def get_object_at(self, offset):
-    """Given an offset in to the packfile return the object that is there.
-
-    Using the associated index the location of an object can be looked up, and
-    then the packfile can be asked directly for that object using this
-    function.
-    """
-    assert isinstance(offset, long) or isinstance(offset, int),\
-            "offset was %r" % offset
-    assert offset >= self._header_size
-    size = os.path.getsize(self._filename)
-    assert size == self._size, "Pack data %s has changed size, I don't " \
-         "like that" % self._filename
-    f = open(self._filename, 'rb')
-    try:
-      map = simple_mmap(f, offset, size-offset)
-      return unpack_object(map)[:2]
-    finally:
-      f.close()
+                type, obj = resolve_object(offset, type, obj, get_ref_text,
+                    at.__getitem__)
+            except Postpone, (sha, ):
+                postponed[sha].append((offset, type, obj))
+            else:
+                shafile = ShaFile.from_raw_string(type, obj)
+                sha = shafile.sha().digest()
+                found[sha] = (type, obj)
+                yield sha, offset, shafile.crc32()
+                todo += postponed.get(sha, [])
+        if postponed:
+            raise KeyError([sha_to_hex(h) for h in postponed.keys()])
+  
+    def sorted_entries(self, resolve_ext_ref=None):
+        ret = list(self.iterentries(resolve_ext_ref))
+        ret.sort()
+        return ret
+  
+    def create_index_v1(self, filename, resolve_ext_ref=None):
+        entries = self.sorted_entries(resolve_ext_ref)
+        write_pack_index_v1(filename, entries, self.calculate_checksum())
+  
+    def create_index_v2(self, filename, resolve_ext_ref=None):
+        entries = self.sorted_entries(resolve_ext_ref)
+        write_pack_index_v2(filename, entries, self.calculate_checksum())
+  
+    def get_stored_checksum(self):
+        return self._stored_checksum
+  
+    def check(self):
+        return (self.calculate_checksum() == self.get_stored_checksum())
+  
+    def get_object_at(self, offset):
+        """Given an offset in to the packfile return the object that is there.
+    
+        Using the associated index the location of an object can be looked up, and
+        then the packfile can be asked directly for that object using this
+        function.
+        """
+        assert isinstance(offset, long) or isinstance(offset, int),\
+                "offset was %r" % offset
+        assert offset >= self._header_size
+        size = os.path.getsize(self._filename)
+        assert size == self._size, "Pack data %s has changed size, I don't " \
+             "like that" % self._filename
+        f = open(self._filename, 'rb')
+        try:
+            map = simple_mmap(f, offset, size-offset)
+            return unpack_object(map)[:2]
+        finally:
+            f.close()
 
 
 class SHA1Writer(object):

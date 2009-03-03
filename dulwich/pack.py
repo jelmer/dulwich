@@ -33,12 +33,11 @@ a pointer in to the corresponding packfile.
 try:
     from collections import defaultdict
 except ImportError:
-    from dulwich.misc import defaultdict
+    from misc import defaultdict
 
 from itertools import imap, izip
 import mmap
 import os
-import sha
 import struct
 import sys
 import zlib
@@ -50,13 +49,14 @@ from objects import (
         sha_to_hex,
         )
 from errors import ApplyDeltaError
+from misc import make_sha
 
 def unpack_from(fmt, buf, offset=0):
   b = buf[offset:offset+struct.calcsize(fmt)]
   return struct.unpack(fmt, b)
 
 
-supports_mmap_offset = (sys.version_info[0] >= 3 or 
+supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
@@ -85,7 +85,7 @@ def read_zlib(data, offset, dec_size):
 
 
 def iter_sha1(iter):
-    sha1 = sha.sha()
+    sha1 = make_sha()
     for name in iter:
         sha1.update(name)
     return sha1.hexdigest()
@@ -275,7 +275,7 @@ class PackIndex(object):
   def calculate_checksum(self):
     f = open(self._filename, 'r')
     try:
-        return sha.sha(self._contents[:-20]).digest()
+        return make_sha(self._contents[:-20]).digest()
     finally:
         f.close()
 
@@ -423,7 +423,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
         map = simple_mmap(f, 0, self._size)
-        return sha.sha(map[:-20]).digest()
+        return make_sha(map[:-20]).digest()
     finally:
         f.close()
 
@@ -518,7 +518,7 @@ class SHA1Writer(object):
     
     def __init__(self, f):
         self.f = f
-        self.sha1 = sha.sha("")
+        self.sha1 = make_sha("")
 
     def write(self, data):
         self.sha1.update(data)

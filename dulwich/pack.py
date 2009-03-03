@@ -30,8 +30,43 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
-from collections import defaultdict
-import hashlib
+try:
+    from collections import defaultdict
+except:
+    class defaultdict(dict):
+        def __init__(self, default_factory=None, *a, **kw):
+            if (default_factory is not None and
+                not hasattr(default_factory, '__call__')):
+                raise TypeError('first argument must be callable')
+            dict.__init__(self, *a, **kw)
+            self.default_factory = default_factory
+        def __getitem__(self, key):
+            try:
+                return dict.__getitem__(self, key)
+            except KeyError:
+                return self.__missing__(key)
+        def __missing__(self, key):
+            if self.default_factory is None:
+                raise KeyError(key)
+            self[key] = value = self.default_factory()
+            return value
+        def __reduce__(self):
+            if self.default_factory is None:
+                args = tuple()
+            else:
+                args = self.default_factory,
+            return type(self), args, None, None, self.items()
+        def copy(self):
+            return self.__copy__()
+        def __copy__(self):
+            return type(self)(self.default_factory, self)
+        def __deepcopy__(self, memo):
+            import copy
+            return type(self)(self.default_factory,
+                              copy.deepcopy(self.items()))
+        def __repr__(self):
+            return 'defaultdict(%s, %s)' % (self.default_factory,
+                                            dict.__repr__(self))
 from itertools import imap, izip
 import mmap
 import os
@@ -77,10 +112,10 @@ def read_zlib(data, offset, dec_size):
 
 
 def iter_sha1(iter):
-    sha = hashlib.sha1()
+    sha1 = sha.sha()
     for name in iter:
-        sha.update(name)
-    return sha.hexdigest()
+        sha1.update(name)
+    return sha1.hexdigest()
 
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024
@@ -267,7 +302,7 @@ class PackIndex(object):
   def calculate_checksum(self):
     f = open(self._filename, 'r')
     try:
-        return hashlib.sha1(self._contents[:-20]).digest()
+        return sha.sha(self._contents[:-20]).digest()
     finally:
         f.close()
 
@@ -415,7 +450,7 @@ class PackData(object):
     f = open(self._filename, 'rb')
     try:
         map = simple_mmap(f, 0, self._size)
-        return hashlib.sha1(map[:-20]).digest()
+        return sha.sha(map[:-20]).digest()
     finally:
         f.close()
 
@@ -510,7 +545,7 @@ class SHA1Writer(object):
     
     def __init__(self, f):
         self.f = f
-        self.sha1 = hashlib.sha1("")
+        self.sha1 = sha.sha("")
 
     def write(self, data):
         self.sha1.update(data)

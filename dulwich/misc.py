@@ -1,4 +1,8 @@
 '''Misc utilities mostly to work with python2.4.'''
+try:
+    import hashlib
+except ImportError:
+    import sha
 
 class defaultdict(dict):
     '''A python 2.4 equivalent of collections.defaultdict.'''
@@ -42,5 +46,14 @@ class defaultdict(dict):
     def __repr__(self):
         return 'defaultdict(%s, %s)' % (self.default_factory,
                                         dict.__repr__(self))
+
+
+def make_sha(source=''):
+    '''A python2.4 workaround for the sha/hashlib module fiasco.'''
+    if hashlib:
+        return hashlib.sha1(source)
+    else:
+        return sha.sha(source)
+
 
 

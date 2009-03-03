@@ -50,11 +50,7 @@ from objects import (
         )
 from errors import ApplyDeltaError
 from misc import make_sha
-
-def unpack_from(fmt, buf, offset=0):
-  b = buf[offset:offset+struct.calcsize(fmt)]
-  return struct.unpack(fmt, b)
-
+from misc import unpack_from
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))

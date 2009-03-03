@@ -15,11 +15,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-'''Misc utilities to work with python2.4.'''
+'''Misc utilities to work with python2.4.
+
+These utilities can all be deleted when dulwich decides it wants to stop
+support for python 2.4.
+'''
 try:
     import hashlib
 except ImportError:
     import sha
+import struct
+
 
 class defaultdict(dict):
     '''A python 2.4 equivalent of collections.defaultdict.'''
@@ -70,7 +76,16 @@ def make_sha(source=''):
     if hashlib:
         return hashlib.sha1(source)
     else:
-        return sha.sha(source)
+        sha1 = sha.sha()
+        sha1.update(source)
+        return sha.hexdigest()
 
 
+def unpack_from(fmt, buf, offset=0):
+    '''A python2.4 workaround for struct missing unpack_from.'''
+    try:
+        return struct.unpack_from(fmt, buf, offset)
+    except AttributeError:
+        b = buf[offset:offset+struct.calcsize(fmt)]
+        return struct.unpack(fmt, b)
 

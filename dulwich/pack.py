@@ -83,6 +83,11 @@ from objects import (
         )
 from errors import ApplyDeltaError
 
+def unpack_from(fmt, buf, offset=0):
+  b = buf[offset:offset+struct.calcsize(fmt)]
+  return struct.unpack(fmt, b)
+
+
 supports_mmap_offset = (sys.version_info[0] >= 3 or 
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
@@ -211,7 +216,7 @@ class PackIndex(object):
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
     else:
-        (self.version, ) = struct.unpack_from(">L", self._contents, 4)
+        (self.version, ) = unpack_from(">L", self._contents, 4)
         assert self.version in (2,), "Version was %d" % self.version
         self._fan_out_table = self._read_fan_out_table(8)
         self._name_table_offset = 8 + 0x100 * 4
@@ -243,7 +248,7 @@ class PackIndex(object):
     :return: Tuple with object name (SHA), offset in pack file and 
           CRC32 checksum (if known)."""
     if self.version == 1:
-        (offset, name) = struct.unpack_from(">L20s", self._contents, 
+        (offset, name) = unpack_from(">L20s", self._contents, 
             (0x100 * 4) + (i * 24))
         return (name, offset, None)
     else:
@@ -254,21 +259,21 @@ class PackIndex(object):
     if self.version == 1:
         return self._unpack_entry(i)[0]
     else:
-        return struct.unpack_from("20s", self._contents, 
+        return unpack_from("20s", self._contents, 
                                   self._name_table_offset + i * 20)[0]
 
   def _unpack_offset(self, i):
     if self.version == 1:
         return self._unpack_entry(i)[1]
     else:
-        return struct.unpack_from(">L", self._contents, 
+        return unpack_from(">L", self._contents, 
                                   self._pack_offset_table_offset + i * 4)[0]
 
   def _unpack_crc32_checksum(self, i):
     if self.version == 1:
         return None
     else:
-        return struct.unpack_from(">L", self._contents, 
+        return unpack_from(">L", self._contents, 
                                   self._crc32_table_offset + i * 4)[0]
 
   def __iter__(self):
@@ -349,9 +354,9 @@ class PackIndex(object):
 def read_pack_header(f):
     header = f.read(12)
     assert header[:4] == "PACK"
-    (version,) = struct.unpack_from(">L", header, 4)
+    (version,) = unpack_from(">L", header, 4)
     assert version in (2, 3), "Version was %d" % version
-    (num_objects,) = struct.unpack_from(">L", header, 8)
+    (num_objects,) = unpack_from(">L", header, 8)
     return (version, num_objects)
 
 
@@ -889,6 +894,8 @@ class Pack(object):
             raise KeyError(sha1)
 
         type, obj = self.data.get_object_at(offset)
+        if isinstance(offset, long):
+          offset = int(offset)
         assert isinstance(offset, int)
         return resolve_object(offset, type, obj, resolve_ref,
             self.data.get_object_at)

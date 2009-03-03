@@ -73,12 +73,11 @@ class defaultdict(dict):
 
 def make_sha(source=''):
     '''A python2.4 workaround for the sha/hashlib module fiasco.'''
-    if hashlib:
+    try:
         return hashlib.sha1(source)
-    else:
-        sha1 = sha.sha()
-        sha1.update(source)
-        return sha.hexdigest()
+    except NameError:
+        sha1 = sha.sha(source)
+        return sha1
 
 
 def unpack_from(fmt, buf, offset=0):

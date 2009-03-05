@@ -30,13 +30,19 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
-from collections import defaultdict
-import hashlib
+try:
+    from collections import defaultdict
+except ImportError:
+    from misc import defaultdict
+
 from itertools import imap, izip
 import mmap
 import os
-import sha
 import struct
+try:
+    from struct import unpack_from
+except ImportError:
+    from misc import unpack_from
 import sys
 import zlib
 import difflib
@@ -47,8 +53,9 @@ from objects import (
         sha_to_hex,
         )
 from errors import ApplyDeltaError
+from misc import make_sha
 
-supports_mmap_offset = (sys.version_info[0] >= 3 or 
+supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
@@ -77,10 +84,10 @@ def read_zlib(data, offset, dec_size):
 
 
 def iter_sha1(iter):
-    sha = hashlib.sha1()
+    sha1 = make_sha()
     for name in iter:
-        sha.update(name)
-    return sha.hexdigest()
+        sha1.update(name)
+    return sha1.hexdigest()
 
 
 MAX_MMAP_SIZE = 256 * 1024 * 1024
@@ -176,7 +183,7 @@ class PackIndex(object):
             self.version = 1
             self._fan_out_table = self._read_fan_out_table(0)
         else:
-            (self.version, ) = struct.unpack_from(">L", self._contents, 4)
+            (self.version, ) = unpack_from(">L", self._contents, 4)
             assert self.version in (2,), "Version was %d" % self.version
             self._fan_out_table = self._read_fan_out_table(8)
             self._name_table_offset = 8 + 0x100 * 4
@@ -208,7 +215,7 @@ class PackIndex(object):
         :return: Tuple with object name (SHA), offset in pack file and 
               CRC32 checksum (if known)."""
         if self.version == 1:
-            (offset, name) = struct.unpack_from(">L20s", self._contents, 
+            (offset, name) = unpack_from(">L20s", self._contents, 
                 (0x100 * 4) + (i * 24))
             return (name, offset, None)
         else:
@@ -219,21 +226,21 @@ class PackIndex(object):
         if self.version == 1:
             return self._unpack_entry(i)[0]
         else:
-            return struct.unpack_from("20s", self._contents, 
+            return unpack_from("20s", self._contents, 
                                       self._name_table_offset + i * 20)[0]
   
     def _unpack_offset(self, i):
         if self.version == 1:
             return self._unpack_entry(i)[1]
         else:
-            return struct.unpack_from(">L", self._contents, 
+            return unpack_from(">L", self._contents, 
                                       self._pack_offset_table_offset + i * 4)[0]
   
     def _unpack_crc32_checksum(self, i):
         if self.version == 1:
             return None
         else:
-            return struct.unpack_from(">L", self._contents, 
+            return unpack_from(">L", self._contents, 
                                       self._crc32_table_offset + i * 4)[0]
   
     def __iter__(self):
@@ -267,7 +274,7 @@ class PackIndex(object):
     def calculate_checksum(self):
         f = open(self._filename, 'r')
         try:
-            return hashlib.sha1(self._contents[:-20]).digest()
+            return make_sha(self._contents[:-20]).digest()
         finally:
             f.close()
   
@@ -314,9 +321,9 @@ class PackIndex(object):
 def read_pack_header(f):
     header = f.read(12)
     assert header[:4] == "PACK"
-    (version,) = struct.unpack_from(">L", header, 4)
+    (version,) = unpack_from(">L", header, 4)
     assert version in (2, 3), "Version was %d" % version
-    (num_objects,) = struct.unpack_from(">L", header, 8)
+    (num_objects,) = unpack_from(">L", header, 8)
     return (version, num_objects)
 
 
@@ -415,7 +422,7 @@ class PackData(object):
         f = open(self._filename, 'rb')
         try:
             map = simple_mmap(f, 0, self._size)
-            return hashlib.sha1(map[:-20]).digest()
+            return make_sha(map[:-20]).digest()
         finally:
             f.close()
   
@@ -510,7 +517,7 @@ class SHA1Writer(object):
     
     def __init__(self, f):
         self.f = f
-        self.sha1 = hashlib.sha1("")
+        self.sha1 = make_sha("")
 
     def write(self, data):
         self.sha1.update(data)
@@ -855,6 +862,8 @@ class Pack(object):
             raise KeyError(sha1)
 
         type, obj = self.data.get_object_at(offset)
+        if isinstance(offset, long):
+          offset = int(offset)
         assert isinstance(offset, int)
         return resolve_object(offset, type, obj, resolve_ref,
             self.data.get_object_at)

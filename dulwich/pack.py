@@ -791,7 +791,7 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         f.write(name)
     for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">l", entry_checksum))
+        f.write(struct.pack(">L", entry_checksum))
     for (name, offset, entry_checksum) in entries:
         # FIXME: handle if MSBit is set in offset
         f.write(struct.pack(">L", offset))

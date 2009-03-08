@@ -17,7 +17,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from errors import HangupException
+from errors import HangupException, GitProtocolError
+import socket
 
 TCP_GIT_PORT = 9418
 
@@ -50,13 +51,16 @@ class Protocol(object):
 
         :return: The next string from the stream
         """
-        sizestr = self.read(4)
-        if not sizestr:
-            raise HangupException()
-        size = int(sizestr, 16)
-        if size == 0:
-            return None
-        return self.read(size-4)
+        try:
+            sizestr = self.read(4)
+            if not sizestr:
+                raise HangupException()
+            size = int(sizestr, 16)
+            if size == 0:
+                return None
+            return self.read(size-4)
+        except socket.error, e:
+            raise GitProtocolError(e)
 
     def read_pkt_seq(self):
         pkt = self.read_pkt_line()
@@ -70,10 +74,13 @@ class Protocol(object):
 
         :param line: A string containing the data to send
         """
-        if line is None:
-            self.write("0000")
-        else:
-            self.write("%04x%s" % (len(line)+4, line))
+        try:
+            if line is None:
+                self.write("0000")
+            else:
+                self.write("%04x%s" % (len(line)+4, line))
+        except socket.error, e:
+            raise GitProtocolError(e)
 
     def write_sideband(self, channel, blob):
         """

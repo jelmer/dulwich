@@ -47,7 +47,7 @@ class SimpleFetchGraphWalker(object):
         return None
 
 
-DEFAULT_CAPABILITIES = ["multi_ack", "side-band-64k", "thin-pack", "ofs-delta"]
+CAPABILITIES = ["multi_ack", "side-band-64k", "ofs-delta"]
 
 
 class GitClient(object):
@@ -55,13 +55,14 @@ class GitClient(object):
 
     """
 
-    def __init__(self, fileno, read, write, capabilities=None):
+    def __init__(self, fileno, read, write, thin_packs=None):
         self.proto = Protocol(read, write)
         self.fileno = fileno
-        if capabilities is None:
-            self._capabilities = DEFAULT_CAPABILITIES
-        else:
-            self._capabilities = capabilities
+        self._capabilities = CAPABILITIES
+        if thin_packs is None:
+            thin_packs = True
+        if thin_packs:
+            self._capabilities.append("thin-pack")
 
     def capabilities(self):
         return " ".join(self._capabilities)
@@ -145,13 +146,13 @@ class GitClient(object):
 
 class TCPGitClient(GitClient):
 
-    def __init__(self, host, port=TCP_GIT_PORT, capabilities=None):
+    def __init__(self, host, port=TCP_GIT_PORT, thin_packs=None):
         self._socket = socket.socket(type=socket.SOCK_STREAM)
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)
         self.host = host
-        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, capabilities=capabilities)
+        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, thin_packs=thin_packs)
 
     def send_pack(self, path):
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
@@ -164,9 +165,9 @@ class TCPGitClient(GitClient):
 
 class SubprocessGitClient(GitClient):
 
-    def __init__(self, capabilities=None):
+    def __init__(self, thin_packs=None):
         self.proc = None
-        self._capabilities = capabilities
+        self._thin_packs = thin_packs
 
     def _connect(self, service, *args):
         argv = [service] + list(args)
@@ -178,7 +179,7 @@ class SubprocessGitClient(GitClient):
         def write_fn(data):
             self.proc.stdin.write(data)
             self.proc.stdin.flush()
-        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, capabilities=self._capabilities)
+        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, thin_packs=self._thin_packs)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)

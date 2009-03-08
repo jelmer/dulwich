@@ -58,7 +58,7 @@ class GitClient(object):
     def __init__(self, fileno, read, write, thin_packs=None):
         self.proto = Protocol(read, write)
         self.fileno = fileno
-        self._capabilities = CAPABILITIES
+        self._capabilities = list(CAPABILITIES)
         if thin_packs is None:
             thin_packs = True
         if thin_packs:

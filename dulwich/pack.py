@@ -818,7 +818,10 @@ class Pack(object):
         if self._data is None:
             self._data = PackData(self._data_path)
             assert len(self.idx) == len(self._data)
-            assert self.idx.get_stored_checksums()[0] == self._data.get_stored_checksum()
+            idx_stored_checksum = self.idx.get_stored_checksums()[0]
+            data_stored_checksum = self._data.get_stored_checksum()
+            if idx_stored_checksum != data_stored_checksum:
+                raise AssertionError("Checksum for index does not match checksum for pack: %s != %s" % (sha_to_hex(idx_stored_checksum), sha_to_hex(data_stored_checksum)))
         return self._data
 
     @property

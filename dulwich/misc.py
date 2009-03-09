@@ -15,11 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-'''Misc utilities to work with python2.4.
+"""Misc utilities to work with python2.4.
 
 These utilities can all be deleted when dulwich decides it wants to stop
 support for python 2.4.
-'''
+"""
 try:
     import hashlib
 except ImportError:
@@ -28,7 +28,7 @@ import struct
 
 
 class defaultdict(dict):
-    '''A python 2.4 equivalent of collections.defaultdict.'''
+    """A python 2.4 equivalent of collections.defaultdict."""
 
     def __init__(self, default_factory=None, *a, **kw):
         if (default_factory is not None and
@@ -72,7 +72,7 @@ class defaultdict(dict):
 
 
 def make_sha(source=''):
-    '''A python2.4 workaround for the sha/hashlib module fiasco.'''
+    """A python2.4 workaround for the sha/hashlib module fiasco."""
     try:
         return hashlib.sha1(source)
     except NameError:
@@ -81,7 +81,7 @@ def make_sha(source=''):
 
 
 def unpack_from(fmt, buf, offset=0):
-    '''A python2.4 workaround for struct missing unpack_from.'''
+    """A python2.4 workaround for struct missing unpack_from."""
     try:
         return struct.unpack_from(fmt, buf, offset)
     except AttributeError:

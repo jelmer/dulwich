@@ -18,24 +18,24 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os, stat
+import os
+import stat
 
-from commit import Commit
-from errors import (
-        MissingCommitError, 
-        NotBlobError, 
-        NotCommitError, 
-        NotGitRepository,
-        NotTreeError, 
-        )
-from object_store import ObjectStore
-from objects import (
-        ShaFile,
-        Commit,
-        Tag,
-        Tree,
-        Blob,
-        )
+from dulwich.errors import (
+    MissingCommitError, 
+    NotBlobError, 
+    NotCommitError, 
+    NotGitRepository,
+    NotTreeError, 
+    )
+from dulwich.object_store import ObjectStore
+from dulwich.objects import (
+    Blob,
+    Commit,
+    ShaFile,
+    Tag,
+    Tree,
+    )
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '

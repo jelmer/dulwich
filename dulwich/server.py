@@ -17,10 +17,20 @@
 # MA  02110-1301, USA.
 
 import SocketServer
-from dulwich.protocol import Protocol, ProtocolFile, TCP_GIT_PORT, extract_capabilities
-from dulwich.repo import Repo
-from dulwich.pack import write_pack_data
 import tempfile
+
+from dulwich.protocol import (
+    Protocol,
+    ProtocolFile,
+    TCP_GIT_PORT,
+    extract_capabilities,
+    )
+from dulwich.repo import (
+    Repo,
+    )
+from dulwich.pack import (
+    write_pack_data,
+    )
 
 class Backend(object):
 

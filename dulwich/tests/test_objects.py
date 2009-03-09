@@ -20,11 +20,12 @@
 import os
 import unittest
 
-from dulwich.objects import (Blob,
-                         Tree,
-                         Commit,
-                         Tag
-                         )
+from dulwich.objects import (
+    Blob,
+    Tree,
+    Commit,
+    Tag,
+    )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
 b_sha = '2969be3e8ee1c0222396a5611407e4769f14e54b'

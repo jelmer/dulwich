@@ -25,10 +25,11 @@ import os
 import sha
 import zlib
 
-from errors import (NotCommitError,
-                    NotTreeError,
-                    NotBlobError,
-                    )
+from dulwich.errors import (
+    NotBlobError,
+    NotCommitError,
+    NotTreeError,
+    )
 
 BLOB_ID = "blob"
 TAG_ID = "tag"

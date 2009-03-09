@@ -23,8 +23,10 @@ import struct
 def read_cache_time(f):
     return struct.unpack(">LL", f.read(8))
 
+
 def write_cache_time(f, t):
     f.write(struct.pack(">LL", *t))
+
 
 def read_cache_entry(f):
     beginoffset = f.tell()

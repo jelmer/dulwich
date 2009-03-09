@@ -20,8 +20,15 @@ import os
 import select
 import socket
 import subprocess
-from dulwich.protocol import Protocol, TCP_GIT_PORT, extract_capabilities
-from dulwich.pack import write_pack_data
+
+from dulwich.protocol import (
+    Protocol,
+    TCP_GIT_PORT,
+    extract_capabilities,
+    )
+from dulwich.pack import (
+    write_pack_data,
+    )
 
 class SimpleFetchGraphWalker(object):
 

@@ -16,6 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Dulwich-related exception classes and utility functions."""
+
 class WrongObjectException(Exception):
     """Baseclass for all the _ is not a _ exceptions on objects.
   
@@ -29,20 +31,24 @@ class WrongObjectException(Exception):
         string = "%s is not a %s" % (sha, self._type)
         Exception.__init__(self, string)
 
+
 class NotCommitError(WrongObjectException):
     """Indicates that the sha requested does not point to a commit."""
   
     _type = 'commit'
+
 
 class NotTreeError(WrongObjectException):
     """Indicates that the sha requested does not point to a tree."""
   
     _type = 'tree'
 
+
 class NotBlobError(WrongObjectException):
     """Indicates that the sha requested does not point to a blob."""
   
     _type = 'blob'
+
 
 class MissingCommitError(Exception):
     """Indicates that a commit was not found in the repository"""

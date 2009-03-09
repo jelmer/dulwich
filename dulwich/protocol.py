@@ -17,8 +17,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from errors import HangupException, GitProtocolError
+"""Generic functions for talking the git smart server protocol."""
+
 import socket
+
+from dulwich.errors import (
+    HangupException,
+    GitProtocolError,
+    )
 
 TCP_GIT_PORT = 9418
 
@@ -122,6 +128,12 @@ class Protocol(object):
 
 
 def extract_capabilities(text):
+    """Extract a capabilities list from a string, if present.
+
+    :param text: String to extract from
+    :return: Tuple with text with capabilities removed and list of 
+        capabilities or None (if no capabilities were present.
+    """
     if not "\0" in text:
         return text, None
     capabilities = text.split("\0")

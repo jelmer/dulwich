@@ -42,18 +42,18 @@ import struct
 try:
     from struct import unpack_from
 except ImportError:
-    from misc import unpack_from
+    from dulwich.misc import unpack_from
 import sys
 import zlib
 import difflib
 
-from objects import (
-        ShaFile,
-        hex_to_sha,
-        sha_to_hex,
-        )
-from errors import ApplyDeltaError
-from misc import make_sha
+from dulwich.objects import (
+    ShaFile,
+    hex_to_sha,
+    sha_to_hex,
+    )
+from dulwich.errors import ApplyDeltaError
+from dulwich.misc import make_sha
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
@@ -419,6 +419,7 @@ class PackData(object):
         return self._num_objects
   
     def calculate_checksum(self):
+        """Calculate the checksum for this pack."""
         f = open(self._filename, 'rb')
         try:
             map = simple_mmap(f, 0, self._size)

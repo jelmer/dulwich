@@ -18,9 +18,12 @@
 # MA  02110-1301, USA.
 
 import unittest
-import test_objects
-import test_repository
-import test_pack
+
+from dulwich.tests import (
+    test_objects,
+    test_repository,
+    test_pack,
+    )
 
 def test_suite():
     test_modules = [test_objects, test_repository, test_pack]

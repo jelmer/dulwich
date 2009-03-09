@@ -16,8 +16,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.object_store import ObjectStore
 from unittest import TestCase
+
+from dulwich.object_store import ObjectStore
 
 class ObjectStoreTests(TestCase):
 

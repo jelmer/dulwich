@@ -16,9 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.index import Index, write_index
 import os
 from unittest import TestCase
+
+from dulwich.index import (
+    Index,
+    write_index,
+    )
 
 class IndexTestCase(TestCase):
 

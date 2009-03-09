@@ -21,21 +21,21 @@ import os
 import unittest
 
 from dulwich.objects import (
-        Tree,
-        )
+    Tree,
+    )
 from dulwich.pack import (
-        Pack,
-        PackIndex,
-        PackData,
-        hex_to_sha,
-        sha_to_hex,
-        write_pack_index_v1,
-        write_pack_index_v2,
-        write_pack,
-        apply_delta,
-        create_delta,
-        read_zlib,
-        )
+    Pack,
+    PackIndex,
+    PackData,
+    apply_delta,
+    create_delta,
+    hex_to_sha,
+    read_zlib,
+    sha_to_hex,
+    write_pack_index_v1,
+    write_pack_index_v2,
+    write_pack,
+    )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
 

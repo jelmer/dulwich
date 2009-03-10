@@ -156,13 +156,13 @@ class GitClient(object):
 
 class TCPGitClient(GitClient):
 
-    def __init__(self, host, port=TCP_GIT_PORT, thin_packs=None):
+    def __init__(self, host, port=TCP_GIT_PORT, *args, **kwargs):
         self._socket = socket.socket(type=socket.SOCK_STREAM)
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)
         self.host = host
-        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, thin_packs=thin_packs)
+        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, *args, **kwargs)
 
     def send_pack(self, path):
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
@@ -175,9 +175,10 @@ class TCPGitClient(GitClient):
 
 class SubprocessGitClient(GitClient):
 
-    def __init__(self, thin_packs=None):
+    def __init__(self, *args, **kwargs):
         self.proc = None
-        self._thin_packs = thin_packs
+        self._args = args
+        self._kwargs = kwargs
 
     def _connect(self, service, *args):
         argv = [service] + list(args)
@@ -189,7 +190,7 @@ class SubprocessGitClient(GitClient):
         def write_fn(data):
             self.proc.stdin.write(data)
             self.proc.stdin.flush()
-        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, thin_packs=self._thin_packs)
+        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, *args, **kwargs)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)

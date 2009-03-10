@@ -124,7 +124,8 @@ class Protocol(object):
         line = self.read_pkt_line()
         splice_at = line.find(" ")
         cmd, args = line[:splice_at], line[splice_at+1:]
-        return cmd, args.split(chr(0))
+        assert args[-1] == "\x00"
+        return cmd, args[:-1].split(chr(0))
 
 
 def extract_capabilities(text):

@@ -206,6 +206,10 @@ class ObjectStoreIterator(ObjectIterator):
             yield o
 
     def __contains__(self, needle):
+        """Check if an object is present.
+
+        :param needle: SHA1 of the object to check for
+        """
         # FIXME: This could be more efficient
         for sha, path in self.shas:
             if sha == needle:
@@ -213,9 +217,11 @@ class ObjectStoreIterator(ObjectIterator):
         return False
 
     def __getitem__(self, key):
+        """Find an object by SHA1."""
         return self.store[key]
 
     def __len__(self):
+        """Return the number of objects."""
         return len(self.shas)
 
 

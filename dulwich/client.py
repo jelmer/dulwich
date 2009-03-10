@@ -62,21 +62,15 @@ class GitClient(object):
 
     """
 
-    def __init__(self, fileno, read, write, thin_packs=None, include_tag=None, 
-                 shallow=None):
+    def __init__(self, fileno, read, write, thin_packs=True, include_tag=True, 
+                 shallow=True):
         self.proto = Protocol(read, write)
         self.fileno = fileno
         self._capabilities = list(CAPABILITIES)
-        if thin_packs is None:
-            thin_packs = True
         if thin_packs:
             self._capabilities.append("thin-pack")
-        if include_tag is None:
-            include_tag = True
         if include_tag:
             self._capabilities.append("include-tag")
-        if shallow is None:
-            shallow = True
         if shallow:
             self._capabilities.append("shallow")
 

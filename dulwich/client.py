@@ -85,8 +85,7 @@ class GitClient(object):
             (sha, ref) = pkt.rstrip("\n").split(" ", 1)
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
-            if not (ref == "capabilities^{}" and sha == "0" * 40):
-                refs[ref] = sha
+            refs[ref] = sha
         return refs, server_capabilities
 
     def send_pack(self, path, generate_pack_contents):

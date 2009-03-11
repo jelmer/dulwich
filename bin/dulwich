@@ -29,6 +29,7 @@ def get_transport_and_path(uri):
     # if its not git or git+ssh, try a local url..
     return SubprocessGitClient(), uri
 
+
 def cmd_fetch_pack(args):
 	from dulwich.client import SimpleFetchGraphWalker
 	from dulwich.repo import Repo
@@ -36,7 +37,7 @@ def cmd_fetch_pack(args):
 	opts = dict(opts)
         client, path = get_transport_and_path(args.pop(0))
 	if "--all" in opts:
-		determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
+		determine_wants = r.object_store.determine_wants_all
 	else:
 		determine_wants = lambda x: [y for y in args if not y in r.object_store]
 	r = Repo(".")
@@ -152,7 +153,6 @@ def cmd_clone(args):
 	if args == []:
 		print "usage: dulwich clone host:path [PATH]"
 		sys.exit(1)
-
         client, host_path = get_transport_and_path(args.pop(0))
 
 	if len(args) > 0:
@@ -164,11 +164,10 @@ def cmd_clone(args):
 		os.mkdir(path)
 	Repo.init(path)
 	r = Repo(path)
-	determine_wants = lambda x: [y for y in x.values() if not y in r.object_store]
 	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
 	f, commit = r.object_store.add_pack()
 	try:
-		client.fetch_pack(host_path, determine_wants, graphwalker, f.write, 
+		client.fetch_pack(host_path, r.object_store.determine_wants_all, graphwalker, f.write, 
 				          sys.stdout.write)
 		f.close()
 		commit()

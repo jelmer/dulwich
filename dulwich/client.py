@@ -126,7 +126,7 @@ class GitClient(object):
         have = graph_walker.next()
         while have:
             self.proto.write_pkt_line("have %s\n" % have)
-            if self.can_read():
+            if self._can_read():
                 pkt = self.proto.read_pkt_line()
                 parts = pkt.rstrip("\n").split(" ")
                 if parts[0] == "ACK":

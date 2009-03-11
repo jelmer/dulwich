@@ -42,6 +42,9 @@ class ObjectStore(object):
         self.path = path
         self._packs = None
 
+    def determine_wants_all(self, refs):
+	    return [sha for (ref, sha) in refs.iteritems() if not sha in self and not ref.endswith("^{}")]
+
     def iter_shas(self, shas):
         return ObjectStoreIterator(self, shas)
 

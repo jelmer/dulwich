@@ -30,6 +30,11 @@ from dulwich.pack import (
     write_pack_data,
     )
 
+
+def _fileno_can_read(fileno):
+    return len(select.select([fileno], [], [], 0)[0]) > 0
+
+
 class SimpleFetchGraphWalker(object):
 
     def __init__(self, local_heads, get_parents):
@@ -62,17 +67,12 @@ class GitClient(object):
 
     """
 
-    def __init__(self, fileno, read, write, thin_packs=True, include_tag=True, 
-                 shallow=True):
+    def __init__(self, can_read, read, write, thin_packs=True):
         self.proto = Protocol(read, write)
-        self.fileno = fileno
+        self._can_read = can_read
         self._capabilities = list(CAPABILITIES)
         if thin_packs:
             self._capabilities.append("thin-pack")
-        if include_tag:
-            self._capabilities.append("include-tag")
-        if shallow:
-            self._capabilities.append("shallow")
 
     def capabilities(self):
         return " ".join(self._capabilities)
@@ -127,7 +127,7 @@ class GitClient(object):
         have = graph_walker.next()
         while have:
             self.proto.write_pkt_line("have %s\n" % have)
-            if len(select.select([self.fileno], [], [], 0)[0]) > 0:
+            if self.can_read():
                 pkt = self.proto.read_pkt_line()
                 parts = pkt.rstrip("\n").split(" ")
                 if parts[0] == "ACK":
@@ -162,7 +162,7 @@ class TCPGitClient(GitClient):
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)
         self.host = host
-        super(TCPGitClient, self).__init__(self._socket.fileno(), self.rfile.read, self.wfile.write, *args, **kwargs)
+        super(TCPGitClient, self).__init__(lambda: _fileno_can_read(self._socket.fileno()), self.rfile.read, self.wfile.write, *args, **kwargs)
 
     def send_pack(self, path):
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
@@ -190,7 +190,7 @@ class SubprocessGitClient(GitClient):
         def write_fn(data):
             self.proc.stdin.write(data)
             self.proc.stdin.flush()
-        return GitClient(self.proc.stdout.fileno(), read_fn, write_fn, *args, **kwargs)
+        return GitClient(lambda: _fileno_can_read(self.proc.stdout.fileno()), read_fn, write_fn, *args, **kwargs)
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)
@@ -246,11 +246,11 @@ class SSHGitClient(GitClient):
 
     def send_pack(self, path):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
-        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
+        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send)
         client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
-        client = GitClient(remote.proc.stdout.fileno(), remote.recv, remote.send)
+        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send)
         client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 

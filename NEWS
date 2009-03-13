@@ -1,8 +1,15 @@
-0.1.1	UNRELEASED
+0.1.1	2009-03-13
 
  BUG FIXES
 
   * Fixed regression in Repo.find_missing_objects()
+
+  * Don't fetch ^{} objects from remote hosts, as requesting them 
+    causes a hangup.
+
+ FEATURES
+
+  * Allow disabling thin packs when talking to remote hosts.
 
 0.1.0	2009-01-24
 

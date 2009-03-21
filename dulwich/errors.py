@@ -18,6 +18,22 @@
 
 """Dulwich-related exception classes and utility functions."""
 
+class ChecksumMismatch(Exception):
+    """A checksum didn't match the expected contents."""
+
+    def __init__(self, expected, got, extra=None):
+        self.expected = expected
+        self.got = got
+        self.extra = extra
+        if self.extra is not None:
+            Exception.__init__(self, 
+                "Checksum mismatch: Expected %s, got %s" % (expected, got))
+        else:
+            Exception.__init__(self,
+                "Checksum mismatch: Expected %s, got %s; %s" % 
+                (expected, got, extra))
+
+
 class WrongObjectException(Exception):
     """Baseclass for all the _ is not a _ exceptions on objects.
   

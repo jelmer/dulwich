@@ -47,12 +47,15 @@ import sys
 import zlib
 import difflib
 
+from dulwich.errors import (
+    ApplyDeltaError,
+    ChecksumMismatch,
+    )
 from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,
     )
-from dulwich.errors import ApplyDeltaError
 from dulwich.misc import make_sha
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
@@ -822,7 +825,8 @@ class Pack(object):
             idx_stored_checksum = self.idx.get_stored_checksums()[0]
             data_stored_checksum = self._data.get_stored_checksum()
             if idx_stored_checksum != data_stored_checksum:
-                raise AssertionError("Checksum for index does not match checksum for pack: %s != %s" % (sha_to_hex(idx_stored_checksum), sha_to_hex(data_stored_checksum)))
+                raise ChecksumMismatch(sha_to_hex(idx_stored_checksum), 
+                                       sha_to_hex(data_stored_checksum))
         return self._data
 
     @property

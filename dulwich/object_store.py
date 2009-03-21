@@ -140,7 +140,7 @@ class ObjectStore(object):
         entries = p.sorted_entries()
         basename = os.path.join(self.pack_dir(), 
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
-        write_pack_index_v2(basename+".idx", entries, p.calculate_checksum())
+        write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
 
     def add_thin_pack(self):

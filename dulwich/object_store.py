@@ -96,7 +96,7 @@ class ObjectStore(object):
         for pack in self.packs:
             if sha in pack:
                 return pack.get_raw(sha, self.get_raw)
-        # FIXME: Are pack deltas ever against on-disk shafiles ?
+        # FIXME: Are thin pack deltas ever against on-disk shafiles ?
         ret = self._get_shafile(sha)
         if ret is not None:
             return ret.as_raw_string()
@@ -152,6 +152,8 @@ class ObjectStore(object):
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
+            os.fdatasync(fd)
+            f.close()
             if os.path.getsize(path) > 0:
                 self.move_in_thin_pack(path)
         return f, commit
@@ -165,6 +167,8 @@ class ObjectStore(object):
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
+            os.fdatasync(fd)
+            f.close()
             if os.path.getsize(path) > 0:
                 self.move_in_pack(path)
         return f, commit

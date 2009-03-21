@@ -7,6 +7,8 @@
   * Don't fetch ^{} objects from remote hosts, as requesting them 
     causes a hangup.
 
+  * Always write pack to disk completely before calculating checksum.
+
  FEATURES
 
   * Allow disabling thin packs when talking to remote hosts.

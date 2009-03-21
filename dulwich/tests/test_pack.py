@@ -77,8 +77,8 @@ class PackIndexTests(PackTests):
   
     def test_get_stored_checksum(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksums()[1]))
-        self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_stored_checksums()[0]))
+        self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksum()))
+        self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_pack_checksum()))
   
     def test_index_check(self):
         p = self.get_pack_index(pack1_sha)
@@ -188,14 +188,26 @@ class TestPack(PackTests):
         self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
     def test_copy(self):
-        p = self.get_pack(pack1_sha)
-        write_pack("Elch", [(x, "") for x in p.iterobjects()], len(p))
-        self.assertEquals(p, Pack("Elch"))
+        origpack = self.get_pack(pack1_sha)
+        self.assertEquals(True, origpack.idx.check())
+        write_pack("Elch", [(x, "") for x in origpack.iterobjects()], 
+            len(origpack))
+        newpack = Pack("Elch")
+        self.assertEquals(origpack, newpack)
+        self.assertEquals(True, newpack.idx.check())
+        self.assertEquals(origpack.name(), newpack.name())
+        self.assertEquals(origpack.idx.get_pack_checksum(), 
+                          newpack.idx.get_pack_checksum())
+        
+        self.assertTrue(
+                (origpack.idx.version != newpack.idx.version) or
+                (origpack.idx.get_stored_checksum() == newpack.idx.get_stored_checksum()))
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)
         commit = p[commit_sha]
-        self.assertEquals("James Westby <jw+debian@jameswestby.net>", commit.author)
+        self.assertEquals("James Westby <jw+debian@jameswestby.net>",
+            commit.author)
         self.assertEquals([], commit.parents)
 
     def test_name(self):
@@ -219,7 +231,7 @@ class BaseTestPackIndexWriting(object):
         self._write_fn("empty.idx", [], pack_checksum)
         idx = PackIndex("empty.idx")
         self.assertTrue(idx.check())
-        self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
+        self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(0, len(idx))
 
     def test_single(self):
@@ -230,7 +242,7 @@ class BaseTestPackIndexWriting(object):
         idx = PackIndex("single.idx")
         self.assertEquals(idx.version, self._expected_version)
         self.assertTrue(idx.check())
-        self.assertEquals(idx.get_stored_checksums()[0], pack_checksum)
+        self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(1, len(idx))
         actual_entries = list(idx.iterentries())
         self.assertEquals(len(my_entries), len(actual_entries))

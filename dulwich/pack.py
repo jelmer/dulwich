@@ -272,7 +272,7 @@ class PackIndex(object):
   
     def check(self):
         """Check that the stored checksum matches the actual checksum."""
-        return self.calculate_checksum() == self.get_stored_checksums()[1]
+        return self.calculate_checksum() == self.get_stored_checksum()
   
     def calculate_checksum(self):
         f = open(self._filename, 'r')
@@ -280,11 +280,14 @@ class PackIndex(object):
             return make_sha(self._contents[:-20]).digest()
         finally:
             f.close()
+
+    def get_pack_checksum(self):
+        """Return the SHA1 checksum stored for the corresponding packfile."""
+        return str(self._contents[-40:-20])
   
-    def get_stored_checksums(self):
-        """Return the SHA1 checksums stored for the corresponding packfile and 
-        this header file itself."""
-        return str(self._contents[-40:-20]), str(self._contents[-20:])
+    def get_stored_checksum(self):
+        """Return the SHA1 checksum stored for this index."""
+        return str(self._contents[-20:])
   
     def object_index(self, sha):
         """Return the index in to the corresponding packfile for the object.
@@ -815,6 +818,7 @@ class Pack(object):
         self._idx = None
 
     def name(self):
+        """The SHA over the SHAs of the objects in this pack."""
         return self.idx.objects_sha1()
 
     @property
@@ -822,7 +826,7 @@ class Pack(object):
         if self._data is None:
             self._data = PackData(self._data_path)
             assert len(self.idx) == len(self._data)
-            idx_stored_checksum = self.idx.get_stored_checksums()[0]
+            idx_stored_checksum = self.idx.get_pack_checksum()
             data_stored_checksum = self._data.get_stored_checksum()
             if idx_stored_checksum != data_stored_checksum:
                 raise ChecksumMismatch(sha_to_hex(idx_stored_checksum), 

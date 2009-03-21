@@ -1,5 +1,6 @@
 # server.py -- Implementation of the server side git protocols
-# Copryight (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008 John Carr
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -15,6 +16,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
+"""Client side support for the Git protocol."""
+
+__docformat__ = 'restructuredText'
 
 import os
 import select
@@ -89,6 +94,12 @@ class GitClient(object):
         return refs, server_capabilities
 
     def send_pack(self, path, generate_pack_contents):
+        """Upload a pack to a remote repository.
+
+        :param path: Repository path
+        :param generate_pack_contents: Function that can return the shas of the 
+            objects to upload.
+        """
         refs, server_capabilities = self.read_refs()
         changed_refs = [] # FIXME
         if not changed_refs:
@@ -154,6 +165,7 @@ class GitClient(object):
 
 
 class TCPGitClient(GitClient):
+    """A Git Client that works over TCP directly (i.e. git://)."""
 
     def __init__(self, host, port=TCP_GIT_PORT, *args, **kwargs):
         self._socket = socket.socket(type=socket.SOCK_STREAM)
@@ -164,10 +176,23 @@ class TCPGitClient(GitClient):
         super(TCPGitClient, self).__init__(lambda: _fileno_can_read(self._socket.fileno()), self.rfile.read, self.wfile.write, *args, **kwargs)
 
     def send_pack(self, path):
+        """Send a pack to a remote host.
+
+        :param path: Path of the repository on the remote host
+        """
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
         super(TCPGitClient, self).send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+        """Fetch a pack from the remote host.
+        
+        :param path: Path of the reposiutory on the remote host
+        :param determine_wants: Callback that receives available refs dict and 
+            should return list of sha's to fetch.
+        :param graph_walker: GraphWalker instance used to find missing shas
+        :param pack_data: Callback for writing pack data
+        :param progress: Callback for writing progress
+        """
         self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
         super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 
@@ -195,7 +220,8 @@ class SubprocessGitClient(GitClient):
         client = self._connect("git-receive-pack", path)
         client.send_pack(path)
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
+        progress):
         client = self._connect("git-upload-pack", path)
         client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 

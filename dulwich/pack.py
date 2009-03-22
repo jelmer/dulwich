@@ -439,7 +439,8 @@ class PackData(object):
         for i in range(len(self)):
             map = simple_mmap(f, offset, self._size-offset)
             (type, obj, total_size) = unpack_object(map)
-            yield offset, type, obj
+            crc32 = zlib.crc32(map[:total_size]) & 0xffffffff
+            yield offset, type, obj, crc32
             offset += total_size
         f.close()
   
@@ -461,7 +462,7 @@ class PackData(object):
             raise Postpone, (sha, )
         todo = list(self.iterobjects())
         while todo:
-            (offset, type, obj) = todo.pop(0)
+            (offset, type, obj, crc32) = todo.pop(0)
             at[offset] = (type, obj)
             assert isinstance(offset, int)
             assert isinstance(type, int)
@@ -475,7 +476,7 @@ class PackData(object):
                 shafile = ShaFile.from_raw_string(type, obj)
                 sha = shafile.sha().digest()
                 found[sha] = (type, obj)
-                yield sha, offset, shafile.crc32()
+                yield sha, offset, crc32
                 todo += postponed.get(sha, [])
         if postponed:
             raise KeyError([sha_to_hex(h) for h in postponed.keys()])
@@ -550,8 +551,10 @@ def write_pack_object(f, type, object):
 
     :param f: File to write to
     :param o: Object to write
+    :return: Tuple with offset at which the object was written, and crc32
     """
     ret = f.tell()
+    packed_data_hdr = ""
     if type == 6: # ref delta
         (delta_base_offset, object) = object
     elif type == 7: # offset delta
@@ -560,10 +563,10 @@ def write_pack_object(f, type, object):
     c = (type << 4) | (size & 15)
     size >>= 4
     while size:
-        f.write(chr(c | 0x80))
+        packed_data_hdr += (chr(c | 0x80))
         c = size & 0x7f
         size >>= 7
-    f.write(chr(c))
+    packed_data_hdr += chr(c)
     if type == 6: # offset delta
         ret = [delta_base_offset & 0x7f]
         delta_base_offset >>= 7
@@ -571,12 +574,13 @@ def write_pack_object(f, type, object):
             delta_base_offset -= 1
             ret.insert(0, 0x80 | (delta_base_offset & 0x7f))
             delta_base_offset >>= 7
-        f.write("".join([chr(x) for x in ret]))
+        packed_data_hdr += "".join([chr(x) for x in ret])
     elif type == 7: # ref delta
         assert len(basename) == 20
-        f.write(basename)
-    f.write(zlib.compress(object))
-    return f.tell()
+        packed_data_hdr += basename
+    packed_data = packed_data_hdr + zlib.compress(object)
+    f.write(packed_data)
+    return (f.tell(), (zlib.crc32(packed_data) & 0xffffffff))
 
 
 def write_pack(filename, objects, num_objects):
@@ -618,7 +622,6 @@ def write_pack_data(f, objects, num_objects, window=10):
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
     for o, path in recency:
         sha1 = o.sha().digest()
-        crc32 = o.crc32()
         orig_t, raw = o.as_raw_string()
         winner = raw
         t = orig_t
@@ -631,7 +634,7 @@ def write_pack_data(f, objects, num_objects, window=10):
         #    if len(delta) < len(winner):
         #        winner = delta
         #        t = 6 if magic[i][2] == 1 else 7
-        offset = write_pack_object(f, t, winner)
+        offset, crc32 = write_pack_object(f, t, winner)
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 
@@ -859,7 +862,11 @@ class Pack(object):
         return iter(self.idx)
 
     def check(self):
-        return self.idx.check() and self.data.check()
+        if not self.idx.check():
+            return False
+        if not self.data.check():
+            return False
+        return True
 
     def get_stored_checksum(self):
         return self.data.get_stored_checksum()
@@ -889,7 +896,7 @@ class Pack(object):
         if get_raw is None:
             def get_raw(x):
                 raise KeyError(x)
-        for offset, type, obj in self.data.iterobjects():
+        for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
                     *resolve_object(offset, type, obj, 

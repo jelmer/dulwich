@@ -120,7 +120,8 @@ class ObjectStore(object):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        temppath = os.path.join(self.pack_dir(), sha_to_hex(urllib2.randombytes(20))+".temppack")
+        temppath = os.path.join(self.pack_dir(), 
+            sha_to_hex(urllib2.randombytes(20))+".temppack")
         write_pack(temppath, p.iterobjects(self.get_raw), len(p))
         pack_sha = PackIndex(temppath+".idx").objects_sha1()
         os.rename(temppath+".pack", 

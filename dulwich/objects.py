@@ -160,9 +160,6 @@ class ShaFile(object):
     def _header(self):
         return "%s %lu\0" % (self._type, len(self._text))
   
-    def crc32(self):
-        return zlib.crc32(self._text) & 0xffffffff
-  
     def sha(self):
         """The SHA1 object that is the name of this object."""
         ressha = sha.new()

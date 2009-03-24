@@ -206,7 +206,11 @@ class Repo(object):
 
     def set_ref(self, name, value):
         file = os.path.join(self.controldir(), name)
-        open(file, 'w').write(value+"\n")
+        f = open(file, 'w')
+        try:
+            f.write(value+"\n")
+        finally:
+            f.close()
 
     def remove_ref(self, name):
         file = os.path.join(self.controldir(), name)

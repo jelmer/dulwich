@@ -208,9 +208,9 @@ class ObjectIterator(object):
 
 class ObjectStoreIterator(ObjectIterator):
 
-    def __init__(self, store, shas):
+    def __init__(self, store, sha_iter):
         self.store = store
-        self.shas = shas
+        self.shas = list(sha_iter)
 
     def __iter__(self):
         return ((self.store[sha], path) for sha, path in self.shas)

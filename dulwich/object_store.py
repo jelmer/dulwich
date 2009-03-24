@@ -26,6 +26,7 @@ from dulwich.objects import (
     ShaFile,
     )
 from dulwich.pack import (
+    Pack,
     iter_sha1, 
     load_packs, 
     write_pack,
@@ -65,6 +66,10 @@ class ObjectStore(object):
         if self._packs is None:
             self._packs = list(load_packs(self.pack_dir()))
         return self._packs
+
+    def _add_known_pack(self, path):
+        if self._packs is not None:
+            self._packs.append(Pack(path))
 
     def _get_shafile_path(self, sha):
         dir = sha[:2]
@@ -124,10 +129,10 @@ class ObjectStore(object):
             sha_to_hex(urllib2.randombytes(20))+".temppack")
         write_pack(temppath, p.iterobjects(self.get_raw), len(p))
         pack_sha = PackIndex(temppath+".idx").objects_sha1()
-        os.rename(temppath+".pack", 
-            os.path.join(self.pack_dir(), "pack-%s.pack" % pack_sha))
-        os.rename(temppath+".idx", 
-            os.path.join(self.pack_dir(), "pack-%s.idx" % pack_sha))
+        newbasename = os.path.join(self.pack_dir(), "pack-%s" % pack_sha)
+        os.rename(temppath+".pack", newbasename+".pack")
+        os.rename(temppath+".idx", newbasename+".idx")
+        self._add_known_pack(newbasename)
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -143,6 +148,7 @@ class ObjectStore(object):
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
+        self._add_known_pack(basename)
 
     def add_thin_pack(self):
         """Add a new thin pack to this object store.
@@ -153,7 +159,7 @@ class ObjectStore(object):
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
-            os.fdatasync(fd)
+            os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:
                 self.move_in_thin_pack(path)
@@ -168,7 +174,7 @@ class ObjectStore(object):
         fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
-            os.fdatasync(fd)
+            os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:
                 self.move_in_pack(path)

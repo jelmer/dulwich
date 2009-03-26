@@ -42,15 +42,17 @@ class ObjectStore(object):
     def __init__(self, path):
         self.path = path
         self._packs = None
+        self.pack_dir = os.path.join(self.path, PACKDIR)
 
     def determine_wants_all(self, refs):
 	    return [sha for (ref, sha) in refs.iteritems() if not sha in self and not ref.endswith("^{}")]
 
     def iter_shas(self, shas):
-        return ObjectStoreIterator(self, shas)
+        """Iterate over the objects for the specified shas.
 
-    def pack_dir(self):
-        return os.path.join(self.path, PACKDIR)
+        :param shas: Iterable object with SHAs
+        """
+        return ObjectStoreIterator(self, shas)
 
     def __contains__(self, sha):
         # TODO: This can be more efficient
@@ -64,7 +66,7 @@ class ObjectStore(object):
     def packs(self):
         """List with pack objects."""
         if self._packs is None:
-            self._packs = list(load_packs(self.pack_dir()))
+            self._packs = list(load_packs(self.pack_dir))
         return self._packs
 
     def _add_known_pack(self, path):
@@ -125,11 +127,11 @@ class ObjectStore(object):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        temppath = os.path.join(self.pack_dir(), 
+        temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
         write_pack(temppath, p.iterobjects(self.get_raw), len(p))
         pack_sha = PackIndex(temppath+".idx").objects_sha1()
-        newbasename = os.path.join(self.pack_dir(), "pack-%s" % pack_sha)
+        newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
         os.rename(temppath+".idx", newbasename+".idx")
         self._add_known_pack(newbasename)
@@ -144,7 +146,7 @@ class ObjectStore(object):
         """
         p = PackData(path)
         entries = p.sorted_entries()
-        basename = os.path.join(self.pack_dir(), 
+        basename = os.path.join(self.pack_dir, 
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
@@ -156,7 +158,7 @@ class ObjectStore(object):
         Thin packs are packs that contain deltas with parents that exist 
         in a different pack.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
             os.fsync(fd)
@@ -171,7 +173,7 @@ class ObjectStore(object):
         :return: Fileobject to write to and a commit function to 
             call when the pack is finished.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
             os.fsync(fd)

@@ -397,7 +397,8 @@ class PackData(object):
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
         self._read_header()
-        self._offset_cache = LRUSizeCache(1024*1024*100, compute_size=compute_object_size)
+        self._offset_cache = LRUSizeCache(1024*1024*5, 
+            compute_size=compute_object_size)
   
     def _read_header(self):
         f = open(self._filename, 'rb')
@@ -450,6 +451,8 @@ class PackData(object):
             assert type != 6
             base_offset = None
         type, base_text = self.resolve_object(base_offset, type, base_obj, get_ref)
+        if base_offset is not None:
+            self._offset_cache[base_offset] = type, base_text
         ret = (type, apply_delta(base_text, delta))
         return ret
   
@@ -524,6 +527,8 @@ class PackData(object):
         then the packfile can be asked directly for that object using this
         function.
         """
+        if offset in self._offset_cache:
+            return self._offset_cache[offset]
         assert isinstance(offset, long) or isinstance(offset, int),\
                 "offset was %r" % offset
         assert offset >= self._header_size

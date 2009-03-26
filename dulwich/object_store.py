@@ -60,12 +60,13 @@ class ObjectStore(object):
         return ObjectStoreIterator(self, shas)
 
     def __contains__(self, sha):
-        # TODO: This can be more efficient
-        try:
-            self[sha]
+        for pack in self.packs:
+            if sha in pack:
+                return True
+        ret = self._get_shafile(sha)
+        if ret is not None:
             return True
-        except KeyError:
-            return False
+        return False
 
     @property
     def packs(self):
@@ -256,11 +257,7 @@ class ObjectStoreIterator(ObjectIterator):
 
         :param needle: SHA1 of the object to check for
         """
-        # FIXME: This could be more efficient
-        for sha, path in self.itershas():
-            if sha == needle:
-                return True
-        return False
+        return needle in self.store
 
     def __getitem__(self, key):
         """Find an object by SHA1."""

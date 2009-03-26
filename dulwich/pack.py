@@ -397,7 +397,7 @@ class PackData(object):
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
         self._read_header()
-        self._offset_cache = LRUSizeCache(compute_size=compute_object_size)
+        self._offset_cache = LRUSizeCache(1024*1024*100, compute_size=compute_object_size)
   
     def _read_header(self):
         f = open(self._filename, 'rb')
@@ -437,8 +437,8 @@ class PackData(object):
             (delta_offset, delta) = obj
             assert isinstance(delta_offset, int)
             assert isinstance(delta, str)
-            offset = offset-delta_offset
-            type, base_obj = get_offset(offset)
+            base_offset = offset-delta_offset
+            type, base_obj = get_offset(base_offset)
             assert isinstance(type, int)
         elif type == 7: # ref delta
             (basename, delta) = obj
@@ -446,7 +446,10 @@ class PackData(object):
             assert isinstance(delta, str)
             type, base_obj = get_ref(basename)
             assert isinstance(type, int)
-        type, base_text = self.resolve_object(offset, type, base_obj, get_ref)
+            # Can't be a ofs delta, as we wouldn't know the base offset
+            assert type != 6
+            base_offset = None
+        type, base_text = self.resolve_object(base_offset, type, base_obj, get_ref)
         ret = (type, apply_delta(base_text, delta))
         return ret
   
@@ -463,7 +466,6 @@ class PackData(object):
   
     def iterentries(self, ext_resolve_ref=None):
         found = {}
-        at = {}
         postponed = defaultdict(list)
         class Postpone(Exception):
             """Raised to postpone delta resolving."""
@@ -480,13 +482,11 @@ class PackData(object):
         todo = list(self.iterobjects())
         while todo:
             (offset, type, obj, crc32) = todo.pop(0)
-            at[offset] = (type, obj)
             assert isinstance(offset, int)
             assert isinstance(type, int)
             assert isinstance(obj, tuple) or isinstance(obj, str)
             try:
-                type, obj = self.resolve_object(offset, type, obj, get_ref_text,
-                    at.__getitem__)
+                type, obj = self.resolve_object(offset, type, obj, get_ref_text)
             except Postpone, (sha, ):
                 postponed[sha].append((offset, type, obj))
             else:

@@ -51,6 +51,9 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     )
+from dulwich.lru_cache import (
+    LRUSizeCache,
+    )
 from dulwich.objects import (
     ShaFile,
     hex_to_sha,
@@ -394,6 +397,7 @@ class PackData(object):
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
         self._read_header()
+        self._offset_cache = LRUSizeCache(compute_size=compute_object_size)
   
     def _read_header(self):
         f = open(self._filename, 'rb')

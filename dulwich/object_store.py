@@ -21,18 +21,18 @@ import tempfile
 import urllib2
 
 from dulwich.objects import (
+    ShaFile,
     hex_to_sha,
     sha_to_hex,
-    ShaFile,
     )
 from dulwich.pack import (
     Pack,
+    PackData, 
     iter_sha1, 
     load_packs, 
     write_pack,
     write_pack_data,
     write_pack_index_v2,
-    PackData, 
     )
 
 PACKDIR = 'pack'
@@ -233,14 +233,23 @@ class ObjectStoreIterator(ObjectIterator):
 
     def __init__(self, store, sha_iter):
         self.store = store
-        self.shas = list(sha_iter)
+        self.sha_iter = sha_iter
+        self._shas = []
 
     def __iter__(self):
-        return ((self.store[sha], path) for sha, path in self.shas)
+        for sha, path in self.itershas():
+            yield self.store[sha], path
 
     def iterobjects(self):
         for o, path in self:
             yield o
+
+    def itershas(self):
+        for sha in self._shas:
+            yield sha
+        for sha in self.sha_iter:
+            self._shas.append(sha)
+            yield sha
 
     def __contains__(self, needle):
         """Check if an object is present.
@@ -248,7 +257,7 @@ class ObjectStoreIterator(ObjectIterator):
         :param needle: SHA1 of the object to check for
         """
         # FIXME: This could be more efficient
-        for sha, path in self.shas:
+        for sha, path in self.itershas():
             if sha == needle:
                 return True
         return False
@@ -259,6 +268,4 @@ class ObjectStoreIterator(ObjectIterator):
 
     def __len__(self):
         """Return the number of objects."""
-        return len(self.shas)
-
-
+        return len(list(self.itershas()))

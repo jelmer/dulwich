@@ -110,8 +110,10 @@ class ObjectStore(object):
         :return: tuple with object type and object contents.
         """
         for pack in self.packs:
-            if sha in pack:
+            try:
                 return pack.get_raw(sha, self.get_raw)
+            except KeyError:
+                pass
         # FIXME: Are thin pack deltas ever against on-disk shafiles ?
         ret = self._get_shafile(sha)
         if ret is not None:

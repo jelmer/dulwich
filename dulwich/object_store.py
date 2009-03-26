@@ -38,10 +38,15 @@ from dulwich.pack import (
 PACKDIR = 'pack'
 
 class ObjectStore(object):
+    """Object store."""
 
     def __init__(self, path):
+        """Open an object store.
+
+        :param path: Path of the object store.
+        """
         self.path = path
-        self._packs = None
+        self._pack_cache = None
         self.pack_dir = os.path.join(self.path, PACKDIR)
 
     def determine_wants_all(self, refs):
@@ -65,13 +70,16 @@ class ObjectStore(object):
     @property
     def packs(self):
         """List with pack objects."""
-        if self._packs is None:
-            self._packs = list(load_packs(self.pack_dir))
-        return self._packs
+        if self._pack_cache is None:
+            self._pack_cache = list(load_packs(self.pack_dir))
+        return self._pack_cache
 
     def _add_known_pack(self, path):
-        if self._packs is not None:
-            self._packs.append(Pack(path))
+        """Add a newly appeared pack to the cache by path.
+
+        """
+        if self._pack_cache is not None:
+            self._pack_cache.append(Pack(path))
 
     def _get_shafile_path(self, sha):
         dir = sha[:2]
@@ -183,6 +191,10 @@ class ObjectStore(object):
         return f, commit
 
     def add_objects(self, objects):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over a list of objects.
+        """
         if len(objects) == 0:
             return
         f, commit = self.add_pack()
@@ -191,24 +203,33 @@ class ObjectStore(object):
 
 
 class ObjectImporter(object):
+    """Interface for importing objects."""
 
     def __init__(self, count):
+        """Create a new ObjectImporter.
+
+        :param count: Number of objects that's going to be imported.
+        """
         self.count = count
 
     def add_object(self, object):
+        """Add an object."""
         raise NotImplementedError(self.add_object)
 
     def finish(self, object):
+        """Finish the imoprt and write objects to disk."""
         raise NotImplementedError(self.finish)
 
 
 class ObjectIterator(object):
+    """Interface for iterating over objects."""
 
     def iterobjects(self):
         raise NotImplementedError(self.iterobjects)
 
 
 class ObjectStoreIterator(ObjectIterator):
+    """ObjectIterator that works on top of an ObjectStore."""
 
     def __init__(self, store, sha_iter):
         self.store = store

@@ -188,337 +188,337 @@ class ShaFile(object):
 
 
 class Blob(ShaFile):
-  """A Git Blob object."""
+    """A Git Blob object."""
 
-  _type = BLOB_ID
-  _num_type = 3
+    _type = BLOB_ID
+    _num_type = 3
 
-  @property
-  def data(self):
-    """The text contained within the blob object."""
-    return self._text
+    @property
+    def data(self):
+        """The text contained within the blob object."""
+        return self._text
 
-  @classmethod
-  def from_file(cls, filename):
-    blob = ShaFile.from_file(filename)
-    if blob._type != cls._type:
-      raise NotBlobError(filename)
-    return blob
+    @classmethod
+    def from_file(cls, filename):
+        blob = ShaFile.from_file(filename)
+        if blob._type != cls._type:
+            raise NotBlobError(filename)
+        return blob
 
-  @classmethod
-  def from_string(cls, string):
-    """Create a blob from a string."""
-    shafile = cls()
-    shafile._text = string
-    return shafile
+    @classmethod
+    def from_string(cls, string):
+        """Create a blob from a string."""
+        shafile = cls()
+        shafile._text = string
+        return shafile
 
 
 class Tag(ShaFile):
-  """A Git Tag object."""
+    """A Git Tag object."""
 
-  _type = TAG_ID
+    _type = TAG_ID
 
-  @classmethod
-  def from_file(cls, filename):
-    blob = ShaFile.from_file(filename)
-    if blob._type != cls._type:
-      raise NotBlobError(filename)
-    return blob
+    @classmethod
+    def from_file(cls, filename):
+        blob = ShaFile.from_file(filename)
+        if blob._type != cls._type:
+            raise NotBlobError(filename)
+        return blob
 
-  @classmethod
-  def from_string(cls, string):
-    """Create a blob from a string."""
-    shafile = cls()
-    shafile._text = string
-    return shafile
+    @classmethod
+    def from_string(cls, string):
+        """Create a blob from a string."""
+        shafile = cls()
+        shafile._text = string
+        return shafile
 
-  def _parse_text(self):
-    """Grab the metadata attached to the tag"""
-    text = self._text
-    count = 0
-    assert text.startswith(OBJECT_ID), "Invalid tag object, " \
-         "must start with %s" % OBJECT_ID
-    count += len(OBJECT_ID)
-    assert text[count] == ' ', "Invalid tag object, " \
-         "%s must be followed by space not %s" % (OBJECT_ID, text[count])
-    count += 1
-    self._object_sha = text[count:count+40]
-    count += 40
-    assert text[count] == '\n', "Invalid tag object, " \
-         "%s sha must be followed by newline" % OBJECT_ID
-    count += 1
-    assert text[count:].startswith(TYPE_ID), "Invalid tag object, " \
-         "%s sha must be followed by %s" % (OBJECT_ID, TYPE_ID)
-    count += len(TYPE_ID)
-    assert text[count] == ' ', "Invalid tag object, " \
-        "%s must be followed by space not %s" % (TAG_ID, text[count])
-    count += 1
-    self._object_type = ""
-    while text[count] != '\n':
-        self._object_type += text[count]
+    def _parse_text(self):
+        """Grab the metadata attached to the tag"""
+        text = self._text
+        count = 0
+        assert text.startswith(OBJECT_ID), "Invalid tag object, " \
+            "must start with %s" % OBJECT_ID
+        count += len(OBJECT_ID)
+        assert text[count] == ' ', "Invalid tag object, " \
+            "%s must be followed by space not %s" % (OBJECT_ID, text[count])
         count += 1
-    count += 1
-    assert self._object_type in (COMMIT_ID, BLOB_ID, TREE_ID, TAG_ID), "Invalid tag object, " \
-        "unexpected object type %s" % self._object_type
-    self._object_type = type_map[self._object_type]
-
-    assert text[count:].startswith(TAG_ID), "Invalid tag object, " \
-        "object type must be followed by %s" % (TAG_ID)
-    count += len(TAG_ID)
-    assert text[count] == ' ', "Invalid tag object, " \
-        "%s must be followed by space not %s" % (TAG_ID, text[count])
-    count += 1
-    self._name = ""
-    while text[count] != '\n':
-        self._name += text[count]
+        self._object_sha = text[count:count+40]
+        count += 40
+        assert text[count] == '\n', "Invalid tag object, " \
+            "%s sha must be followed by newline" % OBJECT_ID
         count += 1
-    count += 1
+        assert text[count:].startswith(TYPE_ID), "Invalid tag object, " \
+            "%s sha must be followed by %s" % (OBJECT_ID, TYPE_ID)
+        count += len(TYPE_ID)
+        assert text[count] == ' ', "Invalid tag object, " \
+            "%s must be followed by space not %s" % (TAG_ID, text[count])
+        count += 1
+        self._object_type = ""
+        while text[count] != '\n':
+            self._object_type += text[count]
+            count += 1
+        count += 1
+        assert self._object_type in (COMMIT_ID, BLOB_ID, TREE_ID, TAG_ID), "Invalid tag object, " \
+            "unexpected object type %s" % self._object_type
+        self._object_type = type_map[self._object_type]
 
-    assert text[count:].startswith(TAGGER_ID), "Invalid tag object, " \
-        "%s must be followed by %s" % (TAG_ID, TAGGER_ID)
-    count += len(TAGGER_ID)
-    assert text[count] == ' ', "Invalid tag object, " \
-        "%s must be followed by space not %s" % (TAGGER_ID, text[count])
-    count += 1
-    self._tagger = ""
-    while text[count] != '>':
-        assert text[count] != '\n', "Malformed tagger information"
+        assert text[count:].startswith(TAG_ID), "Invalid tag object, " \
+            "object type must be followed by %s" % (TAG_ID)
+        count += len(TAG_ID)
+        assert text[count] == ' ', "Invalid tag object, " \
+            "%s must be followed by space not %s" % (TAG_ID, text[count])
+        count += 1
+        self._name = ""
+        while text[count] != '\n':
+            self._name += text[count]
+            count += 1
+        count += 1
+
+        assert text[count:].startswith(TAGGER_ID), "Invalid tag object, " \
+            "%s must be followed by %s" % (TAG_ID, TAGGER_ID)
+        count += len(TAGGER_ID)
+        assert text[count] == ' ', "Invalid tag object, " \
+            "%s must be followed by space not %s" % (TAGGER_ID, text[count])
+        count += 1
+        self._tagger = ""
+        while text[count] != '>':
+            assert text[count] != '\n', "Malformed tagger information"
+            self._tagger += text[count]
+            count += 1
         self._tagger += text[count]
         count += 1
-    self._tagger += text[count]
-    count += 1
-    assert text[count] == ' ', "Invalid tag object, " \
-        "tagger information must be followed by space not %s" % text[count]
-    count += 1
-    self._tag_time = int(text[count:count+10])
-    while text[count] != '\n':
+        assert text[count] == ' ', "Invalid tag object, " \
+            "tagger information must be followed by space not %s" % text[count]
         count += 1
-    count += 1
-    assert text[count] == '\n', "There must be a new line after the headers"
-    count += 1
-    self._message = text[count:]
+        self._tag_time = int(text[count:count+10])
+        while text[count] != '\n':
+            count += 1
+        count += 1
+        assert text[count] == '\n', "There must be a new line after the headers"
+        count += 1
+        self._message = text[count:]
 
-  @property
-  def object(self):
-    """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
-    return (self._object_type, self._object_sha)
+    @property
+    def object(self):
+        """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
+        return (self._object_type, self._object_sha)
 
-  @property
-  def name(self):
-    """Returns the name of this tag"""
-    return self._name
+    @property
+    def name(self):
+        """Returns the name of this tag"""
+        return self._name
 
-  @property
-  def tagger(self):
-    """Returns the name of the person who created this tag"""
-    return self._tagger
+    @property
+    def tagger(self):
+        """Returns the name of the person who created this tag"""
+        return self._tagger
 
-  @property
-  def tag_time(self):
-    """Returns the creation timestamp of the tag.
+    @property
+    def tag_time(self):
+        """Returns the creation timestamp of the tag.
 
-    Returns it as the number of seconds since the epoch"""
-    return self._tag_time
+        Returns it as the number of seconds since the epoch"""
+        return self._tag_time
 
-  @property
-  def message(self):
-    """Returns the message attached to this tag"""
-    return self._message
+    @property
+    def message(self):
+        """Returns the message attached to this tag"""
+        return self._message
 
 
 class Tree(ShaFile):
-  """A Git tree object"""
+    """A Git tree object"""
 
-  _type = TREE_ID
-  _num_type = 2
+    _type = TREE_ID
+    _num_type = 2
 
-  def __init__(self):
-    self._entries = []
+    def __init__(self):
+        self._entries = []
 
-  @classmethod
-  def from_file(cls, filename):
-    tree = ShaFile.from_file(filename)
-    if tree._type != cls._type:
-      raise NotTreeError(filename)
-    return tree
+    @classmethod
+    def from_file(cls, filename):
+        tree = ShaFile.from_file(filename)
+        if tree._type != cls._type:
+            raise NotTreeError(filename)
+        return tree
 
-  def add(self, mode, name, hexsha):
-    self._entries.append((mode, name, hexsha))
+    def add(self, mode, name, hexsha):
+        self._entries.append((mode, name, hexsha))
 
-  def entries(self):
-    """Return a list of tuples describing the tree entries"""
-    return self._entries
+    def entries(self):
+        """Return a list of tuples describing the tree entries"""
+        return self._entries
 
-  def _parse_text(self):
-    """Grab the entries in the tree"""
-    count = 0
-    while count < len(self._text):
-      mode = 0
-      chr = self._text[count]
-      while chr != ' ':
-        assert chr >= '0' and chr <= '7', "%s is not a valid mode char" % chr
-        mode = (mode << 3) + (ord(chr) - ord('0'))
-        count += 1
-        chr = self._text[count]
-      count += 1
-      chr = self._text[count]
-      name = ''
-      while chr != '\0':
-        name += chr
-        count += 1
-        chr = self._text[count]
-      count += 1
-      chr = self._text[count]
-      sha = self._text[count:count+20]
-      hexsha = sha_to_hex(sha)
-      self.add(mode, name, hexsha)
-      count = count + 20
+    def _parse_text(self):
+        """Grab the entries in the tree"""
+        count = 0
+        while count < len(self._text):
+            mode = 0
+            chr = self._text[count]
+            while chr != ' ':
+                assert chr >= '0' and chr <= '7', "%s is not a valid mode char" % chr
+                mode = (mode << 3) + (ord(chr) - ord('0'))
+                count += 1
+                chr = self._text[count]
+            count += 1
+            chr = self._text[count]
+            name = ''
+            while chr != '\0':
+                name += chr
+                count += 1
+                chr = self._text[count]
+            count += 1
+            chr = self._text[count]
+            sha = self._text[count:count+20]
+            hexsha = sha_to_hex(sha)
+            self.add(mode, name, hexsha)
+            count = count + 20
 
-  def serialize(self):
-    self._text = ""
-    for mode, name, hexsha in self._entries:
-        self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
+    def serialize(self):
+        self._text = ""
+        for mode, name, hexsha in self._entries:
+            self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
 
 
 class Commit(ShaFile):
-  """A git commit object"""
+    """A git commit object"""
 
-  _type = COMMIT_ID
-  _num_type = 1
+    _type = COMMIT_ID
+    _num_type = 1
 
-  def __init__(self):
-    self._parents = []
+    def __init__(self):
+        self._parents = []
 
-  @classmethod
-  def from_file(cls, filename):
-    commit = ShaFile.from_file(filename)
-    if commit._type != cls._type:
-      raise NotCommitError(filename)
-    return commit
+    @classmethod
+    def from_file(cls, filename):
+        commit = ShaFile.from_file(filename)
+        if commit._type != cls._type:
+            raise NotCommitError(filename)
+        return commit
 
-  def _parse_text(self):
-    text = self._text
-    count = 0
-    assert text.startswith(TREE_ID), "Invalid commit object, " \
-         "must start with %s" % TREE_ID
-    count += len(TREE_ID)
-    assert text[count] == ' ', "Invalid commit object, " \
-         "%s must be followed by space not %s" % (TREE_ID, text[count])
-    count += 1
-    self._tree = text[count:count+40]
-    count = count + 40
-    assert text[count] == "\n", "Invalid commit object, " \
-         "tree sha must be followed by newline"
-    count += 1
-    self._parents = []
-    while text[count:].startswith(PARENT_ID):
-      count += len(PARENT_ID)
-      assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (PARENT_ID, text[count])
-      count += 1
-      self._parents.append(text[count:count+40])
-      count += 40
-      assert text[count] == "\n", "Invalid commit object, " \
-           "parent sha must be followed by newline"
-      count += 1
-    self._author = None
-    if text[count:].startswith(AUTHOR_ID):
-      count += len(AUTHOR_ID)
-      assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (AUTHOR_ID, text[count])
-      count += 1
-      self._author = ''
-      while text[count] != '>':
-        assert text[count] != '\n', "Malformed author information"
-        self._author += text[count]
+    def _parse_text(self):
+        text = self._text
+        count = 0
+        assert text.startswith(TREE_ID), "Invalid commit object, " \
+             "must start with %s" % TREE_ID
+        count += len(TREE_ID)
+        assert text[count] == ' ', "Invalid commit object, " \
+             "%s must be followed by space not %s" % (TREE_ID, text[count])
         count += 1
-      self._author += text[count]
-      count += 1
-      while text[count] != '\n':
+        self._tree = text[count:count+40]
+        count = count + 40
+        assert text[count] == "\n", "Invalid commit object, " \
+             "tree sha must be followed by newline"
         count += 1
-      count += 1
-    self._committer = None
-    if text[count:].startswith(COMMITTER_ID):
-      count += len(COMMITTER_ID)
-      assert text[count] == ' ', "Invalid commit object, " \
-           "%s must be followed by space not %s" % (COMMITTER_ID, text[count])
-      count += 1
-      self._committer = ''
-      while text[count] != '>':
-        assert text[count] != '\n', "Malformed committer information"
-        self._committer += text[count]
+        self._parents = []
+        while text[count:].startswith(PARENT_ID):
+            count += len(PARENT_ID)
+            assert text[count] == ' ', "Invalid commit object, " \
+                 "%s must be followed by space not %s" % (PARENT_ID, text[count])
+            count += 1
+            self._parents.append(text[count:count+40])
+            count += 40
+            assert text[count] == "\n", "Invalid commit object, " \
+                 "parent sha must be followed by newline"
+            count += 1
+        self._author = None
+        if text[count:].startswith(AUTHOR_ID):
+            count += len(AUTHOR_ID)
+            assert text[count] == ' ', "Invalid commit object, " \
+                 "%s must be followed by space not %s" % (AUTHOR_ID, text[count])
+            count += 1
+            self._author = ''
+            while text[count] != '>':
+                assert text[count] != '\n', "Malformed author information"
+                self._author += text[count]
+                count += 1
+            self._author += text[count]
+            count += 1
+            while text[count] != '\n':
+                count += 1
+            count += 1
+        self._committer = None
+        if text[count:].startswith(COMMITTER_ID):
+            count += len(COMMITTER_ID)
+            assert text[count] == ' ', "Invalid commit object, " \
+                 "%s must be followed by space not %s" % (COMMITTER_ID, text[count])
+            count += 1
+            self._committer = ''
+            while text[count] != '>':
+                assert text[count] != '\n', "Malformed committer information"
+                self._committer += text[count]
+                count += 1
+            self._committer += text[count]
+            count += 1
+            assert text[count] == ' ', "Invalid commit object, " \
+                 "commiter information must be followed by space not %s" % text[count]
+            count += 1
+            self._commit_time = int(text[count:count+10])
+            while text[count] != '\n':
+                count += 1
+            count += 1
+        assert text[count] == '\n', "There must be a new line after the headers"
         count += 1
-      self._committer += text[count]
-      count += 1
-      assert text[count] == ' ', "Invalid commit object, " \
-           "commiter information must be followed by space not %s" % text[count]
-      count += 1
-      self._commit_time = int(text[count:count+10])
-      while text[count] != '\n':
-        count += 1
-      count += 1
-    assert text[count] == '\n', "There must be a new line after the headers"
-    count += 1
-    # XXX: There can be an encoding field.
-    self._message = text[count:]
+        # XXX: There can be an encoding field.
+        self._message = text[count:]
 
-  def serialize(self):
-    self._text = ""
-    self._text += "%s %s\n" % (TREE_ID, self._tree)
-    for p in self._parents:
-      self._text += "%s %s\n" % (PARENT_ID, p)
-    self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
-    self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
-    self._text += "\n" # There must be a new line after the headers
-    self._text += self._message
+    def serialize(self):
+        self._text = ""
+        self._text += "%s %s\n" % (TREE_ID, self._tree)
+        for p in self._parents:
+            self._text += "%s %s\n" % (PARENT_ID, p)
+        self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
+        self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
+        self._text += "\n" # There must be a new line after the headers
+        self._text += self._message
 
-  @property
-  def tree(self):
-    """Returns the tree that is the state of this commit"""
-    return self._tree
+    @property
+    def tree(self):
+        """Returns the tree that is the state of this commit"""
+        return self._tree
 
-  @property
-  def parents(self):
-    """Return a list of parents of this commit."""
-    return self._parents
+    @property
+    def parents(self):
+        """Return a list of parents of this commit."""
+        return self._parents
 
-  @property
-  def author(self):
-    """Returns the name of the author of the commit"""
-    return self._author
+    @property
+    def author(self):
+        """Returns the name of the author of the commit"""
+        return self._author
 
-  @property
-  def committer(self):
-    """Returns the name of the committer of the commit"""
-    return self._committer
+    @property
+    def committer(self):
+        """Returns the name of the committer of the commit"""
+        return self._committer
 
-  @property
-  def message(self):
-    """Returns the commit message"""
-    return self._message
+    @property
+    def message(self):
+        """Returns the commit message"""
+        return self._message
 
-  @property
-  def commit_time(self):
-    """Returns the timestamp of the commit.
-    
-    Returns it as the number of seconds since the epoch.
-    """
-    return self._commit_time
+    @property
+    def commit_time(self):
+        """Returns the timestamp of the commit.
+        
+        Returns it as the number of seconds since the epoch.
+        """
+        return self._commit_time
 
 
 type_map = {
-  BLOB_ID : Blob,
-  TREE_ID : Tree,
-  COMMIT_ID : Commit,
-  TAG_ID: Tag,
+    BLOB_ID : Blob,
+    TREE_ID : Tree,
+    COMMIT_ID : Commit,
+    TAG_ID: Tag,
 }
 
 num_type_map = {
-  0: None,
-  1: Commit,
-  2: Tree,
-  3: Blob,
-  4: Tag,
-  # 5 Is reserved for further expansion
+    0: None,
+    1: Commit,
+    2: Tree,
+    3: Blob,
+    4: Tag,
+    # 5 Is reserved for further expansion
 }
 

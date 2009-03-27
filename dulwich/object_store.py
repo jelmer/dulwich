@@ -21,55 +21,66 @@ import tempfile
 import urllib2
 
 from dulwich.objects import (
+    ShaFile,
     hex_to_sha,
     sha_to_hex,
-    ShaFile,
     )
 from dulwich.pack import (
     Pack,
+    PackData, 
     iter_sha1, 
     load_packs, 
     write_pack,
     write_pack_data,
     write_pack_index_v2,
-    PackData, 
     )
 
 PACKDIR = 'pack'
 
 class ObjectStore(object):
+    """Object store."""
 
     def __init__(self, path):
+        """Open an object store.
+
+        :param path: Path of the object store.
+        """
         self.path = path
-        self._packs = None
+        self._pack_cache = None
+        self.pack_dir = os.path.join(self.path, PACKDIR)
 
     def determine_wants_all(self, refs):
 	    return [sha for (ref, sha) in refs.iteritems() if not sha in self and not ref.endswith("^{}")]
 
     def iter_shas(self, shas):
+        """Iterate over the objects for the specified shas.
+
+        :param shas: Iterable object with SHAs
+        """
         return ObjectStoreIterator(self, shas)
 
-    def pack_dir(self):
-        return os.path.join(self.path, PACKDIR)
-
     def __contains__(self, sha):
-        # TODO: This can be more efficient
-        try:
-            self[sha]
+        for pack in self.packs:
+            if sha in pack:
+                return True
+        ret = self._get_shafile(sha)
+        if ret is not None:
             return True
-        except KeyError:
-            return False
+        return False
 
     @property
     def packs(self):
         """List with pack objects."""
-        if self._packs is None:
-            self._packs = list(load_packs(self.pack_dir()))
-        return self._packs
+        if self._pack_cache is None:
+            self._pack_cache = list(load_packs(self.pack_dir))
+        return self._pack_cache
 
     def _add_known_pack(self, path):
-        if self._packs is not None:
-            self._packs.append(Pack(path))
+        """Add a newly appeared pack to the cache by path.
+
+        """
+        if self._pack_cache is not None:
+            self._pack_cache.append(Pack(path))
 
     def _get_shafile_path(self, sha):
         dir = sha[:2]
@@ -99,8 +110,10 @@ class ObjectStore(object):
         :return: tuple with object type and object contents.
         """
         for pack in self.packs:
-            if sha in pack:
+            try:
                 return pack.get_raw(sha, self.get_raw)
+            except KeyError:
+                pass
         # FIXME: Are thin pack deltas ever against on-disk shafiles ?
         ret = self._get_shafile(sha)
         if ret is not None:
@@ -125,11 +138,11 @@ class ObjectStore(object):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        temppath = os.path.join(self.pack_dir(), 
+        temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
         write_pack(temppath, p.iterobjects(self.get_raw), len(p))
         pack_sha = PackIndex(temppath+".idx").objects_sha1()
-        newbasename = os.path.join(self.pack_dir(), "pack-%s" % pack_sha)
+        newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
         os.rename(temppath+".idx", newbasename+".idx")
         self._add_known_pack(newbasename)
@@ -144,7 +157,7 @@ class ObjectStore(object):
         """
         p = PackData(path)
         entries = p.sorted_entries()
-        basename = os.path.join(self.pack_dir(), 
+        basename = os.path.join(self.pack_dir, 
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
@@ -156,7 +169,7 @@ class ObjectStore(object):
         Thin packs are packs that contain deltas with parents that exist 
         in a different pack.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
             os.fsync(fd)
@@ -171,7 +184,7 @@ class ObjectStore(object):
         :return: Fileobject to write to and a commit function to 
             call when the pack is finished.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir(), suffix=".pack")
+        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'w')
         def commit():
             os.fsync(fd)
@@ -181,6 +194,10 @@ class ObjectStore(object):
         return f, commit
 
     def add_objects(self, objects):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over a list of objects.
+        """
         if len(objects) == 0:
             return
         f, commit = self.add_pack()
@@ -189,46 +206,60 @@ class ObjectStore(object):
 
 
 class ObjectImporter(object):
+    """Interface for importing objects."""
 
     def __init__(self, count):
+        """Create a new ObjectImporter.
+
+        :param count: Number of objects that's going to be imported.
+        """
         self.count = count
 
     def add_object(self, object):
+        """Add an object."""
         raise NotImplementedError(self.add_object)
 
     def finish(self, object):
+        """Finish the imoprt and write objects to disk."""
         raise NotImplementedError(self.finish)
 
 
 class ObjectIterator(object):
+    """Interface for iterating over objects."""
 
     def iterobjects(self):
         raise NotImplementedError(self.iterobjects)
 
 
 class ObjectStoreIterator(ObjectIterator):
+    """ObjectIterator that works on top of an ObjectStore."""
 
     def __init__(self, store, sha_iter):
         self.store = store
-        self.shas = list(sha_iter)
+        self.sha_iter = sha_iter
+        self._shas = []
 
     def __iter__(self):
-        return ((self.store[sha], path) for sha, path in self.shas)
+        for sha, path in self.itershas():
+            yield self.store[sha], path
 
     def iterobjects(self):
         for o, path in self:
             yield o
+
+    def itershas(self):
+        for sha in self._shas:
+            yield sha
+        for sha in self.sha_iter:
+            self._shas.append(sha)
+            yield sha
 
     def __contains__(self, needle):
         """Check if an object is present.
 
         :param needle: SHA1 of the object to check for
         """
-        # FIXME: This could be more efficient
-        for sha, path in self.shas:
-            if sha == needle:
-                return True
-        return False
+        return needle in self.store
 
     def __getitem__(self, key):
         """Find an object by SHA1."""
@@ -236,6 +267,4 @@ class ObjectStoreIterator(ObjectIterator):
 
     def __len__(self):
         """Return the number of objects."""
-        return len(self.shas)
-
-
+        return len(list(self.itershas()))

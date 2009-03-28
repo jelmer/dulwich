@@ -263,7 +263,11 @@ class PackIndex(object):
         return self._object_index(sha)
   
     def _object_index(self, sha):
-        """See object_index"""
+        """See object_index.
+        
+        :param sha: A *binary* SHA string. (20 characters long)_
+        """
+        assert len(sha) == 20
         idx = ord(sha[0])
         if idx == 0:
             start = 0
@@ -719,21 +723,22 @@ def create_delta(base_buf, target_buf):
 
 
 def apply_delta(src_buf, delta):
-    """Based on the similar function in git's patch-delta.c."""
+    """Based on the similar function in git's patch-delta.c.
+    
+    :param src_buf: Source buffer
+    :param delta: Delta instructions
+    """
     assert isinstance(src_buf, str), "was %r" % (src_buf,)
     assert isinstance(delta, str)
     out = []
     index = 0
     delta_length = len(delta)
-    def pop(delta, index):
-        ret = delta[index]
-        index += 1
-        return ord(ret), index
     def get_delta_header_size(delta, index):
         size = 0
         i = 0
         while delta:
-            cmd, index = pop(delta, index)
+            cmd = ord(delta[index])
+            index += 1
             size |= (cmd & ~0x80) << i
             i += 7
             if not cmd & 0x80:
@@ -743,17 +748,20 @@ def apply_delta(src_buf, delta):
     dest_size, index = get_delta_header_size(delta, index)
     assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
     while index < delta_length:
-        cmd, index = pop(delta, index)
+        cmd = ord(delta[index])
+        index += 1
         if cmd & 0x80:
             cp_off = 0
             for i in range(4):
                 if cmd & (1 << i): 
-                    x, index = pop(delta, index)
+                    x = ord(delta[index])
+                    index += 1
                     cp_off |= x << (i * 8)
             cp_size = 0
             for i in range(3):
                 if cmd & (1 << (4+i)): 
-                    x, index = pop(delta, index)
+                    x = ord(delta[index])
+                    index += 1
                     cp_size |= x << (i * 8)
             if cp_size == 0: 
                 cp_size = 0x10000

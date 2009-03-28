@@ -277,9 +277,6 @@ class PackIndex(object):
         at within the corresponding pack file. If the pack file doesn't have the
         object then None will be returned.
         """
-        size = os.path.getsize(self._filename)
-        assert size == self._size, "Pack index %s has changed size, I don't " \
-             "like that" % self._filename
         if len(sha) == 40:
             sha = hex_to_sha(sha)
         return self._object_index(sha)
@@ -532,12 +529,9 @@ class PackData(object):
         assert isinstance(offset, long) or isinstance(offset, int),\
                 "offset was %r" % offset
         assert offset >= self._header_size
-        size = os.path.getsize(self._filename)
-        assert size == self._size, "Pack data %s has changed size, I don't " \
-             "like that" % self._filename
         f = open(self._filename, 'rb')
         try:
-            map = simple_mmap(f, offset, size-offset)
+            map = simple_mmap(f, offset, self._size-offset)
             ret = unpack_object(map)[:2]
             return ret
         finally:

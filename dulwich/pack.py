@@ -315,15 +315,15 @@ def read_pack_tail(f):
     return (f.read(20),)
 
 
-def unpack_object(map):
-    bytes = take_msb_bytes(map, 0)
+def unpack_object(map, offset=0):
+    bytes = take_msb_bytes(map, offset)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type == 6: # offset delta
-        bytes = take_msb_bytes(map, raw_base)
+        bytes = take_msb_bytes(map, raw_base + offset)
         assert not (bytes[-1] & 0x80)
         delta_base_offset = bytes[0] & 0x7f
         for byte in bytes[1:]:
@@ -331,16 +331,16 @@ def unpack_object(map):
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
         raw_base+=len(bytes)
-        uncomp, comp_len = read_zlib(map, raw_base, size)
+        uncomp, comp_len = read_zlib(map, offset + raw_base, size)
         assert size == len(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base
     elif type == 7: # ref delta
-        basename = map[raw_base:raw_base+20]
-        uncomp, comp_len = read_zlib(map, raw_base+20, size)
+        basename = map[offset+raw_base:offset+raw_base+20]
+        uncomp, comp_len = read_zlib(map, offset+raw_base+20, size)
         assert size == len(uncomp)
         return type, (basename, uncomp), comp_len+raw_base+20
     else:
-        uncomp, comp_len = read_zlib(map, raw_base, size)
+        uncomp, comp_len = read_zlib(map, offset+raw_base, size)
         assert len(uncomp) == size
         return type, uncomp, comp_len+raw_base
 

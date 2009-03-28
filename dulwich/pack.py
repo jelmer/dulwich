@@ -189,17 +189,17 @@ class PackIndex(object):
   
     def _unpack_name(self, i):
         if self.version == 1:
-            return self._unpack_entry(i)[0]
+            offset = (0x100 * 4) + (i * 24) + 4
         else:
-            return unpack_from("20s", self._contents, 
-                                      self._name_table_offset + i * 20)[0]
+            offset = self._name_table_offset + i * 20
+        return self._contents[offset:offset+20]
   
     def _unpack_offset(self, i):
         if self.version == 1:
-            return self._unpack_entry(i)[1]
+            offset = (0x100 * 4) + (i * 24)
         else:
-            return unpack_from(">L", self._contents, 
-                                      self._pack_offset_table_offset + i * 4)[0]
+            offset = self._pack_offset_table_offset + i * 4
+        return unpack_from(">L", self._contents, offset)[0]
   
     def _unpack_crc32_checksum(self, i):
         if self.version == 1:

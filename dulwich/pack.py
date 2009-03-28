@@ -111,30 +111,10 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
         raise AssertionError("%s is larger than 256 meg, and this version "
             "of Python does not support the offset argument to mmap().")
     if supports_mmap_offset:
-        return mmap.mmap(f.fileno(), size, access=access, offset=offset)
+        return mmap.mmap(f.fileno(), size, access=access, offset=offset), 0
     else:
-        class ArraySkipper(object):
-
-            def __init__(self, array, offset):
-                self.array = array
-                self.offset = offset
-
-            def __getslice__(self, i, j):
-                return self.array[i+self.offset:j+self.offset]
-
-            def __getitem__(self, i):
-                return self.array[i+self.offset]
-
-            def __len__(self):
-                return len(self.array) - self.offset
-
-            def __str__(self):
-                return str(self.array[self.offset:])
-
         mem = mmap.mmap(f.fileno(), size+offset, access=access)
-        if offset == 0:
-            return mem
-        return ArraySkipper(mem, offset)
+        return mem, offset
 
 
 class PackIndex(object):
@@ -162,7 +142,8 @@ class PackIndex(object):
         # ensure that it hasn't changed.
         self._size = os.path.getsize(filename)
         self._file = open(filename, 'r')
-        self._contents = simple_mmap(self._file, 0, self._size)
+        self._contents, map_offset = simple_mmap(self._file, 0, self._size)
+        assert map_offset == 0
         if self._contents[:4] != '\377tOc':
             self.version = 1
             self._fan_out_table = self._read_fan_out_table(0)
@@ -415,8 +396,8 @@ class PackData(object):
         """Calculate the checksum for this pack."""
         f = open(self._filename, 'rb')
         try:
-            map = simple_mmap(f, 0, self._size)
-            return make_sha(map[:-20]).digest()
+            map, map_offset = simple_mmap(f, 0, self._size - 20)
+            return make_sha(map[map_offset:self._size-20]).digest()
         finally:
             f.close()
 
@@ -456,10 +437,11 @@ class PackData(object):
     def iterobjects(self):
         offset = self._header_size
         f = open(self._filename, 'rb')
-        for i in range(len(self)):
-            map = simple_mmap(f, offset, self._size-offset)
-            (type, obj, total_size) = unpack_object(map)
-            crc32 = zlib.crc32(map[:total_size]) & 0xffffffff
+        num = len(self)
+        map, _ = simple_mmap(f, 0, self._size)
+        for i in range(num):
+            (type, obj, total_size) = unpack_object(map, offset)
+            crc32 = zlib.crc32(map[offset:offset+total_size]) & 0xffffffff
             yield offset, type, obj, crc32
             offset += total_size
         f.close()
@@ -531,8 +513,8 @@ class PackData(object):
         assert offset >= self._header_size
         f = open(self._filename, 'rb')
         try:
-            map = simple_mmap(f, offset, self._size-offset)
-            ret = unpack_object(map)[:2]
+            map, map_offset = simple_mmap(f, offset, self._size-offset)
+            ret = unpack_object(map, map_offset)[:2]
             return ret
         finally:
             f.close()

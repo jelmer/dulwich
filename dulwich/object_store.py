@@ -119,7 +119,7 @@ class ObjectStore(object):
             raise AssertionError
         for pack in self.packs:
             try:
-                return pack.get_raw(sha, self.get_raw)
+                return pack.get_raw(sha)
             except KeyError:
                 pass
         if hexsha is None: 

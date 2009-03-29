@@ -516,3 +516,9 @@ num_type_map = {
     # 5 Is reserved for further expansion
 }
 
+try:
+    # Try to import C versions
+    from dulwich._objects import hex_to_sha, sha_to_hex
+except ImportError:
+    pass
+

@@ -3,6 +3,7 @@
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 
 from distutils.core import setup
+from distutils.extension import Extension
 
 dulwich_version_string = '0.1.1'
 
@@ -22,4 +23,5 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon'],
+      ext_modules=[Extension('dulwich/_objects', ['dulwich/_objects.c'])],
       )

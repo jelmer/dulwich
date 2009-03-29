@@ -114,7 +114,7 @@ class ObjectStore(object):
             hexsha = name
         elif len(name) == 20:
             sha = name
-            hexsha = sha_to_hex(name)
+            hexsha = None
         else:
             raise AssertionError
         for pack in self.packs:
@@ -122,6 +122,8 @@ class ObjectStore(object):
                 return pack.get_raw(sha, self.get_raw)
             except KeyError:
                 pass
+        if hexsha is None: 
+            hexsha = sha_to_hex(name)
         ret = self._get_shafile(hexsha)
         if ret is not None:
             return ret.as_raw_string()

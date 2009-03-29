@@ -121,11 +121,6 @@ class ObjectStore(object):
         raise KeyError(sha)
 
     def __getitem__(self, sha):
-        assert len(sha) == 40, "Incorrect length sha: %s" % str(sha)
-        ret = self._get_shafile(sha)
-        if ret is not None:
-            return ret
-        # Check from packs
         type, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type, uncomp)
 

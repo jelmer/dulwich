@@ -50,20 +50,14 @@ def _decompress(string):
 
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
-    hexsha = ''
-    for c in sha:
-        hexsha += "%02x" % ord(c)
-    assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % \
-           len(hexsha)
+    hexsha = "".join(["%02x" % ord(c) for c in sha])
+    assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % hexsha
     return hexsha
 
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha"""
-    sha = ''
-    for i in range(0, len(hex), 2):
-        sha += chr(int(hex[i:i+2], 16))
-    assert len(sha) == 20, "Incorrent length of sha1: %d" % len(sha)
-    return sha
+    assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
+    return ''.join([chr(int(hex[i:i+2], 16)) for i in xrange(0, len(hex), 2)])
 
 class ShaFile(object):
     """A git SHA file."""

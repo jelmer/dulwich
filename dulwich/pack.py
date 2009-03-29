@@ -229,11 +229,7 @@ class PackIndex(object):
         return self.calculate_checksum() == self.get_stored_checksum()
   
     def calculate_checksum(self):
-        f = open(self._filename, 'r')
-        try:
-            return make_sha(self._contents[:-20]).digest()
-        finally:
-            f.close()
+        return make_sha(self._contents[:-20]).digest()
 
     def get_pack_checksum(self):
         """Return the SHA1 checksum stored for the corresponding packfile."""

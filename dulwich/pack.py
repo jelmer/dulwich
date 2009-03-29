@@ -90,6 +90,7 @@ def read_zlib(data, offset, dec_size):
 
 
 def iter_sha1(iter):
+    """Return the hexdigest of the SHA1 over a set of names."""
     sha1 = make_sha()
     for name in iter:
         sha1.update(name)
@@ -117,6 +118,20 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
         return mem, offset
 
 
+def load_pack_index(filename):
+    f = open(filename, 'r')
+    if f.read(4) == '\377tOc':
+        version = struct.unpack(">L", f.read(4))[0]
+        if version == 2:
+            f.seek(0)
+            return PackIndex2(filename, file=f)
+        else:
+            raise KeyError("Unknown pack index format %d" % version)
+    else:
+        f.seek(0)
+        return PackIndex1(filename, file=f)
+
+
 class PackIndex(object):
     """An index in to a packfile.
   
@@ -131,7 +146,7 @@ class PackIndex(object):
     the start and end offset and then bisect in to find if the value is present.
     """
   
-    def __init__(self, filename):
+    def __init__(self, filename, file=None):
         """Create a pack index object.
     
         Provide it with the name of the index file to consider, and it will map
@@ -141,22 +156,15 @@ class PackIndex(object):
         # Take the size now, so it can be checked each time we map the file to
         # ensure that it hasn't changed.
         self._size = os.path.getsize(filename)
-        self._file = open(filename, 'r')
+        if file is None:
+            self._file = open(filename, 'r')
+        else:
+            self._file = file
         self._contents, map_offset = simple_mmap(self._file, 0, self._size)
         assert map_offset == 0
-        if self._contents[:4] != '\377tOc':
-            self.version = 1
-            self._fan_out_table = self._read_fan_out_table(0)
-        else:
-            (self.version, ) = unpack_from(">L", self._contents, 4)
-            assert self.version in (2,), "Version was %d" % self.version
-            self._fan_out_table = self._read_fan_out_table(8)
-            self._name_table_offset = 8 + 0x100 * 4
-            self._crc32_table_offset = self._name_table_offset + 20 * len(self)
-            self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
   
     def __eq__(self, other):
-        if type(self) != type(other):
+        if not isinstance(other, PackIndex):
             return False
     
         if self._fan_out_table != other._fan_out_table:
@@ -179,34 +187,19 @@ class PackIndex(object):
     
         :return: Tuple with object name (SHA), offset in pack file and 
               CRC32 checksum (if known)."""
-        if self.version == 1:
-            (offset, name) = unpack_from(">L20s", self._contents, 
-                (0x100 * 4) + (i * 24))
-            return (name, offset, None)
-        else:
-            return (self._unpack_name(i), self._unpack_offset(i), 
-                    self._unpack_crc32_checksum(i))
+        raise NotImplementedError(self._unpack_entry)
   
     def _unpack_name(self, i):
-        if self.version == 1:
-            offset = (0x100 * 4) + (i * 24) + 4
-        else:
-            offset = self._name_table_offset + i * 20
-        return self._contents[offset:offset+20]
+        """Unpack the i-th name from the index file."""
+        raise NotImplementedError(self._unpack_name)
   
     def _unpack_offset(self, i):
-        if self.version == 1:
-            offset = (0x100 * 4) + (i * 24)
-        else:
-            offset = self._pack_offset_table_offset + i * 4
-        return unpack_from(">L", self._contents, offset)[0]
-  
+        """Unpack the i-th object offset from the index file."""
+        raise NotImplementedError(self._unpack_offset)
+
     def _unpack_crc32_checksum(self, i):
-        if self.version == 1:
-            return None
-        else:
-            return unpack_from(">L", self._contents, 
-                                      self._crc32_table_offset + i * 4)[0]
+        """Unpack the crc32 checksum for the i-th object from the index file."""
+        raise NotImplementedError(self._unpack_crc32_checksum)
   
     def __iter__(self):
         return imap(sha_to_hex, self._itersha())
@@ -216,6 +209,10 @@ class PackIndex(object):
             yield self._unpack_name(i)
   
     def objects_sha1(self):
+        """Return the hex SHA1 over all the shas of all objects in this pack.
+        
+        :note: This is used for the filename of the pack.
+        """
         return iter_sha1(self._itersha())
   
     def iterentries(self):
@@ -285,6 +282,63 @@ class PackIndex(object):
             else:
                 return self._unpack_offset(i)
         return None
+
+
+class PackIndex1(PackIndex):
+    """Version 1 Pack Index."""
+
+    def __init__(self, filename, file=None):
+        PackIndex.__init__(self, filename, file)
+        self.version = 1
+        self._fan_out_table = self._read_fan_out_table(0)
+
+    def _unpack_entry(self, i):
+        (offset, name) = unpack_from(">L20s", self._contents, 
+            (0x100 * 4) + (i * 24))
+        return (name, offset, None)
+ 
+    def _unpack_name(self, i):
+        offset = (0x100 * 4) + (i * 24) + 4
+        return self._contents[offset:offset+20]
+  
+    def _unpack_offset(self, i):
+        offset = (0x100 * 4) + (i * 24)
+        return unpack_from(">L", self._contents, offset)[0]
+  
+    def _unpack_crc32_checksum(self, i):
+        # Not stored in v1 index files
+        return None 
+  
+
+class PackIndex2(PackIndex):
+    """Version 2 Pack Index."""
+
+    def __init__(self, filename, file=None):
+        PackIndex.__init__(self, filename, file)
+        assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
+        (self.version, ) = unpack_from(">L", self._contents, 4)
+        assert self.version == 2, "Version was %d" % self.version
+        self._fan_out_table = self._read_fan_out_table(8)
+        self._name_table_offset = 8 + 0x100 * 4
+        self._crc32_table_offset = self._name_table_offset + 20 * len(self)
+        self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
+
+    def _unpack_entry(self, i):
+        return (self._unpack_name(i), self._unpack_offset(i), 
+                self._unpack_crc32_checksum(i))
+ 
+    def _unpack_name(self, i):
+        offset = self._name_table_offset + i * 20
+        return self._contents[offset:offset+20]
+  
+    def _unpack_offset(self, i):
+        offset = self._pack_offset_table_offset + i * 4
+        return unpack_from(">L", self._contents, offset)[0]
+  
+    def _unpack_crc32_checksum(self, i):
+        return unpack_from(">L", self._contents, 
+                          self._crc32_table_offset + i * 4)[0]
+  
 
 
 def read_pack_header(f):
@@ -846,7 +900,7 @@ class Pack(object):
     @property
     def idx(self):
         if self._idx is None:
-            self._idx = PackIndex(self._idx_path)
+            self._idx = load_pack_index(self._idx_path)
         return self._idx
 
     def close(self):

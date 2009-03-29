@@ -433,19 +433,18 @@ class PackData(object):
         self._size = os.path.getsize(filename)
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
+        self._file = open(self._filename, 'rb')
         self._read_header()
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=compute_object_size)
+
+    def close(self):
+        self._file.close()
   
     def _read_header(self):
-        f = open(self._filename, 'rb')
-        try:
-            (version, self._num_objects) = \
-                    read_pack_header(f)
-            f.seek(self._size-20)
-            (self._stored_checksum,) = read_pack_tail(f)
-        finally:
-            f.close()
+        (version, self._num_objects) = read_pack_header(self._file)
+        self._file.seek(self._size-20)
+        (self._stored_checksum,) = read_pack_tail(self._file)
   
     def __len__(self):
         """Returns the number of objects in this pack."""
@@ -453,12 +452,11 @@ class PackData(object):
   
     def calculate_checksum(self):
         """Calculate the checksum for this pack."""
-        f = open(self._filename, 'rb')
+        map, map_offset = simple_mmap(self._file, 0, self._size - 20)
         try:
-            map, map_offset = simple_mmap(f, 0, self._size - 20)
             return make_sha(map[map_offset:self._size-20]).digest()
         finally:
-            f.close()
+            map.close()
 
     def resolve_object(self, offset, type, obj, get_ref, get_offset=None):
         """Resolve an object, possibly resolving deltas when necessary.
@@ -495,15 +493,16 @@ class PackData(object):
   
     def iterobjects(self):
         offset = self._header_size
-        f = open(self._filename, 'rb')
         num = len(self)
-        map, _ = simple_mmap(f, 0, self._size)
-        for i in range(num):
-            (type, obj, total_size) = unpack_object(map, offset)
-            crc32 = zlib.crc32(map[offset:offset+total_size]) & 0xffffffff
-            yield offset, type, obj, crc32
-            offset += total_size
-        f.close()
+        map, _ = simple_mmap(self._file, 0, self._size)
+        try:
+            for i in range(num):
+                (type, obj, total_size) = unpack_object(map, offset)
+                crc32 = zlib.crc32(map[offset:offset+total_size]) & 0xffffffff
+                yield offset, type, obj, crc32
+                offset += total_size
+        finally:
+            map.close()
   
     def iterentries(self, ext_resolve_ref=None):
         found = {}
@@ -570,13 +569,12 @@ class PackData(object):
         assert isinstance(offset, long) or isinstance(offset, int),\
                 "offset was %r" % offset
         assert offset >= self._header_size
-        f = open(self._filename, 'rb')
+        map, map_offset = simple_mmap(self._file, offset, self._size-offset)
         try:
-            map, map_offset = simple_mmap(f, offset, self._size-offset)
             ret = unpack_object(map, map_offset)[:2]
             return ret
         finally:
-            f.close()
+            map.close()
 
 
 class SHA1Writer(object):

@@ -280,7 +280,7 @@ class PackIndex(object):
         end = self._fan_out_table[idx]
         i = bisect_find_sha(start, end, sha, self._unpack_name)
         if i is None:
-            return None
+            raise KeyError(sha)
         return self._unpack_offset(i)
             
 
@@ -434,7 +434,7 @@ class PackData(object):
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
         self._read_header()
-        self._offset_cache = LRUSizeCache(1024*1024*100, 
+        self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=compute_object_size)
   
     def _read_header(self):
@@ -935,19 +935,20 @@ class Pack(object):
 
     def __contains__(self, sha1):
         """Check whether this pack contains a particular SHA1."""
-        return (self.idx.object_index(sha1) is not None)
+        try:
+            self.idx.object_index(sha1)
+            return True
+        except KeyError:
+            return False
 
     def get_raw(self, sha1, resolve_ref=None):
         offset = self.idx.object_index(sha1)
-        if offset is None:
-            raise KeyError(sha1)
-        type, obj = self.data.get_object_at(offset)
-        if isinstance(offset, long):
+        obj_type, obj = self.data.get_object_at(offset)
+        if type(offset) is long:
           offset = int(offset)
         if resolve_ref is None:
             resolve_ref = self.get_raw
-        assert isinstance(offset, int)
-        return self.data.resolve_object(offset, type, obj, resolve_ref)
+        return self.data.resolve_object(offset, obj_type, obj, resolve_ref)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

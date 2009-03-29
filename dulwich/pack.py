@@ -915,3 +915,8 @@ def load_packs(path):
         if name.startswith("pack-") and name.endswith(".pack"):
             yield Pack(os.path.join(path, name[:-len(".pack")]))
 
+
+try:
+    from dulwich._pack import apply_delta
+except ImportError:
+    pass

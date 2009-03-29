@@ -103,22 +103,29 @@ class ObjectStore(object):
         finally:
             f.close()
 
-    def get_raw(self, sha):
+    def get_raw(self, name):
         """Obtain the raw text for an object.
         
-        :param sha: Sha for the object.
+        :param name: sha for the object.
         :return: tuple with object type and object contents.
         """
+        if len(name) == 40:
+            sha = hex_to_sha(name)
+            hexsha = name
+        elif len(name) == 20:
+            sha = name
+            hexsha = sha_to_hex(name)
+        else:
+            raise AssertionError
         for pack in self.packs:
             try:
                 return pack.get_raw(sha, self.get_raw)
             except KeyError:
                 pass
-        # FIXME: Are thin pack deltas ever against on-disk shafiles ?
-        ret = self._get_shafile(sha)
+        ret = self._get_shafile(hexsha)
         if ret is not None:
             return ret.as_raw_string()
-        raise KeyError(sha)
+        raise KeyError(hexsha)
 
     def __getitem__(self, sha):
         type, uncomp = self.get_raw(sha)

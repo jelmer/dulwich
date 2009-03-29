@@ -128,6 +128,21 @@ def load_pack_index(filename):
         return PackIndex1(filename, file=f)
 
 
+def bisect_find_sha(start, end, sha, unpack_name):
+    assert start <= end
+    while start <= end:
+        i = (start + end)/2
+        file_sha = unpack_name(i)
+        x = cmp(file_sha, sha)
+        if x < 0:
+            start = i + 1
+        elif x > 0:
+            end = i - 1
+        else:
+            return i
+    return None
+
+
 class PackIndex(object):
     """An index in to a packfile.
   
@@ -263,17 +278,11 @@ class PackIndex(object):
         else:
             start = self._fan_out_table[idx-1]
         end = self._fan_out_table[idx]
-        assert start <= end
-        while start <= end:
-            i = (start + end)/2
-            file_sha = self._unpack_name(i)
-            if file_sha < sha:
-                start = i + 1
-            elif file_sha > sha:
-                end = i - 1
-            else:
-                return self._unpack_offset(i)
-        return None
+        i = bisect_find_sha(start, end, sha, self._unpack_name)
+        if i is None:
+            return None
+        return self._unpack_offset(i)
+            
 
 
 class PackIndex1(PackIndex):
@@ -963,6 +972,6 @@ def load_packs(path):
 
 
 try:
-    from dulwich._pack import apply_delta
+    from dulwich._pack import apply_delta, bisect_find_sha
 except ImportError:
     pass

@@ -97,8 +97,6 @@ def iter_sha1(iter):
     return sha1.hexdigest()
 
 
-MAX_MMAP_SIZE = 1024 * 1024 * 1024
-
 def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     """Simple wrapper for mmap() which always supports the offset parameter.
 
@@ -108,9 +106,6 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     :param access: Access mechanism.
     :return: MMAP'd area.
     """
-    if offset+size > MAX_MMAP_SIZE and not supports_mmap_offset:
-        raise AssertionError("%s is larger than 256 meg, and this version "
-            "of Python does not support the offset argument to mmap().")
     if supports_mmap_offset:
         return mmap.mmap(f.fileno(), size, access=access, offset=offset), 0
     else:

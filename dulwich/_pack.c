@@ -20,6 +20,17 @@
 #include <Python.h>
 #include <stdint.h>
 
+static int py_is_sha(PyObject *sha)
+{
+    if (!PyString_Check(sha))
+        return 0;
+
+    if (PyString_Size(sha) != 20)
+        return 0;
+
+    return 1;
+}
+
 
 static size_t get_delta_header_size(uint8_t *delta, int *index, int length)
 {
@@ -116,8 +127,54 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
     return ret;
 }
 
+static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
+{
+    PyObject *unpack_name;
+    char *sha;
+    int sha_len;
+	int start, end;
+    int idx;
+    if (!PyArg_ParseTuple(args, "iis#O", &start, &end, 
+						  &sha, &sha_len, &unpack_name))
+        return NULL;
+
+    if (sha_len != 20) {
+        PyErr_SetString(PyExc_ValueError, "Sha is not 20 bytes long");
+        return NULL;
+    }
+    if (start > end) {
+        PyErr_SetString(PyExc_AssertionError, "start > end");
+        return NULL;
+    }
+
+    while (start <= end) {
+        PyObject *file_sha;
+        int i = (start + end)/2;
+        int cmp;
+        file_sha = PyObject_CallFunction(unpack_name, "i", i);
+        if (file_sha == NULL) {
+            return NULL;
+        }
+        if (!py_is_sha(file_sha)) {
+            PyErr_SetString(PyExc_TypeError, "unpack_name returned non-sha object");
+            return NULL;
+        }
+        cmp = memcmp(PyString_AsString(file_sha), sha, 20);
+        if (cmp < 0)
+            start = i + 1;
+        else if (cmp > 0)
+            end = i - 1;
+        else {
+			return PyInt_FromLong(i);
+        }
+    }
+    Py_RETURN_NONE;
+}
+
+
 static PyMethodDef py_pack_methods[] = {
 	{ "apply_delta", (PyCFunction)py_apply_delta, METH_VARARGS, NULL },
+    { "bisect_find_sha", (PyCFunction)py_bisect_find_sha, METH_VARARGS, NULL },
 };
 
 void init_pack(void)

@@ -410,7 +410,7 @@ class PackData(object):
         
         :return: Tuple with object type and contents.
         """
-        if not type in (6, 7): # Not a delta
+        if type not in (6, 7): # Not a delta
             return type, obj
 
         if get_offset is None:
@@ -889,6 +889,8 @@ class Pack(object):
         type, obj = self.data.get_object_at(offset)
         if isinstance(offset, long):
           offset = int(offset)
+        if resolve_ref is None:
+            resolve_ref = self.get_raw
         assert isinstance(offset, int)
         return self.data.resolve_object(offset, type, obj, resolve_ref)
 
@@ -899,8 +901,7 @@ class Pack(object):
 
     def iterobjects(self, get_raw=None):
         if get_raw is None:
-            def get_raw(x):
-                raise KeyError(x)
+            get_raw = self.get_raw
         for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(

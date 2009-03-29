@@ -25,10 +25,10 @@ from dulwich.objects import (
     )
 from dulwich.pack import (
     Pack,
-    PackIndex,
     PackData,
     apply_delta,
     create_delta,
+    load_pack_index,
     hex_to_sha,
     read_zlib,
     sha_to_hex,
@@ -50,7 +50,7 @@ class PackTests(unittest.TestCase):
   
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""
-        return PackIndex(os.path.join(self.datadir, 'pack-%s.idx' % sha))
+        return load_pack_index(os.path.join(self.datadir, 'pack-%s.idx' % sha))
   
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha"""
@@ -144,14 +144,14 @@ class TestPackData(PackTests):
     def test_create_index_v1(self):
         p = self.get_pack_data(pack1_sha)
         p.create_index_v1("v1test.idx")
-        idx1 = PackIndex("v1test.idx")
+        idx1 = load_pack_index("v1test.idx")
         idx2 = self.get_pack_index(pack1_sha)
         self.assertEquals(idx1, idx2)
   
     def test_create_index_v2(self):
         p = self.get_pack_data(pack1_sha)
         p.create_index_v2("v2test.idx")
-        idx1 = PackIndex("v2test.idx")
+        idx1 = load_pack_index("v2test.idx")
         idx2 = self.get_pack_index(pack1_sha)
         self.assertEquals(idx1, idx2)
 
@@ -229,7 +229,7 @@ class BaseTestPackIndexWriting(object):
     def test_empty(self):
         pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
         self._write_fn("empty.idx", [], pack_checksum)
-        idx = PackIndex("empty.idx")
+        idx = load_pack_index("empty.idx")
         self.assertTrue(idx.check())
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(0, len(idx))
@@ -239,7 +239,7 @@ class BaseTestPackIndexWriting(object):
         my_entries = [('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, 42)]
         my_entries.sort()
         self._write_fn("single.idx", my_entries, pack_checksum)
-        idx = PackIndex("single.idx")
+        idx = load_pack_index("single.idx")
         self.assertEquals(idx.version, self._expected_version)
         self.assertTrue(idx.check())
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)

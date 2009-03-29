@@ -30,6 +30,7 @@ from dulwich.pack import (
     PackData, 
     iter_sha1, 
     load_packs, 
+    load_pack_index,
     write_pack,
     write_pack_data,
     write_pack_index_v2,
@@ -145,7 +146,7 @@ class ObjectStore(object):
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
         write_pack(temppath, p.iterobjects(self.get_raw), len(p))
-        pack_sha = PackIndex(temppath+".idx").objects_sha1()
+        pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
         os.rename(temppath+".idx", newbasename+".idx")

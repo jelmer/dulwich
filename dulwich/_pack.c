@@ -133,7 +133,6 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
     char *sha;
     int sha_len;
 	int start, end;
-    int idx;
     if (!PyArg_ParseTuple(args, "iis#O", &start, &end, 
 						  &sha, &sha_len, &unpack_name))
         return NULL;
@@ -157,9 +156,11 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
         }
         if (!py_is_sha(file_sha)) {
             PyErr_SetString(PyExc_TypeError, "unpack_name returned non-sha object");
+			Py_DECREF(file_sha);
             return NULL;
         }
         cmp = memcmp(PyString_AsString(file_sha), sha, 20);
+		Py_DECREF(file_sha);
         if (cmp < 0)
             start = i + 1;
         else if (cmp > 0)

@@ -75,7 +75,7 @@ def take_msb_bytes(map, offset):
 
 def read_zlib(data, offset, dec_size):
     obj = zlib.decompressobj()
-    x = ""
+    ret = []
     fed = 0
     while obj.unused_data == "":
         base = offset+fed
@@ -83,7 +83,8 @@ def read_zlib(data, offset, dec_size):
         if len(add) < 1024:
             add += "Z"
         fed += len(add)
-        x += obj.decompress(add)
+        ret.append(obj.decompress(add))
+    x = "".join(ret)
     assert len(x) == dec_size
     comp_len = fed-len(obj.unused_data)
     return x, comp_len

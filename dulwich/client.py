@@ -265,17 +265,18 @@ get_ssh_vendor = SSHVendor
 
 class SSHGitClient(GitClient):
 
-    def __init__(self, host, port=None):
+    def __init__(self, host, port=None, thin_packs=True):
         self.host = host
         self.port = port
+        self._thin_packs = thin_packs
 
     def send_pack(self, path):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
-        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send)
+        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, thin_packs=self._thin_packs)
         client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
-        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send)
+        client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, thin_packs=self._thin_packs)
         client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
 

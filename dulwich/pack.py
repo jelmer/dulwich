@@ -886,7 +886,6 @@ class Pack(object):
         offset = self.idx.object_index(sha1)
         if offset is None:
             raise KeyError(sha1)
-
         type, obj = self.data.get_object_at(offset)
         if isinstance(offset, long):
           offset = int(offset)

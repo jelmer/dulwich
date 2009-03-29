@@ -23,7 +23,7 @@ import unittest
 from dulwich import errors
 from dulwich.repo import Repo
 
-missing_sha = 'b91fa4d900g17e99b433218e988c4eb4a3e9a097'
+missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 class RepositoryTests(unittest.TestCase):
   

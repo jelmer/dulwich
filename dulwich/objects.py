@@ -211,6 +211,7 @@ class Tag(ShaFile):
     """A Git Tag object."""
 
     _type = TAG_ID
+    _num_type = 4
 
     @classmethod
     def from_file(cls, filename):

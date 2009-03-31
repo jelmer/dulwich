@@ -344,6 +344,12 @@ class Tree(ShaFile):
         """Return a list of tuples describing the tree entries"""
         return self._entries
 
+    def __getitem__(self, name):
+        for mode, entry, hexsha in self.entries():
+            if entry == name:
+                return mode, hexsha
+        raise KeyError(name)
+
     def _parse_text(self):
         """Grab the entries in the tree"""
         count = 0

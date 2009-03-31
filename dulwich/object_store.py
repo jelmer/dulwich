@@ -20,8 +20,12 @@ import os
 import tempfile
 import urllib2
 
+from dulwich.errors import (
+    NotTreeError,
+    )
 from dulwich.objects import (
     ShaFile,
+    Tree,
     hex_to_sha,
     sha_to_hex,
     )
@@ -273,3 +277,14 @@ class ObjectStoreIterator(ObjectIterator):
     def __len__(self):
         """Return the number of objects."""
         return len(list(self.itershas()))
+
+
+def tree_lookup_path(object_store, root_sha, path):
+    parts = path.split("/")
+    sha = root_sha
+    for p in parts:
+        obj = object_store[sha]
+        if type(obj) is not Tree:
+            raise NotTreeError(sha)
+        mode, sha = obj[p]
+    return object_store[sha]

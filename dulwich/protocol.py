@@ -47,9 +47,10 @@ class ProtocolFile(object):
 
 class Protocol(object):
 
-    def __init__(self, read, write):
+    def __init__(self, read, write, report_activity=None):
         self.read = read
         self.write = write
+        self.report_activity = report_activity
 
     def read_pkt_line(self):
         """
@@ -63,7 +64,10 @@ class Protocol(object):
                 raise HangupException()
             size = int(sizestr, 16)
             if size == 0:
+                self.report_activity(4, 'read')
                 return None
+            if self.report_activity:
+                self.report_activity(size, 'read')
             return self.read(size-4)
         except socket.error, e:
             raise GitProtocolError(e)
@@ -83,8 +87,10 @@ class Protocol(object):
         try:
             if line is None:
                 self.write("0000")
+                self.report_activity(4, 'write')
             else:
                 self.write("%04x%s" % (len(line)+4, line))
+                self.report_activity(4+len(line), 'write')
         except socket.error, e:
             raise GitProtocolError(e)
 

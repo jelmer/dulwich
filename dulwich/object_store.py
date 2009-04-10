@@ -146,10 +146,19 @@ class ObjectStore(object):
 
         :param path: Path to the pack file.
         """
-        p = PackData(path)
+        data = PackData(path)
+
+        # Write index for the thin pack (do we really need this?)
+        temppath = os.path.join(self.pack_dir, 
+            sha_to_hex(urllib2.randombytes(20))+".tempidx")
+        data.create_index_v2(temppath, self.get_raw)
+        p = Pack.from_objects(data, load_pack_index(temppath))
+
+        # Write a full pack version
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
-        write_pack(temppath, p.iterobjects(self.get_raw), len(p))
+        write_pack(temppath, ((o, None) for o in p.iterobjects(self.get_raw)), 
+                len(p))
         pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")

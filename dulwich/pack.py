@@ -523,7 +523,7 @@ class PackData(object):
                     pass
             raise Postpone, (sha, )
         extra = []
-        todo = chain(self.iterobjects(progress), extra)
+        todo = chain(self.iterobjects(progress=progress), extra)
         for (offset, type, obj, crc32) in todo:
             assert isinstance(offset, int)
             assert isinstance(type, int)
@@ -882,6 +882,13 @@ class Pack(object):
         self._idx_path = self._basename + ".idx"
         self._data = None
         self._idx = None
+
+    @classmethod
+    def from_objects(self, data, idx):
+        ret = Pack("")
+        ret._data = data
+        ret._idx = idx
+        return ret
 
     def name(self):
         """The SHA over the SHAs of the objects in this pack."""

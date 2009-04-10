@@ -72,8 +72,19 @@ class GitClient(object):
 
     """
 
-    def __init__(self, can_read, read, write, thin_packs=True):
-        self.proto = Protocol(read, write)
+    def __init__(self, can_read, read, write, thin_packs=True, 
+        report_activity=None):
+        """Create a new GitClient instance.
+
+        :param can_read: Function that returns True if there is data available
+            to be read.
+        :param read: Callback for reading data, takes number of bytes to read
+        :param write: Callback for writing data
+        :param thin_packs: Whether or not thin packs should be retrieved
+        :param report_activity: Optional callback for reporting transport
+            activity.
+        """
+        self.proto = Protocol(read, write, report_activity)
         self._can_read = can_read
         self._capabilities = list(CAPABILITIES)
         if thin_packs:

@@ -178,8 +178,10 @@ class GitClient(object):
 class TCPGitClient(GitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
-    def __init__(self, host, port=TCP_GIT_PORT, *args, **kwargs):
+    def __init__(self, host, port=None, *args, **kwargs):
         self._socket = socket.socket(type=socket.SOCK_STREAM)
+        if port is None:
+            port = TCP_GIT_PORT
         self._socket.connect((host, port))
         self.rfile = self._socket.makefile('rb', -1)
         self.wfile = self._socket.makefile('wb', 0)

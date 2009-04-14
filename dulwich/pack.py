@@ -108,7 +108,9 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     :return: MMAP'd area.
     """
     if supports_mmap_offset:
-        return mmap.mmap(f.fileno(), size, access=access, offset=offset), 0
+        return (mmap.mmap(f.fileno(), size, access=access, 
+                    offset=int(offset / mmap.ALLOCATIONGRANULARITY)), 
+                (offset % mmap.ALLOCATIONGRANULARITY))
     else:
         mem = mmap.mmap(f.fileno(), size+offset, access=access)
         return mem, offset

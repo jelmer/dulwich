@@ -66,6 +66,16 @@ class Tags(object):
             yield k, self[k]
 
 
+def read_packed_refs(f):
+    l = f.readline()
+    assert l == "# pack-refs with: peeled \n"
+    for l in f.readlines():
+        if l[0] == "^":
+            # FIXME: Return somehow
+            continue
+        yield tuple(l.rstrip("\n").split(" ", 2))
+
+
 class MissingObjectFinder(object):
 
     def __init__(self, object_store, wants, graph_walker, progress=None):
@@ -192,6 +202,9 @@ class Repo(object):
             file = os.path.join(self.controldir(), dir, name)
             if os.path.exists(file):
                 return self._get_ref(file)
+        packed_refs = self.get_packed_refs()
+        if name in packed_refs:
+            return packed_refs[name]
 
     def get_refs(self):
         ret = {}
@@ -202,7 +215,21 @@ class Repo(object):
                 path = os.path.join(self.controldir(), dir, name)
                 if os.path.isfile(path):
                     ret["/".join([dir, name])] = self._get_ref(path)
+        ret.update(self.get_packed_refs())
         return ret
+
+    def get_packed_refs(self):
+        path = os.path.join(self.controldir(), 'packed-refs')
+        if not os.path.exists(path):
+            return {}
+        ret = {}
+        f = open(path, 'r')
+        try:
+            for entry in read_packed_refs(f):
+                ret[entry[1]] = entry[0]
+            return ret
+        finally:
+            f.close()
 
     def set_ref(self, name, value):
         file = os.path.join(self.controldir(), name)

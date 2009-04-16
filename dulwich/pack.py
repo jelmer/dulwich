@@ -927,7 +927,7 @@ class Pack(object):
         return len(self.idx)
 
     def __repr__(self):
-        return "Pack(%r)" % self._basename
+        return "%s(%r)" % (self.__class__.__name__, self._basename)
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""

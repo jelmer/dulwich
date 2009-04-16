@@ -295,5 +295,7 @@ def tree_lookup_path(object_store, root_sha, path):
         obj = object_store[sha]
         if type(obj) is not Tree:
             raise NotTreeError(sha)
+        if p == '':
+            continue
         mode, sha = obj[p]
     return object_store[sha]

@@ -105,6 +105,8 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.committer,
             'James Westby <jw+debian@jameswestby.net>')
         self.assertEqual(c.commit_time, 1174759230)
+        self.assertEqual(c.commit_timezone, 0)
+        self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
   
     def test_read_commit_no_parents(self):
@@ -117,6 +119,8 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.committer,
             'James Westby <jw+debian@jameswestby.net>')
         self.assertEqual(c.commit_time, 1174758034)
+        self.assertEqual(c.commit_timezone, 0)
+        self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
   
     def test_read_commit_two_parents(self):
@@ -130,5 +134,7 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.committer,
             'James Westby <jw+debian@jameswestby.net>')
         self.assertEqual(c.commit_time, 1174773719)
+        self.assertEqual(c.commit_timezone, 0)
+        self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
   

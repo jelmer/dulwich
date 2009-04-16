@@ -435,7 +435,14 @@ class Commit(ShaFile):
                 count += 1
             self._author += text[count]
             count += 1
+            assert text[count] == ' ', "Invalid commit object, " \
+                 "author information must be followed by space not %s" % text[count]
+            count += 1
             self._author_time = int(text[count:count+10])
+            while text[count] != ' ':
+                count += 1
+            self._author_timezone = int(text[count:count+6])
+            count += 1
             while text[count] != '\n':
                 count += 1
             count += 1
@@ -456,6 +463,10 @@ class Commit(ShaFile):
                  "commiter information must be followed by space not %s" % text[count]
             count += 1
             self._commit_time = int(text[count:count+10])
+            while text[count] != ' ':
+                count += 1
+            self._commit_timezone = int(text[count:count+6])
+            count += 1
             while text[count] != '\n':
                 count += 1
             count += 1
@@ -469,8 +480,8 @@ class Commit(ShaFile):
         self._text += "%s %s\n" % (TREE_ID, self._tree)
         for p in self._parents:
             self._text += "%s %s\n" % (PARENT_ID, p)
-        self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._author_time))
-        self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
+        self._text += "%s %s %s %+05d\n" % (AUTHOR_ID, self._author, str(self._author_time), self._author_timezone)
+        self._text += "%s %s %s %+05d\n" % (COMMITTER_ID, self._committer, str(self._commit_time), self._commit_timezone)
         self._text += "\n" # There must be a new line after the headers
         self._text += self._message
 
@@ -508,6 +519,12 @@ class Commit(ShaFile):
         return self._commit_time
 
     @property
+    def commit_timezone(self):
+        """Returns the zone the commit time is in
+        """
+        return self._commit_timezone
+
+    @property
     def author_time(self):
         """Returns the timestamp the commit was written.
         
@@ -515,6 +532,11 @@ class Commit(ShaFile):
         """
         return self._author_time
 
+    @property
+    def author_timezone(self):
+        """Returns the zone the author time is in
+        """
+        return self._author_timezone
 
 
 type_map = {

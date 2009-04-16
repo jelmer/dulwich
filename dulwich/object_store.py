@@ -288,14 +288,14 @@ class ObjectStoreIterator(ObjectIterator):
         return len(list(self.itershas()))
 
 
-def tree_lookup_path(object_store, root_sha, path):
+def tree_lookup_path(lookup_obj, root_sha, path):
     parts = path.split("/")
     sha = root_sha
     for p in parts:
-        obj = object_store[sha]
+        obj = lookup_obj(sha)
         if type(obj) is not Tree:
             raise NotTreeError(sha)
         if p == '':
             continue
         mode, sha = obj[p]
-    return object_store[sha]
+    return lookup_obj(sha)

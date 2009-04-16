@@ -435,6 +435,7 @@ class Commit(ShaFile):
                 count += 1
             self._author += text[count]
             count += 1
+            self._author_time = int(text[count:count+10])
             while text[count] != '\n':
                 count += 1
             count += 1
@@ -468,7 +469,7 @@ class Commit(ShaFile):
         self._text += "%s %s\n" % (TREE_ID, self._tree)
         for p in self._parents:
             self._text += "%s %s\n" % (PARENT_ID, p)
-        self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._commit_time))
+        self._text += "%s %s %s +0000\n" % (AUTHOR_ID, self._author, str(self._author_time))
         self._text += "%s %s %s +0000\n" % (COMMITTER_ID, self._committer, str(self._commit_time))
         self._text += "\n" # There must be a new line after the headers
         self._text += self._message
@@ -505,6 +506,15 @@ class Commit(ShaFile):
         Returns it as the number of seconds since the epoch.
         """
         return self._commit_time
+
+    @property
+    def author_time(self):
+        """Returns the timestamp the commit was written.
+        
+        Returns it as the number of seconds since the epoch.
+        """
+        return self._author_time
+
 
 
 type_map = {

@@ -1,9 +1,6 @@
 # objects.py -- Acces to base git objects
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
-# The header parsing code is based on that from git itself, which is
-# Copyright (C) 2005 Linus Torvalds
-# and licensed under v2 of the GPL.
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

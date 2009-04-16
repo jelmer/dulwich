@@ -66,7 +66,7 @@ class PackIndexTests(PackTests):
     def test_object_index(self):
         """Tests that the correct object offset is returned from the index."""
         p = self.get_pack_index(pack1_sha)
-        self.assertEqual(p.object_index(pack1_sha), None)
+        self.assertRaises(KeyError, p.object_index, pack1_sha)
         self.assertEqual(p.object_index(a_sha), 178)
         self.assertEqual(p.object_index(tree_sha), 138)
         self.assertEqual(p.object_index(commit_sha), 12)

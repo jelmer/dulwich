@@ -107,13 +107,8 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     :param access: Access mechanism.
     :return: MMAP'd area.
     """
-    if supports_mmap_offset:
-        return (mmap.mmap(f.fileno(), size, access=access, 
-                    offset=int(offset / mmap.ALLOCATIONGRANULARITY)), 
-                (offset % mmap.ALLOCATIONGRANULARITY))
-    else:
-        mem = mmap.mmap(f.fileno(), size+offset, access=access)
-        return mem, offset
+    mem = mmap.mmap(f.fileno(), size+offset, access=access)
+    return mem, offset
 
 
 def load_pack_index(filename):

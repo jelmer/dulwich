@@ -1,4 +1,4 @@
-# objects.py -- Acces to base git objects
+# objects.py -- Access to base git objects
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
@@ -16,6 +16,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
+
+"""Access to base git objects."""
+
 
 import mmap
 import os
@@ -45,16 +49,19 @@ def _decompress(string):
     dcomped += dcomp.flush()
     return dcomped
 
+
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
     hexsha = "".join(["%02x" % ord(c) for c in sha])
     assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % hexsha
     return hexsha
 
+
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha"""
     assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
     return ''.join([chr(int(hex[i:i+2], 16)) for i in xrange(0, len(hex), 2)])
+
 
 class ShaFile(object):
     """A git SHA file."""

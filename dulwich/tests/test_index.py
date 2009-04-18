@@ -21,6 +21,7 @@ from unittest import TestCase
 
 from dulwich.index import (
     Index,
+    read_index,
     write_index,
     )
 
@@ -52,10 +53,15 @@ class SimpleIndexTestcase(IndexTestCase):
 class SimpleIndexWriterTestCase(IndexTestCase):
 
     def test_simple_write(self):
+        entries = [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)]
         x = open('test-simple-write-index', 'w+')
         try:
-            write_index(x, [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)])
+            write_index(x, entries)
         finally:
             x.close()
-
+        x = open('test-simple-write-index', 'r')
+        try:
+            self.assertEquals(entries, list(read_index(x)))
+        finally:
+            x.close()
 

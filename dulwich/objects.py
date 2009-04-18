@@ -325,7 +325,7 @@ class Tree(ShaFile):
     _num_type = 2
 
     def __init__(self):
-        self._entries = []
+        self._entries = {}
 
     @classmethod
     def from_file(cls, filename):
@@ -334,18 +334,19 @@ class Tree(ShaFile):
             raise NotTreeError(filename)
         return tree
 
+    def __getitem__(self, name):
+        return self._entries[name]
+
     def add(self, mode, name, hexsha):
-        self._entries.append((mode, name, hexsha))
+        self._entries[name] = mode, hexsha
 
     def entries(self):
         """Return a list of tuples describing the tree entries"""
-        return self._entries
+        return [(mode, name, hexsha) for (name, (mode, hexsha)) in self._entries.iteritems()]
 
-    def __getitem__(self, name):
-        for mode, entry, hexsha in self.entries():
-            if entry == name:
-                return mode, hexsha
-        raise KeyError(name)
+    def iteritems(self):
+        for name in sorted(self._entries.keys()):
+            yield name, self_entries[name][0], self._entries[name][1]
 
     def _parse_text(self):
         """Grab the entries in the tree"""
@@ -374,7 +375,7 @@ class Tree(ShaFile):
 
     def serialize(self):
         self._text = ""
-        for mode, name, hexsha in self._entries:
+        for name, mode, hexsha in self.iteritems():
             self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
 
 

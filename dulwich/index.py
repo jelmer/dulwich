@@ -25,10 +25,17 @@ def read_cache_time(f):
 
 
 def write_cache_time(f, t):
+    if isinstance(t, int):
+        t = (t, 0)
     f.write(struct.pack(">LL", *t))
 
 
 def read_cache_entry(f):
+    """Read an entry from a cache file.
+
+    :param f: File-like object to read from
+    :return: tuple with: inode, device, mode, uid, gid, size, sha, flags
+    """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
     mtime = read_cache_time(f)
@@ -60,8 +67,8 @@ def write_cache_entry(f, entry):
     f.write(name)
     f.write(chr(0))
     real_size = ((f.tell() - beginoffset + 7) & ~7)
-    f.write(chr(0) * (f.tell() - (beginoffset + real_size)))
-    return 
+    f.write("\0" * ((beginoffset + real_size) - f.tell()))
+
 
 def read_index(f):
     """Read an index file, yielding the individual entries."""
@@ -80,8 +87,8 @@ def read_index_dict(f):
     :param f: File object to read from
     """
     ret = {}
-    for (name, ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags) in read_index(f):
-        ret[name] = (ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags)
+    for x in read_index(f):
+        ret[x[0]] = tuple(x[1:])
     return ret
 
 
@@ -110,15 +117,14 @@ def write_index_dict(f, entries):
 class Index(object):
 
     def __init__(self, filename):
-        self._entries = []
         self._filename = filename
-        self._byname = {}
+        self.clear()
         self.read()
 
     def write(self):
         f = open(self._filename, 'w')
         try:
-            write_index(f, self._entries)
+            write_index_dict(f, self._byname)
         finally:
             f.close()
 
@@ -126,18 +132,13 @@ class Index(object):
         f = open(self._filename, 'r')
         try:
             for x in read_index(f):
-                self[x[0]] = x
+
+                self[x[0]] = tuple(x[1:])
         finally:
             f.close()
 
     def __len__(self):
-        return len(self._entries)
-
-    def items(self):
-        return list(self._entries)
-
-    def __iter__(self):
-        return iter(self._entries)
+        return len(self._byname)
 
     def __getitem__(self, name):
         return self._byname[name]
@@ -147,15 +148,15 @@ class Index(object):
 
     def clear(self):
         self._byname = {}
-        self._entries = []
 
     def __setitem__(self, name, x):
+        assert isinstance(name, str)
+        assert len(x) == 10
         # Remove the old entry if any
-        old_entry = self._byname.get(x[0])
-        if old_entry is not None:
-            self._entries.remove(old_entry)
-        self._entries.append(x)
-        self._byname[x[0]] = x
+        self._byname[name] = x
+
+    def iteritems(self):
+        return self._byname.iteritems()
 
     def update(self, entries):
         for name, value in entries.iteritems():

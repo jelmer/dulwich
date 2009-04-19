@@ -92,6 +92,9 @@ class ShaFile(object):
         text = text[1:]
         object._text = text
         return object
+
+    def as_legacy_object(self):
+        return zlib.compress("%s %d\0%s" % (self._type, len(self._text), self._text))
   
     def as_raw_string(self):
         return self._num_type, self._text
@@ -106,8 +109,8 @@ class ShaFile(object):
         try:
             object = num_type_map[num_type]()
         except KeyError:
-            assert False, "Not a known type: %d" % num_type
-        while((byte & 0x80) != 0):
+            raise AssertionError("Not a known type: %d" % num_type)
+        while (byte & 0x80) != 0:
             byte = ord(map[used])
             used += 1
         raw = map[used:]

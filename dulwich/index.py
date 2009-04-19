@@ -59,7 +59,7 @@ def write_cache_entry(f, entry):
     f.write(struct.pack(">LLLLLL20sH", ino, dev, mode, uid, gid, size, sha, flags))
     f.write(name)
     f.write(chr(0))
-    real_size = ((f.tell() - beginoffset + 8) & ~7)
+    real_size = ((f.tell() - beginoffset + 7) & ~7)
     f.write(chr(0) * (f.tell() - (beginoffset + real_size)))
     return 
 
@@ -142,6 +142,13 @@ class Index(object):
     def __getitem__(self, name):
         return self._byname[name]
 
+    def get_sha1(self, path):
+        return self[path][-2]
+
+    def clear(self):
+        self._byname = {}
+        self._entries = []
+
     def __setitem__(self, name, x):
         # Remove the old entry if any
         old_entry = self._byname.get(x[0])
@@ -149,3 +156,7 @@ class Index(object):
             self._entries.remove(old_entry)
         self._entries.append(x)
         self._byname[x[0]] = x
+
+    def update(self, entries):
+        for name, value in entries.iteritems():
+            self[name] = value

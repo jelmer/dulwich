@@ -100,11 +100,13 @@ class ObjectStore(object):
         return None
 
     def _add_shafile(self, sha, o):
-        path = self._get_shafile_path(sha)
-        f = os.path.open(path, 'w')
+        dir = os.path.join(self.path, sha[:2])
+        if not os.path.isdir(dir):
+            os.mkdir(dir)
+        path = os.path.join(dir, sha[2:])
+        f = open(path, 'w+')
         try:
-            f.write(o._header())
-            f.write(o._text)
+            f.write(o.as_legacy_object())
         finally:
             f.close()
 
@@ -210,6 +212,9 @@ class ObjectStore(object):
             if os.path.getsize(path) > 0:
                 self.move_in_pack(path)
         return f, commit
+
+    def add_object(self, obj):
+        self._add_shafile(obj.id, obj)
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.

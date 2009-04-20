@@ -347,6 +347,14 @@ class Tree(ShaFile):
     def __getitem__(self, name):
         return self._entries[name]
 
+    def __setitem__(self, name, value):
+        assert isinstance(value, tuple)
+        assert len(value) == 2
+        self._entries[name] = value
+
+    def __delitem__(self, name):
+        del self._entries[name]
+
     def add(self, mode, name, hexsha):
         self._entries[name] = mode, hexsha
 

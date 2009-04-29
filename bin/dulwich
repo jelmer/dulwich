@@ -166,14 +166,9 @@ def cmd_clone(args):
 	r = Repo(path)
 	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
 	f, commit = r.object_store.add_pack()
-	try:
-		client.fetch_pack(host_path, r.object_store.determine_wants_all, graphwalker, f.write, 
-				          sys.stdout.write)
-		f.close()
-		commit()
-	except:
-		f.close()
-		raise
+	client.fetch_pack(host_path, r.object_store.determine_wants_all, 
+			          graphwalker, f.write, sys.stdout.write)
+	commit()
 
 
 commands = {

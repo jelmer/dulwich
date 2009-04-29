@@ -364,7 +364,7 @@ class Tree(ShaFile):
 
     def iteritems(self):
         for name in sorted(self._entries.keys()):
-            yield name, self_entries[name][0], self._entries[name][1]
+            yield name, self._entries[name][0], self._entries[name][1]
 
     def _parse_text(self):
         """Grab the entries in the tree"""

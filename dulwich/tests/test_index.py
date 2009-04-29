@@ -39,13 +39,10 @@ class SimpleIndexTestcase(IndexTestCase):
         self.assertEquals(1, len(self.get_simple_index("index")))
 
     def test_iter(self):
-        self.assertEquals([
-            ('bla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)
-            ], 
-                list(self.get_simple_index("index")))
+        self.assertEquals(['bla'], list(self.get_simple_index("index")))
 
     def test_getitem(self):
-        self.assertEquals( ('bla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)
+        self.assertEquals( ((1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)
             , 
                 self.get_simple_index("index")["bla"])
 

@@ -132,7 +132,6 @@ class Index(object):
         f = open(self._filename, 'r')
         try:
             for x in read_index(f):
-
                 self[x[0]] = tuple(x[1:])
         finally:
             f.close()
@@ -142,6 +141,9 @@ class Index(object):
 
     def __getitem__(self, name):
         return self._byname[name]
+
+    def __iter__(self):
+        return iter(self._byname)
 
     def get_sha1(self, path):
         return self[path][-2]

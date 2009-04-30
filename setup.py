@@ -5,7 +5,7 @@
 from distutils.core import setup
 from distutils.extension import Extension
 
-dulwich_version_string = '0.2.0'
+dulwich_version_string = '0.2.1'
 
 setup(name='dulwich',
       description='Pure-Python Git Library',

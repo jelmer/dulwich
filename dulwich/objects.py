@@ -371,6 +371,9 @@ class Tree(ShaFile):
             raise NotTreeError(filename)
         return tree
 
+    def __contains__(self, name):
+        return name in self._entries
+
     def __getitem__(self, name):
         return self._entries[name]
 

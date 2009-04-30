@@ -78,12 +78,12 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 {
 	char *text, *end;
 	int len, namelen;
-	PyObject *ret, *item;
+	PyObject *ret, *item, *name;
 
 	if (!PyArg_ParseTuple(args, "s#", &text, &len))
 		return NULL;
 
-	ret = PyList_New(0);
+	ret = PyDict_New();
 	if (ret == NULL) {
 		return NULL;
 	}
@@ -104,13 +104,19 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 
         namelen = strlen(text);
 
-        item = Py_BuildValue("(ls#N)", mode, text, namelen, 
-							 sha_to_pyhex(text+namelen+1));
+		name = PyString_FromStringAndSize(text, namelen);
+		if (name == NULL) {
+			Py_DECREF(ret);
+			return NULL;
+		}
+
+        item = Py_BuildValue("(lN)", mode, sha_to_pyhex((unsigned char *)text+namelen+1));
         if (item == NULL) {
             Py_DECREF(ret);
+			Py_DECREF(name);
             return NULL;
         }
-        PyList_Append(ret, item);
+		PyDict_SetItem(ret, name, item);
 
 		text += namelen+21;
     }

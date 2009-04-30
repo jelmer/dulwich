@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # Setup file for bzr-git
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 
 from distutils.core import setup
 from distutils.extension import Extension
 
-dulwich_version_string = '0.1.1'
+dulwich_version_string = '0.2.0'
 
 setup(name='dulwich',
       description='Pure-Python Git Library',

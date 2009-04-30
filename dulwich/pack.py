@@ -515,7 +515,7 @@ class PackData(object):
                 ret = (self.offset, type, obj, crc32)
                 self.offset += total_size
                 if progress:
-                    progress(self.i, num)
+                    progress(self.i, self.num)
                 self.i+=1
                 return ret
         return ObjectIterator(self)

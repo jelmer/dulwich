@@ -329,7 +329,7 @@ class Tag(ShaFile):
 
 
 def parse_tree(text):
-    ret = []
+    ret = {}
     count = 0
     while count < len(text):
         mode = 0
@@ -350,7 +350,7 @@ def parse_tree(text):
         chr = text[count]
         sha = text[count:count+20]
         hexsha = sha_to_hex(sha)
-        ret.append((mode, name, hexsha))
+        ret[name] = (mode, hexsha)
         count = count + 20
     return ret
 

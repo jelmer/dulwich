@@ -489,19 +489,36 @@ class PackData(object):
         return ret
   
     def iterobjects(self, progress=None):
-        offset = self._header_size
-        num = len(self)
-        map, _ = simple_mmap(self._file, 0, self._size)
-        try:
-            for i in range(num):
-                (type, obj, total_size) = unpack_object(map, offset)
-                crc32 = zlib.crc32(map[offset:offset+total_size]) & 0xffffffff
-                yield offset, type, obj, crc32
-                offset += total_size
+
+        class ObjectIterator(object):
+            
+            def __init__(self, pack):
+                self.i = 0
+                self.offset = pack._header_size
+                self.num = len(pack)
+                self.map, _ = simple_mmap(pack._file, 0, pack._size)
+
+            def __del__(self):
+                self.map.close()
+
+            def __iter__(self):
+                return self
+
+            def __len__(self):
+                return self.num
+            
+            def next(self):
+                if self.i == self.num:
+                    raise StopIteration
+                (type, obj, total_size) = unpack_object(self.map, self.offset)
+                crc32 = zlib.crc32(self.map[self.offset:self.offset+total_size]) & 0xffffffff
+                ret = (self.offset, type, obj, crc32)
+                self.offset += total_size
                 if progress:
-                    progress(i, num)
-        finally:
-            map.close()
+                    progress(self.i, num)
+                self.i+=1
+                return ret
+        return ObjectIterator(self)
   
     def iterentries(self, ext_resolve_ref=None, progress=None):
         found = {}

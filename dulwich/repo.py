@@ -68,8 +68,10 @@ class Tags(object):
 
 def read_packed_refs(f):
     l = f.readline()
-    assert l == "# pack-refs with: peeled \n"
     for l in f.readlines():
+        if l[0] == "#":
+            # Comment
+            continue
         if l[0] == "^":
             # FIXME: Return somehow
             continue

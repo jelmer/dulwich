@@ -42,7 +42,7 @@ class SimpleIndexTestcase(IndexTestCase):
         self.assertEquals(['bla'], list(self.get_simple_index("index")))
 
     def test_getitem(self):
-        self.assertEquals( ((1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)
+        self.assertEquals( ((1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 3)
             , 
                 self.get_simple_index("index")["bla"])
 
@@ -50,7 +50,7 @@ class SimpleIndexTestcase(IndexTestCase):
 class SimpleIndexWriterTestCase(IndexTestCase):
 
     def test_simple_write(self):
-        entries = [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, '\xe6\x9d\xe2\x9b\xb2\xd1\xd6CK\x8b)\xaewZ\xd8\xc2\xe4\x8cS\x91', 3)]
+        entries = [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 3)]
         x = open('test-simple-write-index', 'w+')
         try:
             write_index(x, entries)

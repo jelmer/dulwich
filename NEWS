@@ -1,3 +1,9 @@
+0.2.1	2009-04-30
+
+ BUG FIXES
+
+  * Fix compatibility with Python2.4.
+
 0.2.0	2009-04-30
 
  FEATURES

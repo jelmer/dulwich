@@ -118,7 +118,7 @@ def cmd_dump_index(args):
 	idx = Index(filename)
 
 	for o in idx:
-		print o[0]
+		print o, idx[o]
 
 
 def cmd_init(args):

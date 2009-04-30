@@ -18,4 +18,5 @@ check-noextensions:: clean
 	PYTHONPATH=. $(PYTHON) $(TRIAL) dulwich
 
 clean::
-	$(SETUP) clean
+	$(SETUP) clean --all
+	rm -f dulwich/*.so

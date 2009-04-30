@@ -14,5 +14,8 @@ install::
 check:: build
 	PYTHONPATH=. $(TRIAL) dulwich
 
+check-noextensions:: clean
+	PYTHONPATH=. $(TRIAL) dulwich
+
 clean::
 	$(SETUP) clean

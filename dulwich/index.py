@@ -20,6 +20,9 @@
 
 import struct
 
+from dulwich.objects import sha_to_hex, hex_to_sha
+
+
 def read_cache_time(f):
     return struct.unpack(">LL", f.read(8))
 
@@ -49,7 +52,8 @@ def read_cache_entry(f):
     # Padding:
     real_size = ((f.tell() - beginoffset + 7) & ~7)
     f.seek(beginoffset + real_size)
-    return (name, ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags)
+    return (name, ctime, mtime, ino, dev, mode, uid, gid, size, 
+            sha_to_hex(sha), flags)
 
 
 def write_cache_entry(f, entry):
@@ -63,7 +67,7 @@ def write_cache_entry(f, entry):
     (name, ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    f.write(struct.pack(">LLLLLL20sH", ino, dev, mode, uid, gid, size, sha, flags))
+    f.write(struct.pack(">LLLLLL20sH", ino, dev, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     f.write(chr(0))
     real_size = ((f.tell() - beginoffset + 7) & ~7)

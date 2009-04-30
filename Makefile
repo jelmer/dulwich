@@ -1,6 +1,6 @@
 PYTHON = python
 SETUP = $(PYTHON) setup.py
-TRIAL = trial
+TRIAL = $(shell which trial)
 
 all: build 
 
@@ -12,10 +12,10 @@ install::
 	$(SETUP) install
 
 check:: build
-	PYTHONPATH=. $(TRIAL) dulwich
+	PYTHONPATH=. $(PYTHON) $(TRIAL) dulwich
 
 check-noextensions:: clean
-	PYTHONPATH=. $(TRIAL) dulwich
+	PYTHONPATH=. $(PYTHON) $(TRIAL) dulwich
 
 clean::
 	$(SETUP) clean

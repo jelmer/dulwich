@@ -387,7 +387,8 @@ class Tree(ShaFile):
 
     def entries(self):
         """Return a list of tuples describing the tree entries"""
-        return [(mode, name, hexsha) for (name, (mode, hexsha)) in self._entries.iteritems()]
+        # The order of this is different from iteritems() for historical reasons
+        return [(mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
     def iteritems(self):
         for name in sorted(self._entries.keys()):

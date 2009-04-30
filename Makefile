@@ -6,11 +6,12 @@ all: build
 
 build::
 	$(SETUP) build
+	$(SETUP) build_ext -i
 
 install::
 	$(SETUP) install
 
-check::
+check:: build
 	PYTHONPATH=. $(TRIAL) dulwich
 
 clean::

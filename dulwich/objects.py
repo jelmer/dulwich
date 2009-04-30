@@ -328,6 +328,33 @@ class Tag(ShaFile):
         return self._message
 
 
+def parse_tree(text):
+    ret = []
+    count = 0
+    while count < len(text):
+        mode = 0
+        chr = text[count]
+        while chr != ' ':
+            assert chr >= '0' and chr <= '7', "%s is not a valid mode char" % chr
+            mode = (mode << 3) + (ord(chr) - ord('0'))
+            count += 1
+            chr = text[count]
+        count += 1
+        chr = text[count]
+        name = ''
+        while chr != '\0':
+            name += chr
+            count += 1
+            chr = text[count]
+        count += 1
+        chr = text[count]
+        sha = text[count:count+20]
+        hexsha = sha_to_hex(sha)
+        ret.append((mode, name, hexsha))
+        count = count + 20
+    return ret
+
+
 class Tree(ShaFile):
     """A Git tree object"""
 
@@ -368,28 +395,7 @@ class Tree(ShaFile):
 
     def _parse_text(self):
         """Grab the entries in the tree"""
-        count = 0
-        while count < len(self._text):
-            mode = 0
-            chr = self._text[count]
-            while chr != ' ':
-                assert chr >= '0' and chr <= '7', "%s is not a valid mode char" % chr
-                mode = (mode << 3) + (ord(chr) - ord('0'))
-                count += 1
-                chr = self._text[count]
-            count += 1
-            chr = self._text[count]
-            name = ''
-            while chr != '\0':
-                name += chr
-                count += 1
-                chr = self._text[count]
-            count += 1
-            chr = self._text[count]
-            sha = self._text[count:count+20]
-            hexsha = sha_to_hex(sha)
-            self.add(mode, name, hexsha)
-            count = count + 20
+        self._entries = parse_tree(self._text)
 
     def serialize(self):
         self._text = ""
@@ -456,6 +462,7 @@ class Commit(ShaFile):
             count += 1
             self._author_time = int(text[count:count+10])
             while text[count] != ' ':
+                assert text[count] != '\n', "Malformed author information"
                 count += 1
             self._author_timezone = int(text[count:count+6])
             count += 1
@@ -480,6 +487,7 @@ class Commit(ShaFile):
             count += 1
             self._commit_time = int(text[count:count+10])
             while text[count] != ' ':
+                assert text[count] != '\n', "Malformed committer information"
                 count += 1
             self._commit_timezone = int(text[count:count+6])
             count += 1
@@ -573,7 +581,7 @@ num_type_map = {
 
 try:
     # Try to import C versions
-    from dulwich._objects import hex_to_sha, sha_to_hex
+    from dulwich._objects import hex_to_sha, sha_to_hex, parse_tree
 except ImportError:
     pass
 

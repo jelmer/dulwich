@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import itertools
 import os
 import tempfile
 import urllib2
@@ -73,6 +74,10 @@ class ObjectStore(object):
             return True
         return False
 
+    def __iter__(self):
+        iterables = self.packs + [self._iter_shafile_shas()]
+        return itertools.chain(*iterables)
+
     @property
     def packs(self):
         """List with pack objects."""
@@ -92,6 +97,13 @@ class ObjectStore(object):
         file = sha[2:]
         # Check from object dir
         return os.path.join(self.path, dir, file)
+
+    def _iter_shafile_shas(self):
+        for base in os.listdir(self.path):
+            if len(base) != 2:
+                continue
+            for rest in os.listdir(os.path.join(self.path, base)):
+                yield base+rest
 
     def _get_shafile(self, sha):
         path = self._get_shafile_path(sha)

@@ -24,6 +24,7 @@
 import mmap
 import os
 import sha
+import stat
 import zlib
 
 from dulwich.errors import (
@@ -111,6 +112,9 @@ class ShaFile(object):
         if self._needs_serialization:
             self.serialize()
         return self._text
+
+    def as_pretty_string(self):
+        return self.as_raw_string()
 
     def _ensure_parsed(self):
         if self._needs_parsing:
@@ -435,6 +439,16 @@ class Tree(ShaFile):
         for name, mode, hexsha in self.iteritems():
             self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
         self._needs_serialization = False
+
+    def as_pretty_string(self):
+        text = ""
+        for name, mode, hexsha in self.iteritems():
+            if mode & stat.S_IFDIR:
+                kind = "tree"
+            else:
+                kind = "blob"
+            text += "%04o %s %s\t%s\n" % (mode, kind, hexsha, name)
+        return text
 
 
 class Commit(ShaFile):

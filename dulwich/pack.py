@@ -371,6 +371,10 @@ def read_pack_tail(f):
 
 
 def unpack_object(map, offset=0):
+    """Unpack a Git object.
+
+    :return: tuple with type, uncompressed data and compressed size
+    """
     bytes = take_msb_bytes(map, offset)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
@@ -549,7 +553,7 @@ class PackData(object):
         def get_ref_text(sha):
             assert len(sha) == 20
             if sha in found:
-                return found[sha]
+                return self.get_object_at(found[sha])
             if ext_resolve_ref:
                 try:
                     return ext_resolve_ref(sha)
@@ -569,7 +573,7 @@ class PackData(object):
             else:
                 shafile = ShaFile.from_raw_string(type, obj)
                 sha = shafile.sha().digest()
-                found[sha] = (type, obj)
+                found[sha] = offset
                 yield sha, offset, crc32
                 extra.extend(postponed.get(sha, []))
         if postponed:

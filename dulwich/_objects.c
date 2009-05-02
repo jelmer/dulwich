@@ -117,6 +117,8 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
             return NULL;
         }
 		PyDict_SetItem(ret, name, item);
+		Py_DECREF(name);
+		Py_DECREF(item);
 
 		text += namelen+21;
     }

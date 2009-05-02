@@ -120,7 +120,6 @@ class ShaFile(object):
         self._text = text
         self._needs_parsing = True
         self._needs_serialization = False
-        self._parse_text()
   
     @classmethod
     def _parse_object(cls, map):

@@ -91,7 +91,11 @@ def read_zlib(data, offset, dec_size):
 
 
 def iter_sha1(iter):
-    """Return the hexdigest of the SHA1 over a set of names."""
+    """Return the hexdigest of the SHA1 over a set of names.
+    
+    :param iter: Iterator over string objects
+    :return: 40-byte hex sha1 digest
+    """
     sha1 = make_sha()
     for name in iter:
         sha1.update(name)
@@ -242,14 +246,24 @@ class PackIndex(object):
         return self.calculate_checksum() == self.get_stored_checksum()
   
     def calculate_checksum(self):
+        """Calculate the SHA1 checksum over this pack index.
+
+        :return: This is a 20-byte binary digest
+        """
         return make_sha(self._contents[:-20]).digest()
 
     def get_pack_checksum(self):
-        """Return the SHA1 checksum stored for the corresponding packfile."""
+        """Return the SHA1 checksum stored for the corresponding packfile.
+        
+        :return: 20-byte binary digest
+        """
         return str(self._contents[-40:-20])
   
     def get_stored_checksum(self):
-        """Return the SHA1 checksum stored for this index."""
+        """Return the SHA1 checksum stored for this index.
+        
+        :return: 20-byte binary digest
+        """
         return str(self._contents[-20:])
   
     def object_index(self, sha):
@@ -340,6 +354,10 @@ class PackIndex2(PackIndex):
 
 
 def read_pack_header(f):
+    """Read the header of a pack file.
+
+    :param f: File-like object to read from
+    """
     header = f.read(12)
     assert header[:4] == "PACK"
     (version,) = unpack_from(">L", header, 4)
@@ -383,6 +401,8 @@ def unpack_object(map, offset=0):
 
 
 def compute_object_size((num, obj)):
+    """Compute the size of a unresolved object for use with LRUSizeCache.
+    """
     if num in (6, 7):
         return len(obj[1])
     assert isinstance(obj, str)

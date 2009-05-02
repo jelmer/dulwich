@@ -180,6 +180,8 @@ class ShaFile(object):
         return obj
   
     def _header(self):
+        if self._needs_serialization:
+            self.serialize()
         return "%s %lu\0" % (self._type, len(self._text))
   
     def sha(self):
@@ -218,6 +220,8 @@ class Blob(ShaFile):
 
     _type = BLOB_ID
     _num_type = 3
+    _needs_serialization = False
+    _needs_parsing = False
 
     @property
     def data(self):

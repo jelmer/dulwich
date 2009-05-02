@@ -133,7 +133,7 @@ class ObjectStore(object):
             hexsha = sha_to_hex(name)
         ret = self._get_shafile(hexsha)
         if ret is not None:
-            return ret.as_raw_string()
+            return ret.type, ret.as_raw_string()
         raise KeyError(hexsha)
 
     def __getitem__(self, sha):

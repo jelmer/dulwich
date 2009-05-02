@@ -172,9 +172,10 @@ class ShaFile(object):
     def id(self):
         return self.sha().hexdigest()
   
-    @property
-    def type(self):
+    def get_type(self):
         return self._num_type
+
+    type = property(get_type)
   
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.id)
@@ -300,32 +301,37 @@ class Tag(ShaFile):
         count += 1
         self._message = text[count:]
 
-    @property
-    def object(self):
+    def get_object(self):
         """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
         return (self._object_type, self._object_sha)
 
-    @property
-    def name(self):
+    object = property(get_object)
+
+    def get_name(self):
         """Returns the name of this tag"""
         return self._name
 
-    @property
-    def tagger(self):
+    name = property(get_name)
+
+    def get_tagger(self):
         """Returns the name of the person who created this tag"""
         return self._tagger
 
-    @property
-    def tag_time(self):
+    tagger = property(get_tagger)
+
+    def get_tag_time(self):
         """Returns the creation timestamp of the tag.
 
         Returns it as the number of seconds since the epoch"""
         return self._tag_time
 
-    @property
-    def message(self):
+    tag_time = property(get_tag_time)
+
+    def get_message(self):
         """Returns the message attached to this tag"""
         return self._message
+
+    message = property(get_message)
 
 
 def parse_tree(text):

@@ -513,58 +513,67 @@ class Commit(ShaFile):
         self._text += "\n" # There must be a new line after the headers
         self._text += self._message
 
-    @property
-    def tree(self):
+    def get_tree(self):
         """Returns the tree that is the state of this commit"""
         return self._tree
 
-    @property
-    def parents(self):
+    tree = property(get_tree)
+
+    def get_parents(self):
         """Return a list of parents of this commit."""
         return self._parents
 
-    @property
-    def author(self):
+    parents = property(get_parents)
+
+    def get_author(self):
         """Returns the name of the author of the commit"""
         return self._author
 
-    @property
-    def committer(self):
+    author = property(get_author)
+
+    def get_committer(self):
         """Returns the name of the committer of the commit"""
         return self._committer
 
-    @property
-    def message(self):
+    committer = property(get_committer)
+
+    def get_message(self):
         """Returns the commit message"""
         return self._message
 
-    @property
-    def commit_time(self):
+    message = property(get_message)
+
+    def get_commit_time(self):
         """Returns the timestamp of the commit.
         
         Returns it as the number of seconds since the epoch.
         """
         return self._commit_time
 
-    @property
-    def commit_timezone(self):
+    commit_time = property(get_commit_time)
+
+    def get_commit_timezone(self):
         """Returns the zone the commit time is in
         """
         return self._commit_timezone
 
-    @property
-    def author_time(self):
+    commit_timezone = property(get_commit_timezone)
+
+    def get_author_time(self):
         """Returns the timestamp the commit was written.
         
         Returns it as the number of seconds since the epoch.
         """
         return self._author_time
 
-    @property
-    def author_timezone(self):
+    author_time = property(get_author_time)
+
+    def get_author_timezone(self):
         """Returns the zone the author time is in
         """
         return self._author_timezone
+
+    author_timezone = property(get_author_timezone)
 
 
 type_map = {

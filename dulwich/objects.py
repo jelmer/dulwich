@@ -101,6 +101,10 @@ class ShaFile(object):
             self.serialize()
         return self._text
 
+    def _ensure_parsed(self):
+        if self._needs_parsing:
+            self._parse_text()
+
     def set_raw_string(self, text):
         self._text = text
         self._needs_parsing = True
@@ -147,7 +151,6 @@ class ShaFile(object):
         try:
             map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
             shafile = cls._parse_file(map)
-            shafile._parse_text()
             return shafile
         finally:
             f.close()
@@ -310,21 +313,25 @@ class Tag(ShaFile):
         assert text[count] == '\n', "There must be a new line after the headers"
         count += 1
         self._message = text[count:]
+        self._needs_parsing = False
 
     def get_object(self):
         """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
+        self._ensure_parsed()
         return (self._object_type, self._object_sha)
 
     object = property(get_object)
 
     def get_name(self):
         """Returns the name of this tag"""
+        self._ensure_parsed()
         return self._name
 
     name = property(get_name)
 
     def get_tagger(self):
         """Returns the name of the person who created this tag"""
+        self._ensure_parsed()
         return self._tagger
 
     tagger = property(get_tagger)
@@ -333,12 +340,14 @@ class Tag(ShaFile):
         """Returns the creation timestamp of the tag.
 
         Returns it as the number of seconds since the epoch"""
+        self._ensure_parsed()
         return self._tag_time
 
     tag_time = property(get_tag_time)
 
     def get_message(self):
         """Returns the message attached to this tag"""
+        self._ensure_parsed()
         return self._message
 
     message = property(get_message)
@@ -379,6 +388,8 @@ class Tree(ShaFile):
 
     def __init__(self):
         self._entries = {}
+        self._needs_parsing = False
+        self._needs_serialization = True
 
     @classmethod
     def from_file(cls, filename):
@@ -388,34 +399,45 @@ class Tree(ShaFile):
         return tree
 
     def __contains__(self, name):
+        self._ensure_parsed()
         return name in self._entries
 
     def __getitem__(self, name):
+        self._ensure_parsed()
         return self._entries[name]
 
     def __setitem__(self, name, value):
         assert isinstance(value, tuple)
         assert len(value) == 2
+        self._ensure_parsed()
         self._entries[name] = value
+        self._needs_serialization = True
 
     def __delitem__(self, name):
+        self._ensure_parsed()
         del self._entries[name]
+        self._needs_serialization = True
 
     def add(self, mode, name, hexsha):
+        self._ensure_parsed()
         self._entries[name] = mode, hexsha
+        self._needs_serialization = True
 
     def entries(self):
         """Return a list of tuples describing the tree entries"""
+        self._ensure_parsed()
         # The order of this is different from iteritems() for historical reasons
         return [(mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
     def iteritems(self):
+        self._ensure_parsed()
         for name in sorted(self._entries.keys()):
             yield name, self._entries[name][0], self._entries[name][1]
 
     def _parse_text(self):
         """Grab the entries in the tree"""
         self._entries = parse_tree(self._text)
+        self._needs_parsing = False
 
     def serialize(self):
         self._text = ""
@@ -432,6 +454,8 @@ class Commit(ShaFile):
 
     def __init__(self):
         self._parents = []
+        self._needs_parsing = False
+        self._needs_serialization = True
 
     @classmethod
     def from_file(cls, filename):
@@ -519,6 +543,7 @@ class Commit(ShaFile):
         count += 1
         # XXX: There can be an encoding field.
         self._message = text[count:]
+        self._needs_parsing = False
 
     def serialize(self):
         self._text = ""
@@ -533,30 +558,35 @@ class Commit(ShaFile):
 
     def get_tree(self):
         """Returns the tree that is the state of this commit"""
+        self._ensure_parsed()
         return self._tree
 
     tree = property(get_tree)
 
     def get_parents(self):
         """Return a list of parents of this commit."""
+        self._ensure_parsed()
         return self._parents
 
     parents = property(get_parents)
 
     def get_author(self):
         """Returns the name of the author of the commit"""
+        self._ensure_parsed()
         return self._author
 
     author = property(get_author)
 
     def get_committer(self):
         """Returns the name of the committer of the commit"""
+        self._ensure_parsed()
         return self._committer
 
     committer = property(get_committer)
 
     def get_message(self):
         """Returns the commit message"""
+        self._ensure_parsed()
         return self._message
 
     message = property(get_message)
@@ -566,6 +596,7 @@ class Commit(ShaFile):
         
         Returns it as the number of seconds since the epoch.
         """
+        self._ensure_parsed()
         return self._commit_time
 
     commit_time = property(get_commit_time)
@@ -573,6 +604,7 @@ class Commit(ShaFile):
     def get_commit_timezone(self):
         """Returns the zone the commit time is in
         """
+        self._ensure_parsed()
         return self._commit_timezone
 
     commit_timezone = property(get_commit_timezone)
@@ -582,6 +614,7 @@ class Commit(ShaFile):
         
         Returns it as the number of seconds since the epoch.
         """
+        self._ensure_parsed()
         return self._author_time
 
     author_time = property(get_author_time)
@@ -589,6 +622,7 @@ class Commit(ShaFile):
     def get_author_timezone(self):
         """Returns the zone the author time is in
         """
+        self._ensure_parsed()
         return self._author_timezone
 
     author_timezone = property(get_author_timezone)

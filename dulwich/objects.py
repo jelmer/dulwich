@@ -63,6 +63,17 @@ def hex_to_sha(hex):
     return ''.join([chr(int(hex[i:i+2], 16)) for i in xrange(0, len(hex), 2)])
 
 
+def serializable_property(name, docstring=None):
+    def set(obj, value):
+        obj._ensure_parsed()
+        setattr(obj, "_"+name, value)
+        obj._needs_serialization = True
+    def get(obj):
+        obj._ensure_parsed()
+        return getattr(obj, "_"+name)
+    return property(get, set, doc=docstring)
+
+
 class ShaFile(object):
     """A git SHA file."""
   
@@ -322,35 +333,12 @@ class Tag(ShaFile):
 
     object = property(get_object)
 
-    def get_name(self):
-        """Returns the name of this tag"""
-        self._ensure_parsed()
-        return self._name
-
-    name = property(get_name)
-
-    def get_tagger(self):
-        """Returns the name of the person who created this tag"""
-        self._ensure_parsed()
-        return self._tagger
-
-    tagger = property(get_tagger)
-
-    def get_tag_time(self):
-        """Returns the creation timestamp of the tag.
-
-        Returns it as the number of seconds since the epoch"""
-        self._ensure_parsed()
-        return self._tag_time
-
-    tag_time = property(get_tag_time)
-
-    def get_message(self):
-        """Returns the message attached to this tag"""
-        self._ensure_parsed()
-        return self._message
-
-    message = property(get_message)
+    name = serializable_property("name", "The name of this tag")
+    tagger = serializable_property("tagger", 
+        "Returns the name of the person who created this tag")
+    tag_time = serializable_property("tag_time", 
+        "The creation timestamp of the tag.  As the number of seconds since the epoch")
+    message = serializable_property("message", "The message attached to this tag")
 
 
 def parse_tree(text):
@@ -556,12 +544,7 @@ class Commit(ShaFile):
         self._text += self._message
         self._needs_serialization = False
 
-    def get_tree(self):
-        """Returns the tree that is the state of this commit"""
-        self._ensure_parsed()
-        return self._tree
-
-    tree = property(get_tree)
+    tree = serializable_property("tree", "Tree that is the state of this commit")
 
     def get_parents(self):
         """Return a list of parents of this commit."""
@@ -570,62 +553,26 @@ class Commit(ShaFile):
 
     parents = property(get_parents)
 
-    def get_author(self):
-        """Returns the name of the author of the commit"""
-        self._ensure_parsed()
-        return self._author
+    author = serializable_property("author", 
+        "The name of the author of the commit")
 
-    author = property(get_author)
+    committer = serializable_property("committer", 
+        "The name of the committer of the commit")
 
-    def get_committer(self):
-        """Returns the name of the committer of the commit"""
-        self._ensure_parsed()
-        return self._committer
+    message = serializable_property("message",
+        "The commit message")
 
-    committer = property(get_committer)
+    commit_time = serializable_property("commit_time",
+        "The timestamp of the commit. As the number of seconds since the epoch.")
 
-    def get_message(self):
-        """Returns the commit message"""
-        self._ensure_parsed()
-        return self._message
+    commit_timezone = serializable_property("commit_timezone",
+        "The zone the commit time is in")
 
-    message = property(get_message)
+    author_time = serializable_property("author_time", 
+        "The timestamp the commit was written. as the number of seconds since the epoch.")
 
-    def get_commit_time(self):
-        """Returns the timestamp of the commit.
-        
-        Returns it as the number of seconds since the epoch.
-        """
-        self._ensure_parsed()
-        return self._commit_time
-
-    commit_time = property(get_commit_time)
-
-    def get_commit_timezone(self):
-        """Returns the zone the commit time is in
-        """
-        self._ensure_parsed()
-        return self._commit_timezone
-
-    commit_timezone = property(get_commit_timezone)
-
-    def get_author_time(self):
-        """Returns the timestamp the commit was written.
-        
-        Returns it as the number of seconds since the epoch.
-        """
-        self._ensure_parsed()
-        return self._author_time
-
-    author_time = property(get_author_time)
-
-    def get_author_timezone(self):
-        """Returns the zone the author time is in
-        """
-        self._ensure_parsed()
-        return self._author_timezone
-
-    author_timezone = property(get_author_timezone)
+    author_timezone = serializable_property("author_timezone", 
+        "Returns the zone the author time is in.")
 
 
 type_map = {

@@ -90,14 +90,22 @@ class ShaFile(object):
         object._size = size
         assert text[0] == "\0", "Size not followed by null"
         text = text[1:]
-        object._text = text
+        object.set_raw_string(text)
         return object
 
     def as_legacy_object(self):
         return zlib.compress("%s %d\0%s" % (self._type, len(self._text), self._text))
   
     def as_raw_string(self):
-        return self._num_type, self._text
+        if self._needs_serialization:
+            self.serialize()
+        return self._text
+
+    def set_raw_string(self, text):
+        self._text = text
+        self._needs_parsing = True
+        self._needs_serialization = False
+        self._parse_text()
   
     @classmethod
     def _parse_object(cls, map):
@@ -114,7 +122,7 @@ class ShaFile(object):
             byte = ord(map[used])
             used += 1
         raw = map[used:]
-        object._text = _decompress(raw)
+        object.set_raw_string(_decompress(raw))
         return object
   
     @classmethod
@@ -153,9 +161,8 @@ class ShaFile(object):
         """
         real_class = num_type_map[type]
         obj = real_class()
-        obj._num_type = type
-        obj._text = string
-        obj._parse_text()
+        obj.type = type
+        obj.set_raw_string(string)
         return obj
   
     def _header(self):
@@ -175,7 +182,10 @@ class ShaFile(object):
     def get_type(self):
         return self._num_type
 
-    type = property(get_type)
+    def set_type(self, type):
+        self._num_type = type
+
+    type = property(get_type, set_type)
   
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.id)
@@ -211,7 +221,7 @@ class Blob(ShaFile):
     def from_string(cls, string):
         """Create a blob from a string."""
         shafile = cls()
-        shafile._text = string
+        shafile.set_raw_string(string)
         return shafile
 
 
@@ -232,7 +242,7 @@ class Tag(ShaFile):
     def from_string(cls, string):
         """Create a blob from a string."""
         shafile = cls()
-        shafile._text = string
+        shafile.set_raw_string(string)
         return shafile
 
     def _parse_text(self):
@@ -411,6 +421,7 @@ class Tree(ShaFile):
         self._text = ""
         for name, mode, hexsha in self.iteritems():
             self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
+        self._needs_serialization = False
 
 
 class Commit(ShaFile):
@@ -518,6 +529,7 @@ class Commit(ShaFile):
         self._text += "%s %s %s %+05d\n" % (COMMITTER_ID, self._committer, str(self._commit_time), self._commit_timezone)
         self._text += "\n" # There must be a new line after the headers
         self._text += self._message
+        self._needs_serialization = False
 
     def get_tree(self):
         """Returns the tree that is the state of this commit"""

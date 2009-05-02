@@ -143,6 +143,16 @@ class Repo(object):
     def controldir(self):
         return self._controldir
 
+    def index_path(self):
+        return os.path.join(self.controldir(), "index")
+
+    def open_index(self):
+        from dulwich.index import Index
+        return Index(self.index_path())
+
+    def has_index(self):
+        return os.path.exists(self.index_path())
+
     def find_missing_objects(self, determine_wants, graph_walker, progress):
         """Find the missing objects required for a set of revisions.
 

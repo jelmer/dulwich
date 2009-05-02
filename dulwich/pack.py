@@ -680,7 +680,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     # This helps us find good objects to diff against us
     magic = []
     for obj, path in recency:
-        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()[1]), obj) )
+        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against
@@ -695,14 +695,15 @@ def write_pack_data(f, objects, num_objects, window=10):
     f.write(struct.pack(">L", num_objects)) # Number of objects in pack
     for o, path in recency:
         sha1 = o.sha().digest()
-        orig_t, raw = o.as_raw_string()
+        orig_t = o.type
+        raw = o.as_raw_string()
         winner = raw
         t = orig_t
         #for i in range(offs[o]-window, window):
         #    if i < 0 or i >= len(offs): continue
         #    b = magic[i][4]
         #    if b.type != orig_t: continue
-        #    _, base = b.as_raw_string()
+        #    base = b.as_raw_string()
         #    delta = create_delta(base, raw)
         #    if len(delta) < len(winner):
         #        winner = delta

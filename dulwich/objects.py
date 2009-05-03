@@ -32,6 +32,9 @@ from dulwich.errors import (
     NotCommitError,
     NotTreeError,
     )
+from dulwich.misc import (
+    make_sha,
+    )
 
 BLOB_ID = "blob"
 TAG_ID = "tag"
@@ -189,7 +192,7 @@ class ShaFile(object):
   
     def sha(self):
         """The SHA1 object that is the name of this object."""
-        ressha = sha.new()
+        ressha = make_sha()
         ressha.update(self._header())
         ressha.update(self._text)
         return ressha

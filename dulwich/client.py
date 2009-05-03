@@ -1,4 +1,4 @@
-# server.py -- Implementation of the server side git protocols
+# client.py -- Implementation of the server side git protocols
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # Copyright (C) 2008 John Carr
 #

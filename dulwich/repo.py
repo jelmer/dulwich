@@ -245,6 +245,9 @@ class Repo(object):
 
     def set_ref(self, name, value):
         file = os.path.join(self.controldir(), name)
+        dirpath = os.path.dirname(file)
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
         f = open(file, 'w')
         try:
             f.write(value+"\n")

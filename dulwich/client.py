@@ -128,7 +128,8 @@ class GitClient(object):
         shas = generate_pack_contents(want, have, None)
         write_pack_data(self.write, shas, len(shas))
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+                   progress):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch
@@ -173,6 +174,7 @@ class GitClient(object):
                 progress(pkt)
             else:
                 raise AssertionError("Invalid sideband channel %d" % channel)
+        return refs
 
 
 class TCPGitClient(GitClient):
@@ -207,7 +209,8 @@ class TCPGitClient(GitClient):
         :param progress: Callback for writing progress
         """
         self.proto.send_cmd("git-upload-pack", path, "host=%s" % self.host)
-        super(TCPGitClient, self).fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+        return super(TCPGitClient, self).fetch_pack(path, determine_wants,
+            graph_walker, pack_data, progress)
 
 
 class SubprocessGitClient(GitClient):
@@ -236,7 +239,8 @@ class SubprocessGitClient(GitClient):
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
         progress):
         client = self._connect("git-upload-pack", path)
-        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+        return client.fetch_pack(path, determine_wants, graph_walker, pack_data,
+                                 progress)
 
 
 class SSHSubprocess(object):
@@ -289,8 +293,10 @@ class SSHGitClient(GitClient):
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
         client.send_pack(path)
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+        progress):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-upload-pack %s" % path], port=self.port)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
-        client.fetch_pack(path, determine_wants, graph_walker, pack_data, progress)
+        return client.fetch_pack(path, determine_wants, graph_walker, pack_data,
+                                 progress)
 

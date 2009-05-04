@@ -28,7 +28,9 @@ from dulwich.errors import (
     NotGitRepository,
     NotTreeError, 
     )
-from dulwich.object_store import ObjectStore
+from dulwich.object_store import (
+    ObjectStore,
+    )
 from dulwich.objects import (
     Blob,
     Commit,
@@ -39,9 +41,11 @@ from dulwich.objects import (
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '
-
+REFSDIR = 'refs'
+INDEX_FILENAME = "index"
 
 class Tags(object):
+    """Tags container."""
 
     def __init__(self, tagdir, tags):
         self.tagdir = tagdir
@@ -79,6 +83,15 @@ def read_packed_refs(f):
 
 
 class MissingObjectFinder(object):
+    """Find the objects missing from another git repository.
+
+    :param object_store: Object store containing at least all objects to be 
+        sent
+    :param wants: SHA1s of commits to send
+    :param graph_walker: graph walker object used to see what the remote 
+        repo has and misses
+    :param progress: Optional function to report progress to.
+    """
 
     def __init__(self, object_store, wants, graph_walker, progress=None):
         self.sha_done = set()
@@ -124,14 +137,15 @@ class MissingObjectFinder(object):
 
 
 class Repo(object):
+    """A local git repository."""
 
-    ref_locs = ['', 'refs', 'refs/tags', 'refs/heads', 'refs/remotes']
+    ref_locs = ['', REFSDIR, 'refs/tags', 'refs/heads', 'refs/remotes']
 
     def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", "objects")):
+        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
             self.bare = False
             self._controldir = os.path.join(root, ".git")
-        elif os.path.isdir(os.path.join(root, "objects")):
+        elif os.path.isdir(os.path.join(root, OBJECTDIR)):
             self.bare = True
             self._controldir = root
         else:
@@ -141,16 +155,19 @@ class Repo(object):
         self._object_store = None
 
     def controldir(self):
+        """Return the path of the control directory."""
         return self._controldir
 
     def index_path(self):
-        return os.path.join(self.controldir(), "index")
+        return os.path.join(self.controldir(), INDEX_FILENAME)
 
     def open_index(self):
+        """Open the index for this repository."""
         from dulwich.index import Index
         return Index(self.index_path())
 
     def has_index(self):
+        """Check if an index is present."""
         return os.path.exists(self.index_path())
 
     def find_missing_objects(self, determine_wants, graph_walker, progress):
@@ -210,6 +227,7 @@ class Repo(object):
             f.close()
 
     def ref(self, name):
+        """Return the SHA1 a ref is pointing to."""
         for dir in self.ref_locs:
             file = os.path.join(self.controldir(), dir, name)
             if os.path.exists(file):
@@ -260,7 +278,8 @@ class Repo(object):
             os.remove(file)
 
     def tagdir(self):
-        return os.path.join(self.controldir(), 'refs', 'tags')
+        """Tag directory."""
+        return os.path.join(self.controldir(), REFSDIR, 'tags')
 
     def get_tags(self):
         ret = {}
@@ -271,7 +290,7 @@ class Repo(object):
 
     def heads(self):
         ret = {}
-        for root, dirs, files in os.walk(os.path.join(self.controldir(), 'refs', 'heads')):
+        for root, dirs, files in os.walk(os.path.join(self.controldir(), REFSDIR, 'heads')):
             for name in files:
                 ret[name] = self._get_ref(os.path.join(root, name))
         return ret
@@ -356,11 +375,11 @@ class Repo(object):
 
     @classmethod
     def init_bare(cls, path, mkdir=True):
-        for d in [["objects"], 
-                  ["objects", "info"], 
-                  ["objects", "pack"],
+        for d in [[OBJECTDIR], 
+                  [OBJECTDIR, "info"], 
+                  [OBJECTDIR, "pack"],
                   ["branches"],
-                  ["refs"],
+                  [REFSDIR],
                   ["refs", "tags"],
                   ["refs", "heads"],
                   ["hooks"],

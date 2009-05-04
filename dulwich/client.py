@@ -1,5 +1,5 @@
 # client.py -- Implementation of the server side git protocols
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 # Copyright (C) 2008 John Carr
 #
 # This program is free software; you can redistribute it and/or
@@ -245,9 +245,9 @@ class SubprocessGitClient(GitClient):
             self.proc.stdin.flush()
         return GitClient(lambda: _fileno_can_read(self.proc.stdout.fileno()), read_fn, write_fn, *args, **kwargs)
 
-    def send_pack(self, path):
+    def send_pack(self, path, changed_refs, generate_pack_contents):
         client = self._connect("git-receive-pack", path)
-        return client.send_pack(path)
+        return client.send_pack(path, changed_refs, generate_pack_contents)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
         progress):
@@ -301,10 +301,10 @@ class SSHGitClient(GitClient):
         self._args = args
         self._kwargs = kwargs
 
-    def send_pack(self, path):
+    def send_pack(self, path, get_changed_refs, generate_pack_contents):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
-        return client.send_pack(path)
+        return client.send_pack(path, get_changed_refs, generate_pack_contents)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
         progress):

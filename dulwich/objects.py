@@ -109,7 +109,8 @@ class ShaFile(object):
         return object
 
     def as_legacy_object(self):
-        return zlib.compress("%s %d\0%s" % (self._type, len(self._text), self._text))
+        text = self.as_raw_string()
+        return zlib.compress("%s %d\0%s" % (self._type, len(text), text))
   
     def as_raw_string(self):
         if self._needs_serialization:
@@ -186,15 +187,13 @@ class ShaFile(object):
         return obj
   
     def _header(self):
-        if self._needs_serialization:
-            self.serialize()
-        return "%s %lu\0" % (self._type, len(self._text))
+        return "%s %lu\0" % (self._type, len(self.as_raw_string()))
   
     def sha(self):
         """The SHA1 object that is the name of this object."""
         ressha = make_sha()
         ressha.update(self._header())
-        ressha.update(self._text)
+        ressha.update(self.as_raw_string())
         return ressha
   
     @property

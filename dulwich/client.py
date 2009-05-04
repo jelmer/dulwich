@@ -104,7 +104,7 @@ class GitClient(object):
             refs[ref] = sha
         return refs, server_capabilities
 
-    def send_pack(self, path, generate_pack_contents):
+    def send_pack(self, path, get_changed_refs, generate_pack_contents):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
@@ -112,21 +112,34 @@ class GitClient(object):
             objects to upload.
         """
         refs, server_capabilities = self.read_refs()
-        changed_refs = [] # FIXME
+        changed_refs = get_changed_refs(refs)
         if not changed_refs:
             self.proto.write_pkt_line(None)
-            return
-        self.proto.write_pkt_line("%s %s %s\0%s" % (changed_refs[0][0], changed_refs[0][1], changed_refs[0][2], self.capabilities()))
+            return {}
         want = []
         have = []
-        for changed_ref in changed_refs[:]:
-            self.proto.write_pkt_line("%s %s %s" % changed_refs)
-            want.append(changed_refs[1])
-            if changed_refs[0] != "0"*40:
-                have.append(changed_refs[0])
+        sent_capabilities = False
+        for changed_ref in changed_refs:
+            if sent_capabilities:
+                self.proto.write_pkt_line("%s %s %s" % changed_ref)
+            else:
+                self.proto.write_pkt_line("%s %s %s\0%s" % (changed_ref[0], changed_ref[1], changed_ref[2], self.capabilities()))
+                sent_capabilities = True
+            want.append(changed_ref[1])
+            if changed_ref[0] != "0"*40:
+                have.append(changed_ref[0])
         self.proto.write_pkt_line(None)
-        shas = generate_pack_contents(want, have, None)
-        write_pack_data(self.write, shas, len(shas))
+        shas = generate_pack_contents(want, have)
+            
+        (entries, sha) = write_pack_data(self.proto, shas, len(shas))
+        self.proto.write(sha)
+        
+        # read the final confirmation sha
+        sha = self.proto.read(20)
+        if sha:
+            pass # FIXME: Check that this sha is valid
+            
+        return changed_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress):
@@ -190,13 +203,13 @@ class TCPGitClient(GitClient):
         self.host = host
         super(TCPGitClient, self).__init__(lambda: _fileno_can_read(self._socket.fileno()), self.rfile.read, self.wfile.write, *args, **kwargs)
 
-    def send_pack(self, path):
+    def send_pack(self, path, changed_refs, generate_pack_contents):
         """Send a pack to a remote host.
 
         :param path: Path of the repository on the remote host
         """
         self.proto.send_cmd("git-receive-pack", path, "host=%s" % self.host)
-        super(TCPGitClient, self).send_pack(path)
+        return super(TCPGitClient, self).send_pack(path, changed_refs, generate_pack_contents)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Fetch a pack from the remote host.
@@ -234,7 +247,7 @@ class SubprocessGitClient(GitClient):
 
     def send_pack(self, path):
         client = self._connect("git-receive-pack", path)
-        client.send_pack(path)
+        return client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
         progress):
@@ -291,7 +304,7 @@ class SSHGitClient(GitClient):
     def send_pack(self, path):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
-        client.send_pack(path)
+        return client.send_pack(path)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
         progress):

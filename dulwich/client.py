@@ -130,9 +130,8 @@ class GitClient(object):
             if old_sha1 != "0"*40:
                 have.append(old_sha1)
         self.proto.write_pkt_line(None)
-        shas = generate_pack_contents(want, have)
-            
-        (entries, sha) = write_pack_data(self.proto, shas, len(shas))
+        objects = generate_pack_contents(want, have)
+        (entries, sha) = write_pack_data(self.proto.write_file(), objects, len(objects))
         self.proto.write(sha)
         
         # read the final confirmation sha

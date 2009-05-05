@@ -463,7 +463,7 @@ def parse_timezone(text):
 def format_timezone(offset):
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
-    return ' %+03d%02d' % (offset / 3600, (offset / 60) % 60)
+    return '%+03d%02d' % (offset / 3600, (offset / 60) % 60)
 
 
 class Commit(ShaFile):
@@ -583,7 +583,13 @@ class Commit(ShaFile):
         self._ensure_parsed()
         return self._parents
 
-    parents = property(get_parents)
+    def set_parents(self, value):
+        """Return a list of parents of this commit."""
+        self._ensure_parsed()
+        self._needs_serialization = True
+        self._parents = value
+
+    parents = property(get_parents, set_parents)
 
     author = serializable_property("author", 
         "The name of the author of the commit")

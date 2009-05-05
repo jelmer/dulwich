@@ -25,6 +25,7 @@ from dulwich.objects import (
     Tree,
     Commit,
     Tag,
+    hex_to_sha,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -138,3 +139,51 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
   
+
+
+class CommitSerializationTests(unittest.TestCase):
+
+    def make_base(self):
+        c = Commit()
+        c.tree = 'd80c186a03f423a81b39df39dc87fd269736ca86'
+        c.parents = ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd', '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6']
+        c.author = 'James Westby <jw+debian@jameswestby.net>'
+        c.committer = 'James Westby <jw+debian@jameswestby.net>'
+        c.commit_time = 1174773719
+        c.author_time = 1174773719
+        c.commit_timezone = 0
+        c.author_timezone = 0
+        c.message =  'Merge ../b\n'
+        return c
+
+    def test_simple(self):
+        c = self.make_base()
+        self.assertEquals(c.id, '5dac377bdded4c9aeb8dff595f0faeebcc8498cc')
+        self.assertEquals(
+                'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
+                'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
+                'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
+                'author James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
+                'committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
+                '\n'
+                'Merge ../b\n', c.as_raw_string())
+
+    def test_timezone(self):
+        c = self.make_base()
+        c.commit_timezone = 5 * 60
+        self.assertTrue(" +0005\n" in c.as_raw_string())
+
+    def test_neg_timezone(self):
+        c = self.make_base()
+        c.commit_timezone = -1 * 3600
+        self.assertTrue(" -0100\n" in c.as_raw_string())
+
+
+class TreeSerializationTests(unittest.TestCase):
+
+    def test_simple(self):
+        myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
+        x = Tree()
+        x["myname"] = (0100755, myhexsha)
+        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+                x.as_raw_string())

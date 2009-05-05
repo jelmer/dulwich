@@ -230,6 +230,7 @@ class TCPGitClient(GitClient):
 
 
 class SubprocessGitClient(GitClient):
+    """Git client that talks to a server using a subprocess."""
 
     def __init__(self, *args, **kwargs):
         self.proc = None
@@ -249,11 +250,27 @@ class SubprocessGitClient(GitClient):
         return GitClient(lambda: _fileno_can_read(self.proc.stdout.fileno()), read_fn, write_fn, *args, **kwargs)
 
     def send_pack(self, path, changed_refs, generate_pack_contents):
+        """Upload a pack to the server.
+
+        :param path: Path to the git repository on the server
+        :param changed_refs: Dictionary with new values for the refs
+        :param generate_pack_contents: Function that returns an iterator over 
+            objects to send
+        """
         client = self._connect("git-receive-pack", path)
         return client.send_pack(path, changed_refs, generate_pack_contents)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
         progress):
+        """Retrieve a pack from the server
+
+        :param path: Path to the git repository on the server
+        :param determine_wants: Function that receives existing refs 
+            on the server and returns a list of desired shas
+        :param graph_walker: GraphWalker instance
+        :param pack_data: Function that can write pack data
+        :param progress: Function that can write progress texts
+        """
         client = self._connect("git-upload-pack", path)
         return client.fetch_pack(path, determine_wants, graph_walker, pack_data,
                                  progress)

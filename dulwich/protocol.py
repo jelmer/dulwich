@@ -97,6 +97,25 @@ class Protocol(object):
         except socket.error, e:
             raise GitProtocolError(e)
 
+    def write_file(self):
+        class ProtocolFile(object):
+
+            def __init__(self, proto):
+                self._proto = proto
+                self._offset = 0
+
+            def write(self, data):
+                self._proto.write(data)
+                self._offset += len(data)
+
+            def tell(self):
+                return self._offset
+
+            def close(self):
+                pass
+
+        return ProtocolFile(self)
+
     def write_sideband(self, channel, blob):
         """
         Write data to the sideband (a git multiplexing method)

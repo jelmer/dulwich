@@ -104,7 +104,7 @@ class GitClient(object):
             refs[ref] = sha
         return refs, server_capabilities
 
-    def send_pack(self, path, get_changed_refs, generate_pack_contents):
+    def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
@@ -112,16 +112,15 @@ class GitClient(object):
             objects to upload.
         """
         refs, server_capabilities = self.read_refs()
-        changed_refs = get_changed_refs(refs)
+        changed_refs = determine_wants(refs)
         if not changed_refs:
             self.proto.write_pkt_line(None)
             return {}
         want = []
         have = []
         sent_capabilities = False
-        for changed_ref, (old_sha1, new_sha1) in changed_refs.iteritems():
-            if old_sha1 is None:
-                old_sha1 = "0" * 40
+        for changed_ref, new_sha1 in changed_refs.iteritems():
+            old_sha1 = refs.get(changed_ref, "0" * 40)
             if sent_capabilities:
                 self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, changed_ref))
             else:
@@ -303,10 +302,10 @@ class SSHGitClient(GitClient):
         self._args = args
         self._kwargs = kwargs
 
-    def send_pack(self, path, get_changed_refs, generate_pack_contents):
+    def send_pack(self, path, determine_wants, generate_pack_contents):
         remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack %s" % path], port=self.port)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
-        return client.send_pack(path, get_changed_refs, generate_pack_contents)
+        return client.send_pack(path, determine_wants, generate_pack_contents)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
         progress):

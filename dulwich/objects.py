@@ -454,11 +454,16 @@ class Tree(ShaFile):
 
 
 def parse_timezone(text):
-    return int(text)
+    offset = int(text)
+    hours = int(offset / 100)
+    minutes = (offset % 100)
+    return (hours * 3600) + (minutes * 60)
 
 
-def format_timezone(text):
-    return "%+04d" % text
+def format_timezone(offset):
+    if offset % 60 != 0:
+        raise ValueError("Unable to handle non-minute offset.")
+    return ' %+03d%02d' % (offset / 3600, (offset / 60) % 60)
 
 
 class Commit(ShaFile):

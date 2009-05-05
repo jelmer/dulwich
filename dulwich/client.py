@@ -37,6 +37,7 @@ from dulwich.pack import (
 
 
 def _fileno_can_read(fileno):
+    """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 
@@ -47,14 +48,16 @@ class SimpleFetchGraphWalker(object):
         self.get_parents = get_parents
         self.parents = {}
 
-    def ack(self, ref):
-        if ref in self.heads:
-            self.heads.remove(ref)
-        if ref in self.parents:
-            for p in self.parents[ref]:
+    def ack(self, sha):
+        """Ack that a particular revision and its ancestors are present."""
+        if sha in self.heads:
+            self.heads.remove(sha)
+        if sha in self.parents:
+            for p in self.parents[sha]:
                 self.ack(p)
 
     def next(self):
+        """Iterate over revisions that might be missing in the target."""
         if self.heads:
             ret = self.heads.pop()
             ps = self.get_parents(ret)

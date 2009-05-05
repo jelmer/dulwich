@@ -453,6 +453,14 @@ class Tree(ShaFile):
         return text
 
 
+def parse_timezone(text):
+    return int(text)
+
+
+def format_timezone(text):
+    return "%+04d" % text
+
+
 class Commit(ShaFile):
     """A git commit object"""
 
@@ -516,7 +524,7 @@ class Commit(ShaFile):
             while text[count] != ' ':
                 assert text[count] != '\n', "Malformed author information"
                 count += 1
-            self._author_timezone = int(text[count:count+6])
+            self._author_timezone = parse_timezone(text[count:count+6])
             count += 1
             while text[count] != '\n':
                 count += 1
@@ -541,7 +549,7 @@ class Commit(ShaFile):
             while text[count] != ' ':
                 assert text[count] != '\n', "Malformed committer information"
                 count += 1
-            self._commit_timezone = int(text[count:count+6])
+            self._commit_timezone = parse_timezone(text[count:count+6])
             count += 1
             while text[count] != '\n':
                 count += 1
@@ -557,8 +565,8 @@ class Commit(ShaFile):
         self._text += "%s %s\n" % (TREE_ID, self._tree)
         for p in self._parents:
             self._text += "%s %s\n" % (PARENT_ID, p)
-        self._text += "%s %s %s %+05d\n" % (AUTHOR_ID, self._author, str(self._author_time), self._author_timezone)
-        self._text += "%s %s %s %+05d\n" % (COMMITTER_ID, self._committer, str(self._commit_time), self._commit_timezone)
+        self._text += "%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone))
+        self._text += "%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone))
         self._text += "\n" # There must be a new line after the headers
         self._text += self._message
         self._needs_serialization = False

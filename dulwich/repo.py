@@ -71,6 +71,12 @@ class Tags(object):
 
 
 def read_packed_refs(f):
+    """Read a packed refs file.
+
+    Yields tuples with ref names and SHA1s.
+
+    :param f: file-like object to read from
+    """
     l = f.readline()
     for l in f.readlines():
         if l[0] == "#":

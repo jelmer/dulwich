@@ -244,7 +244,7 @@ class ObjectStore(object):
         write_pack_data(f, objects, len(objects))
         commit()
 
-    def find_missing_objects(self, wants, graph_walker, progress):
+    def find_missing_objects(self, wants, graph_walker, progress=None):
         """Find the missing objects required for a set of revisions.
 
         :param wants: Iterable over SHAs of objects to fetch.

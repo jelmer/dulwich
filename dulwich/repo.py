@@ -18,6 +18,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Repository access."""
+
 import os
 import stat
 
@@ -111,6 +113,7 @@ class Repo(object):
         return self._controldir
 
     def index_path(self):
+        """Return path to the index file."""
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
     def open_index(self):
@@ -154,6 +157,7 @@ class Repo(object):
             self.find_missing_objects(determine_wants, graph_walker, progress))
 
     def object_dir(self):
+        """Return path of the object directory."""
         return os.path.join(self.controldir(), OBJECTDIR)
 
     @property
@@ -190,6 +194,7 @@ class Repo(object):
             return packed_refs[name]
 
     def get_refs(self):
+        """Get dictionary with all refs."""
         ret = {}
         if self.head():
             ret['HEAD'] = self.head()
@@ -202,6 +207,13 @@ class Repo(object):
         return ret
 
     def get_packed_refs(self):
+        """Get contents of the packed-refs file.
+
+        :return: Dictionary mapping ref names to SHA1s
+
+        :note: Will return an empty dictionary when no packed-refs file is 
+            present.
+        """
         path = os.path.join(self.controldir(), 'packed-refs')
         if not os.path.exists(path):
             return {}
@@ -215,6 +227,11 @@ class Repo(object):
             f.close()
 
     def set_ref(self, name, value):
+        """Set a new ref.
+
+        :param name: Name of the ref
+        :param value: SHA1 to point at
+        """
         file = os.path.join(self.controldir(), name)
         dirpath = os.path.dirname(file)
         if not os.path.exists(dirpath):
@@ -226,6 +243,10 @@ class Repo(object):
             f.close()
 
     def remove_ref(self, name):
+        """Remove a ref.
+
+        :param name: Name of the ref
+        """
         file = os.path.join(self.controldir(), name)
         if os.path.exists(file):
             os.remove(file)
@@ -242,6 +263,7 @@ class Repo(object):
         return ret
 
     def heads(self):
+        """Return dictionary with heads."""
         ret = {}
         for root, dirs, files in os.walk(os.path.join(self.controldir(), REFSDIR, 'heads')):
             for name in files:
@@ -249,6 +271,7 @@ class Repo(object):
         return ret
 
     def head(self):
+        """Return the SHA1 pointed at by HEAD."""
         return self.ref('HEAD')
 
     def _get_object(self, sha, cls):

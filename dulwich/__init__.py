@@ -18,6 +18,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+
+"""Python implementation of the Git file formats and protocols."""
+
+
 import client
 import protocol
 import repo

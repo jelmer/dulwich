@@ -472,7 +472,10 @@ class PackData(object):
         return self._num_objects
   
     def calculate_checksum(self):
-        """Calculate the checksum for this pack."""
+        """Calculate the checksum for this pack.
+
+        :return: 20-byte binary SHA1 digest
+        """
         map, map_offset = simple_mmap(self._file, 0, self._size - 20)
         try:
             return make_sha(map[map_offset:self._size-20]).digest()
@@ -585,12 +588,41 @@ class PackData(object):
         return ret
   
     def create_index_v1(self, filename, resolve_ext_ref=None, progress=None):
+        """Create a version 1 file for this data file.
+
+        :param filename: Index filename.
+        :param resolve_ext_ref: Function to use for resolving externally referenced
+            SHA1s (for thin packs)
+        :param progress: Progress report function
+        """
         entries = self.sorted_entries(resolve_ext_ref, progress=progress)
         write_pack_index_v1(filename, entries, self.calculate_checksum())
   
     def create_index_v2(self, filename, resolve_ext_ref=None, progress=None):
+        """Create a version 2 index file for this data file.
+
+        :param filename: Index filename.
+        :param resolve_ext_ref: Function to use for resolving externally referenced
+            SHA1s (for thin packs)
+        :param progress: Progress report function
+        """
         entries = self.sorted_entries(resolve_ext_ref, progress=progress)
         write_pack_index_v2(filename, entries, self.calculate_checksum())
+
+    def create_index(self, filename, resolve_ext_ref=None, progress=None, version=2):
+        """Create an  index file for this data file.
+
+        :param filename: Index filename.
+        :param resolve_ext_ref: Function to use for resolving externally referenced
+            SHA1s (for thin packs)
+        :param progress: Progress report function
+        """
+        if version == 1:
+            self.create_index_v1(filename, resolve_ext_ref, progress)
+        elif version == 2:
+            self.create_index_v2(filename, resolve_ext_ref, progress)
+        else:
+            raise ValueError("unknown index format %d" % version)
   
     def get_stored_checksum(self):
         return self._stored_checksum
@@ -619,6 +651,8 @@ class PackData(object):
 
 
 class SHA1Writer(object):
+    """Wrapper around a file-like object that remembers the SHA1 of 
+    the data written to it."""
     
     def __init__(self, f):
         self.f = f
@@ -681,6 +715,12 @@ def write_pack_object(f, type, object):
 
 
 def write_pack(filename, objects, num_objects):
+    """Write a new pack data file.
+
+    :param filename: Path to the new pack file (without .pack extension)
+    :param objects: Iterable over (object, path) tuples to write
+    :param num_objects: Number of objects to write
+    """
     f = open(filename + ".pack", 'w')
     try:
         entries, data_sum = write_pack_data(f, objects, num_objects)
@@ -762,7 +802,11 @@ def write_pack_index_v1(filename, entries, pack_checksum):
 
 
 def create_delta(base_buf, target_buf):
-    """Use python difflib to work out how to transform base_buf to target_buf"""
+    """Use python difflib to work out how to transform base_buf to target_buf.
+    
+    :param base_buf: Base buffer
+    :param target_buf: Target buffer
+    """
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ""
@@ -914,6 +958,7 @@ def write_pack_index_v2(filename, entries, pack_checksum):
 
 
 class Pack(object):
+    """A Git pack object."""
 
     def __init__(self, basename):
         self._basename = basename
@@ -924,6 +969,7 @@ class Pack(object):
 
     @classmethod
     def from_objects(self, data, idx):
+        """Create a new pack object from pack data and index objects."""
         ret = Pack("")
         ret._data = data
         ret._idx = idx
@@ -931,14 +977,15 @@ class Pack(object):
 
     def name(self):
         """The SHA over the SHAs of the objects in this pack."""
-        return self.idx.objects_sha1()
+        return self.index.objects_sha1()
 
     @property
     def data(self):
+        """The pack data object being used."""
         if self._data is None:
             self._data = PackData(self._data_path)
-            assert len(self.idx) == len(self._data)
-            idx_stored_checksum = self.idx.get_pack_checksum()
+            assert len(self.index) == len(self._data)
+            idx_stored_checksum = self.index.get_pack_checksum()
             data_stored_checksum = self._data.get_stored_checksum()
             if idx_stored_checksum != data_stored_checksum:
                 raise ChecksumMismatch(sha_to_hex(idx_stored_checksum), 
@@ -946,7 +993,11 @@ class Pack(object):
         return self._data
 
     @property
-    def idx(self):
+    def index(self):
+        """The index being used.
+
+        :note: This may be an in-memory index
+        """
         if self._idx is None:
             self._idx = load_pack_index(self._idx_path)
         return self._idx
@@ -954,24 +1005,25 @@ class Pack(object):
     def close(self):
         if self._data is not None:
             self._data.close()
-        self.idx.close()
+        self.index.close()
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.idx == other.idx
+        return type(self) == type(other) and self.index == other.index
 
     def __len__(self):
         """Number of entries in this pack."""
-        return len(self.idx)
+        return len(self.index)
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._basename)
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""
-        return iter(self.idx)
+        return iter(self.index)
 
     def check(self):
-        if not self.idx.check():
+        """Check the integrity of this pack."""
+        if not self.index.check():
             return False
         if not self.data.check():
             return False
@@ -983,13 +1035,13 @@ class Pack(object):
     def __contains__(self, sha1):
         """Check whether this pack contains a particular SHA1."""
         try:
-            self.idx.object_index(sha1)
+            self.index.object_index(sha1)
             return True
         except KeyError:
             return False
 
     def get_raw(self, sha1, resolve_ref=None):
-        offset = self.idx.object_index(sha1)
+        offset = self.index.object_index(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         if type(offset) is long:
           offset = int(offset)
@@ -1003,6 +1055,7 @@ class Pack(object):
         return ShaFile.from_raw_string(type, uncomp)
 
     def iterobjects(self, get_raw=None):
+        """Iterate over the objects in this pack."""
         if get_raw is None:
             get_raw = self.get_raw
         for offset, type, obj, crc32 in self.data.iterobjects():

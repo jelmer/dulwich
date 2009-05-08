@@ -111,7 +111,7 @@ def cmd_dump_index(args):
 	opts, args = getopt(args, "", [])
 
 	if args == []:
-		print "Usage: dulwich dump-pack FILENAME"
+		print "Usage: dulwich dump-index FILENAME"
 		sys.exit(1)
 
 	filename = args[0]

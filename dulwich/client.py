@@ -26,6 +26,9 @@ import select
 import socket
 import subprocess
 
+from dulwich.errors import (
+    ChecksumMismatch,
+    )
 from dulwich.protocol import (
     Protocol,
     TCP_GIT_PORT,
@@ -42,14 +45,20 @@ def _fileno_can_read(fileno):
 
 
 class SimpleFetchGraphWalker(object):
+    """Graph walker that finds out what commits are missing."""
 
     def __init__(self, local_heads, get_parents):
+        """Create a new SimpleFetchGraphWalker instance.
+
+        :param local_heads: SHA1s that should be retrieved
+        :param get_parents: Function for finding the parents of a SHA1.
+        """
         self.heads = set(local_heads)
         self.get_parents = get_parents
         self.parents = {}
 
     def ack(self, sha):
-        """Ack that a particular revision and its ancestors are present."""
+        """Ack that a particular revision and its ancestors are present in the target."""
         if sha in self.heads:
             self.heads.remove(sha)
         if sha in self.parents:
@@ -138,9 +147,9 @@ class GitClient(object):
         self.proto.write(sha)
         
         # read the final confirmation sha
-        sha = self.proto.read(20)
-        if sha:
-            pass # FIXME: Check that this sha is valid
+        client_sha = self.proto.read(20)
+        if not client_sha in (None, sha)
+            raise ChecksumMismatch(sha, client_sha)
             
         return changed_refs
 
@@ -157,7 +166,7 @@ class GitClient(object):
         wants = determine_wants(refs)
         if not wants:
             self.proto.write_pkt_line(None)
-            return
+            return refs
         self.proto.write_pkt_line("want %s %s\n" % (wants[0], self.capabilities()))
         for want in wants[1:]:
             self.proto.write_pkt_line("want %s\n" % want)

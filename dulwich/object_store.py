@@ -50,17 +50,9 @@ from dulwich.pack import (
 
 PACKDIR = 'pack'
 
-class ObjectStore(object):
-    """Object store."""
 
-    def __init__(self, path):
-        """Open an object store.
-
-        :param path: Path of the object store.
-        """
-        self.path = path
-        self._pack_cache = None
-        self.pack_dir = os.path.join(self.path, PACKDIR)
+class BaseObjectStore(object):
+    """Object store interface."""
 
     def determine_wants_all(self, refs):
 	    return [sha for (ref, sha) in refs.iteritems() if not sha in self and not ref.endswith("^{}")]
@@ -71,6 +63,66 @@ class ObjectStore(object):
         :param shas: Iterable object with SHAs
         """
         return ObjectStoreIterator(self, shas)
+
+    def __contains__(self, sha):
+        """Check if a particular object is present by SHA1."""
+        raise NotImplementedError(self.__contains__)
+
+    def get_raw(self, name):
+        """Obtain the raw text for an object.
+        
+        :param name: sha for the object.
+        :return: tuple with object type and object contents.
+        """
+        raise NotImplementedError(self.get_raw)
+
+    def __getitem__(self, sha):
+        """Obtain an object by SHA1."""
+        type, uncomp = self.get_raw(sha)
+        return ShaFile.from_raw_string(type, uncomp)
+
+    def __iter__(self):
+        """Iterate over the SHAs that are present in this store."""
+        raise NotImplementedError(self.__iter__)
+
+    def add_object(self, obj):
+        """Add a single object to this object store.
+
+        """
+        raise NotImplementedError(self.add_object)
+
+    def add_objects(self, objects):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over a list of objects.
+        """
+        raise NotImplementedError(self.add_objects)
+
+    def find_missing_objects(self, wants, graph_walker, progress=None):
+        """Find the missing objects required for a set of revisions.
+
+        :param wants: Iterable over SHAs of objects to fetch.
+        :param graph_walker: Object that can iterate over the list of revisions 
+            to fetch and has an "ack" method that will be called to acknowledge 
+            that a revision is present.
+        :param progress: Simple progress function that will be called with 
+            updated progress strings.
+        :return: Iterator over (sha, path) pairs.
+        """
+        return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
+
+
+class ObjectStore(BaseObjectStore):
+    """Git-style object store that exists on disk."""
+
+    def __init__(self, path):
+        """Open an object store.
+
+        :param path: Path of the object store.
+        """
+        self.path = path
+        self._pack_cache = None
+        self.pack_dir = os.path.join(self.path, PACKDIR)
 
     def __contains__(self, sha):
         """Check if a particular object is present by SHA1."""
@@ -156,10 +208,6 @@ class ObjectStore(object):
         if ret is not None:
             return ret.type, ret.as_raw_string()
         raise KeyError(hexsha)
-
-    def __getitem__(self, sha):
-        type, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type, uncomp)
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -251,18 +299,6 @@ class ObjectStore(object):
         write_pack_data(f, objects, len(objects))
         commit()
 
-    def find_missing_objects(self, wants, graph_walker, progress=None):
-        """Find the missing objects required for a set of revisions.
-
-        :param wants: Iterable over SHAs of objects to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions 
-            to fetch and has an "ack" method that will be called to acknowledge 
-            that a revision is present.
-        :param progress: Simple progress function that will be called with 
-            updated progress strings.
-        :return: Iterator over (sha, path) pairs.
-        """
-        return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
 
 
 class ObjectImporter(object):

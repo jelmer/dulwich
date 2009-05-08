@@ -88,60 +88,6 @@ def read_packed_refs(f):
         yield tuple(l.rstrip("\n").split(" ", 2))
 
 
-class MissingObjectFinder(object):
-    """Find the objects missing from another git repository.
-
-    :param object_store: Object store containing at least all objects to be 
-        sent
-    :param wants: SHA1s of commits to send
-    :param graph_walker: graph walker object used to see what the remote 
-        repo has and misses
-    :param progress: Optional function to report progress to.
-    """
-
-    def __init__(self, object_store, wants, graph_walker, progress=None):
-        self.sha_done = set()
-        self.objects_to_send = set([(w, None) for w in wants])
-        self.object_store = object_store
-        if progress is None:
-            self.progress = lambda x: None
-        else:
-            self.progress = progress
-        ref = graph_walker.next()
-        while ref:
-            if ref in self.object_store:
-                graph_walker.ack(ref)
-            ref = graph_walker.next()
-
-    def add_todo(self, entries):
-        self.objects_to_send.update([e for e in entries if not e in self.sha_done])
-
-    def parse_tree(self, tree):
-        self.add_todo([(sha, name) for (mode, name, sha) in tree.entries()])
-
-    def parse_commit(self, commit):
-        self.add_todo([(commit.tree, "")])
-        self.add_todo([(p, None) for p in commit.parents])
-
-    def parse_tag(self, tag):
-        self.add_todo([(tag.object[1], None)])
-
-    def next(self):
-        if not self.objects_to_send:
-            return None
-        (sha, name) = self.objects_to_send.pop()
-        o = self.object_store[sha]
-        if isinstance(o, Commit):
-            self.parse_commit(o)
-        elif isinstance(o, Tree):
-            self.parse_tree(o)
-        elif isinstance(o, Tag):
-            self.parse_tag(o)
-        self.sha_done.add((sha, name))
-        self.progress("counting objects: %d\r" % len(self.sha_done))
-        return (sha, name)
-
-
 class Repo(object):
     """A local git repository."""
 
@@ -186,10 +132,11 @@ class Repo(object):
             that a revision is present.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
+        :return: Iterator over (sha, path) pairs.
         """
         wants = determine_wants(self.get_refs())
-        return iter(MissingObjectFinder(self.object_store, wants, graph_walker, 
-                progress).next, None)
+        return self.object_store.find_missing_objects(wants, 
+                graph_walker, progress)
 
     def fetch_objects(self, determine_wants, graph_walker, progress):
         """Fetch the missing objects required for a set of revisions.

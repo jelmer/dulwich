@@ -73,7 +73,7 @@ def take_msb_bytes(map, offset):
     return ret
 
 
-def read_zlib(data, offset, dec_size):
+def read_zlib_chunks(data, offset, dec_size):
     obj = zlib.decompressobj()
     ret = []
     fed = 0
@@ -84,9 +84,14 @@ def read_zlib(data, offset, dec_size):
             add += "Z"
         fed += len(add)
         ret.append(obj.decompress(add))
+    comp_len = fed-len(obj.unused_data)
+    return ret, comp_len
+
+
+def read_zlib(data, offset, dec_size):
+    ret, comp_len = read_zlib_chunks(data, offset, dec_size)
     x = "".join(ret)
     assert len(x) == dec_size
-    comp_len = fed-len(obj.unused_data)
     return x, comp_len
 
 

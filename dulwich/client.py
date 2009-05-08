@@ -237,7 +237,7 @@ class SubprocessGitClient(GitClient):
         self._args = args
         self._kwargs = kwargs
 
-    def _connect(self, service, *args):
+    def _connect(self, service, *args, **kwargs):
         argv = [service] + list(args)
         self.proc = subprocess.Popen(argv, bufsize=0,
                                 stdin=subprocess.PIPE,

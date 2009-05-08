@@ -18,6 +18,7 @@
 
 """Parser for the git index file format."""
 
+import os
 import stat
 import struct
 
@@ -227,8 +228,9 @@ def commit_tree(object_store, blobs):
 
     for path in sorted(trees.keys(), reverse=True):
         tree = Tree()
-        for basename, (mode, sha) in trees[path]:
+        for basename, (mode, sha) in trees[path].iteritems():
             tree.add(mode, basename, sha)
+        object_store.add_object(tree)
         if path != "":
             # Add to object store
             parent_path, basename = os.path.split(path)

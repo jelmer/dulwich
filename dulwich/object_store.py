@@ -30,7 +30,9 @@ from dulwich.errors import (
     NotTreeError,
     )
 from dulwich.objects import (
+    Commit,
     ShaFile,
+    Tag,
     Tree,
     hex_to_sha,
     sha_to_hex,

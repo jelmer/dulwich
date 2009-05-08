@@ -158,6 +158,7 @@ class ShaFile(object):
   
     def __init__(self):
         """Don't call this directly"""
+        self._sha = None
   
     def _parse_text(self):
         """For subclasses to do initialisation time parsing"""
@@ -386,6 +387,7 @@ class Tree(ShaFile):
     _num_type = 2
 
     def __init__(self):
+        super(Tree, self).__init__()
         self._entries = {}
         self._needs_parsing = False
         self._needs_serialization = True
@@ -475,6 +477,7 @@ class Commit(ShaFile):
     _num_type = 1
 
     def __init__(self):
+        super(Commit, self).__init__()
         self._parents = []
         self._needs_parsing = False
         self._needs_serialization = True

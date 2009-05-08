@@ -16,6 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+
+"""Git object store interfaces and implementation."""
+
+
 import itertools
 import os
 import tempfile

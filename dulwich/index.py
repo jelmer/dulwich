@@ -125,6 +125,15 @@ def write_index_dict(f, entries):
     write_index(f, entries_list)
 
 
+def cleanup_mode(mode):
+    if stat.S_ISLNK(fsmode)
+        mode = stat.S_IFLNK
+    else:
+        mode = stat.S_IFREG
+    mode |= (fsmode & 0111)
+    return mode
+
+
 class Index(object):
     """A Git Index file."""
 
@@ -169,6 +178,11 @@ class Index(object):
     def get_sha1(self, path):
         """Return the (git object) SHA1 for the object at a path."""
         return self[path][-2]
+
+    def iterblobs(self):
+        """Iterate over path, sha, mode tuples for use with commit_tree."""
+        for path, entry in self:
+            yield path, entry[-2], cleanup_mode(entry[-6])
 
     def clear(self):
         """Remove all contents from this index."""
@@ -222,3 +236,7 @@ def commit_tree(object_store, blobs):
             trees[parent_path][basename] = (stat.S_IFDIR, tree.id)
         else:
             return tree.id
+
+
+def commit_index(object_store, index):
+    return commit_tree(object_store, index.blobs())

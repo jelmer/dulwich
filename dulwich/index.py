@@ -181,3 +181,11 @@ class Index(object):
     def update(self, entries):
         for name, value in entries.iteritems():
             self[name] = value
+
+
+def commit(index, basepath, object_store):
+    """Commit an index.
+
+    :return: SHA1 of the created tree.
+    """
+    raise NotImplementedError(commit)

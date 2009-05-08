@@ -1,8 +1,14 @@
 PYTHON = python
 SETUP = $(PYTHON) setup.py
+PYDOCTOR ?= pydoctor
 TESTRUNNER = $(shell which trial)
 
 all: build 
+
+doc:: pydoctor
+
+pydoctor::
+	$(PYDOCTOR) --make-html -c dulwich.cfg
 
 build::
 	$(SETUP) build

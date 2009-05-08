@@ -319,13 +319,16 @@ class MemoryObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with object type and object contents.
         """
-        return self[sha].as_raw_string()
+        return self[name].as_raw_string()
+
+    def __getitem__(self, name):
+        return self._data[name]
 
     def add_object(self, obj):
         """Add a single object to this object store.
 
         """
-        self._dict[obj.id] = obj
+        self._data[obj.id] = obj
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.

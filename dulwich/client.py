@@ -143,12 +143,13 @@ class GitClient(object):
                 have.append(old_sha1)
         self.proto.write_pkt_line(None)
         objects = generate_pack_contents(want, have)
-        (entries, sha) = write_pack_data(self.proto.write_file(), objects, len(objects))
+        (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
+                                         len(objects))
         self.proto.write(sha)
         
         # read the final confirmation sha
         client_sha = self.proto.read(20)
-        if not client_sha in (None, sha):
+        if not client_sha in (None, "", sha):
             raise ChecksumMismatch(sha, client_sha)
             
         return changed_refs

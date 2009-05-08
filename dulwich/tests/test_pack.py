@@ -189,19 +189,19 @@ class TestPack(PackTests):
 
     def test_copy(self):
         origpack = self.get_pack(pack1_sha)
-        self.assertEquals(True, origpack.idx.check())
+        self.assertEquals(True, origpack.index.check())
         write_pack("Elch", [(x, "") for x in origpack.iterobjects()], 
             len(origpack))
         newpack = Pack("Elch")
         self.assertEquals(origpack, newpack)
-        self.assertEquals(True, newpack.idx.check())
+        self.assertEquals(True, newpack.index.check())
         self.assertEquals(origpack.name(), newpack.name())
-        self.assertEquals(origpack.idx.get_pack_checksum(), 
-                          newpack.idx.get_pack_checksum())
+        self.assertEquals(origpack.index.get_pack_checksum(), 
+                          newpack.index.get_pack_checksum())
         
         self.assertTrue(
-                (origpack.idx.version != newpack.idx.version) or
-                (origpack.idx.get_stored_checksum() == newpack.idx.get_stored_checksum()))
+                (origpack.index.version != newpack.index.version) or
+                (origpack.index.get_stored_checksum() == newpack.index.get_stored_checksum()))
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)

@@ -66,6 +66,7 @@ class ObjectStore(object):
         return ObjectStoreIterator(self, shas)
 
     def __contains__(self, sha):
+        """Check if a particular object is present by SHA1."""
         for pack in self.packs:
             if sha in pack:
                 return True
@@ -75,6 +76,7 @@ class ObjectStore(object):
         return False
 
     def __iter__(self):
+        """Iterate over the SHAs that are present in this store."""
         iterables = self.packs + [self._iter_shafile_shas()]
         return itertools.chain(*iterables)
 
@@ -226,6 +228,9 @@ class ObjectStore(object):
         return f, commit
 
     def add_object(self, obj):
+        """Add a single object to this object store.
+
+        """
         self._add_shafile(obj.id, obj)
 
     def add_objects(self, objects):
@@ -238,6 +243,19 @@ class ObjectStore(object):
         f, commit = self.add_pack()
         write_pack_data(f, objects, len(objects))
         commit()
+
+    def find_missing_objects(self, wants, graph_walker, progress):
+        """Find the missing objects required for a set of revisions.
+
+        :param wants: Iterable over SHAs of objects to fetch.
+        :param graph_walker: Object that can iterate over the list of revisions 
+            to fetch and has an "ack" method that will be called to acknowledge 
+            that a revision is present.
+        :param progress: Simple progress function that will be called with 
+            updated progress strings.
+        :return: Iterator over (sha, path) pairs.
+        """
+        return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
 
 
 class ObjectImporter(object):
@@ -316,3 +334,60 @@ def tree_lookup_path(lookup_obj, root_sha, path):
             continue
         mode, sha = obj[p]
     return lookup_obj(sha)
+
+
+class MissingObjectFinder(object):
+    """Find the objects missing from another object store.
+
+    :param object_store: Object store containing at least all objects to be 
+        sent
+    :param wants: SHA1s of commits to send
+    :param graph_walker: graph walker object used to see what the remote 
+        repo has and misses
+    :param progress: Optional function to report progress to.
+    """
+
+    def __init__(self, object_store, wants, graph_walker, progress=None):
+        self.sha_done = set()
+        self.objects_to_send = set([(w, None) for w in wants])
+        self.object_store = object_store
+        if progress is None:
+            self.progress = lambda x: None
+        else:
+            self.progress = progress
+        ref = graph_walker.next()
+        while ref:
+            if ref in self.object_store:
+                graph_walker.ack(ref)
+            ref = graph_walker.next()
+
+    def add_todo(self, entries):
+        self.objects_to_send.update([e for e in entries if not e in self.sha_done])
+
+    def parse_tree(self, tree):
+        self.add_todo([(sha, name) for (mode, name, sha) in tree.entries()])
+
+    def parse_commit(self, commit):
+        self.add_todo([(commit.tree, "")])
+        self.add_todo([(p, None) for p in commit.parents])
+
+    def parse_tag(self, tag):
+        self.add_todo([(tag.object[1], None)])
+
+    def next(self):
+        if not self.objects_to_send:
+            return None
+        (sha, name) = self.objects_to_send.pop()
+        o = self.object_store[sha]
+        if isinstance(o, Commit):
+            self.parse_commit(o)
+        elif isinstance(o, Tree):
+            self.parse_tree(o)
+        elif isinstance(o, Tag):
+            self.parse_tag(o)
+        self.sha_done.add((sha, name))
+        self.progress("counting objects: %d\r" % len(self.sha_done))
+        return (sha, name)
+
+
+

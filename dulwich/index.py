@@ -18,9 +18,14 @@
 
 """Parser for the git index file format."""
 
+import stat
 import struct
 
-from dulwich.objects import sha_to_hex, hex_to_sha
+from dulwich.objects import (
+    Tree,
+    hex_to_sha,
+    sha_to_hex,
+    )
 
 
 def read_cache_time(f):
@@ -183,9 +188,37 @@ class Index(object):
             self[name] = value
 
 
-def commit(index, basepath, object_store):
-    """Commit an index.
+def commit_tree(object_store, blobs):
+    """Commit a new tree.
 
+    :param object_store: Object store to add trees to
+    :param blobs: Iterable over blob path, sha, mode entries
     :return: SHA1 of the created tree.
     """
-    raise NotImplementedError(commit)
+    trees = {"": {}}
+    def add_tree(path):
+        if path in trees:
+            return trees[path]
+        dirname, basename = os.path.split(path)
+        t = add_tree(dirname)
+        assert isinstance(basename, str)
+        newtree = {}
+        t[basename] = newtree
+        return newtree
+
+    for path, sha, mode in blobs:
+        tree_path, basename = os.path.split(path)
+        tree = add_tree(tree_path)
+        tree[basename] = (mode, sha)
+
+    for path in sorted(trees.keys(), reverse=True):
+        tree = Tree()
+        for basename, (mode, sha) in trees[path]:
+            tree.add(mode, basename, sha)
+        if path != "":
+            # Add to object store
+            parent_path, basename = os.path.split(path)
+            # Update sha in parent
+            trees[parent_path][basename] = (stat.S_IFDIR, tree.id)
+        else:
+            return tree.id

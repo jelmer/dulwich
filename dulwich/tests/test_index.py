@@ -17,12 +17,20 @@
 # MA  02110-1301, USA.
 
 import os
+import stat
 from unittest import TestCase
 
 from dulwich.index import (
     Index,
+    commit_tree,
     read_index,
     write_index,
+    )
+from dulwich.object_store import (
+    MemoryObjectStore,
+    )
+from dulwich.objects import (
+    Blob,
     )
 
 class IndexTestCase(TestCase):
@@ -62,3 +70,19 @@ class SimpleIndexWriterTestCase(IndexTestCase):
         finally:
             x.close()
 
+
+class CommitTreeTests(TestCase):
+
+    def setUp(self):
+        super(CommitTreeTests, self).setUp()
+        self.store = MemoryObjectStore()
+
+    def test_single_blob(self):
+        blob = Blob()
+        blob.data = "foo"
+        self.store.add_object(blob)
+        blobs = [("bla", blob.id, stat.S_IFREG)]
+        rootid = commit_tree(self.store, blobs)
+        self.assertEquals(rootid, "1a1e80437220f9312e855c37ac4398b68e5c1d50")
+        self.assertEquals(blob.id, self.store[rootid]["bla"][1])
+        self.assertEquals(set([rootid, blob.id]), set(self.store._data.keys()))

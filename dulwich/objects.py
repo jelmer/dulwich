@@ -231,10 +231,14 @@ class Blob(ShaFile):
     _needs_serialization = False
     _needs_parsing = False
 
-    @property
-    def data(self):
-        """The text contained within the blob object."""
+    def get_data(self):
         return self._text
+
+    def set_data(self, data):
+        self._text = data
+
+    data = property(get_data, set_data, 
+            "The text contained within the blob object.")
 
     @classmethod
     def from_file(cls, filename):
@@ -420,6 +424,9 @@ class Tree(ShaFile):
         self._needs_serialization = True
 
     def add(self, mode, name, hexsha):
+        assert type(mode) == int
+        assert type(name) == str
+        assert type(hexsha) == str
         self._ensure_parsed()
         self._entries[name] = mode, hexsha
         self._needs_serialization = True

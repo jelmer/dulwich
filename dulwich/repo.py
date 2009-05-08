@@ -31,7 +31,7 @@ from dulwich.errors import (
     NotTreeError, 
     )
 from dulwich.object_store import (
-    ObjectStore,
+    DiskObjectStore,
     )
 from dulwich.objects import (
     Blob,
@@ -163,7 +163,7 @@ class Repo(object):
     @property
     def object_store(self):
         if self._object_store is None:
-            self._object_store = ObjectStore(self.object_dir())
+            self._object_store = DiskObjectStore(self.object_dir())
         return self._object_store
 
     def pack_dir(self):

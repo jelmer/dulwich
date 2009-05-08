@@ -126,7 +126,7 @@ def write_index_dict(f, entries):
 
 
 def cleanup_mode(mode):
-    if stat.S_ISLNK(fsmode)
+    if stat.S_ISLNK(fsmode):
         mode = stat.S_IFLNK
     else:
         mode = stat.S_IFREG

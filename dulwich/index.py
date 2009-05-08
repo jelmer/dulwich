@@ -24,10 +24,12 @@ from dulwich.objects import sha_to_hex, hex_to_sha
 
 
 def read_cache_time(f):
+    """Read a cache time."""
     return struct.unpack(">LL", f.read(8))
 
 
 def write_cache_time(f, t):
+    """Write a cache time."""
     if isinstance(t, int):
         t = (t, 0)
     f.write(struct.pack(">LL", *t))
@@ -119,13 +121,19 @@ def write_index_dict(f, entries):
 
 
 class Index(object):
+    """A Git Index file."""
 
     def __init__(self, filename):
+        """Open an index file.
+        
+        :param filename: Path to the index file
+        """
         self._filename = filename
         self.clear()
         self.read()
 
     def write(self):
+        """Write current contents of index to disk."""
         f = open(self._filename, 'w')
         try:
             write_index_dict(f, self._byname)
@@ -133,6 +141,7 @@ class Index(object):
             f.close()
 
     def read(self):
+        """Read current contents of index from disk."""
         f = open(self._filename, 'r')
         try:
             for x in read_index(f):
@@ -141,18 +150,23 @@ class Index(object):
             f.close()
 
     def __len__(self):
+        """Number of entries in this index file."""
         return len(self._byname)
 
     def __getitem__(self, name):
+        """Retrieve entry by relative path."""
         return self._byname[name]
 
     def __iter__(self):
+        """Iterate over the paths in this index."""
         return iter(self._byname)
 
     def get_sha1(self, path):
+        """Return the (git object) SHA1 for the object at a path."""
         return self[path][-2]
 
     def clear(self):
+        """Remove all contents from this index."""
         self._byname = {}
 
     def __setitem__(self, name, x):

@@ -22,6 +22,7 @@
 
 import itertools
 import os
+import stat
 import tempfile
 import urllib2
 
@@ -328,6 +329,12 @@ class ObjectStoreIterator(ObjectIterator):
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):
+    """Lookup an object in a Git tree.
+
+    :param lookup_obj: Callback for retrieving object by SHA1
+    :param root_sha: SHA1 of the root tree
+    :param path: Path to lookup
+    """
     parts = path.split("/")
     sha = root_sha
     for p in parts:
@@ -353,7 +360,7 @@ class MissingObjectFinder(object):
 
     def __init__(self, object_store, wants, graph_walker, progress=None):
         self.sha_done = set()
-        self.objects_to_send = set([(w, None) for w in wants])
+        self.objects_to_send = set([(w, None, False) for w in wants])
         self.object_store = object_store
         if progress is None:
             self.progress = lambda x: None
@@ -366,32 +373,30 @@ class MissingObjectFinder(object):
             ref = graph_walker.next()
 
     def add_todo(self, entries):
-        self.objects_to_send.update([e for e in entries if not e in self.sha_done])
+        self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
 
     def parse_tree(self, tree):
-        self.add_todo([(sha, name) for (mode, name, sha) in tree.entries()])
+        self.add_todo([(sha, name, not stat.S_ISDIR(mode)) for (mode, name, sha) in tree.entries()])
 
     def parse_commit(self, commit):
-        self.add_todo([(commit.tree, "")])
-        self.add_todo([(p, None) for p in commit.parents])
+        self.add_todo([(commit.tree, "", False)])
+        self.add_todo([(p, None, False) for p in commit.parents])
 
     def parse_tag(self, tag):
-        self.add_todo([(tag.object[1], None)])
+        self.add_todo([(tag.object[1], None, False)])
 
     def next(self):
         if not self.objects_to_send:
             return None
-        (sha, name) = self.objects_to_send.pop()
-        o = self.object_store[sha]
-        if isinstance(o, Commit):
-            self.parse_commit(o)
-        elif isinstance(o, Tree):
-            self.parse_tree(o)
-        elif isinstance(o, Tag):
-            self.parse_tag(o)
-        self.sha_done.add((sha, name))
+        (sha, name, leaf) = self.objects_to_send.pop()
+        if not leaf:
+            o = self.object_store[sha]
+            if isinstance(o, Commit):
+                self.parse_commit(o)
+            elif isinstance(o, Tree):
+                self.parse_tree(o)
+            elif isinstance(o, Tag):
+                self.parse_tag(o)
+        self.sha_done.add(sha)
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)
-
-
-

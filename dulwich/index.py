@@ -219,6 +219,7 @@ def commit_tree(object_store, blobs):
         assert isinstance(basename, str)
         newtree = {}
         t[basename] = newtree
+        trees[path] = newtree
         return newtree
 
     for path, sha, mode in blobs:
@@ -226,18 +227,18 @@ def commit_tree(object_store, blobs):
         tree = add_tree(tree_path)
         tree[basename] = (mode, sha)
 
-    for path in sorted(trees.keys(), reverse=True):
+    def build_tree(path):
         tree = Tree()
-        for basename, (mode, sha) in trees[path].iteritems():
+        for basename, entry in trees[path].iteritems():
+            if type(entry) == dict:
+                mode = stat.S_IFDIR
+                sha = build_tree(os.path.join(path, basename))
+            else:
+                (mode, sha) = entry
             tree.add(mode, basename, sha)
         object_store.add_object(tree)
-        if path != "":
-            # Add to object store
-            parent_path, basename = os.path.split(path)
-            # Update sha in parent
-            trees[parent_path][basename] = (stat.S_IFDIR, tree.id)
-        else:
-            return tree.id
+        return tree.id
+    return build_tree("")
 
 
 def commit_index(object_store, index):

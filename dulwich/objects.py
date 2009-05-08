@@ -126,6 +126,7 @@ class ShaFile(object):
 
     def set_raw_string(self, text):
         self._text = text
+        self._sha = None
         self._needs_parsing = True
         self._needs_serialization = False
   
@@ -191,10 +192,11 @@ class ShaFile(object):
   
     def sha(self):
         """The SHA1 object that is the name of this object."""
-        ressha = make_sha()
-        ressha.update(self._header())
-        ressha.update(self.as_raw_string())
-        return ressha
+        if self._needs_serialization or self._sha is None:
+            self._sha = make_sha()
+            self._sha.update(self._header())
+            self._sha.update(self.as_raw_string())
+        return self._sha
   
     @property
     def id(self):

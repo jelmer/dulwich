@@ -18,24 +18,34 @@
 
 from unittest import TestCase
 
-from dulwich.object_store import ObjectStore
+from dulwich.object_store import (
+    DiskObjectStore,
+    MemoryObjectStore,
+    )
 
-class ObjectStoreTests(TestCase):
+class DiskObjectStoreTests(TestCase):
 
     def test_pack_dir(self):
-        o = ObjectStore("foo")
+        o = DiskObjectStore("foo")
         self.assertEquals("foo/pack", o.pack_dir)
 
     def test_empty_packs(self):
-        o = ObjectStore("foo")
+        o = DiskObjectStore("foo")
         self.assertEquals([], o.packs)
 
     def test_add_objects_empty(self):
-        o = ObjectStore("foo")
+        o = DiskObjectStore("foo")
         o.add_objects([])
 
     def test_add_commit(self):
-        o = ObjectStore("foo")
+        o = DiskObjectStore("foo")
         # TODO: Argh, no way to construct Git commit objects without 
         # access to a serialized form.
         o.add_objects([])
+
+
+class MemoryObjectStoreTests(TestCase):
+
+    def test_iter(self):
+        store = MemoryObjectStore()
+        self.assertEquals([], list(store))

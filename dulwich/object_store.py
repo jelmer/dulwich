@@ -112,7 +112,7 @@ class BaseObjectStore(object):
         return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
 
 
-class ObjectStore(BaseObjectStore):
+class DiskObjectStore(BaseObjectStore):
     """Git-style object store that exists on disk."""
 
     def __init__(self, path):
@@ -299,6 +299,41 @@ class ObjectStore(BaseObjectStore):
         write_pack_data(f, objects, len(objects))
         commit()
 
+
+class MemoryObjectStore(BaseObjectStore):
+
+    def __init__(self):
+        super(MemoryObjectStore, self).__init__()
+        self._data = {}
+
+    def __contains__(self, sha):
+        return sha in self._data
+
+    def __iter__(self):
+        """Iterate over the SHAs that are present in this store."""
+        return self._data.iterkeys()
+
+    def get_raw(self, name):
+        """Obtain the raw text for an object.
+        
+        :param name: sha for the object.
+        :return: tuple with object type and object contents.
+        """
+        return self[sha].as_raw_string()
+
+    def add_object(self, obj):
+        """Add a single object to this object store.
+
+        """
+        self._dict[obj.id] = obj
+
+    def add_objects(self, objects):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over a list of objects.
+        """
+        for obj in objects:
+            self._data[obj.id] = obj
 
 
 class ObjectImporter(object):

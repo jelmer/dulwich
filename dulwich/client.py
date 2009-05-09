@@ -135,6 +135,7 @@ class GitClient(object):
         if not wants:
             self.proto.write_pkt_line(None)
             return refs
+        assert isinstance(wants, list) and type(wants[0]) == str
         self.proto.write_pkt_line("want %s %s\n" % (wants[0], self.capabilities()))
         for want in wants[1:]:
             self.proto.write_pkt_line("want %s\n" % want)

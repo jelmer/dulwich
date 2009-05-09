@@ -443,12 +443,10 @@ class MissingObjectFinder(object):
     :param object_store: Object store containing at least all objects to be 
         sent
     :param wants: SHA1s of commits to send
-    :param graph_walker: graph walker object used to see what the remote 
-        repo has and misses
     :param progress: Optional function to report progress to.
     """
 
-    def __init__(self, haves, wants, graph_walker, progress=None):
+    def __init__(self, object_store, haves, wants, progress=None):
         self.sha_done = set(haves)
         self.objects_to_send = set([(w, None, False) for w in wants])
         self.object_store = object_store

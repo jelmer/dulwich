@@ -348,6 +348,7 @@ class Repo(object):
         controldir = os.path.join(path, ".git")
         os.mkdir(controldir)
         cls.init_bare(controldir)
+        return cls(path)
 
     @classmethod
     def init_bare(cls, path, mkdir=True):
@@ -364,6 +365,7 @@ class Repo(object):
         open(os.path.join(path, 'HEAD'), 'w').write("ref: refs/heads/master\n")
         open(os.path.join(path, 'description'), 'w').write("Unnamed repository")
         open(os.path.join(path, 'info', 'excludes'), 'w').write("")
+        return cls(path)
 
     create = init_bare
 

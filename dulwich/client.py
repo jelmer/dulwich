@@ -91,22 +91,23 @@ class GitClient(object):
         :param generate_pack_contents: Function that can return the shas of the 
             objects to upload.
         """
-        refs, server_capabilities = self.read_refs()
-        changed_refs = determine_wants(refs)
-        if not changed_refs:
+        old_refs, server_capabilities = self.read_refs()
+        new_refs = determine_wants(old_refs)
+        if not new_refs:
             self.proto.write_pkt_line(None)
             return {}
         want = []
-        have = [x for x in refs.values() if not x == "0" * 40]
+        have = [x for x in old_refs.values() if not x == "0" * 40]
         sent_capabilities = False
-        for changed_ref, new_sha1 in changed_refs.iteritems():
-            old_sha1 = refs.get(changed_ref, "0" * 40)
+        for refname in set(new_refs.keys() + old_refs.keys()):
+            old_sha1 = old_refs.get(refname, "0" * 40)
+            new_sha1 = new_refs.get(refname, "0" * 40)
             if sent_capabilities:
                 self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, changed_ref))
             else:
                 self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, changed_ref, self.capabilities()))
                 sent_capabilities = True
-            if not new_sha1 in have:
+            if not new_sha1 in (have, "0" * 40):
                 want.append(new_sha1)
         self.proto.write_pkt_line(None)
         objects = generate_pack_contents(have, want)
@@ -119,7 +120,7 @@ class GitClient(object):
         if not client_sha in (None, "", sha):
             raise ChecksumMismatch(sha, client_sha)
             
-        return changed_refs
+        return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress):

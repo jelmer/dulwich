@@ -98,18 +98,16 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_objects)
 
-    def find_missing_objects(self, wants, graph_walker, progress=None):
+    def find_missing_objects(self, haves, wants, progress=None):
         """Find the missing objects required for a set of revisions.
 
+        :param haves: Iterable over SHAs already in common.
         :param wants: Iterable over SHAs of objects to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions 
-            to fetch and has an "ack" method that will be called to acknowledge 
-            that a revision is present.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
         :return: Iterator over (sha, path) pairs.
         """
-        return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
+        return iter(MissingObjectFinder(self, haves, wants, progress).next, None)
 
     def get_commit_parents(self, sha):
         """Retrieve the parents of a commit.
@@ -450,19 +448,14 @@ class MissingObjectFinder(object):
     :param progress: Optional function to report progress to.
     """
 
-    def __init__(self, object_store, wants, graph_walker, progress=None):
-        self.sha_done = set()
+    def __init__(self, haves, wants, graph_walker, progress=None):
+        self.sha_done = set(haves)
         self.objects_to_send = set([(w, None, False) for w in wants])
         self.object_store = object_store
         if progress is None:
             self.progress = lambda x: None
         else:
             self.progress = progress
-        ref = graph_walker.next()
-        while ref:
-            if ref in self.object_store:
-                graph_walker.ack(ref)
-            ref = graph_walker.next()
 
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])

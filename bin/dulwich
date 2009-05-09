@@ -31,7 +31,6 @@ def get_transport_and_path(uri):
 
 
 def cmd_fetch_pack(args):
-	from dulwich.client import SimpleFetchGraphWalker
 	from dulwich.repo import Repo
 	opts, args = getopt(args, "", ["all"])
 	opts = dict(opts)
@@ -41,7 +40,7 @@ def cmd_fetch_pack(args):
 	else:
 		determine_wants = lambda x: [y for y in args if not y in r.object_store]
 	r = Repo(".")
-	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
+	graphwalker = r.get_graph_walker()
 	f, commit = r.object_store.add_pack()
 	try:
 		client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
@@ -143,7 +142,6 @@ def cmd_init(args):
 
 
 def cmd_clone(args):
-	from dulwich.client import SimpleFetchGraphWalker
 	from dulwich.repo import Repo
 	import os
 	import sys
@@ -164,7 +162,7 @@ def cmd_clone(args):
 		os.mkdir(path)
 	Repo.init(path)
 	r = Repo(path)
-	graphwalker = SimpleFetchGraphWalker(r.heads().values(), r.get_parents)
+	graphwalker = r.get_graph_walker()
 	f, commit = r.object_store.add_pack()
 	client.fetch_pack(host_path, r.object_store.determine_wants_all, 
 			          graphwalker, f.write, sys.stdout.write)

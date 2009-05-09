@@ -156,6 +156,11 @@ class Repo(object):
         return self.object_store.iter_shas(
             self.find_missing_objects(determine_wants, graph_walker, progress))
 
+    def get_graph_walker(self, heads=None):
+        if heads is None:
+            heads = self.heads().values()
+        return self.object_store.get_graph_walker(heads)
+
     def object_dir(self):
         """Return path of the object directory."""
         return os.path.join(self.controldir(), OBJECTDIR)
@@ -292,7 +297,7 @@ class Repo(object):
         return self.object_store[sha]
 
     def get_parents(self, sha):
-        return self.commit(sha).parents
+        return self.object_store.get_commit_parents(sha)
 
     def commit(self, sha):
         return self._get_object(sha, Commit)

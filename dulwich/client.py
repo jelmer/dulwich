@@ -44,38 +44,6 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 
-class SimpleFetchGraphWalker(object):
-    """Graph walker that finds out what commits are missing."""
-
-    def __init__(self, local_heads, get_parents):
-        """Create a new SimpleFetchGraphWalker instance.
-
-        :param local_heads: SHA1s that should be retrieved
-        :param get_parents: Function for finding the parents of a SHA1.
-        """
-        self.heads = set(local_heads)
-        self.get_parents = get_parents
-        self.parents = {}
-
-    def ack(self, sha):
-        """Ack that a particular revision and its ancestors are present in the target."""
-        if sha in self.heads:
-            self.heads.remove(sha)
-        if sha in self.parents:
-            for p in self.parents[sha]:
-                self.ack(p)
-
-    def next(self):
-        """Iterate over revisions that might be missing in the target."""
-        if self.heads:
-            ret = self.heads.pop()
-            ps = self.get_parents(ret)
-            self.parents[ret] = ps
-            self.heads.update(ps)
-            return ret
-        return None
-
-
 CAPABILITIES = ["multi_ack", "side-band-64k", "ofs-delta"]
 
 

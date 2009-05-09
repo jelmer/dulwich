@@ -111,6 +111,22 @@ class BaseObjectStore(object):
         """
         return iter(MissingObjectFinder(self, wants, graph_walker, progress).next, None)
 
+    def get_commit_parents(self, sha):
+        """Retrieve the parents of a commit.
+
+        :param sha: SHA1 of the commit
+        :return: List of parent SHA1s
+        """
+        return self[sha].parents
+
+    def get_graph_walker(self, heads):
+        """Obtain a graph walker for this object store.
+        
+        :param heads: Local heads to start search with
+        :return: GraphWalker object
+        """
+        return ObjectStoreGraphWalker(heads, self.get_commit_parents)
+
 
 class DiskObjectStore(BaseObjectStore):
     """Git-style object store that exists on disk."""
@@ -476,3 +492,38 @@ class MissingObjectFinder(object):
         self.sha_done.add(sha)
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)
+
+
+class ObjectStoreGraphWalker(object):
+    """Graph walker that finds out what commits are missing from an object store."""
+
+    def __init__(self, local_heads, get_parents):
+        """Create a new instance.
+
+        :param local_heads: Heads to start search with
+        :param get_parents: Function for finding the parents of a SHA1.
+        """
+        self.heads = set(local_heads)
+        self.get_parents = get_parents
+        self.parents = {}
+
+    def ack(self, sha):
+        """Ack that a particular revision and its ancestors are present in the source."""
+        if sha in self.heads:
+            self.heads.remove(sha)
+        if sha in self.parents:
+            for p in self.parents[sha]:
+                self.ack(p)
+
+    def next(self):
+        """Iterate over ancestors of heads in the target."""
+        if self.heads:
+            ret = self.heads.pop()
+            ps = self.get_parents(ret)
+            self.parents[ret] = ps
+            self.heads.update(ps)
+            return ret
+        return None
+
+
+

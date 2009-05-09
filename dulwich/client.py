@@ -103,9 +103,9 @@ class GitClient(object):
             old_sha1 = old_refs.get(refname, "0" * 40)
             new_sha1 = new_refs.get(refname, "0" * 40)
             if sent_capabilities:
-                self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, changed_ref))
+                self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
             else:
-                self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, changed_ref, self.capabilities()))
+                self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
                 sent_capabilities = True
             if not new_sha1 in (have, "0" * 40):
                 want.append(new_sha1)

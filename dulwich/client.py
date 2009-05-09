@@ -97,7 +97,7 @@ class GitClient(object):
             self.proto.write_pkt_line(None)
             return {}
         want = []
-        have = []
+        have = [x for x in refs.values() if not x == "0" * 40]
         sent_capabilities = False
         for changed_ref, new_sha1 in changed_refs.iteritems():
             old_sha1 = refs.get(changed_ref, "0" * 40)
@@ -106,11 +106,10 @@ class GitClient(object):
             else:
                 self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, changed_ref, self.capabilities()))
                 sent_capabilities = True
-            want.append(new_sha1)
-            if old_sha1 != "0"*40:
-                have.append(old_sha1)
+            if not new_sha1 in have:
+                want.append(new_sha1)
         self.proto.write_pkt_line(None)
-        objects = generate_pack_contents(want, have)
+        objects = generate_pack_contents(have, want)
         (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
                                          len(objects))
         self.proto.write(sha)

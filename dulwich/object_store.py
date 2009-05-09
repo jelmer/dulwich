@@ -442,13 +442,14 @@ class MissingObjectFinder(object):
 
     :param object_store: Object store containing at least all objects to be 
         sent
+    :param haves: SHA1s of commits not to send (already present in target)
     :param wants: SHA1s of commits to send
     :param progress: Optional function to report progress to.
     """
 
     def __init__(self, object_store, haves, wants, progress=None):
         self.sha_done = set(haves)
-        self.objects_to_send = set([(w, None, False) for w in wants])
+        self.objects_to_send = set([(w, None, False) for w in wants if w not in haves])
         self.object_store = object_store
         if progress is None:
             self.progress = lambda x: None
@@ -515,6 +516,3 @@ class ObjectStoreGraphWalker(object):
             self.heads.update(ps)
             return ret
         return None
-
-
-

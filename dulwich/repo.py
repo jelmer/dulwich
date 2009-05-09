@@ -125,22 +125,6 @@ class Repo(object):
         """Check if an index is present."""
         return os.path.exists(self.index_path())
 
-    def find_missing_objects(self, determine_wants, graph_walker, progress):
-        """Find the missing objects required for a set of revisions.
-
-        :param determine_wants: Function that takes a dictionary with heads 
-            and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions 
-            to fetch and has an "ack" method that will be called to acknowledge 
-            that a revision is present.
-        :param progress: Simple progress function that will be called with 
-            updated progress strings.
-        :return: Iterator over (sha, path) pairs.
-        """
-        wants = determine_wants(self.get_refs())
-        return self.object_store.find_missing_objects(wants, 
-                graph_walker, progress)
-
     def fetch_objects(self, determine_wants, graph_walker, progress):
         """Fetch the missing objects required for a set of revisions.
 
@@ -153,8 +137,10 @@ class Repo(object):
             updated progress strings.
         :return: tuple with number of objects, iterator over objects
         """
+        wants = determine_wants(self.get_refs())
+        haves = self.object_store.find_missing_revisions(graphwalker)
         return self.object_store.iter_shas(
-            self.find_missing_objects(determine_wants, graph_walker, progress))
+            self.object_store.find_missing_objects(haves, wants, progress))
 
     def get_graph_walker(self, heads=None):
         if heads is None:

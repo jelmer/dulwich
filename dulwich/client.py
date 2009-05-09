@@ -113,7 +113,6 @@ class GitClient(object):
         objects = generate_pack_contents(have, want)
         (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
                                          len(objects))
-        self.proto.write(sha)
         
         # read the final confirmation sha
         client_sha = self.proto.read(20)

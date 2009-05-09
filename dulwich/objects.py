@@ -438,9 +438,15 @@ class Tree(ShaFile):
         return [(mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
     def iteritems(self):
+        def cmp_entry((name1, value1), (name2, value2)):
+            if stat.S_ISDIR(value1[0]):
+                name1 += "/"
+            if stat.S_ISDIR(value2[0]):
+                name2 += "/"
+            return cmp(name1, name2)
         self._ensure_parsed()
-        for name in sorted(self._entries.keys()):
-            yield name, self._entries[name][0], self._entries[name][1]
+        for name, entry in sorted(self._entries.iteritems(), cmp=cmp_entry):
+            yield name, entry[0], entry[1]
 
     def _parse_text(self):
         """Grab the entries in the tree"""

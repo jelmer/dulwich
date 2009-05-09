@@ -18,6 +18,7 @@
 # MA  02110-1301, USA.
 
 import os
+import stat
 import unittest
 
 from dulwich.objects import (
@@ -188,3 +189,10 @@ class TreeSerializationTests(unittest.TestCase):
         x["myname"] = (0100755, myhexsha)
         self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
                 x.as_raw_string())
+
+    def test_tree_dir_sort(self):
+        x = Tree()
+        x["a.c"] = (0100755, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        x["a"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        x["a/c"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])

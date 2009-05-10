@@ -48,24 +48,40 @@ REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
-class Tags(object):
-    """Tags container."""
 
-    def __init__(self, tagdir, tags):
-        self.tagdir = tagdir
-        self.tags = tags
+class RefsContainer(object):
 
-    def __getitem__(self, name):
-        return self.tags[name]
-    
+    def __init__(self, path):
+        self.path = path
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.path)
+
+    def refpath(self, name):
+        return os.path.join(self.path, name)
+
     def __setitem__(self, name, ref):
-        self.tags[name] = ref
-        f = open(os.path.join(self.tagdir, name), 'wb')
+        f = open(self.refpath(name), 'wb')
         try:
             f.write("%s\n" % ref)
         finally:
             f.close()
 
+
+class Tags(RefsContainer):
+    """Tags container."""
+
+    def __init__(self, tagdir, tags):
+        super(Tags, self).__init__(tagdir)
+        self.tags = tags
+
+    def __setitem__(self, name, value):
+        super(Tags, self)[name] = value
+        self.tags[name] = value
+
+    def __getitem__(self, name):
+        return self.tags[name]
+    
     def __len__(self):
         return len(self.tags)
 

@@ -543,10 +543,12 @@ class Commit(ShaFile):
             assert text[count] == ' ', "Invalid commit object, " \
                  "author information must be followed by space not %s" % text[count]
             count += 1
-            self._author_time = int(text[count:count+10])
+            time_text = ''
             while text[count] != ' ':
                 assert text[count] != '\n', "Malformed author information"
+                time_text += text[count]
                 count += 1
+            self._author_time = int(time_text)
             self._author_timezone = parse_timezone(text[count:count+6])
             count += 1
             while text[count] != '\n':
@@ -568,10 +570,12 @@ class Commit(ShaFile):
             assert text[count] == ' ', "Invalid commit object, " \
                  "commiter information must be followed by space not %s" % text[count]
             count += 1
-            self._commit_time = int(text[count:count+10])
+            time_text = ""
             while text[count] != ' ':
                 assert text[count] != '\n', "Malformed committer information"
+                time_text += text[count]
                 count += 1
+            self._commit_time = int(time_text)
             self._commit_timezone = parse_timezone(text[count:count+6])
             count += 1
             while text[count] != '\n':

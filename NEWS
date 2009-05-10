@@ -1,3 +1,22 @@
+0.3.0	2009-05-10
+
+ FEATURES
+
+  * A new function `commit_tree' has been added that can commit a tree 
+    based on an index.
+
+ BUG FIXES
+
+  * The memory usage when generating indexes has been significantly reduced.
+ 
+  * A memory leak in the C implementation of parse_tree has been fixed.
+
+  * The send-pack smart server command now works. (Thanks Scott Chacon)
+
+  * The handling of short timestamps (less than 10 digits) has been fixed.
+
+  * The handling of timezones has been fixed.
+
 0.2.1	2009-04-30
 
  BUG FIXES

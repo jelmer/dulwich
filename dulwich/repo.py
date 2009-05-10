@@ -72,11 +72,11 @@ class Tags(RefsContainer):
     """Tags container."""
 
     def __init__(self, tagdir, tags):
-        super(Tags, self).__init__(tagdir)
+        RefsContainer.__init__(self, tagdir)
         self.tags = tags
 
     def __setitem__(self, name, value):
-        super(Tags, self)[name] = value
+        RefsContainer.__setitem__(self, name, value)
         self.tags[name] = value
 
     def __getitem__(self, name):

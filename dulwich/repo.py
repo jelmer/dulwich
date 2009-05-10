@@ -44,6 +44,8 @@ from dulwich.objects import (
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '
 REFSDIR = 'refs'
+REFSDIR_TAGS = 'tags'
+REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
 class Tags(object):
@@ -241,7 +243,7 @@ class Repo(object):
 
     def tagdir(self):
         """Tag directory."""
-        return os.path.join(self.controldir(), REFSDIR, 'tags')
+        return os.path.join(self.controldir(), REFSDIR, REFSDIR_TAGS)
 
     def get_tags(self):
         ret = {}
@@ -253,7 +255,7 @@ class Repo(object):
     def heads(self):
         """Return dictionary with heads."""
         ret = {}
-        for root, dirs, files in os.walk(os.path.join(self.controldir(), REFSDIR, 'heads')):
+        for root, dirs, files in os.walk(os.path.join(self.controldir(), REFSDIR, REFSDIR_HEADS)):
             for name in files:
                 ret[name] = self._get_ref(os.path.join(root, name))
         return ret
@@ -345,8 +347,8 @@ class Repo(object):
                   [OBJECTDIR, "pack"],
                   ["branches"],
                   [REFSDIR],
-                  ["refs", "tags"],
-                  ["refs", "heads"],
+                  [REFSDIR, REFSDIR_TAGS],
+                  [REFSDIR, REFSDIR_HEADS],
                   ["hooks"],
                   ["info"]]:
             os.mkdir(os.path.join(path, *d))

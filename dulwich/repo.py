@@ -157,9 +157,6 @@ class Repo(object):
             self._object_store = DiskObjectStore(self.object_dir())
         return self._object_store
 
-    def pack_dir(self):
-        return os.path.join(self.object_dir(), PACKDIR)
-
     def _get_ref(self, file):
         f = open(file, 'rb')
         try:

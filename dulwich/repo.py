@@ -108,7 +108,8 @@ class Repo(object):
             raise NotGitRepository(root)
         self.path = root
         self.tags = Tags(self.tagdir(), self.get_tags())
-        self._object_store = None
+        self.object_store = DiskObjectStore(
+            os.path.join(self.controldir(), OBJECTDIR))
 
     def controldir(self):
         """Return the path of the control directory."""
@@ -148,16 +149,6 @@ class Repo(object):
         if heads is None:
             heads = self.heads().values()
         return self.object_store.get_graph_walker(heads)
-
-    def object_dir(self):
-        """Return path of the object directory."""
-        return os.path.join(self.controldir(), OBJECTDIR)
-
-    @property
-    def object_store(self):
-        if self._object_store is None:
-            self._object_store = DiskObjectStore(self.object_dir())
-        return self._object_store
 
     def _get_ref(self, file):
         f = open(file, 'rb')

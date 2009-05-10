@@ -35,7 +35,6 @@ class RepositoryTests(unittest.TestCase):
         r = self.open_repo('a')
         basedir = os.path.join(os.path.dirname(__file__), 'data/repos/a/.git')
         self.assertEqual(r.controldir(), basedir)
-        self.assertEqual(r.object_dir(), os.path.join(basedir, 'objects'))
   
     def test_ref(self):
         r = self.open_repo('a')

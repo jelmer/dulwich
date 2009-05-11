@@ -244,8 +244,11 @@ class Repo(object):
     def get_refs(self):
         """Get dictionary with all refs."""
         ret = {}
-        if self.head():
-            ret['HEAD'] = self.head()
+        try:
+            if self.head():
+                ret['HEAD'] = self.head()
+        except KeyError:
+            pass
         ret.update(self.refs.as_dict())
         ret.update(self.get_packed_refs())
         return ret

@@ -49,6 +49,17 @@ REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
 
+def follow_ref(container, name):
+    contents = container[name]
+    if contents.startswith(SYMREF):
+        ref = contents[len(SYMREF):]
+        if ref[-1] == '\n':
+            ref = ref[:-1]
+        return follow_ref(container, ref)
+    assert len(contents) == 40, 'Invalid ref in %s' % name
+    return contents
+
+
 class RefsContainer(object):
 
     def __init__(self, path):
@@ -61,6 +72,17 @@ class RefsContainer(object):
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
+
+    def follow(self, name):
+        return follow_ref(self, name)
+
+    def __getitem__(self, name):
+        file = self.refpath(name)
+        f = open(file, 'rb')
+        try:
+            return f.read().strip("\n")
+        finally:
+            f.close()
 
     def __setitem__(self, name, ref):
         file = self.refpath(name)
@@ -186,7 +208,7 @@ class Repo(object):
                 ref = contents[len(SYMREF):]
                 if ref[-1] == '\n':
                     ref = ref[:-1]
-                return self.ref(ref)
+                return follow_ref(self.refs, ref)
             assert len(contents) == 41, 'Invalid ref in %s' % file
             return contents[:-1]
         finally:

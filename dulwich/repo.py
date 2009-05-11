@@ -58,14 +58,25 @@ class RefsContainer(object):
         return "%s(%r)" % (self.__class__.__name__, self.path)
 
     def refpath(self, name):
+        if os.path.sep != "/":
+            name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
 
     def __setitem__(self, name, ref):
-        f = open(self.refpath(name), 'wb')
+        file = self.refpath(name)
+        dirpath = os.path.dirname(file)
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+        f = open(file, 'w')
         try:
-            f.write("%s\n" % ref)
+            f.write(value+"\n")
         finally:
             f.close()
+
+    def __delitem__(self, name):
+        file = self.refpath(name)
+        if os.path.exists(file):
+            os.remove(file)
 
 
 class Tags(RefsContainer):
@@ -123,6 +134,7 @@ class Repo(object):
         else:
             raise NotGitRepository(root)
         self.path = root
+        self.refs = RefsContainer(self.controldir())
         self.tags = Tags(self.tagdir(), self.get_tags())
         self.object_store = DiskObjectStore(
             os.path.join(self.controldir(), OBJECTDIR))
@@ -215,7 +227,7 @@ class Repo(object):
         if not os.path.exists(path):
             return {}
         ret = {}
-        f = open(path, 'r')
+        f = open(path, 'rb')
         try:
             for entry in read_packed_refs(f):
                 ret[entry[1]] = entry[0]
@@ -229,24 +241,14 @@ class Repo(object):
         :param name: Name of the ref
         :param value: SHA1 to point at
         """
-        file = os.path.join(self.controldir(), name)
-        dirpath = os.path.dirname(file)
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-        f = open(file, 'w')
-        try:
-            f.write(value+"\n")
-        finally:
-            f.close()
+        self.refs[name] = value
 
     def remove_ref(self, name):
         """Remove a ref.
 
         :param name: Name of the ref
         """
-        file = os.path.join(self.controldir(), name)
-        if os.path.exists(file):
-            os.remove(file)
+        del self.refs[name]
 
     def tagdir(self):
         """Tag directory."""

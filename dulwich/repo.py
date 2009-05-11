@@ -69,7 +69,11 @@ class RefsContainer(object):
         return follow_ref(self, name)
 
     def set_ref(self, name, other):
-        self['HEAD'] = "ref: %s\n" % other
+        self[name] = "ref: %s\n" % other
+
+    def import_refs(self, base, other):
+        for name, value in other.iteritems():
+            self["%s/%s" % (base, name)] = value
 
 
 class DiskRefsContainer(RefsContainer):
@@ -120,28 +124,6 @@ class DiskRefsContainer(RefsContainer):
             os.remove(file)
 
 
-class Tags(DiskRefsContainer):
-    """Tags container."""
-
-    def __init__(self, tagdir, tags):
-        DiskRefsContainer.__init__(self, tagdir)
-        self.tags = tags
-
-    def __setitem__(self, name, value):
-        DiskRefsContainer.__setitem__(self, name, value)
-        self.tags[name] = value
-
-    def __getitem__(self, name):
-        return self.tags[name]
-    
-    def __len__(self):
-        return len(self.tags)
-
-    def iteritems(self):
-        for k in self.tags:
-            yield k, self[k]
-
-
 def read_packed_refs(f):
     """Read a packed refs file.
 
@@ -161,9 +143,12 @@ def read_packed_refs(f):
 
 
 class Repo(object):
-    """A local git repository."""
-
-    ref_locs = ['', REFSDIR, 'refs/tags', 'refs/heads', 'refs/remotes']
+    """A local git repository.
+    
+    :ivar refs: Dictionary with the refs in this repository
+    :ivar object_store: Dictionary-like object for accessing
+        the objects
+    """
 
     def __init__(self, root):
         if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
@@ -176,7 +161,6 @@ class Repo(object):
             raise NotGitRepository(root)
         self.path = root
         self.refs = DiskRefsContainer(self.controldir())
-        self.tags = Tags(self.tagdir(), self.get_tags())
         self.object_store = DiskObjectStore(
             os.path.join(self.controldir(), OBJECTDIR))
 
@@ -216,7 +200,7 @@ class Repo(object):
 
     def get_graph_walker(self, heads=None):
         if heads is None:
-            heads = self.heads().values()
+            heads = self.refs.as_dict('refs/heads').values()
         return self.object_store.get_graph_walker(heads)
 
     def ref(self, name):
@@ -254,32 +238,6 @@ class Repo(object):
             return ret
         finally:
             f.close()
-
-    def set_ref(self, name, value):
-        """Set a new ref.
-
-        :param name: Name of the ref
-        :param value: SHA1 to point at
-        """
-        self.refs[name] = value
-
-    def remove_ref(self, name):
-        """Remove a ref.
-
-        :param name: Name of the ref
-        """
-        del self.refs[name]
-
-    def tagdir(self):
-        """Tag directory."""
-        return os.path.join(self.controldir(), REFSDIR, REFSDIR_TAGS)
-
-    def get_tags(self):
-        return self.refs.as_dict("%s/%s" % (REFSDIR, REFSDIR_TAGS))
-
-    def heads(self):
-        """Return dictionary with heads."""
-        return self.refs.as_dict("%s/%s" % (REFSDIR, REFSDIR_HEADS))
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""

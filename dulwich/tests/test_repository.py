@@ -129,4 +129,4 @@ class RepositoryTests(unittest.TestCase):
   
     def test_get_tags_empty(self):
         r = self.open_repo('ooo_merge')
-        self.assertEquals({}, r.get_tags())
+        self.assertEquals({}, r.refs.as_dict('refs/tags'))

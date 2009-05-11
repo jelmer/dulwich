@@ -117,6 +117,9 @@ class ShaFile(object):
             self.serialize()
         return self._text
 
+    def __str__(self):
+        return self.as_raw_string()
+
     def as_pretty_string(self):
         return self.as_raw_string()
 

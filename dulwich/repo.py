@@ -92,6 +92,9 @@ class RefsContainer(object):
         finally:
             f.close()
 
+    def set_ref(self, name, other):
+        self['HEAD'] = "ref: %s\n" % other
+
     def __setitem__(self, name, ref):
         file = self.refpath(name)
         dirpath = os.path.dirname(file)
@@ -237,11 +240,7 @@ class Repo(object):
         ret = {}
         if self.head():
             ret['HEAD'] = self.head()
-        for dir in ["refs/heads", "refs/tags"]:
-            for name in os.listdir(os.path.join(self.controldir(), dir)):
-                path = os.path.join(self.controldir(), dir, name)
-                if os.path.isfile(path):
-                    ret["/".join([dir, name])] = self._get_ref(path)
+        ret.update(refs.as_dict(REFSDIR))
         ret.update(self.get_packed_refs())
         return ret
 
@@ -383,10 +382,11 @@ class Repo(object):
                   ["hooks"],
                   ["info"]]:
             os.mkdir(os.path.join(path, *d))
-        open(os.path.join(path, 'HEAD'), 'w').write("ref: refs/heads/master\n")
+        ret = cls(path)
+        ret.refs.set_ref("HEAD", "refs/heads/master")
         open(os.path.join(path, 'description'), 'w').write("Unnamed repository")
         open(os.path.join(path, 'info', 'excludes'), 'w').write("")
-        return cls(path)
+        return ret
 
     create = init_bare
 

@@ -86,6 +86,8 @@ class RefsContainer(object):
 
     def __getitem__(self, name):
         file = self.refpath(name)
+        if not os.path.exists(file):
+            raise KeyError(name)
         f = open(file, 'rb')
         try:
             return f.read().strip("\n")
@@ -211,36 +213,19 @@ class Repo(object):
             heads = self.heads().values()
         return self.object_store.get_graph_walker(heads)
 
-    def _get_ref(self, file):
-        f = open(file, 'rb')
-        try:
-            contents = f.read()
-            if contents.startswith(SYMREF):
-                ref = contents[len(SYMREF):]
-                if ref[-1] == '\n':
-                    ref = ref[:-1]
-                return follow_ref(self.refs, ref)
-            assert len(contents) == 41, 'Invalid ref in %s' % file
-            return contents[:-1]
-        finally:
-            f.close()
-
     def ref(self, name):
         """Return the SHA1 a ref is pointing to."""
-        for dir in self.ref_locs:
-            file = os.path.join(self.controldir(), dir, name)
-            if os.path.exists(file):
-                return self._get_ref(file)
-        packed_refs = self.get_packed_refs()
-        if name in packed_refs:
-            return packed_refs[name]
+        try:
+            return self.refs.follow(name)
+        except KeyError:
+            return self.get_packed_refs()[name]
 
     def get_refs(self):
         """Get dictionary with all refs."""
         ret = {}
         if self.head():
             ret['HEAD'] = self.head()
-        ret.update(refs.as_dict(REFSDIR))
+        ret.update(self.refs.as_dict(REFSDIR))
         ret.update(self.get_packed_refs())
         return ret
 

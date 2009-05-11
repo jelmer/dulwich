@@ -38,7 +38,7 @@ class RepositoryTests(unittest.TestCase):
   
     def test_ref(self):
         r = self.open_repo('a')
-        self.assertEqual(r.ref('master'),
+        self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
   
     def test_get_refs(self):

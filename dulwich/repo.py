@@ -354,6 +354,11 @@ class Repo(object):
     def __repr__(self):
         return "<Repo at %r>" % self.path
 
+    def __getitem__(self, name):
+        if len(name) in (20, 40):
+            return self.object_store[name]
+        return self.object_store[self.refs[name]]
+
     @classmethod
     def init(cls, path, mkdir=True):
         controldir = os.path.join(path, ".git")

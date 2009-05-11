@@ -68,6 +68,14 @@ class RefsContainer(object):
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.path)
 
+    def as_dict(self, base):
+        ret = {}
+        path = self.refpath(base)
+        for root, dirs, files in os.walk(path):
+            for name in files:
+                ret[name] = self.follow("%s/%s" % (base, name))
+        return ret
+
     def refpath(self, name):
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
@@ -277,23 +285,15 @@ class Repo(object):
         return os.path.join(self.controldir(), REFSDIR, REFSDIR_TAGS)
 
     def get_tags(self):
-        ret = {}
-        for root, dirs, files in os.walk(self.tagdir()):
-            for name in files:
-                ret[name] = self._get_ref(os.path.join(root, name))
-        return ret
+        return self.refs.as_dict("%s/%s" % (REFSDIR, REFSDIR_TAGS))
 
     def heads(self):
         """Return dictionary with heads."""
-        ret = {}
-        for root, dirs, files in os.walk(os.path.join(self.controldir(), REFSDIR, REFSDIR_HEADS)):
-            for name in files:
-                ret[name] = self._get_ref(os.path.join(root, name))
-        return ret
+        return self.refs.as_dict("%s/%s" % (REFSDIR, REFSDIR_HEADS))
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""
-        return self.ref('HEAD')
+        return self.refs.follow('HEAD')
 
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)

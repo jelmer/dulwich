@@ -62,6 +62,18 @@ def follow_ref(container, name):
 
 class RefsContainer(object):
 
+    def as_dict(self, base):
+        raise NotImplementedError(self.as_dict)
+
+    def follow(self, name):
+        return follow_ref(self, name)
+
+    def set_ref(self, name, other):
+        self['HEAD'] = "ref: %s\n" % other
+
+
+class DiskRefsContainer(RefsContainer):
+
     def __init__(self, path):
         self.path = path
 
@@ -81,9 +93,6 @@ class RefsContainer(object):
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
 
-    def follow(self, name):
-        return follow_ref(self, name)
-
     def __getitem__(self, name):
         file = self.refpath(name)
         if not os.path.exists(file):
@@ -93,9 +102,6 @@ class RefsContainer(object):
             return f.read().strip("\n")
         finally:
             f.close()
-
-    def set_ref(self, name, other):
-        self['HEAD'] = "ref: %s\n" % other
 
     def __setitem__(self, name, ref):
         file = self.refpath(name)
@@ -114,15 +120,15 @@ class RefsContainer(object):
             os.remove(file)
 
 
-class Tags(RefsContainer):
+class Tags(DiskRefsContainer):
     """Tags container."""
 
     def __init__(self, tagdir, tags):
-        RefsContainer.__init__(self, tagdir)
+        DiskRefsContainer.__init__(self, tagdir)
         self.tags = tags
 
     def __setitem__(self, name, value):
-        RefsContainer.__setitem__(self, name, value)
+        DiskRefsContainer.__setitem__(self, name, value)
         self.tags[name] = value
 
     def __getitem__(self, name):
@@ -169,7 +175,7 @@ class Repo(object):
         else:
             raise NotGitRepository(root)
         self.path = root
-        self.refs = RefsContainer(self.controldir())
+        self.refs = DiskRefsContainer(self.controldir())
         self.tags = Tags(self.tagdir(), self.get_tags())
         self.object_store = DiskObjectStore(
             os.path.join(self.controldir(), OBJECTDIR))

@@ -117,10 +117,13 @@ class DiskRefsContainer(RefsContainer):
         else:
             keys = self.itersubkeys(base)
         for key in keys:
-            if follow:
-                ret[key] = self.follow(("%s/%s" % (base, key)).strip("/"))
-            else:
-                ret[key] = self[("%s/%s" % (base, key)).strip("/")]
+                if follow:
+                    try:
+                        ret[key] = self.follow(("%s/%s" % (base, key)).strip("/"))
+                    except KeyError:
+                        continue # Unable to resolve
+                else:
+                    ret[key] = self[("%s/%s" % (base, key)).strip("/")]
         return ret
 
     def refpath(self, name):

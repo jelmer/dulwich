@@ -23,7 +23,6 @@
 
 import mmap
 import os
-import sha
 import stat
 import zlib
 

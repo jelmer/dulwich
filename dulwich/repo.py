@@ -353,6 +353,21 @@ class Repo(object):
         if len(name) in (20, 40):
             return self.object_store[name]
         return self.object_store[self.refs[name]]
+    
+    def __setitem__(self, name, value):
+        if name.startswith("refs/") or name == "HEAD":
+            if isinstance(value, ShaFile):
+                self.refs[name] = value.id
+            elif isinstance(value, str):
+                self.refs[name] = value
+            else:
+                raise TypeError(value)
+        raise ValueError(name)
+
+    def __delitem__(self, name):
+        if name.startswith("refs") or name == "HEAD":
+            del self.refs[name]
+        raise ValueError(name)
 
     @classmethod
     def init(cls, path, mkdir=True):

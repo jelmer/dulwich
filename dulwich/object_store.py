@@ -109,21 +109,13 @@ class BaseObjectStore(object):
         """
         return iter(MissingObjectFinder(self, haves, wants, progress).next, None)
 
-    def get_commit_parents(self, sha):
-        """Retrieve the parents of a commit.
-
-        :param sha: SHA1 of the commit
-        :return: List of parent SHA1s
-        """
-        return self[sha].parents
-
     def get_graph_walker(self, heads):
         """Obtain a graph walker for this object store.
         
         :param heads: Local heads to start search with
         :return: GraphWalker object
         """
-        return ObjectStoreGraphWalker(heads, self.get_commit_parents)
+        return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
 
 
 class DiskObjectStore(BaseObjectStore):

@@ -1,7 +1,7 @@
 PYTHON = python
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
-TESTRUNNER = $(shell which trial)
+TESTRUNNER = $(shell which nosetests)
 
 all: build 
 
@@ -26,3 +26,6 @@ check-noextensions:: clean
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
+
+coverage:: build
+	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) --cover-package=dulwich --with-coverage --cover-erase --cover-inclusive dulwich

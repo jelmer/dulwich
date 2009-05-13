@@ -225,7 +225,7 @@ class Repo(object):
             that a revision is present.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
-        :return: tuple with number of objects, iterator over objects
+        :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
         haves = self.object_store.find_common_revisions(graph_walker)

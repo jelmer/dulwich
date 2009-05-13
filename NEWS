@@ -1,3 +1,21 @@
+0.3.1	2009-05-13
+
+ FEATURES
+
+  * Implemented Repo.__getitem__, Repo.__setitem__ and Repo.__delitem__ to 
+    access content.
+
+ API CHANGES
+
+  * Removed Repo.set_ref, Repo.remove_ref, Repo.tags, Repo.get_refs and 
+    Repo.heads in favor of Repo.refs, a dictionary-like object for accessing
+	refs.
+
+ BUG FIXES
+
+  * Removed import of 'sha' module in objects.py, which was causing 
+    deprecation warnings on Python 2.6.
+
 0.3.0	2009-05-10
 
  FEATURES

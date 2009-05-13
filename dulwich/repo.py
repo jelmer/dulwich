@@ -228,7 +228,7 @@ class Repo(object):
         :return: tuple with number of objects, iterator over objects
         """
         wants = determine_wants(self.get_refs())
-        haves = self.object_store.find_missing_revisions(graphwalker)
+        haves = self.object_store.find_common_revisions(graphwalker)
         return self.object_store.iter_shas(
             self.object_store.find_missing_objects(haves, wants, progress))
 

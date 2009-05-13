@@ -298,7 +298,7 @@ class Repo(object):
         return self.object_store[sha]
 
     def get_parents(self, sha):
-        return self.object_store.get_commit_parents(sha)
+        return self.commit(sha).parents
 
     def commit(self, sha):
         return self._get_object(sha, Commit)

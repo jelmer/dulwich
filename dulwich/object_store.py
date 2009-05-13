@@ -61,6 +61,7 @@ class BaseObjectStore(object):
         """Iterate over the objects for the specified shas.
 
         :param shas: Iterable object with SHAs
+        :return: Object iterator
         """
         return ObjectStoreIterator(self, shas)
 

@@ -109,6 +109,21 @@ class BaseObjectStore(object):
         """
         return iter(MissingObjectFinder(self, haves, wants, progress).next, None)
 
+    def find_common_revisions(self, graphwalker):
+        """Find which revisions this store has in common using graphwalker.
+
+        :param graphwalker: A graphwalker object.
+        :return: List of SHAs that are in common
+        """
+        haves = []
+        sha = graphwalker.next()
+        while sha:
+            if sha in self:
+                haves.append(sha)
+                graphwalker.ack(sha)
+            sha = graphwalker.next()
+        return haves
+
     def get_graph_walker(self, heads):
         """Obtain a graph walker for this object store.
         

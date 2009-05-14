@@ -616,7 +616,8 @@ class PackData(object):
         entries = self.sorted_entries(resolve_ext_ref, progress=progress)
         write_pack_index_v2(filename, entries, self.calculate_checksum())
 
-    def create_index(self, filename, resolve_ext_ref=None, progress=None, version=2):
+    def create_index(self, filename, resolve_ext_ref=None, progress=None,
+                     version=2):
         """Create an  index file for this data file.
 
         :param filename: Index filename.

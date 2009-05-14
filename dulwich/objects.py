@@ -127,6 +127,8 @@ class ShaFile(object):
             self._parse_text()
 
     def set_raw_string(self, text):
+        if type(text) != str:
+            raise TypeError(text)
         self._text = text
         self._sha = None
         self._needs_parsing = True

@@ -29,11 +29,12 @@ class RepositoryTests(unittest.TestCase):
   
     def open_repo(self, name):
         return Repo(os.path.join(os.path.dirname(__file__),
-                          'data/repos', name, '.git'))
+                          'data', 'repos', name, '.git'))
   
     def test_simple_props(self):
         r = self.open_repo('a')
-        basedir = os.path.join(os.path.dirname(__file__), 'data/repos/a/.git')
+        basedir = os.path.join(os.path.dirname(__file__), 
+                os.path.join('data', 'repos', 'a', '.git'))
         self.assertEqual(r.controldir(), basedir)
   
     def test_ref(self):

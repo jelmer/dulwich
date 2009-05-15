@@ -7,6 +7,13 @@ from distutils.extension import Extension
 
 dulwich_version_string = '0.3.2'
 
+include_dirs = []
+# Windows MSVC support
+import sys
+if sys.platform == 'win32':
+    include_dirs.append('dulwich')
+
+
 setup(name='dulwich',
       description='Pure-Python Git Library',
       keywords='git',
@@ -24,7 +31,9 @@ setup(name='dulwich',
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon'],
       ext_modules=[
-          Extension('dulwich/_objects', ['dulwich/_objects.c']),
-          Extension('dulwich/_pack', ['dulwich/_pack.c']),
+          Extension('dulwich._objects', ['dulwich/_objects.c'],
+                    include_dirs=include_dirs),
+          Extension('dulwich._pack', ['dulwich/_pack.c'],
+                    include_dirs=include_dirs),
           ],
       )

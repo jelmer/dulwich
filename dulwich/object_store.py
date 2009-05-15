@@ -199,6 +199,8 @@ class DiskObjectStore(BaseObjectStore):
         if not os.path.isdir(dir):
             os.mkdir(dir)
         path = os.path.join(dir, sha[2:])
+        if os.path.exists(path):
+            return # Already there, no need to write again
         f = open(path, 'w+')
         try:
             f.write(o.as_legacy_object())

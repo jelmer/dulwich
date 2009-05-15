@@ -96,7 +96,7 @@ class DiskRefsContainer(RefsContainer):
     def itersubkeys(self, base):
         path = self.refpath(base)
         for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip("/")
+            dir = root[len(path):].strip("/").replace(os.path.sep, "/")
             for filename in files:
                 yield ("%s/%s" % (dir, filename)).strip("/")
 
@@ -105,7 +105,7 @@ class DiskRefsContainer(RefsContainer):
             yield "HEAD"
         path = self.refpath("")
         for root, dirs, files in os.walk(self.refpath("refs")):
-            dir = root[len(path):].strip("/")
+            dir = root[len(path):].strip("/").replace(os.path.sep, "/")
             for filename in files:
                 yield ("%s/%s" % (dir, filename)).strip("/")
 

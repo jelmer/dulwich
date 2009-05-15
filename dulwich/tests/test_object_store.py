@@ -22,12 +22,14 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     )
+import os
+
 
 class DiskObjectStoreTests(TestCase):
 
     def test_pack_dir(self):
         o = DiskObjectStore("foo")
-        self.assertEquals("foo/pack", o.pack_dir)
+        self.assertEquals(os.path.join("foo", "pack"), o.pack_dir)
 
     def test_empty_packs(self):
         o = DiskObjectStore("foo")

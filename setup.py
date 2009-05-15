@@ -24,7 +24,7 @@ setup(name='dulwich',
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon'],
       ext_modules=[
-          Extension('dulwich/_objects', ['dulwich/_objects.c']),
-          Extension('dulwich/_pack', ['dulwich/_pack.c']),
+          Extension('dulwich._objects', ['dulwich/_objects.c']),
+          Extension('dulwich._pack', ['dulwich/_pack.c']),
           ],
       )

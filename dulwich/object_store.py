@@ -134,6 +134,10 @@ class BaseObjectStore(object):
         return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
 
 
+    def generate_pack_contents(self, have, want):
+        return self.iter_shas(self.find_missing_objects(have, want))
+
+
 class DiskObjectStore(BaseObjectStore):
     """Git-style object store that exists on disk."""
 

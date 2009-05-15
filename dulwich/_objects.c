@@ -28,7 +28,7 @@ static PyObject *py_hex_to_sha(PyObject *self, PyObject *py_hexsha)
 	char sha[20];
 	int i;
 
-	if (!PyString_Check(py_hexsha)) {
+	if (!PyString_CheckExact(py_hexsha)) {
 		PyErr_SetString(PyExc_TypeError, "hex sha is not a string");
 		return NULL;
 	}
@@ -61,7 +61,7 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 
 static PyObject *py_sha_to_hex(PyObject *self, PyObject *py_sha)
 {
-	if (!PyString_Check(py_sha)) {
+	if (!PyString_CheckExact(py_sha)) {
 		PyErr_SetString(PyExc_TypeError, "sha is not a string");
 		return NULL;
 	}
@@ -116,7 +116,11 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 			Py_DECREF(name);
             return NULL;
         }
-		PyDict_SetItem(ret, name, item);
+		if (PyDict_SetItem(ret, name, item) == -1) {
+			Py_DECREF(ret);
+			Py_DECREF(item);
+			return NULL;
+		}
 		Py_DECREF(name);
 		Py_DECREF(item);
 

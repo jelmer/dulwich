@@ -22,7 +22,7 @@
 
 static int py_is_sha(PyObject *sha)
 {
-    if (!PyString_Check(sha))
+    if (!PyString_CheckExact(sha))
         return 0;
 
     if (PyString_Size(sha) != 20)

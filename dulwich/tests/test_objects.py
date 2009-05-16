@@ -203,3 +203,45 @@ class TreeSerializationTests(unittest.TestCase):
         x["a"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         x["a/c"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])
+
+
+
+class TagParseTests(unittest.TestCase):
+
+    def test_parse_simple(self):
+        x = Tag()
+        x.set_raw_string("""object a38d6181ff27824c79fc7df825164a212eff6a3f
+type commit
+tag v2.6.22-rc7
+tagger Linus Torvalds <torvalds@woody.linux-foundation.org> Sun Jul 1 12:54:34 2007 -0700
+
+Linux 2.6.22-rc7
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.7 (GNU/Linux)
+
+iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+OK2XeQOiEeXtT76rV4t2WR4=
+=ivrA
+-----END PGP SIGNATURE-----
+""")
+        self.assertEquals("Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger)
+        self.assertEquals("v2.6.22-rc7", tag.name)
+
+    def test_parse_no_tagger(self):
+        x = Tag()
+        x.set_raw_string("""object a38d6181ff27824c79fc7df825164a212eff6a3f
+type commit
+tag v2.6.22-rc7
+
+Linux 2.6.22-rc7
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.7 (GNU/Linux)
+
+iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+OK2XeQOiEeXtT76rV4t2WR4=
+=ivrA
+-----END PGP SIGNATURE-----
+""")
+        self.assertEquals(None, x.tagger)
+        self.assertEquals("v2.6.22-rc7", tag.name)
+

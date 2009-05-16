@@ -102,14 +102,17 @@ class GitClient(object):
         for refname in set(new_refs.keys() + old_refs.keys()):
             old_sha1 = old_refs.get(refname, "0" * 40)
             new_sha1 = new_refs.get(refname, "0" * 40)
-            if sent_capabilities:
-                self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
-            else:
-                self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
-                sent_capabilities = True
+            if old_sha1 != new_sha1:
+                if sent_capabilities:
+                    self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
+                else:
+                    self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
+                    sent_capabilities = True
             if not new_sha1 in (have, "0" * 40):
                 want.append(new_sha1)
         self.proto.write_pkt_line(None)
+        if not want:
+            return new_refs
         objects = generate_pack_contents(have, want)
         (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
                                          len(objects))

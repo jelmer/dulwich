@@ -27,6 +27,7 @@ from cStringIO import (
 import mmap
 import os
 import stat
+import time
 import zlib
 
 from dulwich.errors import (
@@ -298,7 +299,16 @@ class Tag(ShaFile):
             elif field == TAG_ID:
                 self._name = value
             elif field == TAGGER_ID:
-                self._tagger = value
+                sep = value.index("> ")
+                self._tagger = value[0:sep+1]
+                (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
+                try:
+                    self._tag_time = int(timetext)
+                except ValueError: #Not a unix timestamp
+                    self._tag_time = time.strptime(timetext)
+                self._timezonetext = parse_timezone(timezonetext)
+            else:
+                raise AssertionError("Unknown field %s" % field)
         self._message = f.read()
         self._needs_parsing = False
 

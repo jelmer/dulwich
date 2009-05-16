@@ -284,6 +284,7 @@ class Tag(ShaFile):
 
     def _parse_text(self):
         """Grab the metadata attached to the tag"""
+        self._tagger = None
         f = StringIO(self._text)
         for l in f:
             l = l.rstrip("\n")
@@ -413,9 +414,10 @@ class Tree(ShaFile):
         self._needs_parsing = False
 
     def serialize(self):
-        self._text = ""
+        f = StringIO()
         for name, mode, hexsha in self.iteritems():
-            self._text += "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
+            f.write("%04o %s\0%s" % (mode, name, hex_to_sha(hexsha)))
+        self._text = f.getvalue()
         self._needs_serialization = False
 
     def as_pretty_string(self):
@@ -489,14 +491,15 @@ class Commit(ShaFile):
         self._needs_parsing = False
 
     def serialize(self):
-        self._text = ""
-        self._text += "%s %s\n" % (TREE_ID, self._tree)
+        f = StringIO()
+        f.write("%s %s\n" % (TREE_ID, self._tree))
         for p in self._parents:
-            self._text += "%s %s\n" % (PARENT_ID, p)
-        self._text += "%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone))
-        self._text += "%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone))
-        self._text += "\n" # There must be a new line after the headers
-        self._text += self._message
+            f.write("%s %s\n" % (PARENT_ID, p))
+        f.write("%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone)))
+        f.write("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
+        f.write("\n") # There must be a new line after the headers
+        f.write(self._message)
+        self._text = f.getvalue()
         self._needs_serialization = False
 
     tree = serializable_property("tree", "Tree that is the state of this commit")

@@ -49,12 +49,12 @@ def read_cache_entry(f):
     """Read an entry from a cache file.
 
     :param f: File-like object to read from
-    :return: tuple with: inode, device, mode, uid, gid, size, sha, flags
+    :return: tuple with: device, inode, mode, uid, gid, size, sha, flags
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
     mtime = read_cache_time(f)
-    (ino, dev, mode, uid, gid, size, sha, flags, ) = \
+    (dev, ino, mode, uid, gid, size, sha, flags, ) = \
         struct.unpack(">LLLLLL20sH", f.read(20 + 4 * 6 + 2))
     name = ""
     char = f.read(1)
@@ -64,7 +64,7 @@ def read_cache_entry(f):
     # Padding:
     real_size = ((f.tell() - beginoffset + 7) & ~7)
     f.read((beginoffset + real_size) - f.tell())
-    return (name, ctime, mtime, ino, dev, mode, uid, gid, size, 
+    return (name, ctime, mtime, dev, ino, mode, uid, gid, size, 
             sha_to_hex(sha), flags)
 
 
@@ -73,13 +73,13 @@ def write_cache_entry(f, entry):
 
     :param f: File object
     :param entry: Entry to write, tuple with: 
-        (name, ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags)
+        (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
     """
     beginoffset = f.tell()
-    (name, ctime, mtime, ino, dev, mode, uid, gid, size, sha, flags) = entry
+    (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    f.write(struct.pack(">LLLLLL20sH", ino, dev, mode, uid, gid, size, hex_to_sha(sha), flags))
+    f.write(struct.pack(">LLLLLL20sH", dev, ino, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     f.write(chr(0))
     real_size = ((f.tell() - beginoffset + 7) & ~7)

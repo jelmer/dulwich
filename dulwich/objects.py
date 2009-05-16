@@ -21,6 +21,9 @@
 """Access to base git objects."""
 
 
+from cStringIO import (
+    StringIO,
+    )
 import mmap
 import os
 import stat
@@ -507,88 +510,30 @@ class Commit(ShaFile):
         return commit
 
     def _parse_text(self):
-        text = self._text
-        count = 0
-        assert text.startswith(TREE_ID), "Invalid commit object, " \
-             "must start with %s" % TREE_ID
-        count += len(TREE_ID)
-        assert text[count] == ' ', "Invalid commit object, " \
-             "%s must be followed by space not %s" % (TREE_ID, text[count])
-        count += 1
-        self._tree = text[count:count+40]
-        count = count + 40
-        assert text[count] == "\n", "Invalid commit object, " \
-             "tree sha must be followed by newline"
-        count += 1
         self._parents = []
-        while text[count:].startswith(PARENT_ID):
-            count += len(PARENT_ID)
-            assert text[count] == ' ', "Invalid commit object, " \
-                 "%s must be followed by space not %s" % (PARENT_ID, text[count])
-            count += 1
-            self._parents.append(text[count:count+40])
-            count += 40
-            assert text[count] == "\n", "Invalid commit object, " \
-                 "parent sha must be followed by newline"
-            count += 1
         self._author = None
-        if text[count:].startswith(AUTHOR_ID):
-            count += len(AUTHOR_ID)
-            assert text[count] == ' ', "Invalid commit object, " \
-                 "%s must be followed by space not %s" % (AUTHOR_ID, text[count])
-            count += 1
-            self._author = ''
-            while text[count] != '>':
-                assert text[count] != '\n', "Malformed author information"
-                self._author += text[count]
-                count += 1
-            self._author += text[count]
-            count += 1
-            assert text[count] == ' ', "Invalid commit object, " \
-                 "author information must be followed by space not %s" % text[count]
-            count += 1
-            time_text = ''
-            while text[count] != ' ':
-                assert text[count] != '\n', "Malformed author information"
-                time_text += text[count]
-                count += 1
-            self._author_time = int(time_text)
-            self._author_timezone = parse_timezone(text[count:count+6])
-            count += 1
-            while text[count] != '\n':
-                count += 1
-            count += 1
-        self._committer = None
-        if text[count:].startswith(COMMITTER_ID):
-            count += len(COMMITTER_ID)
-            assert text[count] == ' ', "Invalid commit object, " \
-                 "%s must be followed by space not %s" % (COMMITTER_ID, text[count])
-            count += 1
-            self._committer = ''
-            while text[count] != '>':
-                assert text[count] != '\n', "Malformed committer information"
-                self._committer += text[count]
-                count += 1
-            self._committer += text[count]
-            count += 1
-            assert text[count] == ' ', "Invalid commit object, " \
-                 "commiter information must be followed by space not %s" % text[count]
-            count += 1
-            time_text = ""
-            while text[count] != ' ':
-                assert text[count] != '\n', "Malformed committer information"
-                time_text += text[count]
-                count += 1
-            self._commit_time = int(time_text)
-            self._commit_timezone = parse_timezone(text[count:count+6])
-            count += 1
-            while text[count] != '\n':
-                count += 1
-            count += 1
-        assert text[count] == '\n', "There must be a new line after the headers"
-        count += 1
-        # XXX: There can be an encoding field.
-        self._message = text[count:]
+        f = StringIO(self._text)
+        for l in f:
+            l = l.rstrip("\n")
+            if l == "":
+                # Empty line indicates end of headers
+                break
+            (field, value) = l.split(" ", 1)
+            if field == TREE_ID:
+                self._tree = value
+            elif field == PARENT_ID:
+                self._parents.append(value)
+            elif field == AUTHOR_ID:
+                self._author, timetext, timezonetext = value.rsplit(" ", 2)
+                self._author_time = int(timetext)
+                self._author_timezone = parse_timezone(timezonetext)
+            elif field == COMMITTER_ID:
+                self._committer, timetext, timezonetext = value.rsplit(" ", 2)
+                self._commit_time = int(timetext)
+                self._commit_timezone = parse_timezone(timezonetext)
+            else:
+                raise AssertionError("Unknown field %s" % field)
+        self._message = f.read()
         self._needs_parsing = False
 
     def serialize(self):

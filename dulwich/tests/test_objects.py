@@ -208,7 +208,7 @@ class TreeSerializationTests(unittest.TestCase):
 
 class TagParseTests(unittest.TestCase):
 
-    def test_parse_simple(self):
+    def test_parse_ctime(self):
         x = Tag()
         x.set_raw_string("""object a38d6181ff27824c79fc7df825164a212eff6a3f
 type commit
@@ -225,7 +225,7 @@ OK2XeQOiEeXtT76rV4t2WR4=
 -----END PGP SIGNATURE-----
 """)
         self.assertEquals("Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger)
-        self.assertEquals("v2.6.22-rc7", tag.name)
+        self.assertEquals("v2.6.22-rc7", x.name)
 
     def test_parse_no_tagger(self):
         x = Tag()
@@ -243,5 +243,5 @@ OK2XeQOiEeXtT76rV4t2WR4=
 -----END PGP SIGNATURE-----
 """)
         self.assertEquals(None, x.tagger)
-        self.assertEquals("v2.6.22-rc7", tag.name)
+        self.assertEquals("v2.6.22-rc7", x.name)
 

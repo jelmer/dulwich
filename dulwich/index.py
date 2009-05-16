@@ -27,6 +27,10 @@ from dulwich.objects import (
     hex_to_sha,
     sha_to_hex,
     )
+from dulwich.pack import (
+    SHA1Reader,
+    SHA1Writer,
+    )
 
 
 def read_cache_time(f):
@@ -59,7 +63,7 @@ def read_cache_entry(f):
         char = f.read(1)
     # Padding:
     real_size = ((f.tell() - beginoffset + 7) & ~7)
-    f.seek(beginoffset + real_size)
+    f.read((beginoffset + real_size) - f.tell())
     return (name, ctime, mtime, ino, dev, mode, uid, gid, size, 
             sha_to_hex(sha), flags)
 
@@ -149,18 +153,21 @@ class Index(object):
 
     def write(self):
         """Write current contents of index to disk."""
-        f = open(self._filename, 'w')
+        f = open(self._filename, 'wb')
         try:
+            f = SHA1Writer(f)
             write_index_dict(f, self._byname)
         finally:
             f.close()
 
     def read(self):
         """Read current contents of index from disk."""
-        f = open(self._filename, 'r')
+        f = open(self._filename, 'rb')
         try:
+            f = SHA1Reader(f)
             for x in read_index(f):
                 self[x[0]] = tuple(x[1:])
+            f.check_sha()
         finally:
             f.close()
 

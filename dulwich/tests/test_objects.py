@@ -205,6 +205,23 @@ class TreeSerializationTests(unittest.TestCase):
         self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])
 
 
+class TagSerializeTests(unittest.TestCase):
+
+    def test_serialize_simple(self):
+        x = Tag()
+        x.tagger = "Jelmer Vernooij <jelmer@samba.org>"
+        x.name = "0.1"
+        x.message = "Tag 0.1"
+        x.object = (3, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        x.tag_time = 423423423
+        x.tag_timezone = 0
+        self.assertEquals("""object d80c186a03f423a81b39df39dc87fd269736ca86
+type blob
+tag 0.1
+tagger Jelmer Vernooij <jelmer@samba.org> 423423423 +0000
+
+Tag 0.1""", x.as_raw_string())
+
 
 class TagParseTests(unittest.TestCase):
 
@@ -244,4 +261,5 @@ OK2XeQOiEeXtT76rV4t2WR4=
 """)
         self.assertEquals(None, x.tagger)
         self.assertEquals("v2.6.22-rc7", x.name)
+
 

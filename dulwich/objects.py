@@ -269,6 +269,11 @@ class Tag(ShaFile):
     _type = TAG_ID
     _num_type = 4
 
+    def __init__(self):
+        super(Tag, self).__init__()
+        self._needs_parsing = False
+        self._needs_serialization = True
+
     @classmethod
     def from_file(cls, filename):
         blob = ShaFile.from_file(filename)
@@ -282,6 +287,18 @@ class Tag(ShaFile):
         shafile = cls()
         shafile.set_raw_string(string)
         return shafile
+
+    def serialize(self):
+        f = StringIO()
+        f.write("%s %s\n" % (OBJECT_ID, self._object_sha))
+        f.write("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
+        f.write("%s %s\n" % (TAG_ID, self._name))
+        if self._tagger:
+            f.write("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
+        f.write("\n") # To close headers
+        f.write(self._message)
+        self._text = f.getvalue()
+        self._needs_serialization = False
 
     def _parse_text(self):
         """Grab the metadata attached to the tag"""
@@ -306,7 +323,7 @@ class Tag(ShaFile):
                     self._tag_time = int(timetext)
                 except ValueError: #Not a unix timestamp
                     self._tag_time = time.strptime(timetext)
-                self._timezonetext = parse_timezone(timezonetext)
+                self._tag_timezone = parse_timezone(timezonetext)
             else:
                 raise AssertionError("Unknown field %s" % field)
         self._message = f.read()
@@ -317,13 +334,20 @@ class Tag(ShaFile):
         self._ensure_parsed()
         return (self._object_type, self._object_sha)
 
-    object = property(get_object)
+    def set_object(self, value):
+        self._ensure_parsed()
+        (self._object_type, self._object_sha) = value
+        self._needs_serialization = True
+
+    object = property(get_object, set_object)
 
     name = serializable_property("name", "The name of this tag")
     tagger = serializable_property("tagger", 
         "Returns the name of the person who created this tag")
     tag_time = serializable_property("tag_time", 
         "The creation timestamp of the tag.  As the number of seconds since the epoch")
+    tag_timezone = serializable_property("tag_timezone", 
+        "The timezone that tag_time is in.")
     message = serializable_property("message", "The message attached to this tag")
 
 

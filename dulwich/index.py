@@ -42,6 +42,11 @@ def write_cache_time(f, t):
     """Write a cache time."""
     if isinstance(t, int):
         t = (t, 0)
+    elif isinstance(t, float):
+        (secs, nsecs) = divmod(t, 1.0)
+        t = (int(secs), int(nsecs * 1000000000))
+    elif not isinstance(t, tuple):
+        raise TypeError(t)
     f.write(struct.pack(">LL", *t))
 
 

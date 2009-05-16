@@ -50,6 +50,10 @@ OBJECT_ID = "object"
 TYPE_ID = "type"
 TAGGER_ID = "tagger"
 
+S_IFGITLINK	= 0160000
+def S_ISGITLINK(m):
+    return (stat.S_IFMT(m) == S_IFGITLINK)
+
 def _decompress(string):
     dcomp = zlib.decompressobj()
     dcomped = dcomp.decompress(string)

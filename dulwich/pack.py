@@ -658,6 +658,31 @@ class PackData(object):
             map.close()
 
 
+class SHA1Reader(object):
+    """Wrapper around a file-like object that remembers the SHA1 of 
+    the data read from it."""
+
+    def __init__(self, f):
+        self.f = f
+        self.sha1 = make_sha("")
+
+    def read(self, num=None):
+        data = self.f.read(num)
+        self.sha1.update(data)
+        return data
+
+    def check_sha(self):
+        stored = self.f.read(20)
+        if stored != self.sha1.digest():
+            raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
+
+    def close(self):
+        return self.f.close()
+
+    def tell(self):
+        return self.f.tell()
+
+
 class SHA1Writer(object):
     """Wrapper around a file-like object that remembers the SHA1 of 
     the data written to it."""

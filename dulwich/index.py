@@ -258,4 +258,4 @@ def commit_tree(object_store, blobs):
 
 
 def commit_index(object_store, index):
-    return commit_tree(object_store, index.blobs())
+    return commit_tree(object_store, index.iterblobs())

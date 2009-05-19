@@ -49,6 +49,7 @@ COMMITTER_ID = "committer"
 OBJECT_ID = "object"
 TYPE_ID = "type"
 TAGGER_ID = "tagger"
+ENCODING_ID = "encoding"
 
 S_IFGITLINK	= 0160000
 def S_ISGITLINK(m):
@@ -491,6 +492,7 @@ class Commit(ShaFile):
     def __init__(self):
         super(Commit, self).__init__()
         self._parents = []
+        self._encoding = None
         self._needs_parsing = False
         self._needs_serialization = True
 
@@ -523,6 +525,8 @@ class Commit(ShaFile):
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
                 self._commit_time = int(timetext)
                 self._commit_timezone = parse_timezone(timezonetext)
+            elif field == ENCODING_ID:
+                self._encoding = value
             else:
                 raise AssertionError("Unknown field %s" % field)
         self._message = f.read()
@@ -535,6 +539,8 @@ class Commit(ShaFile):
             f.write("%s %s\n" % (PARENT_ID, p))
         f.write("%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone)))
         f.write("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
+        if self.encoding:
+            f.write("%s %s\n" % (ENCODING_ID, self.encoding))
         f.write("\n") # There must be a new line after the headers
         f.write(self._message)
         self._text = f.getvalue()
@@ -575,6 +581,9 @@ class Commit(ShaFile):
 
     author_timezone = serializable_property("author_timezone", 
         "Returns the zone the author time is in.")
+
+    encoding = serializable_property("encoding",
+        "Encoding of the commit message.")
 
 
 type_map = {

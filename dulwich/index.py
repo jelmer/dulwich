@@ -66,7 +66,7 @@ def read_cache_entry(f):
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     data = f.read((beginoffset + real_size) - f.tell())
     return (name, ctime, mtime, dev, ino, mode, uid, gid, size, 
-            sha_to_hex(sha), flags)
+            sha_to_hex(sha), flags & ~0x0fff)
 
 
 def write_cache_entry(f, entry):

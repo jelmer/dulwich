@@ -23,6 +23,8 @@ import stat
 import struct
 
 from dulwich.objects import (
+    S_IFGITLINK,
+    S_ISGITLINK,
     Tree,
     hex_to_sha,
     sha_to_hex,
@@ -132,12 +134,18 @@ def write_index_dict(f, entries):
 
 
 def cleanup_mode(mode):
-    if stat.S_ISLNK(fsmode):
-        mode = stat.S_IFLNK
-    else:
-        mode = stat.S_IFREG
-    mode |= (fsmode & 0111)
-    return mode
+    """Cleanup a mode value.
+    
+    """
+    if stat.S_ISLNK(mode):
+        return stat.S_IFLNK
+    elif stat.S_ISDIR(mode):
+        return stat.S_IFDIR
+    elif S_ISGITLINK(mode):
+        return S_IFGITLINK
+    ret = stat.S_IFREG | 0644
+    ret |= (mode & 0111)
+    return ret
 
 
 class Index(object):

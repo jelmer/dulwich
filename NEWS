@@ -1,5 +1,11 @@
 0.3.2   UNRELEASED
 
+ BUG FIXES
+
+  * Support the encoding field in Commits.
+  
+  * Some Windows compatibility fixes.
+
 0.3.1	2009-05-13
 
  FEATURES

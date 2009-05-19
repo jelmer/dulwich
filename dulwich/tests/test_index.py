@@ -26,6 +26,7 @@ from unittest import TestCase
 
 from dulwich.index import (
     Index,
+    cleanup_mode,
     commit_tree,
     read_index,
     write_index,
@@ -104,3 +105,21 @@ class CommitTreeTests(TestCase):
         self.assertEquals((stat.S_IFREG, blob.id), self.store[dirid]["bar"])
         self.assertEquals(set([rootid, dirid, blob.id]), 
                           set(self.store._data.keys()))
+
+
+class CleanupModeTests(TestCase):
+
+    def test_file(self):
+        self.assertEquals(0100644, cleanup_mode(0100000))
+
+    def test_executable(self):
+        self.assertEquals(0100755, cleanup_mode(0100711))
+
+    def test_symlink(self):
+        self.assertEquals(0120000, cleanup_mode(0120711))
+
+    def test_dir(self):
+        self.assertEquals(0040000, cleanup_mode(040531))
+
+    def test_submodule(self):
+        self.assertEquals(0160000, cleanup_mode(0160744))

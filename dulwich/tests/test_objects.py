@@ -26,7 +26,9 @@ from dulwich.objects import (
     Tree,
     Commit,
     Tag,
+    format_timezone,
     hex_to_sha,
+    parse_timezone,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -268,3 +270,28 @@ OK2XeQOiEeXtT76rV4t2WR4=
         self.assertEquals("v2.6.22-rc7", x.name)
 
 
+class TimezoneTests(unittest.TestCase):
+
+    def test_parse_timezone_utc(self):
+        self.assertEquals(0, parse_timezone("+0000"))
+
+    def test_generate_timezone_utc(self):
+        self.assertEquals("+0000", format_timezone(0))
+
+    def test_parse_timezone_cet(self):
+        self.assertEquals(60 * 60, parse_timezone("+0100"))
+
+    def test_format_timezone_cet(self):
+        self.assertEquals("+0100", format_timezone(60 * 60))
+
+    def test_format_timezone_pdt(self):
+        self.assertEquals("-0400", format_timezone(-4 * 60 * 60))
+
+    def test_parse_timezone_pdt(self):
+        self.assertEquals(-4 * 60 * 60, parse_timezone("-0400"))
+
+    def test_format_timezone_pdt_half(self):
+        self.assertEquals("-0440", format_timezone(int(((-4 * 60) - 40) * 60)))
+
+    def test_parse_timezone_pdt_half(self):
+        self.assertEquals(((-4 * 60) - 40) * 60, parse_timezone("-0440"))

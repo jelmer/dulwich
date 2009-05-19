@@ -18,7 +18,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+
 """Repository access."""
+
 
 import os
 import stat
@@ -50,6 +52,11 @@ INDEX_FILENAME = "index"
 
 
 def follow_ref(container, name):
+    """Follow a ref back to a SHA1.
+    
+    :param container: Ref container to use for looking up refs.
+    :param name: Name of the original ref.
+    """
     contents = container[name]
     if contents.startswith(SYMREF):
         ref = contents[len(SYMREF):]
@@ -61,14 +68,25 @@ def follow_ref(container, name):
 
 
 class RefsContainer(object):
+    """A container for refs."""
 
     def as_dict(self, base):
+        """Return the contents of this ref container under base as a dict."""
         raise NotImplementedError(self.as_dict)
 
     def follow(self, name):
+        """Follow a ref name back to a SHA1.
+        
+        :param name: Name of the ref
+        """
         return follow_ref(self, name)
 
     def set_ref(self, name, other):
+        """Make a ref point at another ref.
+
+        :param name: Name of the ref to set
+        :param other: Name of the ref to point at
+        """
         self[name] = "ref: %s\n" % other
 
     def import_refs(self, base, other):
@@ -77,6 +95,7 @@ class RefsContainer(object):
 
 
 class DiskRefsContainer(RefsContainer):
+    """Refs container that reads refs from disk."""
 
     def __init__(self, path):
         self.path = path
@@ -85,6 +104,7 @@ class DiskRefsContainer(RefsContainer):
         return "%s(%r)" % (self.__class__.__name__, self.path)
 
     def keys(self, base=None):
+        """Refs present in this container."""
         return list(self.iterkeys(base))
 
     def iterkeys(self, base=None):
@@ -110,6 +130,9 @@ class DiskRefsContainer(RefsContainer):
                 yield ("%s/%s" % (dir, filename)).strip("/")
 
     def as_dict(self, base=None, follow=True):
+        """Return the contents of this container as a dictionary.
+
+        """
         ret = {}
         if base is None:
             keys = self.iterkeys()
@@ -127,6 +150,9 @@ class DiskRefsContainer(RefsContainer):
         return ret
 
     def refpath(self, name):
+        """Return the disk path of a ref.
+
+        """
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)

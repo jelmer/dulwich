@@ -17,6 +17,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+
+"""Tests for git base objects."""
+
+
 import os
 import stat
 import unittest

@@ -158,6 +158,11 @@ class CommitSerializationTests(unittest.TestCase):
         c.message =  'Merge ../b\n'
         return c
 
+    def test_encoding(self):
+        c = self.make_base()
+        c.encoding = "iso8859-1"
+        self.assertTrue("encoding iso8859-1\n" in c.as_raw_string())        
+
     def test_short_timestamp(self):
         c = self.make_base()
         c.commit_time = 30

@@ -80,7 +80,7 @@ def write_cache_entry(f, entry):
     (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    flags = len(name) | flags
+    flags = len(name) | (flags &~ 0x0fff)
     f.write(struct.pack(">LLLLLL20sH", dev, ino, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)

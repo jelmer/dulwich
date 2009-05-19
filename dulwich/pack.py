@@ -35,7 +35,12 @@ try:
 except ImportError:
     from misc import defaultdict
 
-from itertools import chain, imap, izip
+import difflib
+from itertools import (
+    chain,
+    imap,
+    izip,
+    )
 import mmap
 import os
 import struct
@@ -45,7 +50,6 @@ except ImportError:
     from dulwich.misc import unpack_from
 import sys
 import zlib
-import difflib
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -574,6 +578,15 @@ class PackData(object):
         return ObjectIterator(self)
   
     def iterentries(self, ext_resolve_ref=None, progress=None):
+        """Yield entries summarizing the contents of this pack.
+
+        :param ext_resolve_ref: Optional function to resolve base
+            objects (in case this is a thin pack)
+        :param progress: Progress function, called with current and
+            total object count.
+
+        This will yield tuples with (sha, offset, crc32)
+        """
         found = {}
         postponed = defaultdict(list)
         class Postpone(Exception):
@@ -609,6 +622,14 @@ class PackData(object):
             raise KeyError([sha_to_hex(h) for h in postponed.keys()])
   
     def sorted_entries(self, resolve_ext_ref=None, progress=None):
+        """Return entries in this pack, sorted by SHA.
+
+        :param ext_resolve_ref: Optional function to resolve base
+            objects (in case this is a thin pack)
+        :param progress: Progress function, called with current and
+            total object count.
+        :return: List of tuples with (sha, offset, crc32)
+        """
         ret = list(self.iterentries(resolve_ext_ref, progress=progress))
         ret.sort()
         return ret
@@ -652,6 +673,7 @@ class PackData(object):
             raise ValueError("unknown index format %d" % version)
   
     def get_stored_checksum(self):
+        """Return the expected checksum stored in this pack."""
         return self._stored_checksum
   
     def check(self):

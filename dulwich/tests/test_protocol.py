@@ -16,6 +16,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+
+"""Tests for the smart protocol utility functions."""
+
+
 from cStringIO import StringIO
 from unittest import TestCase
 

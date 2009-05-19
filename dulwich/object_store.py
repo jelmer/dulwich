@@ -41,7 +41,6 @@ from dulwich.pack import (
     Pack,
     PackData, 
     iter_sha1, 
-    load_packs, 
     load_pack_index,
     write_pack,
     write_pack_data,
@@ -169,8 +168,15 @@ class DiskObjectStore(BaseObjectStore):
     def packs(self):
         """List with pack objects."""
         if self._pack_cache is None:
-            self._pack_cache = list(load_packs(self.pack_dir))
+            self._pack_cache = list(self._load_packs())
         return self._pack_cache
+
+    def _load_packs(self):
+        if not os.path.exists(self.pack_dir):
+            return
+        for name in os.listdir(self.pack_dir):
+            if name.startswith("pack-") and name.endswith(".pack"):
+                yield Pack(os.path.join(self.pack_dir, name[:-len(".pack")]))
 
     def _add_known_pack(self, path):
         """Add a newly appeared pack to the cache by path.

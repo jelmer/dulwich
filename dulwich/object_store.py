@@ -287,7 +287,7 @@ class DiskObjectStore(BaseObjectStore):
         in a different pack.
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
-        f = os.fdopen(fd, 'w')
+        f = os.fdopen(fd, 'wb')
         def commit():
             os.fsync(fd)
             f.close()
@@ -302,7 +302,7 @@ class DiskObjectStore(BaseObjectStore):
             call when the pack is finished.
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
-        f = os.fdopen(fd, 'w')
+        f = os.fdopen(fd, 'wb')
         def commit():
             os.fsync(fd)
             f.close()

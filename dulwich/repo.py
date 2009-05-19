@@ -146,7 +146,7 @@ class DiskRefsContainer(RefsContainer):
         dirpath = os.path.dirname(file)
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
-        f = open(file, 'w')
+        f = open(file, 'wb')
         try:
             f.write(ref+"\n")
         finally:
@@ -390,8 +390,8 @@ class Repo(object):
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")
-        open(os.path.join(path, 'description'), 'w').write("Unnamed repository")
-        open(os.path.join(path, 'info', 'excludes'), 'w').write("")
+        open(os.path.join(path, 'description'), 'wb').write("Unnamed repository")
+        open(os.path.join(path, 'info', 'excludes'), 'wb').write("")
         return ret
 
     create = init_bare

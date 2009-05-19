@@ -68,6 +68,11 @@ supports_mmap_offset = (sys.version_info[0] >= 3 or
 
 
 def take_msb_bytes(map, offset):
+    """Read bytes marked with most significant bit.
+    
+    :param map: The buffer.
+    :param offset: Offset in the buffer at which to start reading.
+    """
     ret = []
     while len(ret) == 0 or ret[-1] & 0x80:
         ret.append(ord(map[offset]))
@@ -75,7 +80,14 @@ def take_msb_bytes(map, offset):
     return ret
 
 
-def read_zlib_chunks(data, offset, dec_size):
+def read_zlib_chunks(data, offset):
+    """Read chunks of zlib data from a buffer.
+    
+    :param data: Buffer to read from
+    :param offset: Offset at which to start reading
+    :return: Tuple with list of chunks and length of 
+        compressed data length
+    """
     obj = zlib.decompressobj()
     ret = []
     fed = 0
@@ -91,7 +103,14 @@ def read_zlib_chunks(data, offset, dec_size):
 
 
 def read_zlib(data, offset, dec_size):
-    ret, comp_len = read_zlib_chunks(data, offset, dec_size)
+    """Read zlib-compressed data from a buffer.
+    
+    :param data: Buffer
+    :param offset: Offset in the buffer at which to read
+    :param dec_size: Size of the decompressed buffer
+    :return: Uncompressed buffer and compressed buffer length.
+    """
+    ret, comp_len = read_zlib_chunks(data, offset)
     x = "".join(ret)
     assert len(x) == dec_size
     return x, comp_len
@@ -123,6 +142,10 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
 
 
 def load_pack_index(filename):
+    """Load an index file by path.
+
+    :param filename: Path to the index file
+    """
     f = open(filename, 'rb')
     if f.read(4) == '\377tOc':
         version = struct.unpack(">L", f.read(4))[0]
@@ -373,10 +396,6 @@ def read_pack_header(f):
     return (version, num_objects)
 
 
-def read_pack_tail(f):
-    return (f.read(20),)
-
-
 def unpack_object(map, offset=0):
     """Unpack a Git object.
 
@@ -472,7 +491,7 @@ class PackData(object):
     def _read_header(self):
         (version, self._num_objects) = read_pack_header(self._file)
         self._file.seek(self._size-20)
-        (self._stored_checksum,) = read_pack_tail(self._file)
+        self._stored_checksum = self._file.read(20)
   
     def __len__(self):
         """Returns the number of objects in this pack."""
@@ -636,6 +655,7 @@ class PackData(object):
         return self._stored_checksum
   
     def check(self):
+        """Check the consistency of this pack."""
         return (self.calculate_checksum() == self.get_stored_checksum())
   
     def get_object_at(self, offset):
@@ -1095,14 +1115,6 @@ class Pack(object):
             assert isinstance(offset, int)
             yield ShaFile.from_raw_string(
                     *self.data.resolve_object(offset, type, obj, get_raw))
-
-
-def load_packs(path):
-    if not os.path.exists(path):
-        return
-    for name in os.listdir(path):
-        if name.startswith("pack-") and name.endswith(".pack"):
-            yield Pack(os.path.join(path, name[:-len(".pack")]))
 
 
 try:

@@ -1,10 +1,16 @@
-0.3.2   UNRELEASED
+0.3.2	2009-05-20
 
  BUG FIXES
 
   * Support the encoding field in Commits.
   
   * Some Windows compatibility fixes.
+
+  * Fixed several issues in commit support.
+
+ FEATURES
+
+  * Basic support for handling submodules.
 
 0.3.1	2009-05-13
 

@@ -369,7 +369,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param objects: Iterable over a list of objects.
         """
-        for obj in objects:
+        for obj, path in objects:
             self._data[obj.id] = obj
 
 

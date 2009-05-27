@@ -214,7 +214,8 @@ class Repo(object):
         if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
             self.bare = False
             self._controldir = os.path.join(root, ".git")
-        elif os.path.isdir(os.path.join(root, OBJECTDIR)):
+        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
+              os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
         else:

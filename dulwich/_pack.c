@@ -175,7 +175,8 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 
 static PyMethodDef py_pack_methods[] = {
 	{ "apply_delta", (PyCFunction)py_apply_delta, METH_VARARGS, NULL },
-    { "bisect_find_sha", (PyCFunction)py_bisect_find_sha, METH_VARARGS, NULL },
+	{ "bisect_find_sha", (PyCFunction)py_bisect_find_sha, METH_VARARGS, NULL },
+	{ NULL, NULL, 0, NULL }
 };
 
 void init_pack(void)

@@ -133,7 +133,8 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 static PyMethodDef py_objects_methods[] = {
 	{ "hex_to_sha", (PyCFunction)py_hex_to_sha, METH_O, NULL },
 	{ "sha_to_hex", (PyCFunction)py_sha_to_hex, METH_O, NULL },
-	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS, NULL, },
+	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS, NULL },
+	{ NULL, NULL, 0, NULL }
 };
 
 void init_objects(void)

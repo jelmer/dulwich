@@ -226,6 +226,9 @@ class ShaFile(object):
   
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.id)
+
+    def __ne__(self, other):
+        return self.id != other.id
   
     def __eq__(self, other):
         """Return true id the sha of the two objects match.
@@ -233,7 +236,7 @@ class ShaFile(object):
         The __le__ etc methods aren't overriden as they make no sense,
         certainly at this level.
         """
-        return self.sha().digest() == other.sha().digest()
+        return self.id == other.id
 
 
 class Blob(ShaFile):

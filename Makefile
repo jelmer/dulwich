@@ -29,3 +29,6 @@ clean::
 
 coverage:: build
 	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) --cover-package=dulwich --with-coverage --cover-erase --cover-inclusive dulwich
+
+coverage-annotate: coverage
+	python-coverage -a -o /usr

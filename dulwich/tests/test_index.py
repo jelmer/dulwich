@@ -1,5 +1,5 @@
-# test_index.py -- Tests for the git index cache
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# test_index.py -- Tests for the git index
+# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,8 +20,12 @@
 """Tests for the index."""
 
 
+from cStringIO import (
+    StringIO,
+    )
 import os
 import stat
+import struct
 from unittest import TestCase
 
 from dulwich.index import (
@@ -29,6 +33,7 @@ from dulwich.index import (
     cleanup_mode,
     commit_tree,
     read_index,
+    write_cache_time,
     write_index,
     )
 from dulwich.object_store import (
@@ -123,3 +128,25 @@ class CleanupModeTests(TestCase):
 
     def test_submodule(self):
         self.assertEquals(0160000, cleanup_mode(0160744))
+
+
+class WriteCacheTimeTests(TestCase):
+
+    def test_write_string(self):
+        f = StringIO()
+        self.assertRaises(TypeError, write_cache_time, f, "foo")
+
+    def test_write_int(self):
+        f = StringIO()
+        write_cache_time(f, 434343)
+        self.assertEquals(struct.pack(">LL", 434343, 0), f.getvalue())
+
+    def test_write_tuple(self):
+        f = StringIO()
+        write_cache_time(f, (434343, 21))
+        self.assertEquals(struct.pack(">LL", 434343, 21), f.getvalue())
+
+    def test_write_float(self):
+        f = StringIO()
+        write_cache_time(f, 434343.000000021)
+        self.assertEquals(struct.pack(">LL", 434343, 21), f.getvalue())

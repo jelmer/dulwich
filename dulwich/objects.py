@@ -106,7 +106,7 @@ class ShaFile(object):
         i = 0
         while text[0] >= '0' and text[0] <= '9':
             if i > 0 and size == 0:
-                assert False, "Size is not in canonical format"
+                raise AssertionError("Size is not in canonical format")
             size = (size * 10) + int(text[0])
             text = text[1:]
             i += 1

@@ -164,6 +164,14 @@ def load_pack_index(filename):
 
 
 def bisect_find_sha(start, end, sha, unpack_name):
+    """Find a SHA in a data blob with sorted SHAs.
+    
+    :param start: Start index of range to search
+    :param end: End index of range to search
+    :param sha: Sha to find
+    :param unpack_name: Callback to retrieve SHA by index
+    :return: Index of the SHA, or None if it wasn't found
+    """
     assert start <= end
     while start <= end:
         i = (start + end)/2
@@ -220,6 +228,9 @@ class PackIndex(object):
             if name1 != name2:
                 return False
         return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
   
     def close(self):
         self._file.close()
@@ -248,6 +259,7 @@ class PackIndex(object):
         raise NotImplementedError(self._unpack_crc32_checksum)
   
     def __iter__(self):
+        """Iterate over the SHAs in this pack."""
         return imap(sha_to_hex, self._itersha())
   
     def _itersha(self):
@@ -277,6 +289,7 @@ class PackIndex(object):
   
     def check(self):
         """Check that the stored checksum matches the actual checksum."""
+        # TODO: Check pack contents, too
         return self.calculate_checksum() == self.get_stored_checksum()
   
     def calculate_checksum(self):
@@ -434,7 +447,7 @@ def unpack_object(map, offset=0):
         return type, uncomp, comp_len+raw_base
 
 
-def compute_object_size((num, obj)):
+def _compute_object_size((num, obj)):
     """Compute the size of a unresolved object for use with LRUSizeCache.
     """
     if num in (6, 7):
@@ -487,7 +500,7 @@ class PackData(object):
         self._file = open(self._filename, 'rb')
         self._read_header()
         self._offset_cache = LRUSizeCache(1024*1024*20, 
-            compute_size=compute_object_size)
+            compute_size=_compute_object_size)
 
     def close(self):
         self._file.close()

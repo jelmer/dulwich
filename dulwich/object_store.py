@@ -132,8 +132,12 @@ class BaseObjectStore(object):
         """
         return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
 
-
     def generate_pack_contents(self, have, want):
+        """Iterate over the contents of a pack file.
+
+        :param have: List of SHA1s of objects that should not be sent
+        :param want: List of SHA1s of objects that should be sent
+        """
         return self.iter_shas(self.find_missing_objects(have, want))
 
 
@@ -319,15 +323,17 @@ class DiskObjectStore(BaseObjectStore):
     def add_object(self, obj):
         """Add a single object to this object store.
 
+        :param obj: Object to add
         """
         self._add_shafile(obj.id, obj)
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over objects, should support __len__.
         """
         if len(objects) == 0:
+            # Don't bother writing an empty pack file
             return
         f, commit = self.add_pack()
         write_pack_data(f, objects, len(objects))
@@ -335,12 +341,14 @@ class DiskObjectStore(BaseObjectStore):
 
 
 class MemoryObjectStore(BaseObjectStore):
+    """Object store that keeps all objects in memory."""
 
     def __init__(self):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
 
     def __contains__(self, sha):
+        """Check if the object with a particular SHA is present."""
         return sha in self._data
 
     def __iter__(self):
@@ -403,19 +411,27 @@ class ObjectStoreIterator(ObjectIterator):
     """ObjectIterator that works on top of an ObjectStore."""
 
     def __init__(self, store, sha_iter):
+        """Create a new ObjectIterator.
+
+        :param store: Object store to retrieve from
+        :param sha_iter: Iterator over (sha, path) tuples
+        """
         self.store = store
         self.sha_iter = sha_iter
         self._shas = []
 
     def __iter__(self):
+        """Yield tuple with next object and path."""
         for sha, path in self.itershas():
             yield self.store[sha], path
 
     def iterobjects(self):
+        """Iterate over just the objects."""
         for o, path in self:
             yield o
 
     def itershas(self):
+        """Iterate over the SHAs."""
         for sha in self._shas:
             yield sha
         for sha in self.sha_iter:
@@ -425,12 +441,21 @@ class ObjectStoreIterator(ObjectIterator):
     def __contains__(self, needle):
         """Check if an object is present.
 
+        :note: This checks if the object is present in 
+            the underlying object store, not if it would
+            be yielded by the iterator.
+
         :param needle: SHA1 of the object to check for
         """
         return needle in self.store
 
     def __getitem__(self, key):
-        """Find an object by SHA1."""
+        """Find an object by SHA1.
+        
+        :note: This retrieves the object from the underlying
+            object store. It will also succeed if the object would
+            not be returned by the iterator.
+        """
         return self.store[key]
 
     def __len__(self):

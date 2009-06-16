@@ -258,4 +258,9 @@ def commit_tree(object_store, blobs):
 
 
 def commit_index(object_store, index):
+    """Create a new tree from an index.
+
+    :param object_store: Object store to save the tree in
+    :param index: Index file
+    """
     return commit_tree(object_store, index.iterblobs())

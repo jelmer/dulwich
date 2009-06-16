@@ -33,62 +33,62 @@ class RepositoryTests(unittest.TestCase):
   
     def open_repo(self, name):
         return Repo(os.path.join(os.path.dirname(__file__),
-                          'data', 'repos', name, '.git'))
+                          'data', 'repos', name))
   
     def test_simple_props(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         basedir = os.path.join(os.path.dirname(__file__), 
-                os.path.join('data', 'repos', 'a', '.git'))
+                os.path.join('data', 'repos', 'a.git'))
         self.assertEqual(r.controldir(), basedir)
   
     def test_ref(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
   
     def test_get_refs(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertEquals({
             'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097', 
             'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
             }, r.get_refs())
   
     def test_head(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
   
     def test_get_object(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         obj = r.get_object(r.head())
         self.assertEqual(obj._type, 'commit')
   
     def test_get_object_non_existant(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertRaises(KeyError, r.get_object, missing_sha)
   
     def test_commit(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         obj = r.commit(r.head())
         self.assertEqual(obj._type, 'commit')
   
     def test_commit_not_commit(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertRaises(errors.NotCommitError,
                           r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
   
     def test_tree(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         commit = r.commit(r.head())
         tree = r.tree(commit.tree)
         self.assertEqual(tree._type, 'tree')
         self.assertEqual(tree.sha().hexdigest(), commit.tree)
   
     def test_tree_not_tree(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertRaises(errors.NotTreeError, r.tree, r.head())
   
     def test_get_blob(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         commit = r.commit(r.head())
         tree = r.tree(commit.tree())
         blob_sha = tree.entries()[0][2]
@@ -97,18 +97,18 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(blob.sha().hexdigest(), blob_sha)
   
     def test_get_blob(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
     
     def test_linear_history(self):
-        r = self.open_repo('a')
+        r = self.open_repo('a.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
                                 '2a72d929692c41d8554c07f6301757ba18a65d91'])
   
     def test_merge_history(self):
-        r = self.open_repo('simple_merge')
+        r = self.open_repo('simple_merge.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
@@ -118,13 +118,13 @@ class RepositoryTests(unittest.TestCase):
                                 '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
   
     def test_revision_history_missing_commit(self):
-        r = self.open_repo('simple_merge')
+        r = self.open_repo('simple_merge.git')
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
   
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
-        r = self.open_repo('ooo_merge')
+        r = self.open_repo('ooo_merge.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
@@ -133,5 +133,5 @@ class RepositoryTests(unittest.TestCase):
                                 'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
   
     def test_get_tags_empty(self):
-        r = self.open_repo('ooo_merge')
+        r = self.open_repo('ooo_merge.git')
         self.assertEquals({}, r.refs.as_dict('refs/tags'))

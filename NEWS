@@ -1,3 +1,9 @@
+0.3.3	UNRELEASED
+
+ FEATURES
+
+  * Implement ShaFile.__hash__().
+
 0.3.2	2009-05-20
 
  BUG FIXES

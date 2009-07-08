@@ -128,6 +128,9 @@ class ShaFile(object):
     def __str__(self):
         return self.as_raw_string()
 
+    def __hash__(self):
+        return hash(self.id)
+
     def as_pretty_string(self):
         return self.as_raw_string()
 

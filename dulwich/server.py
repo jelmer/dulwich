@@ -77,16 +77,17 @@ class GitBackend(Backend):
         self.get_refs = self.repo.get_refs
 
     def apply_pack(self, refs, read):
-        fd, commit = self.repo.object_store.add_thin_pack()
-        fd.write(read())
-        fd.close()
-        commit()
+        f, commit = self.repo.object_store.add_thin_pack()
+        try:
+            f.write(read())
+        finally:
+            commit()
 
         for oldsha, sha, ref in refs:
             if ref == "0" * 40:
-                self.repo.remove_ref(ref)
+                del self.repo.refs[ref]
             else:
-                self.repo.set_ref(ref, sha)
+                self.repo.refs[ref] = sha
 
         print "pack applied"
 

@@ -772,7 +772,7 @@ def write_pack_object(f, type, object):
     :param o: Object to write
     :return: Tuple with offset at which the object was written, and crc32
     """
-    ret = f.tell()
+    offset = f.tell()
     packed_data_hdr = ""
     if type == 6: # ref delta
         (delta_base_offset, object) = object
@@ -799,7 +799,7 @@ def write_pack_object(f, type, object):
         packed_data_hdr += basename
     packed_data = packed_data_hdr + zlib.compress(object)
     f.write(packed_data)
-    return (f.tell(), (zlib.crc32(packed_data) & 0xffffffff))
+    return (offset, (zlib.crc32(packed_data) & 0xffffffff))
 
 
 def write_pack(filename, objects, num_objects):

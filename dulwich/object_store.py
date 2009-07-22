@@ -36,6 +36,7 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     sha_to_hex,
+    S_ISGITLINK,
     )
 from dulwich.pack import (
     Pack,
@@ -505,7 +506,7 @@ class MissingObjectFinder(object):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
 
     def parse_tree(self, tree):
-        self.add_todo([(sha, name, not stat.S_ISDIR(mode)) for (mode, name, sha) in tree.entries()])
+        self.add_todo([(sha, name, not stat.S_ISDIR(mode)) for (mode, name, sha) in tree.entries() if not S_ISGITLINK(mode)])
 
     def parse_commit(self, commit):
         self.add_todo([(commit.tree, "", False)])

@@ -10,6 +10,7 @@ Vcs-Bzr: http://bzr.debian.org/users/jelmer/dulwich/unstable
 
 Package: python-dulwich
 Architecture: any
+Provides: ${python:Provides}
 Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
 XB-Python-Version: ${python:Versions}
 Description: Pure-python Git library

@@ -428,6 +428,9 @@ class Tree(ShaFile):
         del self._entries[name]
         self._needs_serialization = True
 
+    def __len__(self):
+        return len(self._entries)
+
     def add(self, mode, name, hexsha):
         assert type(mode) == int
         assert type(name) == str

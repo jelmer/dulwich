@@ -1,0 +1,64 @@
+dulwich (0.3.2-2) UNRELEASED; urgency=low
+
+  * Run the testsuite during build.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 01 Jun 2009 21:55:36 +0200
+
+dulwich (0.3.2-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 20 May 2009 19:04:00 +0200
+
+dulwich (0.3.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 10 May 2009 16:18:27 +0200
+
+dulwich (0.2.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 30 Apr 2009 14:45:32 +0200
+
+dulwich (0.1.1+bzr220-1) unstable; urgency=low
+
+  * Update package description to mention optimized modules. (Closes: #521839)
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 06 Apr 2009 15:48:41 +0200
+
+dulwich (0.1.1+bzr214-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * Bump standards version.
+  * Fix long description. (Closes: #521003)
+  * Switch to Arch: any, since the package now contains compiled
+    optimized versions of some modules.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 29 Mar 2009 16:14:39 +0200
+
+dulwich (0.1.1~bzr153-1) unstable; urgency=low
+
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 08 Mar 2009 07:02:00 +0100
+
+dulwich (0.1.0+bzr138-2) unstable; urgency=low
+
+  * Add watch file.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 27 Jan 2009 04:26:55 +0100
+
+dulwich (0.1.0+bzr138-1) unstable; urgency=low
+
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 24 Jan 2009 22:58:17 +0100
+
+dulwich (0.1.0-1) unstable; urgency=low
+
+  * Initial release. (Closes: #512897)
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 01 Jan 2009 04:15:38 +0100

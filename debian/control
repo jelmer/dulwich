@@ -1,0 +1,23 @@
+Source: dulwich
+Section: python
+Priority: optional
+Maintainer: Jelmer Vernooij <jelmer@debian.org>
+Homepage: http://samba.org/~jelmer/dulwich
+Build-Depends: python-central (>= 0.5), cdbs (>= 0.4.43), python-all-dev, debhelper (>= 5.0.37.2), python-nose
+Standards-Version: 3.8.1
+XS-Python-Version: >= 2.4
+Vcs-Bzr: http://bzr.debian.org/users/jelmer/dulwich/unstable
+
+Package: python-dulwich
+Architecture: any
+Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
+XB-Python-Version: ${python:Versions}
+Description: Pure-python Git library
+ Dulwich is a Python implementation of the file formats and protocols 
+ used by the Git version control system. It can currently read from and write 
+ to existing Git repositories and implements the protocol for pushing and 
+ receiving packs from remote servers.
+ .
+ All functionality is available in pure Python, but for improved performance 
+ replacements of some modules written in C are also available. This package 
+ includes the high performance versions.

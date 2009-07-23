@@ -2,8 +2,10 @@ dulwich (0.3.3-1) unstable; urgency=low
 
   * Run the testsuite during build.
   * New upstream release.
+  * Avoid hard dependency on python2.4. Thanks doko for the help
+    debugging this. Closes: #534758.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Mon, 01 Jun 2009 21:55:36 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 23 Jul 2009 22:27:26 +0200
 
 dulwich (0.3.2-1) unstable; urgency=low
 

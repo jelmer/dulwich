@@ -29,7 +29,6 @@ setup(name='dulwich',
       in one of the Monty Python sketches.
       """,
       packages=['dulwich', 'dulwich.tests'],
-      scripts=['bin/dulwich', 'bin/dul-daemon'],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),

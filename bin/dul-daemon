@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # dul-daemon - Simple git-daemon a like
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
 # 

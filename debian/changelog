@@ -1,6 +1,7 @@
-dulwich (0.3.2-2) UNRELEASED; urgency=low
+dulwich (0.3.3-1) unstable; urgency=low
 
   * Run the testsuite during build.
+  * New upstream release.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Mon, 01 Jun 2009 21:55:36 +0200
 

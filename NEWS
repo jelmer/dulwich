@@ -1,8 +1,15 @@
-0.3.3	UNRELEASED
+0.3.3	2009-07-23
 
  FEATURES
 
   * Implement ShaFile.__hash__().
+
+  * Implement Tree.__len__()
+
+ BUG FIXES
+  
+  * Check for 'objects' and 'refs' directories
+    when looking for a Git repository. (#380818)
 
 0.3.2	2009-05-20
 

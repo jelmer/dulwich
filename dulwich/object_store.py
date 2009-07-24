@@ -480,7 +480,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
         if p == '':
             continue
         mode, sha = obj[p]
-    return lookup_obj(sha)
+    return mode, sha
 
 
 class MissingObjectFinder(object):

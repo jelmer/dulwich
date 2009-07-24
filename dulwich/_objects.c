@@ -19,33 +19,7 @@
 
 #include <Python.h>
 
-#define hexbyte(x) (isdigit(x)?(x)-'0':(x)-'a'+0xa)
 #define bytehex(x) (((x)<0xa)?('0'+(x)):('a'-0xa+(x)))
-
-static PyObject *py_hex_to_sha(PyObject *self, PyObject *py_hexsha)
-{
-	char *hexsha;
-	char sha[20];
-	int i;
-
-	if (!PyString_CheckExact(py_hexsha)) {
-		PyErr_SetString(PyExc_TypeError, "hex sha is not a string");
-		return NULL;
-	}
-
-	if (PyString_Size(py_hexsha) != 40) {
-		PyErr_SetString(PyExc_ValueError, "hex sha is not 40 bytes long");
-		return NULL;
-	}
-
-	hexsha = PyString_AsString(py_hexsha);
-
-	for (i = 0; i < 20; i++) {
-		sha[i] = (hexbyte(hexsha[i*2]) << 4) + hexbyte(hexsha[i*2+1]);
-	}
-
-	return PyString_FromStringAndSize(sha, 20);
-}
 
 static PyObject *sha_to_pyhex(const unsigned char *sha)
 {
@@ -57,21 +31,6 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 	}
 	
 	return PyString_FromStringAndSize(hexsha, 40);
-}
-
-static PyObject *py_sha_to_hex(PyObject *self, PyObject *py_sha)
-{
-	if (!PyString_CheckExact(py_sha)) {
-		PyErr_SetString(PyExc_TypeError, "sha is not a string");
-		return NULL;
-	}
-
-	if (PyString_Size(py_sha) != 20) {
-		PyErr_SetString(PyExc_ValueError, "sha is not 20 bytes long");
-		return NULL;
-	}
-
-	return sha_to_pyhex((unsigned char *)PyString_AsString(py_sha));
 }
 
 static PyObject *py_parse_tree(PyObject *self, PyObject *args)
@@ -131,8 +90,6 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef py_objects_methods[] = {
-	{ "hex_to_sha", (PyCFunction)py_hex_to_sha, METH_O, NULL },
-	{ "sha_to_hex", (PyCFunction)py_sha_to_hex, METH_O, NULL },
 	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS, NULL },
 	{ NULL, NULL, 0, NULL }
 };

@@ -1,5 +1,9 @@
 0.3.4	UNRELEASED
 
+ BUG FIXES
+
+  * Use binascii.hexlify / binascii.unhexlify for better performance.
+
 0.3.3	2009-07-23
 
  FEATURES

@@ -1,5 +1,10 @@
 0.3.4	UNRELEASED
 
+ API CHANGES
+
+  * dulwich.object_store.tree_lookup_path will now return the mode and 
+    sha of the object found rather than the object itself.
+
  BUG FIXES
 
   * Use binascii.hexlify / binascii.unhexlify for better performance.

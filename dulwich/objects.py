@@ -21,6 +21,7 @@
 """Access to base git objects."""
 
 
+import binascii
 from cStringIO import (
     StringIO,
     )
@@ -64,7 +65,7 @@ def _decompress(string):
 
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
-    hexsha = "".join(["%02x" % ord(c) for c in sha])
+    hexsha = binascii.hexlify(sha)
     assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % hexsha
     return hexsha
 
@@ -72,7 +73,7 @@ def sha_to_hex(sha):
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha"""
     assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
-    return ''.join([chr(int(hex[i:i+2], 16)) for i in xrange(0, len(hex), 2)])
+    return binascii.unhexlify(hex)
 
 
 def serializable_property(name, docstring=None):
@@ -617,7 +618,7 @@ num_type_map = {
 
 try:
     # Try to import C versions
-    from dulwich._objects import hex_to_sha, sha_to_hex, parse_tree
+    from dulwich._objects import parse_tree
 except ImportError:
     pass
 

@@ -135,7 +135,10 @@ def write_index_dict(f, entries):
 
 def cleanup_mode(mode):
     """Cleanup a mode value.
+
+    This will return a mode that can be stored in a tree object.
     
+    :param mode: Mode to clean up.
     """
     if stat.S_ISLNK(mode):
         return stat.S_IFLNK

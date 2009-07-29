@@ -430,6 +430,7 @@ class Tree(ShaFile):
         self._needs_serialization = True
 
     def __len__(self):
+        self._ensure_parsed()
         return len(self._entries)
 
     def add(self, mode, name, hexsha):

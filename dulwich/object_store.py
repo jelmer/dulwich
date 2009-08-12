@@ -288,6 +288,7 @@ class DiskObjectStore(BaseObjectStore):
         basename = os.path.join(self.pack_dir, 
             "pack-%s" % iter_sha1(entry[0] for entry in entries))
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
+        p.close()
         os.rename(path, basename + ".pack")
         self._add_known_pack(basename)
 

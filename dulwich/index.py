@@ -36,12 +36,20 @@ from dulwich.pack import (
 
 
 def read_cache_time(f):
-    """Read a cache time."""
+    """Read a cache time.
+    
+    :param f: File-like object to read from
+    :return: Tuple with seconds and nanoseconds
+    """
     return struct.unpack(">LL", f.read(8))
 
 
 def write_cache_time(f, t):
-    """Write a cache time."""
+    """Write a cache time.
+    
+    :param f: File-like object to write to
+    :param t: Time to write (as int, float or tuple with secs and nsecs)
+    """
     if isinstance(t, int):
         t = (t, 0)
     elif isinstance(t, float):
@@ -179,6 +187,8 @@ class Index(object):
             f = SHA1Reader(f)
             for x in read_index(f):
                 self[x[0]] = tuple(x[1:])
+            # FIXME: Additional data?
+            f.read(os.path.getsize(self._filename)-f.tell()-20)
             f.check_sha()
         finally:
             f.close()

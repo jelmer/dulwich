@@ -104,3 +104,7 @@ class GitProtocolError(Exception):
 
 class HangupException(GitProtocolError):
     """Hangup exception."""
+
+    def __init__(self):
+        Exception.__init__(self,
+            "The remote server unexpectedly closed the connection.")

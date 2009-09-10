@@ -132,6 +132,8 @@ class UploadPackHandler(Handler):
             while want and want[:4] == 'want':
                 want_revs.append(want[5:45])
                 want = self.proto.read_pkt_line()
+                if want == None:
+                    self.proto.write_pkt_line("ACK %s\n" % want_revs[-1])
             return want_revs
 
         progress = lambda x: self.proto.write_sideband(2, x)

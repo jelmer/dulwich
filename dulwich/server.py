@@ -132,6 +132,8 @@ class UploadPackHandler(Handler):
             while want and want[:4] == 'want':
                 want_revs.append(want[5:45])
                 want = self.proto.read_pkt_line()
+                if want == None:
+                    self.proto.write_pkt_line("ACK %s\n" % want_revs[-1])
             return want_revs
 
         progress = lambda x: self.proto.write_sideband(2, x)
@@ -142,14 +144,35 @@ class UploadPackHandler(Handler):
             def __init__(self, proto):
                 self.proto = proto
                 self._last_sha = None
+                self._cached = False
+                self._cache = []
+                self._cache_index = 0
 
             def ack(self, have_ref):
                 self.proto.write_pkt_line("ACK %s continue\n" % have_ref)
 
+            def reset(self):
+                self._cached = True
+                self._cache_index = 0
+
             def next(self):
+                if not self._cached:
+                    return self.next_from_proto()
+                self._cache_index = self._cache_index + 1
+                if self._cache_index > len(self._cache):
+                    return None
+                return self._cache[self._cache_index]
+
+            def next_from_proto(self):
                 have = self.proto.read_pkt_line()
+                if have is None:
+                    self.proto.write_pkt_line("ACK %s\n" % self._last_sha)
+                    return None
+
                 if have[:4] == 'have':
+                    self._cache.append(have[5:45])
                     return have[5:45]
+
 
                 #if have[:4] == 'done':
                 #    return None

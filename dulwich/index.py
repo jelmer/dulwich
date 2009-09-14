@@ -198,7 +198,10 @@ class Index(object):
         return len(self._byname)
 
     def __getitem__(self, name):
-        """Retrieve entry by relative path."""
+        """Retrieve entry by relative path.
+        
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        """
         return self._byname[name]
 
     def __iter__(self):

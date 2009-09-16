@@ -31,7 +31,7 @@ The Commit
 ----------
 
 You're used to generate commits using Git. You have set up your name and
-e-mail, and you know how to see the history using "git log".
+e-mail, and you know how to see the history using ``git log``.
 
 A commit file looks like this::
 
@@ -56,11 +56,11 @@ A tree file looks like this::
 
   tree <content length><NUL><file mode> <filename><NUL><blob sha>...
 
-And repeats for every file in the tree. A real example from Dulwich itself::
+And repeats for every file in the tree.
 
 Note that for a unknown reason, the SHA-1 digest is in binary form here.
 
-The file mode is like the octal argument you could give to the "chmod"
+The file mode is like the octal argument you could give to the ``chmod``
 command.  Except it is in extended form to tell regular files from
 directories and other types.
 
@@ -99,7 +99,7 @@ For instance there is an index of the current state of the working copy.
 There are also pack files to group several small objects in a single indexed
 file.
 
-You'll find more detailled explanations and examples here:
+For a more detailled explanation of object formats and SHA-1 digests, see:
 http://www-cs-students.stanford.edu/~blynn/gitmagic/ch08.html
 
 Just note that recent versions of Git compress object files using zlib.

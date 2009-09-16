@@ -13,14 +13,14 @@ The access to every object is through the Repo object. You can open an
 existing repository or you can create a new one. There are two types of Git
 repositories:
 
-  Regular Repositories -- They are the ones you create using "git init" and
-  you daily use. They contain a ".git" folder.
+  Regular Repositories -- They are the ones you create using ``git init`` and
+  you daily use. They contain a ``.git`` folder.
 
   Bare Repositories -- There is not ".git" folder. The top-level folder
   contains itself the "branches", "hooks"... folders. These are used for
   published repositories (mirrors).
 
-Let's create a folder and turn it into a repository, like "git init" would::
+Let's create a folder and turn it into a repository, like ``git init`` would::
 
   >>> from os import mkdir
   >>> mkdir("myrepo")
@@ -42,7 +42,7 @@ empty for now, we'll start by adding a new file::
   >>> blob.id
   '456a1e689eb87b947be24562e830421cd799388c'
 
-Of course you could create a blob from an existing file using "from_file"
+Of course you could create a blob from an existing file using ``from_file``
 instead.
 
 As said in the introduction, file content is separed from file name. Let's
@@ -100,7 +100,7 @@ Playing again with Git
 ======================
 
 At this point you can come back to the shell, go into the "myrepo" folder and
-type "git status" to let Git confirm that this is a regular repository on
+type ``git status`` to let Git confirm that this is a regular repository on
 branch "master".
 
 Git will tell you that the file "spam" is deleted, which is normal because
@@ -110,13 +110,13 @@ all!
 
 You can checkout the last state using ``git checkout -f``. The force flag
 will prevent Git from complaining that there are uncommitted changes in the
-checkout.
+working copy.
 
-The file ``spam`` appears and with no surprise::
+The file ``spam`` appears and with no surprise contains the same bytes as the
+blob::
 
   $ cat spam
   My file content
 
-contains the same bytes as the blob.
-
-Remember to reload the repository when you modify it outside of Dulwich!
+.. attention:: Remember to recreate the repo object when you modify the
+               repository outside of Dulwich!

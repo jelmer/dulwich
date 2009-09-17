@@ -58,7 +58,8 @@ job of the commit::
   >>> from time import time
   >>> commit = Commit()
   >>> commit.tree = tree.id
-  >>> commit.author = commit.committer = "Your Name <your.email@example.com>"
+  >>> author = "Your Name <your.email@example.com>"
+  >>> commit.author = commit.committer = author
   >>> commit.commit_time = commit.author_time = int(time())
   >>> tz = parse_timezone('-0200')
   >>> commit.commit_timezone = commit.author_timezone = tz

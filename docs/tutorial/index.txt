@@ -6,3 +6,4 @@ Dulwich Tutorial
 
 .. include:: 0-introduction.txt
 .. include:: 1-initial-commit.txt
+.. include:: 2-change_file.txt

@@ -12,15 +12,15 @@ object from the previous chapter.
 
 Let's first build the blob::
 
-  >>> spam = Blob.from_string("My new file content")
+  >>> spam = Blob.from_string("My new file content\n")
   >>> spam.id
-  'fd2a0fa3ad828c5bda4b7badcbe522dc3b12af73'
+  '16ee2682887a962f854ebd25a61db16ef4efe49f'
 
 An alternative is to alter the previously constructed blob object::
 
-  >>> blob.data = "My new file content"
+  >>> blob.data = "My new file content\n"
   >>> blob.id
-  'fd2a0fa3ad828c5bda4b7badcbe522dc3b12af73'
+  '16ee2682887a962f854ebd25a61db16ef4efe49f'
 
 In any case, update the blob id known as "spam". You also have the
 opportunity of changing its mode::
@@ -49,7 +49,7 @@ Remain to record this whole new family::
   >>> object_store.add_object(c2)
 
 You can already ask git to introspect this commit using ``git show`` and the
-value of ``commit.it`` as an argument. You'll see the difference will the
+value of ``commit.id`` as an argument. You'll see the difference will the
 previous blob recorded as "spam".
 
 You won't see it using git log because the head is still the previous

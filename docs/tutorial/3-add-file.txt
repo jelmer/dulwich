@@ -1,0 +1,41 @@
+Adding a file
+=============
+
+If you followed well, the next lesson will be straightforward.
+
+We need a new blob::
+
+    >>> ham = Blob.from_string("Another\nmultiline\nfile\n")
+    >>> ham.id
+    'a3b5eda0b83eb8fb6e5dce91ecafda9e97269c70'
+
+But the same tree::
+
+    >>> tree["ham"] = (0100644, spam.id)
+
+And a new commit::
+
+  >>> c3 = Commit()
+  >>> c3.tree = tree.id
+  >>> c3.parents = [commit.id]
+  >>> c3.author = c3.committer = author
+  >>> c3.commit_time = c3.author_time = int(time())
+  >>> c3.commit_timezone = c3.author_timezone = tz
+  >>> c3.encoding = "UTF-8"
+  >>> c3.message = 'Adding "ham"'
+
+Save it all::
+
+    >>> object_store.add_object(spam)
+    >>> object_store.add_object(tree)
+    >>> object_store.add_object(c3)
+
+Update the head::
+
+    >>> repo.refs['refs/heads/master'] = commit.id
+
+A call to ``git show`` will confirm the addition of "spam".
+
+Remember you can also call ``git checkout -f`` to make it appear.
+
+Well... Adding "spam" was not such a good idea... We'll remove it.

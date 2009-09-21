@@ -1,0 +1,33 @@
+Renaming a file
+===============
+
+Remember you learned that the file name and content are distinct. So renaming
+a file is just about associating a blob id to a new name. We won't store more
+content, and the operation will be painless.
+
+Let's transfer the blob id from the old name to the new one::
+
+    >>> tree["eggs"] = tree["spam"]
+    >>> del tree["spam"]
+
+As usual, we need a commit to store the new tree id::
+
+  >>> c5 = Commit()
+  >>> c5.tree = tree.id
+  >>> c5.parents = [commit.id]
+  >>> c5.author = c5.committer = author
+  >>> c5.commit_time = c5.author_time = int(time())
+  >>> c5.commit_timezone = c5.author_timezone = tz
+  >>> c5.encoding = "UTF-8"
+  >>> c5.message = 'Rename "spam" to "eggs"'
+
+As for a deletion, we only have a tree and a commit to save::
+
+    >>> object_store.add_object(tree)
+    >>> object_store.add_object(c5)
+
+Remains to make the head bleeding-edge::
+
+    >>> repo.refs['refs/heads/master'] = commit.id
+
+As a last exercise, see how ``git show`` illustrates it.

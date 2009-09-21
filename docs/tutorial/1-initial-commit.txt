@@ -34,9 +34,9 @@ When you use Git, you generally add or modify content. As our repository is
 empty for now, we'll start by adding a new file::
 
   >>> from dulwich.objects import Blob
-  >>> blob = Blob.from_string("My file content")
+  >>> blob = Blob.from_string("My file content\n")
   >>> blob.id
-  '456a1e689eb87b947be24562e830421cd799388c'
+  'c55063a4d5d37aa1af2b2dad3a70aa34dae54dc6'
 
 Of course you could create a blob from an existing file using ``from_file``
 instead.

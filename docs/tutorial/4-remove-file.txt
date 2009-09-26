@@ -1,0 +1,30 @@
+Removing a file
+===============
+
+Removing a file just means removing its entry in the tree. The blob won't be
+deleted because Git tries to preserve the history of your repository.
+
+It's all pythonic::
+
+    >>> del tree["ham"]
+
+  >>> c4 = Commit()
+  >>> c4.tree = tree.id
+  >>> c4.parents = [commit.id]
+  >>> c4.author = c4.committer = author
+  >>> c4.commit_time = c4.author_time = int(time())
+  >>> c4.commit_timezone = c4.author_timezone = tz
+  >>> c4.encoding = "UTF-8"
+  >>> c4.message = 'Removing "ham"'
+
+Here we only have the new tree and the commit to save::
+
+    >>> object_store.add_object(spam)
+    >>> object_store.add_object(tree)
+    >>> object_store.add_object(c4)
+
+And of course update the head::
+
+    >>> repo.refs['refs/heads/master'] = commit.id
+
+If you don't trust me, ask ``git show``. ;-)

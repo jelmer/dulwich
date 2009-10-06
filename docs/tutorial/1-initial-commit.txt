@@ -54,7 +54,7 @@ permissions. You can hardcode them or you can use the ``stat`` module.
 The tree state of our repository still needs to be placed in time. That's the
 job of the commit::
 
-  >>> from dulwich.objects import Commit
+  >>> from dulwich.objects import Commit, parse_timezone
   >>> from time import time
   >>> commit = Commit()
   >>> commit.tree = tree.id

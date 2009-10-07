@@ -6,6 +6,8 @@
 
   * Add Index.changes_from_tree()
 
+  * Add ObjectStore.tree_changes()
+
 0.4.0	2009-10-07
 
  DOCUMENTATION

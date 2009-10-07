@@ -5,7 +5,7 @@
 from distutils.core import setup
 from distutils.extension import Extension
 
-dulwich_version_string = '0.3.4'
+dulwich_version_string = '0.4.0'
 
 include_dirs = []
 # Windows MSVC support

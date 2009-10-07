@@ -1,4 +1,8 @@
-0.3.4	UNRELEASED
+0.4.0	2009-10-07
+
+ DOCUMENTATION
+
+  * Added tutorial.
 
  API CHANGES
 
@@ -12,6 +16,8 @@
   * Cope with extra unknown data in index files by ignoring it (for now).
 
   * Add proper error message when server unexpectedly hangs up. (#415843)
+
+  * Correctly write opcode for equal in create_delta.
 
 0.3.3	2009-07-23
 

@@ -99,6 +99,65 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_objects)
 
+    def tree_changes(self, source, target, want_unchanged=False):
+        """Find the differences between the contents of two trees
+
+        :param object_store: Object store to use for retrieving tree contents
+        :param tree: SHA1 of the root tree
+        :param want_unchanged: Whether unchanged files should be reported
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        """
+        todo = set([(source, target, "")])
+        while todo:
+            (sid, tid, path) = todo.pop()
+            if sid is not None:
+                stree = self[sid]
+            else:
+                stree = {}
+            if tid is not None:
+                ttree = self[tid]
+            else:
+                ttree = {}
+            for name, oldmode, oldhexsha in stree.iteritems():
+                if path == "":
+                    oldchildpath = name
+                else:
+                    oldchildpath = "%s/%s" % (path, name)
+                try:
+                    (newmode, newhexsha) = ttree[name]
+                    newchildpath = oldchildpath
+                except KeyError:
+                    newmode = None
+                    newhexsha = None
+                    newchildpath = None
+                if (want_unchanged or oldmode != newmode or 
+                    oldhexsha != newhexsha):
+                    if stat.S_ISDIR(oldmode):
+                        if newmode is None or stat.S_ISDIR(newmode):
+                            todo.add((oldhexsha, newhexsha, oldchildpath))
+                        else:
+                            # entry became a file
+                            todo.add((oldhexsha, None, oldchildpath))
+                            yield ((None, newchildpath), (None, newmode), (None, newhexsha))
+                    else:
+                        if newmode is not None and stat.S_ISDIR(newmode):
+                            # entry became a dir
+                            yield ((oldchildpath, None), (oldmode, None), (oldhexsha, None))
+                            todo.add((None, newhexsha, newchildpath))
+                        else:
+                            yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
+
+            for name, newmode, newhexsha in ttree.iteritems():
+                if path == "":
+                    childpath = name
+                else:
+                    childpath = "%s/%s" % (path, name)
+                if not name in stree:
+                    if not stat.S_ISDIR(newmode):
+                        yield ((None, childpath), (None, newmode), (None, newhexsha))
+                    else:
+                        todo.add((None, newhexsha, childpath))
+
     def iter_tree_contents(self, tree):
         """Yield (path, mode, hexsha) tuples for all non-Tree objects in a tree.
 

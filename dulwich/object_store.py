@@ -99,6 +99,25 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_objects)
 
+    def iter_tree_contents(self, tree):
+        """Yield (path, mode, hexsha) tuples for all non-Tree objects in a tree.
+
+        :param tree: SHA1 of the root of the tree
+        """
+        todo = set([(tree, "")])
+        while todo:
+            (tid, tpath) = todo.pop()
+            tree = self[tid]
+            for name, mode, hexsha in tree.iteritems(): 
+                if tpath == "":
+                    path = name
+                else:
+                    path = "%s/%s" % (tpath, name)
+                if stat.S_ISDIR(mode):
+                    todo.add((hexsha, path))
+                else:
+                    yield path, mode, hexsha
+
     def find_missing_objects(self, haves, wants, progress=None):
         """Find the missing objects required for a set of revisions.
 

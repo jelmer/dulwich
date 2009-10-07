@@ -1,5 +1,11 @@
 0.4.1	UNRELEASED
 
+ FEATURES
+
+  * Add ObjectStore.iter_tree_contents()
+
+  * Add Index.changes_from_tree()
+
 0.4.0	2009-10-07
 
  DOCUMENTATION

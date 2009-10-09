@@ -8,6 +8,8 @@
 
   * Add ObjectStore.tree_changes()
 
+  * Add functionality for writing patches in dulwich.patch.
+
 0.4.0	2009-10-07
 
  DOCUMENTATION

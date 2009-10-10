@@ -22,9 +22,13 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
+from dulwich.objects import (
+    Blob,
+    )
+
 import time
 
-def write_commit_patch(f, commit, progress, version=None):
+def write_commit_patch(f, commit, contents, progress, version=None):
     """Write a individual file patch.
 
     :param commit: Commit object
@@ -40,6 +44,7 @@ def write_commit_patch(f, commit, progress, version=None):
     f.write("---\n")
     f.write("TODO: Print diffstat\n")
     f.write("\n")
+    f.write(contents)
     f.write("-- \n")
     if version is None:
         from dulwich import __version__ as dulwich_version
@@ -55,3 +60,37 @@ def get_summary(commit):
     :return: Summary string
     """
     return commit.message.splitlines()[0].replace(" ", "-")
+
+
+def _blob_id(contents):
+    if contents is None:
+        return "0" * 7
+    else:
+        return Blob.from_string("".join(contents)).id[:7]
+
+
+def write_diff_file_header(f, (old_path, old_mode, old_rev), 
+                              (new_path, new_mode, new_rev)):
+    """Write diff file header.
+
+    :param f: File-like object to write to
+    :param (old_path, old_mode, old_rev): Previous file mode (None if nonexisting)
+    :param (new_path, new_mode, new_rev): New file mode (None if nonexisting)
+    """
+    if old_path is None:
+        old_path = "/dev/null"
+    else:
+        old_path = "a/%s" % old_path
+    if new_path is None:
+        new_path = "/dev/null"
+    else:
+        new_path = "b/%s" % new_path
+    f.write("diff --git %s %s\n" % (old_path, new_path))
+    if old_mode != new_mode:
+        if new_mode is not None:
+            if old_mode is not None:
+                f.write("old file mode %o\n" % old_mode)
+            f.write("new file mode %o\n" % new_mode) 
+        else:
+            f.write("deleted file mode %o\n" % old_mode)
+    f.write("index %s..%s %o\n" % (old_rev, new_rev, new_mode))

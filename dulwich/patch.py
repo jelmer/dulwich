@@ -26,7 +26,9 @@ from dulwich.objects import (
     Blob,
     )
 
+import difflib
 import time
+
 
 def write_commit_patch(f, commit, contents, progress, version=None):
     """Write a individual file patch.
@@ -62,21 +64,24 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
-def _blob_id(contents):
-    if contents is None:
-        return "0" * 7
-    else:
-        return Blob.from_string("".join(contents)).id[:7]
-
-
-def write_diff_file_header(f, (old_path, old_mode, old_rev), 
-                              (new_path, new_mode, new_rev)):
+def write_blob_diff(f, (old_path, old_mode, old_blob), 
+                       (new_path, new_mode, new_blob)):
     """Write diff file header.
 
     :param f: File-like object to write to
-    :param (old_path, old_mode, old_rev): Previous file mode (None if nonexisting)
-    :param (new_path, new_mode, new_rev): New file mode (None if nonexisting)
+    :param (old_path, old_mode, old_blob): Previous file (None if nonexisting)
+    :param (new_path, new_mode, new_blob): New file (None if nonexisting)
     """
+    def blob_id(blob):
+        if blob is None:
+            return "0" * 7
+        else:
+            return blob.id[:7]
+    def lines(blob):
+        if blob is not None:
+            return blob.data.splitlines(True)
+        else:
+            return []
     if old_path is None:
         old_path = "/dev/null"
     else:
@@ -93,4 +98,9 @@ def write_diff_file_header(f, (old_path, old_mode, old_rev),
             f.write("new file mode %o\n" % new_mode) 
         else:
             f.write("deleted file mode %o\n" % old_mode)
-    f.write("index %s..%s %o\n" % (old_rev, new_rev, new_mode))
+    f.write("index %s..%s %o\n" % (
+        blob_id(old_blob), blob_id(new_blob), new_mode))
+    old_contents = lines(old_blob)
+    new_contents = lines(new_blob)
+    f.writelines(difflib.unified_diff(old_contents, new_contents, 
+        old_path, new_path))

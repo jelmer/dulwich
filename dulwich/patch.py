@@ -22,11 +22,8 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-from dulwich.objects import (
-    Blob,
-    )
-
 import difflib
+import subprocess
 import time
 
 
@@ -44,8 +41,15 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     f.write("Subject: [PATCH %d/%d] %s\n" % (num, total, commit.message))
     f.write("\n")
     f.write("---\n")
-    f.write("TODO: Print diffstat\n")
-    f.write("\n")
+    try:
+        p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE, 
+                             stdin=subprocess.PIPE)
+    except OSError, e:
+        pass # diffstat not available?
+    else:
+        (diffstat, _) = p.communicate(contents)
+        f.write(diffstat)
+        f.write("\n")
     f.write(contents)
     f.write("-- \n")
     if version is None:

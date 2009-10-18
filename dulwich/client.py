@@ -124,6 +124,25 @@ class GitClient(object):
             
         return new_refs
 
+    def fetch(self, path, target, determine_wants=None, progress=None):
+        """Fetch into a target repository.
+
+        :param path: Path to fetch from
+        :param target: Target repository to fetch into
+        :param determine_wants: Optional function to determine what refs 
+            to fetch
+        :param progress: Optional progress function
+        :return: remote refs
+        """
+        if determine_wants is None:
+            determine_wants = target.object_store.determine_wants_all
+        f, commit = target.object_store.add_pack()
+        try:
+            return self.fetch_pack(path, determine_wants, target.graph_walker, 
+                                   f.write, progress)
+        finally:
+            commit()
+
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress):
         """Retrieve a pack from a git smart server.

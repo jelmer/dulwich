@@ -251,7 +251,8 @@ class Repo(object):
         :param progress: Optional progress function
         """
         target.object_store.add_objects(
-            self.fetch_objects(determine_wants, target.graph_walker, progress))
+            self.fetch_objects(determine_wants, target.get_graph_walker(),
+                progress))
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress):

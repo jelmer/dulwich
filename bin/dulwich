@@ -31,156 +31,151 @@ def get_transport_and_path(uri):
 
 
 def cmd_fetch_pack(args):
-	from dulwich.repo import Repo
-	opts, args = getopt(args, "", ["all"])
-	opts = dict(opts)
-        client, path = get_transport_and_path(args.pop(0))
-	if "--all" in opts:
-		determine_wants = r.object_store.determine_wants_all
-	else:
-		determine_wants = lambda x: [y for y in args if not y in r.object_store]
-	r = Repo(".")
-	graphwalker = r.get_graph_walker()
-	f, commit = r.object_store.add_pack()
-	try:
-            client.fetch_pack(path, determine_wants, graphwalker, f.write, sys.stdout.write)
-        finally:
-		commit()
+    from dulwich.repo import Repo
+    opts, args = getopt(args, "", ["all"])
+    opts = dict(opts)
+    client, path = get_transport_and_path(args.pop(0))
+    r = Repo(".")
+    if "--all" in opts:
+        determine_wants = r.object_store.determine_wants_all
+    else:
+        determine_wants = lambda x: [y for y in args if not y in r.object_store]
+    graphwalker = r.get_graph_walker()
+    client.fetch(path, r.object_store, determine_wants)
 
 
 def cmd_log(args):
-	from dulwich.repo import Repo
-	opts, args = getopt(args, "", [])
-	r = Repo(".")
-	todo = [r.head()]
-	done = set()
-	while todo:
-		sha = todo.pop()
-		assert isinstance(sha, str)
-		if sha in done:
-			continue
-		done.add(sha)
-		commit = r.commit(sha)
-		print "-" * 50
-		print "commit: %s" % sha
-		if len(commit.parents) > 1:
-			print "merge: %s" % "...".join(commit.parents[1:])
-		print "author: %s" % commit.author
-		print "committer: %s" % commit.committer
-		print ""
-		print commit.message
-		print ""
-		todo.extend([p for p in commit.parents if p not in done])
+    from dulwich.repo import Repo
+    opts, args = getopt(args, "", [])
+    r = Repo(".")
+    todo = [r.head()]
+    done = set()
+    while todo:
+        sha = todo.pop()
+        assert isinstance(sha, str)
+        if sha in done:
+            continue
+        done.add(sha)
+        commit = r.commit(sha)
+        print "-" * 50
+        print "commit: %s" % sha
+        if len(commit.parents) > 1:
+            print "merge: %s" % "...".join(commit.parents[1:])
+        print "author: %s" % commit.author
+        print "committer: %s" % commit.committer
+        print ""
+        print commit.message
+        print ""
+        todo.extend([p for p in commit.parents if p not in done])
 
 
 def cmd_dump_pack(args):
-	from dulwich.errors import ApplyDeltaError
-	from dulwich.pack import Pack, sha_to_hex
-	import os
-	import sys
+    from dulwich.errors import ApplyDeltaError
+    from dulwich.pack import Pack, sha_to_hex
+    import os
+    import sys
 
-	opts, args = getopt(args, "", [])
+    opts, args = getopt(args, "", [])
 
-	if args == []:
-		print "Usage: dulwich dump-pack FILENAME"
-		sys.exit(1)
+    if args == []:
+        print "Usage: dulwich dump-pack FILENAME"
+        sys.exit(1)
 
-	basename, _ = os.path.splitext(args[0])
-	x = Pack(basename)
-	print "Object names checksum: %s" % x.name()
-	print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
-	if not x.check():
-		print "CHECKSUM DOES NOT MATCH"
-	print "Length: %d" % len(x)
-	for name in x:
-		try:
-			print "\t%s" % x[name]
-		except KeyError, k:
-			print "\t%s: Unable to resolve base %s" % (name, k)
-		except ApplyDeltaError, e:
-			print "\t%s: Unable to apply delta: %r" % (name, e)
+    basename, _ = os.path.splitext(args[0])
+    x = Pack(basename)
+    print "Object names checksum: %s" % x.name()
+    print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
+    if not x.check():
+        print "CHECKSUM DOES NOT MATCH"
+    print "Length: %d" % len(x)
+    for name in x:
+        try:
+            print "\t%s" % x[name]
+        except KeyError, k:
+            print "\t%s: Unable to resolve base %s" % (name, k)
+        except ApplyDeltaError, e:
+            print "\t%s: Unable to apply delta: %r" % (name, e)
 
 
 def cmd_dump_index(args):
-	from dulwich.index import Index
+    from dulwich.index import Index
 
-	opts, args = getopt(args, "", [])
+    opts, args = getopt(args, "", [])
 
-	if args == []:
-		print "Usage: dulwich dump-index FILENAME"
-		sys.exit(1)
+    if args == []:
+        print "Usage: dulwich dump-index FILENAME"
+        sys.exit(1)
 
-	filename = args[0]
-	idx = Index(filename)
+    filename = args[0]
+    idx = Index(filename)
 
-	for o in idx:
-		print o, idx[o]
+    for o in idx:
+        print o, idx[o]
 
 
 def cmd_init(args):
-	from dulwich.repo import Repo
-	import os
-	import sys
-	opts, args = getopt(args, "", ["--bare"])
-	opts = dict(opts)
+    from dulwich.repo import Repo
+    import os
+    opts, args = getopt(args, "", ["--bare"])
+    opts = dict(opts)
 
-	if args == []:
-		path = os.getcwd()
-	else:
-		path = args[0]
+    if args == []:
+        path = os.getcwd()
+    else:
+        path = args[0]
 
-	if not os.path.exists(path):
-		os.mkdir(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
 
-	if "--bare" in opts:
-		Repo.init_bare(path)
-	else:
-		Repo.init(path)
+    if "--bare" in opts:
+        Repo.init_bare(path)
+    else:
+        Repo.init(path)
 
 
 def cmd_clone(args):
-	from dulwich.repo import Repo
-	import os
-	import sys
-	opts, args = getopt(args, "", [])
-	opts = dict(opts)
+    from dulwich.repo import Repo
+    import os
+    import sys
+    opts, args = getopt(args, "", [])
+    opts = dict(opts)
 
-	if args == []:
-		print "usage: dulwich clone host:path [PATH]"
-		sys.exit(1)
+    if args == []:
+        print "usage: dulwich clone host:path [PATH]"
+        sys.exit(1)
         client, host_path = get_transport_and_path(args.pop(0))
 
-	if len(args) > 0:
-		path = args.pop(0)
-	else:
-		path = host_path.split("/")[-1]
+    if len(args) > 0:
+        path = args.pop(0)
+    else:
+        path = host_path.split("/")[-1]
 
-	if not os.path.exists(path):
-		os.mkdir(path)
-	Repo.init(path)
-	r = Repo(path)
-	graphwalker = r.get_graph_walker()
-	f, commit = r.object_store.add_pack()
-	client.fetch_pack(host_path, r.object_store.determine_wants_all, 
-			          graphwalker, f.write, sys.stdout.write)
-	commit()
+    if not os.path.exists(path):
+        os.mkdir(path)
+    Repo.init(path)
+    r = Repo(path)
+    graphwalker = r.get_graph_walker()
+    f, commit = r.object_store.add_pack()
+    client.fetch_pack(host_path, r.object_store.determine_wants_all, 
+                      graphwalker, f.write, sys.stdout.write)
+    commit()
 
 
 commands = {
-	"fetch-pack": cmd_fetch_pack,
-	"dump-pack": cmd_dump_pack,
-	"dump-index": cmd_dump_index,
-	"init": cmd_init,
-	"log": cmd_log,
-	"clone": cmd_clone,
-	}
+    "fetch-pack": cmd_fetch_pack,
+    "dump-pack": cmd_dump_pack,
+    "dump-index": cmd_dump_index,
+    "init": cmd_init,
+    "log": cmd_log,
+    "clone": cmd_clone,
+    }
 
 if len(sys.argv) < 2:
-	print "Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys()))
-	sys.exit(1)
+    print "Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys()))
+    sys.exit(1)
 
 cmd = sys.argv[1]
 if not cmd in commands:
-	print "No such subcommand: %s" % cmd
-	sys.exit(1)
+    print "No such subcommand: %s" % cmd
+    sys.exit(1)
 commands[cmd](sys.argv[2:])

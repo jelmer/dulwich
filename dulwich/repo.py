@@ -409,6 +409,52 @@ class Repo(object):
             del self.refs[name]
         raise ValueError(name)
 
+    def do_commit(self, committer, message,
+                  author=None, commit_timestamp=None,
+                  commit_timezone=None, author_timestamp=None, 
+                  author_timezone=None, tree=None):
+        """Create a new commit.
+
+        :param committer: Committer fullname
+        :param message: Commit message
+        :param author: Author fullname (defaults to committer)
+        :param commit_timestamp: Commit timestamp (defaults to now)
+        :param commit_timezone: Commit timestamp timezone (defaults to GMT)
+        :param author_timestamp: Author timestamp (defaults to commit timestamp)
+        :param author_timezone: Author timestamp timezone 
+            (defaults to commit timestamp timezone)
+        :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
+        :return: New commit SHA1
+        """
+        from dulwich.index import commit_index
+        import time
+        index = self.open_index()
+        c = Commit()
+        if tree is None:
+            c.tree = commit_index(self.object_store, index)
+        else:
+            c.tree = tree
+        c.committer = committer
+        if commit_timestamp is None:
+            commit_timestamp = time.time()
+        c.commit_time = int(commit_timestamp)
+        if commit_timezone is None:
+            commit_timezone = 0
+        c.commit_timezone = commit_timezone
+        if author is None:
+            author = committer
+        c.author = author
+        if author_timestamp is None:
+            author_timestamp = commit_timestamp
+        c.author_time = int(author_timestamp)
+        if author_timezone is None:
+            author_timezone = commit_timezone
+        c.author_timezone = author_timezone
+        c.message = message
+        self.object_store.add_object(c)
+        self.refs["HEAD"] = c.id
+        return c.id
+
     @classmethod
     def init(cls, path, mkdir=True):
         controldir = os.path.join(path, ".git")

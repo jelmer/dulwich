@@ -218,7 +218,8 @@ class Index(object):
 
     def iterblobs(self):
         """Iterate over path, sha, mode tuples for use with commit_tree."""
-        for path, entry in self:
+        for path in self:
+            entry = self[path]
             yield path, entry[-2], cleanup_mode(entry[-6])
 
     def clear(self):

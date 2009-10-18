@@ -161,7 +161,20 @@ def cmd_clone(args):
     commit()
 
 
+def cmd_commit(args):
+    from dulwich.repo import Repo
+    import os
+    opts, args = getopt(args, "", ["message"])
+    opts = dict(opts)
+    r = Repo(".")
+    committer = "%s <%s>" % (os.getenv("GIT_COMMITTER_NAME"), 
+                             os.getenv("GIT_COMMITTER_EMAIL"))
+    author = "%s <%s>" % (os.getenv("GIT_AUTHOR_NAME"), 
+                          os.getenv("GIT_AUTHOR_EMAIL"))
+    r.do_commit(committer=committer, author=author, message=opts["--message"])
+
 commands = {
+    "commit": cmd_commit,
     "fetch-pack": cmd_fetch_pack,
     "dump-pack": cmd_dump_pack,
     "dump-index": cmd_dump_index,

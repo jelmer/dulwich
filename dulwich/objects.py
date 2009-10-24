@@ -306,7 +306,10 @@ class Tag(ShaFile):
         f.write("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
         f.write("%s %s\n" % (TAG_ID, self._name))
         if self._tagger:
-            f.write("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
+            if self._tag_time is None:
+                f.write("%s %s\n" % (TAGGER_ID, self._tagger))
+            else:
+                f.write("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
         f.write("\n") # To close headers
         f.write(self._message)
         self._text = f.getvalue()
@@ -328,14 +331,20 @@ class Tag(ShaFile):
             elif field == TAG_ID:
                 self._name = value
             elif field == TAGGER_ID:
-                sep = value.index("> ")
-                self._tagger = value[0:sep+1]
-                (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
                 try:
-                    self._tag_time = int(timetext)
-                except ValueError: #Not a unix timestamp
-                    self._tag_time = time.strptime(timetext)
-                self._tag_timezone = parse_timezone(timezonetext)
+                    sep = value.index("> ")
+                except ValueError:
+                    self._tagger = value
+                    self._tag_time = None
+                    self._tag_timezone = None
+                else:
+                    self._tagger = value[0:sep+1]
+                    (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
+                    try:
+                        self._tag_time = int(timetext)
+                    except ValueError: #Not a unix timestamp
+                        self._tag_time = time.strptime(timetext)
+                    self._tag_timezone = parse_timezone(timezonetext)
             else:
                 raise AssertionError("Unknown field %s" % field)
         self._message = f.read()

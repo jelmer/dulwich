@@ -55,7 +55,7 @@ previous blob recorded as "spam".
 You won't see it using git log because the head is still the previous
 commit. It's easy to remedy::
 
-  >>> repo.refs['refs/heads/master'] = commit.id
+  >>> repo.refs['refs/heads/master'] = c2.id
 
 Now all git tools will work as expected. Though don't forget that Dulwich is
 still open!

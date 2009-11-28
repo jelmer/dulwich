@@ -1,17 +1,17 @@
 # objects.py -- Access to base git objects
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # of the License or (at your option) a later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -89,7 +89,7 @@ def serializable_property(name, docstring=None):
 
 class ShaFile(object):
     """A git SHA file."""
-  
+
     @classmethod
     def _parse_legacy_object(cls, map):
         """Parse a legacy object, creating it and setting object._text"""
@@ -120,7 +120,7 @@ class ShaFile(object):
     def as_legacy_object(self):
         text = self.as_raw_string()
         return zlib.compress("%s %d\0%s" % (self._type, len(text), text))
-  
+
     def as_raw_string(self):
         if self._needs_serialization:
             self.serialize()
@@ -146,7 +146,7 @@ class ShaFile(object):
         self._sha = None
         self._needs_parsing = True
         self._needs_serialization = False
-  
+
     @classmethod
     def _parse_object(cls, map):
         """Parse a new style object , creating it and setting object._text"""
@@ -164,7 +164,7 @@ class ShaFile(object):
         raw = map[used:]
         object.set_raw_string(_decompress(raw))
         return object
-  
+
     @classmethod
     def _parse_file(cls, map):
         word = (ord(map[0]) << 8) + ord(map[1])
@@ -172,14 +172,14 @@ class ShaFile(object):
             return cls._parse_legacy_object(map)
         else:
             return cls._parse_object(map)
-  
+
     def __init__(self):
         """Don't call this directly"""
         self._sha = None
-  
+
     def _parse_text(self):
         """For subclasses to do initialisation time parsing"""
-  
+
     @classmethod
     def from_file(cls, filename):
         """Get the contents of a SHA file on disk"""
@@ -191,11 +191,11 @@ class ShaFile(object):
             return shafile
         finally:
             f.close()
-  
+
     @classmethod
     def from_raw_string(cls, type, string):
         """Creates an object of the indicated type from the raw string given.
-    
+
         Type is the numeric type of an object. String is the raw uncompressed
         contents.
         """
@@ -204,10 +204,10 @@ class ShaFile(object):
         obj.type = type
         obj.set_raw_string(string)
         return obj
-  
+
     def _header(self):
         return "%s %lu\0" % (self._type, len(self.as_raw_string()))
-  
+
     def sha(self):
         """The SHA1 object that is the name of this object."""
         if self._needs_serialization or self._sha is None:
@@ -215,11 +215,11 @@ class ShaFile(object):
             self._sha.update(self._header())
             self._sha.update(self.as_raw_string())
         return self._sha
-  
+
     @property
     def id(self):
         return self.sha().hexdigest()
-  
+
     def get_type(self):
         return self._num_type
 
@@ -227,16 +227,16 @@ class ShaFile(object):
         self._num_type = type
 
     type = property(get_type, set_type)
-  
+
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.id)
 
     def __ne__(self, other):
         return self.id != other.id
-  
+
     def __eq__(self, other):
         """Return true id the sha of the two objects match.
-  
+
         The __le__ etc methods aren't overriden as they make no sense,
         certainly at this level.
         """
@@ -257,7 +257,7 @@ class Blob(ShaFile):
     def set_data(self, data):
         self._text = data
 
-    data = property(get_data, set_data, 
+    data = property(get_data, set_data,
             "The text contained within the blob object.")
 
     @classmethod
@@ -363,11 +363,11 @@ class Tag(ShaFile):
     object = property(get_object, set_object)
 
     name = serializable_property("name", "The name of this tag")
-    tagger = serializable_property("tagger", 
+    tagger = serializable_property("tagger",
         "Returns the name of the person who created this tag")
-    tag_time = serializable_property("tag_time", 
+    tag_time = serializable_property("tag_time",
         "The creation timestamp of the tag.  As the number of seconds since the epoch")
-    tag_timezone = serializable_property("tag_timezone", 
+    tag_timezone = serializable_property("tag_timezone",
         "The timezone that tag_time is in.")
     message = serializable_property("message", "The message attached to this tag")
 
@@ -585,10 +585,10 @@ class Commit(ShaFile):
 
     parents = property(get_parents, set_parents)
 
-    author = serializable_property("author", 
+    author = serializable_property("author",
         "The name of the author of the commit")
 
-    committer = serializable_property("committer", 
+    committer = serializable_property("committer",
         "The name of the committer of the commit")
 
     message = serializable_property("message",
@@ -600,10 +600,10 @@ class Commit(ShaFile):
     commit_timezone = serializable_property("commit_timezone",
         "The zone the commit time is in")
 
-    author_time = serializable_property("author_time", 
+    author_time = serializable_property("author_time",
         "The timestamp the commit was written. as the number of seconds since the epoch.")
 
-    author_timezone = serializable_property("author_timezone", 
+    author_timezone = serializable_property("author_timezone",
         "Returns the zone the author time is in.")
 
     encoding = serializable_property("encoding",

@@ -375,27 +375,20 @@ class Tag(ShaFile):
 def parse_tree(text):
     ret = {}
     count = 0
-    while count < len(text):
-        mode = 0
-        chr = text[count]
-        while chr != ' ':
-            assert chr >= '0' and chr <= '7', "%s is not a valid mode char" % chr
-            mode = (mode << 3) + (ord(chr) - ord('0'))
-            count += 1
-            chr = text[count]
-        count += 1
-        chr = text[count]
-        name = ''
-        while chr != '\0':
-            name += chr
-            count += 1
-            chr = text[count]
-        count += 1
-        chr = text[count]
-        sha = text[count:count+20]
-        hexsha = sha_to_hex(sha)
-        ret[name] = (mode, hexsha)
-        count = count + 20
+    l = len(text)
+    while count < l:
+        mode_end = text.index(' ', count)
+        mode = int(text[count:mode_end], 8)
+
+        name_end = text.index('\0', mode_end)
+        name = text[mode_end+1:name_end]
+
+        count = name_end+21
+
+        sha = text[name_end+1:count]
+
+        ret[name] = (mode, sha_to_hex(sha))
+
     return ret
 
 

@@ -774,9 +774,9 @@ def write_pack_object(f, type, object):
     """
     offset = f.tell()
     packed_data_hdr = ""
-    if type == 6: # ref delta
+    if type == 6: # offset delta
         (delta_base_offset, object) = object
-    elif type == 7: # offset delta
+    elif type == 7: # ref delta
         (basename, object) = object
     size = len(object)
     c = (type << 4) | (size & 15)
@@ -891,7 +891,7 @@ def write_pack_index_v1(filename, entries, pack_checksum):
 
 def create_delta(base_buf, target_buf):
     """Use python difflib to work out how to transform base_buf to target_buf.
-    
+
     :param base_buf: Base buffer
     :param target_buf: Target buffer
     """
@@ -925,12 +925,12 @@ def create_delta(base_buf, target_buf):
             o = i1
             for i in range(4):
                 if o & 0xff << i*8:
-                    scratch += chr(o >> i)
+                    scratch += chr((o >> i*8) & 0xff)
                     op |= 1 << i
             s = i2 - i1
             for i in range(2):
                 if s & 0xff << i*8:
-                    scratch += chr(s >> i)
+                    scratch += chr((s >> i*8) & 0xff)
                     op |= 1 << (4+i)
             out_buf += chr(op)
             out_buf += scratch

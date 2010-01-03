@@ -1,0 +1,14 @@
+Conclusion
+==========
+
+You'll find the ``test.py`` program with some tips I use to ease generating
+objects.
+
+You can also make Tag objects, but this is left as a exercise to the reader.
+
+Dulwich is abstracting  much of the Git plumbing, so there would be more to
+see.
+
+Dulwich is also able to clone and push repositories.
+
+That's all folks!

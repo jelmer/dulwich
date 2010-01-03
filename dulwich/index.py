@@ -36,12 +36,20 @@ from dulwich.pack import (
 
 
 def read_cache_time(f):
-    """Read a cache time."""
+    """Read a cache time.
+    
+    :param f: File-like object to read from
+    :return: Tuple with seconds and nanoseconds
+    """
     return struct.unpack(">LL", f.read(8))
 
 
 def write_cache_time(f, t):
-    """Write a cache time."""
+    """Write a cache time.
+    
+    :param f: File-like object to write to
+    :param t: Time to write (as int, float or tuple with secs and nsecs)
+    """
     if isinstance(t, int):
         t = (t, 0)
     elif isinstance(t, float):
@@ -135,7 +143,10 @@ def write_index_dict(f, entries):
 
 def cleanup_mode(mode):
     """Cleanup a mode value.
+
+    This will return a mode that can be stored in a tree object.
     
+    :param mode: Mode to clean up.
     """
     if stat.S_ISLNK(mode):
         return stat.S_IFLNK
@@ -176,6 +187,8 @@ class Index(object):
             f = SHA1Reader(f)
             for x in read_index(f):
                 self[x[0]] = tuple(x[1:])
+            # FIXME: Additional data?
+            f.read(os.path.getsize(self._filename)-f.tell()-20)
             f.check_sha()
         finally:
             f.close()
@@ -185,7 +198,10 @@ class Index(object):
         return len(self._byname)
 
     def __getitem__(self, name):
-        """Retrieve entry by relative path."""
+        """Retrieve entry by relative path.
+        
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        """
         return self._byname[name]
 
     def __iter__(self):

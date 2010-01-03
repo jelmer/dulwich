@@ -1,3 +1,10 @@
+dulwich (0.4.0-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump standards version to 3.8.3.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 07 Oct 2009 12:08:10 +0200
+
 dulwich (0.3.3-1) unstable; urgency=low
 
   * Run the testsuite during build.

@@ -15,8 +15,7 @@ this for you with file lookup soon.
 
 There is also support for creating blobs. Blob.from_string(string) will create
 a blob object from the string. You can then call blob.sha() to get the sha
-object for this blob, and hexdigest() on that will get its ID. There is
-currently no method that allows you to write it out though.
+object for this blob, and hexdigest() on that will get its ID. 
 
 The project is named after the part of London that Mr. and Mrs. Git live in 
 in the particular Monty Python sketch. It is based on the Python-Git module 

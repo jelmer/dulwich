@@ -2,10 +2,13 @@
 # Setup file for bzr-git
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 
-from distutils.core import setup
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 from distutils.extension import Extension
 
-dulwich_version_string = '0.4.0'
+dulwich_version_string = '0.4.1'
 
 include_dirs = []
 # Windows MSVC support
@@ -24,8 +27,8 @@ setup(name='dulwich',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',
       long_description="""
-      Simple Pure-Python implementation of the Git file formats and 
-      protocols. Dulwich is the place where Mr. and Mrs. Git live 
+      Simple Pure-Python implementation of the Git file formats and
+      protocols. Dulwich is the place where Mr. and Mrs. Git live
       in one of the Monty Python sketches.
       """,
       packages=['dulwich', 'dulwich.tests'],

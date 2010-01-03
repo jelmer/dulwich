@@ -1,3 +1,11 @@
+dulwich (0.4.1-1) unstable; urgency=low
+
+  * New upstream release.
+   + Supports time-less tags. Closes: #543240
+  * Rebuilt against newer version of python-central. Closes: #551893
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 03 Jan 2010 16:40:19 +0100
+
 dulwich (0.4.0-1) unstable; urgency=low
 
   * New upstream release.

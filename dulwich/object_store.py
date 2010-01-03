@@ -1,16 +1,16 @@
-# object_store.py -- Object store for git objects 
+# object_store.py -- Object store for git objects
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # or (at your option) a later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -40,8 +40,8 @@ from dulwich.objects import (
     )
 from dulwich.pack import (
     Pack,
-    PackData, 
-    iter_sha1, 
+    PackData,
+    iter_sha1,
     load_pack_index,
     write_pack,
     write_pack_data,
@@ -71,7 +71,7 @@ class BaseObjectStore(object):
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
-        
+
         :param name: sha for the object.
         :return: tuple with object type and object contents.
         """
@@ -98,6 +98,84 @@ class BaseObjectStore(object):
         :param objects: Iterable over a list of objects.
         """
         raise NotImplementedError(self.add_objects)
+
+    def tree_changes(self, source, target, want_unchanged=False):
+        """Find the differences between the contents of two trees
+
+        :param object_store: Object store to use for retrieving tree contents
+        :param tree: SHA1 of the root tree
+        :param want_unchanged: Whether unchanged files should be reported
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        """
+        todo = set([(source, target, "")])
+        while todo:
+            (sid, tid, path) = todo.pop()
+            if sid is not None:
+                stree = self[sid]
+            else:
+                stree = {}
+            if tid is not None:
+                ttree = self[tid]
+            else:
+                ttree = {}
+            for name, oldmode, oldhexsha in stree.iteritems():
+                if path == "":
+                    oldchildpath = name
+                else:
+                    oldchildpath = "%s/%s" % (path, name)
+                try:
+                    (newmode, newhexsha) = ttree[name]
+                    newchildpath = oldchildpath
+                except KeyError:
+                    newmode = None
+                    newhexsha = None
+                    newchildpath = None
+                if (want_unchanged or oldmode != newmode or 
+                    oldhexsha != newhexsha):
+                    if stat.S_ISDIR(oldmode):
+                        if newmode is None or stat.S_ISDIR(newmode):
+                            todo.add((oldhexsha, newhexsha, oldchildpath))
+                        else:
+                            # entry became a file
+                            todo.add((oldhexsha, None, oldchildpath))
+                            yield ((None, newchildpath), (None, newmode), (None, newhexsha))
+                    else:
+                        if newmode is not None and stat.S_ISDIR(newmode):
+                            # entry became a dir
+                            yield ((oldchildpath, None), (oldmode, None), (oldhexsha, None))
+                            todo.add((None, newhexsha, newchildpath))
+                        else:
+                            yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
+
+            for name, newmode, newhexsha in ttree.iteritems():
+                if path == "":
+                    childpath = name
+                else:
+                    childpath = "%s/%s" % (path, name)
+                if not name in stree:
+                    if not stat.S_ISDIR(newmode):
+                        yield ((None, childpath), (None, newmode), (None, newhexsha))
+                    else:
+                        todo.add((None, newhexsha, childpath))
+
+    def iter_tree_contents(self, tree):
+        """Yield (path, mode, hexsha) tuples for all non-Tree objects in a tree.
+
+        :param tree: SHA1 of the root of the tree
+        """
+        todo = set([(tree, "")])
+        while todo:
+            (tid, tpath) = todo.pop()
+            tree = self[tid]
+            for name, mode, hexsha in tree.iteritems(): 
+                if tpath == "":
+                    path = name
+                else:
+                    path = "%s/%s" % (tpath, name)
+                if stat.S_ISDIR(mode):
+                    todo.add((hexsha, path))
+                else:
+                    yield path, mode, hexsha
 
     def find_missing_objects(self, haves, wants, progress=None):
         """Find the missing objects required for a set of revisions.

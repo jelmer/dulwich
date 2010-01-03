@@ -1,3 +1,15 @@
+0.4.1	2010-01-03
+
+ FEATURES
+
+  * Add ObjectStore.iter_tree_contents()
+
+  * Add Index.changes_from_tree()
+
+  * Add ObjectStore.tree_changes()
+
+  * Add functionality for writing patches in dulwich.patch.
+
 0.4.0	2009-10-07
 
  DOCUMENTATION

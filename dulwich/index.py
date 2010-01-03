@@ -212,9 +212,14 @@ class Index(object):
         """Return the (git object) SHA1 for the object at a path."""
         return self[path][-2]
 
+    def get_mode(self, path):
+        """Return the POSIX file mode for the object at a path."""
+        return self[path][-6]
+
     def iterblobs(self):
         """Iterate over path, sha, mode tuples for use with commit_tree."""
-        for path, entry in self:
+        for path in self:
+            entry = self[path]
             yield path, entry[-2], cleanup_mode(entry[-6])
 
     def clear(self):
@@ -233,6 +238,28 @@ class Index(object):
     def update(self, entries):
         for name, value in entries.iteritems():
             self[name] = value
+
+    def changes_from_tree(self, object_store, tree, want_unchanged=False):
+        """Find the differences between the contents of this index and a tree.
+
+        :param object_store: Object store to use for retrieving tree contents
+        :param tree: SHA1 of the root tree
+        :param want_unchanged: Whether unchanged files should be reported
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        """
+        mine = set(self._byname.keys())
+        for (name, mode, sha) in object_store.iter_tree_contents(tree):
+            if name in mine:
+                if (want_unchanged or self.get_sha1(name) != sha or 
+                    self.get_mode(name) != mode):
+                    yield ((name, name), (mode, self.get_mode(name)), (sha, self.get_sha1(name)))
+                mine.remove(name)
+            else:
+                # Was removed
+                yield ((name, None), (mode, None), (sha, None))
+        # Mention added files
+        for name in mine:
+            yield ((None, name), (None, self.get_mode(name)), (None, self.get_sha1(name)))
 
 
 def commit_tree(object_store, blobs):

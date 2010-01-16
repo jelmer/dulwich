@@ -250,6 +250,8 @@ class Repo(object):
             fetch.
         :param progress: Optional progress function
         """
+        if determine_wants is None:
+            determine_wants = lambda heads: heads.values()
         target.object_store.add_objects(
             self.fetch_objects(determine_wants, target.get_graph_walker(),
                 progress))

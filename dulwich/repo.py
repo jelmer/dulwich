@@ -32,6 +32,7 @@ from dulwich.errors import (
     NotGitRepository,
     NotTreeError, 
     )
+from dulwich.file import GitFile
 from dulwich.object_store import (
     DiskObjectStore,
     )
@@ -161,7 +162,7 @@ class DiskRefsContainer(RefsContainer):
         file = self.refpath(name)
         if not os.path.exists(file):
             raise KeyError(name)
-        f = open(file, 'rb')
+        f = GitFile(file, 'rb')
         try:
             return f.read().strip("\n")
         finally:
@@ -172,7 +173,7 @@ class DiskRefsContainer(RefsContainer):
         dirpath = os.path.dirname(file)
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
-        f = open(file, 'wb')
+        f = GitFile(file, 'wb')
         try:
             f.write(ref+"\n")
         finally:
@@ -310,7 +311,7 @@ class Repo(object):
         if not os.path.exists(path):
             return {}
         ret = {}
-        f = open(path, 'rb')
+        f = GitFile(path, 'rb')
         try:
             for entry in read_packed_refs(f):
                 ret[entry[1]] = entry[0]
@@ -482,15 +483,25 @@ class Repo(object):
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")
-        open(os.path.join(path, 'description'), 'wb').write("Unnamed repository")
-        open(os.path.join(path, 'info', 'excludes'), 'wb').write("")
-        open(os.path.join(path, 'config'), 'wb').write("""[core]
+        f = GitFile(os.path.join(path, 'description'), 'wb')
+        try:
+            f.write("Unnamed repository")
+        finally:
+            f.close()
+
+        f = GitFile(os.path.join(path, 'config'), 'wb')
+        try:
+            f.write("""[core]
     repositoryformatversion = 0
     filemode = true
     bare = false
     logallrefupdates = true
 """)
+        finally:
+            f.close()
+
+        f = GitFile(os.path.join(path, 'info', 'excludes'), 'wb')
+        f.close()
         return ret
 
     create = init_bare
-

@@ -29,6 +29,7 @@ import urllib2
 from dulwich.errors import (
     NotTreeError,
     )
+from dulwich.file import GitFile
 from dulwich.objects import (
     Commit,
     ShaFile,
@@ -294,7 +295,7 @@ class DiskObjectStore(BaseObjectStore):
         path = os.path.join(dir, sha[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
-        f = open(path, 'w+')
+        f = GitFile(path, 'wb')
         try:
             f.write(o.as_legacy_object())
         finally:

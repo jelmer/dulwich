@@ -28,6 +28,9 @@ from dulwich.errors import (
 
 TCP_GIT_PORT = 9418
 
+SINGLE_ACK = 0
+MULTI_ACK = 1
+
 class ProtocolFile(object):
     """
     Some network ops are like file ops. The file ops expect to operate on
@@ -160,11 +163,33 @@ def extract_capabilities(text):
     """Extract a capabilities list from a string, if present.
 
     :param text: String to extract from
-    :return: Tuple with text with capabilities removed and list of 
-        capabilities or None (if no capabilities were present.
+    :return: Tuple with text with capabilities removed and list of capabilities
     """
     if not "\0" in text:
-        return text, None
-    capabilities = text.split("\0")
-    return (capabilities[0], capabilities[1:])
+        return text, []
+    text, capabilities = text.rstrip().split("\0")
+    return (text, capabilities.split(" "))
 
+
+def extract_want_line_capabilities(text):
+    """Extract a capabilities list from a want line, if present.
+
+    Note that want lines have capabilities separated from the rest of the line
+    by a space instead of a null byte. Thus want lines have the form:
+
+        want obj-id cap1 cap2 ...
+
+    :param text: Want line to extract from
+    :return: Tuple with text with capabilities removed and list of capabilities
+    """
+    split_text = text.rstrip().split(" ")
+    if len(split_text) < 3:
+        return text, []
+    return (" ".join(split_text[:2]), split_text[2:])
+
+
+def ack_type(capabilities):
+    """Extract the ack type from a capabilities list."""
+    if 'multi_ack' in capabilities:
+        return MULTI_ACK
+    return SINGLE_ACK

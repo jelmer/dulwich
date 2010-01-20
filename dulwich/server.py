@@ -20,14 +20,25 @@
 """Git smart network protocol server implementation."""
 
 
+import collections
 import SocketServer
 import tempfile
 
+from dulwich.errors import (
+    GitProtocolError,
+    )
+from dulwich.objects import (
+    hex_to_sha,
+    )
 from dulwich.protocol import (
     Protocol,
     ProtocolFile,
     TCP_GIT_PORT,
     extract_capabilities,
+    extract_want_line_capabilities,
+    SINGLE_ACK,
+    MULTI_ACK,
+    ack_type,
     )
 from dulwich.repo import (
     Repo,
@@ -73,6 +84,7 @@ class GitBackend(Backend):
             Repo.create(self.gitdir)
 
         self.repo = Repo(self.gitdir)
+        self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
 
@@ -106,12 +118,32 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
+    def __init__(self, backend, read, write):
+        Handler.__init__(self, backend, read, write)
+        self._client_capabilities = None
+        self._graph_walker = None
+
     def default_capabilities(self):
         return ("multi_ack", "side-band-64k", "thin-pack", "ofs-delta")
+
+    def set_client_capabilities(self, caps):
+        my_caps = self.default_capabilities()
+        for cap in caps:
+            if '_ack' in cap and cap not in my_caps:
+                raise GitProtocolError('Client asked for capability %s that '
+                                       'was not advertised.' % cap)
+        self._client_capabilities = caps
+
+    def get_client_capabilities(self):
+        return self._client_capabilities
+
+    client_capabilities = property(get_client_capabilities,
+                                   set_client_capabilities)
 
     def handle(self):
         def determine_wants(heads):
             keys = heads.keys()
+            values = set(heads.itervalues())
             if keys:
                 self.proto.write_pkt_line("%s %s\x00%s\n" % ( heads[keys[0]], keys[0], self.capabilities()))
                 for k in keys[1:]:
@@ -126,65 +158,29 @@ class UploadPackHandler(Handler):
             if want == None:
                 return []
 
-            want, self.client_capabilities = extract_capabilities(want)
+            want, self.client_capabilities = extract_want_line_capabilities(want)
+            graph_walker.set_ack_type(ack_type(self.client_capabilities))
 
             want_revs = []
             while want and want[:4] == 'want':
-                want_revs.append(want[5:45])
+                sha = want[5:45]
+                try:
+                    hex_to_sha(sha)
+                except (TypeError, AssertionError), e:
+                    raise GitProtocolError(e)
+
+                if sha not in values:
+                    raise GitProtocolError(
+                        'Client wants invalid object %s' % sha)
+                want_revs.append(sha)
                 want = self.proto.read_pkt_line()
-                if want == None:
-                    self.proto.write_pkt_line("ACK %s\n" % want_revs[-1])
+            graph_walker.set_wants(want_revs)
             return want_revs
 
         progress = lambda x: self.proto.write_sideband(2, x)
         write = lambda x: self.proto.write_sideband(1, x)
 
-        class ProtocolGraphWalker(object):
-
-            def __init__(self, proto):
-                self.proto = proto
-                self._last_sha = None
-                self._cached = False
-                self._cache = []
-                self._cache_index = 0
-
-            def ack(self, have_ref):
-                self.proto.write_pkt_line("ACK %s continue\n" % have_ref)
-
-            def reset(self):
-                self._cached = True
-                self._cache_index = 0
-
-            def next(self):
-                if not self._cached:
-                    return self.next_from_proto()
-                self._cache_index = self._cache_index + 1
-                if self._cache_index > len(self._cache):
-                    return None
-                return self._cache[self._cache_index]
-
-            def next_from_proto(self):
-                have = self.proto.read_pkt_line()
-                if have is None:
-                    self.proto.write_pkt_line("ACK %s\n" % self._last_sha)
-                    return None
-
-                if have[:4] == 'have':
-                    self._cache.append(have[5:45])
-                    return have[5:45]
-
-
-                #if have[:4] == 'done':
-                #    return None
-
-                if self._last_sha:
-                    # Oddness: Git seems to resend the last ACK, without the "continue" statement
-                    self.proto.write_pkt_line("ACK %s\n" % self._last_sha)
-
-                # The exchange finishes with a NAK
-                self.proto.write_pkt_line("NAK\n")
-
-        graph_walker = ProtocolGraphWalker(self.proto)
+        graph_walker = ProtocolGraphWalker(self.backend.object_store, self.proto)
         objects_iter = self.backend.fetch_objects(determine_wants, graph_walker, progress)
 
         # Do they want any objects?
@@ -198,6 +194,184 @@ class UploadPackHandler(Handler):
         progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
+
+
+class ProtocolGraphWalker(object):
+    """A graph walker that knows the git protocol.
+
+    As a graph walker, this class implements ack(), next(), and reset(). It also
+    contains some base methods for interacting with the wire and walking the
+    commit tree.
+
+    The work of determining which acks to send is passed on to the
+    implementation instance stored in _impl. The reason for this is that we do
+    not know at object creation time what ack level the protocol requires. A
+    call to set_ack_level() is required to set up the implementation, before any
+    calls to next() or ack() are made.
+    """
+    def __init__(self, object_store, proto):
+        self.store = object_store
+        self.proto = proto
+        self._wants = []
+        self._cached = False
+        self._cache = []
+        self._cache_index = 0
+        self._impl = None
+
+    def ack(self, have_ref):
+        return self._impl.ack(have_ref)
+
+    def reset(self):
+        self._cached = True
+        self._cache_index = 0
+
+    def next(self):
+        if not self._cached:
+            return self._impl.next()
+        self._cache_index += 1
+        if self._cache_index > len(self._cache):
+            return None
+        return self._cache[self._cache_index]
+
+    def read_proto_line(self):
+        """Read a line from the wire.
+
+        :return: a tuple having one of the following forms:
+            ('have', obj_id)
+            ('done', None)
+            (None, None)  (for a flush-pkt)
+        """
+        line = self.proto.read_pkt_line()
+        if not line:
+            return (None, None)
+        fields = line.rstrip('\n').split(' ', 1)
+        if len(fields) == 1 and fields[0] == 'done':
+            return ('done', None)
+        if len(fields) == 2 and fields[0] == 'have':
+            try:
+                hex_to_sha(fields[1])
+                return fields
+            except (TypeError, AssertionError), e:
+                raise GitProtocolError(e)
+        raise GitProtocolError('Received invalid line from client:\n%s' % line)
+
+    def send_ack(self, sha, ack_type=''):
+        if ack_type:
+            ack_type = ' %s' % ack_type
+        self.proto.write_pkt_line('ACK %s%s\n' % (sha, ack_type))
+
+    def send_nak(self):
+        self.proto.write_pkt_line('NAK\n')
+
+    def set_wants(self, wants):
+        self._wants = wants
+
+    def _is_satisfied(self, haves, want, earliest):
+        """Check whether a want is satisfied by a set of haves.
+
+        A want, typically a branch tip, is "satisfied" only if there exists a
+        path back from that want to one of the haves.
+
+        :param haves: A set of commits we know the client has.
+        :param want: The want to check satisfaction for.
+        :param earliest: A timestamp beyond which the search for haves will be
+            terminated, presumably because we're searching too far down the
+            wrong branch.
+        """
+        o = self.store[want]
+        pending = collections.deque([o])
+        while pending:
+            commit = pending.popleft()
+            if commit.id in haves:
+                return True
+            if not getattr(commit, 'get_parents', None):
+                # non-commit wants are assumed to be satisfied
+                continue
+            for parent in commit.get_parents():
+                parent_obj = self.store[parent]
+                # TODO: handle parents with later commit times than children
+                if parent_obj.commit_time >= earliest:
+                    pending.append(parent_obj)
+        return False
+
+    def all_wants_satisfied(self, haves):
+        """Check whether all the current wants are satisfied by a set of haves.
+
+        :param haves: A set of commits we know the client has.
+        :note: Wants are specified with set_wants rather than passed in since
+            in the current interface they are determined outside this class.
+        """
+        haves = set(haves)
+        earliest = min([self.store[h].commit_time for h in haves])
+        for want in self._wants:
+            if not self._is_satisfied(haves, want, earliest):
+                return False
+        return True
+
+    def set_ack_type(self, ack_type):
+        impl_classes = {
+            MULTI_ACK: MultiAckGraphWalkerImpl,
+            SINGLE_ACK: SingleAckGraphWalkerImpl,
+            }
+        self._impl = impl_classes[ack_type](self)
+
+
+class SingleAckGraphWalkerImpl(object):
+    """Graph walker implementation that speaks the single-ack protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._sent_ack = False
+
+    def ack(self, have_ref):
+        if not self._sent_ack:
+            self.walker.send_ack(have_ref)
+            self._sent_ack = True
+
+    def next(self):
+        command, sha = self.walker.read_proto_line()
+        if command in (None, 'done'):
+            if not self._sent_ack:
+                self.walker.send_nak()
+            return None
+        elif command == 'have':
+            return sha
+
+
+class MultiAckGraphWalkerImpl(object):
+    """Graph walker implementation that speaks the multi-ack protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._found_base = False
+        self._common = []
+
+    def ack(self, have_ref):
+        self._common.append(have_ref)
+        if not self._found_base:
+            self.walker.send_ack(have_ref, 'continue')
+            if self.walker.all_wants_satisfied(self._common):
+                self._found_base = True
+        # else we blind ack within next
+
+    def next(self):
+        command, sha = self.walker.read_proto_line()
+        if command is None:
+            self.walker.send_nak()
+            return None
+        elif command == 'done':
+            # don't nak unless no common commits were found, even if not
+            # everything is satisfied
+            if self._common:
+                self.walker.send_ack(self._common[-1])
+            else:
+                self.walker.send_nak()
+            return None
+        elif command == 'have':
+            if self._found_base:
+                # blind ack
+                self.walker.send_ack(sha, 'continue')
+            return sha
 
 
 class ReceivePackHandler(Handler):
@@ -267,5 +441,3 @@ class TCPGitServer(SocketServer.TCPServer):
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT):
         self.backend = backend
         SocketServer.TCPServer.__init__(self, (listen_addr, port), TCPGitRequestHandler)
-
-

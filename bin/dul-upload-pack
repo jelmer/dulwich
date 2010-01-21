@@ -18,6 +18,7 @@
 # MA  02110-1301, USA.
 
 import sys
+from dulwich.repo import Repo
 from dulwich.server import GitBackend, UploadPackHandler
 
 def send_fn(data):
@@ -29,6 +30,6 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         gitdir = sys.argv[1]
 
-    backend = GitBackend(gitdir)
+    backend = GitBackend(Repo(gitdir))
     handler = UploadPackHandler(backend, sys.stdin.read, send_fn)
     handler.handle()

@@ -38,6 +38,14 @@ class GitFileTests(unittest.TestCase):
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
 
+    def test_invalid(self):
+        foo = self.path('foo')
+        self.assertRaises(IOError, GitFile, foo, mode='r')
+        self.assertRaises(IOError, GitFile, foo, mode='ab')
+        self.assertRaises(IOError, GitFile, foo, mode='r+b')
+        self.assertRaises(IOError, GitFile, foo, mode='w+b')
+        self.assertRaises(IOError, GitFile, foo, mode='a+bU')
+
     def test_readonly(self):
         f = GitFile(self.path('foo'), 'rb')
         self.assertTrue(isinstance(f, file))

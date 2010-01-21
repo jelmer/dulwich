@@ -205,6 +205,13 @@ class ShaFile(object):
         obj.set_raw_string(string)
         return obj
 
+    @classmethod
+    def from_string(cls, string):
+        """Create a blob from a string."""
+        shafile = cls()
+        shafile.set_raw_string(string)
+        return shafile
+
     def _header(self):
         return "%s %lu\0" % (self._type, len(self.as_raw_string()))
 
@@ -266,13 +273,6 @@ class Blob(ShaFile):
         if blob._type != cls._type:
             raise NotBlobError(filename)
         return blob
-
-    @classmethod
-    def from_string(cls, string):
-        """Create a blob from a string."""
-        shafile = cls()
-        shafile.set_raw_string(string)
-        return shafile
 
 
 class Tag(ShaFile):

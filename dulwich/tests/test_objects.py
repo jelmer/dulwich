@@ -203,6 +203,29 @@ class CommitSerializationTests(unittest.TestCase):
         self.assertTrue(" -0100\n" in c.as_raw_string())
 
 
+class CommitDeserializationTests(unittest.TestCase):
+
+    def test_simple(self):
+        c = Commit.from_string(
+                'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
+                'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
+                'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
+                'author James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
+                'committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
+                '\n'
+                'Merge ../b\n')
+        self.assertEquals('Merge ../b\n', c.message)
+        self.assertEquals('James Westby <jw+debian@jameswestby.net>',
+            c.author)
+        self.assertEquals('James Westby <jw+debian@jameswestby.net>',
+            c.committer)
+        self.assertEquals('d80c186a03f423a81b39df39dc87fd269736ca86',
+            c.tree)
+        self.assertEquals(['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                          '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+            c.parents)
+
+
 class TreeSerializationTests(unittest.TestCase):
 
     def test_simple(self):

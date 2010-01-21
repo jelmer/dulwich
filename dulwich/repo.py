@@ -203,45 +203,18 @@ def read_packed_refs(f):
         yield tuple(l.rstrip("\n").split(" ", 2))
 
 
-class Repo(object):
-    """A local git repository.
-    
-    :ivar refs: Dictionary with the refs in this repository
+
+class BaseRepo(object):
+    """Base class for a git repository.
+
     :ivar object_store: Dictionary-like object for accessing
         the objects
+    :ivar refs: Dictionary-like object with the refs in this repository
     """
 
-    def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
-            self.bare = False
-            self._controldir = os.path.join(root, ".git")
-        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
-              os.path.isdir(os.path.join(root, REFSDIR))):
-            self.bare = True
-            self._controldir = root
-        else:
-            raise NotGitRepository(root)
-        self.path = root
-        self.refs = DiskRefsContainer(self.controldir())
-        self.object_store = DiskObjectStore(
-            os.path.join(self.controldir(), OBJECTDIR))
-
-    def controldir(self):
-        """Return the path of the control directory."""
-        return self._controldir
-
-    def index_path(self):
-        """Return path to the index file."""
-        return os.path.join(self.controldir(), INDEX_FILENAME)
-
-    def open_index(self):
-        """Open the index for this repository."""
-        from dulwich.index import Index
-        return Index(self.index_path())
-
-    def has_index(self):
-        """Check if an index is present."""
-        return os.path.exists(self.index_path())
+    def __init__(self, object_store, refs):
+        self.object_store = object_store
+        self.refs = refs
 
     def fetch(self, target, determine_wants=None, progress=None):
         """Fetch objects into another repository.
@@ -282,42 +255,11 @@ class Repo(object):
 
     def ref(self, name):
         """Return the SHA1 a ref is pointing to."""
-        try:
-            return self.refs.follow(name)
-        except KeyError:
-            return self.get_packed_refs()[name]
+        raise NotImplementedError(self.refs)
 
     def get_refs(self):
         """Get dictionary with all refs."""
-        ret = {}
-        try:
-            if self.head():
-                ret['HEAD'] = self.head()
-        except KeyError:
-            pass
-        ret.update(self.refs.as_dict())
-        ret.update(self.get_packed_refs())
-        return ret
-
-    def get_packed_refs(self):
-        """Get contents of the packed-refs file.
-
-        :return: Dictionary mapping ref names to SHA1s
-
-        :note: Will return an empty dictionary when no packed-refs file is 
-            present.
-        """
-        path = os.path.join(self.controldir(), 'packed-refs')
-        if not os.path.exists(path):
-            return {}
-        ret = {}
-        f = GitFile(path, 'rb')
-        try:
-            for entry in read_packed_refs(f):
-                ret[entry[1]] = entry[0]
-            return ret
-        finally:
-            f.close()
+        raise NotImplementedError(self.get_refs)
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""
@@ -393,9 +335,6 @@ class Repo(object):
         history.reverse()
         return history
 
-    def __repr__(self):
-        return "<Repo at %r>" % self.path
-
     def __getitem__(self, name):
         if len(name) in (20, 40):
             return self.object_store[name]
@@ -415,6 +354,87 @@ class Repo(object):
         if name.startswith("refs") or name == "HEAD":
             del self.refs[name]
         raise ValueError(name)
+
+
+class Repo(BaseRepo):
+    """A git repository backed by local disk."""
+
+    def __init__(self, root):
+        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
+            self.bare = False
+            self._controldir = os.path.join(root, ".git")
+        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
+              os.path.isdir(os.path.join(root, REFSDIR))):
+            self.bare = True
+            self._controldir = root
+        else:
+            raise NotGitRepository(root)
+        self.path = root
+        object_store = DiskObjectStore(
+            os.path.join(self.controldir(), OBJECTDIR))
+        refs = DiskRefsContainer(self.controldir())
+        BaseRepo.__init__(self, object_store, refs)
+
+    def controldir(self):
+        """Return the path of the control directory."""
+        return self._controldir
+
+    def index_path(self):
+        """Return path to the index file."""
+        return os.path.join(self.controldir(), INDEX_FILENAME)
+
+    def open_index(self):
+        """Open the index for this repository."""
+        from dulwich.index import Index
+        return Index(self.index_path())
+
+    def has_index(self):
+        """Check if an index is present."""
+        return os.path.exists(self.index_path())
+
+    def ref(self, name):
+        """Return the SHA1 a ref is pointing to."""
+        try:
+            return self.refs.follow(name)
+        except KeyError:
+            return self.get_packed_refs()[name]
+
+    def get_refs(self):
+        """Get dictionary with all refs."""
+        # TODO: move to base class after merging RefsContainer changes
+        ret = {}
+        try:
+            if self.head():
+                ret['HEAD'] = self.head()
+        except KeyError:
+            pass
+        ret.update(self.refs.as_dict())
+        ret.update(self.get_packed_refs())
+        return ret
+
+    def get_packed_refs(self):
+        """Get contents of the packed-refs file.
+
+        :return: Dictionary mapping ref names to SHA1s
+
+        :note: Will return an empty dictionary when no packed-refs file is
+            present.
+        """
+        # TODO: move to base class after merging RefsContainer changes
+        path = os.path.join(self.controldir(), 'packed-refs')
+        if not os.path.exists(path):
+            return {}
+        ret = {}
+        f = open(path, 'rb')
+        try:
+            for entry in read_packed_refs(f):
+                ret[entry[1]] = entry[0]
+            return ret
+        finally:
+            f.close()
+
+    def __repr__(self):
+        return "<Repo at %r>" % self.path
 
     def do_commit(self, committer, message,
                   author=None, commit_timestamp=None,

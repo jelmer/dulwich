@@ -76,14 +76,10 @@ class Backend(object):
 
 class GitBackend(Backend):
 
-    def __init__(self, gitdir=None):
-        self.gitdir = gitdir
-
-        if not self.gitdir:
-            self.gitdir = tempfile.mkdtemp()
-            Repo.create(self.gitdir)
-
-        self.repo = Repo(self.gitdir)
+    def __init__(self, repo=None):
+        if repo is None:
+            repo = Repo(tmpfile.mkdtemp())
+        self.repo = repo
         self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs

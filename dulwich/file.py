@@ -25,8 +25,38 @@ import os
 
 
 def GitFile(filename, mode='r', bufsize=-1):
+    """Create a file object that obeys the git file locking protocol.
+
+    See _GitFile for a description of the file locking protocol.
+
+    Only read-only and write-only (binary) modes are supported; r+, w+, and a
+    are not.  To read and write from the same file, you can take advantage of
+    the fact that opening a file for write does not actually open the file you
+    request:
+
+    >>> write_file = GitFile('filename', 'wb')
+    >>> read_file = GitFile('filename', 'rb')
+    >>> read_file.readlines()
+    ['contents\n', 'of\n', 'the\n', 'file\n']
+    >>> write_file.write('foo')
+    >>> read_file.close()
+    >>> write_file.close()
+    >>> new_file = GitFile('filename', 'rb')
+    'foo'
+    >>> new_file.close()
+    >>> other_file = GitFile('filename', 'wb')
+    Traceback (most recent call last):
+        ...
+    OSError: [Errno 17] File exists: 'filename.lock'
+
+    :return: a builtin file object or a _GitFile object
+    """
     if 'a' in mode:
         raise IOError('append mode not supported for Git files')
+    if '+' in mode:
+        raise IOError('read/write mode not supported for Git files')
+    if 'b' not in mode:
+        raise IOError('text mode not supported for Git files')
     if 'w' in mode:
         return _GitFile(filename, mode, bufsize)
     else:

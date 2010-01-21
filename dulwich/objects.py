@@ -512,6 +512,7 @@ class Commit(ShaFile):
         self._encoding = None
         self._needs_parsing = False
         self._needs_serialization = True
+        self._extra = {}
 
     @classmethod
     def from_file(cls, filename):
@@ -522,6 +523,7 @@ class Commit(ShaFile):
 
     def _parse_text(self):
         self._parents = []
+        self._extra = {}
         self._author = None
         f = StringIO(self._text)
         for l in f:
@@ -545,7 +547,9 @@ class Commit(ShaFile):
             elif field == ENCODING_ID:
                 self._encoding = value
             else:
-                raise AssertionError("Unknown field %s" % field)
+                if field in self._extra:
+                    raise KeyError("%s already exists in extra" % field)
+                self._extra[field] = value
         self._message = f.read()
         self._needs_parsing = False
 
@@ -558,6 +562,10 @@ class Commit(ShaFile):
         f.write("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
         if self.encoding:
             f.write("%s %s\n" % (ENCODING_ID, self.encoding))
+        for k in sorted(self.extra.keys()):
+            if "\n" in k or "\n" in self.extra[k]:
+                raise AssertionError("newline in extra data: %r -> %r" % (k, self.extra[k]))
+            f.write("%s %s\n" % (k, self.extra[k]))
         f.write("\n") # There must be a new line after the headers
         f.write(self._message)
         self._text = f.getvalue()
@@ -577,6 +585,18 @@ class Commit(ShaFile):
         self._parents = value
 
     parents = property(get_parents, set_parents)
+
+    def get_extra(self):
+        """Return extra settings of this commit."""
+        self._ensure_parsed()
+        return self._extra
+
+    def set_extra(self, value):
+        self._ensure_parsed()
+        self._needs_serialization = True
+        self._extra = value
+
+    extra = property(get_extra, set_extra)
 
     author = serializable_property("author",
         "The name of the author of the commit")

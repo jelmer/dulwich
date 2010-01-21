@@ -1,3 +1,9 @@
+0.4.2	UNRELEASED
+
+ BUG FIXES
+
+  * Support custom fields in commits.
+
 0.4.1	2010-01-03
 
  FEATURES

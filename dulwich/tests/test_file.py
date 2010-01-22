@@ -113,29 +113,3 @@ class GitFileTests(unittest.TestCase):
         new_orig_f = open(foo, 'rb')
         self.assertEquals(new_orig_f.read(), 'foo contents')
         new_orig_f.close()
-
-    def test_safe_method(self):
-        foo = self.path('foo')
-        foo_lock = '%s.lock' % foo
-
-        f = GitFile(foo, 'wb')
-        f.write('new contents')
-
-        def error_method(x):
-            f._test = x
-            raise IOError('fake IO error')
-
-        try:
-            f._safe_method(error_method)('test value')
-            fail()
-        except IOError, e:
-            # error is re-raised
-            self.assertEquals('fake IO error', e.message)
-
-        # method got correct args
-        self.assertEquals('test value', f._test)
-        self.assertFalse(os.path.exists(foo_lock))
-
-        new_orig_f = open(foo, 'rb')
-        self.assertEquals(new_orig_f.read(), 'foo contents')
-        new_orig_f.close()

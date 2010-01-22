@@ -68,7 +68,7 @@ class _GitFile(object):
 
     All writes to a file foo will be written into foo.lock in the same
     directory, and the lockfile will be renamed to overwrite the original file
-    on close. The lockfile is automatically removed upon filesystem error.
+    on close.
 
     :note: You *must* call close() or abort() on a _GitFile for the lock to be
         released. Typically this will happen in a finally block.
@@ -86,18 +86,7 @@ class _GitFile(object):
         self._file = os.fdopen(fd, mode, bufsize)
 
         for method in self.PROXY_METHODS:
-            setattr(self, method,
-                    self._safe_method(getattr(self._file, method)))
-
-    def _safe_method(self, file_method):
-        # note that built-in file methods have no kwargs
-        def do_safe_method(*args):
-            try:
-                return file_method(*args)
-            except (OSError, IOError):
-                self.abort()
-                raise
-        return do_safe_method
+            setattr(self, method, getattr(self._file, method))
 
     def abort(self):
         """Close and discard the lockfile without overwriting the target.

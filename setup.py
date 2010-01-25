@@ -3,10 +3,9 @@
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 
 try:
-    from setuptools import setup
+    from setuptools import setup, Extension
 except ImportError:
-    from distutils.core import setup
-from distutils.extension import Extension
+    from distutils.core import setup, Extension
 
 dulwich_version_string = '0.4.2'
 
@@ -15,6 +14,26 @@ include_dirs = []
 import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
+
+ext_modules = [
+    Extension('dulwich._objects', ['dulwich/_objects.c'],
+              include_dirs=include_dirs),
+    Extension('dulwich._pack', ['dulwich/_pack.c'],
+              include_dirs=include_dirs),
+    ]
+
+try:
+    from setuptools import Feature
+except ImportError:
+    speedups = None
+    mandatory_ext_modules = ext_modules
+else:
+    mandatory_ext_modules = []
+    speedups = Feature(
+        "optional C speed-enhancements",
+        standard = True,
+        ext_modules=ext_modules,
+    )
 
 
 setup(name='dulwich',
@@ -33,10 +52,6 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon'],
-      ext_modules=[
-          Extension('dulwich._objects', ['dulwich/_objects.c'],
-                    include_dirs=include_dirs),
-          Extension('dulwich._pack', ['dulwich/_pack.c'],
-                    include_dirs=include_dirs),
-          ],
+      features = {'speedups': speedups},
+      ext_modules = mandatory_ext_modules,
       )

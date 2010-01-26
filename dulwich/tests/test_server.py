@@ -113,6 +113,20 @@ class TestCommit(object):
         return '%s(%s)' % (self.__class__.__name__, self._sha)
 
 
+class TestBackend(object):
+    def __init__(self, objects):
+        self.object_store = objects
+
+
+class TestHandler(object):
+    def __init__(self, objects, proto):
+        self.backend = TestBackend(objects)
+        self.proto = proto
+
+    def capabilities(self):
+        return 'multi_ack'
+
+
 class ProtocolGraphWalkerTestCase(TestCase):
     def setUp(self):
         # Create the following commit tree:
@@ -126,7 +140,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
             FOUR: TestCommit(FOUR, [TWO], 444),
             FIVE: TestCommit(FIVE, [THREE], 555),
             }
-        self._walker = ProtocolGraphWalker(self._objects, None)
+        self._walker = ProtocolGraphWalker(
+            TestHandler(self._objects, TestProto()))
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))
@@ -152,6 +167,45 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertFalse(self._walker.all_wants_satisfied([TWO]))
         self.assertFalse(self._walker.all_wants_satisfied([THREE]))
         self.assertTrue(self._walker.all_wants_satisfied([TWO, THREE]))
+
+    def test_read_proto_line(self):
+        self._walker.proto.set_output([
+            'want %s' % ONE,
+            'want %s' % TWO,
+            'have %s' % THREE,
+            'foo %s' % FOUR,
+            'bar',
+            'done',
+            ])
+        self.assertEquals(('want', ONE), self._walker.read_proto_line())
+        self.assertEquals(('want', TWO), self._walker.read_proto_line())
+        self.assertEquals(('have', THREE), self._walker.read_proto_line())
+        self.assertRaises(GitProtocolError, self._walker.read_proto_line)
+        self.assertRaises(GitProtocolError, self._walker.read_proto_line)
+        self.assertEquals(('done', None), self._walker.read_proto_line())
+        self.assertEquals((None, None), self._walker.read_proto_line())
+
+    def test_determine_wants(self):
+        self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
+
+        self._walker.proto.set_output([
+            'want %s multi_ack' % ONE,
+            'want %s' % TWO,
+            ])
+        heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
+        self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
+
+        self._walker.proto.set_output(['want %s multi_ack' % FOUR])
+        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+
+        self._walker.proto.set_output([])
+        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+
+        self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo'])
+        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+
+        self._walker.proto.set_output(['want %s multi_ack' % FOUR])
+        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
     # TODO: test commit time cutoff
 
@@ -307,13 +361,19 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(ONE)
 
     def test_multi_ack_flush(self):
-        # same as ack test but ends with a flush-pkt instead of done
-        self._walker.lines[-1] = (None, None)
-
+        self._walker.lines = [
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+            ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
+        self.assertNak() # nak the flush-pkt
+
         self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, 'continue')
@@ -323,25 +383,9 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, 'continue')
 
         self.assertNextEquals(None)
-        self.assertNak()
+        self.assertAck(THREE)
 
     def test_multi_ack_nak(self):
-        self.assertNextEquals(TWO)
-        self.assertNoAck()
-
-        self.assertNextEquals(ONE)
-        self.assertNoAck()
-
-        self.assertNextEquals(THREE)
-        self.assertNoAck()
-
-        self.assertNextEquals(None)
-        self.assertNak()
-
-    def test_multi_ack_nak_flush(self):
-        # same as nak test but ends with a flush-pkt instead of done
-        self._walker.lines[-1] = (None, None)
-
         self.assertNextEquals(TWO)
         self.assertNoAck()
 

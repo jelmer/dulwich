@@ -20,6 +20,7 @@
 """Git object store interfaces and implementation."""
 
 
+import errno
 import itertools
 import os
 import stat
@@ -269,15 +270,21 @@ class DiskObjectStore(BaseObjectStore):
     def packs(self):
         """List with pack objects."""
         if self._pack_cache is None:
-            self._pack_cache = list(self._load_packs())
+            self._pack_cache = self._load_packs()
         return self._pack_cache
 
     def _load_packs(self):
         if not os.path.exists(self.pack_dir):
-            return
+            return []
+        pack_files = []
         for name in os.listdir(self.pack_dir):
+            # TODO: verify that idx exists first
             if name.startswith("pack-") and name.endswith(".pack"):
-                yield Pack(os.path.join(self.pack_dir, name[:-len(".pack")]))
+                filename = os.path.join(self.pack_dir, name)
+                pack_files.append((os.stat(filename).st_mtime, filename))
+        pack_files.sort(reverse=True)
+        suffix_len = len(".pack")
+        return [Pack(f[:-suffix_len]) for _, f in pack_files]
 
     def _add_known_pack(self, path):
         """Add a newly appeared pack to the cache by path.

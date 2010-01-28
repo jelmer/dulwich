@@ -522,6 +522,18 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+    def get_named_file(self, path):
+        """Get a file from the control dir with a specific name.
+
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :return: An open file object, or None if the file does not exist.
+        """
+        raise NotImplementedError(self.get_named_file)
+
     def fetch(self, target, determine_wants=None, progress=None):
         """Fetch objects into another repository.
 
@@ -684,6 +696,23 @@ class Repo(BaseRepo):
     def controldir(self):
         """Return the path of the control directory."""
         return self._controldir
+
+    def get_named_file(self, path):
+        """Get a file from the control dir with a specific name.
+
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :return: An open file object, or None if the file does not exist.
+        """
+        try:
+            return open(os.path.join(self.controldir(), path.lstrip('/')), 'rb')
+        except (IOError, OSError), e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
 
     def index_path(self):
         """Return path to the index file."""

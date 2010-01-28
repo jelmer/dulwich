@@ -120,10 +120,13 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
-    def __init__(self, backend, read, write):
+    def __init__(self, backend, read, write,
+                 stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
         self._client_capabilities = None
         self._graph_walker = None
+        self._stateless_rpc = stateless_rpc
+        self._advertise_refs = advertise_refs
 
     def default_capabilities(self):
         return ("multi_ack", "side-band-64k", "thin-pack", "ofs-delta")
@@ -401,6 +404,12 @@ class MultiAckGraphWalkerImpl(object):
 
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack to the client."""
+
+    def __init__(self, backend, read, write,
+                 stateless_rpc=False, advertise_refs=False):
+        Handler.__init__(self, backend, read, write)
+        self._stateless_rpc = stateless_rpc
+        self._advertise_refs = advertise_refs
 
     def default_capabilities(self):
         return ("report-status", "delete-refs")

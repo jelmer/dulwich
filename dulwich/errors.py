@@ -108,3 +108,11 @@ class HangupException(GitProtocolError):
     def __init__(self):
         Exception.__init__(self,
             "The remote server unexpectedly closed the connection.")
+
+
+class FileFormatException(Exception):
+    """Base class for exceptions relating to reading git file formats."""
+
+
+class PackedRefsException(FileFormatException):
+    """Indicates an error parsing a packed-refs file."""

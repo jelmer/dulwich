@@ -113,3 +113,19 @@ class GitFileTests(unittest.TestCase):
         new_orig_f = open(foo, 'rb')
         self.assertEquals(new_orig_f.read(), 'foo contents')
         new_orig_f.close()
+
+    def test_abort_close(self):
+        foo = self.path('foo')
+        f = GitFile(foo, 'wb')
+        f.abort()
+        try:
+            f.close()
+        except (IOError, OSError):
+            self.fail()
+
+        f = GitFile(foo, 'wb')
+        f.close()
+        try:
+            f.abort()
+        except (IOError, OSError):
+            self.fail()

@@ -23,6 +23,13 @@
 import errno
 import os
 
+def ensure_dir_exists(dirname):
+    """Ensure a directory exists, creating if necessary."""
+    try:
+        os.makedirs(dirname)
+    except OSError, e:
+        if e.errno != errno.EEXIST:
+            raise
 
 def GitFile(filename, mode='r', bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
@@ -84,6 +91,7 @@ class _GitFile(object):
         self._lockfilename = '%s.lock' % self._filename
         fd = os.open(self._lockfilename, os.O_RDWR | os.O_CREAT | os.O_EXCL)
         self._file = os.fdopen(fd, mode, bufsize)
+        self._closed = False
 
         for method in self.PROXY_METHODS:
             setattr(self, method, getattr(self._file, method))
@@ -93,9 +101,12 @@ class _GitFile(object):
 
         If the file is already closed, this is a no-op.
         """
+        if self._closed:
+            return
         self._file.close()
         try:
             os.remove(self._lockfilename)
+            self._closed = True
         except OSError, e:
             # The file may have been removed already, which is ok.
             if e.errno != errno.ENOENT:
@@ -112,6 +123,8 @@ class _GitFile(object):
             file is still closed, so further attempts to write to the same file
             object will raise ValueError.
         """
+        if self._closed:
+            return
         self._file.close()
         try:
             os.rename(self._lockfilename, self._filename)

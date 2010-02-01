@@ -30,6 +30,7 @@ TCP_GIT_PORT = 9418
 
 SINGLE_ACK = 0
 MULTI_ACK = 1
+MULTI_ACK_DETAILED = 2
 
 class ProtocolFile(object):
     """
@@ -190,6 +191,8 @@ def extract_want_line_capabilities(text):
 
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
-    if 'multi_ack' in capabilities:
+    if 'multi_ack_detailed' in capabilities:
+      return MULTI_ACK_DETAILED
+    elif 'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK

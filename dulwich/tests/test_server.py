@@ -31,6 +31,7 @@ from dulwich.server import (
     ProtocolGraphWalker,
     SingleAckGraphWalkerImpl,
     MultiAckGraphWalkerImpl,
+    MultiAckDetailedGraphWalkerImpl,
     )
 
 from dulwich.protocol import (
@@ -122,6 +123,8 @@ class TestHandler(object):
     def __init__(self, objects, proto):
         self.backend = TestBackend(objects)
         self.proto = proto
+        self.stateless_rpc = False
+        self.advertise_refs = False
 
     def capabilities(self):
         return 'multi_ack'
@@ -215,6 +218,8 @@ class TestProtocolGraphWalker(object):
         self.acks = []
         self.lines = []
         self.done = False
+        self.stateless_rpc = False
+        self.advertise_refs = False
 
     def read_proto_line(self):
         return self.lines.pop(0)
@@ -249,9 +254,13 @@ class AckGraphWalkerImplTestCase(TestCase):
     def assertNoAck(self):
         self.assertEquals(None, self._walker.pop_ack())
 
-    def assertAck(self, sha, ack_type=''):
-        self.assertEquals((sha, ack_type), self._walker.pop_ack())
+    def assertAcks(self, acks):
+        for sha, ack_type in acks:
+            self.assertEquals((sha, ack_type), self._walker.pop_ack())
         self.assertNoAck()
+
+    def assertAck(self, sha, ack_type=''):
+        self.assertAcks([(sha, ack_type)])
 
     def assertNak(self):
         self.assertAck(None, 'nak')
@@ -386,6 +395,117 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE)
 
     def test_multi_ack_nak(self):
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNoAck()
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        self.assertNextEquals(None)
+        self.assertNak()
+
+class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+    impl_cls = MultiAckDetailedGraphWalkerImpl
+
+    def test_multi_ack(self):
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self._walker.done = True
+        self._impl.ack(ONE)
+        self.assertAcks([(ONE, 'common'), (ONE, 'ready')])
+
+        self.assertNextEquals(THREE)
+        self._impl.ack(THREE)
+        self.assertAck(THREE, 'ready')
+
+        self.assertNextEquals(None)
+        self.assertAck(THREE)
+
+    def test_multi_ack_partial(self):
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self._impl.ack(ONE)
+        self.assertAck(ONE, 'common')
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        self.assertNextEquals(None)
+        # done, re-send ack of last common
+        self.assertAck(ONE)
+
+    def test_multi_ack_flush(self):
+        # same as ack test but contains a flush-pkt in the middle
+        self._walker.lines = [
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+            ]
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNak() # nak the flush-pkt
+
+        self._walker.done = True
+        self._impl.ack(ONE)
+        self.assertAcks([(ONE, 'common'), (ONE, 'ready')])
+
+        self.assertNextEquals(THREE)
+        self._impl.ack(THREE)
+        self.assertAck(THREE, 'ready')
+
+        self.assertNextEquals(None)
+        self.assertAck(THREE)
+
+    def test_multi_ack_nak(self):
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNoAck()
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        self.assertNextEquals(None)
+        self.assertNak()
+
+    def test_multi_ack_nak_flush(self):
+        # same as nak test but contains a flush-pkt in the middle
+        self._walker.lines = [
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+            ]
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNak()
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        self.assertNextEquals(None)
+        self.assertNak()
+
+    def test_multi_ack_stateless(self):
+        # transmission ends with a flush-pkt
+        self._walker.lines[-1] = (None, None)
+        self._walker.stateless_rpc = True
+
         self.assertNextEquals(TWO)
         self.assertNoAck()
 

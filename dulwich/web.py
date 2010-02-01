@@ -163,6 +163,27 @@ def get_info_packs(req, backend, mat):
         yield 'P pack-%s.pack\n' % pack.name()
 
 
+class _LengthLimitedFile(object):
+    """Wrapper class to limit the length of reads from a file-like object.
+
+    This is used to ensure EOF is read from the wsgi.input object once
+    Content-Length bytes are read. This behavior is required by the WSGI spec
+    but not implemented in wsgiref as of 2.5.
+    """
+    def __init__(self, input, max_bytes):
+        self._input = input
+        self._bytes_avail = max_bytes
+
+    def read(self, size=-1):
+        if self._bytes_avail <= 0:
+            return ''
+        if size == -1 or size > self._bytes_avail:
+            size = self._bytes_avail
+        self._bytes_avail -= size
+        return self._input.read(size)
+
+    # TODO: support more methods as necessary
+
 def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
     handler_cls = services.get(service, None)
@@ -173,6 +194,12 @@ def handle_service_request(req, backend, mat):
 
     output = StringIO()
     input = req.environ['wsgi.input']
+    # This is not necessary if this app is run from a conforming WSGI server.
+    # Unfortunately, there's no way to tell that at this point.
+    # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
+    # content-length
+    if 'CONTENT_LENGTH' in req.environ:
+        input = _LengthLimitedFile(input, int(req.environ['CONTENT_LENGTH']))
     handler = handler_cls(backend, input.read, output.write, stateless_rpc=True)
     handler.handle()
     yield output.getvalue()

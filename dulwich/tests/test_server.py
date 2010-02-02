@@ -202,7 +202,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
         self._walker.proto.set_output([])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertEquals([], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo'])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)

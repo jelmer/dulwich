@@ -402,6 +402,7 @@ class DiskRefsContainer(RefsContainer):
         """
         self._check_refname(name)
         filename = self.refpath(name)
+        ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, 'wb')
         try:
             if old_ref is not None:

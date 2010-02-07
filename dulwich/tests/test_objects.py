@@ -235,7 +235,7 @@ class CommitDeserializationTests(unittest.TestCase):
                 'extra-field data\n'
                 '\n'
                 'Merge ../b\n')
-        self.assertEquals('data', c.extra['extra-field'])
+        self.assertEquals([('extra-field', 'data')], c.extra)
 
 
 class TreeSerializationTests(unittest.TestCase):

@@ -9,6 +9,8 @@
   * --without-speedups option to setup.py to allow building/installing 
     without the C extensions. (Hal Wine, Jelmer Vernooij)
 
+  * Implement Repo.get_config(). (Jelmer Vernooij)
+
 0.4.1	2010-01-03
 
  FEATURES

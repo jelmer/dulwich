@@ -90,13 +90,13 @@ class RepositoryTests(unittest.TestCase):
     def test_get_blob(self):
         r = self.open_repo('a.git')
         commit = r.commit(r.head())
-        tree = r.tree(commit.tree())
+        tree = r.tree(commit.tree)
         blob_sha = tree.entries()[0][2]
         blob = r.get_blob(blob_sha)
         self.assertEqual(blob._type, 'blob')
         self.assertEqual(blob.sha().hexdigest(), blob_sha)
   
-    def test_get_blob(self):
+    def test_get_blob_notblob(self):
         r = self.open_repo('a.git')
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
     

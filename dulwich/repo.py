@@ -342,6 +342,10 @@ class Repo(object):
     def get_parents(self, sha):
         return self.commit(sha).parents
 
+    def get_config(self):
+        from configobj import ConfigObj
+        return ConfigObj(os.path.join(self._controldir, 'config'))
+
     def commit(self, sha):
         return self._get_object(sha, Commit)
 
@@ -480,6 +484,12 @@ class Repo(object):
         ret.refs.set_ref("HEAD", "refs/heads/master")
         open(os.path.join(path, 'description'), 'wb').write("Unnamed repository")
         open(os.path.join(path, 'info', 'excludes'), 'wb').write("")
+        open(os.path.join(path, 'config'), 'wb').write("""[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = false
+    logallrefupdates = true
+""")
         return ret
 
     create = init_bare

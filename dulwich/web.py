@@ -26,6 +26,7 @@ import time
 
 from dulwich.objects import (
     Tag,
+    num_type_map,
     )
 from dulwich.repo import (
     Repo,
@@ -114,13 +115,16 @@ def get_idx_file(req, backend, mat):
 
 services = {'git-upload-pack': UploadPackHandler,
             'git-receive-pack': ReceivePackHandler}
-def get_info_refs(req, backend, mat):
+def get_info_refs(req, backend, mat, services=None):
+    if services is None:
+        services = services
     params = cgi.parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
     if service:
         handler_cls = services.get(service, None)
         if handler_cls is None:
             yield req.forbidden('Unsupported service %s' % service)
+            return
         req.nocache()
         req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
         output = StringIO()
@@ -147,9 +151,11 @@ def get_info_refs(req, backend, mat):
             if not o:
                 continue
             yield '%s\t%s\n' % (sha, name)
-            if isinstance(o, Tag):
-                while isinstance(o, Tag):
-                    _, sha = o.object
+            obj_type = num_type_map[o.type]
+            if obj_type == Tag:
+                while obj_type == Tag:
+                    num_type, sha = o.object
+                    obj_type = num_type_map[num_type]
                     o = backend.repo[sha]
                 if not o:
                     continue
@@ -184,11 +190,14 @@ class _LengthLimitedFile(object):
 
     # TODO: support more methods as necessary
 
-def handle_service_request(req, backend, mat):
+def handle_service_request(req, backend, mat, services=services):
+    if services is None:
+        services = services
     service = mat.group().lstrip('/')
     handler_cls = services.get(service, None)
     if handler_cls is None:
         yield req.forbidden('Unsupported service %s' % service)
+        return
     req.nocache()
     req.respond(HTTP_OK, 'application/x-%s-response' % service)
 

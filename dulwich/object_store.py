@@ -20,6 +20,7 @@
 """Git object store interfaces and implementation."""
 
 
+import errno
 import itertools
 import os
 import stat
@@ -333,14 +334,17 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_dir = os.path.join(self.path, PACKDIR)
 
     def _load_packs(self):
-        if not os.path.exists(self.pack_dir):
-            return []
         pack_files = []
-        for name in os.listdir(self.pack_dir):
-            # TODO: verify that idx exists first
-            if name.startswith("pack-") and name.endswith(".pack"):
-                filename = os.path.join(self.pack_dir, name)
-                pack_files.append((os.stat(filename).st_mtime, filename))
+        try:
+            for name in os.listdir(self.pack_dir):
+                # TODO: verify that idx exists first
+                if name.startswith("pack-") and name.endswith(".pack"):
+                    filename = os.path.join(self.pack_dir, name)
+                    pack_files.append((os.stat(filename).st_mtime, filename))
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return []
+            raise
         pack_files.sort(reverse=True)
         suffix_len = len(".pack")
         return [Pack(f[:-suffix_len]) for _, f in pack_files]
@@ -360,9 +364,12 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
-        if os.path.exists(path):
-          return ShaFile.from_file(path)
-        return None
+        try:
+            return ShaFile.from_file(path)
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.

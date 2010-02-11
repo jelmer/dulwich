@@ -424,8 +424,11 @@ class DiskRefsContainer(RefsContainer):
                 if orig_ref != old_ref:
                     return False
             # may only be packed
-            if os.path.exists(filename):
+            try:
                 os.remove(filename)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
             self._remove_packed_ref(name)
         finally:
             # never write, we just wanted the lock

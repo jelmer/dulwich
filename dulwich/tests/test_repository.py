@@ -20,75 +20,110 @@
 
 """Tests for the repository."""
 
-
+from cStringIO import StringIO
 import os
+import shutil
+import tempfile
 import unittest
 
 from dulwich import errors
-from dulwich.repo import Repo
+from dulwich.repo import (
+    check_ref_format,
+    DiskRefsContainer,
+    Repo,
+    read_packed_refs,
+    read_packed_refs_with_peeled,
+    write_packed_refs,
+    _split_ref_line,
+    )
 
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
+
+def open_repo(name):
+    """Open a copy of a repo in a temporary directory.
+
+    Use this function for accessing repos in dulwich/tests/data/repos to avoid
+    accidentally or intentionally modifying those repos in place. Use
+    tear_down_repo to delete any temp files created.
+
+    :param name: The name of the repository, relative to
+        dulwich/tests/data/repos
+    :returns: An initialized Repo object that lives in a temporary directory.
+    """
+    temp_dir = tempfile.mkdtemp()
+    repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
+    temp_repo_dir = os.path.join(temp_dir, name)
+    shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
+    return Repo(temp_repo_dir)
+
+def tear_down_repo(repo):
+    """Tear down a test repository."""
+    temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
+    shutil.rmtree(temp_dir)
+
+
 class RepositoryTests(unittest.TestCase):
-  
-    def open_repo(self, name):
-        return Repo(os.path.join(os.path.dirname(__file__),
-                          'data', 'repos', name))
+
+    def setUp(self):
+        self._repo = None
+
+    def tearDown(self):
+        if self._repo is not None:
+            tear_down_repo(self._repo)
   
     def test_simple_props(self):
-        r = self.open_repo('a.git')
-        basedir = os.path.join(os.path.dirname(__file__), 
-                os.path.join('data', 'repos', 'a.git'))
-        self.assertEqual(r.controldir(), basedir)
+        r = self._repo = open_repo('a.git')
+        self.assertEqual(r.controldir(), r.path)
   
     def test_ref(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
   
     def test_get_refs(self):
-        r = self.open_repo('a.git')
-        self.assertEquals({
+        r = self._repo = open_repo('a.git')
+        self.assertEqual({
             'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097', 
             'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
             }, r.get_refs())
   
     def test_head(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
   
     def test_get_object(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         obj = r.get_object(r.head())
         self.assertEqual(obj._type, 'commit')
   
     def test_get_object_non_existant(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertRaises(KeyError, r.get_object, missing_sha)
   
     def test_commit(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         obj = r.commit(r.head())
         self.assertEqual(obj._type, 'commit')
   
     def test_commit_not_commit(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertRaises(errors.NotCommitError,
                           r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
   
     def test_tree(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         commit = r.commit(r.head())
         tree = r.tree(commit.tree)
         self.assertEqual(tree._type, 'tree')
         self.assertEqual(tree.sha().hexdigest(), commit.tree)
   
     def test_tree_not_tree(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertRaises(errors.NotTreeError, r.tree, r.head())
   
     def test_get_blob(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         commit = r.commit(r.head())
         tree = r.tree(commit.tree)
         blob_sha = tree.entries()[0][2]
@@ -97,18 +132,18 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(blob.sha().hexdigest(), blob_sha)
   
     def test_get_blob_notblob(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
     
     def test_linear_history(self):
-        r = self.open_repo('a.git')
+        r = self._repo = open_repo('a.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
                                 '2a72d929692c41d8554c07f6301757ba18a65d91'])
   
     def test_merge_history(self):
-        r = self.open_repo('simple_merge.git')
+        r = self._repo = open_repo('simple_merge.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
@@ -118,13 +153,13 @@ class RepositoryTests(unittest.TestCase):
                                 '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
   
     def test_revision_history_missing_commit(self):
-        r = self.open_repo('simple_merge.git')
+        r = self._repo = open_repo('simple_merge.git')
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
   
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
-        r = self.open_repo('ooo_merge.git')
+        r = self._repo = open_repo('ooo_merge.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
@@ -133,9 +168,250 @@ class RepositoryTests(unittest.TestCase):
                                 'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
   
     def test_get_tags_empty(self):
-        r = self.open_repo('ooo_merge.git')
-        self.assertEquals({}, r.refs.as_dict('refs/tags'))
+        r = self._repo = open_repo('ooo_merge.git')
+        self.assertEqual({}, r.refs.as_dict('refs/tags'))
 
     def test_get_config(self):
-        r = self.open_repo('ooo_merge.git')
+        r = self._repo = open_repo('ooo_merge.git')
         self.assertEquals({}, r.get_config())
+
+
+class CheckRefFormatTests(unittest.TestCase):
+    """Tests for the check_ref_format function.
+
+    These are the same tests as in the git test suite.
+    """
+
+    def test_valid(self):
+        self.assertTrue(check_ref_format('heads/foo'))
+        self.assertTrue(check_ref_format('foo/bar/baz'))
+        self.assertTrue(check_ref_format('refs///heads/foo'))
+        self.assertTrue(check_ref_format('foo./bar'))
+        self.assertTrue(check_ref_format('heads/foo@bar'))
+        self.assertTrue(check_ref_format('heads/fix.lock.error'))
+
+    def test_invalid(self):
+        self.assertFalse(check_ref_format('foo'))
+        self.assertFalse(check_ref_format('heads/foo/'))
+        self.assertFalse(check_ref_format('./foo'))
+        self.assertFalse(check_ref_format('.refs/foo'))
+        self.assertFalse(check_ref_format('heads/foo..bar'))
+        self.assertFalse(check_ref_format('heads/foo?bar'))
+        self.assertFalse(check_ref_format('heads/foo.lock'))
+        self.assertFalse(check_ref_format('heads/v@{ation'))
+        self.assertFalse(check_ref_format('heads/foo\bar'))
+
+
+ONES = "1" * 40
+TWOS = "2" * 40
+THREES = "3" * 40
+FOURS = "4" * 40
+
+class PackedRefsFileTests(unittest.TestCase):
+    def test_split_ref_line_errors(self):
+        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+                          'singlefield')
+        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+                          'badsha name')
+        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+                          '%s bad/../refname' % ONES)
+
+    def test_read_without_peeled(self):
+        f = StringIO('# comment\n%s ref/1\n%s ref/2' % (ONES, TWOS))
+        self.assertEqual([(ONES, 'ref/1'), (TWOS, 'ref/2')],
+                         list(read_packed_refs(f)))
+
+    def test_read_without_peeled_errors(self):
+        f = StringIO('%s ref/1\n^%s' % (ONES, TWOS))
+        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+
+    def test_read_with_peeled(self):
+        f = StringIO('%s ref/1\n%s ref/2\n^%s\n%s ref/4' % (
+            ONES, TWOS, THREES, FOURS))
+        self.assertEqual([
+            (ONES, 'ref/1', None),
+            (TWOS, 'ref/2', THREES),
+            (FOURS, 'ref/4', None),
+            ], list(read_packed_refs_with_peeled(f)))
+
+    def test_read_with_peeled_errors(self):
+        f = StringIO('^%s\n%s ref/1' % (TWOS, ONES))
+        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+
+        f = StringIO('%s ref/1\n^%s\n^%s' % (ONES, TWOS, THREES))
+        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+
+    def test_write_with_peeled(self):
+        f = StringIO()
+        write_packed_refs(f, {'ref/1': ONES, 'ref/2': TWOS},
+                          {'ref/1': THREES})
+        self.assertEqual(
+            "# pack-refs with: peeled\n%s ref/1\n^%s\n%s ref/2\n" % (
+            ONES, THREES, TWOS), f.getvalue())
+
+    def test_write_without_peeled(self):
+        f = StringIO()
+        write_packed_refs(f, {'ref/1': ONES, 'ref/2': TWOS})
+        self.assertEqual("%s ref/1\n%s ref/2\n" % (ONES, TWOS), f.getvalue())
+
+
+class RefsContainerTests(unittest.TestCase):
+    def setUp(self):
+        self._repo = open_repo('refs.git')
+        self._refs = self._repo.refs
+
+    def tearDown(self):
+        tear_down_repo(self._repo)
+
+    def test_get_packed_refs(self):
+        self.assertEqual(
+            {'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c'},
+            self._refs.get_packed_refs())
+
+    def test_keys(self):
+        self.assertEqual([
+            'HEAD',
+            'refs/heads/loop',
+            'refs/heads/master',
+            'refs/tags/refs-0.1',
+            ], sorted(list(self._refs.keys())))
+        self.assertEqual(['loop', 'master'],
+                         sorted(self._refs.keys('refs/heads')))
+        self.assertEqual(['refs-0.1'], list(self._refs.keys('refs/tags')))
+
+    def test_as_dict(self):
+        # refs/heads/loop does not show up
+        self.assertEqual({
+            'HEAD': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+            'refs/heads/master': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+            'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
+            }, self._refs.as_dict())
+
+    def test_setitem(self):
+        self._refs['refs/some/ref'] = '42d06bd4b77fed026b154d16493e5deab78f02ec'
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['refs/some/ref'])
+        f = open(os.path.join(self._refs.path, 'refs', 'some', 'ref'), 'rb')
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                          f.read()[:40])
+        f.close()
+
+    def test_setitem_symbolic(self):
+        ones = '1' * 40
+        self._refs['HEAD'] = ones
+        self.assertEqual(ones, self._refs['HEAD'])
+
+        # ensure HEAD was not modified
+        f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
+        self.assertEqual('ref: refs/heads/master', iter(f).next().rstrip('\n'))
+        f.close()
+
+        # ensure the symbolic link was written through
+        f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'), 'rb')
+        self.assertEqual(ones, f.read()[:40])
+        f.close()
+
+    def test_set_if_equals(self):
+        nines = '9' * 40
+        self.assertFalse(self._refs.set_if_equals('HEAD', 'c0ffee', nines))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['HEAD'])
+
+        self.assertTrue(self._refs.set_if_equals(
+            'HEAD', '42d06bd4b77fed026b154d16493e5deab78f02ec', nines))
+        self.assertEqual(nines, self._refs['HEAD'])
+
+        # ensure symref was followed
+        self.assertEqual(nines, self._refs['refs/heads/master'])
+
+        self.assertFalse(os.path.exists(
+            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
+        self.assertFalse(os.path.exists(
+            os.path.join(self._refs.path, 'HEAD.lock')))
+
+    def test_add_if_new(self):
+        nines = '9' * 40
+        self.assertFalse(self._refs.add_if_new('refs/heads/master', nines))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['refs/heads/master'])
+
+        self.assertTrue(self._refs.add_if_new('refs/some/ref', nines))
+        self.assertEqual(nines, self._refs['refs/some/ref'])
+
+        # don't overwrite packed ref
+        self.assertFalse(self._refs.add_if_new('refs/tags/refs-0.1', nines))
+        self.assertEqual('df6800012397fb85c56e7418dd4eb9405dee075c',
+                         self._refs['refs/tags/refs-0.1'])
+
+    def test_check_refname(self):
+        try:
+            self._refs._check_refname('HEAD')
+        except KeyError:
+            self.fail()
+
+        try:
+            self._refs._check_refname('refs/heads/foo')
+        except KeyError:
+            self.fail()
+
+        self.assertRaises(KeyError, self._refs._check_refname, 'refs')
+        self.assertRaises(KeyError, self._refs._check_refname, 'notrefs/foo')
+
+    def test_follow(self):
+        self.assertEquals(
+            ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),
+            self._refs._follow('HEAD'))
+        self.assertEquals(
+            ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),
+            self._refs._follow('refs/heads/master'))
+        self.assertRaises(KeyError, self._refs._follow, 'notrefs/foo')
+        self.assertRaises(KeyError, self._refs._follow, 'refs/heads/loop')
+
+    def test_delitem(self):
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                          self._refs['refs/heads/master'])
+        del self._refs['refs/heads/master']
+        self.assertRaises(KeyError, lambda: self._refs['refs/heads/master'])
+        ref_file = os.path.join(self._refs.path, 'refs', 'heads', 'master')
+        self.assertFalse(os.path.exists(ref_file))
+        self.assertFalse('refs/heads/master' in self._refs.get_packed_refs())
+
+    def test_delitem_symbolic(self):
+        self.assertEqual('ref: refs/heads/master',
+                          self._refs._read_ref_file('HEAD'))
+        del self._refs['HEAD']
+        self.assertRaises(KeyError, lambda: self._refs['HEAD'])
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['refs/heads/master'])
+        self.assertFalse(os.path.exists(os.path.join(self._refs.path, 'HEAD')))
+
+    def test_remove_if_equals(self):
+        nines = '9' * 40
+        self.assertFalse(self._refs.remove_if_equals('HEAD', 'c0ffee'))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['HEAD'])
+
+        # HEAD is a symref, so shouldn't equal its dereferenced value
+        self.assertFalse(self._refs.remove_if_equals(
+            'HEAD', '42d06bd4b77fed026b154d16493e5deab78f02ec'))
+        self.assertTrue(self._refs.remove_if_equals(
+            'refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'))
+        self.assertRaises(KeyError, lambda: self._refs['refs/heads/master'])
+
+        # HEAD is now a broken symref
+        self.assertRaises(KeyError, lambda: self._refs['HEAD'])
+        self.assertEqual('ref: refs/heads/master',
+                          self._refs._read_ref_file('HEAD'))
+
+        self.assertFalse(os.path.exists(
+            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
+        self.assertFalse(os.path.exists(
+            os.path.join(self._refs.path, 'HEAD.lock')))
+
+        # test removing ref that is only packed
+        self.assertEqual('df6800012397fb85c56e7418dd4eb9405dee075c',
+                         self._refs['refs/tags/refs-0.1'])
+        self.assertTrue(
+            self._refs.remove_if_equals('refs/tags/refs-0.1',
+            'df6800012397fb85c56e7418dd4eb9405dee075c'))
+        self.assertRaises(KeyError, lambda: self._refs['refs/tags/refs-0.1'])

@@ -22,6 +22,7 @@ import os
 import stat
 import struct
 
+from dulwich.file import GitFile
 from dulwich.objects import (
     S_IFGITLINK,
     S_ISGITLINK,
@@ -173,7 +174,7 @@ class Index(object):
 
     def write(self):
         """Write current contents of index to disk."""
-        f = open(self._filename, 'wb')
+        f = GitFile(self._filename, 'wb')
         try:
             f = SHA1Writer(f)
             write_index_dict(f, self._byname)
@@ -182,7 +183,7 @@ class Index(object):
 
     def read(self):
         """Read current contents of index from disk."""
-        f = open(self._filename, 'rb')
+        f = GitFile(self._filename, 'rb')
         try:
             f = SHA1Reader(f)
             for x in read_index(f):

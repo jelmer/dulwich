@@ -36,6 +36,7 @@ from dulwich.errors import (
     NotCommitError,
     NotTreeError,
     )
+from dulwich.file import GitFile
 from dulwich.misc import (
     make_sha,
     )
@@ -184,7 +185,7 @@ class ShaFile(object):
     def from_file(cls, filename):
         """Get the contents of a SHA file on disk"""
         size = os.path.getsize(filename)
-        f = open(filename, 'rb')
+        f = GitFile(filename, 'rb')
         try:
             map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
             shafile = cls._parse_file(map)
@@ -637,4 +638,3 @@ try:
     from dulwich._objects import parse_tree
 except ImportError:
     pass
-

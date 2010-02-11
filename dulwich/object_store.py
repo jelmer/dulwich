@@ -20,6 +20,7 @@
 """Git object store interfaces and implementation."""
 
 
+import errno
 import itertools
 import os
 import stat
@@ -29,6 +30,7 @@ import urllib2
 from dulwich.errors import (
     NotTreeError,
     )
+from dulwich.file import GitFile
 from dulwich.objects import (
     Commit,
     ShaFile,
@@ -65,9 +67,25 @@ class BaseObjectStore(object):
         """
         return ObjectStoreIterator(self, shas)
 
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
+        raise NotImplementedError(self.contains_loose)
+
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
+        raise NotImplementedError(self.contains_packed)
+
     def __contains__(self, sha):
-        """Check if a particular object is present by SHA1."""
-        raise NotImplementedError(self.__contains__)
+        """Check if a particular object is present by SHA1.
+
+        This method makes no distinction between loose and packed objects.
+        """
+        return self.contains_packed(sha) or self.contains_loose(sha)
+
+    @property
+    def packs(self):
+        """Iterable of pack objects."""
+        raise NotImplementedError
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
@@ -232,14 +250,15 @@ class DiskObjectStore(BaseObjectStore):
         self._pack_cache = None
         self.pack_dir = os.path.join(self.path, PACKDIR)
 
-    def __contains__(self, sha):
-        """Check if a particular object is present by SHA1."""
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
+        return self._get_shafile(sha) is not None
+
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
         for pack in self.packs:
             if sha in pack:
                 return True
-        ret = self._get_shafile(sha)
-        if ret is not None:
-            return True
         return False
 
     def __iter__(self):
@@ -251,15 +270,21 @@ class DiskObjectStore(BaseObjectStore):
     def packs(self):
         """List with pack objects."""
         if self._pack_cache is None:
-            self._pack_cache = list(self._load_packs())
+            self._pack_cache = self._load_packs()
         return self._pack_cache
 
     def _load_packs(self):
         if not os.path.exists(self.pack_dir):
-            return
+            return []
+        pack_files = []
         for name in os.listdir(self.pack_dir):
+            # TODO: verify that idx exists first
             if name.startswith("pack-") and name.endswith(".pack"):
-                yield Pack(os.path.join(self.pack_dir, name[:-len(".pack")]))
+                filename = os.path.join(self.pack_dir, name)
+                pack_files.append((os.stat(filename).st_mtime, filename))
+        pack_files.sort(reverse=True)
+        suffix_len = len(".pack")
+        return [Pack(f[:-suffix_len]) for _, f in pack_files]
 
     def _add_known_pack(self, path):
         """Add a newly appeared pack to the cache by path.
@@ -294,7 +319,7 @@ class DiskObjectStore(BaseObjectStore):
         path = os.path.join(dir, sha[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
-        f = open(path, 'w+')
+        f = GitFile(path, 'wb')
         try:
             f.write(o.as_legacy_object())
         finally:
@@ -427,13 +452,22 @@ class MemoryObjectStore(BaseObjectStore):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
 
-    def __contains__(self, sha):
-        """Check if the object with a particular SHA is present."""
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
         return sha in self._data
+
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
+        return False
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
         return self._data.iterkeys()
+
+    @property
+    def packs(self):
+        """List with pack objects."""
+        return []
 
     def get_raw(self, name):
         """Obtain the raw text for an object.

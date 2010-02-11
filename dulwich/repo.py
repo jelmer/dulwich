@@ -24,7 +24,6 @@
 
 import errno
 import os
-import stat
 
 from dulwich.errors import (
     MissingCommitError, 
@@ -511,6 +510,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
         if refname in peeled_refs:
             f.write('^%s\n' % peeled_refs[refname])
 
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -534,6 +534,19 @@ class BaseRepo(object):
         :return: An open file object, or None if the file does not exist.
         """
         raise NotImplementedError(self.get_named_file)
+
+    def put_named_file(self, relpath, contents):
+        """Write a file in the control directory with specified name and 
+        contents.
+
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :param contents: Contents of the new file
+        """
+        raise NotImplementedError(self.put_named_file)
 
     def fetch(self, target, determine_wants=None, progress=None):
         """Fetch objects into another repository.
@@ -698,6 +711,15 @@ class Repo(BaseRepo):
         """Return the path of the control directory."""
         return self._controldir
 
+    def put_named_file(self, path, contents):
+        """Write a file from the control dir with a specific name and contents.
+        """
+        f = GitFile(os.path.join(self.controldir(), path, 'config'), 'wb')
+        try:
+            f.write(contents)
+        finally:
+            f.close()
+
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
@@ -798,25 +820,14 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")
-        f = GitFile(os.path.join(path, 'description'), 'wb')
-        try:
-            f.write("Unnamed repository")
-        finally:
-            f.close()
-
-        f = GitFile(os.path.join(path, 'config'), 'wb')
-        try:
-            f.write("""[core]
+        ret.put_named_file('description', "Unnamed repository")
+        ret.put_named_file('config', """[core]
     repositoryformatversion = 0
     filemode = true
     bare = false
     logallrefupdates = true
 """)
-        finally:
-            f.close()
-
-        f = GitFile(os.path.join(path, 'info', 'excludes'), 'wb')
-        f.close()
+        ret.put_named_file(os.path.join('info', 'excludes'), '')
         return ret
 
     create = init_bare

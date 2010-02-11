@@ -4,12 +4,25 @@
 
   * Support custom fields in commits.
 
+  * Improved ref handling. (Dave Borowitz)
+
+  * Rework server protocol to be smarter and interoperate with cgit client.
+    (Dave Borowitz)
+
+  * Add a GitFile class that uses the same locking protocol for writes as 
+    cgit. (Dave Borowitz)
+
  FEATURES
 
   * --without-speedups option to setup.py to allow building/installing 
     without the C extensions. (Hal Wine, Jelmer Vernooij)
 
   * Implement Repo.get_config(). (Jelmer Vernooij)
+
+  * HTTP dumb and smart server. (Dave Borowitz)
+
+  * Add abstract baseclass for Repo that does not require file system 
+    operations. (Dave Borowitz)
 
 0.4.1	2010-01-03
 

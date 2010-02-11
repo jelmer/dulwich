@@ -55,6 +55,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     )
+from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
     )
@@ -150,7 +151,7 @@ def load_pack_index(filename):
 
     :param filename: Path to the index file
     """
-    f = open(filename, 'rb')
+    f = GitFile(filename, 'rb')
     if f.read(4) == '\377tOc':
         version = struct.unpack(">L", f.read(4))[0]
         if version == 2:
@@ -211,7 +212,7 @@ class PackIndex(object):
         # ensure that it hasn't changed.
         self._size = os.path.getsize(filename)
         if file is None:
-            self._file = open(filename, 'rb')
+            self._file = GitFile(filename, 'rb')
         else:
             self._file = file
         self._contents, map_offset = simple_mmap(self._file, 0, self._size)
@@ -497,7 +498,7 @@ class PackData(object):
         self._size = os.path.getsize(filename)
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
-        self._file = open(self._filename, 'rb')
+        self._file = GitFile(self._filename, 'rb')
         self._read_header()
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=_compute_object_size)
@@ -809,7 +810,7 @@ def write_pack(filename, objects, num_objects):
     :param objects: Iterable over (object, path) tuples to write
     :param num_objects: Number of objects to write
     """
-    f = open(filename + ".pack", 'wb')
+    f = GitFile(filename + ".pack", 'wb')
     try:
         entries, data_sum = write_pack_data(f, objects, num_objects)
     finally:
@@ -873,7 +874,7 @@ def write_pack_index_v1(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    f = open(filename, 'wb')
+    f = GitFile(filename, 'wb')
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
@@ -1021,7 +1022,7 @@ def write_pack_index_v2(filename, entries, pack_checksum):
             crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
-    f = open(filename, 'wb')
+    f = GitFile(filename, 'wb')
     f = SHA1Writer(f)
     f.write('\377tOc') # Magic!
     f.write(struct.pack(">L", 2))

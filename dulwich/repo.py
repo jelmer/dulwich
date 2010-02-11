@@ -57,6 +57,18 @@ REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
+BASE_DIRECTORIES = [
+    [OBJECTDIR], 
+    [OBJECTDIR, "info"], 
+    [OBJECTDIR, "pack"],
+    ["branches"],
+    [REFSDIR],
+    [REFSDIR, REFSDIR_TAGS],
+    [REFSDIR, REFSDIR_HEADS],
+    ["hooks"],
+    ["info"]
+    ]
+
 
 def check_ref_format(refname):
     """Check if a refname is correctly formatted.
@@ -819,15 +831,7 @@ class Repo(BaseRepo):
 
     @classmethod
     def init_bare(cls, path, mkdir=True):
-        for d in [[OBJECTDIR], 
-                  [OBJECTDIR, "info"], 
-                  [OBJECTDIR, "pack"],
-                  ["branches"],
-                  [REFSDIR],
-                  [REFSDIR, REFSDIR_TAGS],
-                  [REFSDIR, REFSDIR_HEADS],
-                  ["hooks"],
-                  ["info"]]:
+        for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")

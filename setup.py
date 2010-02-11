@@ -51,7 +51,7 @@ setup(name='dulwich',
       in one of the Monty Python sketches.
       """,
       packages=['dulwich', 'dulwich.tests'],
-      scripts=['bin/dulwich', 'bin/dul-daemon'],
+      scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
       features = {'speedups': speedups},
       ext_modules = mandatory_ext_modules,
       )

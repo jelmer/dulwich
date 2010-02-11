@@ -26,6 +26,11 @@ from unittest import TestCase
 from dulwich.protocol import (
     Protocol,
     extract_capabilities,
+    extract_want_line_capabilities,
+    ack_type,
+    SINGLE_ACK,
+    MULTI_ACK,
+    MULTI_ACK_DETAILED,
     )
 
 class ProtocolTests(TestCase):
@@ -77,10 +82,30 @@ class ProtocolTests(TestCase):
         self.assertRaises(AssertionError, self.proto.read_cmd)
 
 
-class ExtractCapabilitiesTestCase(TestCase):
+class CapabilitiesTestCase(TestCase):
 
     def test_plain(self):
-        self.assertEquals(("bla", None), extract_capabilities("bla"))
+        self.assertEquals(("bla", []), extract_capabilities("bla"))
 
     def test_caps(self):
-        self.assertEquals(("bla", ["la", "la"]), extract_capabilities("bla\0la\0la"))
+        self.assertEquals(("bla", ["la"]), extract_capabilities("bla\0la"))
+        self.assertEquals(("bla", ["la"]), extract_capabilities("bla\0la\n"))
+        self.assertEquals(("bla", ["la", "la"]), extract_capabilities("bla\0la la"))
+
+    def test_plain_want_line(self):
+        self.assertEquals(("want bla", []), extract_want_line_capabilities("want bla"))
+
+    def test_caps_want_line(self):
+        self.assertEquals(("want bla", ["la"]), extract_want_line_capabilities("want bla la"))
+        self.assertEquals(("want bla", ["la"]), extract_want_line_capabilities("want bla la\n"))
+        self.assertEquals(("want bla", ["la", "la"]), extract_want_line_capabilities("want bla la la"))
+
+    def test_ack_type(self):
+        self.assertEquals(SINGLE_ACK, ack_type(['foo', 'bar']))
+        self.assertEquals(MULTI_ACK, ack_type(['foo', 'bar', 'multi_ack']))
+        self.assertEquals(MULTI_ACK_DETAILED,
+                          ack_type(['foo', 'bar', 'multi_ack_detailed']))
+        # choose detailed when both present
+        self.assertEquals(MULTI_ACK_DETAILED,
+                          ack_type(['foo', 'bar', 'multi_ack',
+                                    'multi_ack_detailed']))

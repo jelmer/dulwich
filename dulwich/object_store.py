@@ -20,7 +20,6 @@
 """Git object store interfaces and implementation."""
 
 
-import errno
 import itertools
 import os
 import stat
@@ -312,19 +311,6 @@ class DiskObjectStore(BaseObjectStore):
           return ShaFile.from_file(path)
         return None
 
-    def _add_shafile(self, sha, o):
-        dir = os.path.join(self.path, sha[:2])
-        if not os.path.isdir(dir):
-            os.mkdir(dir)
-        path = os.path.join(dir, sha[2:])
-        if os.path.exists(path):
-            return # Already there, no need to write again
-        f = GitFile(path, 'wb')
-        try:
-            f.write(o.as_legacy_object())
-        finally:
-            f.close()
-
     def get_raw(self, name):
         """Obtain the raw text for an object.
         
@@ -430,7 +416,17 @@ class DiskObjectStore(BaseObjectStore):
 
         :param obj: Object to add
         """
-        self._add_shafile(obj.id, obj)
+        dir = os.path.join(self.path, obj.id[:2])
+        if not os.path.isdir(dir):
+            os.mkdir(dir)
+        path = os.path.join(dir, obj.id[2:])
+        if os.path.exists(path):
+            return # Already there, no need to write again
+        f = GitFile(path, 'wb')
+        try:
+            f.write(obj.as_legacy_object())
+        finally:
+            f.close()
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.

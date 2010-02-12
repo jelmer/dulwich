@@ -799,7 +799,7 @@ class Repo(BaseRepo):
     def put_named_file(self, path, contents):
         """Write a file from the control dir with a specific name and contents.
         """
-        f = GitFile(os.path.join(self.controldir(), path, 'config'), 'wb')
+        f = GitFile(os.path.join(self.controldir(), path), 'wb')
         try:
             f.write(contents)
         finally:

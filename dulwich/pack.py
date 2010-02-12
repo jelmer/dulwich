@@ -72,24 +72,21 @@ supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
-def take_msb_bytes(map, offset):
+def take_msb_bytes(read):
     """Read bytes marked with most significant bit.
     
-    :param map: The buffer.
-    :param offset: Offset in the buffer at which to start reading.
+    :param read: Read function
     """
     ret = []
     while len(ret) == 0 or ret[-1] & 0x80:
-        ret.append(ord(map[offset]))
-        offset += 1
+        ret.append(ord(read(1)))
     return ret
 
 
-def read_zlib_chunks(data, offset):
+def read_zlib_chunks(read):
     """Read chunks of zlib data from a buffer.
     
-    :param data: Buffer to read from
-    :param offset: Offset at which to start reading
+    :param read: Read function
     :return: Tuple with list of chunks and length of 
         compressed data length
     """
@@ -97,8 +94,7 @@ def read_zlib_chunks(data, offset):
     ret = []
     fed = 0
     while obj.unused_data == "":
-        base = offset+fed
-        add = data[base:base+1024]
+        add = read(1024)
         if len(add) < 1024:
             add += "Z"
         fed += len(add)
@@ -107,15 +103,14 @@ def read_zlib_chunks(data, offset):
     return ret, comp_len
 
 
-def read_zlib(data, offset, dec_size):
+def read_zlib(read, dec_size):
     """Read zlib-compressed data from a buffer.
     
-    :param data: Buffer
-    :param offset: Offset in the buffer at which to read
+    :param read: Read function
     :param dec_size: Size of the decompressed buffer
     :return: Uncompressed buffer and compressed buffer length.
     """
-    ret, comp_len = read_zlib_chunks(data, offset)
+    ret, comp_len = read_zlib_chunks(read)
     x = "".join(ret)
     assert len(x) == dec_size
     return x, comp_len
@@ -414,36 +409,37 @@ def read_pack_header(f):
     return (version, num_objects)
 
 
-def unpack_object(map, offset=0):
+def unpack_object(read):
     """Unpack a Git object.
 
     :return: tuple with type, uncompressed data and compressed size
     """
-    bytes = take_msb_bytes(map, offset)
+    bytes = take_msb_bytes(read)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type == 6: # offset delta
-        bytes = take_msb_bytes(map, raw_base + offset)
+        bytes = take_msb_bytes(read)
+        raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
         delta_base_offset = bytes[0] & 0x7f
         for byte in bytes[1:]:
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        raw_base+=len(bytes)
-        uncomp, comp_len = read_zlib(map, offset + raw_base, size)
+        uncomp, comp_len = read_zlib(read, size)
         assert size == len(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base
     elif type == 7: # ref delta
-        basename = map[offset+raw_base:offset+raw_base+20]
-        uncomp, comp_len = read_zlib(map, offset+raw_base+20, size)
+        basename = map.read(20)
+        raw_base += 20
+        uncomp, comp_len = read_zlib(read, size)
         assert size == len(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base+20
+        return type, (basename, uncomp), comp_len+raw_base
     else:
-        uncomp, comp_len = read_zlib(map, offset+raw_base, size)
+        uncomp, comp_len = read_zlib(read, size)
         assert len(uncomp) == size
         return type, uncomp, comp_len+raw_base
 
@@ -580,8 +576,10 @@ class PackData(object):
             def next(self):
                 if self.i == self.num:
                     raise StopIteration
-                (type, obj, total_size) = unpack_object(self.map, self.offset)
-                crc32 = zlib.crc32(self.map[self.offset:self.offset+total_size]) & 0xffffffff
+                self.map.seek(self.offset)
+                (type, obj, total_size) = unpack_object(self.map.read)
+                self.map.seek(self.offset)
+                crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
                 ret = (self.offset, type, obj, crc32)
                 self.offset += total_size
                 if progress:
@@ -707,7 +705,8 @@ class PackData(object):
         assert offset >= self._header_size
         map, map_offset = simple_mmap(self._file, offset, self._size-offset)
         try:
-            ret = unpack_object(map, map_offset)[:2]
+            map.seek(map_offset)
+            ret = unpack_object(map.read)[:2]
             return ret
         finally:
             map.close()

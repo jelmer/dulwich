@@ -593,19 +593,6 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.get_named_file)
 
-    def put_named_file(self, relpath, contents):
-        """Write a file in the control directory with specified name and 
-        contents.
-
-        Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-baked Repo, the object returned need not be
-        pointing to a file in that location.
-
-        :param path: The path to the file, relative to the control dir.
-        :param contents: Contents of the new file
-        """
-        raise NotImplementedError(self.put_named_file)
-
     def open_index(self):
         """Open the index for this repository.
         
@@ -823,7 +810,7 @@ class Repo(BaseRepo):
         """Return the path of the control directory."""
         return self._controldir
 
-    def put_named_file(self, path, contents):
+    def _put_named_file(self, path, contents):
         """Write a file from the control dir with a specific name and contents.
         """
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
@@ -880,14 +867,14 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")
-        ret.put_named_file('description', "Unnamed repository")
-        ret.put_named_file('config', """[core]
+        ret._put_named_file('description', "Unnamed repository")
+        ret._put_named_file('config', """[core]
     repositoryformatversion = 0
     filemode = true
     bare = false
     logallrefupdates = true
 """)
-        ret.put_named_file(os.path.join('info', 'excludes'), '')
+        ret._put_named_file(os.path.join('info', 'excludes'), '')
         return ret
 
     create = init_bare

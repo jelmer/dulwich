@@ -518,8 +518,11 @@ class PackData(object):
         self._file.close()
 
     def _get_size(self):
+        if self._size is not None:
+            return self._size
         self._size = os.path.getsize(self._filename)
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (self._filename, self._size, self._header_size)
+        return self._size
   
     def _read_header(self):
         (version, self._num_objects) = read_pack_header(self._file)

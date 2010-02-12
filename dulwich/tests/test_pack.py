@@ -21,6 +21,7 @@
 """Tests for Dulwich packs."""
 
 
+from cStringIO import StringIO
 import os
 import unittest
 
@@ -283,5 +284,5 @@ class ZlibTests(unittest.TestCase):
 
     def test_simple_decompress(self):
         self.assertEquals(("tree 4ada885c9196b6b6fa08744b5862bf92896fc002\nparent None\nauthor Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\ncommitter Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n\nProvide replacement for mmap()'s offset argument.", 158), 
-        read_zlib(TEST_COMP1, 0, 229))
+        read_zlib(StringIO(TEST_COMP1).read, 229))
 

@@ -29,7 +29,6 @@ import unittest
 from dulwich import errors
 from dulwich.repo import (
     check_ref_format,
-    DiskRefsContainer,
     Repo,
     read_packed_refs,
     read_packed_refs_with_peeled,
@@ -378,7 +377,7 @@ class RefsContainerTests(unittest.TestCase):
 
     def test_delitem_symbolic(self):
         self.assertEqual('ref: refs/heads/master',
-                          self._refs._read_ref_file('HEAD'))
+                          self._refs.read_loose_ref('HEAD'))
         del self._refs['HEAD']
         self.assertRaises(KeyError, lambda: self._refs['HEAD'])
         self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
@@ -401,7 +400,7 @@ class RefsContainerTests(unittest.TestCase):
         # HEAD is now a broken symref
         self.assertRaises(KeyError, lambda: self._refs['HEAD'])
         self.assertEqual('ref: refs/heads/master',
-                          self._refs._read_ref_file('HEAD'))
+                          self._refs.read_loose_ref('HEAD'))
 
         self.assertFalse(os.path.exists(
             os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))

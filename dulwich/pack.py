@@ -502,7 +502,7 @@ class PackData(object):
             self._file = GitFile(self._filename, 'rb')
         else:
             self._file = file
-        self._read_header()
+        (version, self._num_objects) = read_pack_header(self._file)
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=_compute_object_size)
 
@@ -523,9 +523,6 @@ class PackData(object):
         self._size = os.path.getsize(self._filename)
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (self._filename, self._size, self._header_size)
         return self._size
-  
-    def _read_header(self):
-        (version, self._num_objects) = read_pack_header(self._file)
   
     def __len__(self):
         """Returns the number of objects in this pack."""

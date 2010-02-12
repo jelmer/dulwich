@@ -83,7 +83,7 @@ def take_msb_bytes(read):
     return ret
 
 
-def read_zlib_chunks(read):
+def read_zlib_chunks(read, buffer_size=4096):
     """Read chunks of zlib data from a buffer.
     
     :param read: Read function
@@ -94,8 +94,8 @@ def read_zlib_chunks(read):
     ret = []
     fed = 0
     while obj.unused_data == "":
-        add = read(1024)
-        if len(add) < 1024:
+        add = read(buffer_size)
+        if len(add) < buffer_size:
             add += "Z"
         fed += len(add)
         ret.append(obj.decompress(add))
@@ -126,19 +126,6 @@ def iter_sha1(iter):
     for name in iter:
         sha1.update(name)
     return sha1.hexdigest()
-
-
-def simple_mmap(f, offset, size):
-    """Simple wrapper for mmap() which always supports the offset parameter.
-
-    :param f: File object.
-    :param offset: Offset in the file, from the beginning of the file.
-    :param size: Size of the mmap'ed area
-    :param access: Access mechanism.
-    :return: MMAP'd area.
-    """
-    mem = mmap.mmap(f.fileno(), size+offset, access=mmap.ACCESS_READ)
-    return mem, offset
 
 
 def load_pack_index(filename):
@@ -210,8 +197,8 @@ class PackIndex(object):
             self._file = GitFile(filename, 'rb')
         else:
             self._file = file
-        self._contents, map_offset = simple_mmap(self._file, 0, self._size)
-        assert map_offset == 0
+        self._contents = mmap.mmap(self._file.fileno(), self._size,
+            access=mmap.ACCESS_READ)
   
     def __eq__(self, other):
         if not isinstance(other, PackIndex):
@@ -515,11 +502,14 @@ class PackData(object):
 
         :return: 20-byte binary SHA1 digest
         """
-        map, map_offset = simple_mmap(self._file, 0, self._size - 20)
-        try:
-            return make_sha(map[map_offset:self._size-20]).digest()
-        finally:
-            map.close()
+        s = make_sha()
+        self._file.seek(0)
+        todo = self._size - 20
+        while todo > 0:
+            x = self._file.read(min(todo, 1<<16))
+            s.update(x)
+            todo -= len(x)
+        return s.digest()
 
     def resolve_object(self, offset, type, obj, get_ref, get_offset=None):
         """Resolve an object, possibly resolving deltas when necessary.
@@ -700,13 +690,8 @@ class PackData(object):
         assert isinstance(offset, long) or isinstance(offset, int),\
                 "offset was %r" % offset
         assert offset >= self._header_size
-        map, map_offset = simple_mmap(self._file, offset, self._size-offset)
-        try:
-            map.seek(map_offset)
-            ret = unpack_object(map.read)[:2]
-            return ret
-        finally:
-            map.close()
+        self._file.seek(offset)
+        return unpack_object(self._file.read)[:2]
 
 
 class SHA1Reader(object):

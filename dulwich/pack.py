@@ -207,11 +207,12 @@ class PackIndex(object):
             self._file = file
         fileno = getattr(self._file, 'fileno', None)
         if fileno is not None:
+            fd = self._file.fileno()
             if size is None:
-                self._size = os.path.getsize(filename)
+                self._size = os.fstat(fd).st_size
             else:
                 self._size = size
-            self._contents = mmap.mmap(self._file.fileno(), self._size,
+            self._contents = mmap.mmap(fd, self._size,
                 access=mmap.ACCESS_READ)
         else:
             self._file.seek(0)

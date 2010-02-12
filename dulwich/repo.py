@@ -139,6 +139,13 @@ class RefsContainer(object):
         else:
             return self.allkeys()
 
+    def subkeys(self, base):
+        keys = set()
+        for refname in self.allkeys():
+            if refname.startswith(base):
+                keys.add(refname)
+        return keys
+
     def as_dict(self, base=None):
         """Return the contents of this container as a dictionary.
 
@@ -210,6 +217,18 @@ class RefsContainer(object):
         if sha is None:
             raise KeyError(name)
         return sha
+
+
+class DictRefsContainer(RefsContainer):
+
+    def __init__(self, refs):
+        self._refs = refs
+
+    def allkeys(self):
+        return self._refs.keys()
+
+    def read_loose_ref(self, name):
+        return self._refs[name]
 
 
 class DiskRefsContainer(RefsContainer):

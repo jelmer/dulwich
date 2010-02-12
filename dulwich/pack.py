@@ -133,7 +133,7 @@ def iter_sha1(iter):
     return sha1.hexdigest()
 
 
-def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
+def simple_mmap(f, offset, size):
     """Simple wrapper for mmap() which always supports the offset parameter.
 
     :param f: File object.
@@ -142,7 +142,7 @@ def simple_mmap(f, offset, size, access=mmap.ACCESS_READ):
     :param access: Access mechanism.
     :return: MMAP'd area.
     """
-    mem = mmap.mmap(f.fileno(), size+offset, access=access)
+    mem = mmap.mmap(f.fileno(), size+offset, access=mmap.ACCESS_READ)
     return mem, offset
 
 

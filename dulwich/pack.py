@@ -128,22 +128,31 @@ def iter_sha1(iter):
     return sha1.hexdigest()
 
 
-def load_pack_index(filename):
+def load_pack_index(path):
     """Load an index file by path.
 
     :param filename: Path to the index file
     """
-    f = GitFile(filename, 'rb')
+    f = GitFile(path, 'rb')
+    return load_pack_index_file(path, f)
+
+
+def load_pack_index_file(path, f):
+    """Load an index file from a file-like object.
+
+    :param path: Path for the index file
+    :param f: File-like object
+    """
     if f.read(4) == '\377tOc':
         version = struct.unpack(">L", f.read(4))[0]
         if version == 2:
             f.seek(0)
-            return PackIndex2(filename, file=f)
+            return PackIndex2(path, file=f)
         else:
             raise KeyError("Unknown pack index format %d" % version)
     else:
         f.seek(0)
-        return PackIndex1(filename, file=f)
+        return PackIndex1(path, file=f)
 
 
 def bisect_find_sha(start, end, sha, unpack_name):
@@ -183,7 +192,7 @@ class PackIndex(object):
     the start and end offset and then bisect in to find if the value is present.
     """
   
-    def __init__(self, filename, file=None):
+    def __init__(self, filename, file=None, size=None):
         """Create a pack index object.
     
         Provide it with the name of the index file to consider, and it will map
@@ -192,13 +201,22 @@ class PackIndex(object):
         self._filename = filename
         # Take the size now, so it can be checked each time we map the file to
         # ensure that it hasn't changed.
-        self._size = os.path.getsize(filename)
         if file is None:
             self._file = GitFile(filename, 'rb')
         else:
             self._file = file
-        self._contents = mmap.mmap(self._file.fileno(), self._size,
-            access=mmap.ACCESS_READ)
+        fileno = getattr(self._file, 'fileno', None)
+        if fileno is not None:
+            if size is None:
+                self._size = os.path.getsize(filename)
+            else:
+                self._size = size
+            self._contents = mmap.mmap(self._file.fileno(), self._size,
+                access=mmap.ACCESS_READ)
+        else:
+            self._file.seek(0)
+            self._contents = self._file.read()
+            self._size = len(self._contents)
   
     def __eq__(self, other):
         if not isinstance(other, PackIndex):
@@ -329,8 +347,8 @@ class PackIndex(object):
 class PackIndex1(PackIndex):
     """Version 1 Pack Index."""
 
-    def __init__(self, filename, file=None):
-        PackIndex.__init__(self, filename, file)
+    def __init__(self, filename, file=None, size=None):
+        PackIndex.__init__(self, filename, file, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
@@ -355,8 +373,8 @@ class PackIndex1(PackIndex):
 class PackIndex2(PackIndex):
     """Version 2 Pack Index."""
 
-    def __init__(self, filename, file=None):
-        PackIndex.__init__(self, filename, file)
+    def __init__(self, filename, file=None, size=None):
+        PackIndex.__init__(self, filename, file, size)
         assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
         (self.version, ) = unpack_from(">L", self._contents, 4)
         assert self.version == 2, "Version was %d" % self.version
@@ -467,7 +485,7 @@ class PackData(object):
     It will all just throw a zlib or KeyError.
     """
   
-    def __init__(self, filename):
+    def __init__(self, filename, file=None, size=None):
         """Create a PackData object that represents the pack in the given filename.
     
         The file must exist and stay readable until the object is disposed of. It
@@ -477,13 +495,27 @@ class PackData(object):
         mmap implementation is flawed.
         """
         self._filename = filename
-        self._size = os.path.getsize(filename)
+        if size is None:
+            self._size = os.path.getsize(filename)
+        else:
+            self._size = size
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
-        self._file = GitFile(self._filename, 'rb')
+        if file is None:
+            self._file = GitFile(self._filename, 'rb')
+        else:
+            self._file = file
         self._read_header()
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=_compute_object_size)
+
+    @classmethod
+    def from_file(cls, file, size):
+        return cls(str(file), file=file, size=size)
+
+    @classmethod
+    def from_path(cls, path):
+        return cls(filename=path)
 
     def close(self):
         self._file.close()

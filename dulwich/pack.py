@@ -496,12 +496,8 @@ class PackData(object):
         mmap implementation is flawed.
         """
         self._filename = filename
-        if size is None:
-            self._size = os.path.getsize(filename)
-        else:
-            self._size = size
+        self._size = size
         self._header_size = 12
-        assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
         if file is None:
             self._file = GitFile(self._filename, 'rb')
         else:
@@ -520,11 +516,13 @@ class PackData(object):
 
     def close(self):
         self._file.close()
+
+    def _get_size(self):
+        self._size = os.path.getsize(self._filename)
+        assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (self._filename, self._size, self._header_size)
   
     def _read_header(self):
         (version, self._num_objects) = read_pack_header(self._file)
-        self._file.seek(self._size-20)
-        self._stored_checksum = self._file.read(20)
   
     def __len__(self):
         """Returns the number of objects in this pack."""
@@ -537,7 +535,7 @@ class PackData(object):
         """
         s = make_sha()
         self._file.seek(0)
-        todo = self._size - 20
+        todo = self._get_size() - 20
         while todo > 0:
             x = self._file.read(min(todo, 1<<16))
             s.update(x)
@@ -705,7 +703,8 @@ class PackData(object):
   
     def get_stored_checksum(self):
         """Return the expected checksum stored in this pack."""
-        return self._stored_checksum
+        self._file.seek(self._get_size()-20)
+        return self._file.read(20)
   
     def check(self):
         """Check the consistency of this pack."""

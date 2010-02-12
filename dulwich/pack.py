@@ -562,10 +562,7 @@ class PackData(object):
                 self.i = 0
                 self.offset = pack._header_size
                 self.num = len(pack)
-                self.map, _ = simple_mmap(pack._file, 0, pack._size)
-
-            def __del__(self):
-                self.map.close()
+                self.map = pack._file
 
             def __iter__(self):
                 return self

@@ -494,7 +494,6 @@ class PackData(object):
         mmap implementation is flawed.
         """
         self._filename = filename
-        assert os.path.exists(filename), "%s is not a packfile" % filename
         self._size = os.path.getsize(filename)
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)

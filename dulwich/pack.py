@@ -72,24 +72,21 @@ supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
-def take_msb_bytes(map, offset):
+def take_msb_bytes(read):
     """Read bytes marked with most significant bit.
     
-    :param map: The buffer.
-    :param offset: Offset in the buffer at which to start reading.
+    :param read: Read function
     """
     ret = []
     while len(ret) == 0 or ret[-1] & 0x80:
-        ret.append(ord(map[offset]))
-        offset += 1
+        ret.append(ord(read(1)))
     return ret
 
 
-def read_zlib_chunks(data, offset):
+def read_zlib_chunks(read, buffer_size=4096):
     """Read chunks of zlib data from a buffer.
     
-    :param data: Buffer to read from
-    :param offset: Offset at which to start reading
+    :param read: Read function
     :return: Tuple with list of chunks and length of 
         compressed data length
     """
@@ -97,9 +94,8 @@ def read_zlib_chunks(data, offset):
     ret = []
     fed = 0
     while obj.unused_data == "":
-        base = offset+fed
-        add = data[base:base+1024]
-        if len(add) < 1024:
+        add = read(buffer_size)
+        if len(add) < buffer_size:
             add += "Z"
         fed += len(add)
         ret.append(obj.decompress(add))
@@ -107,15 +103,14 @@ def read_zlib_chunks(data, offset):
     return ret, comp_len
 
 
-def read_zlib(data, offset, dec_size):
+def read_zlib(read, dec_size):
     """Read zlib-compressed data from a buffer.
     
-    :param data: Buffer
-    :param offset: Offset in the buffer at which to read
+    :param read: Read function
     :param dec_size: Size of the decompressed buffer
     :return: Uncompressed buffer and compressed buffer length.
     """
-    ret, comp_len = read_zlib_chunks(data, offset)
+    ret, comp_len = read_zlib_chunks(read)
     x = "".join(ret)
     assert len(x) == dec_size
     return x, comp_len
@@ -133,35 +128,31 @@ def iter_sha1(iter):
     return sha1.hexdigest()
 
 
-def simple_mmap(f, offset, size):
-    """Simple wrapper for mmap() which always supports the offset parameter.
-
-    :param f: File object.
-    :param offset: Offset in the file, from the beginning of the file.
-    :param size: Size of the mmap'ed area
-    :param access: Access mechanism.
-    :return: MMAP'd area.
-    """
-    mem = mmap.mmap(f.fileno(), size+offset, access=mmap.ACCESS_READ)
-    return mem, offset
-
-
-def load_pack_index(filename):
+def load_pack_index(path):
     """Load an index file by path.
 
     :param filename: Path to the index file
     """
-    f = GitFile(filename, 'rb')
+    f = GitFile(path, 'rb')
+    return load_pack_index_file(path, f)
+
+
+def load_pack_index_file(path, f):
+    """Load an index file from a file-like object.
+
+    :param path: Path for the index file
+    :param f: File-like object
+    """
     if f.read(4) == '\377tOc':
         version = struct.unpack(">L", f.read(4))[0]
         if version == 2:
             f.seek(0)
-            return PackIndex2(filename, file=f)
+            return PackIndex2(path, file=f)
         else:
             raise KeyError("Unknown pack index format %d" % version)
     else:
         f.seek(0)
-        return PackIndex1(filename, file=f)
+        return PackIndex1(path, file=f)
 
 
 def bisect_find_sha(start, end, sha, unpack_name):
@@ -201,7 +192,7 @@ class PackIndex(object):
     the start and end offset and then bisect in to find if the value is present.
     """
   
-    def __init__(self, filename, file=None):
+    def __init__(self, filename, file=None, size=None):
         """Create a pack index object.
     
         Provide it with the name of the index file to consider, and it will map
@@ -210,13 +201,23 @@ class PackIndex(object):
         self._filename = filename
         # Take the size now, so it can be checked each time we map the file to
         # ensure that it hasn't changed.
-        self._size = os.path.getsize(filename)
         if file is None:
             self._file = GitFile(filename, 'rb')
         else:
             self._file = file
-        self._contents, map_offset = simple_mmap(self._file, 0, self._size)
-        assert map_offset == 0
+        fileno = getattr(self._file, 'fileno', None)
+        if fileno is not None:
+            fd = self._file.fileno()
+            if size is None:
+                self._size = os.fstat(fd).st_size
+            else:
+                self._size = size
+            self._contents = mmap.mmap(fd, self._size,
+                access=mmap.ACCESS_READ)
+        else:
+            self._file.seek(0)
+            self._contents = self._file.read()
+            self._size = len(self._contents)
   
     def __eq__(self, other):
         if not isinstance(other, PackIndex):
@@ -347,8 +348,8 @@ class PackIndex(object):
 class PackIndex1(PackIndex):
     """Version 1 Pack Index."""
 
-    def __init__(self, filename, file=None):
-        PackIndex.__init__(self, filename, file)
+    def __init__(self, filename, file=None, size=None):
+        PackIndex.__init__(self, filename, file, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
@@ -373,8 +374,8 @@ class PackIndex1(PackIndex):
 class PackIndex2(PackIndex):
     """Version 2 Pack Index."""
 
-    def __init__(self, filename, file=None):
-        PackIndex.__init__(self, filename, file)
+    def __init__(self, filename, file=None, size=None):
+        PackIndex.__init__(self, filename, file, size)
         assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
         (self.version, ) = unpack_from(">L", self._contents, 4)
         assert self.version == 2, "Version was %d" % self.version
@@ -414,36 +415,37 @@ def read_pack_header(f):
     return (version, num_objects)
 
 
-def unpack_object(map, offset=0):
+def unpack_object(read):
     """Unpack a Git object.
 
     :return: tuple with type, uncompressed data and compressed size
     """
-    bytes = take_msb_bytes(map, offset)
+    bytes = take_msb_bytes(read)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type == 6: # offset delta
-        bytes = take_msb_bytes(map, raw_base + offset)
+        bytes = take_msb_bytes(read)
+        raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
         delta_base_offset = bytes[0] & 0x7f
         for byte in bytes[1:]:
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        raw_base+=len(bytes)
-        uncomp, comp_len = read_zlib(map, offset + raw_base, size)
+        uncomp, comp_len = read_zlib(read, size)
         assert size == len(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base
     elif type == 7: # ref delta
-        basename = map[offset+raw_base:offset+raw_base+20]
-        uncomp, comp_len = read_zlib(map, offset+raw_base+20, size)
+        basename = map.read(20)
+        raw_base += 20
+        uncomp, comp_len = read_zlib(read, size)
         assert size == len(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base+20
+        return type, (basename, uncomp), comp_len+raw_base
     else:
-        uncomp, comp_len = read_zlib(map, offset+raw_base, size)
+        uncomp, comp_len = read_zlib(read, size)
         assert len(uncomp) == size
         return type, uncomp, comp_len+raw_base
 
@@ -484,7 +486,7 @@ class PackData(object):
     It will all just throw a zlib or KeyError.
     """
   
-    def __init__(self, filename):
+    def __init__(self, filename, file=None, size=None):
         """Create a PackData object that represents the pack in the given filename.
     
         The file must exist and stay readable until the object is disposed of. It
@@ -494,13 +496,27 @@ class PackData(object):
         mmap implementation is flawed.
         """
         self._filename = filename
-        self._size = os.path.getsize(filename)
+        if size is None:
+            self._size = os.path.getsize(filename)
+        else:
+            self._size = size
         self._header_size = 12
         assert self._size >= self._header_size, "%s is too small for a packfile (%d < %d)" % (filename, self._size, self._header_size)
-        self._file = GitFile(self._filename, 'rb')
+        if file is None:
+            self._file = GitFile(self._filename, 'rb')
+        else:
+            self._file = file
         self._read_header()
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=_compute_object_size)
+
+    @classmethod
+    def from_file(cls, file, size):
+        return cls(str(file), file=file, size=size)
+
+    @classmethod
+    def from_path(cls, path):
+        return cls(filename=path)
 
     def close(self):
         self._file.close()
@@ -519,11 +535,14 @@ class PackData(object):
 
         :return: 20-byte binary SHA1 digest
         """
-        map, map_offset = simple_mmap(self._file, 0, self._size - 20)
-        try:
-            return make_sha(map[map_offset:self._size-20]).digest()
-        finally:
-            map.close()
+        s = make_sha()
+        self._file.seek(0)
+        todo = self._size - 20
+        while todo > 0:
+            x = self._file.read(min(todo, 1<<16))
+            s.update(x)
+            todo -= len(x)
+        return s.digest()
 
     def resolve_object(self, offset, type, obj, get_ref, get_offset=None):
         """Resolve an object, possibly resolving deltas when necessary.
@@ -566,10 +585,7 @@ class PackData(object):
                 self.i = 0
                 self.offset = pack._header_size
                 self.num = len(pack)
-                self.map, _ = simple_mmap(pack._file, 0, pack._size)
-
-            def __del__(self):
-                self.map.close()
+                self.map = pack._file
 
             def __iter__(self):
                 return self
@@ -580,8 +596,10 @@ class PackData(object):
             def next(self):
                 if self.i == self.num:
                     raise StopIteration
-                (type, obj, total_size) = unpack_object(self.map, self.offset)
-                crc32 = zlib.crc32(self.map[self.offset:self.offset+total_size]) & 0xffffffff
+                self.map.seek(self.offset)
+                (type, obj, total_size) = unpack_object(self.map.read)
+                self.map.seek(self.offset)
+                crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
                 ret = (self.offset, type, obj, crc32)
                 self.offset += total_size
                 if progress:
@@ -705,12 +723,8 @@ class PackData(object):
         assert isinstance(offset, long) or isinstance(offset, int),\
                 "offset was %r" % offset
         assert offset >= self._header_size
-        map, map_offset = simple_mmap(self._file, offset, self._size-offset)
-        try:
-            ret = unpack_object(map, map_offset)[:2]
-            return ret
-        finally:
-            map.close()
+        self._file.seek(offset)
+        return unpack_object(self._file.read)[:2]
 
 
 class SHA1Reader(object):

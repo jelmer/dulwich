@@ -62,6 +62,18 @@ def tear_down_repo(repo):
     shutil.rmtree(temp_dir)
 
 
+
+class CreateRepositoryTests(unittest.TestCase):
+
+    def test_create(self):
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            repo = Repo.init_bare(tmp_dir)
+            self.assertEquals(tmp_dir, repo._controldir)
+        finally:
+            shutil.rmtree(tmp_dir)
+
+
 class RepositoryTests(unittest.TestCase):
 
     def setUp(self):
@@ -70,7 +82,7 @@ class RepositoryTests(unittest.TestCase):
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
-  
+
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.controldir(), r.path)
@@ -207,6 +219,7 @@ THREES = "3" * 40
 FOURS = "4" * 40
 
 class PackedRefsFileTests(unittest.TestCase):
+
     def test_split_ref_line_errors(self):
         self.assertRaises(errors.PackedRefsException, _split_ref_line,
                           'singlefield')
@@ -255,6 +268,7 @@ class PackedRefsFileTests(unittest.TestCase):
 
 
 class RefsContainerTests(unittest.TestCase):
+
     def setUp(self):
         self._repo = open_repo('refs.git')
         self._refs = self._repo.refs

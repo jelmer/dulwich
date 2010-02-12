@@ -253,6 +253,10 @@ class PackBasedObjectStore(BaseObjectStore):
     def _load_packs(self):
         raise NotImplementedError(self._load_packs)
 
+    def _pack_cache_stale(self):
+        """Check whether the pack cache is stale."""
+        raise NotImplementedError(self._pack_cache_stale)
+
     def _add_known_pack(self, pack):
         """Add a newly appeared pack to the cache by path.
 
@@ -263,7 +267,7 @@ class PackBasedObjectStore(BaseObjectStore):
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is None:
+        if self._pack_cache is None or self._pack_cache_stale():
             self._pack_cache = self._load_packs()
         return self._pack_cache
 
@@ -332,11 +336,14 @@ class DiskObjectStore(PackBasedObjectStore):
         super(DiskObjectStore, self).__init__()
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
+        self._pack_cache_time = 0
 
     def _load_packs(self):
         pack_files = []
         try:
-            for name in os.listdir(self.pack_dir):
+            self._pack_cache_time = os.stat(self.pack_dir).st_mtime
+            pack_dir_contents = os.listdir(self.pack_dir)
+            for name in pack_dir_contents:
                 # TODO: verify that idx exists first
                 if name.startswith("pack-") and name.endswith(".pack"):
                     filename = os.path.join(self.pack_dir, name)
@@ -348,6 +355,14 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_files.sort(reverse=True)
         suffix_len = len(".pack")
         return [Pack(f[:-suffix_len]) for _, f in pack_files]
+
+    def _pack_cache_stale(self):
+        try:
+            return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return True
+            raise
 
     def _get_shafile_path(self, sha):
         dir = sha[:2]

@@ -35,32 +35,12 @@ from dulwich.repo import (
     write_packed_refs,
     _split_ref_line,
     )
+from dulwich.tests.utils import (
+    open_repo,
+    tear_down_repo,
+    )
 
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
-
-
-def open_repo(name):
-    """Open a copy of a repo in a temporary directory.
-
-    Use this function for accessing repos in dulwich/tests/data/repos to avoid
-    accidentally or intentionally modifying those repos in place. Use
-    tear_down_repo to delete any temp files created.
-
-    :param name: The name of the repository, relative to
-        dulwich/tests/data/repos
-    :returns: An initialized Repo object that lives in a temporary directory.
-    """
-    temp_dir = tempfile.mkdtemp()
-    repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
-    temp_repo_dir = os.path.join(temp_dir, name)
-    shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
-    return Repo(temp_repo_dir)
-
-def tear_down_repo(repo):
-    """Tear down a test repository."""
-    temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
-    shutil.rmtree(temp_dir)
-
 
 
 class CreateRepositoryTests(unittest.TestCase):
@@ -82,7 +62,7 @@ class RepositoryTests(unittest.TestCase):
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
-
+  
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.controldir(), r.path)
@@ -219,7 +199,6 @@ THREES = "3" * 40
 FOURS = "4" * 40
 
 class PackedRefsFileTests(unittest.TestCase):
-
     def test_split_ref_line_errors(self):
         self.assertRaises(errors.PackedRefsException, _split_ref_line,
                           'singlefield')
@@ -268,7 +247,6 @@ class PackedRefsFileTests(unittest.TestCase):
 
 
 class RefsContainerTests(unittest.TestCase):
-
     def setUp(self):
         self._repo = open_repo('refs.git')
         self._refs = self._repo.refs

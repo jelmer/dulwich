@@ -87,8 +87,8 @@ def read_zlib_chunks(read, buffer_size=4096):
     """Read chunks of zlib data from a buffer.
     
     :param read: Read function
-    :return: Tuple with list of chunks and length of 
-        compressed data length
+    :return: Tuple with list of chunks, length of 
+        compressed data length and unused read data
     """
     obj = zlib.decompressobj()
     ret = []
@@ -100,7 +100,7 @@ def read_zlib_chunks(read, buffer_size=4096):
         fed += len(add)
         ret.append(obj.decompress(add))
     comp_len = fed-len(obj.unused_data)
-    return ret, comp_len
+    return ret, comp_len, obj.unused_data
 
 
 def read_zlib(read, dec_size):
@@ -108,12 +108,14 @@ def read_zlib(read, dec_size):
     
     :param read: Read function
     :param dec_size: Size of the decompressed buffer
-    :return: Uncompressed buffer and compressed buffer length.
+    :return: Uncompressed buffer, compressed buffer length and unused read
+        data.
     """
-    ret, comp_len = read_zlib_chunks(read)
+    ret, comp_len, unused = read_zlib_chunks(read)
     x = "".join(ret)
     assert len(x) == dec_size
-    return x, comp_len
+    return x, comp_len, unused
+
 
 
 def iter_sha1(iter):
@@ -418,7 +420,8 @@ def read_pack_header(f):
 def unpack_object(read):
     """Unpack a Git object.
 
-    :return: tuple with type, uncompressed data and compressed size
+    :return: tuple with type, uncompressed data, compressed size and 
+        tail data
     """
     bytes = take_msb_bytes(read)
     type = (bytes[0] >> 4) & 0x07
@@ -435,19 +438,19 @@ def unpack_object(read):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp, comp_len = read_zlib(read, size)
+        uncomp, comp_len, unused = read_zlib(read, size)
         assert size == len(uncomp)
-        return type, (delta_base_offset, uncomp), comp_len+raw_base
+        return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
         basename = map.read(20)
         raw_base += 20
-        uncomp, comp_len = read_zlib(read, size)
+        uncomp, comp_len, unused = read_zlib(read, size)
         assert size == len(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base
+        return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp, comp_len = read_zlib(read, size)
+        uncomp, comp_len, unused = read_zlib(read, size)
         assert len(uncomp) == size
-        return type, uncomp, comp_len+raw_base
+        return type, uncomp, comp_len+raw_base, unused
 
 
 def _compute_object_size((num, obj)):
@@ -595,7 +598,7 @@ class PackData(object):
                 if self.i == self.num:
                     raise StopIteration
                 self.map.seek(self.offset)
-                (type, obj, total_size) = unpack_object(self.map.read)
+                (type, obj, total_size, unused) = unpack_object(self.map.read)
                 self.map.seek(self.offset)
                 crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
                 ret = (self.offset, type, obj, crc32)

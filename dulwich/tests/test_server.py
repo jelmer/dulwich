@@ -81,31 +81,34 @@ class HandlerTestCase(TestCase):
     def setUp(self):
         self._handler = Handler(None, None, None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
+        self._handler.required_capabilities = lambda: ('cap2',)
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except GitProtocolError:
-            self.fail()
+        except GitProtocolError, e:
+            self.fail(e)
 
     def test_capability_line(self):
         self.assertEquals('cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
-
-        self.assertSucceeds(set_caps, [])
         self.assertSucceeds(set_caps, ['cap2'])
         self.assertSucceeds(set_caps, ['cap1', 'cap2'])
+
         # different order
         self.assertSucceeds(set_caps, ['cap3', 'cap1', 'cap2'])
-        self.assertRaises(GitProtocolError, set_caps, ['capxxx', 'cap1'])
+
+        # error cases
+        self.assertRaises(GitProtocolError, set_caps, ['capxxx', 'cap2'])
+        self.assertRaises(GitProtocolError, set_caps, ['cap1', 'cap3'])
 
         # ignore innocuous but unknown capabilities
-        self.assertRaises(GitProtocolError, set_caps, ['ignoreme'])
+        self.assertRaises(GitProtocolError, set_caps, ['cap2', 'ignoreme'])
         self.assertFalse('ignoreme' in self._handler.capabilities())
         self._handler.innocuous_capabilities = lambda: ('ignoreme',)
-        self.assertSucceeds(set_caps, ['ignoreme'])
+        self.assertSucceeds(set_caps, ['cap2', 'ignoreme'])
 
     def test_has_capability(self):
         self.assertRaises(GitProtocolError, self._handler.has_capability, 'cap')
@@ -122,7 +125,8 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.proto = TestProto()
 
     def test_progress(self):
-        self._handler.set_client_capabilities([])
+        caps = self._handler.required_capabilities()
+        self._handler.set_client_capabilities(caps)
         self._handler.progress('first message')
         self._handler.progress('second message')
         self.assertEqual('first message',
@@ -132,7 +136,8 @@ class UploadPackHandlerTestCase(TestCase):
         self.assertEqual(None, self._handler.proto.get_received_line(2))
 
     def test_no_progress(self):
-        self._handler.set_client_capabilities(['no-progress'])
+        caps = list(self._handler.required_capabilities()) + ['no-progress']
+        self._handler.set_client_capabilities(caps)
         self._handler.progress('first message')
         self._handler.progress('second message')
         self.assertEqual(None, self._handler.proto.get_received_line(2))

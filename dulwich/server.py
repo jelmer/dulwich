@@ -166,7 +166,7 @@ class Handler(object):
             if cap not in my_caps:
                 raise GitProtocolError('Client asked for capability %s that '
                                        'was not advertised.' % cap)
-        self._client_capabilities = caps
+        self._client_capabilities = set(caps)
 
     def has_capability(self, cap):
         if self._client_capabilities is None:
@@ -187,26 +187,29 @@ class UploadPackHandler(Handler):
 
     def capabilities(self):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta")
+                "ofs-delta", "no-progress")
+
+    def progress(self, message):
+        if self.has_capability("no-progress"):
+            return
+        self.proto.write_sideband(2, message)
 
     def handle(self):
-
-        progress = lambda x: self.proto.write_sideband(2, x)
         write = lambda x: self.proto.write_sideband(1, x)
 
         graph_walker = ProtocolGraphWalker(self)
         objects_iter = self.backend.fetch_objects(
-          graph_walker.determine_wants, graph_walker, progress)
+          graph_walker.determine_wants, graph_walker, self.progress)
 
         # Do they want any objects?
         if len(objects_iter) == 0:
             return
 
-        progress("dul-daemon says what\n")
-        progress("counting objects: %d, done.\n" % len(objects_iter))
+        self.progress("dul-daemon says what\n")
+        self.progress("counting objects: %d, done.\n" % len(objects_iter))
         write_pack_data(ProtocolFile(None, write), objects_iter, 
                         len(objects_iter))
-        progress("how was that, then?\n")
+        self.progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
 

@@ -160,6 +160,7 @@ class Handler(object):
     def capabilities(self):
         raise NotImplementedError(self.capabilities)
 
+<<<<<<< HEAD
     def set_client_capabilities(self, caps):
         my_caps = self.capabilities()
         for cap in caps:
@@ -167,6 +168,19 @@ class Handler(object):
                 raise GitProtocolError('Client asked for capability %s that '
                                        'was not advertised.' % cap)
         self._client_capabilities = set(caps)
+=======
+    def innocuous_capabilities(self):
+        return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
+
+    def set_client_capabilities(self, caps):
+        allowable_caps = set(self.innocuous_capabilities())
+        allowable_caps.update(self.capabilities())
+        for cap in caps:
+            if cap not in allowable_caps:
+                raise GitProtocolError('Client asked for capability %s that '
+                                       'was not advertised.' % cap)
+        self._client_capabilities = caps
+>>>>>>> Refactor server capability code into base Handler.
 
     def has_capability(self, cap):
         if self._client_capabilities is None:
@@ -189,11 +203,14 @@ class UploadPackHandler(Handler):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
                 "ofs-delta", "no-progress")
 
+<<<<<<< HEAD
     def progress(self, message):
         if self.has_capability("no-progress"):
             return
         self.proto.write_sideband(2, message)
 
+=======
+>>>>>>> Refactor server capability code into base Handler.
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
@@ -521,8 +538,8 @@ class ReceivePackHandler(Handler):
         if self.advertise_refs or not self.stateless_rpc:
             if refs:
                 self.proto.write_pkt_line(
-                    "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
-                                       self.capability_line()))
+                  "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
+                                     self.capability_line()))
                 for i in range(1, len(refs)):
                     ref = refs[i]
                     self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))

@@ -160,17 +160,12 @@ class Handler(object):
     def capabilities(self):
         raise NotImplementedError(self.capabilities)
 
-<<<<<<< HEAD
-    def set_client_capabilities(self, caps):
-        my_caps = self.capabilities()
-        for cap in caps:
-            if cap not in my_caps:
-                raise GitProtocolError('Client asked for capability %s that '
-                                       'was not advertised.' % cap)
-        self._client_capabilities = set(caps)
-=======
     def innocuous_capabilities(self):
         return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
+
+    def required_capabilities(self):
+        """Return a list of capabilities that we require the client to have."""
+        return []
 
     def set_client_capabilities(self, caps):
         allowable_caps = set(self.innocuous_capabilities())
@@ -179,8 +174,11 @@ class Handler(object):
             if cap not in allowable_caps:
                 raise GitProtocolError('Client asked for capability %s that '
                                        'was not advertised.' % cap)
-        self._client_capabilities = caps
->>>>>>> Refactor server capability code into base Handler.
+        for cap in self.required_capabilities():
+            if cap not in caps:
+                raise GitProtocolError('Client does not support required '
+                                       'capability %s.' % cap)
+        self._client_capabilities = set(caps)
 
     def has_capability(self, cap):
         if self._client_capabilities is None:
@@ -203,14 +201,14 @@ class UploadPackHandler(Handler):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
                 "ofs-delta", "no-progress")
 
-<<<<<<< HEAD
+    def required_capabilities(self):
+        return ("side-band-64k", "thin-pack", "ofs-delta")
+
     def progress(self, message):
         if self.has_capability("no-progress"):
             return
         self.proto.write_sideband(2, message)
 
-=======
->>>>>>> Refactor server capability code into base Handler.
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
@@ -531,6 +529,9 @@ class ReceivePackHandler(Handler):
 
     def capabilities(self):
         return ("report-status", "delete-refs")
+
+    def required_capabilities(self):
+        return ("delete-refs",)
 
     def handle(self):
         refs = self.backend.get_refs().items()

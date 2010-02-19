@@ -108,6 +108,28 @@ class HandlerTestCase(TestCase):
         self.assertFalse(self._handler.has_capability('capxxx'))
 
 
+class UploadPackHandlerTestCase(TestCase):
+    def setUp(self):
+        self._handler = UploadPackHandler(None, None, None)
+        self._handler.proto = TestProto()
+
+    def test_progress(self):
+        self._handler.set_client_capabilities([])
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual('first message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual('second message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+    def test_no_progress(self):
+        self._handler.set_client_capabilities(['no-progress'])
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+
 class TestCommit(object):
     def __init__(self, sha, parents, commit_time):
         self.id = sha

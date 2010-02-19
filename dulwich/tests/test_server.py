@@ -93,12 +93,19 @@ class HandlerTestCase(TestCase):
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
+
         self.assertSucceeds(set_caps, [])
         self.assertSucceeds(set_caps, ['cap2'])
         self.assertSucceeds(set_caps, ['cap1', 'cap2'])
         # different order
         self.assertSucceeds(set_caps, ['cap3', 'cap1', 'cap2'])
         self.assertRaises(GitProtocolError, set_caps, ['capxxx', 'cap1'])
+
+        # ignore innocuous but unknown capabilities
+        self.assertRaises(GitProtocolError, set_caps, ['ignoreme'])
+        self.assertFalse('ignoreme' in self._handler.capabilities())
+        self._handler.innocuous_capabilities = lambda: ('ignoreme',)
+        self.assertSucceeds(set_caps, ['ignoreme'])
 
     def test_has_capability(self):
         self.assertRaises(GitProtocolError, self._handler.has_capability, 'cap')

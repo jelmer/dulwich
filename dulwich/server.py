@@ -123,7 +123,6 @@ class GitBackend(Backend):
             status.append(('unpack', 'ok'))
 
         for oldsha, sha, ref in refs:
-            # TODO: check refname
             ref_error = None
             try:
                 if sha == ZERO_SHA:

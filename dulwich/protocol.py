@@ -28,6 +28,8 @@ from dulwich.errors import (
 
 TCP_GIT_PORT = 9418
 
+ZERO_SHA = "0" * 40
+
 SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2

@@ -66,11 +66,12 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def apply_pack(self, refs, read):
+    def apply_pack(self, refs, read, delete_refs=True):
         """ Import a set of changes into a repository and update the refs
 
         :param refs: list of tuple(name, sha)
         :param read: callback to read from the incoming pack
+        :param delete_refs: whether to allow deleting refs
         """
         raise NotImplementedError
 
@@ -93,7 +94,7 @@ class GitBackend(Backend):
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
 
-    def apply_pack(self, refs, read):
+    def apply_pack(self, refs, read, delete_refs=True):
         f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
         status = []
@@ -124,7 +125,11 @@ class GitBackend(Backend):
             # TODO: check refname
             ref_error = None
             try:
-                if ref == "0" * 40:
+                if sha == "0" * 40:
+                    if not delete_refs:
+                        raise GitProtocolError(
+                          'Attempted to delete refs without delete-refs '
+                          'capability.')
                     try:
                         del self.repo.refs[ref]
                     except all_exceptions:
@@ -530,9 +535,6 @@ class ReceivePackHandler(Handler):
     def capabilities(self):
         return ("report-status", "delete-refs")
 
-    def required_capabilities(self):
-        return ("delete-refs",)
-
     def handle(self):
         refs = self.backend.get_refs().items()
 
@@ -567,7 +569,8 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.backend.apply_pack(client_refs, self.proto.read)
+        status = self.backend.apply_pack(client_refs, self.proto.read,
+                                         self.has_capability('delete-refs'))
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

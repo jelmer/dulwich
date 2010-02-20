@@ -42,6 +42,7 @@ from dulwich.protocol import (
     Protocol,
     ProtocolFile,
     TCP_GIT_PORT,
+    ZERO_SHA,
     extract_capabilities,
     extract_want_line_capabilities,
     SINGLE_ACK,
@@ -125,7 +126,7 @@ class GitBackend(Backend):
             # TODO: check refname
             ref_error = None
             try:
-                if sha == "0" * 40:
+                if sha == ZERO_SHA:
                     if not delete_refs:
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
@@ -547,7 +548,8 @@ class ReceivePackHandler(Handler):
                     ref = refs[i]
                     self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
             else:
-                self.proto.write_pkt_line("0000000000000000000000000000000000000000 capabilities^{} %s" % self.capability_line())
+                self.proto.write_pkt_line("%s capabilities^{} %s" % (
+                  ZERO_SHA, self.capability_line()))
 
             self.proto.write("0000")
             if self.advertise_refs:

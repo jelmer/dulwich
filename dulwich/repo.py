@@ -648,7 +648,8 @@ class BaseRepo(object):
                 progress))
         return self.get_refs()
 
-    def fetch_objects(self, determine_wants, graph_walker, progress):
+    def fetch_objects(self, determine_wants, graph_walker, progress,
+                      get_tagged=None):
         """Fetch the missing objects required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads 
@@ -658,12 +659,15 @@ class BaseRepo(object):
             that a revision is present.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(haves, wants, progress))
+            self.object_store.find_missing_objects(haves, wants, progress,
+                                                   get_tagged))
 
     def get_graph_walker(self, heads=None):
         if heads is None:

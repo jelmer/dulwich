@@ -195,16 +195,20 @@ class BaseObjectStore(object):
                 else:
                     yield path, mode, hexsha
 
-    def find_missing_objects(self, haves, wants, progress=None):
+    def find_missing_objects(self, haves, wants, progress=None,
+                             get_tagged=None):
         """Find the missing objects required for a set of revisions.
 
         :param haves: Iterable over SHAs already in common.
         :param wants: Iterable over SHAs of objects to fetch.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         :return: Iterator over (sha, path) pairs.
         """
-        return iter(MissingObjectFinder(self, haves, wants, progress).next, None)
+        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged)
+        return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
         """Find which revisions this store has in common using graphwalker.
@@ -637,9 +641,13 @@ class MissingObjectFinder(object):
     :param haves: SHA1s of commits not to send (already present in target)
     :param wants: SHA1s of commits to send
     :param progress: Optional function to report progress to.
+    :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+        sha for including tags.
+    :param tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
-    def __init__(self, object_store, haves, wants, progress=None):
+    def __init__(self, object_store, haves, wants, progress=None,
+                 get_tagged=None):
         self.sha_done = set(haves)
         self.objects_to_send = set([(w, None, False) for w in wants if w not in haves])
         self.object_store = object_store
@@ -647,6 +655,7 @@ class MissingObjectFinder(object):
             self.progress = lambda x: None
         else:
             self.progress = progress
+        self._tagged = get_tagged and get_tagged() or {}
 
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
@@ -673,6 +682,8 @@ class MissingObjectFinder(object):
                 self.parse_tree(o)
             elif isinstance(o, Tag):
                 self.parse_tag(o)
+        if sha in self._tagged:
+            self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)

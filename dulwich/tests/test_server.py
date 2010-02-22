@@ -142,6 +142,31 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.progress('second message')
         self.assertEqual(None, self._handler.proto.get_received_line(2))
 
+    def test_get_tagged(self):
+        refs = {
+            'refs/tags/tag1': ONE,
+            'refs/tags/tag2': TWO,
+            'refs/heads/master': FOUR,  # not a tag, no peeled value
+            }
+        peeled = {
+            'refs/tags/tag1': '1234',
+            'refs/tags/tag2': '5678',
+            }
+
+        class TestRepo(object):
+            def get_peeled(self, ref):
+                return peeled.get(ref, refs[ref])
+
+        caps = list(self._handler.required_capabilities()) + ['include-tag']
+        self._handler.set_client_capabilities(caps)
+        self.assertEquals({'1234': ONE, '5678': TWO},
+                          self._handler.get_tagged(refs, repo=TestRepo()))
+
+        # non-include-tag case
+        caps = self._handler.required_capabilities()
+        self._handler.set_client_capabilities(caps)
+        self.assertEquals({}, self._handler.get_tagged(refs, repo=TestRepo()))
+
 
 class TestCommit(object):
     def __init__(self, sha, parents, commit_time):

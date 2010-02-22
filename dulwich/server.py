@@ -76,11 +76,14 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def fetch_objects(self, determine_wants, graph_walker, progress):
+    def fetch_objects(self, determine_wants, graph_walker, progress,
+                      get_tagged=None):
         """
         Yield the objects required for a list of commits.
 
         :param progress: is a callback to send progress messages to the client
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         """
         raise NotImplementedError
 
@@ -91,6 +94,7 @@ class GitBackend(Backend):
         if repo is None:
             repo = Repo(tmpfile.mkdtemp())
         self.repo = repo
+        self.refs = self.repo.refs
         self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
@@ -204,7 +208,7 @@ class UploadPackHandler(Handler):
 
     def capabilities(self):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta", "no-progress")
+                "ofs-delta", "no-progress", "include-tag")
 
     def required_capabilities(self):
         return ("side-band-64k", "thin-pack", "ofs-delta")
@@ -214,12 +218,42 @@ class UploadPackHandler(Handler):
             return
         self.proto.write_sideband(2, message)
 
+    def get_tagged(self, refs=None, repo=None):
+        """Get a dict of peeled values of tags to their original tag shas.
+
+        :param refs: dict of refname -> sha of possible tags; defaults to all of
+            the backend's refs.
+        :param repo: optional Repo instance for getting peeled refs; defaults to
+            the backend's repo, if available
+        :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
+            tag whose peeled value is peeled_sha.
+        """
+        if not self.has_capability("include-tag"):
+            return {}
+        if refs is None:
+            refs = self.backend.get_refs()
+        if repo is None:
+            repo = getattr(self.backend, "repo", None)
+            if repo is None:
+                # Bail if we don't have a Repo available; this is ok since
+                # clients must be able to handle if the server doesn't include
+                # all relevant tags.
+                # TODO: either guarantee a Repo, or fix behavior when missing
+                return {}
+        tagged = {}
+        for name, sha in refs.iteritems():
+            peeled_sha = repo.get_peeled(name)
+            if peeled_sha != sha:
+                tagged[peeled_sha] = sha
+        return tagged
+
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
         graph_walker = ProtocolGraphWalker(self)
         objects_iter = self.backend.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress)
+          graph_walker.determine_wants, graph_walker, self.progress,
+          get_tagged=self.get_tagged)
 
         # Do they want any objects?
         if len(objects_iter) == 0:

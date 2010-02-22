@@ -99,3 +99,6 @@ class DiskObjectStoreTests(ObjectStoreTests,TestCase):
             shutil.rmtree("foo")
         os.makedirs(os.path.join("foo", "pack"))
         self.store = DiskObjectStore("foo")
+
+
+# TODO: MissingObjectFinderTests

@@ -442,7 +442,7 @@ def unpack_object(read):
         assert size == len(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
-        basename = map.read(20)
+        basename = read(20)
         raw_base += 20
         uncomp, comp_len, unused = read_zlib(read, size)
         assert size == len(uncomp)

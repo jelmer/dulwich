@@ -22,6 +22,7 @@
 """Repository access."""
 
 
+import ConfigParser
 import errno
 import os
 
@@ -671,8 +672,9 @@ class BaseRepo(object):
         return self.commit(sha).parents
 
     def get_config(self):
-        from configobj import ConfigObj
-        return ConfigObj(os.path.join(self._controldir, 'config'))
+        p = ConfigParser.RawConfigParser()
+        p.read(os.path.join(self._controldir, 'config'))
+        return dict((section, dict(p.items(section))) for section in p.sections())
 
     def commit(self, sha):
         return self._get_object(sha, Commit)

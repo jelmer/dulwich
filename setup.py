@@ -1,11 +1,12 @@
 #!/usr/bin/python
 # Setup file for bzr-git
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2010 Jelmer Vernooij <jelmer@samba.org>
 
 try:
     from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
+from distutils.core import Distribution
 
 dulwich_version_string = '0.5.0'
 
@@ -15,27 +16,23 @@ import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
 
-ext_modules = [
-    Extension('dulwich._objects', ['dulwich/_objects.c'],
-              include_dirs=include_dirs),
-    Extension('dulwich._pack', ['dulwich/_pack.c'],
-              include_dirs=include_dirs),
-    ]
 
-try:
-    from setuptools import Feature
-except ImportError:
-    speedups = None
-    mandatory_ext_modules = ext_modules
-else:
-    mandatory_ext_modules = []
-    speedups = Feature(
-        "optional C speed-enhancements",
-        standard = True,
-        ext_modules=ext_modules,
-    )
+class DulwichDistribution(Distribution):
 
+    def is_pure(self):
+        if self.pure:
+            return True
 
+    def has_ext_modules(self):
+        return not self.pure
+
+    global_options = Distribution.global_options + [
+        ('pure', None, 
+            "use pure (slower) Python code instead of C extensions")]
+
+    pure = False
+
+        
 setup(name='dulwich',
       description='Pure-Python Git Library',
       keywords='git',
@@ -52,6 +49,11 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
-      features = {'speedups': speedups},
-      ext_modules = mandatory_ext_modules,
+      ext_modules = [
+          Extension('dulwich._objects', ['dulwich/_objects.c'],
+                    include_dirs=include_dirs),
+          Extension('dulwich._pack', ['dulwich/_pack.c'],
+              include_dirs=include_dirs),
+          ],
+      distclass=DulwichDistribution,
       )

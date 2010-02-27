@@ -12,6 +12,9 @@
   * Add a GitFile class that uses the same locking protocol for writes as 
     cgit. (Dave Borowitz)
 
+  * Cope with forward slashes correctly in the index on Windows.
+    (Jelmer Vernooij, #526793)
+
  FEATURES
 
   * --without-speedups option to setup.py to allow building/installing 

@@ -36,6 +36,27 @@ from dulwich.pack import (
     )
 
 
+def pathsplit(path):
+    """Split a /-delimited path into a directory part and a basename.
+
+    :param path: The path to split.
+    :return: Tuple with directory name and basename
+    """
+    try:
+        (dirname, basename) = path.rsplit("/", 1)
+    except ValueError:
+        return ("", path)
+    else:
+        return (dirname, basename)
+
+
+def pathjoin(*args):
+    """Join a /-delimited path.
+
+    """
+    return "/".join([p for p in args if p])
+
+
 def read_cache_time(f):
     """Read a cache time.
     
@@ -274,7 +295,7 @@ def commit_tree(object_store, blobs):
     def add_tree(path):
         if path in trees:
             return trees[path]
-        dirname, basename = os.path.split(path)
+        dirname, basename = pathsplit(path)
         t = add_tree(dirname)
         assert isinstance(basename, str)
         newtree = {}
@@ -283,7 +304,7 @@ def commit_tree(object_store, blobs):
         return newtree
 
     for path, sha, mode in blobs:
-        tree_path, basename = os.path.split(path)
+        tree_path, basename = pathsplit(path)
         tree = add_tree(tree_path)
         tree[basename] = (mode, sha)
 
@@ -292,7 +313,7 @@ def commit_tree(object_store, blobs):
         for basename, entry in trees[path].iteritems():
             if type(entry) == dict:
                 mode = stat.S_IFDIR
-                sha = build_tree(os.path.join(path, basename))
+                sha = build_tree(pathjoin(path, basename))
             else:
                 (mode, sha) = entry
             tree.add(mode, basename, sha)

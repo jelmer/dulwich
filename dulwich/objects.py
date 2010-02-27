@@ -393,6 +393,29 @@ class Blob(ShaFile):
         pass  # it's impossible for raw data to be malformed
 
 
+def _parse_tag_or_commit(text):
+    """Parse tag or commit text.
+
+    :param text: the raw text of the tag or commit object.
+    :yield: tuples of (field, value), one per header line, in the order read
+        from the text, possibly including duplicates. Includes a field named
+        None for the freeform tag/commit text.
+    """
+    f = StringIO(text)
+    for l in f:
+        l = l.rstrip("\n")
+        if l == "":
+            # Empty line indicates end of headers
+            break
+        yield l.split(" ", 1)
+    yield (None, f.read())
+    f.close()
+
+
+def parse_tag(text):
+    return _parse_tag_or_commit(text)
+
+
 class Tag(ShaFile):
     """A Git Tag object."""
 
@@ -425,7 +448,6 @@ class Tag(ShaFile):
         :raise ObjectFormatException: if the object is malformed in some way
         """
         super(Tag, self).check()
-        # TODO(dborowitz): check header order
         self._check_has_member("_object_sha", "missing object sha")
         self._check_has_member("_object_class", "missing object type")
         self._check_has_member("_name", "missing tag name")
@@ -437,6 +459,18 @@ class Tag(ShaFile):
 
         if getattr(self, "_tagger", None):
             check_identity(self._tagger, "invalid tagger")
+
+        last = None
+        for field, _ in parse_tag("".join(self._chunked_text)):
+            if field == _OBJECT_HEADER and last is not None:
+                raise ObjectFormatException("unexpected object")
+            elif field == _TYPE_HEADER and last != _OBJECT_HEADER:
+                raise ObjectFormatException("unexpected type")
+            elif field == _TAG_HEADER and last != _TYPE_HEADER:
+                raise ObjectFormatException("unexpected tag name")
+            elif field == _TAGGER_HEADER and last != _TAG_HEADER:
+                raise ObjectFormatException("unexpected tagger")
+            last = field
 
     def _serialize(self):
         chunks = []
@@ -458,12 +492,7 @@ class Tag(ShaFile):
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
-        f = StringIO("".join(chunks))
-        for l in f:
-            l = l.rstrip("\n")
-            if l == "":
-                break # empty line indicates end of headers
-            (field, value) = l.split(" ", 1)
+        for field, value in parse_tag("".join(chunks)):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
             elif field == _TYPE_HEADER:
@@ -484,9 +513,10 @@ class Tag(ShaFile):
                     self._tag_time = int(timetext)
                     self._tag_timezone, self._tag_timezone_neg_utc = \
                             parse_timezone(timezonetext)
+            elif field is None:
+                self._message = value
             else:
                 raise AssertionError("Unknown field %s" % field)
-        self._message = f.read()
 
     def _get_object(self):
         """Get the object pointed to by this tag.
@@ -702,6 +732,10 @@ def format_timezone(offset, negative_utc=False):
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 
+def parse_commit(text):
+    return _parse_tag_or_commit(text)
+
+
 class Commit(ShaFile):
     """A git commit object"""
 
@@ -729,13 +763,7 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
-        f = StringIO("".join(chunks))
-        for l in f:
-            l = l.rstrip("\n")
-            if l == "":
-                # Empty line indicates end of headers
-                break
-            (field, value) = l.split(" ", 1)
+        for field, value in parse_commit("".join(self._chunked_text)):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:
@@ -752,9 +780,10 @@ class Commit(ShaFile):
                     parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:
                 self._encoding = value
+            elif field is None:
+                self._message = value
             else:
                 self._extra.append((field, value))
-        self._message = f.read()
 
     def check(self):
         """Check this object for internal consistency.
@@ -762,8 +791,6 @@ class Commit(ShaFile):
         :raise ObjectFormatException: if the object is malformed in some way
         """
         super(Commit, self).check()
-        # TODO(dborowitz): check header order
-        # TODO(dborowitz): check for duplicate headers
         self._check_has_member("_tree", "missing tree")
         self._check_has_member("_author", "missing author")
         self._check_has_member("_committer", "missing committer")
@@ -775,6 +802,24 @@ class Commit(ShaFile):
 
         check_identity(self._author, "invalid author")
         check_identity(self._committer, "invalid committer")
+
+        last = None
+        for field, _ in parse_commit("".join(self._chunked_text)):
+            if field == _TREE_HEADER and last is not None:
+                raise ObjectFormatException("unexpected tree")
+            elif field == _PARENT_HEADER and last not in (_PARENT_HEADER,
+                                                          _TREE_HEADER):
+                raise ObjectFormatException("unexpected parent")
+            elif field == _AUTHOR_HEADER and last not in (_TREE_HEADER,
+                                                          _PARENT_HEADER):
+                raise ObjectFormatException("unexpected author")
+            elif field == _COMMITTER_HEADER and last != _AUTHOR_HEADER:
+                raise ObjectFormatException("unexpected committer")
+            elif field == _ENCODING_HEADER and last != _COMMITTER_HEADER:
+                raise ObjectFormatException("unexpected encoding")
+            last = field
+
+        # TODO: optionally check for duplicate parents
 
     def _serialize(self):
         chunks = []

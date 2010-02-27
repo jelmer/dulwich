@@ -6,6 +6,7 @@ try:
     from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
+from distutils.core import Distribution
 
 dulwich_version_string = '0.5.0'
 
@@ -36,6 +37,19 @@ else:
     )
 
 
+class dulwichDistribution(Distribution):
+    def is_pure(self):
+        if self.pure:
+            return True
+    def has_ext_modules(self):
+        if self.pure:
+            return False
+        
+dulwichDistribution.pure = 0
+dulwichDistribution.global_options.append(('pure', None, "use pure (slow) Python "
+"code instead of C extensions"))
+        
+
 setup(name='dulwich',
       description='Pure-Python Git Library',
       keywords='git',
@@ -54,4 +68,5 @@ setup(name='dulwich',
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
       features = {'speedups': speedups},
       ext_modules = mandatory_ext_modules,
+      distclass=dulwichDistribution,
       )

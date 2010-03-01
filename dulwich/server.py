@@ -259,7 +259,10 @@ class ProtocolGraphWalker(object):
                 if not i:
                     line = "%s\x00%s" % (line, self.handler.capability_line())
                 self.proto.write_pkt_line("%s\n" % line)
-                # TODO: include peeled value of any tags
+                peeled_sha = self.handler.backend.repo.get_peeled(ref)
+                if peeled_sha != sha:
+                    self.proto.write_pkt_line('%s %s^{}\n' %
+                                              (peeled_sha, ref))
 
             # i'm done..
             self.proto.write_pkt_line(None)

@@ -27,6 +27,7 @@ import tempfile
 import unittest
 
 from dulwich import errors
+from dulwich import objects
 from dulwich.repo import (
     check_ref_format,
     Repo,
@@ -75,8 +76,10 @@ class RepositoryTests(unittest.TestCase):
     def test_get_refs(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual({
-            'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097', 
-            'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
+            'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            'refs/tags/mytag-packed': 'b0931cadc54336e78a1d980420e3268903b57a50',
             }, r.get_refs())
   
     def test_head(self):
@@ -112,7 +115,40 @@ class RepositoryTests(unittest.TestCase):
     def test_tree_not_tree(self):
         r = self._repo = open_repo('a.git')
         self.assertRaises(errors.NotTreeError, r.tree, r.head())
-  
+
+    def test_tag(self):
+        r = self._repo = open_repo('a.git')
+        tag_sha = '28237f4dc30d0d462658d6b937b08a0f0b6ef55a'
+        tag = r.tag(tag_sha)
+        self.assertEqual(tag._type, 'tag')
+        self.assertEqual(tag.sha().hexdigest(), tag_sha)
+        obj_type, obj_sha = tag.object
+        self.assertEqual(obj_type, objects.Commit)
+        self.assertEqual(obj_sha, r.head())
+
+    def test_tag_not_tag(self):
+        r = self._repo = open_repo('a.git')
+        self.assertRaises(errors.NotTagError, r.tag, r.head())
+
+    def test_get_peeled(self):
+        # unpacked ref
+        r = self._repo = open_repo('a.git')
+        tag_sha = '28237f4dc30d0d462658d6b937b08a0f0b6ef55a'
+        self.assertNotEqual(r[tag_sha].sha().hexdigest(), r.head())
+        self.assertEqual(r.get_peeled('refs/tags/mytag'), r.head())
+
+        # packed ref with cached peeled value
+        packed_tag_sha = 'b0931cadc54336e78a1d980420e3268903b57a50'
+        parent_sha = r[r.head()].parents[0]
+        self.assertNotEqual(r[packed_tag_sha].sha().hexdigest(), parent_sha)
+        self.assertEqual(r.get_peeled('refs/tags/mytag-packed'), parent_sha)
+
+        # TODO: add more corner cases to test repo
+
+    def test_get_peeled_not_tag(self):
+        r = self._repo = open_repo('a.git')
+        self.assertEqual(r.get_peeled('HEAD'), r.head())
+
     def test_get_blob(self):
         r = self._repo = open_repo('a.git')
         commit = r.commit(r.head())
@@ -255,27 +291,47 @@ class RefsContainerTests(unittest.TestCase):
         tear_down_repo(self._repo)
 
     def test_get_packed_refs(self):
-        self.assertEqual(
-            {'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c'},
-            self._refs.get_packed_refs())
+        self.assertEqual({
+            'refs/heads/packed': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+            'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
+            }, self._refs.get_packed_refs())
+
+    def test_get_peeled_not_packed(self):
+        # not packed
+        self.assertEqual(None, self._refs.get_peeled('refs/tags/refs-0.2'))
+        self.assertEqual('3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
+                         self._refs['refs/tags/refs-0.2'])
+
+        # packed, known not peelable
+        self.assertEqual(self._refs['refs/heads/packed'],
+                         self._refs.get_peeled('refs/heads/packed'))
+
+        # packed, peeled
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs.get_peeled('refs/tags/refs-0.1'))
 
     def test_keys(self):
         self.assertEqual([
             'HEAD',
             'refs/heads/loop',
             'refs/heads/master',
+            'refs/heads/packed',
             'refs/tags/refs-0.1',
+            'refs/tags/refs-0.2',
             ], sorted(list(self._refs.keys())))
-        self.assertEqual(['loop', 'master'],
+        self.assertEqual(['loop', 'master', 'packed'],
                          sorted(self._refs.keys('refs/heads')))
-        self.assertEqual(['refs-0.1'], list(self._refs.keys('refs/tags')))
+        self.assertEqual(['refs-0.1', 'refs-0.2'],
+                         sorted(self._refs.keys('refs/tags')))
 
     def test_as_dict(self):
         # refs/heads/loop does not show up
         self.assertEqual({
             'HEAD': '42d06bd4b77fed026b154d16493e5deab78f02ec',
             'refs/heads/master': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+            'refs/heads/packed': '42d06bd4b77fed026b154d16493e5deab78f02ec',
             'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
+            'refs/tags/refs-0.2': '3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
             }, self._refs.as_dict())
 
     def test_setitem(self):

@@ -61,6 +61,12 @@ class NotTreeError(WrongObjectException):
     _type = 'tree'
 
 
+class NotTagError(WrongObjectException):
+    """Indicates that the sha requested does not point to a tag."""
+
+    _type = 'tag'
+
+
 class NotBlobError(WrongObjectException):
     """Indicates that the sha requested does not point to a blob."""
   

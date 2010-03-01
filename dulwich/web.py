@@ -24,10 +24,6 @@ import os
 import re
 import time
 
-from dulwich.objects import (
-    Tag,
-    num_type_map,
-    )
 from dulwich.repo import (
     Repo,
     )
@@ -151,15 +147,9 @@ def get_info_refs(req, backend, mat, services=None):
             if not o:
                 continue
             yield '%s\t%s\n' % (sha, name)
-            obj_type = num_type_map[o.type]
-            if obj_type == Tag:
-                while obj_type == Tag:
-                    num_type, sha = o.object
-                    obj_type = num_type_map[num_type]
-                    o = backend.repo[sha]
-                if not o:
-                    continue
-                yield '%s\t%s^{}\n' % (o.sha(), name)
+            peeled_sha = backend.repo.get_peeled(name)
+            if peeled_sha != sha:
+                yield '%s\t%s^{}\n' % (peeled_sha, name)
 
 
 def get_info_packs(req, backend, mat):

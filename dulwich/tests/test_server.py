@@ -45,6 +45,7 @@ TWO = '2' * 40
 THREE = '3' * 40
 FOUR = '4' * 40
 FIVE = '5' * 40
+SIX = '6' * 40
 
 class TestProto(object):
     def __init__(self):
@@ -143,14 +144,23 @@ class TestCommit(object):
         return '%s(%s)' % (self.__class__.__name__, self._sha)
 
 
+class TestRepo(object):
+    def __init__(self):
+        self.peeled = {}
+
+    def get_peeled(self, name):
+        return self.peeled[name]
+
+
 class TestBackend(object):
-    def __init__(self, objects):
+    def __init__(self, repo, objects):
+        self.repo = repo
         self.object_store = objects
 
 
 class TestUploadPackHandler(Handler):
     def __init__(self, objects, proto):
-        self.backend = TestBackend(objects)
+        self.backend = TestBackend(TestRepo(), objects)
         self.proto = proto
         self.stateless_rpc = False
         self.advertise_refs = False
@@ -172,6 +182,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             FOUR: TestCommit(FOUR, [TWO], 444),
             FIVE: TestCommit(FIVE, [THREE], 555),
             }
+
         self._walker = ProtocolGraphWalker(
             TestUploadPackHandler(self._objects, TestProto()))
 
@@ -225,6 +236,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             'want %s' % TWO,
             ])
         heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
+        self._walker.handler.backend.repo.peeled = heads
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
@@ -238,6 +250,35 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+
+    def test_determine_wants_advertisement(self):
+        self._walker.proto.set_output([])
+        # advertise branch tips plus tag
+        heads = {'ref4': FOUR, 'ref5': FIVE, 'tag6': SIX}
+        peeled = {'ref4': FOUR, 'ref5': FIVE, 'tag6': FIVE}
+        self._walker.handler.backend.repo.peeled = peeled
+        self._walker.determine_wants(heads)
+        lines = []
+        while True:
+            line = self._walker.proto.get_received_line()
+            if line == 'None':
+                break
+            # strip capabilities list if present
+            if '\x00' in line:
+                line = line[:line.index('\x00')]
+            lines.append(line.rstrip())
+
+        self.assertEquals([
+            '%s ref4' % FOUR,
+            '%s ref5' % FIVE,
+            '%s tag6^{}' % FIVE,
+            '%s tag6' % SIX,
+            ], sorted(lines))
+
+        # ensure peeled tag was advertised immediately following tag
+        for i, line in enumerate(lines):
+            if line.endswith(' tag6'):
+                self.assertEquals('%s tag6^{}' % FIVE, lines[i+1])
 
     # TODO: test commit time cutoff
 

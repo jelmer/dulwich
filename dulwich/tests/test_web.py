@@ -113,13 +113,28 @@ class DumbHandlersTestCase(WebTestCase):
         blob2 = TestBlob('222')
         blob3 = TestBlob('333')
 
-        tag1 = TestTag('aaa', TestTag.type, 'bbb')
-        tag2 = TestTag('bbb', TestBlob.type, '222')
+        tag1 = TestTag('aaa', TestBlob.type, '222')
+
+        class TestRepo(object):
+            def __init__(self, objects, peeled):
+                self._objects = dict((o.sha(), o) for o in objects)
+                self._peeled = peeled
+
+            def get_peeled(self, sha):
+                return self._peeled[sha]
+
+            def __getitem__(self, sha):
+                return self._objects[sha]
 
         class TestBackend(object):
             def __init__(self):
-                objects = [blob1, blob2, blob3, tag1, tag2]
-                self.repo = dict((o.sha(), o) for o in objects)
+                objects = [blob1, blob2, blob3, tag1]
+                self.repo = TestRepo(objects, {
+                    'HEAD': '000',
+                    'refs/heads/master': blob1.sha(),
+                    'refs/tags/tag-tag': blob2.sha(),
+                    'refs/tags/blob-tag': blob3.sha(),
+                    })
 
             def get_refs(self):
                 return {

@@ -20,7 +20,7 @@
   * --pure option to setup.py to allow building/installing without the C 
     extensions. (Hal Wine, Anatoly Techtonik, Jelmer Vernooij, #434326)
 
-  * Implement Repo.get_config(). (Jelmer Vernooij)
+  * Implement Repo.get_config(). (Jelmer Vernooij, Augie Fackler)
 
   * HTTP dumb and smart server. (Dave Borowitz)
 

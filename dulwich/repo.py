@@ -22,15 +22,21 @@
 """Repository access."""
 
 
+import errno
 import os
-import stat
 
 from dulwich.errors import (
     MissingCommitError, 
+    NoIndexPresent,
     NotBlobError, 
     NotCommitError, 
     NotGitRepository,
     NotTreeError, 
+    PackedRefsException,
+    )
+from dulwich.file import (
+    ensure_dir_exists,
+    GitFile,
     )
 from dulwich.object_store import (
     DiskObjectStore,
@@ -41,6 +47,7 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    hex_to_sha,
     )
 
 OBJECTDIR = 'objects'
@@ -50,36 +57,61 @@ REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
+BASE_DIRECTORIES = [
+    [OBJECTDIR], 
+    [OBJECTDIR, "info"], 
+    [OBJECTDIR, "pack"],
+    ["branches"],
+    [REFSDIR],
+    [REFSDIR, REFSDIR_TAGS],
+    [REFSDIR, REFSDIR_HEADS],
+    ["hooks"],
+    ["info"]
+    ]
 
-def follow_ref(container, name):
-    """Follow a ref back to a SHA1.
-    
-    :param container: Ref container to use for looking up refs.
-    :param name: Name of the original ref.
+
+def read_info_refs(f):
+    ret = {}
+    for l in f.readlines():
+        (sha, name) = l.rstrip("\n").split("\t", 1)
+        ret[name] = sha
+    return ret
+
+
+def check_ref_format(refname):
+    """Check if a refname is correctly formatted.
+
+    Implements all the same rules as git-check-ref-format[1].
+
+    [1] http://www.kernel.org/pub/software/scm/git/docs/git-check-ref-format.html
+
+    :param refname: The refname to check
+    :return: True if refname is valid, False otherwise
     """
-    contents = container[name]
-    if contents.startswith(SYMREF):
-        ref = contents[len(SYMREF):]
-        if ref[-1] == '\n':
-            ref = ref[:-1]
-        return follow_ref(container, ref)
-    assert len(contents) == 40, 'Invalid ref in %s' % name
-    return contents
+    # These could be combined into one big expression, but are listed separately
+    # to parallel [1].
+    if '/.' in refname or refname.startswith('.'):
+        return False
+    if '/' not in refname:
+        return False
+    if '..' in refname:
+        return False
+    for c in refname:
+        if ord(c) < 040 or c in '\177 ~^:?*[':
+            return False
+    if refname[-1] in '/.':
+        return False
+    if refname.endswith('.lock'):
+        return False
+    if '@{' in refname:
+        return False
+    if '\\' in refname:
+        return False
+    return True
 
 
 class RefsContainer(object):
     """A container for refs."""
-
-    def as_dict(self, base):
-        """Return the contents of this ref container under base as a dict."""
-        raise NotImplementedError(self.as_dict)
-
-    def follow(self, name):
-        """Follow a ref name back to a SHA1.
-        
-        :param name: Name of the ref
-        """
-        return follow_ref(self, name)
 
     def set_ref(self, name, other):
         """Make a ref point at another ref.
@@ -87,11 +119,124 @@ class RefsContainer(object):
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
         """
-        self[name] = "ref: %s\n" % other
+        self[name] = SYMREF + other + '\n'
+
+    def get_packed_refs(self):
+        """Get contents of the packed-refs file.
+
+        :return: Dictionary mapping ref names to SHA1s
+
+        :note: Will return an empty dictionary when no packed-refs file is
+            present.
+        """
+        raise NotImplementedError(self.get_packed_refs)
 
     def import_refs(self, base, other):
         for name, value in other.iteritems():
             self["%s/%s" % (base, name)] = value
+
+    def keys(self, base=None):
+        """Refs present in this container.
+
+        :param base: An optional base to return refs under
+        :return: An unsorted set of valid refs in this container, including
+            packed refs.
+        """
+        if base is not None:
+            return self.subkeys(base)
+        else:
+            return self.allkeys()
+
+    def subkeys(self, base):
+        keys = set()
+        for refname in self.allkeys():
+            if refname.startswith(base):
+                keys.add(refname)
+        return keys
+
+    def as_dict(self, base=None):
+        """Return the contents of this container as a dictionary.
+
+        """
+        ret = {}
+        keys = self.keys(base)
+        if base is None:
+            base = ""
+        for key in keys:
+            try:
+                ret[key] = self[("%s/%s" % (base, key)).strip("/")]
+            except KeyError:
+                continue # Unable to resolve
+
+        return ret
+
+    def _check_refname(self, name):
+        """Ensure a refname is valid and lives in refs or is HEAD.
+
+        HEAD is not a valid refname according to git-check-ref-format, but this
+        class needs to be able to touch HEAD. Also, check_ref_format expects
+        refnames without the leading 'refs/', but this class requires that
+        so it cannot touch anything outside the refs dir (or HEAD).
+
+        :param name: The name of the reference.
+        :raises KeyError: if a refname is not HEAD or is otherwise not valid.
+        """
+        if name == 'HEAD':
+            return
+        if not name.startswith('refs/') or not check_ref_format(name[5:]):
+            raise KeyError(name)
+
+    def read_loose_ref(self, name):
+        """Read a loose reference and return its contents.
+
+        :param name: the refname to read
+        :return: The contents of the ref file, or None if it does 
+            not exist.
+        """
+        raise NotImplementedError(self.read_loose_ref)
+
+    def _follow(self, name):
+        """Follow a reference name.
+
+        :return: a tuple of (refname, sha), where refname is the name of the
+            last reference in the symbolic reference chain
+        """
+        self._check_refname(name)
+        contents = SYMREF + name
+        depth = 0
+        while contents.startswith(SYMREF):
+            refname = contents[len(SYMREF):]
+            contents = self.read_loose_ref(refname)
+            if not contents:
+                contents = self.get_packed_refs().get(refname, None)
+                if not contents:
+                    break
+            depth += 1
+            if depth > 5:
+                raise KeyError(name)
+        return refname, contents
+
+    def __getitem__(self, name):
+        """Get the SHA1 for a reference name.
+
+        This method follows all symbolic references.
+        """
+        _, sha = self._follow(name)
+        if sha is None:
+            raise KeyError(name)
+        return sha
+
+
+class DictRefsContainer(RefsContainer):
+
+    def __init__(self, refs):
+        self._refs = refs
+
+    def allkeys(self):
+        return self._refs.keys()
+
+    def read_loose_ref(self, name):
+        return self._refs[name]
 
 
 class DiskRefsContainer(RefsContainer):
@@ -99,55 +244,41 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(self, path):
         self.path = path
+        self._packed_refs = None
+        self._peeled_refs = {}
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.path)
 
-    def keys(self, base=None):
-        """Refs present in this container."""
-        return list(self.iterkeys(base))
-
-    def iterkeys(self, base=None):
-        if base is not None:
-            return self.itersubkeys(base)
-        else:
-            return self.iterallkeys()
-
-    def itersubkeys(self, base):
+    def subkeys(self, base):
+        keys = set()
         path = self.refpath(base)
         for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip("/").replace(os.path.sep, "/")
+            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                yield ("%s/%s" % (dir, filename)).strip("/")
+                refname = ("%s/%s" % (dir, filename)).strip("/")
+                # check_ref_format requires at least one /, so we prepend the
+                # base before calling it.
+                if check_ref_format("%s/%s" % (base, refname)):
+                    keys.add(refname)
+        for key in self.get_packed_refs():
+            if key.startswith(base):
+                keys.add(key[len(base):].strip("/"))
+        return keys
 
-    def iterallkeys(self):
+    def allkeys(self):
+        keys = set()
         if os.path.exists(self.refpath("HEAD")):
-            yield "HEAD"
+            keys.add("HEAD")
         path = self.refpath("")
         for root, dirs, files in os.walk(self.refpath("refs")):
-            dir = root[len(path):].strip("/").replace(os.path.sep, "/")
+            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                yield ("%s/%s" % (dir, filename)).strip("/")
-
-    def as_dict(self, base=None, follow=True):
-        """Return the contents of this container as a dictionary.
-
-        """
-        ret = {}
-        if base is None:
-            keys = self.iterkeys()
-            base = ""
-        else:
-            keys = self.itersubkeys(base)
-        for key in keys:
-                if follow:
-                    try:
-                        ret[key] = self.follow(("%s/%s" % (base, key)).strip("/"))
-                    except KeyError:
-                        continue # Unable to resolve
-                else:
-                    ret[key] = self[("%s/%s" % (base, key)).strip("/")]
-        return ret
+                refname = ("%s/%s" % (dir, filename)).strip("/")
+                if check_ref_format(refname):
+                    keys.add(refname)
+        keys.update(self.get_packed_refs())
+        return keys
 
     def refpath(self, name):
         """Return the disk path of a ref.
@@ -157,90 +288,318 @@ class DiskRefsContainer(RefsContainer):
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
 
-    def __getitem__(self, name):
-        file = self.refpath(name)
-        if not os.path.exists(file):
-            raise KeyError(name)
-        f = open(file, 'rb')
+    def get_packed_refs(self):
+        """Get contents of the packed-refs file.
+
+        :return: Dictionary mapping ref names to SHA1s
+
+        :note: Will return an empty dictionary when no packed-refs file is
+            present.
+        """
+        # TODO: invalidate the cache on repacking
+        if self._packed_refs is None:
+            self._packed_refs = {}
+            path = os.path.join(self.path, 'packed-refs')
+            try:
+                f = GitFile(path, 'rb')
+            except IOError, e:
+                if e.errno == errno.ENOENT:
+                    return {}
+                raise
+            try:
+                first_line = iter(f).next().rstrip()
+                if (first_line.startswith("# pack-refs") and " peeled" in
+                        first_line):
+                    for sha, name, peeled in read_packed_refs_with_peeled(f):
+                        self._packed_refs[name] = sha
+                        if peeled:
+                            self._peeled_refs[name] = peeled
+                else:
+                    f.seek(0)
+                    for sha, name in read_packed_refs(f):
+                        self._packed_refs[name] = sha
+            finally:
+                f.close()
+        return self._packed_refs
+
+    def read_loose_ref(self, name):
+        """Read a reference file and return its contents.
+
+        If the reference file a symbolic reference, only read the first line of
+        the file. Otherwise, only read the first 40 bytes.
+
+        :param name: the refname to read, relative to refpath
+        :return: The contents of the ref file, or None if the file does not
+            exist.
+        :raises IOError: if any other error occurs
+        """
+        filename = self.refpath(name)
         try:
-            return f.read().strip("\n")
+            f = GitFile(filename, 'rb')
+            try:
+                header = f.read(len(SYMREF))
+                if header == SYMREF:
+                    # Read only the first line
+                    return header + iter(f).next().rstrip("\n")
+                else:
+                    # Read only the first 40 bytes
+                    return header + f.read(40-len(SYMREF))
+            finally:
+                f.close()
+        except IOError, e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
+
+    def _remove_packed_ref(self, name):
+        if self._packed_refs is None:
+            return
+        filename = os.path.join(self.path, 'packed-refs')
+        # reread cached refs from disk, while holding the lock
+        f = GitFile(filename, 'wb')
+        try:
+            self._packed_refs = None
+            self.get_packed_refs()
+
+            if name not in self._packed_refs:
+                return
+
+            del self._packed_refs[name]
+            if name in self._peeled_refs:
+                del self._peeled_refs[name]
+            write_packed_refs(f, self._packed_refs, self._peeled_refs)
+            f.close()
+        finally:
+            f.abort()
+
+    def set_if_equals(self, name, old_ref, new_ref):
+        """Set a refname to new_ref only if it currently equals old_ref.
+
+        This method follows all symbolic references, and can be used to perform
+        an atomic compare-and-swap operation.
+
+        :param name: The refname to set.
+        :param old_ref: The old sha the refname must refer to, or None to set
+            unconditionally.
+        :param new_ref: The new sha the refname will refer to.
+        :return: True if the set was successful, False otherwise.
+        """
+        try:
+            realname, _ = self._follow(name)
+        except KeyError:
+            realname = name
+        filename = self.refpath(realname)
+        ensure_dir_exists(os.path.dirname(filename))
+        f = GitFile(filename, 'wb')
+        try:
+            if old_ref is not None:
+                try:
+                    # read again while holding the lock
+                    orig_ref = self.read_loose_ref(realname)
+                    if orig_ref is None:
+                        orig_ref = self.get_packed_refs().get(realname, None)
+                    if orig_ref != old_ref:
+                        f.abort()
+                        return False
+                except (OSError, IOError):
+                    f.abort()
+                    raise
+            try:
+                f.write(new_ref+"\n")
+            except (OSError, IOError):
+                f.abort()
+                raise
         finally:
             f.close()
+        return True
+
+    def add_if_new(self, name, ref):
+        """Add a new reference only if it does not already exist."""
+        self._check_refname(name)
+        filename = self.refpath(name)
+        ensure_dir_exists(os.path.dirname(filename))
+        f = GitFile(filename, 'wb')
+        try:
+            if os.path.exists(filename) or name in self.get_packed_refs():
+                f.abort()
+                return False
+            try:
+                f.write(ref+"\n")
+            except (OSError, IOError):
+                f.abort()
+                raise
+        finally:
+            f.close()
+        return True
 
     def __setitem__(self, name, ref):
-        file = self.refpath(name)
-        dirpath = os.path.dirname(file)
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-        f = open(file, 'wb')
+        """Set a reference name to point to the given SHA1.
+
+        This method follows all symbolic references.
+
+        :note: This method unconditionally overwrites the contents of a reference
+            on disk. To update atomically only if the reference has not changed
+            on disk, use set_if_equals().
+        """
+        self.set_if_equals(name, None, ref)
+
+    def remove_if_equals(self, name, old_ref):
+        """Remove a refname only if it currently equals old_ref.
+
+        This method does not follow symbolic references. It can be used to
+        perform an atomic compare-and-delete operation.
+
+        :param name: The refname to delete.
+        :param old_ref: The old sha the refname must refer to, or None to delete
+            unconditionally.
+        :return: True if the delete was successful, False otherwise.
+        """
+        self._check_refname(name)
+        filename = self.refpath(name)
+        ensure_dir_exists(os.path.dirname(filename))
+        f = GitFile(filename, 'wb')
         try:
-            f.write(ref+"\n")
+            if old_ref is not None:
+                orig_ref = self.read_loose_ref(name)
+                if orig_ref is None:
+                    orig_ref = self.get_packed_refs().get(name, None)
+                if orig_ref != old_ref:
+                    return False
+            # may only be packed
+            try:
+                os.remove(filename)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
+            self._remove_packed_ref(name)
         finally:
-            f.close()
+            # never write, we just wanted the lock
+            f.abort()
+        return True
 
     def __delitem__(self, name):
-        file = self.refpath(name)
-        if os.path.exists(file):
-            os.remove(file)
+        """Remove a refname.
+
+        This method does not follow symbolic references.
+        :note: This method unconditionally deletes the contents of a reference
+            on disk. To delete atomically only if the reference has not changed
+            on disk, use set_if_equals().
+        """
+        self.remove_if_equals(name, None)
+
+
+def _split_ref_line(line):
+    """Split a single ref line into a tuple of SHA1 and name."""
+    fields = line.rstrip("\n").split(" ")
+    if len(fields) != 2:
+        raise PackedRefsException("invalid ref line '%s'" % line)
+    sha, name = fields
+    try:
+        hex_to_sha(sha)
+    except (AssertionError, TypeError), e:
+        raise PackedRefsException(e)
+    if not check_ref_format(name):
+        raise PackedRefsException("invalid ref name '%s'" % name)
+    return (sha, name)
 
 
 def read_packed_refs(f):
     """Read a packed refs file.
 
-    Yields tuples with ref names and SHA1s.
+    Yields tuples with SHA1s and ref names.
 
     :param f: file-like object to read from
     """
-    l = f.readline()
-    for l in f.readlines():
+    for l in f:
         if l[0] == "#":
             # Comment
             continue
         if l[0] == "^":
-            # FIXME: Return somehow
+            raise PackedRefsException(
+                "found peeled ref in packed-refs without peeled")
+        yield _split_ref_line(l)
+
+
+def read_packed_refs_with_peeled(f):
+    """Read a packed refs file including peeled refs.
+
+    Assumes the "# pack-refs with: peeled" line was already read. Yields tuples
+    with ref names, SHA1s, and peeled SHA1s (or None).
+
+    :param f: file-like object to read from, seek'ed to the second line
+    """
+    last = None
+    for l in f:
+        if l[0] == "#":
             continue
-        yield tuple(l.rstrip("\n").split(" ", 2))
+        l = l.rstrip("\n")
+        if l[0] == "^":
+            if not last:
+                raise PackedRefsException("unexpected peeled ref line")
+            try:
+                hex_to_sha(l[1:])
+            except (AssertionError, TypeError), e:
+                raise PackedRefsException(e)
+            sha, name = _split_ref_line(last)
+            last = None
+            yield (sha, name, l[1:])
+        else:
+            if last:
+                sha, name = _split_ref_line(last)
+                yield (sha, name, None)
+            last = l
+    if last:
+        sha, name = _split_ref_line(last)
+        yield (sha, name, None)
 
 
-class Repo(object):
-    """A local git repository.
-    
-    :ivar refs: Dictionary with the refs in this repository
+def write_packed_refs(f, packed_refs, peeled_refs=None):
+    """Write a packed refs file.
+
+    :param f: empty file-like object to write to
+    :param packed_refs: dict of refname to sha of packed refs to write
+    """
+    if peeled_refs is None:
+        peeled_refs = {}
+    else:
+        f.write('# pack-refs with: peeled\n')
+    for refname in sorted(packed_refs.iterkeys()):
+        f.write('%s %s\n' % (packed_refs[refname], refname))
+        if refname in peeled_refs:
+            f.write('^%s\n' % peeled_refs[refname])
+
+
+class BaseRepo(object):
+    """Base class for a git repository.
+
     :ivar object_store: Dictionary-like object for accessing
         the objects
+    :ivar refs: Dictionary-like object with the refs in this repository
     """
 
-    def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
-            self.bare = False
-            self._controldir = os.path.join(root, ".git")
-        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
-              os.path.isdir(os.path.join(root, REFSDIR))):
-            self.bare = True
-            self._controldir = root
-        else:
-            raise NotGitRepository(root)
-        self.path = root
-        self.refs = DiskRefsContainer(self.controldir())
-        self.object_store = DiskObjectStore(
-            os.path.join(self.controldir(), OBJECTDIR))
+    def __init__(self, object_store, refs):
+        self.object_store = object_store
+        self.refs = refs
 
-    def controldir(self):
-        """Return the path of the control directory."""
-        return self._controldir
+    def get_named_file(self, path):
+        """Get a file from the control dir with a specific name.
 
-    def index_path(self):
-        """Return path to the index file."""
-        return os.path.join(self.controldir(), INDEX_FILENAME)
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :return: An open file object, or None if the file does not exist.
+        """
+        raise NotImplementedError(self.get_named_file)
 
     def open_index(self):
-        """Open the index for this repository."""
-        from dulwich.index import Index
-        return Index(self.index_path())
-
-    def has_index(self):
-        """Check if an index is present."""
-        return os.path.exists(self.index_path())
+        """Open the index for this repository.
+        
+        :raises NoIndexPresent: If no index is present
+        :return: Index instance
+        """
+        raise NotImplementedError(self.open_index)
 
     def fetch(self, target, determine_wants=None, progress=None):
         """Fetch objects into another repository.
@@ -250,6 +609,8 @@ class Repo(object):
             fetch.
         :param progress: Optional progress function
         """
+        if determine_wants is None:
+            determine_wants = lambda heads: heads.values()
         target.object_store.add_objects(
             self.fetch_objects(determine_wants, target.get_graph_walker(),
                 progress))
@@ -279,46 +640,15 @@ class Repo(object):
 
     def ref(self, name):
         """Return the SHA1 a ref is pointing to."""
-        try:
-            return self.refs.follow(name)
-        except KeyError:
-            return self.get_packed_refs()[name]
+        return self.refs[name]
 
     def get_refs(self):
         """Get dictionary with all refs."""
-        ret = {}
-        try:
-            if self.head():
-                ret['HEAD'] = self.head()
-        except KeyError:
-            pass
-        ret.update(self.refs.as_dict())
-        ret.update(self.get_packed_refs())
-        return ret
-
-    def get_packed_refs(self):
-        """Get contents of the packed-refs file.
-
-        :return: Dictionary mapping ref names to SHA1s
-
-        :note: Will return an empty dictionary when no packed-refs file is 
-            present.
-        """
-        path = os.path.join(self.controldir(), 'packed-refs')
-        if not os.path.exists(path):
-            return {}
-        ret = {}
-        f = open(path, 'rb')
-        try:
-            for entry in read_packed_refs(f):
-                ret[entry[1]] = entry[0]
-            return ret
-        finally:
-            f.close()
+        return self.refs.as_dict()
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""
-        return self.refs.follow('HEAD')
+        return self.refs['HEAD']
 
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
@@ -339,6 +669,13 @@ class Repo(object):
 
     def get_parents(self, sha):
         return self.commit(sha).parents
+
+    def get_config(self):
+        import ConfigParser
+        p = ConfigParser.RawConfigParser()
+        p.read(os.path.join(self._controldir, 'config'))
+        return dict((section, dict(p.items(section)))
+                    for section in p.sections())
 
     def commit(self, sha):
         return self._get_object(sha, Commit)
@@ -386,14 +723,11 @@ class Repo(object):
         history.reverse()
         return history
 
-    def __repr__(self):
-        return "<Repo at %r>" % self.path
-
     def __getitem__(self, name):
         if len(name) in (20, 40):
             return self.object_store[name]
         return self.object_store[self.refs[name]]
-    
+
     def __setitem__(self, name, value):
         if name.startswith("refs/") or name == "HEAD":
             if isinstance(value, ShaFile):
@@ -455,6 +789,74 @@ class Repo(object):
         self.refs["HEAD"] = c.id
         return c.id
 
+
+class Repo(BaseRepo):
+    """A git repository backed by local disk."""
+
+    def __init__(self, root):
+        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
+            self.bare = False
+            self._controldir = os.path.join(root, ".git")
+        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
+              os.path.isdir(os.path.join(root, REFSDIR))):
+            self.bare = True
+            self._controldir = root
+        else:
+            raise NotGitRepository(root)
+        self.path = root
+        object_store = DiskObjectStore(
+            os.path.join(self.controldir(), OBJECTDIR))
+        refs = DiskRefsContainer(self.controldir())
+        BaseRepo.__init__(self, object_store, refs)
+
+    def controldir(self):
+        """Return the path of the control directory."""
+        return self._controldir
+
+    def _put_named_file(self, path, contents):
+        """Write a file from the control dir with a specific name and contents.
+        """
+        f = GitFile(os.path.join(self.controldir(), path), 'wb')
+        try:
+            f.write(contents)
+        finally:
+            f.close()
+
+    def get_named_file(self, path):
+        """Get a file from the control dir with a specific name.
+
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :return: An open file object, or None if the file does not exist.
+        """
+        try:
+            return open(os.path.join(self.controldir(), path.lstrip('/')), 'rb')
+        except (IOError, OSError), e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
+
+    def index_path(self):
+        """Return path to the index file."""
+        return os.path.join(self.controldir(), INDEX_FILENAME)
+
+    def open_index(self):
+        """Open the index for this repository."""
+        from dulwich.index import Index
+        if not self.has_index():
+            raise NoIndexPresent()
+        return Index(self.index_path())
+
+    def has_index(self):
+        """Check if an index is present."""
+        return os.path.exists(self.index_path())
+
+    def __repr__(self):
+        return "<Repo at %r>" % self.path
+
     @classmethod
     def init(cls, path, mkdir=True):
         controldir = os.path.join(path, ".git")
@@ -464,21 +866,18 @@ class Repo(object):
 
     @classmethod
     def init_bare(cls, path, mkdir=True):
-        for d in [[OBJECTDIR], 
-                  [OBJECTDIR, "info"], 
-                  [OBJECTDIR, "pack"],
-                  ["branches"],
-                  [REFSDIR],
-                  [REFSDIR, REFSDIR_TAGS],
-                  [REFSDIR, REFSDIR_HEADS],
-                  ["hooks"],
-                  ["info"]]:
+        for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
         ret.refs.set_ref("HEAD", "refs/heads/master")
-        open(os.path.join(path, 'description'), 'wb').write("Unnamed repository")
-        open(os.path.join(path, 'info', 'excludes'), 'wb').write("")
+        ret._put_named_file('description', "Unnamed repository")
+        ret._put_named_file('config', """[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = false
+    logallrefupdates = true
+""")
+        ret._put_named_file(os.path.join('info', 'excludes'), '')
         return ret
 
     create = init_bare
-

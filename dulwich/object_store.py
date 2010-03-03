@@ -20,6 +20,7 @@
 """Git object store interfaces and implementation."""
 
 
+import errno
 import itertools
 import os
 import stat
@@ -29,6 +30,7 @@ import urllib2
 from dulwich.errors import (
     NotTreeError,
     )
+from dulwich.file import GitFile
 from dulwich.objects import (
     Commit,
     ShaFile,
@@ -65,9 +67,25 @@ class BaseObjectStore(object):
         """
         return ObjectStoreIterator(self, shas)
 
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
+        raise NotImplementedError(self.contains_loose)
+
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
+        raise NotImplementedError(self.contains_packed)
+
     def __contains__(self, sha):
-        """Check if a particular object is present by SHA1."""
-        raise NotImplementedError(self.__contains__)
+        """Check if a particular object is present by SHA1.
+
+        This method makes no distinction between loose and packed objects.
+        """
+        return self.contains_packed(sha) or self.contains_loose(sha)
+
+    @property
+    def packs(self):
+        """Iterable of pack objects."""
+        raise NotImplementedError
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
@@ -220,85 +238,49 @@ class BaseObjectStore(object):
         return self.iter_shas(self.find_missing_objects(have, want))
 
 
-class DiskObjectStore(BaseObjectStore):
-    """Git-style object store that exists on disk."""
+class PackBasedObjectStore(BaseObjectStore):
 
-    def __init__(self, path):
-        """Open an object store.
-
-        :param path: Path of the object store.
-        """
-        self.path = path
+    def __init__(self):
         self._pack_cache = None
-        self.pack_dir = os.path.join(self.path, PACKDIR)
 
-    def __contains__(self, sha):
-        """Check if a particular object is present by SHA1."""
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
         for pack in self.packs:
             if sha in pack:
                 return True
-        ret = self._get_shafile(sha)
-        if ret is not None:
-            return True
         return False
 
-    def __iter__(self):
-        """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_shafile_shas()]
-        return itertools.chain(*iterables)
+    def _load_packs(self):
+        raise NotImplementedError(self._load_packs)
+
+    def _add_known_pack(self, pack):
+        """Add a newly appeared pack to the cache by path.
+
+        """
+        if self._pack_cache is not None:
+            self._pack_cache.append(pack)
 
     @property
     def packs(self):
         """List with pack objects."""
         if self._pack_cache is None:
-            self._pack_cache = list(self._load_packs())
+            self._pack_cache = self._load_packs()
         return self._pack_cache
 
-    def _load_packs(self):
-        if not os.path.exists(self.pack_dir):
-            return
-        for name in os.listdir(self.pack_dir):
-            if name.startswith("pack-") and name.endswith(".pack"):
-                yield Pack(os.path.join(self.pack_dir, name[:-len(".pack")]))
+    def _iter_loose_objects(self):
+        raise NotImplementedError(self._iter_loose_objects)
 
-    def _add_known_pack(self, path):
-        """Add a newly appeared pack to the cache by path.
+    def _get_loose_object(self, sha):
+        raise NotImplementedError(self._get_loose_object)
 
-        """
-        if self._pack_cache is not None:
-            self._pack_cache.append(Pack(path))
+    def __iter__(self):
+        """Iterate over the SHAs that are present in this store."""
+        iterables = self.packs + [self._iter_loose_objects()]
+        return itertools.chain(*iterables)
 
-    def _get_shafile_path(self, sha):
-        dir = sha[:2]
-        file = sha[2:]
-        # Check from object dir
-        return os.path.join(self.path, dir, file)
-
-    def _iter_shafile_shas(self):
-        for base in os.listdir(self.path):
-            if len(base) != 2:
-                continue
-            for rest in os.listdir(os.path.join(self.path, base)):
-                yield base+rest
-
-    def _get_shafile(self, sha):
-        path = self._get_shafile_path(sha)
-        if os.path.exists(path):
-          return ShaFile.from_file(path)
-        return None
-
-    def _add_shafile(self, sha, o):
-        dir = os.path.join(self.path, sha[:2])
-        if not os.path.isdir(dir):
-            os.mkdir(dir)
-        path = os.path.join(dir, sha[2:])
-        if os.path.exists(path):
-            return # Already there, no need to write again
-        f = open(path, 'w+')
-        try:
-            f.write(o.as_legacy_object())
-        finally:
-            f.close()
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
+        return self._get_loose_object(sha) is not None
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
@@ -321,10 +303,73 @@ class DiskObjectStore(BaseObjectStore):
                 pass
         if hexsha is None: 
             hexsha = sha_to_hex(name)
-        ret = self._get_shafile(hexsha)
+        ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type, ret.as_raw_string()
         raise KeyError(hexsha)
+
+    def add_objects(self, objects):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over objects, should support __len__.
+        """
+        if len(objects) == 0:
+            # Don't bother writing an empty pack file
+            return
+        f, commit = self.add_pack()
+        write_pack_data(f, objects, len(objects))
+        commit()
+
+
+class DiskObjectStore(PackBasedObjectStore):
+    """Git-style object store that exists on disk."""
+
+    def __init__(self, path):
+        """Open an object store.
+
+        :param path: Path of the object store.
+        """
+        super(DiskObjectStore, self).__init__()
+        self.path = path
+        self.pack_dir = os.path.join(self.path, PACKDIR)
+
+    def _load_packs(self):
+        pack_files = []
+        try:
+            for name in os.listdir(self.pack_dir):
+                # TODO: verify that idx exists first
+                if name.startswith("pack-") and name.endswith(".pack"):
+                    filename = os.path.join(self.pack_dir, name)
+                    pack_files.append((os.stat(filename).st_mtime, filename))
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return []
+            raise
+        pack_files.sort(reverse=True)
+        suffix_len = len(".pack")
+        return [Pack(f[:-suffix_len]) for _, f in pack_files]
+
+    def _get_shafile_path(self, sha):
+        dir = sha[:2]
+        file = sha[2:]
+        # Check from object dir
+        return os.path.join(self.path, dir, file)
+
+    def _iter_loose_objects(self):
+        for base in os.listdir(self.path):
+            if len(base) != 2:
+                continue
+            for rest in os.listdir(os.path.join(self.path, base)):
+                yield base+rest
+
+    def _get_loose_object(self, sha):
+        path = self._get_shafile_path(sha)
+        try:
+            return ShaFile.from_file(path)
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -351,7 +396,7 @@ class DiskObjectStore(BaseObjectStore):
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
         os.rename(temppath+".idx", newbasename+".idx")
-        self._add_known_pack(newbasename)
+        self._add_known_pack(Pack(newbasename))
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -368,7 +413,7 @@ class DiskObjectStore(BaseObjectStore):
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         p.close()
         os.rename(path, basename + ".pack")
-        self._add_known_pack(basename)
+        self._add_known_pack(Pack(basename))
 
     def add_thin_pack(self):
         """Add a new thin pack to this object store.
@@ -405,19 +450,17 @@ class DiskObjectStore(BaseObjectStore):
 
         :param obj: Object to add
         """
-        self._add_shafile(obj.id, obj)
-
-    def add_objects(self, objects):
-        """Add a set of objects to this object store.
-
-        :param objects: Iterable over objects, should support __len__.
-        """
-        if len(objects) == 0:
-            # Don't bother writing an empty pack file
-            return
-        f, commit = self.add_pack()
-        write_pack_data(f, objects, len(objects))
-        commit()
+        dir = os.path.join(self.path, obj.id[:2])
+        if not os.path.isdir(dir):
+            os.mkdir(dir)
+        path = os.path.join(dir, obj.id[2:])
+        if os.path.exists(path):
+            return # Already there, no need to write again
+        f = GitFile(path, 'wb')
+        try:
+            f.write(obj.as_legacy_object())
+        finally:
+            f.close()
 
 
 class MemoryObjectStore(BaseObjectStore):
@@ -427,13 +470,22 @@ class MemoryObjectStore(BaseObjectStore):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
 
-    def __contains__(self, sha):
-        """Check if the object with a particular SHA is present."""
+    def contains_loose(self, sha):
+        """Check if a particular object is present by SHA1 and is loose."""
         return sha in self._data
+
+    def contains_packed(self, sha):
+        """Check if a particular object is present by SHA1 and is packed."""
+        return False
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
         return self._data.iterkeys()
+
+    @property
+    def packs(self):
+        """List with pack objects."""
+        return []
 
     def get_raw(self, name):
         """Obtain the raw text for an object.

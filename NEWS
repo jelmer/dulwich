@@ -1,3 +1,32 @@
+0.5.0	2010-03-03
+
+ BUG FIXES
+
+  * Support custom fields in commits.
+
+  * Improved ref handling. (Dave Borowitz)
+
+  * Rework server protocol to be smarter and interoperate with cgit client.
+    (Dave Borowitz)
+
+  * Add a GitFile class that uses the same locking protocol for writes as 
+    cgit. (Dave Borowitz)
+
+  * Cope with forward slashes correctly in the index on Windows.
+    (Jelmer Vernooij, #526793)
+
+ FEATURES
+
+  * --pure option to setup.py to allow building/installing without the C 
+    extensions. (Hal Wine, Anatoly Techtonik, Jelmer Vernooij, #434326)
+
+  * Implement Repo.get_config(). (Jelmer Vernooij, Augie Fackler)
+
+  * HTTP dumb and smart server. (Dave Borowitz)
+
+  * Add abstract baseclass for Repo that does not require file system 
+    operations. (Dave Borowitz)
+
 0.4.1	2010-01-03
 
  FEATURES

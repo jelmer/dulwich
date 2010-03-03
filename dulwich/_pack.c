@@ -110,17 +110,20 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
             index += cmd;
 		} else {
 			PyErr_SetString(PyExc_ValueError, "Invalid opcode 0");
+			Py_DECREF(ret);
 			return NULL;
 		}
 	}
     
     if (index != delta_len) {
 		PyErr_SetString(PyExc_ValueError, "delta not empty");
+		Py_DECREF(ret);
 		return NULL;
 	}
 
 	if (dest_size != outindex) {
         PyErr_SetString(PyExc_ValueError, "dest size incorrect");
+		Py_DECREF(ret);
 		return NULL;
 	}
 

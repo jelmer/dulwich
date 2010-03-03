@@ -1,9 +1,10 @@
-dulwich (0.4.1-2) UNRELEASED; urgency=low
+dulwich (0.5.0-1) unstable; urgency=low
 
+  * New upstream release.
   * Switch to dpkg-source 3.0 (quilt) format.
   * Bump standards version to 3.8.4.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Thu, 04 Feb 2010 12:29:43 +0100
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 03 Mar 2010 16:43:41 +0100
 
 dulwich (0.4.1-1) unstable; urgency=low
 

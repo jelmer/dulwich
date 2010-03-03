@@ -36,6 +36,7 @@ from dulwich.errors import (
     NotCommitError,
     NotTreeError,
     )
+from dulwich.file import GitFile
 from dulwich.misc import (
     make_sha,
     )
@@ -184,7 +185,7 @@ class ShaFile(object):
     def from_file(cls, filename):
         """Get the contents of a SHA file on disk"""
         size = os.path.getsize(filename)
-        f = open(filename, 'rb')
+        f = GitFile(filename, 'rb')
         try:
             map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
             shafile = cls._parse_file(map)
@@ -204,6 +205,13 @@ class ShaFile(object):
         obj.type = type
         obj.set_raw_string(string)
         return obj
+
+    @classmethod
+    def from_string(cls, string):
+        """Create a blob from a string."""
+        shafile = cls()
+        shafile.set_raw_string(string)
+        return shafile
 
     def _header(self):
         return "%s %lu\0" % (self._type, len(self.as_raw_string()))
@@ -266,13 +274,6 @@ class Blob(ShaFile):
         if blob._type != cls._type:
             raise NotBlobError(filename)
         return blob
-
-    @classmethod
-    def from_string(cls, string):
-        """Create a blob from a string."""
-        shafile = cls()
-        shafile.set_raw_string(string)
-        return shafile
 
 
 class Tag(ShaFile):
@@ -512,6 +513,7 @@ class Commit(ShaFile):
         self._encoding = None
         self._needs_parsing = False
         self._needs_serialization = True
+        self._extra = {}
 
     @classmethod
     def from_file(cls, filename):
@@ -522,6 +524,7 @@ class Commit(ShaFile):
 
     def _parse_text(self):
         self._parents = []
+        self._extra = []
         self._author = None
         f = StringIO(self._text)
         for l in f:
@@ -545,7 +548,7 @@ class Commit(ShaFile):
             elif field == ENCODING_ID:
                 self._encoding = value
             else:
-                raise AssertionError("Unknown field %s" % field)
+                self._extra.append((field, value))
         self._message = f.read()
         self._needs_parsing = False
 
@@ -558,6 +561,10 @@ class Commit(ShaFile):
         f.write("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
         if self.encoding:
             f.write("%s %s\n" % (ENCODING_ID, self.encoding))
+        for k, v in self.extra:
+            if "\n" in k or "\n" in v:
+                raise AssertionError("newline in extra data: %r -> %r" % (k, v))
+            f.write("%s %s\n" % (k, v))
         f.write("\n") # There must be a new line after the headers
         f.write(self._message)
         self._text = f.getvalue()
@@ -577,6 +584,13 @@ class Commit(ShaFile):
         self._parents = value
 
     parents = property(get_parents, set_parents)
+
+    def get_extra(self):
+        """Return extra settings of this commit."""
+        self._ensure_parsed()
+        return self._extra
+
+    extra = property(get_extra)
 
     author = serializable_property("author",
         "The name of the author of the commit")
@@ -624,4 +638,3 @@ try:
     from dulwich._objects import parse_tree
 except ImportError:
     pass
-

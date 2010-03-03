@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # Setup file for bzr-git
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2010 Jelmer Vernooij <jelmer@samba.org>
 
 try:
-    from setuptools import setup
+    from setuptools import setup, Extension
 except ImportError:
-    from distutils.core import setup
-from distutils.extension import Extension
+    from distutils.core import setup, Extension
+from distutils.core import Distribution
 
-dulwich_version_string = '0.4.1'
+dulwich_version_string = '0.5.0'
 
 include_dirs = []
 # Windows MSVC support
@@ -17,6 +17,22 @@ if sys.platform == 'win32':
     include_dirs.append('dulwich')
 
 
+class DulwichDistribution(Distribution):
+
+    def is_pure(self):
+        if self.pure:
+            return True
+
+    def has_ext_modules(self):
+        return not self.pure
+
+    global_options = Distribution.global_options + [
+        ('pure', None, 
+            "use pure (slower) Python code instead of C extensions")]
+
+    pure = False
+
+        
 setup(name='dulwich',
       description='Pure-Python Git Library',
       keywords='git',
@@ -32,10 +48,12 @@ setup(name='dulwich',
       in one of the Monty Python sketches.
       """,
       packages=['dulwich', 'dulwich.tests'],
-      ext_modules=[
+      scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
+      ext_modules = [
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),
           Extension('dulwich._pack', ['dulwich/_pack.c'],
-                    include_dirs=include_dirs),
+              include_dirs=include_dirs),
           ],
+      distclass=DulwichDistribution,
       )

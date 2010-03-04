@@ -99,9 +99,10 @@ def object_class(type):
     """Get the object class corresponding to the given type.
 
     :param type: Either a type name string or a numeric type.
-    :return: The ShaFile subclass corresponding to the given type.
+    :return: The ShaFile subclass corresponding to the given type, or None if
+        type is not a valid type name/number.
     """
-    return _TYPE_MAP[type]
+    return _TYPE_MAP.get(type, None)
 
 
 def check_hexsha(hex, error_msg):
@@ -124,32 +125,40 @@ def check_identity(identity, error_msg):
 class ShaFile(object):
     """A git SHA file."""
 
-    @classmethod
-    def _parse_legacy_object(cls, map):
-        """Parse a legacy object, creating it and setting object._text"""
-        text = _decompress(map)
-        object = None
-        for cls in OBJECT_CLASSES:
-            if text.startswith(cls.type_name):
-                object = cls()
-                text = text[len(cls.type_name):]
-                break
-        assert object is not None, "%s is not a known object type" % text[:9]
-        assert text[0] == ' ', "%s is not a space" % text[0]
-        text = text[1:]
-        size = 0
-        i = 0
-        while text[0] >= '0' and text[0] <= '9':
-            if i > 0 and size == 0:
-                raise AssertionError("Size is not in canonical format")
-            size = (size * 10) + int(text[0])
-            text = text[1:]
-            i += 1
-        object._size = size
-        assert text[0] == "\0", "Size not followed by null"
-        text = text[1:]
-        object.set_raw_string(text)
-        return object
+    @staticmethod
+    def _parse_legacy_object_header(magic, f):
+        """Parse a legacy object, creating it but not reading the file."""
+        bufsize = 1024
+        decomp = zlib.decompressobj()
+        header = decomp.decompress(magic)
+        start = 0
+        end = -1
+        while end < 0:
+            header += decomp.decompress(f.read(bufsize))
+            end = header.find("\0", start)
+            start = len(header)
+        header = header[:end]
+        type_name, size = header.split(" ", 1)
+        size = int(size)  # sanity check
+        obj_class = object_class(type_name)
+        if not obj_class:
+            raise ObjectFormatException("Not a known type: %s" % type_name)
+        obj = obj_class()
+        obj._filename = f.name
+        return obj
+
+    def _parse_legacy_object(self, f):
+        """Parse a legacy object, setting the raw string."""
+        size = os.path.getsize(f.name)
+        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
+        try:
+            text = _decompress(map)
+        finally:
+            map.close()
+        header_end = text.find('\0')
+        if header_end < 0:
+            raise ObjectFormatException("Invalid object header")
+        self.set_raw_string(text[header_end+1:])
 
     def as_legacy_object_chunks(self):
         compobj = zlib.compressobj()
@@ -162,9 +171,10 @@ class ShaFile(object):
         return "".join(self.as_legacy_object_chunks())
 
     def as_raw_chunks(self):
-        if self._needs_serialization:
+        if self._needs_parsing:
+            self._ensure_parsed()
+        else:
             self._chunked_text = self._serialize()
-            self._needs_serialization = False
         return self._chunked_text
 
     def as_raw_string(self):
@@ -181,6 +191,9 @@ class ShaFile(object):
 
     def _ensure_parsed(self):
         if self._needs_parsing:
+            if not self._chunked_text:
+                assert self._filename, "ShaFile needs either text or filename"
+                self._parse_file()
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
@@ -195,35 +208,55 @@ class ShaFile(object):
         self._needs_parsing = True
         self._needs_serialization = False
 
-    @classmethod
-    def _parse_object(cls, map):
-        """Parse a new style object , creating it and setting object._text"""
-        used = 0
-        byte = ord(map[used])
-        used += 1
-        type_num = (byte >> 4) & 7
+    @staticmethod
+    def _parse_object_header(magic, f):
+        """Parse a new style object, creating it but not reading the file."""
+        num_type = (ord(magic[0]) >> 4) & 7
+        obj_class = object_class(num_type)
+        if not obj_class:
+            raise ObjectFormatError("Not a known type: %d" % num_type)
+        obj = obj_class()
+        obj._filename = f.name
+        return obj
+
+    def _parse_object(self, f):
+        """Parse a new style object, setting self._text."""
+        size = os.path.getsize(f.name)
+        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
         try:
-            object = object_class(type_num)()
-        except KeyError:
-            raise AssertionError("Not a known type: %d" % type_num)
-        while (byte & 0x80) != 0:
-            byte = ord(map[used])
-            used += 1
-        raw = map[used:]
-        object.set_raw_string(_decompress(raw))
-        return object
+            # skip type and size; type must have already been determined, and we
+            # trust zlib to fail if it's otherwise corrupted
+            byte = ord(map[0])
+            used = 1
+            while (byte & 0x80) != 0:
+                byte = ord(map[used])
+                used += 1
+            raw = map[used:]
+            self.set_raw_string(_decompress(raw))
+        finally:
+            map.close()
 
     @classmethod
-    def _parse_file(cls, map):
-        word = (ord(map[0]) << 8) + ord(map[1])
-        if ord(map[0]) == 0x78 and (word % 31) == 0:
-            return cls._parse_legacy_object(map)
+    def _is_legacy_object(cls, magic):
+        b0, b1 = map(ord, magic)
+        word = (b0 << 8) + b1
+        return b0 == 0x78 and (word % 31) == 0
+
+    @classmethod
+    def _parse_file_header(cls, f):
+        magic = f.read(2)
+        if cls._is_legacy_object(magic):
+            return cls._parse_legacy_object_header(magic, f)
         else:
-            return cls._parse_object(map)
+            return cls._parse_object_header(magic, f)
 
     def __init__(self):
         """Don't call this directly"""
         self._sha = None
+        self._filename = None
+        self._chunked_text = []
+        self._needs_parsing = False
+        self._needs_serialization = True
 
     def _deserialize(self, chunks):
         raise NotImplementedError(self._deserialize)
@@ -231,15 +264,29 @@ class ShaFile(object):
     def _serialize(self):
         raise NotImplementedError(self._serialize)
 
+    def _parse_file(self):
+        f = GitFile(self._filename, 'rb')
+        try:
+            magic = f.read(2)
+            if self._is_legacy_object(magic):
+                self._parse_legacy_object(f)
+            else:
+                self._parse_object(f)
+        finally:
+            f.close()
+
     @classmethod
     def from_file(cls, filename):
-        """Get the contents of a SHA file on disk"""
-        size = os.path.getsize(filename)
+        """Get the contents of a SHA file on disk."""
         f = GitFile(filename, 'rb')
         try:
-            map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-            shafile = cls._parse_file(map)
-            return shafile
+            try:
+                obj = cls._parse_file_header(f)
+                obj._needs_parsing = True
+                obj._needs_serialization = True
+                return obj
+            except (IndexError, ValueError), e:
+                raise ObjectFormatException("invalid object header")
         finally:
             f.close()
 
@@ -267,7 +314,7 @@ class ShaFile(object):
 
     @classmethod
     def from_string(cls, string):
-        """Create a blob from a string."""
+        """Create a ShaFile from a string."""
         obj = cls()
         obj.set_raw_string(string)
         return obj
@@ -367,13 +414,23 @@ class Blob(ShaFile):
         self.set_raw_string(data)
 
     data = property(_get_data, _set_data,
-            "The text contained within the blob object.")
+                    "The text contained within the blob object.")
 
     def _get_chunked(self):
+        self._ensure_parsed()
         return self._chunked_text
 
     def _set_chunked(self, chunks):
         self._chunked_text = chunks
+
+    def _serialize(self):
+        if not self._chunked_text:
+            self._ensure_parsed()
+        self._needs_serialization = False
+        return self._chunked_text
+
+    def _deserialize(self, chunks):
+        return "".join(chunks)
 
     chunked = property(_get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
@@ -424,8 +481,6 @@ class Tag(ShaFile):
 
     def __init__(self):
         super(Tag, self).__init__()
-        self._needs_parsing = False
-        self._needs_serialization = True
         self._tag_timezone_neg_utc = False
 
     @classmethod
@@ -434,13 +489,6 @@ class Tag(ShaFile):
         if not isinstance(tag, cls):
             raise NotTagError(filename)
         return tag
-
-    @classmethod
-    def from_string(cls, string):
-        """Create a blob from a string."""
-        shafile = cls()
-        shafile.set_raw_string(string)
-        return shafile
 
     def check(self):
         """Check this object for internal consistency.
@@ -600,8 +648,6 @@ class Tree(ShaFile):
     def __init__(self):
         super(Tree, self).__init__()
         self._entries = {}
-        self._needs_parsing = False
-        self._needs_serialization = True
 
     @classmethod
     def from_file(cls, filename):
@@ -668,7 +714,6 @@ class Tree(ShaFile):
         # TODO: list comprehension is for efficiency in the common (small) case;
         # if memory efficiency in the large case is a concern, use a genexp.
         self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
-        self._needs_parsing = False
 
     def check(self):
         """Check this object for internal consistency.
@@ -746,8 +791,6 @@ class Commit(ShaFile):
         super(Commit, self).__init__()
         self._parents = []
         self._encoding = None
-        self._needs_parsing = False
-        self._needs_serialization = True
         self._extra = {}
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False

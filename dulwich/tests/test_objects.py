@@ -212,11 +212,13 @@ class BlobReadTests(unittest.TestCase):
 
 class ShaFileCheckTests(unittest.TestCase):
 
-    def assertCheckFails(self, obj, data):
+    def assertCheckFails(self, cls, data):
+        obj = cls()
         obj.set_raw_string(data)
         self.assertRaises(ObjectFormatException, obj.check)
 
-    def assertCheckSucceeds(self, obj, data):
+    def assertCheckSucceeds(self, cls, data):
+        obj = cls()
         obj.set_raw_string(data)
         try:
             obj.check()
@@ -343,22 +345,22 @@ class CommitParseTests(ShaFileCheckTests):
         self.assertEquals('UTF-8', c.encoding)
 
     def test_check(self):
-        self.assertCheckSucceeds(Commit(), self.make_commit_text())
-        self.assertCheckSucceeds(Commit(), self.make_commit_text(parents=None))
-        self.assertCheckSucceeds(Commit(),
+        self.assertCheckSucceeds(Commit, self.make_commit_text())
+        self.assertCheckSucceeds(Commit, self.make_commit_text(parents=None))
+        self.assertCheckSucceeds(Commit,
                                  self.make_commit_text(encoding='UTF-8'))
 
-        self.assertCheckFails(Commit(), self.make_commit_text(tree='xxx'))
-        self.assertCheckFails(Commit(), self.make_commit_text(
+        self.assertCheckFails(Commit, self.make_commit_text(tree='xxx'))
+        self.assertCheckFails(Commit, self.make_commit_text(
           parents=[a_sha, 'xxx']))
         bad_committer = "some guy without an email address 1174773719 +0000"
-        self.assertCheckFails(Commit(),
+        self.assertCheckFails(Commit,
                               self.make_commit_text(committer=bad_committer))
-        self.assertCheckFails(Commit(),
+        self.assertCheckFails(Commit,
                               self.make_commit_text(author=bad_committer))
-        self.assertCheckFails(Commit(), self.make_commit_text(author=None))
-        self.assertCheckFails(Commit(), self.make_commit_text(committer=None))
-        self.assertCheckFails(Commit(), self.make_commit_text(
+        self.assertCheckFails(Commit, self.make_commit_text(author=None))
+        self.assertCheckFails(Commit, self.make_commit_text(committer=None))
+        self.assertCheckFails(Commit, self.make_commit_text(
           author=None, committer=None))
 
     def test_check_duplicates(self):
@@ -369,9 +371,9 @@ class CommitParseTests(ShaFileCheckTests):
             text = '\n'.join(lines)
             if lines[i].startswith('parent'):
                 # duplicate parents are ok for now
-                self.assertCheckSucceeds(Commit(), text)
+                self.assertCheckSucceeds(Commit, text)
             else:
-                self.assertCheckFails(Commit(), text)
+                self.assertCheckFails(Commit, text)
 
     def test_check_order(self):
         lines = self.make_commit_lines(parents=[a_sha], encoding='UTF-8')
@@ -382,9 +384,9 @@ class CommitParseTests(ShaFileCheckTests):
             perm = list(perm)
             text = '\n'.join(perm + rest)
             if perm == headers:
-                self.assertCheckSucceeds(Commit(), text)
+                self.assertCheckSucceeds(Commit, text)
             else:
-                self.assertCheckFails(Commit(), text)
+                self.assertCheckFails(Commit, text)
 
 
 class TreeTests(ShaFileCheckTests):
@@ -406,6 +408,7 @@ class TreeTests(ShaFileCheckTests):
     def _do_test_parse_tree(self, parse_tree):
         o = Tree.from_file(os.path.join(os.path.dirname(__file__), 'data',
                                         'trees', tree_sha))
+        o._parse_file()
         self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))
 
@@ -418,7 +421,7 @@ class TreeTests(ShaFileCheckTests):
         self._do_test_parse_tree(parse_tree)
 
     def test_check(self):
-        t = Tree()
+        t = Tree
         sha = hex_to_sha(a_sha)
 
         # filenames
@@ -530,26 +533,26 @@ class TagParseTests(ShaFileCheckTests):
         self.assertEquals("v2.6.22-rc7", x.name)
 
     def test_check(self):
-        self.assertCheckSucceeds(Tag(), self.make_tag_text())
-        self.assertCheckFails(Tag(), self.make_tag_text(object_sha=None))
-        self.assertCheckFails(Tag(), self.make_tag_text(object_type_name=None))
-        self.assertCheckFails(Tag(), self.make_tag_text(name=None))
-        self.assertCheckFails(Tag(), self.make_tag_text(name=''))
-        self.assertCheckFails(Tag(), self.make_tag_text(
+        self.assertCheckSucceeds(Tag, self.make_tag_text())
+        self.assertCheckFails(Tag, self.make_tag_text(object_sha=None))
+        self.assertCheckFails(Tag, self.make_tag_text(object_type_name=None))
+        self.assertCheckFails(Tag, self.make_tag_text(name=None))
+        self.assertCheckFails(Tag, self.make_tag_text(name=''))
+        self.assertCheckFails(Tag, self.make_tag_text(
           object_type_name="foobar"))
-        self.assertCheckFails(Tag(), self.make_tag_text(
+        self.assertCheckFails(Tag, self.make_tag_text(
           tagger="some guy without an email address 1183319674 -0700"))
-        self.assertCheckFails(Tag(), self.make_tag_text(
+        self.assertCheckFails(Tag, self.make_tag_text(
           tagger=("Linus Torvalds <torvalds@woody.linux-foundation.org> "
                   "Sun 7 Jul 2007 12:54:34 +0700")))
-        self.assertCheckFails(Tag(), self.make_tag_text(object_sha="xxx"))
+        self.assertCheckFails(Tag, self.make_tag_text(object_sha="xxx"))
 
     def test_check_duplicates(self):
         # duplicate each of the header fields
         for i in xrange(4):
             lines = self.make_tag_lines()
             lines.insert(i, lines[i])
-            self.assertCheckFails(Tag(), '\n'.join(lines))
+            self.assertCheckFails(Tag, '\n'.join(lines))
 
     def test_check_order(self):
         lines = self.make_tag_lines()
@@ -560,9 +563,9 @@ class TagParseTests(ShaFileCheckTests):
             perm = list(perm)
             text = '\n'.join(perm + rest)
             if perm == headers:
-                self.assertCheckSucceeds(Tag(), text)
+                self.assertCheckSucceeds(Tag, text)
             else:
-                self.assertCheckFails(Tag(), text)
+                self.assertCheckFails(Tag, text)
 
 
 class CheckTests(unittest.TestCase):

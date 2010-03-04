@@ -38,6 +38,7 @@ from dulwich.objects import (
     Tag,
     format_timezone,
     hex_to_sha,
+    hex_to_filename,
     check_hexsha,
     check_identity,
     parse_timezone,
@@ -89,11 +90,11 @@ except ImportError:
 
 class BlobReadTests(unittest.TestCase):
     """Test decompression of blobs"""
-  
-    def get_sha_file(self, obj, base, sha):
-        return obj.from_file(os.path.join(os.path.dirname(__file__),
-                                          'data', base, sha))
-  
+
+    def get_sha_file(self, cls, base, sha):
+        dir = os.path.join(os.path.dirname(__file__), 'data', base)
+        return cls.from_file(hex_to_filename(dir, sha))
+
     def get_blob(self, sha):
         """Return the blob named sha from the test data dir"""
         return self.get_sha_file(Blob, 'blobs', sha)
@@ -406,8 +407,8 @@ class TreeTests(ShaFileCheckTests):
         self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])
 
     def _do_test_parse_tree(self, parse_tree):
-        o = Tree.from_file(os.path.join(os.path.dirname(__file__), 'data',
-                                        'trees', tree_sha))
+        dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
+        o = Tree.from_file(hex_to_filename(dir, tree_sha))
         o._parse_file()
         self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))

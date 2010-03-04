@@ -39,6 +39,7 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     sha_to_hex,
+    hex_to_filename,
     S_ISGITLINK,
     )
 from dulwich.pack import (
@@ -362,10 +363,8 @@ class DiskObjectStore(PackBasedObjectStore):
             raise
 
     def _get_shafile_path(self, sha):
-        dir = sha[:2]
-        file = sha[2:]
         # Check from object dir
-        return os.path.join(self.path, dir, file)
+        return hex_to_filename(self.path, sha)
 
     def _iter_loose_objects(self):
         for base in os.listdir(self.path):

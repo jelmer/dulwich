@@ -84,6 +84,27 @@ def hex_to_sha(hex):
     return binascii.unhexlify(hex)
 
 
+def hex_to_filename(path, hex):
+    """Takes a hex sha and returns its filename relative to the given path."""
+    dir = hex[:2]
+    file = hex[2:]
+    # Check from object dir
+    return os.path.join(path, dir, file)
+
+
+def filename_to_hex(filename):
+    """Takes an object filename and returns its corresponding hex sha."""
+    # grab the last (up to) two path components
+    names = filename.rsplit(os.path.sep, 2)[-2:]
+    errmsg = "Invalid object filename: %s" % filename
+    assert len(names) == 2, errmsg
+    base, rest = names
+    assert len(base) == 2 and len(rest) == 38, errmsg
+    hex = base + rest
+    hex_to_sha(hex)
+    return hex
+
+
 def serializable_property(name, docstring=None):
     def set(obj, value):
         obj._ensure_parsed()
@@ -120,6 +141,20 @@ def check_identity(identity, error_msg):
         or identity.find(">", email_end + 1) >= 0
         or not identity.endswith(">")):
         raise ObjectFormatException(error_msg)
+
+
+class FixedSha(object):
+    """SHA object that behaves like hashlib's but is given a fixed value."""
+
+    def __init__(self, hexsha):
+        self._hexsha = hexsha
+        self._sha = hex_to_sha(hexsha)
+
+    def digest(self):
+        return self._sha
+
+    def hexdigest(self):
+        return self._hexsha
 
 
 class ShaFile(object):
@@ -282,6 +317,7 @@ class ShaFile(object):
         try:
             try:
                 obj = cls._parse_file_header(f)
+                obj._sha = FixedSha(filename_to_hex(filename))
                 obj._needs_parsing = True
                 obj._needs_serialization = True
                 return obj

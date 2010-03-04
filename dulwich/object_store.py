@@ -378,7 +378,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_file(path)
-        except OSError, e:
+        except (OSError, IOError), e:
             if e.errno == errno.ENOENT:
                 return None
             raise

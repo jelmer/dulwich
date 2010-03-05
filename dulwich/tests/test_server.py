@@ -35,10 +35,6 @@ from dulwich.server import (
     MultiAckDetailedGraphWalkerImpl,
     )
 
-from dulwich.protocol import (
-    SINGLE_ACK,
-    MULTI_ACK,
-    )
 
 ONE = '1' * 40
 TWO = '2' * 40
@@ -47,6 +43,7 @@ FOUR = '4' * 40
 FIVE = '5' * 40
 
 class TestProto(object):
+
     def __init__(self):
         self._output = []
         self._received = {0: [], 1: [], 2: [], 3: []}
@@ -77,6 +74,7 @@ class TestProto(object):
 
 
 class HandlerTestCase(TestCase):
+
     def setUp(self):
         self._handler = Handler(None, None, None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
@@ -108,7 +106,31 @@ class HandlerTestCase(TestCase):
         self.assertFalse(self._handler.has_capability('capxxx'))
 
 
+class UploadPackHandlerTestCase(TestCase):
+
+    def setUp(self):
+        self._handler = UploadPackHandler(None, None, None)
+        self._handler.proto = TestProto()
+
+    def test_progress(self):
+        self._handler.set_client_capabilities([])
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual('first message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual('second message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+    def test_no_progress(self):
+        self._handler.set_client_capabilities(['no-progress'])
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+
 class TestCommit(object):
+
     def __init__(self, sha, parents, commit_time):
         self.id = sha
         self._parents = parents
@@ -122,11 +144,13 @@ class TestCommit(object):
 
 
 class TestBackend(object):
+
     def __init__(self, objects):
         self.object_store = objects
 
 
 class TestUploadPackHandler(Handler):
+
     def __init__(self, objects, proto):
         self.backend = TestBackend(objects)
         self.proto = proto
@@ -138,6 +162,7 @@ class TestUploadPackHandler(Handler):
 
 
 class ProtocolGraphWalkerTestCase(TestCase):
+
     def setUp(self):
         # Create the following commit tree:
         #   3---5
@@ -221,6 +246,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
 
 class TestProtocolGraphWalker(object):
+
     def __init__(self):
         self.acks = []
         self.lines = []
@@ -248,6 +274,7 @@ class TestProtocolGraphWalker(object):
 
 class AckGraphWalkerImplTestCase(TestCase):
     """Base setup and asserts for AckGraphWalker tests."""
+
     def setUp(self):
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
@@ -277,6 +304,7 @@ class AckGraphWalkerImplTestCase(TestCase):
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = SingleAckGraphWalkerImpl
 
     def test_single_ack(self):
@@ -343,6 +371,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNak()
 
 class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = MultiAckGraphWalkerImpl
 
     def test_multi_ack(self):
@@ -414,7 +443,9 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(None)
         self.assertNak()
 
+
 class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = MultiAckDetailedGraphWalkerImpl
 
     def test_multi_ack(self):

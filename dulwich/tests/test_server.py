@@ -28,6 +28,7 @@ from dulwich.errors import (
     )
 from dulwich.server import (
     UploadPackHandler,
+    Handler,
     ProtocolGraphWalker,
     SingleAckGraphWalkerImpl,
     MultiAckGraphWalkerImpl,
@@ -75,30 +76,36 @@ class TestProto(object):
             return None
 
 
-class UploadPackHandlerTestCase(TestCase):
+class HandlerTestCase(TestCase):
     def setUp(self):
-        self._handler = UploadPackHandler(None, None, None)
+        self._handler = Handler(None, None, None)
+        self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
+
+    def assertSucceeds(self, func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except GitProtocolError:
+            self.fail()
+
+    def test_capability_line(self):
+        self.assertEquals('cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
-        try:
-            self._handler.set_client_capabilities([])
-        except GitProtocolError:
-            self.fail()
+        set_caps = self._handler.set_client_capabilities
+        self.assertSucceeds(set_caps, [])
+        self.assertSucceeds(set_caps, ['cap2'])
+        self.assertSucceeds(set_caps, ['cap1', 'cap2'])
+        # different order
+        self.assertSucceeds(set_caps, ['cap3', 'cap1', 'cap2'])
+        self.assertRaises(GitProtocolError, set_caps, ['capxxx', 'cap1'])
 
-        try:
-            self._handler.set_client_capabilities([
-                'multi_ack', 'side-band-64k', 'thin-pack', 'ofs-delta'])
-        except GitProtocolError:
-            self.fail()
-
-    def test_set_client_capabilities_error(self):
-        self.assertRaises(GitProtocolError,
-                          self._handler.set_client_capabilities,
-                          ['weird_ack_level', 'ofs-delta'])
-        try:
-            self._handler.set_client_capabilities(['include-tag'])
-        except GitProtocolError:
-            self.fail()
+    def test_has_capability(self):
+        self.assertRaises(GitProtocolError, self._handler.has_capability, 'cap')
+        caps = self._handler.capabilities()
+        self._handler.set_client_capabilities(caps)
+        for cap in caps:
+            self.assertTrue(self._handler.has_capability(cap))
+        self.assertFalse(self._handler.has_capability('capxxx'))
 
 
 class TestCommit(object):
@@ -119,7 +126,7 @@ class TestBackend(object):
         self.object_store = objects
 
 
-class TestHandler(object):
+class TestUploadPackHandler(Handler):
     def __init__(self, objects, proto):
         self.backend = TestBackend(objects)
         self.proto = proto
@@ -127,7 +134,7 @@ class TestHandler(object):
         self.advertise_refs = False
 
     def capabilities(self):
-        return 'multi_ack'
+        return ('multi_ack',)
 
 
 class ProtocolGraphWalkerTestCase(TestCase):
@@ -144,7 +151,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             FIVE: TestCommit(FIVE, [THREE], 555),
             }
         self._walker = ProtocolGraphWalker(
-            TestHandler(self._objects, TestProto()))
+            TestUploadPackHandler(self._objects, TestProto()))
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))

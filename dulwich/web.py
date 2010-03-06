@@ -20,7 +20,6 @@
 
 from cStringIO import StringIO
 import cgi
-import os
 import re
 import time
 
@@ -28,11 +27,7 @@ from dulwich.objects import (
     Tag,
     num_type_map,
     )
-from dulwich.repo import (
-    Repo,
-    )
 from dulwich.server import (
-    GitBackend,
     ReceivePackHandler,
     UploadPackHandler,
     )

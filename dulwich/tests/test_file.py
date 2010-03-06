@@ -25,7 +25,9 @@ import unittest
 
 from dulwich.file import GitFile
 
+
 class GitFileTests(unittest.TestCase):
+
     def setUp(self):
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path('foo'), 'wb')

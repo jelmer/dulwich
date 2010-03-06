@@ -20,7 +20,6 @@
 """Tests for the smart protocol server."""
 
 
-from cStringIO import StringIO
 from unittest import TestCase
 
 from dulwich.errors import (

@@ -28,7 +28,6 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 import SocketServer
-import tempfile
 
 from dulwich.errors import (
     ApplyDeltaError,

@@ -23,7 +23,6 @@ import re
 from unittest import TestCase
 
 from dulwich.objects import (
-    type_map,
     Tag,
     Blob,
     )

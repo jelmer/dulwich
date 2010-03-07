@@ -26,7 +26,6 @@ import shutil
 import tempfile
 
 from dulwich.pack import (
-    Pack,
     write_pack,
     )
 from dulwich.tests.test_pack import (

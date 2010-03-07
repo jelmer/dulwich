@@ -32,6 +32,7 @@ from dulwich.errors import (
 from dulwich.protocol import (
     Protocol,
     TCP_GIT_PORT,
+    ZERO_SHA,
     extract_capabilities,
     )
 from dulwich.pack import (
@@ -97,18 +98,18 @@ class GitClient(object):
             self.proto.write_pkt_line(None)
             return {}
         want = []
-        have = [x for x in old_refs.values() if not x == "0" * 40]
+        have = [x for x in old_refs.values() if not x == ZERO_SHA]
         sent_capabilities = False
         for refname in set(new_refs.keys() + old_refs.keys()):
-            old_sha1 = old_refs.get(refname, "0" * 40)
-            new_sha1 = new_refs.get(refname, "0" * 40)
+            old_sha1 = old_refs.get(refname, ZERO_SHA)
+            new_sha1 = new_refs.get(refname, ZERO_SHA)
             if old_sha1 != new_sha1:
                 if sent_capabilities:
                     self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
                 else:
                     self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
                     sent_capabilities = True
-            if not new_sha1 in (have, "0" * 40):
+            if not new_sha1 in (have, ZERO_SHA):
                 want.append(new_sha1)
         self.proto.write_pkt_line(None)
         if not want:
@@ -333,4 +334,3 @@ class SSHGitClient(GitClient):
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
         return client.fetch_pack(path, determine_wants, graph_walker, pack_data,
                                  progress)
-

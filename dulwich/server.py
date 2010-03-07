@@ -41,6 +41,7 @@ from dulwich.protocol import (
     Protocol,
     ProtocolFile,
     TCP_GIT_PORT,
+    ZERO_SHA,
     extract_capabilities,
     extract_want_line_capabilities,
     SINGLE_ACK,
@@ -65,19 +66,23 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def apply_pack(self, refs, read):
+    def apply_pack(self, refs, read, delete_refs=True):
         """ Import a set of changes into a repository and update the refs
 
         :param refs: list of tuple(name, sha)
         :param read: callback to read from the incoming pack
+        :param delete_refs: whether to allow deleting refs
         """
         raise NotImplementedError
 
-    def fetch_objects(self, determine_wants, graph_walker, progress):
+    def fetch_objects(self, determine_wants, graph_walker, progress,
+                      get_tagged=None):
         """
         Yield the objects required for a list of commits.
 
         :param progress: is a callback to send progress messages to the client
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         """
         raise NotImplementedError
 
@@ -88,11 +93,12 @@ class GitBackend(Backend):
         if repo is None:
             repo = Repo(tmpfile.mkdtemp())
         self.repo = repo
+        self.refs = self.repo.refs
         self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
 
-    def apply_pack(self, refs, read):
+    def apply_pack(self, refs, read, delete_refs=True):
         f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
         status = []
@@ -120,10 +126,13 @@ class GitBackend(Backend):
             status.append(('unpack', 'ok'))
 
         for oldsha, sha, ref in refs:
-            # TODO: check refname
             ref_error = None
             try:
-                if ref == "0" * 40:
+                if sha == ZERO_SHA:
+                    if not delete_refs:
+                        raise GitProtocolError(
+                          'Attempted to delete refs without delete-refs '
+                          'capability.')
                     try:
                         del self.repo.refs[ref]
                     except all_exceptions:
@@ -159,12 +168,24 @@ class Handler(object):
     def capabilities(self):
         raise NotImplementedError(self.capabilities)
 
+    def innocuous_capabilities(self):
+        return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
+
+    def required_capabilities(self):
+        """Return a list of capabilities that we require the client to have."""
+        return []
+
     def set_client_capabilities(self, caps):
-        my_caps = self.capabilities()
+        allowable_caps = set(self.innocuous_capabilities())
+        allowable_caps.update(self.capabilities())
         for cap in caps:
-            if cap not in my_caps:
+            if cap not in allowable_caps:
                 raise GitProtocolError('Client asked for capability %s that '
                                        'was not advertised.' % cap)
+        for cap in self.required_capabilities():
+            if cap not in caps:
+                raise GitProtocolError('Client does not support required '
+                                       'capability %s.' % cap)
         self._client_capabilities = set(caps)
 
     def has_capability(self, cap):
@@ -186,19 +207,52 @@ class UploadPackHandler(Handler):
 
     def capabilities(self):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta", "no-progress")
+                "ofs-delta", "no-progress", "include-tag")
+
+    def required_capabilities(self):
+        return ("side-band-64k", "thin-pack", "ofs-delta")
 
     def progress(self, message):
         if self.has_capability("no-progress"):
             return
         self.proto.write_sideband(2, message)
 
+    def get_tagged(self, refs=None, repo=None):
+        """Get a dict of peeled values of tags to their original tag shas.
+
+        :param refs: dict of refname -> sha of possible tags; defaults to all of
+            the backend's refs.
+        :param repo: optional Repo instance for getting peeled refs; defaults to
+            the backend's repo, if available
+        :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
+            tag whose peeled value is peeled_sha.
+        """
+        if not self.has_capability("include-tag"):
+            return {}
+        if refs is None:
+            refs = self.backend.get_refs()
+        if repo is None:
+            repo = getattr(self.backend, "repo", None)
+            if repo is None:
+                # Bail if we don't have a Repo available; this is ok since
+                # clients must be able to handle if the server doesn't include
+                # all relevant tags.
+                # TODO: either guarantee a Repo, or fix behavior when missing
+                return {}
+        tagged = {}
+        for name, sha in refs.iteritems():
+            peeled_sha = repo.get_peeled(name)
+            if peeled_sha != sha:
+                tagged[peeled_sha] = sha
+        return tagged
+
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
         graph_walker = ProtocolGraphWalker(self)
         objects_iter = self.backend.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress)
+          graph_walker.determine_wants, graph_walker, self.progress,
+          get_tagged=self.get_tagged)
 
         # Do they want any objects?
         if len(objects_iter) == 0:
@@ -258,7 +312,10 @@ class ProtocolGraphWalker(object):
                 if not i:
                     line = "%s\x00%s" % (line, self.handler.capability_line())
                 self.proto.write_pkt_line("%s\n" % line)
-                # TODO: include peeled value of any tags
+                peeled_sha = self.handler.backend.repo.get_peeled(ref)
+                if peeled_sha != sha:
+                    self.proto.write_pkt_line('%s %s^{}\n' %
+                                              (peeled_sha, ref))
 
             # i'm done..
             self.proto.write_pkt_line(None)
@@ -508,12 +565,6 @@ class ReceivePackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def __init__(self, backend, read, write,
-                 stateless_rpc=False, advertise_refs=False):
-        Handler.__init__(self, backend, read, write)
-        self._stateless_rpc = stateless_rpc
-        self._advertise_refs = advertise_refs
-
     def capabilities(self):
         return ("report-status", "delete-refs")
 
@@ -523,13 +574,14 @@ class ReceivePackHandler(Handler):
         if self.advertise_refs or not self.stateless_rpc:
             if refs:
                 self.proto.write_pkt_line(
-                    "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
-                                       self.capability_line()))
+                  "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
+                                     self.capability_line()))
                 for i in range(1, len(refs)):
                     ref = refs[i]
                     self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
             else:
-                self.proto.write_pkt_line("0000000000000000000000000000000000000000 capabilities^{} %s" % self.capability_line())
+                self.proto.write_pkt_line("%s capabilities^{} %s" % (
+                  ZERO_SHA, self.capability_line()))
 
             self.proto.write("0000")
             if self.advertise_refs:
@@ -551,7 +603,8 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.backend.apply_pack(client_refs, self.proto.read)
+        status = self.backend.apply_pack(client_refs, self.proto.read,
+                                         self.has_capability('delete-refs'))
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

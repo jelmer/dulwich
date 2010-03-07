@@ -24,16 +24,9 @@ tests, deadlocks may freeze the test process such that it cannot be Ctrl-C'ed.
 On *nix, you can kill the tests with Ctrl-Z, "kill %".
 """
 
-import sys
 import threading
-import unittest
 from wsgiref import simple_server
 
-import nose
-
-from dulwich.repo import (
-    Repo,
-    )
 from dulwich.server import (
     GitBackend,
     )
@@ -41,16 +34,13 @@ from dulwich.web import (
     HTTPGitApplication,
     )
 
-from dulwich.tests.utils import (
-    open_repo,
-    tear_down_repo,
-    )
 from server_utils import (
     ServerTests,
     ShutdownServerMixIn,
     )
 from utils import (
     CompatTestCase,
+    SkipTest,
     )
 
 
@@ -105,7 +95,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # TODO(dborowitz): enable after merging thin pack fixes.
-        raise nose.SkipTest('Skipping push test due to known pack bug.')
+        raise SkipTest('Skipping push test due to known pack bug.')
 
 
 class DumbWebTestCase(WebTests, CompatTestCase):
@@ -124,4 +114,4 @@ class DumbWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # Note: remove this if dumb pushing is supported
-        raise nose.SkipTest('Dumb web pushing not supported.')
+        raise SkipTest('Dumb web pushing not supported.')

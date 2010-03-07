@@ -25,9 +25,6 @@ On *nix, you can kill the tests with Ctrl-Z, "kill %".
 """
 
 import threading
-import unittest
-
-import nose
 
 from dulwich import server
 from server_utils import (
@@ -36,6 +33,7 @@ from server_utils import (
     )
 from utils import (
     CompatTestCase,
+    SkipTest,
     )
 
 
@@ -74,4 +72,4 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
     def test_push_to_dulwich(self):
-        raise nose.SkipTest('Skipping push test due to known deadlock bug.')
+        raise SkipTest('Skipping push test due to known deadlock bug.')

@@ -195,16 +195,20 @@ class BaseObjectStore(object):
                 else:
                     yield path, mode, hexsha
 
-    def find_missing_objects(self, haves, wants, progress=None):
+    def find_missing_objects(self, haves, wants, progress=None,
+                             get_tagged=None):
         """Find the missing objects required for a set of revisions.
 
         :param haves: Iterable over SHAs already in common.
         :param wants: Iterable over SHAs of objects to fetch.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         :return: Iterator over (sha, path) pairs.
         """
-        return iter(MissingObjectFinder(self, haves, wants, progress).next, None)
+        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged)
+        return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
         """Find which revisions this store has in common using graphwalker.
@@ -253,6 +257,10 @@ class PackBasedObjectStore(BaseObjectStore):
     def _load_packs(self):
         raise NotImplementedError(self._load_packs)
 
+    def _pack_cache_stale(self):
+        """Check whether the pack cache is stale."""
+        raise NotImplementedError(self._pack_cache_stale)
+
     def _add_known_pack(self, pack):
         """Add a newly appeared pack to the cache by path.
 
@@ -263,7 +271,7 @@ class PackBasedObjectStore(BaseObjectStore):
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is None:
+        if self._pack_cache is None or self._pack_cache_stale():
             self._pack_cache = self._load_packs()
         return self._pack_cache
 
@@ -332,11 +340,14 @@ class DiskObjectStore(PackBasedObjectStore):
         super(DiskObjectStore, self).__init__()
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
+        self._pack_cache_time = 0
 
     def _load_packs(self):
         pack_files = []
         try:
-            for name in os.listdir(self.pack_dir):
+            self._pack_cache_time = os.stat(self.pack_dir).st_mtime
+            pack_dir_contents = os.listdir(self.pack_dir)
+            for name in pack_dir_contents:
                 # TODO: verify that idx exists first
                 if name.startswith("pack-") and name.endswith(".pack"):
                     filename = os.path.join(self.pack_dir, name)
@@ -348,6 +359,14 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_files.sort(reverse=True)
         suffix_len = len(".pack")
         return [Pack(f[:-suffix_len]) for _, f in pack_files]
+
+    def _pack_cache_stale(self):
+        try:
+            return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                return True
+            raise
 
     def _get_shafile_path(self, sha):
         dir = sha[:2]
@@ -622,9 +641,13 @@ class MissingObjectFinder(object):
     :param haves: SHA1s of commits not to send (already present in target)
     :param wants: SHA1s of commits to send
     :param progress: Optional function to report progress to.
+    :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+        sha for including tags.
+    :param tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
-    def __init__(self, object_store, haves, wants, progress=None):
+    def __init__(self, object_store, haves, wants, progress=None,
+                 get_tagged=None):
         self.sha_done = set(haves)
         self.objects_to_send = set([(w, None, False) for w in wants if w not in haves])
         self.object_store = object_store
@@ -632,6 +655,7 @@ class MissingObjectFinder(object):
             self.progress = lambda x: None
         else:
             self.progress = progress
+        self._tagged = get_tagged and get_tagged() or {}
 
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
@@ -658,6 +682,8 @@ class MissingObjectFinder(object):
                 self.parse_tree(o)
             elif isinstance(o, Tag):
                 self.parse_tag(o)
+        if sha in self._tagged:
+            self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)

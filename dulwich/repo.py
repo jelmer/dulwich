@@ -32,6 +32,7 @@ from dulwich.errors import (
     NotCommitError, 
     NotGitRepository,
     NotTreeError, 
+    NotTagError,
     PackedRefsException,
     )
 from dulwich.file import (
@@ -48,6 +49,7 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
+    num_type_map,
     )
 
 OBJECTDIR = 'objects'
@@ -130,6 +132,16 @@ class RefsContainer(object):
             present.
         """
         raise NotImplementedError(self.get_packed_refs)
+
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
+
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to a
+            tag, this will be the SHA the ref refers to. If the ref may point to
+            a tag, but no cached information is available, None is returned.
+        """
+        return None
 
     def import_refs(self, base, other):
         for name, value in other.iteritems():
@@ -245,7 +257,7 @@ class DiskRefsContainer(RefsContainer):
     def __init__(self, path):
         self.path = path
         self._packed_refs = None
-        self._peeled_refs = {}
+        self._peeled_refs = None
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.path)
@@ -310,6 +322,7 @@ class DiskRefsContainer(RefsContainer):
                 first_line = iter(f).next().rstrip()
                 if (first_line.startswith("# pack-refs") and " peeled" in
                         first_line):
+                    self._peeled_refs = {}
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
                         self._packed_refs[name] = sha
                         if peeled:
@@ -321,6 +334,24 @@ class DiskRefsContainer(RefsContainer):
             finally:
                 f.close()
         return self._packed_refs
+
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
+
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to a
+            tag, this will be the SHA the ref refers to. If the ref may point to
+            a tag, but no cached information is available, None is returned.
+        """
+        self.get_packed_refs()
+        if self._peeled_refs is None or name not in self._packed_refs:
+            # No cache: no peeled refs were read, or this ref is loose
+            return None
+        if name in self._peeled_refs:
+            return self._peeled_refs[name]
+        else:
+            # Known not peelable
+            return self[name]
 
     def read_loose_ref(self, name):
         """Read a reference file and return its contents.
@@ -558,6 +589,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 
     :param f: empty file-like object to write to
     :param packed_refs: dict of refname to sha of packed refs to write
+    :param peeled_refs: dict of refname to peeled value of sha
     """
     if peeled_refs is None:
         peeled_refs = {}
@@ -616,7 +648,8 @@ class BaseRepo(object):
                 progress))
         return self.get_refs()
 
-    def fetch_objects(self, determine_wants, graph_walker, progress):
+    def fetch_objects(self, determine_wants, graph_walker, progress,
+                      get_tagged=None):
         """Fetch the missing objects required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads 
@@ -626,12 +659,15 @@ class BaseRepo(object):
             that a revision is present.
         :param progress: Simple progress function that will be called with 
             updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(haves, wants, progress))
+            self.object_store.find_missing_objects(haves, wants, progress,
+                                                   get_tagged))
 
     def get_graph_walker(self, heads=None):
         if heads is None:
@@ -660,6 +696,8 @@ class BaseRepo(object):
                 raise NotBlobError(ret)
             elif cls is Tree:
                 raise NotTreeError(ret)
+            elif cls is Tag:
+                raise NotTagError(ret)
             else:
                 raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
         return ret
@@ -685,6 +723,24 @@ class BaseRepo(object):
 
     def tag(self, sha):
         return self._get_object(sha, Tag)
+
+    def get_peeled(self, ref):
+        """Get the peeled value of a ref.
+
+        :param ref: the refname to peel
+        :return: the fully-peeled SHA1 of a tag object, after peeling all
+            intermediate tags; if the original ref does not point to a tag, this
+            will equal the original SHA1.
+        """
+        cached = self.refs.get_peeled(ref)
+        if cached is not None:
+            return cached
+        obj = self[ref]
+        obj_type = num_type_map[obj.type]
+        while obj_type == Tag:
+            obj_type, sha = obj.object
+            obj = self.get_object(sha)
+        return obj.id
 
     def get_blob(self, sha):
         return self._get_object(sha, Blob)

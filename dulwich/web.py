@@ -23,10 +23,6 @@ import cgi
 import re
 import time
 
-from dulwich.objects import (
-    Tag,
-    num_type_map,
-    )
 from dulwich.server import (
     ReceivePackHandler,
     UploadPackHandler,
@@ -99,23 +95,23 @@ def get_loose_object(req, backend, mat):
 def get_pack_file(req, backend, mat):
     req.cache_forever()
     return send_file(req, backend.repo.get_named_file(mat.group()),
-                     'application/x-git-packed-objects', False)
+                     'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
     return send_file(req, backend.repo.get_named_file(mat.group()),
-                     'application/x-git-packed-objects-toc', False)
+                     'application/x-git-packed-objects-toc')
 
 
-services = {'git-upload-pack': UploadPackHandler,
-            'git-receive-pack': ReceivePackHandler}
+default_services = {'git-upload-pack': UploadPackHandler,
+                    'git-receive-pack': ReceivePackHandler}
 def get_info_refs(req, backend, mat, services=None):
     if services is None:
-        services = services
+        services = default_services
     params = cgi.parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
-    if service:
+    if service and not req.dumb:
         handler_cls = services.get(service, None)
         if handler_cls is None:
             yield req.forbidden('Unsupported service %s' % service)
@@ -146,15 +142,9 @@ def get_info_refs(req, backend, mat, services=None):
             if not o:
                 continue
             yield '%s\t%s\n' % (sha, name)
-            obj_type = num_type_map[o.type]
-            if obj_type == Tag:
-                while obj_type == Tag:
-                    num_type, sha = o.object
-                    obj_type = num_type_map[num_type]
-                    o = backend.repo[sha]
-                if not o:
-                    continue
-                yield '%s\t%s^{}\n' % (o.sha(), name)
+            peeled_sha = backend.repo.get_peeled(name)
+            if peeled_sha != sha:
+                yield '%s\t%s^{}\n' % (peeled_sha, name)
 
 
 def get_info_packs(req, backend, mat):
@@ -185,9 +175,10 @@ class _LengthLimitedFile(object):
 
     # TODO: support more methods as necessary
 
-def handle_service_request(req, backend, mat, services=services):
+
+def handle_service_request(req, backend, mat, services=None):
     if services is None:
-        services = services
+        services = default_services
     service = mat.group().lstrip('/')
     handler_cls = services.get(service, None)
     if handler_cls is None:
@@ -215,8 +206,9 @@ class HTTPGitRequest(object):
     :ivar environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response):
+    def __init__(self, environ, start_response, dumb=False):
         self.environ = environ
+        self.dumb = dumb
         self._start_response = start_response
         self._cache_headers = []
         self._headers = []
@@ -285,13 +277,14 @@ class HTTPGitApplication(object):
         ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
-    def __init__(self, backend):
+    def __init__(self, backend, dumb=False):
         self.backend = backend
+        self.dumb = dumb
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
-        req = HTTPGitRequest(environ, start_response)
+        req = HTTPGitRequest(environ, start_response, self.dumb)
         # environ['QUERY_STRING'] has qs args
         handler = None
         for smethod, spath in self.services.iterkeys():

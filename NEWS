@@ -1,3 +1,21 @@
+0.5.1	UNRELEASED
+
+ BUG FIXES
+ 
+  * Fix ReceivePackHandler to disallow removing refs without delete-refs.
+    (Dave Borowitz)
+
+  * Deal with capabilities required by the client, even if they 
+    can not be disabled in the server. (Dave Borowitz)
+
+ FEATURES
+
+  * Add include-tag capability to server. (Dave Borowitz)
+
+ TESTS
+
+  * Add framework for testing compatibility with C Git. (Dave Borowitz)
+
 0.5.0	2010-03-03
 
  BUG FIXES

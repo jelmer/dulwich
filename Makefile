@@ -3,7 +3,7 @@ SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 TESTRUNNER = $(shell which nosetests)
 
-all: build 
+all: build
 
 doc:: pydoctor
 
@@ -22,6 +22,9 @@ check:: build
 
 check-noextensions:: clean
 	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) dulwich
+
+check-compat:: build
+	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) -i compat
 
 clean::
 	$(SETUP) clean --all

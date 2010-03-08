@@ -29,6 +29,7 @@ import stat
 import unittest
 
 from dulwich.errors import (
+    ChecksumMismatch,
     ObjectFormatException,
     )
 from dulwich.objects import (
@@ -210,22 +211,27 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
 
+    def test_check_id(self):
+        wrong_sha = '1' * 40
+        b = self.get_blob(wrong_sha)
+        self.assertEqual(wrong_sha, b.id)
+        self.assertRaises(ChecksumMismatch, b.check)
+        self.assertEqual('742b386350576589175e374a5706505cbd17680c', b.id)
+
 
 class ShaFileCheckTests(unittest.TestCase):
 
     def assertCheckFails(self, cls, data):
         obj = cls()
-        obj.set_raw_string(data)
-        self.assertRaises(ObjectFormatException, obj.check)
+        def do_check():
+            obj.set_raw_string(data)
+            obj.check()
+        self.assertRaises(ObjectFormatException, do_check)
 
     def assertCheckSucceeds(self, cls, data):
         obj = cls()
         obj.set_raw_string(data)
-        try:
-            obj.check()
-        except ObjectFormatException, e:
-            raise
-            self.fail(e)
+        self.assertEqual(None, obj.check())
 
 
 class CommitSerializationTests(unittest.TestCase):

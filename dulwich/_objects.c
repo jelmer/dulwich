@@ -60,7 +60,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		mode = strtol(text, &text, 8);
 
 		if (*text != ' ') {
-			PyErr_SetString(PyExc_RuntimeError, "Expected space");
+			PyErr_SetString(PyExc_ValueError, "Expected space");
 			Py_DECREF(ret);
 			return NULL;
 		}
@@ -76,7 +76,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		}
 
 		if (text + namelen + 20 >= end) {
-			PyErr_SetString(PyExc_RuntimeError, "SHA truncated");
+			PyErr_SetString(PyExc_ValueError, "SHA truncated");
 			Py_DECREF(ret);
 			Py_DECREF(name);
 			return NULL;

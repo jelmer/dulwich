@@ -31,6 +31,7 @@ import stat
 import zlib
 
 from dulwich.errors import (
+    ChecksumMismatch,
     NotBlobError,
     NotCommitError,
     NotTagError,
@@ -208,7 +209,7 @@ class ShaFile(object):
     def as_raw_chunks(self):
         if self._needs_parsing:
             self._ensure_parsed()
-        else:
+        elif self._needs_serialization:
             self._chunked_text = self._serialize()
         return self._chunked_text
 
@@ -239,8 +240,9 @@ class ShaFile(object):
 
     def set_raw_chunks(self, chunks):
         self._chunked_text = chunks
+        self._deserialize(chunks)
         self._sha = None
-        self._needs_parsing = True
+        self._needs_parsing = False
         self._needs_serialization = False
 
     @staticmethod
@@ -370,15 +372,22 @@ class ShaFile(object):
         """Check this object for internal consistency.
 
         :raise ObjectFormatException: if the object is malformed in some way
+        :raise ChecksumMismatch: if the object was created with a SHA that does
+            not match its contents
         """
         # TODO: if we find that error-checking during object parsing is a
         # performance bottleneck, those checks should be moved to the class's
         # check() method during optimization so we can still check the object
         # when necessary.
+        old_sha = self.id
         try:
             self._deserialize(self.as_raw_chunks())
+            self._sha = None
+            new_sha = self.id
         except Exception, e:
             raise ObjectFormatException(e)
+        if old_sha != new_sha:
+            raise ChecksumMismatch(new_sha, old_sha)
 
     def _header(self):
         return "%s %lu\0" % (self.type_name, self.raw_length())
@@ -399,8 +408,13 @@ class ShaFile(object):
 
     def sha(self):
         """The SHA1 object that is the name of this object."""
-        if self._needs_serialization or self._sha is None:
-            self._sha = self._make_sha()
+        if self._sha is None:
+            # this is a local because as_raw_chunks() overwrites self._sha
+            new_sha = make_sha()
+            new_sha.update(self._header())
+            for chunk in self.as_raw_chunks():
+                new_sha.update(chunk)
+            self._sha = new_sha
         return self._sha
 
     @property
@@ -483,7 +497,7 @@ class Blob(ShaFile):
 
         :raise ObjectFormatException: if the object is malformed in some way
         """
-        pass  # it's impossible for raw data to be malformed
+        super(Blob, self).check()
 
 
 def _parse_tag_or_commit(text):
@@ -580,7 +594,10 @@ class Tag(ShaFile):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
             elif field == _TYPE_HEADER:
-                self._object_class = object_class(value)
+                obj_class = object_class(value)
+                if not obj_class:
+                    raise ObjectFormatException("Not a known type: %s" % value)
+                self._object_class = obj_class
             elif field == _TAG_HEADER:
                 self._name = value
             elif field == _TAGGER_HEADER:
@@ -593,14 +610,17 @@ class Tag(ShaFile):
                     self._tag_timezone_neg_utc = False
                 else:
                     self._tagger = value[0:sep+1]
-                    (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
-                    self._tag_time = int(timetext)
-                    self._tag_timezone, self._tag_timezone_neg_utc = \
-                            parse_timezone(timezonetext)
+                    try:
+                        (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
+                        self._tag_time = int(timetext)
+                        self._tag_timezone, self._tag_timezone_neg_utc = \
+                                parse_timezone(timezonetext)
+                    except ValueError, e:
+                        raise ObjectFormatException(e)
             elif field is None:
                 self._message = value
             else:
-                raise AssertionError("Unknown field %s" % field)
+                raise ObjectFormatError("Unknown field %s" % field)
 
     def _get_object(self):
         """Get the object pointed to by this tag.
@@ -746,7 +766,10 @@ class Tree(ShaFile):
 
     def _deserialize(self, chunks):
         """Grab the entries in the tree"""
-        parsed_entries = parse_tree("".join(chunks))
+        try:
+            parsed_entries = parse_tree("".join(chunks))
+        except ValueError, e:
+            raise ObjectFormatException(e)
         # TODO: list comprehension is for efficiency in the common (small) case;
         # if memory efficiency in the large case is a concern, use a genexp.
         self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])

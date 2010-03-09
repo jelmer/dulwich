@@ -317,7 +317,10 @@ class PackIndex(object):
     def check(self):
         """Check that the stored checksum matches the actual checksum."""
         # TODO: Check pack contents, too
-        return self.calculate_checksum() == self.get_stored_checksum()
+        actual = self.calculate_checksum()
+        stored = self.get_stored_checksum()
+        if actual != stored:
+            raise ChecksumMismatch(stored, actual)
 
     def calculate_checksum(self):
         """Calculate the SHA1 checksum over this pack index.
@@ -730,7 +733,10 @@ class PackData(object):
 
     def check(self):
         """Check the consistency of this pack."""
-        return (self.calculate_checksum() == self.get_stored_checksum())
+        actual = self.calculate_checksum()
+        stored = self.get_stored_checksum()
+        if actual != stored:
+            raise ChecksumMismatch(stored, actual)
 
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
@@ -1222,12 +1228,12 @@ class Pack(object):
         return iter(self.index)
 
     def check(self):
-        """Check the integrity of this pack."""
-        if not self.index.check():
-            return False
-        if not self.data.check():
-            return False
-        return True
+        """Check the integrity of this pack.
+
+        :raise ChecksumMismatch: if a checksum for the index or data is wrong
+        """
+        self.index.check()
+        self.data.check()
 
     def get_stored_checksum(self):
         return self.data.get_stored_checksum()

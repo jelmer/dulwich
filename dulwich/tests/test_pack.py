@@ -26,6 +26,9 @@ import os
 import unittest
 import zlib
 
+from dulwich.errors import (
+    ChecksumMismatch,
+    )
 from dulwich.objects import (
     Tree,
     )
@@ -65,6 +68,12 @@ class PackTests(unittest.TestCase):
     def get_pack(self, sha):
         return Pack(os.path.join(self.datadir, 'pack-%s' % sha))
 
+    def assertSucceeds(self, func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except ChecksumMismatch, e:
+            self.fail(e)
+
 
 class PackIndexTests(PackTests):
     """Class that tests the index of packfiles"""
@@ -85,11 +94,11 @@ class PackIndexTests(PackTests):
         p = self.get_pack_index(pack1_sha)
         self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksum()))
         self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_pack_checksum()))
-  
+
     def test_index_check(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEquals(True, p.check())
-  
+        self.assertSucceeds(p.check)
+
     def test_iterentries(self):
         p = self.get_pack_index(pack1_sha)
         self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, None), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, None), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, None)], list(p.iterentries()))
@@ -134,11 +143,11 @@ class TestPackData(PackTests):
     def test_pack_len(self):
         p = self.get_pack_data(pack1_sha)
         self.assertEquals(3, len(p))
-  
+
     def test_index_check(self):
         p = self.get_pack_data(pack1_sha)
-        self.assertEquals(True, p.check())
-  
+        self.assertSucceeds(p.check)
+
     def test_iterobjects(self):
         p = self.get_pack_data(pack1_sha)
         self.assertEquals([(12, 1, 'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\nauthor James Westby <jw+debian@jameswestby.net> 1174945067 +0100\ncommitter James Westby <jw+debian@jameswestby.net> 1174945067 +0100\n\nTest commit\n', 3775879613L), (138, 2, '100644 a\x00og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 912998690L), (178, 3, 'test 1\n', 1373561701L)], [(len, type, "".join(chunks), offset) for (len, type, chunks, offset) in p.iterobjects()])
@@ -195,16 +204,16 @@ class TestPack(PackTests):
 
     def test_copy(self):
         origpack = self.get_pack(pack1_sha)
-        self.assertEquals(True, origpack.index.check())
+        self.assertSucceeds(origpack.index.check)
         write_pack("Elch", [(x, "") for x in origpack.iterobjects()], 
             len(origpack))
         newpack = Pack("Elch")
         self.assertEquals(origpack, newpack)
-        self.assertEquals(True, newpack.index.check())
+        self.assertSucceeds(newpack.index.check)
         self.assertEquals(origpack.name(), newpack.name())
         self.assertEquals(origpack.index.get_pack_checksum(), 
                           newpack.index.get_pack_checksum())
-        
+
         self.assertTrue(
                 (origpack.index.version != newpack.index.version) or
                 (origpack.index.get_stored_checksum() == newpack.index.get_stored_checksum()))
@@ -232,11 +241,17 @@ class TestHexToSha(unittest.TestCase):
 
 class BaseTestPackIndexWriting(object):
 
+    def assertSucceeds(self, func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except ChecksumMismatch, e:
+            self.fail(e)
+
     def test_empty(self):
         pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
         self._write_fn("empty.idx", [], pack_checksum)
         idx = load_pack_index("empty.idx")
-        self.assertTrue(idx.check())
+        self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(0, len(idx))
 
@@ -247,7 +262,7 @@ class BaseTestPackIndexWriting(object):
         self._write_fn("single.idx", my_entries, pack_checksum)
         idx = load_pack_index("single.idx")
         self.assertEquals(idx.version, self._expected_version)
-        self.assertTrue(idx.check())
+        self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(1, len(idx))
         actual_entries = list(idx.iterentries())

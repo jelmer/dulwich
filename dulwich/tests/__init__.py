@@ -18,3 +18,27 @@
 # MA  02110-1301, USA.
 
 """Tests for Dulwich."""
+
+import unittest
+
+
+def test_suite():
+    names = [
+        'client',
+        'file',
+        'index',
+        'lru_cache',
+        'objects',
+        'object_store',
+        'pack',
+        'protocol',
+        'repository',
+        'server',
+        'web',
+        ]
+    module_names = ['dulwich.tests.test_' + name for name in names]
+    result = unittest.TestSuite()
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromNames(module_names)
+    result.addTests(suite)
+    return result

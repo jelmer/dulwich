@@ -143,7 +143,7 @@ def cmd_clone(args):
     if args == []:
         print "usage: dulwich clone host:path [PATH]"
         sys.exit(1)
-        client, host_path = get_transport_and_path(args.pop(0))
+    client, host_path = get_transport_and_path(args.pop(0))
 
     if len(args) > 0:
         path = args.pop(0)

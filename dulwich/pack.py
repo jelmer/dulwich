@@ -268,7 +268,8 @@ class PackIndex(object):
         """Unpack the i-th entry in the index file.
 
         :return: Tuple with object name (SHA), offset in pack file and CRC32
-            checksum (if known)."""
+            checksum (if known).
+        """
         raise NotImplementedError(self._unpack_entry)
 
     def _unpack_name(self, i):
@@ -301,8 +302,7 @@ class PackIndex(object):
     def iterentries(self):
         """Iterate over the entries in this pack index.
 
-        Will yield tuples with object name, offset in packfile and crc32
-        checksum.
+        :yields: tuples with object name, offset in packfile and crc32 checksum.
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
@@ -533,8 +533,8 @@ class PackData(object):
     def __init__(self, filename, file=None, size=None):
         """Create a PackData object representing the pack in the given filename.
 
-        The file must exist and stay readable until the object is disposed of.
-        It must also stay the same size. It will be mapped whenever needed.
+        The file must exist and stay readable until the object is disposed of. It
+        must also stay the same size. It will be mapped whenever needed.
 
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
@@ -671,10 +671,9 @@ class PackData(object):
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
 
-        :param progress: Progress function, called with current and
-            total object count.
-
-        This will yield tuples with (sha, offset, crc32)
+        :param progress: Progress function, called with current and total object
+            count.
+        :yields: tuples with (sha, offset, crc32)
         """
         for offset, type, obj, crc32 in self.iterobjects(progress=progress):
             assert isinstance(offset, int)
@@ -686,8 +685,8 @@ class PackData(object):
     def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
 
-        :param progress: Progress function, called with current and
-            total object count
+        :param progress: Progress function, called with current and total object
+            count
         :return: List of tuples with (sha, offset, crc32)
         """
         ret = list(self.iterentries(progress=progress))

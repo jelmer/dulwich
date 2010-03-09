@@ -1,17 +1,17 @@
 # test_pack.py -- Tests for the handling of git packs.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # of the License, or (at your option) any later version of the license.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -23,6 +23,8 @@
 
 from cStringIO import StringIO
 import os
+import shutil
+import tempfile
 import unittest
 import zlib
 
@@ -30,6 +32,8 @@ from dulwich.errors import (
     ChecksumMismatch,
     )
 from dulwich.objects import (
+    hex_to_sha,
+    sha_to_hex,
     Tree,
     )
 from dulwich.pack import (
@@ -52,19 +56,26 @@ a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
 tree_sha = 'b2a2766a2879c209ab1176e7e778b81ae422eeaa'
 commit_sha = 'f18faa16531ac570a3fdc8c7ca16682548dafd12'
 
+
 class PackTests(unittest.TestCase):
     """Base class for testing packs"""
-  
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
+
     datadir = os.path.join(os.path.dirname(__file__), 'data/packs')
-  
+
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""
         return load_pack_index(os.path.join(self.datadir, 'pack-%s.idx' % sha))
-  
+
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha"""
         return PackData(os.path.join(self.datadir, 'pack-%s.pack' % sha))
-  
+
     def get_pack(self, sha):
         return Pack(os.path.join(self.datadir, 'pack-%s' % sha))
 
@@ -77,7 +88,7 @@ class PackTests(unittest.TestCase):
 
 class PackIndexTests(PackTests):
     """Class that tests the index of packfiles"""
-  
+
     def test_object_index(self):
         """Tests that the correct object offset is returned from the index."""
         p = self.get_pack_index(pack1_sha)
@@ -85,15 +96,17 @@ class PackIndexTests(PackTests):
         self.assertEqual(p.object_index(a_sha), 178)
         self.assertEqual(p.object_index(tree_sha), 138)
         self.assertEqual(p.object_index(commit_sha), 12)
-  
+
     def test_index_len(self):
         p = self.get_pack_index(pack1_sha)
         self.assertEquals(3, len(p))
-  
+
     def test_get_stored_checksum(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEquals("\xf2\x84\x8e*\xd1o2\x9a\xe1\xc9.;\x95\xe9\x18\x88\xda\xa5\xbd\x01", str(p.get_stored_checksum()))
-        self.assertEquals( 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7' , str(p.get_pack_checksum()))
+        self.assertEquals('f2848e2ad16f329ae1c92e3b95e91888daa5bd01',
+                          sha_to_hex(p.get_stored_checksum()))
+        self.assertEquals('721980e866af9a5f93ad674144e1459b8ba3e7b7',
+                          sha_to_hex(p.get_pack_checksum()))
 
     def test_index_check(self):
         p = self.get_pack_index(pack1_sha)
@@ -101,45 +114,50 @@ class PackIndexTests(PackTests):
 
     def test_iterentries(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEquals([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, None), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, None), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, None)], list(p.iterentries()))
-  
+        entries = [(sha_to_hex(s), o, c) for s, o, c in p.iterentries()]
+        self.assertEquals([
+          ('6f670c0fb53f9463760b7295fbb814e965fb20c8', 178, None),
+          ('b2a2766a2879c209ab1176e7e778b81ae422eeaa', 138, None),
+          ('f18faa16531ac570a3fdc8c7ca16682548dafd12', 12, None)
+          ], entries)
+
     def test_iter(self):
         p = self.get_pack_index(pack1_sha)
         self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
-  
+
 
 class TestPackDeltas(unittest.TestCase):
-  
-    test_string1 = "The answer was flailing in the wind"
-    test_string2 = "The answer was falling down the pipe"
-    test_string3 = "zzzzz"
-  
-    test_string_empty = ""
-    test_string_big = "Z" * 8192
-  
+
+    test_string1 = 'The answer was flailing in the wind'
+    test_string2 = 'The answer was falling down the pipe'
+    test_string3 = 'zzzzz'
+
+    test_string_empty = ''
+    test_string_big = 'Z' * 8192
+
     def _test_roundtrip(self, base, target):
         self.assertEquals([target],
-            apply_delta(base, create_delta(base, target)))
-  
+                          apply_delta(base, create_delta(base, target)))
+
     def test_nochange(self):
         self._test_roundtrip(self.test_string1, self.test_string1)
-  
+
     def test_change(self):
         self._test_roundtrip(self.test_string1, self.test_string2)
-  
+
     def test_rewrite(self):
         self._test_roundtrip(self.test_string1, self.test_string3)
-  
+
     def test_overflow(self):
         self._test_roundtrip(self.test_string_empty, self.test_string_big)
 
 
 class TestPackData(PackTests):
     """Tests getting the data from the packfile."""
-  
+
     def test_create_pack(self):
         p = self.get_pack_data(pack1_sha)
-  
+
     def test_pack_len(self):
         p = self.get_pack_data(pack1_sha)
         self.assertEquals(3, len(p))
@@ -150,23 +168,46 @@ class TestPackData(PackTests):
 
     def test_iterobjects(self):
         p = self.get_pack_data(pack1_sha)
-        self.assertEquals([(12, 1, 'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\nauthor James Westby <jw+debian@jameswestby.net> 1174945067 +0100\ncommitter James Westby <jw+debian@jameswestby.net> 1174945067 +0100\n\nTest commit\n', 3775879613L), (138, 2, '100644 a\x00og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 912998690L), (178, 3, 'test 1\n', 1373561701L)], [(len, type, "".join(chunks), offset) for (len, type, chunks, offset) in p.iterobjects()])
-  
+        commit_data = ('tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\n'
+                       'author James Westby <jw+debian@jameswestby.net> '
+                       '1174945067 +0100\n'
+                       'committer James Westby <jw+debian@jameswestby.net> '
+                       '1174945067 +0100\n'
+                       '\n'
+                       'Test commit\n')
+        blob_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
+        tree_data = '100644 a\0%s' % hex_to_sha(blob_sha)
+        actual = []
+        for offset, type, chunks, crc32 in p.iterobjects():
+            actual.append((offset, type, ''.join(chunks), crc32))
+        self.assertEquals([
+          (12, 1, commit_data, 3775879613L),
+          (138, 2, tree_data, 912998690L),
+          (178, 3, 'test 1\n', 1373561701L)
+          ], actual)
+
     def test_iterentries(self):
         p = self.get_pack_data(pack1_sha)
-        self.assertEquals(set([('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, 1373561701L), ('\xb2\xa2vj(y\xc2\t\xab\x11v\xe7\xe7x\xb8\x1a\xe4"\xee\xaa', 138, 912998690L), ('\xf1\x8f\xaa\x16S\x1a\xc5p\xa3\xfd\xc8\xc7\xca\x16h%H\xda\xfd\x12', 12, 3775879613L)]), set(p.iterentries()))
-  
+        entries = set((sha_to_hex(s), o, c) for s, o, c in p.iterentries())
+        self.assertEquals(set([
+          ('6f670c0fb53f9463760b7295fbb814e965fb20c8', 178, 1373561701L),
+          ('b2a2766a2879c209ab1176e7e778b81ae422eeaa', 138, 912998690L),
+          ('f18faa16531ac570a3fdc8c7ca16682548dafd12', 12, 3775879613L),
+          ]), entries)
+
     def test_create_index_v1(self):
         p = self.get_pack_data(pack1_sha)
-        p.create_index_v1("v1test.idx")
-        idx1 = load_pack_index("v1test.idx")
+        filename = os.path.join(self.tempdir, 'v1test.idx')
+        p.create_index_v1(filename)
+        idx1 = load_pack_index(filename)
         idx2 = self.get_pack_index(pack1_sha)
         self.assertEquals(idx1, idx2)
-  
+
     def test_create_index_v2(self):
         p = self.get_pack_data(pack1_sha)
-        p.create_index_v2("v2test.idx")
-        idx1 = load_pack_index("v2test.idx")
+        filename = os.path.join(self.tempdir, 'v2test.idx')
+        p.create_index_v2(filename)
+        idx1 = load_pack_index(filename)
         idx2 = self.get_pack_index(pack1_sha)
         self.assertEquals(idx1, idx2)
 
@@ -205,24 +246,26 @@ class TestPack(PackTests):
     def test_copy(self):
         origpack = self.get_pack(pack1_sha)
         self.assertSucceeds(origpack.index.check)
-        write_pack("Elch", [(x, "") for x in origpack.iterobjects()], 
-            len(origpack))
-        newpack = Pack("Elch")
+        basename = os.path.join(self.tempdir, 'Elch')
+        write_pack(basename, [(x, '') for x in origpack.iterobjects()],
+                   len(origpack))
+        newpack = Pack(basename)
         self.assertEquals(origpack, newpack)
         self.assertSucceeds(newpack.index.check)
         self.assertEquals(origpack.name(), newpack.name())
-        self.assertEquals(origpack.index.get_pack_checksum(), 
+        self.assertEquals(origpack.index.get_pack_checksum(),
                           newpack.index.get_pack_checksum())
 
-        self.assertTrue(
-                (origpack.index.version != newpack.index.version) or
-                (origpack.index.get_stored_checksum() == newpack.index.get_stored_checksum()))
+        wrong_version = origpack.index.version != newpack.index.version
+        orig_checksum = origpack.index.get_stored_checksum()
+        new_checksum = newpack.index.get_stored_checksum()
+        self.assertTrue(wrong_version or orig_checksum == new_checksum)
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)
         commit = p[commit_sha]
-        self.assertEquals("James Westby <jw+debian@jameswestby.net>",
-            commit.author)
+        self.assertEquals('James Westby <jw+debian@jameswestby.net>',
+                          commit.author)
         self.assertEquals([], commit.parents)
 
     def test_name(self):
@@ -230,16 +273,16 @@ class TestPack(PackTests):
         self.assertEquals(pack1_sha, p.name())
 
 
-class TestHexToSha(unittest.TestCase):
-
-    def test_simple(self):
-        self.assertEquals('\xab\xcd' * 10, hex_to_sha("abcd" * 10))
-
-    def test_reverse(self):
-        self.assertEquals("abcd" * 10, sha_to_hex('\xab\xcd' * 10))
+pack_checksum = hex_to_sha('721980e866af9a5f93ad674144e1459b8ba3e7b7')
 
 
 class BaseTestPackIndexWriting(object):
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -248,50 +291,62 @@ class BaseTestPackIndexWriting(object):
             self.fail(e)
 
     def test_empty(self):
-        pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
-        self._write_fn("empty.idx", [], pack_checksum)
-        idx = load_pack_index("empty.idx")
+        filename = os.path.join(self.tempdir, 'empty.idx')
+        self._write_fn(filename, [], pack_checksum)
+        idx = load_pack_index(filename)
         self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(0, len(idx))
 
     def test_single(self):
-        pack_checksum = 'r\x19\x80\xe8f\xaf\x9a_\x93\xadgAD\xe1E\x9b\x8b\xa3\xe7\xb7'
-        my_entries = [('og\x0c\x0f\xb5?\x94cv\x0br\x95\xfb\xb8\x14\xe9e\xfb \xc8', 178, 42)]
-        my_entries.sort()
-        self._write_fn("single.idx", my_entries, pack_checksum)
-        idx = load_pack_index("single.idx")
+        entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
+        my_entries = [(entry_sha, 178, 42)]
+        filename = os.path.join(self.tempdir, 'single.idx')
+        self._write_fn(filename, my_entries, pack_checksum)
+        idx = load_pack_index(filename)
         self.assertEquals(idx.version, self._expected_version)
         self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(1, len(idx))
         actual_entries = list(idx.iterentries())
         self.assertEquals(len(my_entries), len(actual_entries))
-        for a, b in zip(my_entries, actual_entries):
-            self.assertEquals(a[0], b[0])
-            self.assertEquals(a[1], b[1])
+        for mine, actual in zip(my_entries, actual_entries):
+            my_sha, my_offset, my_crc = mine
+            actual_sha, actual_offset, actual_crc = actual
+            self.assertEquals(my_sha, actual_sha)
+            self.assertEquals(my_offset, actual_offset)
             if self._has_crc32_checksum:
-                self.assertEquals(a[2], b[2])
+                self.assertEquals(my_crc, actual_crc)
             else:
-                self.assertTrue(b[2] is None)
+                self.assertTrue(actual_crc is None)
 
 
 class TestPackIndexWritingv1(unittest.TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
+        BaseTestPackIndexWriting.setUp(self)
         self._has_crc32_checksum = False
         self._expected_version = 1
         self._write_fn = write_pack_index_v1
+
+    def tearDown(self):
+        unittest.TestCase.tearDown(self)
+        BaseTestPackIndexWriting.tearDown(self)
 
 
 class TestPackIndexWritingv2(unittest.TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
         unittest.TestCase.setUp(self)
+        BaseTestPackIndexWriting.setUp(self)
         self._has_crc32_checksum = True
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
+
+    def tearDown(self):
+        unittest.TestCase.tearDown(self)
+        BaseTestPackIndexWriting.tearDown(self)
 
 
 class ReadZlibTests(unittest.TestCase):

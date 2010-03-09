@@ -36,6 +36,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    ObjectFormatException,
     )
 from dulwich.misc import (
     make_sha,
@@ -643,48 +644,43 @@ class ReceivePackHandler(Handler):
     def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
-                          AssertionError, socket.error, zlib.error)
+                          AssertionError, socket.error, zlib.error,
+                          ObjectFormatException)
         status = []
         unpack_error = None
         # TODO: more informative error messages than just the exception string
         try:
             PackStreamVerifier(self.proto, f).verify()
-        except all_exceptions, e:
-            unpack_error = str(e).replace('\n', '')
-        try:
-            commit()
-        except all_exceptions, e:
-            if not unpack_error:
-                unpack_error = str(e).replace('\n', '')
-
-        if unpack_error:
-            status.append(('unpack', unpack_error))
-        else:
+            p = commit()
+            if not p:
+                raise IOError('Failed to write pack')
+            p.check()
             status.append(('unpack', 'ok'))
+        except all_exceptions, e:
+            status.append(('unpack', str(e).replace('\n', '')))
+            # The pack may still have been moved in, but it may contain broken
+            # objects. We trust a later GC to clean it up.
 
         for oldsha, sha, ref in refs:
-            ref_error = None
+            ref_status = 'ok'
             try:
                 if sha == ZERO_SHA:
-                    if not self.has_capability('delete-refs'):
+                    if not delete_refs:
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')
                     try:
                         del self.repo.refs[ref]
                     except all_exceptions:
-                        ref_error = 'failed to delete'
+                        ref_status = 'failed to delete'
                 else:
                     try:
                         self.repo.refs[ref] = sha
                     except all_exceptions:
-                        ref_error = 'failed to write'
+                        ref_status = 'failed to write'
             except KeyError, e:
-                ref_error = 'bad ref'
-            if ref_error:
-                status.append((ref, ref_error))
-            else:
-                status.append((ref, 'ok'))
+                ref_status = 'bad ref'
+            status.append((ref, ref_status))
 
         return status
 

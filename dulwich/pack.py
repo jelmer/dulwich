@@ -316,7 +316,6 @@ class PackIndex(object):
 
     def check(self):
         """Check that the stored checksum matches the actual checksum."""
-        # TODO: Check pack contents, too
         actual = self.calculate_checksum()
         stored = self.get_stored_checksum()
         if actual != stored:
@@ -1233,6 +1232,9 @@ class Pack(object):
         """
         self.index.check()
         self.data.check()
+        for obj in self.iterobjects():
+            obj.check()
+        # TODO: object connectivity checks
 
     def get_stored_checksum(self):
         return self.data.get_stored_checksum()

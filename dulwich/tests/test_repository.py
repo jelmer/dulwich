@@ -72,6 +72,12 @@ class RepositoryTests(unittest.TestCase):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
+
+    def test_setitem(self):
+        r = self._repo = open_repo('a.git')
+        r["refs/tags/foo"] = 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
+        self.assertEquals('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+                          r["refs/tags/foo"].id)
   
     def test_get_refs(self):
         r = self._repo = open_repo('a.git')
@@ -235,6 +241,7 @@ THREES = "3" * 40
 FOURS = "4" * 40
 
 class PackedRefsFileTests(unittest.TestCase):
+
     def test_split_ref_line_errors(self):
         self.assertRaises(errors.PackedRefsException, _split_ref_line,
                           'singlefield')
@@ -283,6 +290,7 @@ class PackedRefsFileTests(unittest.TestCase):
 
 
 class RefsContainerTests(unittest.TestCase):
+
     def setUp(self):
         self._repo = open_repo('refs.git')
         self._refs = self._repo.refs

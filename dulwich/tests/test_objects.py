@@ -39,6 +39,7 @@ from dulwich.objects import (
     Tag,
     format_timezone,
     hex_to_sha,
+    sha_to_hex,
     hex_to_filename,
     check_hexsha,
     check_identity,
@@ -87,6 +88,15 @@ except ImportError:
                     break
             else:
                 return
+
+
+class TestHexToSha(unittest.TestCase):
+
+    def test_simple(self):
+        self.assertEquals("\xab\xcd" * 10, hex_to_sha("abcd" * 10))
+
+    def test_reverse(self):
+        self.assertEquals("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
 class BlobReadTests(unittest.TestCase):

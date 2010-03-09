@@ -792,7 +792,8 @@ class BaseRepo(object):
                 self.refs[name] = value
             else:
                 raise TypeError(value)
-        raise ValueError(name)
+        else:
+            raise ValueError(name)
 
     def __delitem__(self, name):
         if name.startswith("refs") or name == "HEAD":

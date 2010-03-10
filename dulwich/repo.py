@@ -684,6 +684,8 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
+        if not wants:
+            return []
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
             self.object_store.find_missing_objects(haves, wants, progress,

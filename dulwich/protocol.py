@@ -171,7 +171,7 @@ def extract_capabilities(text):
     if not "\0" in text:
         return text, []
     text, capabilities = text.rstrip().split("\0")
-    return (text, capabilities.split(" "))
+    return (text, capabilities.strip().split(" "))
 
 
 def extract_want_line_capabilities(text):

@@ -16,6 +16,11 @@
 
   * Add framework for testing compatibility with C Git. (Dave Borowitz)
 
+ API BREAKAGES
+
+  * The 'committer' and 'message' arguments to Repo.do_commit() have 
+    been swapped. 'committer' is now optional. (Jelmer Vernooij)
+
 0.5.0	2010-03-03
 
  BUG FIXES

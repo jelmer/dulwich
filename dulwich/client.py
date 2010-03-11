@@ -139,8 +139,8 @@ class GitClient(object):
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
         try:
-            return self.fetch_pack(path, determine_wants, target.graph_walker, 
-                                   f.write, progress)
+            return self.fetch_pack(path, determine_wants, 
+                target.get_graph_walker(), f.write, progress)
         finally:
             commit()
 

@@ -47,7 +47,11 @@ def cmd_fetch_pack(args):
 def cmd_log(args):
     from dulwich.repo import Repo
     opts, args = getopt(args, "", [])
-    r = Repo(".")
+    if len(args) > 0:
+        path = args.pop(0)
+    else:
+        path = "."
+    r = Repo(path)
     todo = [r.head()]
     done = set()
     while todo:

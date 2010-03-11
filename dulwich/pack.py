@@ -84,23 +84,37 @@ def take_msb_bytes(read):
     return ret
 
 
-def read_zlib_chunks(read, buffer_size=4096):
-    """Read chunks of zlib data from a buffer.
-    
-    :param read: Read function
-    :return: Tuple with list of chunks, length of 
-        compressed data length and unused read data
+def read_zlib_chunks(read_some, dec_size, buffer_size=4096):
+    """Read zlib data from a buffer.
+
+    This function requires that the buffer have additional data following the
+    compressed data, which is guaranteed to be the case for git pack files.
+
+    :param read_some: Read function that returns at least one byte, but may
+        return less than the requested size
+    :param dec_size: Expected size of the decompressed buffer
+    :param buffer_size: Size of the read buffer
+    :return: Tuple with list of chunks, length of compressed data length and
+        and unused read data.
+    :raise zlib.error: if a decompression error occurred.
     """
+    if dec_size <= -1:
+        raise ValueError("non-negative zlib data stream size expected")
     obj = zlib.decompressobj()
     ret = []
     fed = 0
+    size = 0
     while obj.unused_data == "":
-        add = read(buffer_size)
-        if len(add) < buffer_size:
-            add += "Z"
+        add = read_some(buffer_size)
+        if not add:
+            raise zlib.error("EOF before end of zlib stream")
         fed += len(add)
-        ret.append(obj.decompress(add))
-    comp_len = fed-len(obj.unused_data)
+        decomp = obj.decompress(add)
+        size += len(decomp)
+        ret.append(decomp)
+    if size != dec_size:
+        raise zlib.error("decompressed data does not match expected size")
+    comp_len = fed - len(obj.unused_data)
     return ret, comp_len, obj.unused_data
 
 
@@ -441,17 +455,17 @@ def unpack_object(read):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp, comp_len, unused = read_zlib_chunks(read)
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
         assert size == chunks_length(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
         basename = read(20)
         raw_base += 20
-        uncomp, comp_len, unused = read_zlib_chunks(read)
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
         assert size == chunks_length(uncomp)
         return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp, comp_len, unused = read_zlib_chunks(read)
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
         assert chunks_length(uncomp) == size
         return type, uncomp, comp_len+raw_base, unused
 

@@ -152,13 +152,11 @@ def cmd_clone(args):
 
     if not os.path.exists(path):
         os.mkdir(path)
-    Repo.init(path)
-    r = Repo(path)
-    graphwalker = r.get_graph_walker()
-    f, commit = r.object_store.add_pack()
-    client.fetch_pack(host_path, r.object_store.determine_wants_all, 
-                      graphwalker, f.write, sys.stdout.write)
-    commit()
+    r = Repo.init(path)
+    remote_refs = client.fetch(host_path, r,
+        determine_wants=r.object_store.determine_wants_all,
+        progress=sys.stdout.write)
+    r["HEAD"] = remote_refs["HEAD"]
 
 
 def cmd_commit(args):

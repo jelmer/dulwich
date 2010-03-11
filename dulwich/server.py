@@ -38,8 +38,9 @@ from dulwich.objects import (
     hex_to_sha,
     )
 from dulwich.protocol import (
-    Protocol,
     ProtocolFile,
+    Protocol,
+    ReceivableProtocol,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -637,7 +638,7 @@ class ReceivePackHandler(Handler):
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
-        proto = Protocol(self.rfile.read, self.wfile.write)
+        proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
         command, args = proto.read_cmd()
 
         # switch case to handle the specific git command

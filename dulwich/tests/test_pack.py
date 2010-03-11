@@ -24,6 +24,7 @@
 from cStringIO import StringIO
 import os
 import unittest
+import zlib
 
 from dulwich.objects import (
     Tree,
@@ -277,11 +278,67 @@ class TestPackIndexWritingv2(unittest.TestCase, BaseTestPackIndexWriting):
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
 
-TEST_COMP1 = """\x78\x9c\x9d\x8e\xc1\x0a\xc2\x30\x10\x44\xef\xf9\x8a\xbd\xa9\x08\x92\x86\xb4\x26\x20\xe2\xd9\x83\x78\xf2\xbe\x49\x37\xb5\xa5\x69\xca\x36\xf5\xfb\x4d\xfd\x04\x67\x6e\x33\xcc\xf0\x32\x13\x81\xc6\x16\x8d\xa9\xbd\xad\x6c\xe3\x8a\x03\x4a\x73\xd6\xda\xd5\xa6\x51\x2e\x58\x65\x6c\x13\xbc\x94\x4a\xcc\xc8\x34\x65\x78\xa4\x89\x04\xae\xf9\x9d\x18\xee\x34\x46\x62\x78\x11\x4f\x29\xf5\x03\x5c\x86\x5f\x70\x5b\x30\x3a\x3c\x25\xee\xae\x50\xa9\xf2\x60\xa4\xaa\x34\x1c\x65\x91\xf0\x29\xc6\x3e\x67\xfa\x6f\x2d\x9e\x9c\x3e\x7d\x4b\xc0\x34\x8f\xe8\x29\x6e\x48\xa1\xa0\xc4\x88\xf3\xfe\xb0\x5b\x20\x85\xb0\x50\x06\xe4\x6e\xdd\xca\xd3\x17\x26\xfa\x49\x23"""
 
+class ReadZlibTests(unittest.TestCase):
 
-class ZlibTests(unittest.TestCase):
+    decomp = (
+      'tree 4ada885c9196b6b6fa08744b5862bf92896fc002\n'
+      'parent None\n'
+      'author Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
+      'committer Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
+      '\n'
+      "Provide replacement for mmap()'s offset argument.")
+    comp = zlib.compress(decomp)
+    extra = 'nextobject'
+
+    def setUp(self):
+        self.read = StringIO(self.comp + self.extra).read
+
+    def test_decompress_size(self):
+        good_decomp_len = len(self.decomp)
+        self.assertRaises(ValueError, read_zlib_chunks, self.read, -1)
+        self.assertRaises(zlib.error, read_zlib_chunks, self.read,
+                          good_decomp_len - 1)
+        self.assertRaises(zlib.error, read_zlib_chunks, self.read,
+                          good_decomp_len + 1)
+
+    def test_decompress_truncated(self):
+        read = StringIO(self.comp[:10]).read
+        self.assertRaises(zlib.error, read_zlib_chunks, read, len(self.decomp))
+
+        read = StringIO(self.comp).read
+        self.assertRaises(zlib.error, read_zlib_chunks, read, len(self.decomp))
+
+    def test_decompress_empty(self):
+        comp = zlib.compress('')
+        read = StringIO(comp + self.extra).read
+        decomp, comp_len, unused_data = read_zlib_chunks(read, 0)
+        self.assertEqual('', ''.join(decomp))
+        self.assertEqual(len(comp), comp_len)
+        self.assertNotEquals('', unused_data)
+        self.assertEquals(self.extra, unused_data + read())
+
+    def _do_decompress_test(self, buffer_size):
+        decomp, comp_len, unused_data = read_zlib_chunks(
+          self.read, len(self.decomp), buffer_size=buffer_size)
+        self.assertEquals(self.decomp, ''.join(decomp))
+        self.assertEquals(len(self.comp), comp_len)
+        self.assertNotEquals('', unused_data)
+        self.assertEquals(self.extra, unused_data + self.read())
 
     def test_simple_decompress(self):
-        self.assertEquals((["tree 4ada885c9196b6b6fa08744b5862bf92896fc002\nparent None\nauthor Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\ncommitter Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n\nProvide replacement for mmap()'s offset argument."], 158, 'Z'), 
-        read_zlib_chunks(StringIO(TEST_COMP1).read, 229))
+        self._do_decompress_test(4096)
+
+    # These buffer sizes are not intended to be realistic, but rather simulate
+    # larger buffer sizes that may end at various places.
+    def test_decompress_buffer_size_1(self):
+        self._do_decompress_test(1)
+
+    def test_decompress_buffer_size_2(self):
+        self._do_decompress_test(2)
+
+    def test_decompress_buffer_size_3(self):
+        self._do_decompress_test(3)
+
+    def test_decompress_buffer_size_4(self):
+        self._do_decompress_test(4)

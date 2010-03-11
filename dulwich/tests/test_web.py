@@ -153,28 +153,16 @@ class DumbHandlersTestCase(WebTestCase):
 
 class SmartHandlersTestCase(WebTestCase):
 
-    class TestProtocol(object):
-        def __init__(self, handler):
-            self._handler = handler
-
-        def write_pkt_line(self, line):
-            if line is None:
-                self._handler.write('flush-pkt\n')
-            else:
-                self._handler.write('pkt-line: %s' % line)
-
     class _TestUploadPackHandler(object):
-        def __init__(self, backend, args, read, write, stateless_rpc=False,
+        def __init__(self, backend, args, proto, stateless_rpc=False,
                      advertise_refs=False):
             self.args = args
-            self.read = read
-            self.write = write
-            self.proto = SmartHandlersTestCase.TestProtocol(self)
+            self.proto = proto
             self.stateless_rpc = stateless_rpc
             self.advertise_refs = advertise_refs
 
         def handle(self):
-            self.write('handled input: %s' % self.read())
+            self.proto.write('handled input: %s' % self.proto.recv(1024))
 
     def _MakeHandler(self, *args, **kwargs):
         self._handler = self._TestUploadPackHandler(*args, **kwargs)
@@ -222,8 +210,8 @@ class SmartHandlersTestCase(WebTestCase):
         mat = re.search('.*', '/git-upload-pack')
         output = ''.join(get_info_refs(self._req, 'backend', mat,
                                        services=self.services()))
-        self.assertEquals(('pkt-line: # service=git-upload-pack\n'
-                           'flush-pkt\n'
+        self.assertEquals(('001e# service=git-upload-pack\n'
+                           '0000'
                            # input is ignored by the handler
                            'handled input: '), output)
         self.assertTrue(self._handler.advertise_refs)

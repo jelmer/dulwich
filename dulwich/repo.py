@@ -774,8 +774,7 @@ class BaseRepo(object):
                     break
                 i += 1
             history.insert(i, commit)
-            parents = commit.parents
-            pending_commits += parents
+            pending_commits += commit.parents
         history.reverse()
         return history
 

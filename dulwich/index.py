@@ -283,6 +283,14 @@ class Index(object):
         for name in mine:
             yield ((None, name), (None, self.get_mode(name)), (None, self.get_sha1(name)))
 
+    def commit(self, object_store):
+        """Create a new tree from an index.
+
+        :param object_store: Object store to save the tree in
+        :return: Root tree SHA
+        """
+        return commit_tree(object_store, self.iterblobs())
+
 
 def commit_tree(object_store, blobs):
     """Commit a new tree.
@@ -327,5 +335,7 @@ def commit_index(object_store, index):
 
     :param object_store: Object store to save the tree in
     :param index: Index file
+    :note: This function is deprecated, use index.commit() instead.
+    :return: Root tree sha.
     """
     return commit_tree(object_store, index.iterblobs())

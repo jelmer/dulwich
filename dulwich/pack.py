@@ -417,12 +417,12 @@ class PackIndex2(PackIndex):
   
 
 
-def read_pack_header(f):
+def read_pack_header(read):
     """Read the header of a pack file.
 
-    :param f: File-like object to read from
+    :param read: Read function
     """
-    header = f.read(12)
+    header = read(12)
     assert header[:4] == "PACK"
     (version,) = unpack_from(">L", header, 4)
     assert version in (2, 3), "Version was %d" % version
@@ -434,20 +434,25 @@ def chunks_length(chunks):
     return sum(imap(len, chunks))
 
 
-def unpack_object(read):
+def unpack_object(read_all, read_some=None):
     """Unpack a Git object.
 
-    :return: tuple with type, uncompressed data as chunks, compressed size and 
-        tail data
+    :param read_all: Read function that blocks until the number of requested
+        bytes are read.
+    :param read_some: Read function that returns at least one byte, but may not
+        return the number of bytes requested.
+    :return: tuple with type, uncompressed data, compressed size and tail data.
     """
-    bytes = take_msb_bytes(read)
+    if read_some is None:
+        read_some = read_all
+    bytes = take_msb_bytes(read_all)
     type = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type == 6: # offset delta
-        bytes = take_msb_bytes(read)
+        bytes = take_msb_bytes(read_all)
         raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
         delta_base_offset = bytes[0] & 0x7f
@@ -455,17 +460,17 @@ def unpack_object(read):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
         assert size == chunks_length(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
-        basename = read(20)
+        basename = read_all(20)
         raw_base += 20
-        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
         assert size == chunks_length(uncomp)
         return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
         assert chunks_length(uncomp) == size
         return type, uncomp, comp_len+raw_base, unused
 
@@ -522,7 +527,7 @@ class PackData(object):
             self._file = GitFile(self._filename, 'rb')
         else:
             self._file = file
-        (version, self._num_objects) = read_pack_header(self._file)
+        (version, self._num_objects) = read_pack_header(self._file.read)
         self._offset_cache = LRUSizeCache(1024*1024*20, 
             compute_size=_compute_object_size)
 

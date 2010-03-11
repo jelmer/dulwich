@@ -26,6 +26,9 @@ try:
     from urlparse import parse_qs
 except ImportError:
     from dulwich.misc import parse_qs
+from dulwich.protocol import (
+    ReceivableProtocol,
+    )
 from dulwich.server import (
     ReceivePackHandler,
     UploadPackHandler,
@@ -138,9 +141,8 @@ def get_info_refs(req, backend, mat, services=None):
         req.nocache()
         req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
         output = StringIO()
-        dummy_input = StringIO()  # GET request, handler doesn't need to read
-        handler = handler_cls(backend, [url_prefix(mat)],
-                              dummy_input.read, output.write,
+        proto = ReceivableProtocol(StringIO().read, output.write)
+        handler = handler_cls(backend, [url_prefix(mat)], proto,
                               stateless_rpc=True, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
         handler.proto.write_pkt_line(None)
@@ -216,8 +218,8 @@ def handle_service_request(req, backend, mat, services=None):
     # content-length
     if 'CONTENT_LENGTH' in req.environ:
         input = _LengthLimitedFile(input, int(req.environ['CONTENT_LENGTH']))
-    handler = handler_cls(backend, [url_prefix(mat)], input.read, output.write,
-                          stateless_rpc=True)
+    proto = ReceivableProtocol(input.read, output.write)
+    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()
     yield output.getvalue()
 

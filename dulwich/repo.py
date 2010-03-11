@@ -799,14 +799,14 @@ class BaseRepo(object):
             del self.refs[name]
         raise ValueError(name)
 
-    def do_commit(self, committer, message,
+    def do_commit(self, message, committer=None, 
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None, 
                   author_timezone=None, tree=None):
         """Create a new commit.
 
-        :param committer: Committer fullname
         :param message: Commit message
+        :param committer: Committer fullname
         :param author: Author fullname (defaults to committer)
         :param commit_timestamp: Commit timestamp (defaults to now)
         :param commit_timezone: Commit timestamp timezone (defaults to GMT)
@@ -816,19 +816,22 @@ class BaseRepo(object):
         :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
         :return: New commit SHA1
         """
-        from dulwich.index import commit_index
         import time
         index = self.open_index()
         c = Commit()
         if tree is None:
-            c.tree = commit_index(self.object_store, index)
+            c.tree = index.commit(self.object_store)
         else:
             c.tree = tree
+        # TODO: Allow username to be missing, and get it from .git/config
+        if committer is None:
+            raise ValueError("committer not set")
         c.committer = committer
         if commit_timestamp is None:
             commit_timestamp = time.time()
         c.commit_time = int(commit_timestamp)
         if commit_timezone is None:
+            # FIXME: Use current user timezone rather than UTC
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:

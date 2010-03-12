@@ -623,6 +623,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     """
     parts = path.split("/")
     sha = root_sha
+    mode = None
     for p in parts:
         obj = lookup_obj(sha)
         if type(obj) is not Tree:

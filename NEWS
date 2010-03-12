@@ -8,6 +8,9 @@
   * Deal with capabilities required by the client, even if they 
     can not be disabled in the server. (Dave Borowitz)
 
+  * Fix trailing newlines in generated patch files.
+    (Jelmer Vernooij)
+
  FEATURES
 
   * Add include-tag capability to server. (Dave Borowitz)
@@ -25,7 +28,7 @@
 
  BUG FIXES
 
-  * Support custom fields in commits.
+  * Support custom fields in commits (readonly). (Jelmer Vernooij)
 
   * Improved ref handling. (Dave Borowitz)
 
@@ -54,13 +57,14 @@
 
  FEATURES
 
-  * Add ObjectStore.iter_tree_contents()
+  * Add ObjectStore.iter_tree_contents(). (Jelmer Vernooij)
 
-  * Add Index.changes_from_tree()
+  * Add Index.changes_from_tree(). (Jelmer Vernooij)
 
-  * Add ObjectStore.tree_changes()
+  * Add ObjectStore.tree_changes(). (Jelmer Vernooij)
 
   * Add functionality for writing patches in dulwich.patch.
+    (Jelmer Vernooij)
 
 0.4.0	2009-10-07
 

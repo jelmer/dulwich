@@ -124,10 +124,10 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                f.write("old file mode %o\n" % old_mode)
-            f.write("new file mode %o\n" % new_mode) 
+                f.write("old mode %o\n" % old_mode)
+            f.write("new mode %o\n" % new_mode) 
         else:
-            f.write("deleted file mode %o\n" % old_mode)
+            f.write("deleted mode %o\n" % old_mode)
     f.write("index %s..%s %o\n" % (
         blob_id(old_blob), blob_id(new_blob), new_mode))
     old_contents = lines(old_blob)

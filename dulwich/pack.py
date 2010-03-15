@@ -72,6 +72,12 @@ supports_mmap_offset = (sys.version_info[0] >= 3 or
         (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
+OFS_DELTA = 6
+REF_DELTA = 7
+
+DELTA_TYPES = (OFS_DELTA, REF_DELTA)
+
+
 def take_msb_bytes(read):
     """Read bytes marked with most significant bit.
 
@@ -453,7 +459,7 @@ def unpack_object(read_all, read_some=None):
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
-    if type == 6: # offset delta
+    if type == OFS_DELTA:
         bytes = take_msb_bytes(read_all)
         raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
@@ -465,7 +471,7 @@ def unpack_object(read_all, read_some=None):
         uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
         assert size == chunks_length(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
-    elif type == 7: # ref delta
+    elif type == REF_DELTA:
         basename = read_all(20)
         raw_base += 20
         uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
@@ -479,7 +485,7 @@ def unpack_object(read_all, read_some=None):
 
 def _compute_object_size((num, obj)):
     """Compute the size of a unresolved object for use with LRUSizeCache."""
-    if num in (6, 7):
+    if num in DELTA_TYPES:
         return chunks_length(obj[1])
     return chunks_length(obj)
 
@@ -578,25 +584,25 @@ class PackData(object):
 
         :return: Tuple with object type and contents.
         """
-        if type not in (6, 7): # Not a delta
+        if type not in DELTA_TYPES:
             return type, obj
 
         if get_offset is None:
             get_offset = self.get_object_at
 
-        if type == 6: # offset delta
+        if type == OFS_DELTA:
             (delta_offset, delta) = obj
             assert isinstance(delta_offset, int)
             base_offset = offset-delta_offset
             type, base_obj = get_offset(base_offset)
             assert isinstance(type, int)
-        elif type == 7: # ref delta
+        elif type == REF_DELTA:
             (basename, delta) = obj
             assert isinstance(basename, str) and len(basename) == 20
             type, base_obj = get_ref(basename)
             assert isinstance(type, int)
             # Can't be a ofs delta, as we wouldn't know the base offset
-            assert type != 6
+            assert type != OFS_DELTA
             base_offset = None
         type, base_chunks = self.resolve_object(base_offset, type, base_obj,
                                                 get_ref)
@@ -815,9 +821,9 @@ def write_pack_object(f, type, object):
     """
     offset = f.tell()
     packed_data_hdr = ""
-    if type == 6: # offset delta
+    if type == OFS_DELTA:
         (delta_base_offset, object) = object
-    elif type == 7: # ref delta
+    elif type == REF_DELTA:
         (basename, object) = object
     size = len(object)
     c = (type << 4) | (size & 15)
@@ -827,7 +833,7 @@ def write_pack_object(f, type, object):
         c = size & 0x7f
         size >>= 7
     packed_data_hdr += chr(c)
-    if type == 6: # offset delta
+    if type == OFS_DELTA:
         ret = [delta_base_offset & 0x7f]
         delta_base_offset >>= 7
         while delta_base_offset:
@@ -835,7 +841,7 @@ def write_pack_object(f, type, object):
             ret.insert(0, 0x80 | (delta_base_offset & 0x7f))
             delta_base_offset >>= 7
         packed_data_hdr += "".join([chr(x) for x in ret])
-    elif type == 7: # ref delta
+    elif type == REF_DELTA:
         assert len(basename) == 20
         packed_data_hdr += basename
     packed_data = packed_data_hdr + zlib.compress(object)

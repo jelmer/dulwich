@@ -45,6 +45,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
+    ThinPackData,
     iter_sha1,
     load_pack_index,
     write_pack,
@@ -390,19 +391,18 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param path: Path to the pack file.
         """
-        data = PackData(path)
+        data = ThinPackData(self, path)
 
         # Write index for the thin pack (do we really need this?)
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".tempidx")
-        data.create_index_v2(temppath, self.get_raw)
+        data.create_index_v2(temppath)
         p = Pack.from_objects(data, load_pack_index(temppath))
 
         # Write a full pack version
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
-        write_pack(temppath, ((o, None) for o in p.iterobjects(self.get_raw)), 
-                len(p))
+        write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
         pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")

@@ -642,7 +642,8 @@ class ReceivePackHandler(Handler):
 
     def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
-        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
+        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
+                          AssertionError, socket.error, zlib.error)
         status = []
         unpack_error = None
         # TODO: more informative error messages than just the exception string

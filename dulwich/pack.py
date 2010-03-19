@@ -63,6 +63,7 @@ from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,
+    object_header,
     )
 from dulwich.misc import (
     make_sha,
@@ -490,6 +491,15 @@ def _compute_object_size((num, obj)):
     return chunks_length(obj)
 
 
+def obj_sha(type, chunks):
+    """Compute the SHA for a numeric type and object chunks."""
+    sha = make_sha()
+    sha.update(object_header(type, chunks_length(chunks)))
+    for chunk in chunks:
+        sha.update(chunk)
+    return sha.digest()
+
+
 class PackData(object):
     """The data contained in a packfile.
 
@@ -668,10 +678,7 @@ class PackData(object):
             assert isinstance(type, int)
             assert isinstance(obj, list) or isinstance(obj, tuple)
             type, obj = self.resolve_object(offset, type, obj)
-            # TODO: hash the data directly to avoid object parsing overhead.
-            shafile = ShaFile.from_raw_chunks(type, obj)
-            sha = shafile.sha().digest()
-            yield sha, offset, crc32
+            yield obj_sha(type, obj), offset, crc32
 
     def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
@@ -804,9 +811,7 @@ class ThinPackData(PackData):
                 # Save memory by not storing the inflated obj in postponed
                 postponed[e.sha].append((offset, type, None, crc32))
             else:
-                # TODO: hash the data directly to avoid object parsing overhead.
-                shafile = ShaFile.from_raw_chunks(type, obj)
-                sha = shafile.sha().digest()
+                sha = obj_sha(type, obj)
                 found[sha] = offset
                 yield sha, offset, crc32
                 extra.extend(postponed.pop(sha, []))

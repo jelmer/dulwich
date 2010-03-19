@@ -106,6 +106,11 @@ def filename_to_hex(filename):
     return hex
 
 
+def object_header(num_type, length):
+    """Return an object header for the given numeric type and text length."""
+    return "%s %d\0" % (object_class(num_type).type_name, length)
+
+
 def serializable_property(name, docstring=None):
     def set(obj, value):
         obj._ensure_parsed()
@@ -390,7 +395,7 @@ class ShaFile(object):
             raise ChecksumMismatch(new_sha, old_sha)
 
     def _header(self):
-        return "%s %lu\0" % (self.type_name, self.raw_length())
+        return object_header(self.type, self.raw_length())
 
     def raw_length(self):
         """Returns the length of the raw string of this object."""

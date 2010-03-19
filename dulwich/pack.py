@@ -536,6 +536,7 @@ class PackData(object):
         (version, self._num_objects) = read_pack_header(self._file.read)
         self._offset_cache = LRUSizeCache(1024*1024*20,
             compute_size=_compute_object_size)
+        self.pack = None
 
     @classmethod
     def from_file(cls, file, size):
@@ -579,7 +580,18 @@ class PackData(object):
             todo -= len(x)
         return s.digest()
 
-    def resolve_object(self, offset, type, obj, get_ref, get_offset=None):
+    def get_ref(self, sha):
+        """Get the object for a ref SHA, only looking in this pack."""
+        # TODO: cache these results
+        if self.pack is None:
+            raise KeyError(sha)
+        offset = self.pack.index.object_index(sha)
+        if not offset:
+            raise KeyError(sha)
+        type, obj = self.get_object_at(offset)
+        return offset, type, obj
+
+    def resolve_object(self, offset, type, obj, get_ref=None):
         """Resolve an object, possibly resolving deltas when necessary.
 
         :return: Tuple with object type and contents.
@@ -587,28 +599,30 @@ class PackData(object):
         if type not in DELTA_TYPES:
             return type, obj
 
-        if get_offset is None:
-            get_offset = self.get_object_at
-
+        if get_ref is None:
+            get_ref = self.get_ref
         if type == OFS_DELTA:
             (delta_offset, delta) = obj
+            # TODO: clean up asserts and replace with nicer error messages
+            assert isinstance(offset, int)
             assert isinstance(delta_offset, int)
             base_offset = offset-delta_offset
-            type, base_obj = get_offset(base_offset)
+            type, base_obj = self.get_object_at(base_offset)
             assert isinstance(type, int)
         elif type == REF_DELTA:
             (basename, delta) = obj
             assert isinstance(basename, str) and len(basename) == 20
-            type, base_obj = get_ref(basename)
+            base_offset, type, base_obj = get_ref(basename)
             assert isinstance(type, int)
-            # Can't be a ofs delta, as we wouldn't know the base offset
-            assert type != OFS_DELTA
-            base_offset = None
-        type, base_chunks = self.resolve_object(base_offset, type, base_obj,
-                                                get_ref)
-        if base_offset is not None:
-            self._offset_cache[base_offset] = type, base_chunks
-        return (type, apply_delta(base_chunks, delta))
+        type, base_chunks = self.resolve_object(base_offset, type, base_obj)
+        chunks = apply_delta(base_chunks, delta)
+        # TODO(dborowitz): This can result in poor performance if large base
+        # objects are separated from deltas in the pack. We should reorganize
+        # so that we apply deltas to all objects in a chain one after the other
+        # to optimize cache performance.
+        if offset is not None:
+            self._offset_cache[offset] = type, chunks
+        return type, chunks
 
     def iterobjects(self, progress=None):
 
@@ -641,98 +655,64 @@ class PackData(object):
                 return ret
         return ObjectIterator(self)
 
-    def iterentries(self, ext_resolve_ref=None, progress=None):
+    def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
 
-        :param ext_resolve_ref: Optional function to resolve base
-            objects (in case this is a thin pack)
         :param progress: Progress function, called with current and
             total object count.
 
         This will yield tuples with (sha, offset, crc32)
         """
-        found = {}
-        postponed = defaultdict(list)
-        class Postpone(Exception):
-            """Raised to postpone delta resolving."""
-
-        def get_ref_text(sha):
-            assert len(sha) == 20
-            if sha in found:
-                return self.get_object_at(found[sha])
-            if ext_resolve_ref:
-                try:
-                    return ext_resolve_ref(sha)
-                except KeyError:
-                    pass
-            raise Postpone, (sha, )
-        extra = []
-        todo = chain(self.iterobjects(progress=progress), extra)
-        for (offset, type, obj, crc32) in todo:
+        for offset, type, obj, crc32 in self.iterobjects(progress=progress):
             assert isinstance(offset, int)
             assert isinstance(type, int)
-            try:
-                type, obj = self.resolve_object(offset, type, obj,
-                    get_ref_text)
-            except Postpone, (sha, ):
-                postponed[sha].append((offset, type, obj))
-            else:
-                shafile = ShaFile.from_raw_chunks(type, obj)
-                sha = shafile.sha().digest()
-                found[sha] = offset
-                yield sha, offset, crc32
-                extra.extend(postponed.get(sha, []))
-        if postponed:
-            raise KeyError([sha_to_hex(h) for h in postponed.keys()])
+            assert isinstance(obj, list) or isinstance(obj, tuple)
+            type, obj = self.resolve_object(offset, type, obj)
+            # TODO: hash the data directly to avoid object parsing overhead.
+            shafile = ShaFile.from_raw_chunks(type, obj)
+            sha = shafile.sha().digest()
+            yield sha, offset, crc32
 
-    def sorted_entries(self, resolve_ext_ref=None, progress=None):
+    def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
 
-        :param resolve_ext_ref: Optional function to resolve base
-            objects (in case this is a thin pack)
         :param progress: Progress function, called with current and
             total object count
         :return: List of tuples with (sha, offset, crc32)
         """
-        ret = list(self.iterentries(resolve_ext_ref, progress=progress))
+        ret = list(self.iterentries(progress=progress))
         ret.sort()
         return ret
 
-    def create_index_v1(self, filename, resolve_ext_ref=None, progress=None):
+    def create_index_v1(self, filename, progress=None):
         """Create a version 1 file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally
-            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
-        entries = self.sorted_entries(resolve_ext_ref, progress=progress)
+        entries = self.sorted_entries(progress=progress)
         write_pack_index_v1(filename, entries, self.calculate_checksum())
 
-    def create_index_v2(self, filename, resolve_ext_ref=None, progress=None):
+    def create_index_v2(self, filename, progress=None):
         """Create a version 2 index file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally
-            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
-        entries = self.sorted_entries(resolve_ext_ref, progress=progress)
+        entries = self.sorted_entries(progress=progress)
         write_pack_index_v2(filename, entries, self.calculate_checksum())
 
-    def create_index(self, filename, resolve_ext_ref=None, progress=None,
+    def create_index(self, filename, progress=None,
                      version=2):
         """Create an  index file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally
-            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
         if version == 1:
-            self.create_index_v1(filename, resolve_ext_ref, progress)
+            self.create_index_v1(filename, progress)
         elif version == 2:
-            self.create_index_v2(filename, resolve_ext_ref, progress)
+            self.create_index_v2(filename, progress)
         else:
             raise ValueError("unknown index format %d" % version)
 
@@ -759,6 +739,79 @@ class PackData(object):
         assert offset >= self._header_size
         self._file.seek(offset)
         return unpack_object(self._file.read)[:2]
+
+
+class ThinPackData(PackData):
+    """PackData for thin packs, which require an ObjectStore for resolving."""
+
+    def __init__(self, store, *args, **kwargs):
+        super(ThinPackData, self).__init__(*args, **kwargs)
+        self.store = store
+
+    def get_ref(self, sha):
+        """Resolve a reference looking in both this pack and the store."""
+        try:
+            # As part of completing a pack we create a Pack object with a
+            # ThinPackData and a full PackIndex, so check in the index first if
+            # possible.
+            # TODO(dborowitz): reevaluate this when the pack completion code is
+            # rewritten.
+            return super(ThinPackData, self).get_ref(sha)
+        except KeyError:
+            type, obj = self.store.get_raw(sha)
+            return None, type, obj
+
+    def iterentries(self, progress=None):
+        """Yield entries summarizing the contents of this pack.
+
+        :param progress: Progress function, called with current and
+            total object count.
+
+        This will yield tuples with (sha, offset, crc32)
+        """
+        found = {}
+        postponed = defaultdict(list)
+
+        class Postpone(Exception):
+            """Raised to postpone delta resolving."""
+
+            def __init__(self, sha):
+                self.sha = sha
+
+        def get_ref_text(sha):
+            assert len(sha) == 20
+            if sha in found:
+                offset = found[sha]
+                type, obj = self.get_object_at(offset)
+                return offset, type, obj
+            try:
+                return self.get_ref(sha)
+            except KeyError:
+                raise Postpone(sha)
+
+        extra = []
+        todo = chain(self.iterobjects(progress=progress), extra)
+        for (offset, type, obj, crc32) in todo:
+            assert isinstance(offset, int)
+            if obj is None:
+                # Inflate postponed delta
+                obj, type = self.get_object_at(offset)
+            assert isinstance(type, int)
+            assert isinstance(obj, list) or isinstance(obj, tuple)
+            try:
+                type, obj = self.resolve_object(offset, type, obj, get_ref_text)
+            except Postpone, e:
+                # Save memory by not storing the inflated obj in postponed
+                postponed[e.sha].append((offset, type, None, crc32))
+            else:
+                # TODO: hash the data directly to avoid object parsing overhead.
+                shafile = ShaFile.from_raw_chunks(type, obj)
+                sha = shafile.sha().digest()
+                found[sha] = offset
+                yield sha, offset, crc32
+                extra.extend(postponed.pop(sha, []))
+        if postponed:
+            raise KeyError([sha_to_hex(h) for h in postponed.keys()])
 
 
 class SHA1Reader(object):
@@ -1113,6 +1166,7 @@ class Pack(object):
         ret = Pack("")
         ret._data = data
         ret._idx = idx
+        data.pack = ret
         return ret
 
     def name(self):
@@ -1124,6 +1178,7 @@ class Pack(object):
         """The pack data object being used."""
         if self._data is None:
             self._data = PackData(self._data_path)
+            self._data.pack = self
             assert len(self.index) == len(self._data)
             idx_stored_checksum = self.index.get_pack_checksum()
             data_stored_checksum = self._data.get_stored_checksum()
@@ -1180,30 +1235,25 @@ class Pack(object):
         except KeyError:
             return False
 
-    def get_raw(self, sha1, resolve_ref=None):
+    def get_raw(self, sha1):
         offset = self.index.object_index(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         if type(offset) is long:
           offset = int(offset)
-        if resolve_ref is None:
-            resolve_ref = self.get_raw
-        kind, chunks = self.data.resolve_object(offset, obj_type, obj,
-            resolve_ref)
-        return kind, "".join(chunks)
+        type_num, chunks = self.data.resolve_object(offset, obj_type, obj)
+        return type_num, "".join(chunks)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
         type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp)
 
-    def iterobjects(self, get_raw=None):
+    def iterobjects(self):
         """Iterate over the objects in this pack."""
-        if get_raw is None:
-            get_raw = self.get_raw
         for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
-            type, obj = self.data.resolve_object(offset, type, obj, get_raw)
-            yield ShaFile.from_raw_chunks(type, obj)
+            yield ShaFile.from_raw_chunks(
+                    *self.data.resolve_object(offset, type, obj))
 
 
 try:

@@ -96,10 +96,6 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     def _make_app(self, backend):
         return HTTPGitApplication(backend)
 
-    def test_push_to_dulwich(self):
-        # TODO(dborowitz): enable after merging thin pack fixes.
-        raise TestSkipped('Skipping push test due to known pack bug.')
-
 
 class DumbWebTestCase(WebTests, CompatTestCase):
     """Test cases for dumb HTTP server."""

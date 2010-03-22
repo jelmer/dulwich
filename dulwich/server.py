@@ -329,10 +329,10 @@ class ProtocolGraphWalker(object):
         while command != None:
             if command != 'want':
                 raise GitProtocolError(
-                    'Protocol got unexpected command %s' % command)
+                  'Protocol got unexpected command %s' % command)
             if sha not in values:
                 raise GitProtocolError(
-                    'Client wants invalid object %s' % sha)
+                  'Client wants invalid object %s' % sha)
             want_revs.append(sha)
             command, sha = self.read_proto_line()
 
@@ -440,10 +440,10 @@ class ProtocolGraphWalker(object):
 
     def set_ack_type(self, ack_type):
         impl_classes = {
-            MULTI_ACK: MultiAckGraphWalkerImpl,
-            MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
-            SINGLE_ACK: SingleAckGraphWalkerImpl,
-            }
+          MULTI_ACK: MultiAckGraphWalkerImpl,
+          MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
+          SINGLE_ACK: SingleAckGraphWalkerImpl,
+          }
         self._impl = impl_classes[ack_type](self)
 
 
@@ -568,7 +568,6 @@ class ReceivePackHandler(Handler):
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
-        unpack_error = None
         # TODO: more informative error messages than just the exception string
         try:
             PackStreamCopier(self.proto.read, self.proto.recv, f).verify()

@@ -178,8 +178,8 @@ class TestPackData(PackTests):
         blob_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
         tree_data = '100644 a\0%s' % hex_to_sha(blob_sha)
         actual = []
-        for offset, type, chunks, crc32 in p.iterobjects():
-            actual.append((offset, type, ''.join(chunks), crc32))
+        for offset, type_num, chunks, crc32 in p.iterobjects():
+            actual.append((offset, type_num, ''.join(chunks), crc32))
         self.assertEquals([
           (12, 1, commit_data, 3775879613L),
           (138, 2, tree_data, 912998690L),

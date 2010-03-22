@@ -68,12 +68,14 @@ except ImportError:
     # Implementation of permutations from Python 2.6 documentation:
     # http://docs.python.org/2.6/library/itertools.html#itertools.permutations
     # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+    # Modified syntax slightly to run under Python 2.4.
     def permutations(iterable, r=None):
         # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
         # permutations(range(3)) --> 012 021 102 120 201 210
         pool = tuple(iterable)
         n = len(pool)
-        r = n if r is None else r
+        if r is None:
+            r = n
         if r > n:
             return
         indices = range(n)

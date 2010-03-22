@@ -45,6 +45,7 @@ FOUR = '4' * 40
 FIVE = '5' * 40
 SIX = '6' * 40
 
+
 class TestProto(object):
 
     def __init__(self):
@@ -218,12 +219,12 @@ class ProtocolGraphWalkerTestCase(TestCase):
         #  /
         # 1---2---4
         self._objects = {
-            ONE: TestCommit(ONE, [], 111),
-            TWO: TestCommit(TWO, [ONE], 222),
-            THREE: TestCommit(THREE, [ONE], 333),
-            FOUR: TestCommit(FOUR, [TWO], 444),
-            FIVE: TestCommit(FIVE, [THREE], 555),
-            }
+          ONE: TestCommit(ONE, [], 111),
+          TWO: TestCommit(TWO, [ONE], 222),
+          THREE: TestCommit(THREE, [ONE], 333),
+          FOUR: TestCommit(FOUR, [TWO], 444),
+          FIVE: TestCommit(FIVE, [THREE], 555),
+          }
 
         self._walker = ProtocolGraphWalker(
             TestUploadPackHandler(self._objects, TestProto()),
@@ -256,13 +257,13 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def test_read_proto_line(self):
         self._walker.proto.set_output([
-            'want %s' % ONE,
-            'want %s' % TWO,
-            'have %s' % THREE,
-            'foo %s' % FOUR,
-            'bar',
-            'done',
-            ])
+          'want %s' % ONE,
+          'want %s' % TWO,
+          'have %s' % THREE,
+          'foo %s' % FOUR,
+          'bar',
+          'done',
+          ])
         self.assertEquals(('want', ONE), self._walker.read_proto_line())
         self.assertEquals(('want', TWO), self._walker.read_proto_line())
         self.assertEquals(('have', THREE), self._walker.read_proto_line())
@@ -275,9 +276,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
 
         self._walker.proto.set_output([
-            'want %s multi_ack' % ONE,
-            'want %s' % TWO,
-            ])
+          'want %s multi_ack' % ONE,
+          'want %s' % TWO,
+          ])
         heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
         self._walker.get_peeled = heads.get
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
@@ -312,11 +313,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
             lines.append(line.rstrip())
 
         self.assertEquals([
-            '%s ref4' % FOUR,
-            '%s ref5' % FIVE,
-            '%s tag6^{}' % FIVE,
-            '%s tag6' % SIX,
-            ], sorted(lines))
+          '%s ref4' % FOUR,
+          '%s ref5' % FIVE,
+          '%s tag6^{}' % FIVE,
+          '%s tag6' % SIX,
+          ], sorted(lines))
 
         # ensure peeled tag was advertised immediately following tag
         for i, line in enumerate(lines):
@@ -359,11 +360,11 @@ class AckGraphWalkerImplTestCase(TestCase):
     def setUp(self):
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
-            ('have', TWO),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self._impl = self.impl_cls(self._walker)
 
     def assertNoAck(self):
@@ -451,6 +452,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(None)
         self.assertNak()
 
+
 class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     impl_cls = MultiAckGraphWalkerImpl
@@ -488,17 +490,17 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     def test_multi_ack_flush(self):
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self.assertNak() # nak the flush-pkt
+        self.assertNak()  # nak the flush-pkt
 
         self._walker.done = True
         self._impl.ack(ONE)
@@ -563,17 +565,17 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_flush(self):
         # same as ack test but contains a flush-pkt in the middle
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self.assertNak() # nak the flush-pkt
+        self.assertNak()  # nak the flush-pkt
 
         self._walker.done = True
         self._impl.ack(ONE)
@@ -602,12 +604,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_nak_flush(self):
         # same as nak test but contains a flush-pkt in the middle
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 

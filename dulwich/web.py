@@ -80,17 +80,19 @@ def send_file(req, f, content_type):
         yield req.not_found('File not found')
         return
     try:
-        try:
-            req.respond(HTTP_OK, content_type)
-            while True:
-                data = f.read(10240)
-                if not data:
-                    break
-                yield data
-        except IOError:
-            yield req.not_found('Error reading file')
-    finally:
+        req.respond(HTTP_OK, content_type)
+        while True:
+            data = f.read(10240)
+            if not data:
+                break
+            yield data
         f.close()
+    except IOError:
+        f.close()
+        yield req.not_found('Error reading file')
+    except:
+        f.close()
+        raise
 
 
 def get_text_file(req, backend, mat):

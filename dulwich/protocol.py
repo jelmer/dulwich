@@ -36,6 +36,7 @@ SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
 
+
 class ProtocolFile(object):
     """
     Some network ops are like file ops. The file ops expect to operate on
@@ -181,7 +182,7 @@ class ReceivableProtocol(Protocol):
 
     def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
         super(ReceivableProtocol, self).__init__(self.read, write,
-                                                report_activity)
+                                                 report_activity)
         self._recv = recv
         self._rbuf = StringIO()
         self._rbufsize = rbufsize
@@ -302,7 +303,7 @@ def extract_want_line_capabilities(text):
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
     if 'multi_ack_detailed' in capabilities:
-      return MULTI_ACK_DETAILED
+        return MULTI_ACK_DETAILED
     elif 'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK

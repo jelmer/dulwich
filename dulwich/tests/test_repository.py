@@ -208,6 +208,55 @@ class RepositoryTests(unittest.TestCase):
         r = self._repo = open_repo('ooo_merge.git')
         self.assertEquals({}, r.get_config())
 
+    def test_common_revisions(self):
+        """
+        This test demonstrates that ``find_common_revisions()`` actually returns
+        common heads, not revisions; dulwich already uses
+        ``find_common_revisions()`` in such a manner (see
+        ``Repo.fetch_objects()``).
+        """
+
+        expected_shas = set(['60dacdc733de308bb77bb76ce0fb0f9b44c9769e'])
+
+        # Source for objects.
+        r_base = open_repo('simple_merge.git')
+
+        # Re-create each-side of the merge in simple_merge.git.
+        #
+        # Since the trees and blobs are missing, the repository created is
+        # corrupted, but we're only checking for commits for the purpose of this
+        # test, so it's immaterial.
+        r1_dir = tempfile.mkdtemp()
+        r1_commits = ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd', # HEAD
+                      '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
+                      '0d89f20333fbb1d2f3a94da77f4981373d8f4310']
+
+        r2_dir = tempfile.mkdtemp()
+        r2_commits = ['4cffe90e0a41ad3f5190079d7c8f036bde29cbe6', # HEAD
+                      '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
+                      '0d89f20333fbb1d2f3a94da77f4981373d8f4310']
+
+        try:
+            r1 = Repo.init_bare(r1_dir)
+            map(lambda c: r1.object_store.add_object(r_base.get_object(c)), \
+                r1_commits)
+            r1.refs['HEAD'] = r1_commits[0]
+
+            r2 = Repo.init_bare(r2_dir)
+            map(lambda c: r2.object_store.add_object(r_base.get_object(c)), \
+                r2_commits)
+            r2.refs['HEAD'] = r2_commits[0]
+
+            # Finally, the 'real' testing!
+            shas = r2.object_store.find_common_revisions(r1.get_graph_walker())
+            self.assertEqual(set(shas), expected_shas)
+
+            shas = r1.object_store.find_common_revisions(r2.get_graph_walker())
+            self.assertEqual(set(shas), expected_shas)
+        finally:
+            shutil.rmtree(r1_dir)
+            shutil.rmtree(r2_dir)
+
 
 class CheckRefFormatTests(unittest.TestCase):
     """Tests for the check_ref_format function.

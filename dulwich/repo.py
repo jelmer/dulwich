@@ -270,6 +270,9 @@ class DictRefsContainer(RefsContainer):
     def read_loose_ref(self, name):
         return self._refs[name]
 
+    def __setitem__(self, name, value):
+        self._refs[name] = value
+
 
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""

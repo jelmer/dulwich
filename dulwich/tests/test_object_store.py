@@ -31,13 +31,15 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     )
+from utils import (
+    make_object,
+    )
 import os
 import shutil
 import tempfile
 
 
-testobject = Blob()
-testobject.data = "yummy data"
+testobject = make_object(Blob, data="yummy data")
 
 
 class ObjectStoreTests(object):

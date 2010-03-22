@@ -20,10 +20,13 @@
 """Utility functions common to Dulwich tests."""
 
 
+import datetime
 import os
 import shutil
 import tempfile
+import time
 
+from dulwich.objects import Commit
 from dulwich.repo import Repo
 
 
@@ -49,3 +52,31 @@ def tear_down_repo(repo):
     """Tear down a test repository."""
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
     shutil.rmtree(temp_dir)
+
+
+def make_object(cls, **attrs):
+    """Make an object for testing and assign some members.
+
+    :param attrs: dict of attributes to set on the new object.
+    :return: A newly initialized object of type cls.
+    """
+    obj = cls()
+    for name, value in attrs.iteritems():
+        setattr(obj, name, value)
+    return obj
+
+
+def make_commit(**kwargs):
+    """Make a Commit object with a default set of members."""
+    default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
+    attrs = {'author': 'Test Author <test@nodomain.com>',
+             'author_time': default_time,
+             'author_timezone': 0,
+             'committer': 'Test Committer <test@nodomain.com>',
+             'commit_time': default_time,
+             'commit_timezone': 0,
+             'message': 'Test message.',
+             'parents': [],
+             'tree': '0' * 40}
+    attrs.update(kwargs)
+    return make_object(Commit, **attrs)

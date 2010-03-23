@@ -470,8 +470,11 @@ class DiskObjectStore(PackBasedObjectStore):
         :param obj: Object to add
         """
         dir = os.path.join(self.path, obj.id[:2])
-        if not os.path.isdir(dir):
+        try:
             os.mkdir(dir)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
         path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again

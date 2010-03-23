@@ -694,7 +694,12 @@ class MissingObjectFinder(object):
 
 
 class ObjectStoreGraphWalker(object):
-    """Graph walker that finds out what commits are missing from an object store."""
+    """Graph walker that finds out what commits are missing from an object 
+    store.
+    
+    :ivar heads: Revisions without descendants in the local repo
+    :ivar get_parents: Function to retrieve parents in the local repo
+    """
 
     def __init__(self, local_heads, get_parents):
         """Create a new instance.
@@ -707,7 +712,7 @@ class ObjectStoreGraphWalker(object):
         self.parents = {}
 
     def ack(self, sha):
-        """Ack that a particular revision and its ancestors are present in the source."""
+        """Ack that a revision and its ancestors are present in the source."""
         if sha in self.heads:
             self.heads.remove(sha)
         if sha in self.parents:

@@ -716,13 +716,44 @@ class BaseRepo(object):
                     for section in p.sections())
 
     def commit(self, sha):
+        """Retrieve the commit with a particular SHA.
+
+        :param sha: SHA of the commit to retrieve
+        :raise NotCommitError: If the SHA provided doesn't point at a Commit
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Commit` object
+        """
         return self._get_object(sha, Commit)
 
     def tree(self, sha):
+        """Retrieve the tree with a particular SHA.
+
+        :param sha: SHA of the tree to retrieve
+        :raise NotTreeError: If the SHA provided doesn't point at a Tree
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Tree` object
+        """
         return self._get_object(sha, Tree)
 
     def tag(self, sha):
+        """Retrieve the tag with a particular SHA.
+
+        :param sha: SHA of the tag to retrieve
+        :raise NotTagError: If the SHA provided doesn't point at a Tag
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Tag` object
+        """
         return self._get_object(sha, Tag)
+
+    def get_blob(self, sha):
+        """Retrieve the blob with a particular SHA.
+
+        :param sha: SHA of the blob to retrieve
+        :raise NotBlobError: If the SHA provided doesn't point at a Blob
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Blob` object
+        """
+        return self._get_object(sha, Blob)
 
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
@@ -741,9 +772,6 @@ class BaseRepo(object):
             obj_type, sha = obj.object
             obj = self.get_object(sha)
         return obj.id
-
-    def get_blob(self, sha):
-        return self._get_object(sha, Blob)
 
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.

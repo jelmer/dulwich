@@ -334,3 +334,18 @@ class SSHGitClient(GitClient):
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
         return client.fetch_pack(path, determine_wants, graph_walker, pack_data,
                                  progress)
+
+
+def get_transport_and_path(uri):
+    """Obtain a git client from a URI or path.
+
+    :param uri: URI or path
+    :return: Tuple with client instance and relative path.
+    """
+    from dulwich.client import TCPGitClient, SSHGitClient, SubprocessGitClient
+    for handler, transport in (("git://", TCPGitClient), ("git+ssh://", SSHGitClient)):
+        if uri.startswith(handler):
+            host, path = uri[len(handler):].split("/", 1)
+            return transport(host), "/"+path
+    # if its not git or git+ssh, try a local url..
+    return SubprocessGitClient(), uri

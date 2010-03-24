@@ -941,6 +941,33 @@ class Repo(BaseRepo):
         """Check if an index is present."""
         return os.path.exists(self.index_path())
 
+    def stage(self, paths):
+        """Stage a set of paths.
+
+        :param paths: List of paths, relative to the repository path
+        """
+        from dulwich.index import cleanup_mode
+        index = self.open_index()
+        for path in paths:
+            blob = Blob()
+            try:
+                st = os.stat(path)
+            except OSError:
+                # File no longer exists
+                del index[path]
+            else:
+                f = open(path, 'rb')
+                try:
+                    blob.data = f.read()
+                finally:
+                    f.close()
+                self.object_store.add_object(blob)
+                # XXX: Cleanup some of the other file properties as well?
+                index[path] = (st.st_ctime, st.st_mtime, st.st_dev, st.st_ino,
+                    cleanup_mode(st.st_mode), st.st_uid, st.st_gid, st.st_size,
+                    blob.id, 0)
+        index.write()
+
     def __repr__(self):
         return "<Repo at %r>" % self.path
 

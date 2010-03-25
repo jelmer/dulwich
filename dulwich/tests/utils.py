@@ -66,17 +66,21 @@ def make_object(cls, **attrs):
     return obj
 
 
-def make_commit(**kwargs):
-    """Make a Commit object with a default set of members."""
+def make_commit(**attrs):
+    """Make a Commit object with a default set of members.
+
+    :param attrs: dict of attributes to overwrite from the default values.
+    :return: A newly initialized Commit object.
+    """
     default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
-    attrs = {'author': 'Test Author <test@nodomain.com>',
-             'author_time': default_time,
-             'author_timezone': 0,
-             'committer': 'Test Committer <test@nodomain.com>',
-             'commit_time': default_time,
-             'commit_timezone': 0,
-             'message': 'Test message.',
-             'parents': [],
-             'tree': '0' * 40}
-    attrs.update(kwargs)
-    return make_object(Commit, **attrs)
+    all_attrs = {'author': 'Test Author <test@nodomain.com>',
+                 'author_time': default_time,
+                 'author_timezone': 0,
+                 'committer': 'Test Committer <test@nodomain.com>',
+                 'commit_time': default_time,
+                 'commit_timezone': 0,
+                 'message': 'Test message.',
+                 'parents': [],
+                 'tree': '0' * 40}
+    all_attrs.update(attrs)
+    return make_object(Commit, **all_attrs)

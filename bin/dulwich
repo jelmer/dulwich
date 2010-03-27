@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# dul-daemon - Simple git smart server client
+# dulwich - Simple command-line interface to Dulwich
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
@@ -16,6 +16,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
+"""Simple command-line interface to Dulwich>
+
+This is a very simple command-line wrapper for Dulwich. It is by 
+no means intended to be a full-blown Git command-line interface but just 
+a way to test Dulwich.
+"""
 
 import os
 import sys
@@ -70,7 +77,6 @@ def cmd_log(args):
 
 
 def cmd_dump_pack(args):
-
     opts, args = getopt(args, "", [])
 
     if args == []:
@@ -94,7 +100,6 @@ def cmd_dump_pack(args):
 
 
 def cmd_dump_index(args):
-
     opts, args = getopt(args, "", [])
 
     if args == []:
@@ -158,6 +163,7 @@ def cmd_commit(args):
     author = "%s <%s>" % (os.getenv("GIT_AUTHOR_NAME"), 
                           os.getenv("GIT_AUTHOR_EMAIL"))
     r.do_commit(committer=committer, author=author, message=opts["--message"])
+
 
 commands = {
     "commit": cmd_commit,

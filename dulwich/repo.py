@@ -228,6 +228,13 @@ class RefsContainer(object):
                 raise KeyError(name)
         return refname, contents
 
+    def __contains__(self, refname):
+        if self.read_loose_ref(refname):
+            return True
+        if self.get_packed_refs().get(refname, None):
+            return True
+        return False
+
     def __getitem__(self, name):
         """Get the SHA1 for a reference name.
 

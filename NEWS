@@ -11,6 +11,8 @@
   * Fix trailing newlines in generated patch files.
     (Jelmer Vernooij)
 
+  * Implement RefsContainer.__contains__. (Jelmer Vernooij)
+
  FEATURES
 
   * Add include-tag capability to server. (Dave Borowitz)

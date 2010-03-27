@@ -422,6 +422,10 @@ class RefsContainerTests(unittest.TestCase):
         self.assertRaises(KeyError, self._refs._follow, 'notrefs/foo')
         self.assertRaises(KeyError, self._refs._follow, 'refs/heads/loop')
 
+    def test_contains(self):
+        self.assertTrue('refs/heads/master' in self._refs)
+        self.assertFalse('refs/heads/bar' in self._refs)
+
     def test_delitem(self):
         self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
                           self._refs['refs/heads/master'])

@@ -51,6 +51,8 @@ from dulwich.objects import (
     hex_to_sha,
     num_type_map,
     )
+import warnings
+
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '
@@ -730,6 +732,8 @@ class BaseRepo(object):
         :raise KeyError: If the SHA provided didn't exist
         :return: A `Commit` object
         """
+        warnings.warn("Repo.commit(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning, level=2)
         return self._get_object(sha, Commit)
 
     def tree(self, sha):
@@ -740,6 +744,8 @@ class BaseRepo(object):
         :raise KeyError: If the SHA provided didn't exist
         :return: A `Tree` object
         """
+        warnings.warn("Repo.tree(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning)
         return self._get_object(sha, Tree)
 
     def tag(self, sha):
@@ -750,6 +756,8 @@ class BaseRepo(object):
         :raise KeyError: If the SHA provided didn't exist
         :return: A `Tag` object
         """
+        warnings.warn("Repo.tag(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning)
         return self._get_object(sha, Tag)
 
     def get_blob(self, sha):
@@ -760,6 +768,8 @@ class BaseRepo(object):
         :raise KeyError: If the SHA provided didn't exist
         :return: A `Blob` object
         """
+        warnings.warn("Repo.get_blob(sha) is deprecated. Use Repo[sha] "
+            "instead.", category=DeprecationWarning)
         return self._get_object(sha, Blob)
 
     def get_peeled(self, ref):

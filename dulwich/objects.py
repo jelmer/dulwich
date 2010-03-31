@@ -280,7 +280,7 @@ class ShaFile(object):
         return self.id != other.id
 
     def __eq__(self, other):
-        """Return true id the sha of the two objects match.
+        """Return true if the sha of the two objects match.
 
         The __le__ etc methods aren't overriden as they make no sense,
         certainly at this level.

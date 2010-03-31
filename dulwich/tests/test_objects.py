@@ -82,6 +82,18 @@ class BlobReadTests(unittest.TestCase):
         b = Blob.from_string(string)
         self.assertEqual(b.data, string)
         self.assertEqual(b.sha().hexdigest(), b_sha)
+
+    def test_chunks(self):
+        string = 'test 5\n'
+        b = Blob.from_string(string)
+        self.assertEqual([string], b.chunked)
+
+    def test_set_chunks(self):
+        b = Blob()
+        b.chunked = ['te', 'st', ' 5\n']
+        self.assertEqual('test 5\n', b.data)
+        b.chunked = ['te', 'st', ' 6\n']
+        self.assertEqual('test 6\n', b.as_raw_string())
   
     def test_parse_legacy_blob(self):
         string = 'test 3\n'

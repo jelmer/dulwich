@@ -29,6 +29,10 @@
   * Repo.get_blob, Repo.commit, Repo.tag and Repo.tree are now deprecated.
     (Jelmer Vernooij)
 
+ API CHANGES
+
+  * Blob.chunked was added. (Jelmer Vernooij)
+
 0.5.0	2010-03-03
 
  BUG FIXES

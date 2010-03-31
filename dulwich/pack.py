@@ -103,21 +103,6 @@ def read_zlib_chunks(read, buffer_size=4096):
     return ret, comp_len, obj.unused_data
 
 
-def read_zlib(read, dec_size):
-    """Read zlib-compressed data from a buffer.
-    
-    :param read: Read function
-    :param dec_size: Size of the decompressed buffer
-    :return: Uncompressed buffer, compressed buffer length and unused read
-        data.
-    """
-    ret, comp_len, unused = read_zlib_chunks(read)
-    x = "".join(ret)
-    assert len(x) == dec_size
-    return x, comp_len, unused
-
-
-
 def iter_sha1(iter):
     """Return the hexdigest of the SHA1 over a set of names.
     
@@ -438,17 +423,20 @@ def unpack_object(read):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp, comp_len, unused = read_zlib(read, size)
+        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp = "".join(uncomp_chunks)
         assert size == len(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
         basename = read(20)
         raw_base += 20
-        uncomp, comp_len, unused = read_zlib(read, size)
+        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp = "".join(uncomp_chunks)
         assert size == len(uncomp)
         return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp, comp_len, unused = read_zlib(read, size)
+        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
+        uncomp = "".join(uncomp_chunks)
         assert len(uncomp) == size
         return type, uncomp, comp_len+raw_base, unused
 

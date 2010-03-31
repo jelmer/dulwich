@@ -125,7 +125,7 @@ class ShaFile(object):
 
     def as_raw_string(self):
         if self._needs_serialization:
-            self.serialize()
+            self._serialize()
         return self._text
 
     def __str__(self):
@@ -275,7 +275,7 @@ class Blob(ShaFile):
 
     def _get_data(self):
         if self._needs_serialization:
-            self.serialize()
+            self._serialize()
         return self._text
 
     def _set_data(self, data):
@@ -300,7 +300,7 @@ class Blob(ShaFile):
     def _parse_text(self):
         self._chunked = [self._text]
 
-    def serialize(self):
+    def _serialize(self):
         self._text = "".join(self._chunked)
 
     def _raw_length(self):
@@ -349,7 +349,7 @@ class Tag(ShaFile):
         shafile.set_raw_string(string)
         return shafile
 
-    def serialize(self):
+    def _serialize(self):
         f = StringIO()
         f.write("%s %s\n" % (OBJECT_ID, self._object_sha))
         f.write("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
@@ -543,7 +543,7 @@ class Tree(ShaFile):
         self._entries = parse_tree(self._text)
         self._needs_parsing = False
 
-    def serialize(self):
+    def _serialize(self):
         self._text = serialize_tree(self.iteritems())
         self._needs_serialization = False
 
@@ -626,7 +626,7 @@ class Commit(ShaFile):
         self._message = f.read()
         self._needs_parsing = False
 
-    def serialize(self):
+    def _serialize(self):
         f = StringIO()
         f.write("%s %s\n" % (TREE_ID, self._tree))
         for p in self._parents:

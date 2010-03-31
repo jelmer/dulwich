@@ -540,7 +540,7 @@ class PackData(object):
         :return: Tuple with object type and contents.
         """
         if type not in (6, 7): # Not a delta
-            return type, obj
+            return type, "".join(obj)
 
         if get_offset is None:
             get_offset = self.get_object_at
@@ -561,11 +561,11 @@ class PackData(object):
             # Can't be a ofs delta, as we wouldn't know the base offset
             assert type != 6
             base_offset = None
-        type, base_text = self.resolve_object(base_offset, type, base_obj, get_ref)
+        type, base_text = self.resolve_object(base_offset, type, base_obj,
+            get_ref)
         if base_offset is not None:
             self._offset_cache[base_offset] = type, base_text
-        ret = (type, apply_delta(base_text, delta))
-        return ret
+        return (type, "".join(apply_delta(base_text, delta)))
   
     def iterobjects(self, progress=None):
 
@@ -717,8 +717,7 @@ class PackData(object):
                 "offset was %r" % offset
         assert offset >= self._header_size
         self._file.seek(offset)
-        (type, obj_chunks) = unpack_object(self._file.read)[:2]
-        return (type, "".join(obj_chunks))
+        return unpack_object(self._file.read)[:2]
 
 
 class SHA1Reader(object):
@@ -1014,8 +1013,7 @@ def apply_delta(src_buf, delta):
     if index != delta_length:
         raise ApplyDeltaError("delta not empty: %r" % delta[index:])
 
-    out = ''.join(out)
-    if dest_size != len(out):
+    if dest_size != chunks_length(out):
         raise ApplyDeltaError("dest size incorrect")
 
     return out
@@ -1156,7 +1154,7 @@ class Pack(object):
             get_raw = self.get_raw
         for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
-            yield ShaFile.from_raw_string(
+            yield ShaFile.from_raw_chunks(
                     *self.data.resolve_object(offset, type, obj, get_raw))
 
 

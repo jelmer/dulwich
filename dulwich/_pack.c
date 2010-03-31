@@ -127,7 +127,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-    return ret;
+    return Py_BuildValue("[N]", ret);
 }
 
 static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)

@@ -53,7 +53,8 @@ TYPE_ID = "type"
 TAGGER_ID = "tagger"
 ENCODING_ID = "encoding"
 
-S_IFGITLINK	= 0160000
+S_IFGITLINK = 0160000
+
 def S_ISGITLINK(m):
     return (stat.S_IFMT(m) == S_IFGITLINK)
 
@@ -421,23 +422,52 @@ class Tag(ShaFile):
 
 
 def parse_tree(text):
+    """Parse a tree text.
+
+    :param text: Serialized text to parse
+    :return: Dictionary with names as keys, (mode, sha) tuples as values
+    """
     ret = {}
     count = 0
     l = len(text)
     while count < l:
         mode_end = text.index(' ', count)
         mode = int(text[count:mode_end], 8)
-
         name_end = text.index('\0', mode_end)
         name = text[mode_end+1:name_end]
-
         count = name_end+21
-
         sha = text[name_end+1:count]
-
         ret[name] = (mode, sha_to_hex(sha))
-
     return ret
+
+
+def serialize_tree(items):
+    """Serialize the items in a tree to a text.
+
+    :param items: Sorted iterable over (name, mode, sha) tuples
+    :return: Serialized tree text
+    """
+    f = StringIO()
+    for name, mode, hexsha in items:
+        f.write("%04o %s\0%s" % (mode, name, hex_to_sha(hexsha)))
+    return f.getvalue()
+
+
+def sorted_tree_items(entries):
+    """Iterate over a tree entries dictionary in the order in which 
+    the items would be serialized.
+
+    :param entries: Dictionary mapping names to (mode, sha) tuples
+    :return: Iterator over (name, mode, sha)
+    """
+    def cmp_entry((name1, value1), (name2, value2)):
+        if stat.S_ISDIR(value1[0]):
+            name1 += "/"
+        if stat.S_ISDIR(value2[0]):
+            name2 += "/"
+        return cmp(name1, name2)
+    for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
+        yield name, entry[0], entry[1]
 
 
 class Tree(ShaFile):
@@ -494,19 +524,19 @@ class Tree(ShaFile):
     def entries(self):
         """Return a list of tuples describing the tree entries"""
         self._ensure_parsed()
-        # The order of this is different from iteritems() for historical reasons
-        return [(mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
+        # The order of this is different from iteritems() for historical
+        # reasons
+        return [
+            (mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
     def iteritems(self):
-        def cmp_entry((name1, value1), (name2, value2)):
-            if stat.S_ISDIR(value1[0]):
-                name1 += "/"
-            if stat.S_ISDIR(value2[0]):
-                name2 += "/"
-            return cmp(name1, name2)
+        """Iterate over all entries in the order in which they would be
+        serialized.
+
+        :return: Iterator over (name, mode, sha) tuples
+        """
         self._ensure_parsed()
-        for name, entry in sorted(self._entries.iteritems(), cmp=cmp_entry):
-            yield name, entry[0], entry[1]
+        return sorted_tree_items(self._entries)
 
     def _parse_text(self):
         """Grab the entries in the tree"""
@@ -514,10 +544,7 @@ class Tree(ShaFile):
         self._needs_parsing = False
 
     def serialize(self):
-        f = StringIO()
-        for name, mode, hexsha in self.iteritems():
-            f.write("%04o %s\0%s" % (mode, name, hex_to_sha(hexsha)))
-        self._text = f.getvalue()
+        self._text = serialize_tree(self.iteritems())
         self._needs_serialization = False
 
     def as_pretty_string(self):
@@ -682,6 +709,6 @@ num_type_map = {
 
 try:
     # Try to import C versions
-    from dulwich._objects import parse_tree
+    from dulwich._objects import parse_tree, sorted_tree_items
 except ImportError:
     pass

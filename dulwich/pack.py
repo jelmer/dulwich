@@ -848,7 +848,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     # This helps us find good objects to diff against us
     magic = []
     for obj, path in recency:
-        magic.append( (obj.type, path, 1, -len(obj.as_raw_string()), obj) )
+        magic.append( (obj.type, path, 1, -obj.raw_length(), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find preceeding objects
     # to diff against

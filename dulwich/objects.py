@@ -214,12 +214,12 @@ class ShaFile(object):
         shafile.set_raw_string(string)
         return shafile
 
-    def _raw_length(self):
+    def raw_length(self):
         """Returns the length of the raw string of this object."""
         return len(self.as_raw_string())
 
     def _header(self):
-        return "%s %lu\0" % (self._type, self._raw_length())
+        return "%s %lu\0" % (self._type, self.raw_length())
 
     def _make_sha(self):
         ret = make_sha()
@@ -303,7 +303,7 @@ class Blob(ShaFile):
     def _serialize(self):
         self._text = "".join(self._chunked)
 
-    def _raw_length(self):
+    def raw_length(self):
         ret = 0
         for chunk in self.chunked:
             ret += len(chunk)

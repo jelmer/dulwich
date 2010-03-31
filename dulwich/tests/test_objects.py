@@ -194,7 +194,7 @@ class CommitSerializationTests(unittest.TestCase):
 
     def test_raw_length(self):
         c = self.make_base()
-        self.assertEquals(len(c.as_raw_string()), c._raw_length())
+        self.assertEquals(len(c.as_raw_string()), c.raw_length())
 
     def test_simple(self):
         c = self.make_base()

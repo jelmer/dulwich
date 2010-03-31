@@ -565,7 +565,7 @@ class PackData(object):
             get_ref)
         if base_offset is not None:
             self._offset_cache[base_offset] = type, base_chunks
-        return (type, apply_delta("".join(base_chunks), delta))
+        return (type, apply_delta(base_chunks, delta))
   
     def iterobjects(self, progress=None):
 
@@ -960,7 +960,8 @@ def apply_delta(src_buf, delta):
     :param src_buf: Source buffer
     :param delta: Delta instructions
     """
-    assert isinstance(src_buf, str), "was %r" % (src_buf,)
+    if type(src_buf) != str:
+        src_buf = "".join(src_buf)
     assert isinstance(delta, str)
     out = []
     index = 0

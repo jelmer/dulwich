@@ -540,7 +540,7 @@ class PackData(object):
         :return: Tuple with object type and contents.
         """
         if type not in (6, 7): # Not a delta
-            return type, "".join(obj)
+            return type, obj
 
         if get_offset is None:
             get_offset = self.get_object_at
@@ -561,11 +561,11 @@ class PackData(object):
             # Can't be a ofs delta, as we wouldn't know the base offset
             assert type != 6
             base_offset = None
-        type, base_text = self.resolve_object(base_offset, type, base_obj,
+        type, base_chunks = self.resolve_object(base_offset, type, base_obj,
             get_ref)
         if base_offset is not None:
-            self._offset_cache[base_offset] = type, base_text
-        return (type, "".join(apply_delta(base_text, delta)))
+            self._offset_cache[base_offset] = type, base_chunks
+        return (type, apply_delta("".join(base_chunks), delta))
   
     def iterobjects(self, progress=None):
 
@@ -587,9 +587,7 @@ class PackData(object):
                 if self.i == self.num:
                     raise StopIteration
                 self.map.seek(self.offset)
-                (type, obj_chunks, total_size, unused) = unpack_object(
-                    self.map.read)
-                obj = "".join(obj_chunks)
+                (type, obj, total_size, unused) = unpack_object(self.map.read)
                 self.map.seek(self.offset)
                 crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
                 ret = (self.offset, type, obj, crc32)
@@ -630,13 +628,13 @@ class PackData(object):
         for (offset, type, obj, crc32) in todo:
             assert isinstance(offset, int)
             assert isinstance(type, int)
-            assert isinstance(obj, tuple) or isinstance(obj, str)
+            assert isinstance(obj, list) or isinstance(obj, str)
             try:
                 type, obj = self.resolve_object(offset, type, obj, get_ref_text)
             except Postpone, (sha, ):
                 postponed[sha].append((offset, type, obj))
             else:
-                shafile = ShaFile.from_raw_string(type, obj)
+                shafile = ShaFile.from_raw_chunks(type, obj)
                 sha = shafile.sha().digest()
                 found[sha] = offset
                 yield sha, offset, crc32
@@ -1141,7 +1139,9 @@ class Pack(object):
           offset = int(offset)
         if resolve_ref is None:
             resolve_ref = self.get_raw
-        return self.data.resolve_object(offset, obj_type, obj, resolve_ref)
+        kind, chunks = self.data.resolve_object(offset, obj_type, obj,
+            resolve_ref)
+        return kind, "".join(chunks)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
@@ -1154,8 +1154,8 @@ class Pack(object):
             get_raw = self.get_raw
         for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
-            yield ShaFile.from_raw_chunks(
-                    *self.data.resolve_object(offset, type, obj, get_raw))
+            type, obj = self.data.resolve_object(offset, type, obj, get_raw)
+            yield ShaFile.from_raw_chunks(type, obj)
 
 
 try:

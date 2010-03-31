@@ -808,9 +808,11 @@ class BaseRepo(object):
         while pending_commits != []:
             head = pending_commits.pop(0)
             try:
-                commit = self.commit(head)
+                commit = self[head]
             except KeyError:
                 raise MissingCommitError(head)
+            if type(commit) != Commit:
+                raise NotCommitError(commit)
             if commit in history:
                 continue
             i = 0

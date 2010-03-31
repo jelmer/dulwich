@@ -402,10 +402,14 @@ def read_pack_header(f):
     return (version, num_objects)
 
 
+def chunks_length(chunks):
+    return sum(imap(len, chunks))
+
+
 def unpack_object(read):
     """Unpack a Git object.
 
-    :return: tuple with type, uncompressed data, compressed size and 
+    :return: tuple with type, uncompressed data as chunks, compressed size and 
         tail data
     """
     bytes = take_msb_bytes(read)
@@ -423,21 +427,18 @@ def unpack_object(read):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
-        uncomp = "".join(uncomp_chunks)
-        assert size == len(uncomp)
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        assert size == chunks_length(uncomp)
         return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
     elif type == 7: # ref delta
         basename = read(20)
         raw_base += 20
-        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
-        uncomp = "".join(uncomp_chunks)
-        assert size == len(uncomp)
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        assert size == chunks_length(uncomp)
         return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp_chunks, comp_len, unused = read_zlib_chunks(read, size)
-        uncomp = "".join(uncomp_chunks)
-        assert len(uncomp) == size
+        uncomp, comp_len, unused = read_zlib_chunks(read, size)
+        assert chunks_length(uncomp) == size
         return type, uncomp, comp_len+raw_base, unused
 
 
@@ -586,7 +587,9 @@ class PackData(object):
                 if self.i == self.num:
                     raise StopIteration
                 self.map.seek(self.offset)
-                (type, obj, total_size, unused) = unpack_object(self.map.read)
+                (type, obj_chunks, total_size, unused) = unpack_object(
+                    self.map.read)
+                obj = "".join(obj_chunks)
                 self.map.seek(self.offset)
                 crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
                 ret = (self.offset, type, obj, crc32)
@@ -714,7 +717,8 @@ class PackData(object):
                 "offset was %r" % offset
         assert offset >= self._header_size
         self._file.seek(offset)
-        return unpack_object(self._file.read)[:2]
+        (type, obj_chunks) = unpack_object(self._file.read)[:2]
+        return (type, "".join(obj_chunks))
 
 
 class SHA1Reader(object):

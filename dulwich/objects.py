@@ -123,11 +123,14 @@ class ShaFile(object):
         text = self.as_raw_string()
         return zlib.compress("%s %d\0%s" % (self._type, len(text), text))
 
-    def as_raw_string(self):
+    def as_raw_chunks(self):
         if self._needs_serialization:
-            self._serialize()
+            self._chunked_text = self._serialize()
             self._needs_serialization = False
-        return self._text
+        return self._chunked_text
+
+    def as_raw_string(self):
+        return "".join(self.as_raw_chunks())
 
     def __str__(self):
         return self.as_raw_string()
@@ -140,13 +143,16 @@ class ShaFile(object):
 
     def _ensure_parsed(self):
         if self._needs_parsing:
-            self._deserialize()
+            self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
     def set_raw_string(self, text):
         if type(text) != str:
             raise TypeError(text)
-        self._text = text
+        self.set_raw_chunks([text])
+
+    def set_raw_chunks(self, chunks):
+        self._chunked_text = chunks
         self._sha = None
         self._needs_parsing = True
         self._needs_serialization = False
@@ -181,8 +187,11 @@ class ShaFile(object):
         """Don't call this directly"""
         self._sha = None
 
-    def _deserialize(self):
-        """For subclasses to do initialisation time parsing"""
+    def _deserialize(self, chunks):
+        raise NotImplementedError(self._deserialize)
+
+    def _serialize(self):
+        raise NotImplementedError(self._serialize)
 
     @classmethod
     def from_file(cls, filename):
@@ -210,23 +219,40 @@ class ShaFile(object):
         return obj
 
     @classmethod
+    def from_raw_chunks(cls, type, chunks):
+        """Creates an object of the indicated type from the raw chunks given.
+
+        Type is the numeric type of an object. Chunks is a sequence of the raw 
+        uncompressed contents.
+        """
+        real_class = num_type_map[type]
+        obj = real_class()
+        obj.type = type
+        obj.set_raw_chunks(chunks)
+        return obj
+
+    @classmethod
     def from_string(cls, string):
         """Create a blob from a string."""
         shafile = cls()
         shafile.set_raw_string(string)
         return shafile
 
-    def raw_length(self):
-        """Returns the length of the raw string of this object."""
-        return len(self.as_raw_string())
-
     def _header(self):
         return "%s %lu\0" % (self._type, self.raw_length())
+
+    def raw_length(self):
+        """Returns the length of the raw string of this object."""
+        ret = 0
+        for chunk in self.as_raw_chunks():
+            ret += len(chunk)
+        return ret
 
     def _make_sha(self):
         ret = make_sha()
         ret.update(self._header())
-        ret.update(self.as_raw_string())
+        for chunk in self.as_raw_chunks():
+            ret.update(chunk)
         return ret
 
     def sha(self):
@@ -270,54 +296,27 @@ class Blob(ShaFile):
 
     def __init__(self):
         super(Blob, self).__init__()
-        self._chunked = []
-        self._text = ""
+        self._chunked_text = []
         self._needs_parsing = False
         self._needs_serialization = False
 
     def _get_data(self):
-        if self._needs_serialization:
-            self._serialize()
-            self._needs_serialization = False
-        return self._text
+        return self.as_raw_string()
 
     def _set_data(self, data):
-        self._text = data
-        self._needs_parsing = True
-        self._needs_serialization = False
+        self.set_raw_string(data)
 
     data = property(_get_data, _set_data,
             "The text contained within the blob object.")
 
     def _get_chunked(self):
-        self._ensure_parsed()
-        return self._chunked
+        return self._chunked_text
 
     def _set_chunked(self, chunks):
-        self._chunked = chunks
-        self._needs_serialization = True
+        self._chunked_text = chunks
 
     chunked = property(_get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
-
-    def _deserialize(self):
-        self._chunked = [self._text]
-
-    def _serialize(self):
-        self._text = "".join(self._chunked)
-
-    def raw_length(self):
-        ret = 0
-        for chunk in self.chunked:
-            ret += len(chunk)
-        return ret
-
-    def _make_sha(self):
-        ret = make_sha()
-        ret.update(self._header())
-        for chunk in self._chunked:
-            ret.update(chunk)
-        return ret
 
     @classmethod
     def from_file(cls, filename):
@@ -364,13 +363,12 @@ class Tag(ShaFile):
                 chunks.append("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
         chunks.append("\n") # To close headers
         chunks.append(self._message)
-        self._text = "".join(chunks)
-        self._needs_serialization = False
+        return chunks
 
-    def _deserialize(self):
+    def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
-        f = StringIO(self._text)
+        f = StringIO("".join(chunks))
         for l in f:
             l = l.rstrip("\n")
             if l == "":
@@ -538,12 +536,12 @@ class Tree(ShaFile):
         self._ensure_parsed()
         return sorted_tree_items(self._entries)
 
-    def _deserialize(self):
+    def _deserialize(self, chunks):
         """Grab the entries in the tree"""
-        self._entries = parse_tree(self._text)
+        self._entries = parse_tree("".join(chunks))
 
     def _serialize(self):
-        self._text = "".join(serialize_tree(self.iteritems()))
+        return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self):
         text = []
@@ -594,11 +592,11 @@ class Commit(ShaFile):
             raise NotCommitError(filename)
         return commit
 
-    def _deserialize(self):
+    def _deserialize(self, chunks):
         self._parents = []
         self._extra = []
         self._author = None
-        f = StringIO(self._text)
+        f = StringIO("".join(chunks))
         for l in f:
             l = l.rstrip("\n")
             if l == "":
@@ -638,7 +636,7 @@ class Commit(ShaFile):
             chunks.append("%s %s\n" % (k, v))
         chunks.append("\n") # There must be a new line after the headers
         chunks.append(self._message)
-        self._text = "".join(chunks)
+        return chunks
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 

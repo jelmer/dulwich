@@ -260,17 +260,44 @@ class Blob(ShaFile):
 
     _type = BLOB_ID
     _num_type = 3
-    _needs_serialization = False
-    _needs_parsing = False
+
+    def __init__(self):
+        super(Blob, self).__init__()
+        self._chunked = []
+        self._text = ""
+        self._needs_parsing = False
+        self._needs_serialization = False
 
     def get_data(self):
+        if self._needs_serialization:
+            self.serialize()
         return self._text
 
     def set_data(self, data):
         self._text = data
+        self._needs_parsing = True
+        self._needs_serialization = False
 
     data = property(get_data, set_data,
             "The text contained within the blob object.")
+
+    def get_chunked(self):
+        if self._needs_parsing:
+            self._parse_text()
+        return self._chunked
+
+    def set_chunked(self, chunks):
+        self._chunked = chunks
+        self._needs_serialization = True
+
+    chunked = property(get_chunked, set_chunked,
+        "The text within the blob object, as chunks (not necessarily lines).")
+
+    def _parse_text(self):
+        self._chunked = [self._text]
+
+    def serialize(self):
+        self._text = "".join(self._chunked)
 
     @classmethod
     def from_file(cls, filename):

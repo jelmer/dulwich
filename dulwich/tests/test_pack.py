@@ -35,7 +35,7 @@ from dulwich.pack import (
     create_delta,
     load_pack_index,
     hex_to_sha,
-    read_zlib,
+    read_zlib_chunks,
     sha_to_hex,
     write_pack_index_v1,
     write_pack_index_v2,
@@ -283,6 +283,6 @@ TEST_COMP1 = """\x78\x9c\x9d\x8e\xc1\x0a\xc2\x30\x10\x44\xef\xf9\x8a\xbd\xa9\x08
 class ZlibTests(unittest.TestCase):
 
     def test_simple_decompress(self):
-        self.assertEquals(("tree 4ada885c9196b6b6fa08744b5862bf92896fc002\nparent None\nauthor Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\ncommitter Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n\nProvide replacement for mmap()'s offset argument.", 158, 'Z'), 
-        read_zlib(StringIO(TEST_COMP1).read, 229))
+        self.assertEquals((["tree 4ada885c9196b6b6fa08744b5862bf92896fc002\nparent None\nauthor Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\ncommitter Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n\nProvide replacement for mmap()'s offset argument."], 158, 'Z'), 
+        read_zlib_chunks(StringIO(TEST_COMP1).read, 229))
 

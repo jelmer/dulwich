@@ -140,7 +140,7 @@ class ShaFile(object):
 
     def _ensure_parsed(self):
         if self._needs_parsing:
-            self._parse_text()
+            self._deserialize()
             self._needs_parsing = False
 
     def set_raw_string(self, text):
@@ -181,7 +181,7 @@ class ShaFile(object):
         """Don't call this directly"""
         self._sha = None
 
-    def _parse_text(self):
+    def _deserialize(self):
         """For subclasses to do initialisation time parsing"""
 
     @classmethod
@@ -300,7 +300,7 @@ class Blob(ShaFile):
     chunked = property(_get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
 
-    def _parse_text(self):
+    def _deserialize(self):
         self._chunked = [self._text]
 
     def _serialize(self):
@@ -367,7 +367,7 @@ class Tag(ShaFile):
         self._text = "".join(chunks)
         self._needs_serialization = False
 
-    def _parse_text(self):
+    def _deserialize(self):
         """Grab the metadata attached to the tag"""
         self._tagger = None
         f = StringIO(self._text)
@@ -538,7 +538,7 @@ class Tree(ShaFile):
         self._ensure_parsed()
         return sorted_tree_items(self._entries)
 
-    def _parse_text(self):
+    def _deserialize(self):
         """Grab the entries in the tree"""
         self._entries = parse_tree(self._text)
 
@@ -594,7 +594,7 @@ class Commit(ShaFile):
             raise NotCommitError(filename)
         return commit
 
-    def _parse_text(self):
+    def _deserialize(self):
         self._parents = []
         self._extra = []
         self._author = None

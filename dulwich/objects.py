@@ -213,8 +213,12 @@ class ShaFile(object):
         shafile.set_raw_string(string)
         return shafile
 
+    def _raw_length(self):
+        """Returns the length of the raw string of this object."""
+        return len(self.as_raw_string())
+
     def _header(self):
-        return "%s %lu\0" % (self._type, len(self.as_raw_string()))
+        return "%s %lu\0" % (self._type, self._raw_length())
 
     def sha(self):
         """The SHA1 object that is the name of this object."""

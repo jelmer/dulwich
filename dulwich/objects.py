@@ -126,6 +126,7 @@ class ShaFile(object):
     def as_raw_string(self):
         if self._needs_serialization:
             self._serialize()
+            self._needs_serialization = False
         return self._text
 
     def __str__(self):
@@ -140,6 +141,7 @@ class ShaFile(object):
     def _ensure_parsed(self):
         if self._needs_parsing:
             self._parse_text()
+            self._needs_parsing = False
 
     def set_raw_string(self, text):
         if type(text) != str:
@@ -276,6 +278,7 @@ class Blob(ShaFile):
     def _get_data(self):
         if self._needs_serialization:
             self._serialize()
+            self._needs_serialization = False
         return self._text
 
     def _set_data(self, data):
@@ -397,7 +400,6 @@ class Tag(ShaFile):
             else:
                 raise AssertionError("Unknown field %s" % field)
         self._message = f.read()
-        self._needs_parsing = False
 
     def _get_object(self):
         """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
@@ -539,11 +541,9 @@ class Tree(ShaFile):
     def _parse_text(self):
         """Grab the entries in the tree"""
         self._entries = parse_tree(self._text)
-        self._needs_parsing = False
 
     def _serialize(self):
         self._text = "".join(serialize_tree(self.iteritems()))
-        self._needs_serialization = False
 
     def as_pretty_string(self):
         text = []
@@ -622,7 +622,6 @@ class Commit(ShaFile):
             else:
                 self._extra.append((field, value))
         self._message = f.read()
-        self._needs_parsing = False
 
     def _serialize(self):
         chunks = []
@@ -640,7 +639,6 @@ class Commit(ShaFile):
         chunks.append("\n") # There must be a new line after the headers
         chunks.append(self._message)
         self._text = "".join(chunks)
-        self._needs_serialization = False
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 

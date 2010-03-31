@@ -25,6 +25,7 @@ import os
 import shutil
 import tempfile
 import unittest
+import warnings
 
 from dulwich import errors
 from dulwich import objects
@@ -103,29 +104,49 @@ class RepositoryTests(unittest.TestCase):
   
     def test_commit(self):
         r = self._repo = open_repo('a.git')
-        obj = r.commit(r.head())
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            obj = r.commit(r.head())
+        finally:
+            warnings.resetwarnings()
         self.assertEqual(obj._type, 'commit')
   
     def test_commit_not_commit(self):
         r = self._repo = open_repo('a.git')
-        self.assertRaises(errors.NotCommitError,
-                          r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            self.assertRaises(errors.NotCommitError,
+                r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
+        finally:
+            warnings.resetwarnings()
   
     def test_tree(self):
         r = self._repo = open_repo('a.git')
-        commit = r.commit(r.head())
-        tree = r.tree(commit.tree)
+        commit = r[r.head()]
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            tree = r.tree(commit.tree)
+        finally:
+            warnings.resetwarnings()
         self.assertEqual(tree._type, 'tree')
         self.assertEqual(tree.sha().hexdigest(), commit.tree)
   
     def test_tree_not_tree(self):
         r = self._repo = open_repo('a.git')
-        self.assertRaises(errors.NotTreeError, r.tree, r.head())
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            self.assertRaises(errors.NotTreeError, r.tree, r.head())
+        finally:
+            warnings.resetwarnings()
 
     def test_tag(self):
         r = self._repo = open_repo('a.git')
         tag_sha = '28237f4dc30d0d462658d6b937b08a0f0b6ef55a'
-        tag = r.tag(tag_sha)
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            tag = r.tag(tag_sha)
+        finally:
+            warnings.resetwarnings()
         self.assertEqual(tag._type, 'tag')
         self.assertEqual(tag.sha().hexdigest(), tag_sha)
         obj_type, obj_sha = tag.object
@@ -134,7 +155,11 @@ class RepositoryTests(unittest.TestCase):
 
     def test_tag_not_tag(self):
         r = self._repo = open_repo('a.git')
-        self.assertRaises(errors.NotTagError, r.tag, r.head())
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            self.assertRaises(errors.NotTagError, r.tag, r.head())
+        finally:
+            warnings.resetwarnings()
 
     def test_get_peeled(self):
         # unpacked ref
@@ -157,16 +182,24 @@ class RepositoryTests(unittest.TestCase):
 
     def test_get_blob(self):
         r = self._repo = open_repo('a.git')
-        commit = r.commit(r.head())
-        tree = r.tree(commit.tree)
+        commit = r[r.head()]
+        tree = r[commit.tree]
         blob_sha = tree.entries()[0][2]
-        blob = r.get_blob(blob_sha)
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            blob = r.get_blob(blob_sha)
+        finally:
+            warnings.resetwarnings()
         self.assertEqual(blob._type, 'blob')
         self.assertEqual(blob.sha().hexdigest(), blob_sha)
   
     def test_get_blob_notblob(self):
         r = self._repo = open_repo('a.git')
-        self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
+        finally:
+            warnings.resetwarnings()
     
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')

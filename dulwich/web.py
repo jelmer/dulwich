@@ -19,9 +19,9 @@
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
 from cStringIO import StringIO
-import cgi
 import re
 import time
+import urlparse
 
 from dulwich.server import (
     ReceivePackHandler,
@@ -109,7 +109,7 @@ default_services = {'git-upload-pack': UploadPackHandler,
 def get_info_refs(req, backend, mat, services=None):
     if services is None:
         services = default_services
-    params = cgi.parse_qs(req.environ['QUERY_STRING'])
+    params = urlparse.parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
     if service and not req.dumb:
         handler_cls = services.get(service, None)

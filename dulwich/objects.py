@@ -350,18 +350,18 @@ class Tag(ShaFile):
         return shafile
 
     def _serialize(self):
-        f = StringIO()
-        f.write("%s %s\n" % (OBJECT_ID, self._object_sha))
-        f.write("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
-        f.write("%s %s\n" % (TAG_ID, self._name))
+        chunks = []
+        chunks.append("%s %s\n" % (OBJECT_ID, self._object_sha))
+        chunks.append("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
+        chunks.append("%s %s\n" % (TAG_ID, self._name))
         if self._tagger:
             if self._tag_time is None:
-                f.write("%s %s\n" % (TAGGER_ID, self._tagger))
+                chunks.append("%s %s\n" % (TAGGER_ID, self._tagger))
             else:
-                f.write("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
-        f.write("\n") # To close headers
-        f.write(self._message)
-        self._text = f.getvalue()
+                chunks.append("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
+        chunks.append("\n") # To close headers
+        chunks.append(self._message)
+        self._text = "".join(chunks)
         self._needs_serialization = False
 
     def _parse_text(self):
@@ -445,12 +445,10 @@ def serialize_tree(items):
     """Serialize the items in a tree to a text.
 
     :param items: Sorted iterable over (name, mode, sha) tuples
-    :return: Serialized tree text
+    :return: Serialized tree text as chunks
     """
-    f = StringIO()
     for name, mode, hexsha in items:
-        f.write("%04o %s\0%s" % (mode, name, hex_to_sha(hexsha)))
-    return f.getvalue()
+        yield "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
 
 
 def sorted_tree_items(entries):
@@ -544,18 +542,18 @@ class Tree(ShaFile):
         self._needs_parsing = False
 
     def _serialize(self):
-        self._text = serialize_tree(self.iteritems())
+        self._text = "".join(serialize_tree(self.iteritems()))
         self._needs_serialization = False
 
     def as_pretty_string(self):
-        text = ""
+        text = []
         for name, mode, hexsha in self.iteritems():
             if mode & stat.S_IFDIR:
                 kind = "tree"
             else:
                 kind = "blob"
-            text += "%04o %s %s\t%s\n" % (mode, kind, hexsha, name)
-        return text
+            text.append("%04o %s %s\t%s\n" % (mode, kind, hexsha, name))
+        return "".join(text)
 
 
 def parse_timezone(text):
@@ -627,21 +625,21 @@ class Commit(ShaFile):
         self._needs_parsing = False
 
     def _serialize(self):
-        f = StringIO()
-        f.write("%s %s\n" % (TREE_ID, self._tree))
+        chunks = []
+        chunks.append("%s %s\n" % (TREE_ID, self._tree))
         for p in self._parents:
-            f.write("%s %s\n" % (PARENT_ID, p))
-        f.write("%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone)))
-        f.write("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
+            chunks.append("%s %s\n" % (PARENT_ID, p))
+        chunks.append("%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone)))
+        chunks.append("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
         if self.encoding:
-            f.write("%s %s\n" % (ENCODING_ID, self.encoding))
+            chunks.append("%s %s\n" % (ENCODING_ID, self.encoding))
         for k, v in self.extra:
             if "\n" in k or "\n" in v:
                 raise AssertionError("newline in extra data: %r -> %r" % (k, v))
-            f.write("%s %s\n" % (k, v))
-        f.write("\n") # There must be a new line after the headers
-        f.write(self._message)
-        self._text = f.getvalue()
+            chunks.append("%s %s\n" % (k, v))
+        chunks.append("\n") # There must be a new line after the headers
+        chunks.append(self._message)
+        self._text = "".join(chunks)
         self._needs_serialization = False
 
     tree = serializable_property("tree", "Tree that is the state of this commit")

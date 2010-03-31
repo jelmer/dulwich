@@ -47,6 +47,29 @@ static size_t get_delta_header_size(uint8_t *delta, int *index, int length)
 	return size;
 }
 
+static PyObject *py_chunked_as_string(PyObject *py_buf)
+{
+	if (PyList_Check(py_buf)) {
+		PyObject *sep = PyString_FromString("");
+		if (sep == NULL) {
+			PyErr_NoMemory();
+			return NULL;
+		}
+		py_buf = _PyString_Join(sep, py_buf);
+		Py_DECREF(sep);
+		if (py_buf == NULL) {
+			PyErr_NoMemory();
+			return NULL;
+		}
+	} else if (PyString_Check(py_buf)) {
+		Py_INCREF(py_buf);
+	} else {
+		PyErr_SetString(PyExc_TypeError,
+			"src_buf is not a string or a list of chunks");
+		return NULL;
+	}
+    return py_buf;
+}
 
 static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 {
@@ -56,34 +79,26 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 	size_t outindex = 0;
 	int index;
 	uint8_t *out;
-	PyObject *ret, *py_src_buf;
+	PyObject *ret, *py_src_buf, *py_delta;
 
-	if (!PyArg_ParseTuple(args, "Os#", &py_src_buf,
-						  (uint8_t *)&delta, &delta_len))
+	if (!PyArg_ParseTuple(args, "OO", &py_src_buf, &py_delta))
 		return NULL;
 
-	if (PyList_Check(py_src_buf)) {
-		PyObject *sep = PyString_FromString("");
-		if (sep == NULL) {
-			PyErr_NoMemory();
-			return NULL;
-		}
-		py_src_buf = _PyString_Join(sep, py_src_buf);
-		Py_DECREF(sep);
-		if (py_src_buf == NULL) {
-			PyErr_NoMemory();
-			return NULL;
-		}
-	} else if (PyString_Check(py_src_buf)) {
-		Py_INCREF(py_src_buf);
-	} else {
-		PyErr_SetString(PyExc_TypeError,
-			"src_buf is not a string or a list of chunks");
-		return NULL;
-	}
+    py_src_buf = py_chunked_as_string(py_src_buf);
+    if (py_src_buf == NULL)
+        return NULL;
+
+    py_delta = py_chunked_as_string(py_delta);
+    if (py_delta == NULL) {
+        Py_DECREF(py_src_buf);
+        return NULL;
+    }
 
 	src_buf = (uint8_t *)PyString_AS_STRING(py_src_buf);
 	src_buf_len = PyString_GET_SIZE(py_src_buf);
+
+    delta = (uint8_t *)PyString_AS_STRING(py_delta);
+    delta_len = PyString_GET_SIZE(py_delta);
 
     index = 0;
     src_size = get_delta_header_size(delta, &index, delta_len);
@@ -91,6 +106,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		PyErr_Format(PyExc_ValueError, 
 			"Unexpected source buffer size: %lu vs %d", src_size, src_buf_len);
 		Py_DECREF(py_src_buf);
+		Py_DECREF(py_delta);
 		return NULL;
 	}
     dest_size = get_delta_header_size(delta, &index, delta_len);
@@ -98,6 +114,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 	if (ret == NULL) {
 		PyErr_NoMemory();
 		Py_DECREF(py_src_buf);
+		Py_DECREF(py_delta);
 		return NULL;
 	}
 	out = (uint8_t *)PyString_AsString(ret);
@@ -136,11 +153,13 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		} else {
 			PyErr_SetString(PyExc_ValueError, "Invalid opcode 0");
 			Py_DECREF(ret);
+            Py_DECREF(py_delta);
 			Py_DECREF(py_src_buf);
 			return NULL;
 		}
 	}
 	Py_DECREF(py_src_buf);
+    Py_DECREF(py_delta);
     
     if (index != delta_len) {
 		PyErr_SetString(PyExc_ValueError, "delta not empty");

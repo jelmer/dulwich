@@ -446,9 +446,8 @@ def _compute_object_size((num, obj)):
     """Compute the size of a unresolved object for use with LRUSizeCache.
     """
     if num in (6, 7):
-        return len(obj[1])
-    assert isinstance(obj, str)
-    return len(obj)
+        return chunks_length(obj[1])
+    return chunks_length(obj)
 
 
 class PackData(object):
@@ -548,14 +547,12 @@ class PackData(object):
         if type == 6: # offset delta
             (delta_offset, delta) = obj
             assert isinstance(delta_offset, int)
-            assert isinstance(delta, str)
             base_offset = offset-delta_offset
             type, base_obj = get_offset(base_offset)
             assert isinstance(type, int)
         elif type == 7: # ref delta
             (basename, delta) = obj
             assert isinstance(basename, str) and len(basename) == 20
-            assert isinstance(delta, str)
             type, base_obj = get_ref(basename)
             assert isinstance(type, int)
             # Can't be a ofs delta, as we wouldn't know the base offset
@@ -962,7 +959,8 @@ def apply_delta(src_buf, delta):
     """
     if type(src_buf) != str:
         src_buf = "".join(src_buf)
-    assert isinstance(delta, str)
+    if type(delta) != str:
+        delta = "".join(delta)
     out = []
     index = 0
     delta_length = len(delta)

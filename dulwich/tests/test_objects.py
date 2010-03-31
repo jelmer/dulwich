@@ -180,6 +180,10 @@ class CommitSerializationTests(unittest.TestCase):
         c1.set_raw_string(c.as_raw_string())
         self.assertEquals(30, c1.commit_time)
 
+    def test_raw_length(self):
+        c = self.make_base()
+        self.assertEquals(len(c.as_raw_string()), c._raw_length())
+
     def test_simple(self):
         c = self.make_base()
         self.assertEquals(c.id, '5dac377bdded4c9aeb8dff595f0faeebcc8498cc')

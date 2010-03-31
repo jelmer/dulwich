@@ -733,7 +733,7 @@ class BaseRepo(object):
         :return: A `Commit` object
         """
         warnings.warn("Repo.commit(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, level=2)
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Commit)
 
     def tree(self, sha):
@@ -745,7 +745,7 @@ class BaseRepo(object):
         :return: A `Tree` object
         """
         warnings.warn("Repo.tree(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning)
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Tree)
 
     def tag(self, sha):
@@ -757,7 +757,7 @@ class BaseRepo(object):
         :return: A `Tag` object
         """
         warnings.warn("Repo.tag(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning)
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Tag)
 
     def get_blob(self, sha):
@@ -769,7 +769,7 @@ class BaseRepo(object):
         :return: A `Blob` object
         """
         warnings.warn("Repo.get_blob(sha) is deprecated. Use Repo[sha] "
-            "instead.", category=DeprecationWarning)
+            "instead.", category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Blob)
 
     def get_peeled(self, ref):

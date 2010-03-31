@@ -220,12 +220,16 @@ class ShaFile(object):
     def _header(self):
         return "%s %lu\0" % (self._type, self._raw_length())
 
+    def _make_sha(self):
+        ret = make_sha()
+        ret.update(self._header())
+        ret.update(self.as_raw_string())
+        return ret
+
     def sha(self):
         """The SHA1 object that is the name of this object."""
         if self._needs_serialization or self._sha is None:
-            self._sha = make_sha()
-            self._sha.update(self._header())
-            self._sha.update(self.as_raw_string())
+            self._sha = self._make_sha()
         return self._sha
 
     @property
@@ -268,29 +272,28 @@ class Blob(ShaFile):
         self._needs_parsing = False
         self._needs_serialization = False
 
-    def get_data(self):
+    def _get_data(self):
         if self._needs_serialization:
             self.serialize()
         return self._text
 
-    def set_data(self, data):
+    def _set_data(self, data):
         self._text = data
         self._needs_parsing = True
         self._needs_serialization = False
 
-    data = property(get_data, set_data,
+    data = property(_get_data, _set_data,
             "The text contained within the blob object.")
 
-    def get_chunked(self):
-        if self._needs_parsing:
-            self._parse_text()
+    def _get_chunked(self):
+        self._ensure_parsed()
         return self._chunked
 
-    def set_chunked(self, chunks):
+    def _set_chunked(self, chunks):
         self._chunked = chunks
         self._needs_serialization = True
 
-    chunked = property(get_chunked, set_chunked,
+    chunked = property(_get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
 
     def _parse_text(self):
@@ -298,6 +301,19 @@ class Blob(ShaFile):
 
     def serialize(self):
         self._text = "".join(self._chunked)
+
+    def _raw_length(self):
+        ret = 0
+        for chunk in self.chunked:
+            ret += len(chunk)
+        return ret
+
+    def _make_sha(self):
+        ret = make_sha()
+        ret.update(self._header())
+        for chunk in self._chunked:
+            ret.update(chunk)
+        return ret
 
     @classmethod
     def from_file(cls, filename):
@@ -382,17 +398,17 @@ class Tag(ShaFile):
         self._message = f.read()
         self._needs_parsing = False
 
-    def get_object(self):
+    def _get_object(self):
         """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
         self._ensure_parsed()
         return (self._object_type, self._object_sha)
 
-    def set_object(self, value):
+    def _set_object(self, value):
         self._ensure_parsed()
         (self._object_type, self._object_sha) = value
         self._needs_serialization = True
 
-    object = property(get_object, set_object)
+    object = property(_get_object, _set_object)
 
     name = serializable_property("name", "The name of this tag")
     tagger = serializable_property("tagger",
@@ -603,25 +619,25 @@ class Commit(ShaFile):
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 
-    def get_parents(self):
+    def _get_parents(self):
         """Return a list of parents of this commit."""
         self._ensure_parsed()
         return self._parents
 
-    def set_parents(self, value):
-        """Return a list of parents of this commit."""
+    def _set_parents(self, value):
+        """Set a list of parents of this commit."""
         self._ensure_parsed()
         self._needs_serialization = True
         self._parents = value
 
-    parents = property(get_parents, set_parents)
+    parents = property(_get_parents, _set_parents)
 
-    def get_extra(self):
+    def _get_extra(self):
         """Return extra settings of this commit."""
         self._ensure_parsed()
         return self._extra
 
-    extra = property(get_extra)
+    extra = property(_get_extra)
 
     author = serializable_property("author",
         "The name of the author of the commit")

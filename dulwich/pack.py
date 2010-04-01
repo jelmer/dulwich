@@ -625,7 +625,6 @@ class PackData(object):
         for (offset, type, obj, crc32) in todo:
             assert isinstance(offset, int)
             assert isinstance(type, int)
-            assert isinstance(obj, list) or isinstance(obj, str)
             try:
                 type, obj = self.resolve_object(offset, type, obj, get_ref_text)
             except Postpone, (sha, ):

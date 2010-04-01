@@ -119,7 +119,8 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = UploadPackHandler(None, None, None)
+        self._handler = UploadPackHandler(None, ["/", "host=lolcathost"],
+                                          None, None)
         self._handler.proto = TestProto()
 
     def test_progress(self):

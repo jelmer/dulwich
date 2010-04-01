@@ -20,6 +20,8 @@
 
 """Tests for git base objects."""
 
+# TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
+
 
 import os
 import stat
@@ -278,7 +280,7 @@ class TagSerializeTests(unittest.TestCase):
         x.tagger = "Jelmer Vernooij <jelmer@samba.org>"
         x.name = "0.1"
         x.message = "Tag 0.1"
-        x.object = (3, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        x.object = (Blob, "d80c186a03f423a81b39df39dc87fd269736ca86")
         x.tag_time = 423423423
         x.tag_timezone = 0
         self.assertEquals("""object d80c186a03f423a81b39df39dc87fd269736ca86

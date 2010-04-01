@@ -23,6 +23,7 @@
 import errno
 import itertools
 import os
+import posixpath
 import stat
 import tempfile
 import urllib2
@@ -137,10 +138,7 @@ class BaseObjectStore(object):
             else:
                 ttree = {}
             for name, oldmode, oldhexsha in stree.iteritems():
-                if path == "":
-                    oldchildpath = name
-                else:
-                    oldchildpath = "%s/%s" % (path, name)
+                oldchildpath = posixpath.join(path, name)
                 try:
                     (newmode, newhexsha) = ttree[name]
                     newchildpath = oldchildpath
@@ -166,10 +164,7 @@ class BaseObjectStore(object):
                             yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
 
             for name, newmode, newhexsha in ttree.iteritems():
-                if path == "":
-                    childpath = name
-                else:
-                    childpath = "%s/%s" % (path, name)
+                childpath = posixpath.join(path, name)
                 if not name in stree:
                     if not stat.S_ISDIR(newmode):
                         yield ((None, childpath), (None, newmode), (None, newhexsha))
@@ -186,10 +181,7 @@ class BaseObjectStore(object):
             (tid, tpath) = todo.pop()
             tree = self[tid]
             for name, mode, hexsha in tree.iteritems(): 
-                if tpath == "":
-                    path = name
-                else:
-                    path = "%s/%s" % (tpath, name)
+                path = posixpath.join(tpath, name)
                 if stat.S_ISDIR(mode):
                     todo.add((hexsha, path))
                 else:

@@ -150,7 +150,6 @@ class GitBackend(Backend):
             else:
                 status.append((ref, 'ok'))
 
-
         print "pack applied"
         return status
 
@@ -199,7 +198,7 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
-    def __init__(self, backend, read, write,
+    def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
         self._graph_walker = None
@@ -560,7 +559,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, read, write,
+    def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
         self.stateless_rpc = stateless_rpc
@@ -634,7 +633,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
         else:
             return
 
-        h = cls(self.server.backend, self.rfile.read, self.wfile.write)
+        h = cls(self.server.backend, args, self.rfile.read, self.wfile.write)
         h.handle()
 
 

@@ -28,6 +28,7 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 import SocketServer
+import tempfile
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -91,7 +92,7 @@ class GitBackend(Backend):
 
     def __init__(self, repo=None):
         if repo is None:
-            repo = Repo(tmpfile.mkdtemp())
+            repo = Repo(tempfile.mkdtemp())
         self.repo = repo
         self.refs = self.repo.refs
         self.object_store = self.repo.object_store

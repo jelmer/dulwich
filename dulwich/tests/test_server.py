@@ -229,7 +229,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
         self._walker = ProtocolGraphWalker(
             TestUploadPackHandler(self._objects, TestProto()),
-            self._objects)
+            self._objects, None)
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))
@@ -281,7 +281,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             'want %s' % TWO,
             ])
         heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
-        self._walker.handler.backend.repo.peeled = heads
+        self._walker.get_peeled = heads.get
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
@@ -301,7 +301,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         # advertise branch tips plus tag
         heads = {'ref4': FOUR, 'ref5': FIVE, 'tag6': SIX}
         peeled = {'ref4': FOUR, 'ref5': FIVE, 'tag6': FIVE}
-        self._walker.handler.backend.repo.peeled = peeled
+        self._walker.get_peeled = peeled.get
         self._walker.determine_wants(heads)
         lines = []
         while True:

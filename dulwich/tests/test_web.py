@@ -96,15 +96,11 @@ class DumbHandlersTestCase(WebTestCase):
         self._environ['QUERY_STRING'] = ''
 
         class TestTag(object):
-            type = Tag().type
-
-            def __init__(self, sha, obj_type, obj_sha):
+            def __init__(self, sha, obj_class, obj_sha):
                 self.sha = lambda: sha
-                self.object = (obj_type, obj_sha)
+                self.object = (obj_class, obj_sha)
 
         class TestBlob(object):
-            type = Blob().type
-
             def __init__(self, sha):
                 self.sha = lambda: sha
 
@@ -112,7 +108,7 @@ class DumbHandlersTestCase(WebTestCase):
         blob2 = TestBlob('222')
         blob3 = TestBlob('333')
 
-        tag1 = TestTag('aaa', TestBlob.type, '222')
+        tag1 = TestTag('aaa', Blob, '222')
 
         class TestRepo(object):
             def __init__(self, objects, peeled):

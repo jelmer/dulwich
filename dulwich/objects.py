@@ -41,22 +41,27 @@ from dulwich.misc import (
     make_sha,
     )
 
-BLOB_ID = "blob"
-TAG_ID = "tag"
-TREE_ID = "tree"
-COMMIT_ID = "commit"
-PARENT_ID = "parent"
-AUTHOR_ID = "author"
-COMMITTER_ID = "committer"
-OBJECT_ID = "object"
-TYPE_ID = "type"
-TAGGER_ID = "tagger"
-ENCODING_ID = "encoding"
+
+# Header fields for commits
+_TREE_HEADER = "tree"
+_PARENT_HEADER = "parent"
+_AUTHOR_HEADER = "author"
+_COMMITTER_HEADER = "committer"
+_ENCODING_HEADER = "encoding"
+
+
+# Header fields for objects
+_OBJECT_HEADER = "object"
+_TYPE_HEADER = "type"
+_TAG_HEADER = "tag"
+_TAGGER_HEADER = "tagger"
+
 
 S_IFGITLINK = 0160000
 
 def S_ISGITLINK(m):
     return (stat.S_IFMT(m) == S_IFGITLINK)
+
 
 def _decompress(string):
     dcomp = zlib.decompressobj()
@@ -89,6 +94,15 @@ def serializable_property(name, docstring=None):
     return property(get, set, doc=docstring)
 
 
+def object_class(type):
+    """Get the object class corresponding to the given type.
+
+    :param type: Either a type name string or a numeric type.
+    :return: The ShaFile subclass corresponding to the given type.
+    """
+    return _TYPE_MAP[type]
+
+
 class ShaFile(object):
     """A git SHA file."""
 
@@ -97,10 +111,10 @@ class ShaFile(object):
         """Parse a legacy object, creating it and setting object._text"""
         text = _decompress(map)
         object = None
-        for posstype in type_map.keys():
-            if text.startswith(posstype):
-                object = type_map[posstype]()
-                text = text[len(posstype):]
+        for cls in OBJECT_CLASSES:
+            if text.startswith(cls.type_name):
+                object = cls()
+                text = text[len(cls.type_name):]
                 break
         assert object is not None, "%s is not a known object type" % text[:9]
         assert text[0] == ' ', "%s is not a space" % text[0]
@@ -121,7 +135,7 @@ class ShaFile(object):
 
     def as_legacy_object(self):
         text = self.as_raw_string()
-        return zlib.compress("%s %d\0%s" % (self._type, len(text), text))
+        return zlib.compress("%s %d\0%s" % (self.type_name, len(text), text))
 
     def as_raw_chunks(self):
         if self._needs_serialization:
@@ -163,11 +177,11 @@ class ShaFile(object):
         used = 0
         byte = ord(map[used])
         used += 1
-        num_type = (byte >> 4) & 7
+        type_num = (byte >> 4) & 7
         try:
-            object = num_type_map[num_type]()
+            object = object_class(type_num)()
         except KeyError:
-            raise AssertionError("Not a known type: %d" % num_type)
+            raise AssertionError("Not a known type: %d" % type_num)
         while (byte & 0x80) != 0:
             byte = ord(map[used])
             used += 1
@@ -205,41 +219,37 @@ class ShaFile(object):
         finally:
             f.close()
 
-    @classmethod
-    def from_raw_string(cls, type, string):
+    @staticmethod
+    def from_raw_string(type_num, string):
         """Creates an object of the indicated type from the raw string given.
 
-        Type is the numeric type of an object. String is the raw uncompressed
-        contents.
+        :param type_num: The numeric type of the object.
+        :param string: The raw uncompressed contents.
         """
-        real_class = num_type_map[type]
-        obj = real_class()
-        obj.type = type
+        obj = object_class(type_num)()
         obj.set_raw_string(string)
         return obj
 
-    @classmethod
-    def from_raw_chunks(cls, type, chunks):
+    @staticmethod
+    def from_raw_chunks(type_num, chunks):
         """Creates an object of the indicated type from the raw chunks given.
 
-        Type is the numeric type of an object. Chunks is a sequence of the raw 
-        uncompressed contents.
+        :param type_num: The numeric type of the object.
+        :param chunks: An iterable of the raw uncompressed contents.
         """
-        real_class = num_type_map[type]
-        obj = real_class()
-        obj.type = type
+        obj = object_class(type_num)()
         obj.set_raw_chunks(chunks)
         return obj
 
     @classmethod
     def from_string(cls, string):
         """Create a blob from a string."""
-        shafile = cls()
-        shafile.set_raw_string(string)
-        return shafile
+        obj = cls()
+        obj.set_raw_string(string)
+        return obj
 
     def _header(self):
-        return "%s %lu\0" % (self._type, self.raw_length())
+        return "%s %lu\0" % (self.type_name, self.raw_length())
 
     def raw_length(self):
         """Returns the length of the raw string of this object."""
@@ -266,11 +276,12 @@ class ShaFile(object):
         return self.sha().hexdigest()
 
     def get_type(self):
-        return self._num_type
+        return self.type_num
 
     def set_type(self, type):
-        self._num_type = type
+        self.type_num = type
 
+    # DEPRECATED: use type_num or type_name as needed.
     type = property(get_type, set_type)
 
     def __repr__(self):
@@ -291,8 +302,8 @@ class ShaFile(object):
 class Blob(ShaFile):
     """A Git Blob object."""
 
-    _type = BLOB_ID
-    _num_type = 3
+    type_name = 'blob'
+    type_num = 3
 
     def __init__(self):
         super(Blob, self).__init__()
@@ -321,7 +332,7 @@ class Blob(ShaFile):
     @classmethod
     def from_file(cls, filename):
         blob = ShaFile.from_file(filename)
-        if blob._type != cls._type:
+        if not isinstance(blob, cls):
             raise NotBlobError(filename)
         return blob
 
@@ -329,8 +340,8 @@ class Blob(ShaFile):
 class Tag(ShaFile):
     """A Git Tag object."""
 
-    _type = TAG_ID
-    _num_type = 4
+    type_name = 'tag'
+    type_num = 4
 
     def __init__(self):
         super(Tag, self).__init__()
@@ -339,10 +350,10 @@ class Tag(ShaFile):
 
     @classmethod
     def from_file(cls, filename):
-        blob = ShaFile.from_file(filename)
-        if blob._type != cls._type:
-            raise NotBlobError(filename)
-        return blob
+        tag = ShaFile.from_file(filename)
+        if not isinstance(tag, cls):
+            raise NotTagError(filename)
+        return tag
 
     @classmethod
     def from_string(cls, string):
@@ -353,14 +364,16 @@ class Tag(ShaFile):
 
     def _serialize(self):
         chunks = []
-        chunks.append("%s %s\n" % (OBJECT_ID, self._object_sha))
-        chunks.append("%s %s\n" % (TYPE_ID, num_type_map[self._object_type]._type))
-        chunks.append("%s %s\n" % (TAG_ID, self._name))
+        chunks.append("%s %s\n" % (_OBJECT_HEADER, self._object_sha))
+        chunks.append("%s %s\n" % (_TYPE_HEADER, self._object_class.type_name))
+        chunks.append("%s %s\n" % (_TAG_HEADER, self._name))
         if self._tagger:
             if self._tag_time is None:
-                chunks.append("%s %s\n" % (TAGGER_ID, self._tagger))
+                chunks.append("%s %s\n" % (_TAGGER_HEADER, self._tagger))
             else:
-                chunks.append("%s %s %d %s\n" % (TAGGER_ID, self._tagger, self._tag_time, format_timezone(self._tag_timezone)))
+                chunks.append("%s %s %d %s\n" % (
+                  _TAGGER_HEADER, self._tagger, self._tag_time,
+                  format_timezone(self._tag_timezone)))
         chunks.append("\n") # To close headers
         chunks.append(self._message)
         return chunks
@@ -374,13 +387,13 @@ class Tag(ShaFile):
             if l == "":
                 break # empty line indicates end of headers
             (field, value) = l.split(" ", 1)
-            if field == OBJECT_ID:
+            if field == _OBJECT_HEADER:
                 self._object_sha = value
-            elif field == TYPE_ID:
-                self._object_type = type_map[value]
-            elif field == TAG_ID:
+            elif field == _TYPE_HEADER:
+                self._object_class = object_class(value)
+            elif field == _TAG_HEADER:
                 self._name = value
-            elif field == TAGGER_ID:
+            elif field == _TAGGER_HEADER:
                 try:
                     sep = value.index("> ")
                 except ValueError:
@@ -400,13 +413,16 @@ class Tag(ShaFile):
         self._message = f.read()
 
     def _get_object(self):
-        """Returns the object pointed by this tag, represented as a tuple(type, sha)"""
+        """Get the object pointed to by this tag.
+
+        :return: tuple of (object class, sha).
+        """
         self._ensure_parsed()
-        return (self._object_type, self._object_sha)
+        return (self._object_class, self._object_sha)
 
     def _set_object(self, value):
         self._ensure_parsed()
-        (self._object_type, self._object_sha) = value
+        (self._object_class, self._object_sha) = value
         self._needs_serialization = True
 
     object = property(_get_object, _set_object)
@@ -471,8 +487,8 @@ def sorted_tree_items(entries):
 class Tree(ShaFile):
     """A Git tree object"""
 
-    _type = TREE_ID
-    _num_type = 2
+    type_name = 'tree'
+    type_num = 2
 
     def __init__(self):
         super(Tree, self).__init__()
@@ -483,7 +499,7 @@ class Tree(ShaFile):
     @classmethod
     def from_file(cls, filename):
         tree = ShaFile.from_file(filename)
-        if tree._type != cls._type:
+        if not isinstance(tree, cls):
             raise NotTreeError(filename)
         return tree
 
@@ -574,8 +590,8 @@ def format_timezone(offset):
 class Commit(ShaFile):
     """A git commit object"""
 
-    _type = COMMIT_ID
-    _num_type = 1
+    type_name = 'commit'
+    type_num = 1
 
     def __init__(self):
         super(Commit, self).__init__()
@@ -588,7 +604,7 @@ class Commit(ShaFile):
     @classmethod
     def from_file(cls, filename):
         commit = ShaFile.from_file(filename)
-        if commit._type != cls._type:
+        if not isinstance(commit, cls):
             raise NotCommitError(filename)
         return commit
 
@@ -603,19 +619,19 @@ class Commit(ShaFile):
                 # Empty line indicates end of headers
                 break
             (field, value) = l.split(" ", 1)
-            if field == TREE_ID:
+            if field == _TREE_HEADER:
                 self._tree = value
-            elif field == PARENT_ID:
+            elif field == _PARENT_HEADER:
                 self._parents.append(value)
-            elif field == AUTHOR_ID:
+            elif field == _AUTHOR_HEADER:
                 self._author, timetext, timezonetext = value.rsplit(" ", 2)
                 self._author_time = int(timetext)
                 self._author_timezone = parse_timezone(timezonetext)
-            elif field == COMMITTER_ID:
+            elif field == _COMMITTER_HEADER:
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
                 self._commit_time = int(timetext)
                 self._commit_timezone = parse_timezone(timezonetext)
-            elif field == ENCODING_ID:
+            elif field == _ENCODING_HEADER:
                 self._encoding = value
             else:
                 self._extra.append((field, value))
@@ -623,13 +639,17 @@ class Commit(ShaFile):
 
     def _serialize(self):
         chunks = []
-        chunks.append("%s %s\n" % (TREE_ID, self._tree))
+        chunks.append("%s %s\n" % (_TREE_HEADER, self._tree))
         for p in self._parents:
-            chunks.append("%s %s\n" % (PARENT_ID, p))
-        chunks.append("%s %s %s %s\n" % (AUTHOR_ID, self._author, str(self._author_time), format_timezone(self._author_timezone)))
-        chunks.append("%s %s %s %s\n" % (COMMITTER_ID, self._committer, str(self._commit_time), format_timezone(self._commit_timezone)))
+            chunks.append("%s %s\n" % (_PARENT_HEADER, p))
+        chunks.append("%s %s %s %s\n" % (
+          _AUTHOR_HEADER, self._author, str(self._author_time),
+          format_timezone(self._author_timezone)))
+        chunks.append("%s %s %s %s\n" % (
+          _COMMITTER_HEADER, self._committer, str(self._commit_time),
+          format_timezone(self._commit_timezone)))
         if self.encoding:
-            chunks.append("%s %s\n" % (ENCODING_ID, self.encoding))
+            chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
         for k, v in self.extra:
             if "\n" in k or "\n" in v:
                 raise AssertionError("newline in extra data: %r -> %r" % (k, v))
@@ -685,21 +705,19 @@ class Commit(ShaFile):
         "Encoding of the commit message.")
 
 
-type_map = {
-    BLOB_ID : Blob,
-    TREE_ID : Tree,
-    COMMIT_ID : Commit,
-    TAG_ID: Tag,
-}
+OBJECT_CLASSES = (
+    Commit,
+    Tree,
+    Blob,
+    Tag,
+    )
 
-num_type_map = {
-    0: None,
-    1: Commit,
-    2: Tree,
-    3: Blob,
-    4: Tag,
-    # 5 Is reserved for further expansion
-}
+_TYPE_MAP = {}
+
+for cls in OBJECT_CLASSES:
+    _TYPE_MAP[cls.type_name] = cls
+    _TYPE_MAP[cls.type_num] = cls
+
 
 try:
     # Try to import C versions

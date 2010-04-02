@@ -133,9 +133,15 @@ class ShaFile(object):
         object.set_raw_string(text)
         return object
 
+    def as_legacy_object_chunks(self):
+        compobj = zlib.compressobj()
+        yield compobj.compress(self._header())
+        for chunk in self.as_raw_chunks():
+            yield compobj.compress(chunk)
+        yield compobj.flush()
+
     def as_legacy_object(self):
-        text = self.as_raw_string()
-        return zlib.compress("%s %d\0%s" % (self.type_name, len(text), text))
+        return "".join(self.as_legacy_object_chunks())
 
     def as_raw_chunks(self):
         if self._needs_serialization:

@@ -92,16 +92,16 @@ class RepositoryTests(unittest.TestCase):
     def test_head(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
-  
+
     def test_get_object(self):
         r = self._repo = open_repo('a.git')
         obj = r.get_object(r.head())
-        self.assertEqual(obj._type, 'commit')
-  
+        self.assertEqual(obj.type_name, 'commit')
+
     def test_get_object_non_existant(self):
         r = self._repo = open_repo('a.git')
         self.assertRaises(KeyError, r.get_object, missing_sha)
-  
+
     def test_commit(self):
         r = self._repo = open_repo('a.git')
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -109,8 +109,8 @@ class RepositoryTests(unittest.TestCase):
             obj = r.commit(r.head())
         finally:
             warnings.resetwarnings()
-        self.assertEqual(obj._type, 'commit')
-  
+        self.assertEqual(obj.type_name, 'commit')
+
     def test_commit_not_commit(self):
         r = self._repo = open_repo('a.git')
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -119,7 +119,7 @@ class RepositoryTests(unittest.TestCase):
                 r.commit, '4f2e6529203aa6d44b5af6e3292c837ceda003f9')
         finally:
             warnings.resetwarnings()
-  
+
     def test_tree(self):
         r = self._repo = open_repo('a.git')
         commit = r[r.head()]
@@ -128,9 +128,9 @@ class RepositoryTests(unittest.TestCase):
             tree = r.tree(commit.tree)
         finally:
             warnings.resetwarnings()
-        self.assertEqual(tree._type, 'tree')
+        self.assertEqual(tree.type_name, 'tree')
         self.assertEqual(tree.sha().hexdigest(), commit.tree)
-  
+
     def test_tree_not_tree(self):
         r = self._repo = open_repo('a.git')
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -147,10 +147,10 @@ class RepositoryTests(unittest.TestCase):
             tag = r.tag(tag_sha)
         finally:
             warnings.resetwarnings()
-        self.assertEqual(tag._type, 'tag')
+        self.assertEqual(tag.type_name, 'tag')
         self.assertEqual(tag.sha().hexdigest(), tag_sha)
-        obj_type, obj_sha = tag.object
-        self.assertEqual(obj_type, objects.Commit)
+        obj_class, obj_sha = tag.object
+        self.assertEqual(obj_class, objects.Commit)
         self.assertEqual(obj_sha, r.head())
 
     def test_tag_not_tag(self):
@@ -190,9 +190,9 @@ class RepositoryTests(unittest.TestCase):
             blob = r.get_blob(blob_sha)
         finally:
             warnings.resetwarnings()
-        self.assertEqual(blob._type, 'blob')
+        self.assertEqual(blob.type_name, 'blob')
         self.assertEqual(blob.sha().hexdigest(), blob_sha)
-  
+
     def test_get_blob_notblob(self):
         r = self._repo = open_repo('a.git')
         warnings.simplefilter("ignore", DeprecationWarning)

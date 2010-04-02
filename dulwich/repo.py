@@ -49,7 +49,7 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
-    num_type_map,
+    object_class,
     )
 import warnings
 
@@ -698,7 +698,7 @@ class BaseRepo(object):
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
         ret = self.get_object(sha)
-        if ret._type != cls._type:
+        if not isinstance(ret, cls):
             if cls is Commit:
                 raise NotCommitError(ret)
             elif cls is Blob:
@@ -708,7 +708,8 @@ class BaseRepo(object):
             elif cls is Tag:
                 raise NotTagError(ret)
             else:
-                raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
+                raise Exception("Type invalid: %r != %r" % (
+                  ret.type_name, cls.type_name))
         return ret
 
     def get_object(self, sha):
@@ -784,9 +785,9 @@ class BaseRepo(object):
         if cached is not None:
             return cached
         obj = self[ref]
-        obj_type = num_type_map[obj.type]
-        while obj_type == Tag:
-            obj_type, sha = obj.object
+        obj_class = object_class(obj.type_name)
+        while obj_class is Tag:
+            obj_class, sha = obj.object
             obj = self.get_object(sha)
         return obj.id
 

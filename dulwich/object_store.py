@@ -92,14 +92,14 @@ class BaseObjectStore(object):
         """Obtain the raw text for an object.
 
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         raise NotImplementedError(self.get_raw)
 
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""
-        type, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type, uncomp)
+        type_num, uncomp = self.get_raw(sha)
+        return ShaFile.from_raw_string(type_num, uncomp)
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
@@ -284,9 +284,9 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
-        
+
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         if len(name) == 40:
             sha = hex_to_sha(name)
@@ -305,7 +305,7 @@ class PackBasedObjectStore(BaseObjectStore):
             hexsha = sha_to_hex(name)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
-            return ret.type, ret.as_raw_string()
+            return ret.type_num, ret.as_raw_string()
         raise KeyError(hexsha)
 
     def add_objects(self, objects):
@@ -503,9 +503,9 @@ class MemoryObjectStore(BaseObjectStore):
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
-        
+
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         return self[name].as_raw_string()
 
@@ -621,7 +621,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     mode = None
     for p in parts:
         obj = lookup_obj(sha)
-        if type(obj) is not Tree:
+        if not isinstance(obj, Tree):
             raise NotTreeError(sha)
         if p == '':
             continue

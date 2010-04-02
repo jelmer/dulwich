@@ -183,13 +183,13 @@ class TestPack(PackTests):
         """Tests random access for non-delta objects"""
         p = self.get_pack(pack1_sha)
         obj = p[a_sha]
-        self.assertEqual(obj._type, 'blob')
+        self.assertEqual(obj.type_name, 'blob')
         self.assertEqual(obj.sha().hexdigest(), a_sha)
         obj = p[tree_sha]
-        self.assertEqual(obj._type, 'tree')
+        self.assertEqual(obj.type_name, 'tree')
         self.assertEqual(obj.sha().hexdigest(), tree_sha)
         obj = p[commit_sha]
-        self.assertEqual(obj._type, 'commit')
+        self.assertEqual(obj.type_name, 'commit')
         self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
     def test_copy(self):
@@ -285,4 +285,3 @@ class ZlibTests(unittest.TestCase):
     def test_simple_decompress(self):
         self.assertEquals((["tree 4ada885c9196b6b6fa08744b5862bf92896fc002\nparent None\nauthor Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\ncommitter Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n\nProvide replacement for mmap()'s offset argument."], 158, 'Z'), 
         read_zlib_chunks(StringIO(TEST_COMP1).read, 229))
-

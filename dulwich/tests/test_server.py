@@ -26,12 +26,15 @@ from dulwich.errors import (
     GitProtocolError,
     )
 from dulwich.server import (
-    UploadPackHandler,
+    Backend,
+    DictBackend,
+    BackendRepo,
     Handler,
-    ProtocolGraphWalker,
-    SingleAckGraphWalkerImpl,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
+    ProtocolGraphWalker,
+    SingleAckGraphWalkerImpl,
+    UploadPackHandler,
     )
 
 
@@ -76,7 +79,7 @@ class TestProto(object):
 class HandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = Handler(None, None, None)
+        self._handler = Handler(Backend(), None, None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
         self._handler.required_capabilities = lambda: ('cap2',)
 
@@ -119,8 +122,9 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = UploadPackHandler(None, ["/", "host=lolcathost"],
-                                          None, None)
+        self._backend = DictBackend({"/": BackendRepo()})
+        self._handler = UploadPackHandler(self._backend,
+                ["/", "host=lolcathost"], None, None)
         self._handler.proto = TestProto()
 
     def test_progress(self):
@@ -224,7 +228,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
             }
 
         self._walker = ProtocolGraphWalker(
-            TestUploadPackHandler(self._objects, TestProto()))
+            TestUploadPackHandler(self._objects, TestProto()),
+            self._objects)
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))

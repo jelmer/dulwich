@@ -82,7 +82,8 @@ class BackendRepo(object):
         :return: The peeled value of the ref. If the ref is known not point to
             a tag, this will be the SHA the ref refers to. If the ref may 
             point to a tag, but no cached information is available, None is 
-            returned.  """
+            returned.
+        """
         return None
 
     def apply_pack(self, refs, read, delete_refs=True):

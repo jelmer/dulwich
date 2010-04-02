@@ -28,7 +28,6 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 import SocketServer
-import tempfile
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -50,14 +49,12 @@ from dulwich.protocol import (
     MULTI_ACK_DETAILED,
     ack_type,
     )
-from dulwich.repo import (
-    Repo,
-    )
 from dulwich.pack import (
     write_pack_data,
     )
 
 class Backend(object):
+    """A backend for the Git smart server implementation."""
 
     def get_refs(self):
         """
@@ -90,9 +87,7 @@ class Backend(object):
 
 class GitBackend(Backend):
 
-    def __init__(self, repo=None):
-        if repo is None:
-            repo = Repo(tempfile.mkdtemp())
+    def __init__(self, repo):
         self.repo = repo
         self.refs = self.repo.refs
         self.object_store = self.repo.object_store

@@ -213,7 +213,8 @@ class PackIndex(object):
         if self._fan_out_table != other._fan_out_table:
             return False
     
-        for (name1, _, _), (name2, _, _) in izip(self.iterentries(), other.iterentries()):
+        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
+                                                 other.iterentries()):
             if name1 != name2:
                 return False
         return True
@@ -265,7 +266,8 @@ class PackIndex(object):
     def iterentries(self):
         """Iterate over the entries in this pack index.
        
-        Will yield tuples with object name, offset in packfile and crc32 checksum.
+        Will yield tuples with object name, offset in packfile and crc32
+        checksum.
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
@@ -273,7 +275,8 @@ class PackIndex(object):
     def _read_fan_out_table(self, start_offset):
         ret = []
         for i in range(0x100):
-            ret.append(struct.unpack(">L", self._contents[start_offset+i*4:start_offset+(i+1)*4])[0])
+            ret.append(struct.unpack(">L",
+                self._contents[start_offset+i*4:start_offset+(i+1)*4])[0])
         return ret
   
     def check(self):
@@ -305,9 +308,9 @@ class PackIndex(object):
     def object_index(self, sha):
         """Return the index in to the corresponding packfile for the object.
     
-        Given the name of an object it will return the offset that object lives
-        at within the corresponding pack file. If the pack file doesn't have the
-        object then None will be returned.
+        Given the name of an object it will return the offset that object
+        lives at within the corresponding pack file. If the pack file doesn't
+        have the object then None will be returned.
         """
         if len(sha) == 40:
             sha = hex_to_sha(sha)
@@ -472,16 +475,17 @@ class PackData(object):
     buffer from the start of the deflated object on. This is bad, but until I
     get mmap sorted out it will have to do.
   
-    Currently there are no integrity checks done. Also no attempt is made to try
-    and detect the delta case, or a request for an object at the wrong position.
-    It will all just throw a zlib or KeyError.
+    Currently there are no integrity checks done. Also no attempt is made to
+    try and detect the delta case, or a request for an object at the wrong
+    position.  It will all just throw a zlib or KeyError.
     """
   
     def __init__(self, filename, file=None, size=None):
-        """Create a PackData object that represents the pack in the given filename.
+        """Create a PackData object that represents the pack in the given
+        filename.
     
-        The file must exist and stay readable until the object is disposed of. It
-        must also stay the same size. It will be mapped whenever needed.
+        The file must exist and stay readable until the object is disposed of.
+        It must also stay the same size. It will be mapped whenever needed.
     
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
@@ -626,7 +630,8 @@ class PackData(object):
             assert isinstance(offset, int)
             assert isinstance(type, int)
             try:
-                type, obj = self.resolve_object(offset, type, obj, get_ref_text)
+                type, obj = self.resolve_object(offset, type, obj,
+                    get_ref_text)
             except Postpone, (sha, ):
                 postponed[sha].append((offset, type, obj))
             else:
@@ -655,8 +660,8 @@ class PackData(object):
         """Create a version 1 file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally referenced
-            SHA1s (for thin packs)
+        :param resolve_ext_ref: Function to use for resolving externally
+            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
         entries = self.sorted_entries(resolve_ext_ref, progress=progress)
@@ -666,8 +671,8 @@ class PackData(object):
         """Create a version 2 index file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally referenced
-            SHA1s (for thin packs)
+        :param resolve_ext_ref: Function to use for resolving externally
+            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
         entries = self.sorted_entries(resolve_ext_ref, progress=progress)
@@ -678,8 +683,8 @@ class PackData(object):
         """Create an  index file for this data file.
 
         :param filename: Index filename.
-        :param resolve_ext_ref: Function to use for resolving externally referenced
-            SHA1s (for thin packs)
+        :param resolve_ext_ref: Function to use for resolving externally
+            referenced SHA1s (for thin packs)
         :param progress: Progress report function
         """
         if version == 1:
@@ -701,8 +706,8 @@ class PackData(object):
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
     
-        Using the associated index the location of an object can be looked up, and
-        then the packfile can be asked directly for that object using this
+        Using the associated index the location of an object can be looked up,
+        and then the packfile can be asked directly for that object using this
         function.
         """
         if offset in self._offset_cache:
@@ -870,8 +875,8 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     """Write a new pack index file.
 
     :param filename: The filename of the new pack index file.
-    :param entries: List of tuples with object name (sha), offset_in_pack,  and
-            crc32_checksum.
+    :param entries: List of tuples with object name (sha), offset_in_pack,
+        and crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
     f = GitFile(filename, 'wb')
@@ -1019,8 +1024,8 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     """Write a new pack index file.
 
     :param filename: The filename of the new pack index file.
-    :param entries: List of tuples with object name (sha), offset_in_pack,  and
-            crc32_checksum.
+    :param entries: List of tuples with object name (sha), offset_in_pack, and
+        crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     """
     f = GitFile(filename, 'wb')

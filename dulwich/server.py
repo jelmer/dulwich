@@ -75,6 +75,16 @@ class BackendRepo(object):
         """
         raise NotImplementedError
 
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
+
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to
+            a tag, this will be the SHA the ref refers to. If the ref may 
+            point to a tag, but no cached information is available, None is 
+            returned.  """
+        return None
+
     def apply_pack(self, refs, read, delete_refs=True):
         """ Import a set of changes into a repository and update the refs
 
@@ -267,7 +277,8 @@ class UploadPackHandler(Handler):
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
-        graph_walker = ProtocolGraphWalker(self, self.repo.object_store)
+        graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
+            self.repo.get_peeled)
         objects_iter = self.repo.fetch_objects(
           graph_walker.determine_wants, graph_walker, self.progress,
           get_tagged=self.get_tagged)
@@ -298,9 +309,10 @@ class ProtocolGraphWalker(object):
     call to set_ack_level() is required to set up the implementation, before any
     calls to next() or ack() are made.
     """
-    def __init__(self, handler, object_store):
+    def __init__(self, handler, object_store, get_peeled):
         self.handler = handler
         self.store = object_store
+        self.get_peeled = get_peeled
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
@@ -330,7 +342,7 @@ class ProtocolGraphWalker(object):
                 if not i:
                     line = "%s\x00%s" % (line, self.handler.capability_line())
                 self.proto.write_pkt_line("%s\n" % line)
-                peeled_sha = self.handler.backend.repo.get_peeled(ref)
+                peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line('%s %s^{}\n' %
                                               (peeled_sha, ref))

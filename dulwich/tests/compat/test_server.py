@@ -65,7 +65,9 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         CompatTestCase.tearDown(self)
 
     def _start_server(self, repo):
-        dul_server = TCPGitServer(server.GitBackend(repo), 'localhost', 0)
+        dul_server = TCPGitServer(
+            server.DictBackend({"/": server.GitBackendRepo(repo)}),
+            'localhost', 0)
         threading.Thread(target=dul_server.serve).start()
         self._server = dul_server
         _, port = self._server.socket.getsockname()

@@ -28,7 +28,7 @@ import threading
 from wsgiref import simple_server
 
 from dulwich.server import (
-    GitBackend,
+    GitBackendRepo,
     )
 from dulwich.web import (
     HTTPGitApplication,
@@ -68,7 +68,7 @@ class WebTests(ServerTests):
     protocol = 'http'
 
     def _start_server(self, repo):
-        app = self._make_app(GitBackend(repo))
+        app = self._make_app(GitBackendRepo(repo))
         dul_server = simple_server.make_server('localhost', 0, app,
                                                server_class=WSGIServer)
         threading.Thread(target=dul_server.serve_forever).start()

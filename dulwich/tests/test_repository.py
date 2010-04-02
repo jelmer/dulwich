@@ -556,3 +556,11 @@ class RefsContainerTests(unittest.TestCase):
             self._refs.remove_if_equals('refs/tags/refs-0.1',
             'df6800012397fb85c56e7418dd4eb9405dee075c'))
         self.assertRaises(KeyError, lambda: self._refs['refs/tags/refs-0.1'])
+
+    def test_read_ref(self):
+        self.assertEqual('ref: refs/heads/master', self._refs.read_ref("HEAD"))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec', 
+            self._refs.read_ref("refs/heads/packed"))
+        self.assertEqual(None,
+            self._refs.read_ref("nonexistant"))
+

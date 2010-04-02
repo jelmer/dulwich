@@ -200,6 +200,18 @@ class RefsContainer(object):
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
             raise KeyError(name)
 
+    def read_ref(self, refname):
+        """Read a reference without following any references.
+
+        :param refname: The name of the reference
+        :return: The contents of the ref file, or None if it does 
+            not exist.
+        """
+        contents = self.read_loose_ref(refname)
+        if not contents:
+            contents = self.get_packed_refs().get(refname, None)
+        return contents
+
     def read_loose_ref(self, name):
         """Read a loose reference and return its contents.
 
@@ -220,20 +232,16 @@ class RefsContainer(object):
         depth = 0
         while contents.startswith(SYMREF):
             refname = contents[len(SYMREF):]
-            contents = self.read_loose_ref(refname)
+            contents = self.read_ref(refname)
             if not contents:
-                contents = self.get_packed_refs().get(refname, None)
-                if not contents:
-                    break
+                break
             depth += 1
             if depth > 5:
                 raise KeyError(name)
         return refname, contents
 
     def __contains__(self, refname):
-        if self.read_loose_ref(refname):
-            return True
-        if self.get_packed_refs().get(refname, None):
+        if self.read_ref(refname):
             return True
         return False
 

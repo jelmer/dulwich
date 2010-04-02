@@ -56,6 +56,17 @@ from dulwich.pack import (
 class Backend(object):
     """A backend for the Git smart server implementation."""
 
+    def open_repository(self, path):
+        """Open the repository at a path."""
+        raise NotImplementedError(self.open_repository)
+
+
+class BackendRepo(object):
+    """Repository abstraction used by the Git server.
+    
+    Eventually this should become just a subset of Repo.
+    """
+
     def get_refs(self):
         """
         Get all the refs in the repository
@@ -85,7 +96,7 @@ class Backend(object):
         raise NotImplementedError
 
 
-class GitBackend(Backend):
+class GitBackendRepo(BackendRepo):
 
     def __init__(self, repo):
         self.repo = repo
@@ -149,6 +160,17 @@ class GitBackend(Backend):
         return status
 
 
+class DictBackend(Backend):
+    """Trivial backend that looks up Git repositories in a dictionary."""
+
+    def __init__(self, repos):
+        self.repos = repos
+
+    def open_repository(self, path):
+        # FIXME: What to do in case there is no repo ?
+        return self.repos[path]
+
+
 class Handler(object):
     """Smart protocol command handler base class."""
 
@@ -196,6 +218,7 @@ class UploadPackHandler(Handler):
     def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
+        self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
@@ -225,14 +248,14 @@ class UploadPackHandler(Handler):
         if not self.has_capability("include-tag"):
             return {}
         if refs is None:
-            refs = self.backend.get_refs()
+            refs = self.repo.get_refs()
         if repo is None:
-            repo = getattr(self.backend, "repo", None)
+            repo = getattr(self.repo, "repo", None)
             if repo is None:
                 # Bail if we don't have a Repo available; this is ok since
                 # clients must be able to handle if the server doesn't include
                 # all relevant tags.
-                # TODO: either guarantee a Repo, or fix behavior when missing
+                # TODO: fix behavior when missing
                 return {}
         tagged = {}
         for name, sha in refs.iteritems():
@@ -244,8 +267,8 @@ class UploadPackHandler(Handler):
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
-        graph_walker = ProtocolGraphWalker(self)
-        objects_iter = self.backend.fetch_objects(
+        graph_walker = ProtocolGraphWalker(self, self.repo.object_store)
+        objects_iter = self.repo.fetch_objects(
           graph_walker.determine_wants, graph_walker, self.progress,
           get_tagged=self.get_tagged)
 
@@ -275,9 +298,9 @@ class ProtocolGraphWalker(object):
     call to set_ack_level() is required to set up the implementation, before any
     calls to next() or ack() are made.
     """
-    def __init__(self, handler):
+    def __init__(self, handler, object_store):
         self.handler = handler
-        self.store = handler.backend.object_store
+        self.store = object_store
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
@@ -557,6 +580,7 @@ class ReceivePackHandler(Handler):
     def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
+        self.repo = backend.open_repository(args[0])
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
@@ -564,7 +588,7 @@ class ReceivePackHandler(Handler):
         return ("report-status", "delete-refs")
 
     def handle(self):
-        refs = self.backend.get_refs().items()
+        refs = self.repo.get_refs().items()
 
         if self.advertise_refs or not self.stateless_rpc:
             if refs:
@@ -598,8 +622,8 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.backend.apply_pack(client_refs, self.proto.read,
-                                         self.has_capability('delete-refs'))
+        status = self.repo.apply_pack(client_refs, self.proto.read,
+            self.has_capability('delete-refs'))
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

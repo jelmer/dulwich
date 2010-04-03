@@ -19,6 +19,7 @@ install::
 
 check:: build
 	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) dulwich
+	which git > /dev/null && PYTHONPATH=. $(PYTHON) $(TESTRUNNER) -i compat
 
 check-noextensions:: clean
 	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) dulwich

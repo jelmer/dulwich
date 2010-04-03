@@ -73,7 +73,7 @@ def send_file(req, f, content_type):
 
 def get_text_file(req, backend, mat):
     req.nocache()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, backend.get_named_file(mat.group()),
                      'text/plain')
 
 
@@ -94,13 +94,13 @@ def get_loose_object(req, backend, mat):
 
 def get_pack_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, backend.get_named_file(mat.group()),
                      'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, backend.get_named_file(mat.group()),
                      'application/x-git-packed-objects-toc')
 
 
@@ -138,11 +138,11 @@ def get_info_refs(req, backend, mat, services=None):
             if name == 'HEAD':
                 continue
             sha = refs[name]
-            o = backend.repo[sha]
+            o = backend[sha]
             if not o:
                 continue
             yield '%s\t%s\n' % (sha, name)
-            peeled_sha = backend.repo.get_peeled(name)
+            peeled_sha = backend.get_peeled(name)
             if peeled_sha != sha:
                 yield '%s\t%s^{}\n' % (peeled_sha, name)
 

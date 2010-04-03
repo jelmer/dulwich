@@ -80,9 +80,10 @@ class BackendRepo(object):
 
         :param name: Name of the ref to peel
         :return: The peeled value of the ref. If the ref is known not point to
-            a tag, this will be the SHA the ref refers to. If the ref may 
-            point to a tag, but no cached information is available, None is 
-            returned.  """
+            a tag, this will be the SHA the ref refers to. If no cached
+            information about a tag is available, this method may return None,
+            but it should attempt to peel the tag if possible.
+        """
         return None
 
     def apply_pack(self, refs, read, delete_refs=True):
@@ -114,6 +115,7 @@ class GitBackendRepo(BackendRepo):
         self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
+        self.get_peeled = self.repo.get_peeled
 
     def apply_pack(self, refs, read, delete_refs=True):
         f, commit = self.repo.object_store.add_thin_pack()

@@ -531,7 +531,7 @@ class ReceivePackHandler(Handler):
     def capabilities(self):
         return ("report-status", "delete-refs")
 
-    def _apply_pack(self, refs, read, delete_refs=True):
+    def _apply_pack(self, refs, read):
         f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
         status = []
@@ -562,7 +562,7 @@ class ReceivePackHandler(Handler):
             ref_error = None
             try:
                 if sha == ZERO_SHA:
-                    if not delete_refs:
+                    if not self.has_capability('delete-refs'):
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')
@@ -620,8 +620,7 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.repo._apply_pack(client_refs, self.proto.read,
-            self.has_capability('delete-refs'))
+        status = self.repo._apply_pack(client_refs, self.proto.read)
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

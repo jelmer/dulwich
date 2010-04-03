@@ -175,11 +175,9 @@ class TestCommit(object):
 
     def __init__(self, sha, parents, commit_time):
         self.id = sha
-        self._parents = parents
+        self.parents = parents
         self.commit_time = commit_time
-
-    def get_parents(self):
-        return self._parents
+        self.type_name = "commit"
 
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__, self._sha)

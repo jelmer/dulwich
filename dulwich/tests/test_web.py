@@ -114,12 +114,21 @@ class DumbHandlersTestCase(WebTestCase):
             def __init__(self, objects, peeled):
                 self._objects = dict((o.sha(), o) for o in objects)
                 self._peeled = peeled
+                self.repo = self
 
             def get_peeled(self, sha):
                 return self._peeled[sha]
 
             def __getitem__(self, sha):
                 return self._objects[sha]
+
+            def get_refs(self):
+                return {
+                    'HEAD': '000',
+                    'refs/heads/master': blob1.sha(),
+                    'refs/tags/tag-tag': tag1.sha(),
+                    'refs/tags/blob-tag': blob3.sha(),
+                    }
 
         class TestBackend(object):
             def __init__(self):
@@ -131,19 +140,16 @@ class DumbHandlersTestCase(WebTestCase):
                     'refs/tags/blob-tag': blob3.sha(),
                     })
 
-            def get_refs(self):
-                return {
-                    'HEAD': '000',
-                    'refs/heads/master': blob1.sha(),
-                    'refs/tags/tag-tag': tag1.sha(),
-                    'refs/tags/blob-tag': blob3.sha(),
-                    }
+            def open_repository(self, path):
+                assert path == '/'
+                return self.repo
 
+        mat = re.search('.*', '//info/refs')
         self.assertEquals(['111\trefs/heads/master\n',
                            '333\trefs/tags/blob-tag\n',
                            'aaa\trefs/tags/tag-tag\n',
                            '222\trefs/tags/tag-tag^{}\n'],
-                          list(get_info_refs(self._req, TestBackend(), None)))
+                          list(get_info_refs(self._req, TestBackend(), mat)))
 
 
 class SmartHandlersTestCase(WebTestCase):
@@ -159,8 +165,9 @@ class SmartHandlersTestCase(WebTestCase):
                 self._handler.write('pkt-line: %s' % line)
 
     class _TestUploadPackHandler(object):
-        def __init__(self, backend, read, write, stateless_rpc=False,
+        def __init__(self, backend, args, read, write, stateless_rpc=False,
                      advertise_refs=False):
+            self.args = args
             self.read = read
             self.write = write
             self.proto = SmartHandlersTestCase.TestProtocol(self)
@@ -213,7 +220,8 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['wsgi.input'] = StringIO('foo')
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
-        output = ''.join(get_info_refs(self._req, 'backend', None,
+        mat = re.search('.*', '/git-upload-pack')
+        output = ''.join(get_info_refs(self._req, 'backend', mat,
                                        services=self.services()))
         self.assertEquals(('pkt-line: # service=git-upload-pack\n'
                            'flush-pkt\n'

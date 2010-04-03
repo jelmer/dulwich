@@ -26,7 +26,11 @@ On *nix, you can kill the tests with Ctrl-Z, "kill %".
 
 import threading
 
-from dulwich import server
+from dulwich.server import (
+    DictBackend,
+    GitBackendRepo,
+    TCPGitServer,
+    )
 from server_utils import (
     ServerTests,
     ShutdownServerMixIn,
@@ -37,16 +41,16 @@ from utils import (
     )
 
 
-if getattr(server.TCPGitServer, 'shutdown', None):
-    TCPGitServer = server.TCPGitServer
-else:
-    class TCPGitServer(ShutdownServerMixIn, server.TCPGitServer):
+if not getattr(TCPGitServer, 'shutdown', None):
+    _TCPGitServer = TCPGitServer
+
+    class TCPGitServer(ShutdownServerMixIn, TCPGitServer):
         """Subclass of TCPGitServer that can be shut down."""
 
         def __init__(self, *args, **kwargs):
             # BaseServer is old-style so we have to call both __init__s
             ShutdownServerMixIn.__init__(self)
-            server.TCPGitServer.__init__(self, *args, **kwargs)
+            _TCPGitServer.__init__(self, *args, **kwargs)
 
         serve = ShutdownServerMixIn.serve_forever
 
@@ -65,7 +69,8 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         CompatTestCase.tearDown(self)
 
     def _start_server(self, repo):
-        dul_server = TCPGitServer(server.GitBackend(repo), 'localhost', 0)
+        backend = DictBackend({'/': GitBackendRepo(repo)})
+        dul_server = TCPGitServer(backend, 'localhost', 0)
         threading.Thread(target=dul_server.serve).start()
         self._server = dul_server
         _, port = self._server.socket.getsockname()

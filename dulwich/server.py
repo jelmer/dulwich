@@ -86,15 +86,6 @@ class BackendRepo(object):
         """
         return None
 
-    def apply_pack(self, refs, read, delete_refs=True):
-        """ Import a set of changes into a repository and update the refs
-
-        :param refs: list of tuple(name, sha)
-        :param read: callback to read from the incoming pack
-        :param delete_refs: whether to allow deleting refs
-        """
-        raise NotImplementedError
-
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):
         """
@@ -115,61 +106,6 @@ class GitBackendRepo(BackendRepo):
         self.object_store = self.repo.object_store
         self.fetch_objects = self.repo.fetch_objects
         self.get_refs = self.repo.get_refs
-
-    def apply_pack(self, refs, read, delete_refs=True):
-        f, commit = self.repo.object_store.add_thin_pack()
-        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
-        status = []
-        unpack_error = None
-        # TODO: more informative error messages than just the exception string
-        try:
-            # TODO: decode the pack as we stream to avoid blocking reads beyond
-            # the end of data (when using HTTP/1.1 chunked encoding)
-            while True:
-                data = read(10240)
-                if not data:
-                    break
-                f.write(data)
-        except all_exceptions, e:
-            unpack_error = str(e).replace('\n', '')
-        try:
-            commit()
-        except all_exceptions, e:
-            if not unpack_error:
-                unpack_error = str(e).replace('\n', '')
-
-        if unpack_error:
-            status.append(('unpack', unpack_error))
-        else:
-            status.append(('unpack', 'ok'))
-
-        for oldsha, sha, ref in refs:
-            ref_error = None
-            try:
-                if sha == ZERO_SHA:
-                    if not delete_refs:
-                        raise GitProtocolError(
-                          'Attempted to delete refs without delete-refs '
-                          'capability.')
-                    try:
-                        del self.repo.refs[ref]
-                    except all_exceptions:
-                        ref_error = 'failed to delete'
-                else:
-                    try:
-                        self.repo.refs[ref] = sha
-                    except all_exceptions:
-                        ref_error = 'failed to write'
-            except KeyError, e:
-                ref_error = 'bad ref'
-            if ref_error:
-                status.append((ref, ref_error))
-            else:
-                status.append((ref, 'ok'))
-
-        print "pack applied"
-        return status
-
 
 class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
@@ -600,6 +536,60 @@ class ReceivePackHandler(Handler):
     def capabilities(self):
         return ("report-status", "delete-refs")
 
+    def _apply_pack(self, refs, read, delete_refs=True):
+        f, commit = self.repo.object_store.add_thin_pack()
+        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
+        status = []
+        unpack_error = None
+        # TODO: more informative error messages than just the exception string
+        try:
+            # TODO: decode the pack as we stream to avoid blocking reads beyond
+            # the end of data (when using HTTP/1.1 chunked encoding)
+            while True:
+                data = read(10240)
+                if not data:
+                    break
+                f.write(data)
+        except all_exceptions, e:
+            unpack_error = str(e).replace('\n', '')
+        try:
+            commit()
+        except all_exceptions, e:
+            if not unpack_error:
+                unpack_error = str(e).replace('\n', '')
+
+        if unpack_error:
+            status.append(('unpack', unpack_error))
+        else:
+            status.append(('unpack', 'ok'))
+
+        for oldsha, sha, ref in refs:
+            ref_error = None
+            try:
+                if sha == ZERO_SHA:
+                    if not delete_refs:
+                        raise GitProtocolError(
+                          'Attempted to delete refs without delete-refs '
+                          'capability.')
+                    try:
+                        del self.repo.refs[ref]
+                    except all_exceptions:
+                        ref_error = 'failed to delete'
+                else:
+                    try:
+                        self.repo.refs[ref] = sha
+                    except all_exceptions:
+                        ref_error = 'failed to write'
+            except KeyError, e:
+                ref_error = 'bad ref'
+            if ref_error:
+                status.append((ref, ref_error))
+            else:
+                status.append((ref, 'ok'))
+
+        print "pack applied"
+        return status
+
     def handle(self):
         refs = self.repo.get_refs().items()
 
@@ -635,7 +625,7 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.repo.apply_pack(client_refs, self.proto.read,
+        status = self.repo._apply_pack(client_refs, self.proto.read,
             self.has_capability('delete-refs'))
 
         # when we have read all the pack from the client, send a status report

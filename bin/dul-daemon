@@ -22,10 +22,11 @@ from dulwich.repo import Repo
 from dulwich.server import DictBackend, GitBackendRepo, TCPGitServer
 
 if __name__ == "__main__":
-    gitdir = None
     if len(sys.argv) > 1:
         gitdir = sys.argv[1]
+    else:
+        gitdir = "."
 
-	backend = DictBackend({"/": GitBackendRepo(Repo(gitdir))})
+    backend = DictBackend({"/": GitBackendRepo(Repo(gitdir))})
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()

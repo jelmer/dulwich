@@ -64,8 +64,12 @@ class Backend(object):
 class BackendRepo(object):
     """Repository abstraction used by the Git server.
     
-    Eventually this should become just a subset of Repo.
+    Please note that the methods required here are a 
+    subset of those provided by dulwich.repo.Repo.
     """
+
+    object_store = None
+    refs = None
 
     def get_refs(self):
         """
@@ -97,15 +101,6 @@ class BackendRepo(object):
         """
         raise NotImplementedError
 
-
-class GitBackendRepo(BackendRepo):
-
-    def __init__(self, repo):
-        self.repo = repo
-        self.refs = self.repo.refs
-        self.object_store = self.repo.object_store
-        self.fetch_objects = self.repo.fetch_objects
-        self.get_refs = self.repo.get_refs
 
 class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""

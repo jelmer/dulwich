@@ -23,7 +23,6 @@ import re
 from unittest import TestCase
 
 from dulwich.objects import (
-    Tag,
     Blob,
     )
 from dulwich.web import (
@@ -110,26 +109,23 @@ class DumbHandlersTestCase(WebTestCase):
 
         tag1 = TestTag('aaa', Blob, '222')
 
-        class TestRepo(object):
-            def __init__(self, objects, peeled):
-                self._objects = dict((o.sha(), o) for o in objects)
-                self._peeled = peeled
-
-            def get_peeled(self, sha):
-                return self._peeled[sha]
-
-            def __getitem__(self, sha):
-                return self._objects[sha]
-
         class TestBackend(object):
+
             def __init__(self):
                 objects = [blob1, blob2, blob3, tag1]
-                self.repo = TestRepo(objects, {
+                self._objects = dict((o.sha(), o) for o in objects)
+                self._peeled = {
                     'HEAD': '000',
                     'refs/heads/master': blob1.sha(),
                     'refs/tags/tag-tag': blob2.sha(),
                     'refs/tags/blob-tag': blob3.sha(),
-                    })
+                    }
+
+            def __getitem__(self, sha):
+                return self._objects[sha]
+
+            def get_peeled(self, sha):
+                return self._peeled[sha]
 
             def get_refs(self):
                 return {

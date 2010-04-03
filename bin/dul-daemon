@@ -27,6 +27,6 @@ if __name__ == "__main__":
     else:
         gitdir = "."
 
-    backend = DictBackend({"/": GitBackendRepo(Repo(gitdir))})
+    backend = DictBackend({"/": Repo(gitdir)})
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()

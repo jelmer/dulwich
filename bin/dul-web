@@ -30,7 +30,7 @@ if __name__ == "__main__":
     else:
         gitdir = os.getcwd()
 
-	backend = DictBackend({"/": GitBackendRepo(Repo(gitdir))})
+    backend = DictBackend({"/": GitBackendRepo(Repo(gitdir))})
     app = HTTPGitApplication(backend)
     # TODO: allow serving on other ports via command-line flag
     server = make_server('', 8000, app)

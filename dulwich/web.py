@@ -33,7 +33,7 @@ HTTP_NOT_FOUND = '404 Not Found'
 HTTP_FORBIDDEN = '403 Forbidden'
 
 
-def date_time_string(self, timestamp=None):
+def date_time_string(timestamp=None):
     # Based on BaseHTTPServer.py in python2.5
     weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     months = [None,
@@ -44,6 +44,22 @@ def date_time_string(self, timestamp=None):
     year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
     return '%s, %02d %3s %4d %02d:%02d:%02d GMD' % (
             weekdays[wd], day, months[month], year, hh, mm, ss)
+
+
+def url_prefix(mat):
+    """Extract the URL prefix from a regex match.
+
+    :param mat: A regex match object.
+    :returns: The URL prefix, defined as the text before the match in the
+        original string. Normalized to start with one leading slash and end with
+        zero.
+    """
+    return '/' + mat.string[:mat.start()].strip('/')
+
+
+def get_repo(backend, mat):
+    """Get a Repo instance for the given backend and URL regex match."""
+    return backend.open_repository(url_prefix(mat)).repo
 
 
 def send_file(req, f, content_type):
@@ -73,13 +89,13 @@ def send_file(req, f, content_type):
 
 def get_text_file(req, backend, mat):
     req.nocache()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
                      'text/plain')
 
 
 def get_loose_object(req, backend, mat):
     sha = mat.group(1) + mat.group(2)
-    object_store = backend.object_store
+    object_store = get_repo(backend, mat).object_store
     if not object_store.contains_loose(sha):
         yield req.not_found('Object not found')
         return
@@ -94,13 +110,13 @@ def get_loose_object(req, backend, mat):
 
 def get_pack_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
                      'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, backend.repo.get_named_file(mat.group()),
+    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
                      'application/x-git-packed-objects-toc')
 
 
@@ -120,7 +136,8 @@ def get_info_refs(req, backend, mat, services=None):
         req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
         output = StringIO()
         dummy_input = StringIO()  # GET request, handler doesn't need to read
-        handler = handler_cls(backend, dummy_input.read, output.write,
+        handler = handler_cls(backend, [url_prefix(mat)],
+                              dummy_input.read, output.write,
                               stateless_rpc=True, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
         handler.proto.write_pkt_line(None)
@@ -131,18 +148,19 @@ def get_info_refs(req, backend, mat, services=None):
         # TODO: select_getanyfile() (see http-backend.c)
         req.nocache()
         req.respond(HTTP_OK, 'text/plain')
-        refs = backend.get_refs()
+        repo = get_repo(backend, mat)
+        refs = repo.get_refs()
         for name in sorted(refs.iterkeys()):
             # get_refs() includes HEAD as a special case, but we don't want to
             # advertise it
             if name == 'HEAD':
                 continue
             sha = refs[name]
-            o = backend.repo[sha]
+            o = repo[sha]
             if not o:
                 continue
             yield '%s\t%s\n' % (sha, name)
-            peeled_sha = backend.repo.get_peeled(name)
+            peeled_sha = repo.get_peeled(name)
             if peeled_sha != sha:
                 yield '%s\t%s^{}\n' % (peeled_sha, name)
 
@@ -150,7 +168,7 @@ def get_info_refs(req, backend, mat, services=None):
 def get_info_packs(req, backend, mat):
     req.nocache()
     req.respond(HTTP_OK, 'text/plain')
-    for pack in backend.object_store.packs:
+    for pack in get_repo(backend, mat).object_store.packs:
         yield 'P pack-%s.pack\n' % pack.name()
 
 
@@ -195,7 +213,8 @@ def handle_service_request(req, backend, mat, services=None):
     # content-length
     if 'CONTENT_LENGTH' in req.environ:
         input = _LengthLimitedFile(input, int(req.environ['CONTENT_LENGTH']))
-    handler = handler_cls(backend, input.read, output.write, stateless_rpc=True)
+    handler = handler_cls(backend, [url_prefix(mat)], input.read, output.write,
+                          stateless_rpc=True)
     handler.handle()
     yield output.getvalue()
 

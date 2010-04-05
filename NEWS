@@ -29,6 +29,9 @@
   * Repo.get_blob, Repo.commit, Repo.tag and Repo.tree are now deprecated.
     (Jelmer Vernooij)
 
+  * RefsContainer.set_ref() was renamed to RefsContainer.set_symbolic_ref(),
+    for clarity. (Jelmer Vernooij)
+
  API CHANGES
 
   * Blob.chunked was added. (Jelmer Vernooij)

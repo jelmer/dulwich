@@ -34,6 +34,7 @@ import zlib
 from dulwich.errors import (
     NotBlobError,
     NotCommitError,
+    NotTagError,
     NotTreeError,
     )
 from dulwich.file import GitFile

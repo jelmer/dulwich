@@ -447,9 +447,8 @@ def parse_tree(text):
     """Parse a tree text.
 
     :param text: Serialized text to parse
-    :return: Dictionary with names as keys, (mode, sha) tuples as values
+    :yields: tuples of (name, mode, sha)
     """
-    ret = {}
     count = 0
     l = len(text)
     while count < l:
@@ -459,8 +458,7 @@ def parse_tree(text):
         name = text[mode_end+1:name_end]
         count = name_end+21
         sha = text[name_end+1:count]
-        ret[name] = (mode, sha_to_hex(sha))
-    return ret
+        yield (name, mode, sha_to_hex(sha))
 
 
 def serialize_tree(items):
@@ -560,7 +558,11 @@ class Tree(ShaFile):
 
     def _deserialize(self, chunks):
         """Grab the entries in the tree"""
-        self._entries = parse_tree("".join(chunks))
+        parsed_entries = parse_tree("".join(chunks))
+        # TODO: list comprehension is for efficiency in the common (small) case;
+        # if memory efficiency in the large case is a concern, use a genexp.
+        self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
+        self._needs_parsing = False
 
     def _serialize(self):
         return list(serialize_tree(self.iteritems()))
@@ -725,6 +727,10 @@ for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_num] = cls
 
 
+
+# Hold on to the pure-python implementations for testing
+_parse_tree_py = parse_tree
+_sorted_tree_items_py = sorted_tree_items
 try:
     # Try to import C versions
     from dulwich._objects import parse_tree, sorted_tree_items

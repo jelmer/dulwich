@@ -32,8 +32,11 @@ from dulwich.protocol import (
 from dulwich.server import (
     ReceivePackHandler,
     UploadPackHandler,
+    DEFAULT_HANDLERS,
     )
 
+
+# HTTP error strings
 HTTP_OK = '200 OK'
 HTTP_NOT_FOUND = '404 Not Found'
 HTTP_FORBIDDEN = '403 Forbidden'
@@ -128,15 +131,11 @@ def get_idx_file(req, backend, mat):
                      'application/x-git-packed-objects-toc')
 
 
-default_services = {'git-upload-pack': UploadPackHandler,
-                    'git-receive-pack': ReceivePackHandler}
-def get_info_refs(req, backend, mat, services=None):
-    if services is None:
-        services = default_services
+def get_info_refs(req, backend, mat):
     params = parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
     if service and not req.dumb:
-        handler_cls = services.get(service, None)
+        handler_cls = req.handlers.get(service, None)
         if handler_cls is None:
             yield req.forbidden('Unsupported service %s' % service)
             return
@@ -202,11 +201,9 @@ class _LengthLimitedFile(object):
     # TODO: support more methods as necessary
 
 
-def handle_service_request(req, backend, mat, services=None):
-    if services is None:
-        services = default_services
+def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
-    handler_cls = services.get(service, None)
+    handler_cls = req.handlers.get(service, None)
     if handler_cls is None:
         yield req.forbidden('Unsupported service %s' % service)
         return
@@ -233,9 +230,10 @@ class HTTPGitRequest(object):
     :ivar environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response, dumb=False):
+    def __init__(self, environ, start_response, dumb=False, handlers=None):
         self.environ = environ
         self.dumb = dumb
+        self.handlers = handlers and handlers or DEFAULT_HANDLERS
         self._start_response = start_response
         self._cache_headers = []
         self._headers = []
@@ -304,14 +302,16 @@ class HTTPGitApplication(object):
       ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
-    def __init__(self, backend, dumb=False):
+    def __init__(self, backend, dumb=False, handlers=None):
         self.backend = backend
         self.dumb = dumb
+        self.handlers = handlers
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
-        req = HTTPGitRequest(environ, start_response, self.dumb)
+        req = HTTPGitRequest(environ, start_response, dumb=self.dumb,
+                             handlers=self.handlers)
         # environ['QUERY_STRING'] has qs args
         handler = None
         for smethod, spath in self.services.iterkeys():

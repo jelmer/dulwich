@@ -27,8 +27,6 @@ import os
 import stat
 import unittest
 
-import nose
-
 from dulwich.objects import (
     Blob,
     Tree,
@@ -39,6 +37,9 @@ from dulwich.objects import (
     parse_timezone,
     parse_tree,
     _parse_tree_py,
+    )
+from dulwich.tests import (
+    TestSkipped,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -287,7 +288,7 @@ class TreeTests(unittest.TestCase):
 
     def test_parse_tree_extension(self):
         if parse_tree is _parse_tree_py:
-            raise nose.SkipTest('parse_tree extension not found')
+            raise TestSkipped('parse_tree extension not found')
         self._do_test_parse_tree(parse_tree)
 
 

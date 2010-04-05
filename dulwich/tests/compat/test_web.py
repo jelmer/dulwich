@@ -30,6 +30,9 @@ from wsgiref import simple_server
 from dulwich.server import (
     DictBackend,
     )
+from dulwich.tests import (
+    TestSkipped,
+    )
 from dulwich.web import (
     HTTPGitApplication,
     )
@@ -40,7 +43,6 @@ from server_utils import (
     )
 from utils import (
     CompatTestCase,
-    SkipTest,
     )
 
 
@@ -96,7 +98,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # TODO(dborowitz): enable after merging thin pack fixes.
-        raise SkipTest('Skipping push test due to known pack bug.')
+        raise TestSkipped('Skipping push test due to known pack bug.')
 
 
 class DumbWebTestCase(WebTests, CompatTestCase):
@@ -115,4 +117,4 @@ class DumbWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # Note: remove this if dumb pushing is supported
-        raise SkipTest('Dumb web pushing not supported.')
+        raise TestSkipped('Dumb web pushing not supported.')

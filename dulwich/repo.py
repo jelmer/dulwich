@@ -118,6 +118,12 @@ class RefsContainer(object):
     """A container for refs."""
 
     def set_ref(self, name, other):
+        warnings.warn("RefsContainer.set_ref() is deprecated."
+            "Use set_symblic_ref instead.",
+            category=DeprecationWarning, stacklevel=2)
+        return self.set_symbolic_ref(name, other)
+
+    def set_symbolic_ref(self, name, other):
         """Make a ref point at another ref.
 
         :param name: Name of the ref to set
@@ -1011,7 +1017,7 @@ class Repo(BaseRepo):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
         ret = cls(path)
-        ret.refs.set_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
         ret._put_named_file('description', "Unnamed repository")
         ret._put_named_file('config', """[core]
     repositoryformatversion = 0

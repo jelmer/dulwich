@@ -44,7 +44,10 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s#", &text, &len))
 		return NULL;
 
-	ret = PyDict_New();
+	/* TODO: currently this returns a list; if memory usage is a concern,
+	* consider rewriting as a custom iterator object */
+	ret = PyList_New(0);
+
 	if (ret == NULL) {
 		return NULL;
 	}
@@ -71,19 +74,18 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 			return NULL;
 		}
 
-		item = Py_BuildValue("(lN)", mode,
+		item = Py_BuildValue("(NlN)", name, mode,
 							 sha_to_pyhex((unsigned char *)text+namelen+1));
 		if (item == NULL) {
 			Py_DECREF(ret);
 			Py_DECREF(name);
 			return NULL;
 		}
-		if (PyDict_SetItem(ret, name, item) == -1) {
+		if (PyList_Append(ret, item) == -1) {
 			Py_DECREF(ret);
 			Py_DECREF(item);
 			return NULL;
 		}
-		Py_DECREF(name);
 		Py_DECREF(item);
 
 		text += namelen+21;

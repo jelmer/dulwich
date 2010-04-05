@@ -19,7 +19,7 @@
 
 import sys
 from dulwich.repo import Repo
-from dulwich.server import DictBackend, GitBackendRepo, TCPGitServer
+from dulwich.server import DictBackend, TCPGitServer
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

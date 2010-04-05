@@ -21,6 +21,10 @@
 
 import unittest
 
+# XXX: Ideally we should allow other test runners as well, 
+# but unfortunately unittest doesn't have a SkipTest/TestSkipped
+# exception.
+from nose import SkipTest as TestSkipped
 
 def test_suite():
     names = [

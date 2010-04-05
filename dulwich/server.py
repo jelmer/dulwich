@@ -582,7 +582,6 @@ class ReceivePackHandler(Handler):
             else:
                 status.append((ref, 'ok'))
 
-        print "pack applied"
         return status
 
     def handle(self):

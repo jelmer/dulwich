@@ -43,13 +43,17 @@ class WebTestCase(TestCase):
 
     def setUp(self):
         self._environ = {}
-        self._req = HTTPGitRequest(self._environ, self._start_response)
+        self._req = HTTPGitRequest(self._environ, self._start_response,
+                                   handlers=self._handlers())
         self._status = None
         self._headers = []
 
     def _start_response(self, status, headers):
         self._status = status
         self._headers = list(headers)
+
+    def _handlers(self):
+        return None
 
 
 class DumbHandlersTestCase(WebTestCase):
@@ -177,7 +181,7 @@ class SmartHandlersTestCase(WebTestCase):
         self._handler = self._TestUploadPackHandler(*args, **kwargs)
         return self._handler
 
-    def services(self):
+    def _handlers(self):
         return {'git-upload-pack': self._make_handler}
 
     def test_handle_service_request_unknown(self):
@@ -188,8 +192,7 @@ class SmartHandlersTestCase(WebTestCase):
     def test_handle_service_request(self):
         self._environ['wsgi.input'] = StringIO('foo')
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat,
-                                                services=self.services()))
+        output = ''.join(handle_service_request(self._req, 'backend', mat))
         self.assertEqual('handled input: foo', output)
         response_type = 'application/x-git-upload-pack-response'
         self.assertTrue(('Content-Type', response_type) in self._headers)
@@ -200,16 +203,14 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['wsgi.input'] = StringIO('foobar')
         self._environ['CONTENT_LENGTH'] = 3
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat,
-                                                services=self.services()))
+        output = ''.join(handle_service_request(self._req, 'backend', mat))
         self.assertEqual('handled input: foo', output)
         response_type = 'application/x-git-upload-pack-response'
         self.assertTrue(('Content-Type', response_type) in self._headers)
 
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
-        list(get_info_refs(self._req, 'backend', None,
-                           services=self.services()))
+        list(get_info_refs(self._req, 'backend', None))
         self.assertEquals(HTTP_FORBIDDEN, self._status)
 
     def test_get_info_refs(self):
@@ -217,8 +218,7 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(get_info_refs(self._req, 'backend', mat,
-                                       services=self.services()))
+        output = ''.join(get_info_refs(self._req, 'backend', mat))
         self.assertEquals(('001e# service=git-upload-pack\n'
                            '0000'
                            # input is ignored by the handler

@@ -27,6 +27,8 @@ import os
 import stat
 import unittest
 
+import nose
+
 from dulwich.objects import (
     Blob,
     Tree,
@@ -35,6 +37,8 @@ from dulwich.objects import (
     format_timezone,
     hex_to_sha,
     parse_timezone,
+    parse_tree,
+    _parse_tree_py,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -256,7 +260,7 @@ class CommitDeserializationTests(unittest.TestCase):
         self.assertEquals([('extra-field', 'data')], c.extra)
 
 
-class TreeSerializationTests(unittest.TestCase):
+class TreeTests(unittest.TestCase):
 
     def test_simple(self):
         myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
@@ -271,6 +275,20 @@ class TreeSerializationTests(unittest.TestCase):
         x["a"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         x["a/c"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])
+
+    def _do_test_parse_tree(self, parse_tree):
+        o = Tree.from_file(os.path.join(os.path.dirname(__file__), 'data',
+                                        'trees', tree_sha))
+        self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
+                          list(parse_tree(o.as_raw_string())))
+
+    def test_parse_tree(self):
+        self._do_test_parse_tree(_parse_tree_py)
+
+    def test_parse_tree_extension(self):
+        if parse_tree is _parse_tree_py:
+            raise nose.SkipTest('parse_tree extension not found')
+        self._do_test_parse_tree(parse_tree)
 
 
 class TagSerializeTests(unittest.TestCase):

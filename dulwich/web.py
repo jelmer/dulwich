@@ -21,8 +21,11 @@
 from cStringIO import StringIO
 import re
 import time
-import urlparse
 
+try:
+    from urlparse import parse_qs
+except ImportError:
+    from dulwich.misc import parse_qs
 from dulwich.server import (
     ReceivePackHandler,
     UploadPackHandler,
@@ -125,7 +128,7 @@ default_services = {'git-upload-pack': UploadPackHandler,
 def get_info_refs(req, backend, mat, services=None):
     if services is None:
         services = default_services
-    params = urlparse.parse_qs(req.environ['QUERY_STRING'])
+    params = parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
     if service and not req.dumb:
         handler_cls = services.get(service, None)

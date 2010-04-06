@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#if (PY_VERSION_HEX < 0x02050000)
+typedef int Py_ssize_t;
+#endif
+
 #define bytehex(x) (((x)<0xa)?('0'+(x)):('a'-0xa+(x)))
 
 static PyObject *sha_to_pyhex(const unsigned char *sha)

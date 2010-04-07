@@ -13,6 +13,9 @@
 
   * Implement RefsContainer.__contains__. (Jelmer Vernooij)
 
+  * Cope with \r in ref files on Windows. (
+	http://github.com/jelmer/dulwich/issues/#issue/13, Jelmer Vernooij)
+
  FEATURES
 
   * Add include-tag capability to server. (Dave Borowitz)

@@ -403,6 +403,7 @@ class Tag(ShaFile):
         super(Tag, self).__init__()
         self._needs_parsing = False
         self._needs_serialization = True
+        self._tag_timezone_neg_utc = False
 
     @classmethod
     def from_file(cls, filename):
@@ -448,7 +449,8 @@ class Tag(ShaFile):
             else:
                 chunks.append("%s %s %d %s\n" % (
                   _TAGGER_HEADER, self._tagger, self._tag_time,
-                  format_timezone(self._tag_timezone)))
+                  format_timezone(self._tag_timezone,
+                    self._tag_timezone_neg_utc)))
         chunks.append("\n") # To close headers
         chunks.append(self._message)
         return chunks
@@ -475,11 +477,13 @@ class Tag(ShaFile):
                     self._tagger = value
                     self._tag_time = None
                     self._tag_timezone = None
+                    self._tag_timezone_neg_utc = False
                 else:
                     self._tagger = value[0:sep+1]
                     (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
                     self._tag_time = int(timetext)
-                    self._tag_timezone = parse_timezone(timezonetext)
+                    self._tag_timezone, self._tag_timezone_neg_utc = \
+                            parse_timezone(timezonetext)
             else:
                 raise AssertionError("Unknown field %s" % field)
         self._message = f.read()
@@ -679,17 +683,21 @@ class Tree(ShaFile):
 
 def parse_timezone(text):
     offset = int(text)
+    negative_utc = (offset == 0 and text[0] == '-')
     signum = (offset < 0) and -1 or 1
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = (offset % 100)
-    return signum * (hours * 3600 + minutes * 60)
+    return signum * (hours * 3600 + minutes * 60), negative_utc
 
 
-def format_timezone(offset):
+def format_timezone(offset, negative_utc=False):
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
-    sign = (offset < 0) and '-' or '+'
+    if offset < 0 or (offset == 0 and negative_utc):
+        sign = '-'
+    else:
+        sign = '+'
     offset = abs(offset)
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
@@ -707,6 +715,8 @@ class Commit(ShaFile):
         self._needs_parsing = False
         self._needs_serialization = True
         self._extra = {}
+        self._author_timezone_neg_utc = False
+        self._commit_timezone_neg_utc = False
 
     @classmethod
     def from_file(cls, filename):
@@ -733,11 +743,13 @@ class Commit(ShaFile):
             elif field == _AUTHOR_HEADER:
                 self._author, timetext, timezonetext = value.rsplit(" ", 2)
                 self._author_time = int(timetext)
-                self._author_timezone = parse_timezone(timezonetext)
+                self._author_timezone, self._author_timezone_neg_utc =\
+                    parse_timezone(timezonetext)
             elif field == _COMMITTER_HEADER:
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
                 self._commit_time = int(timetext)
-                self._commit_timezone = parse_timezone(timezonetext)
+                self._commit_timezone, self._commit_timezone_neg_utc =\
+                    parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:
                 self._encoding = value
             else:
@@ -771,10 +783,12 @@ class Commit(ShaFile):
             chunks.append("%s %s\n" % (_PARENT_HEADER, p))
         chunks.append("%s %s %s %s\n" % (
           _AUTHOR_HEADER, self._author, str(self._author_time),
-          format_timezone(self._author_timezone)))
+          format_timezone(self._author_timezone,
+                          self._author_timezone_neg_utc)))
         chunks.append("%s %s %s %s\n" % (
           _COMMITTER_HEADER, self._committer, str(self._commit_time),
-          format_timezone(self._commit_timezone)))
+          format_timezone(self._commit_timezone,
+                          self._commit_timezone_neg_utc)))
         if self.encoding:
             chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
         for k, v in self.extra:

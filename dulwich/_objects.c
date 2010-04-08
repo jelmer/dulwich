@@ -37,7 +37,7 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 
 static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 {
-	char *text, *end;
+	char *text, *start, *end;
 	int len, namelen;
 	PyObject *ret, *item, *name;
 
@@ -52,6 +52,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
+	start = text;
 	end = text + len;
 
 	while (text < end) {
@@ -66,7 +67,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 
 		text++;
 
-		namelen = strlen(text);
+		namelen = strnlen(text, len - (text - start));
 
 		name = PyString_FromStringAndSize(text, namelen);
 		if (name == NULL) {

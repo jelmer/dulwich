@@ -477,6 +477,7 @@ class TagParseTests(ShaFileCheckTests):
 
 
 class CheckTests(unittest.TestCase):
+
     def test_check_hexsha(self):
         check_hexsha(a_sha, "failed to check good sha")
         self.assertRaises(ObjectFormatException, check_hexsha, '1' * 39,

@@ -288,7 +288,7 @@ class CommitParseTests(ShaFileCheckTests):
         self.assertEquals(['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                            '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
                           c.parents)
-        expected_time = datetime.datetime(2007, 3, 24, 15, 1, 59)
+        expected_time = datetime.datetime(2007, 3, 24, 23, 1, 59).replace(tzinfo=None)
         self.assertEquals(expected_time,
                           datetime.datetime.fromtimestamp(c.commit_time))
         self.assertEquals(0, c.commit_timezone)
@@ -451,7 +451,7 @@ class TagParseTests(ShaFileCheckTests):
                           object_sha)
         self.assertEquals(Commit, object_type)
         self.assertEquals(datetime.datetime.fromtimestamp(x.tag_time),
-                          datetime.datetime(2007, 7, 1, 12, 54, 34))
+                          datetime.datetime(2007, 7, 1, 21, 54, 34, 0).replace(tzinfo=None))
         self.assertEquals(-25200, x.tag_timezone)
 
     def test_parse_no_tagger(self):

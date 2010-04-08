@@ -600,6 +600,10 @@ class Tree(ShaFile):
         self._ensure_parsed()
         return len(self._entries)
 
+    def __iter__(self):
+        self._ensure_parsed()
+        return iter(self._entries)
+
     def add(self, mode, name, hexsha):
         assert type(mode) == int
         assert type(name) == str

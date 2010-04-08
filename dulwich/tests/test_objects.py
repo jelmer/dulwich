@@ -387,6 +387,11 @@ class TreeTests(ShaFileCheckTests):
         self.assertCheckFails(t, '100644 a\0%s\n100755 a\0%s' % (sha, sha2))
         self.assertCheckFails(t, '100644 b\0%s\n100644 a\0%s' % (sha2, sha))
 
+    def test_iter(self):
+        t = Tree()
+        t["foo"] = (0100644, a_sha)
+        self.assertEquals(set(["foo"]), set(t))
+
 
 class TagSerializeTests(unittest.TestCase):
 

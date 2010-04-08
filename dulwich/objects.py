@@ -28,7 +28,6 @@ from cStringIO import (
 import mmap
 import os
 import stat
-import time
 import zlib
 
 from dulwich.errors import (
@@ -294,7 +293,7 @@ class ShaFile(object):
         # check() method during optimization so we can still check the object
         # when necessary.
         try:
-            self._deserialize(self._chunked_text)
+            self._deserialize(self.as_raw_chunks())
         except Exception, e:
             raise ObjectFormatException(e)
 

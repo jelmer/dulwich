@@ -123,5 +123,9 @@ class PackedRefsException(FileFormatException):
     """Indicates an error parsing a packed-refs file."""
 
 
+class ObjectFormatException(FileFormatException):
+    """Indicates an error parsing an object."""
+
+
 class NoIndexPresent(Exception):
     """No index is present."""

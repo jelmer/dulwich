@@ -74,6 +74,13 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 			return NULL;
 		}
 
+		if (text + namelen + 20 >= end) {
+			PyErr_SetString(PyExc_RuntimeError, "SHA truncated");
+			Py_DECREF(ret);
+			Py_DECREF(name);
+			return NULL;
+		}
+
 		item = Py_BuildValue("(NlN)", name, mode,
 							 sha_to_pyhex((unsigned char *)text+namelen+1));
 		if (item == NULL) {

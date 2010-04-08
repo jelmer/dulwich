@@ -23,10 +23,14 @@
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
 
+import datetime
 import os
 import stat
 import unittest
 
+from dulwich.errors import (
+    ObjectFormatException,
+    )
 from dulwich.objects import (
     Blob,
     Tree,
@@ -34,6 +38,8 @@ from dulwich.objects import (
     Tag,
     format_timezone,
     hex_to_sha,
+    check_hexsha,
+    check_identity,
     parse_timezone,
     parse_tree,
     _parse_tree_py,
@@ -169,7 +175,21 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
-  
+
+
+class ShaFileCheckTests(unittest.TestCase):
+
+    def assertCheckFails(self, obj, data):
+        obj.set_raw_string(data)
+        self.assertRaises(ObjectFormatException, obj.check)
+
+    def assertCheckSucceeds(self, obj, data):
+        obj.set_raw_string(data)
+        try:
+            obj.check()
+        except ObjectFormatException, e:
+            raise
+            self.fail(e)
 
 
 class CommitSerializationTests(unittest.TestCase):
@@ -226,42 +246,87 @@ class CommitSerializationTests(unittest.TestCase):
         self.assertTrue(" -0100\n" in c.as_raw_string())
 
 
-class CommitDeserializationTests(unittest.TestCase):
+default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'
+
+class CommitParseTests(ShaFileCheckTests):
+
+    def make_commit_text(self,
+                         tree='d80c186a03f423a81b39df39dc87fd269736ca86',
+                         parents=['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                                  '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                         author=default_committer,
+                         committer=default_committer,
+                         encoding=None,
+                         message='Merge ../b\n',
+                         extra=None):
+        lines = []
+        if tree is not None:
+            lines.append('tree %s' % tree)
+        if parents is not None:
+            lines.extend('parent %s' % p for p in parents)
+        if author is not None:
+            lines.append('author %s' % author)
+        if committer is not None:
+            lines.append('committer %s' % committer)
+        if encoding is not None:
+            lines.append('encoding %s' % encoding)
+        if extra is not None:
+            for name, value in sorted(extra.iteritems()):
+                lines.append('%s %s' % (name, value))
+        lines.append('')
+        if message is not None:
+            lines.append(message)
+        return '\n'.join(lines)
 
     def test_simple(self):
-        c = Commit.from_string(
-                'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
-                'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
-                'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
-                'author James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
-                'committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
-                '\n'
-                'Merge ../b\n')
+        c = Commit.from_string(self.make_commit_text())
         self.assertEquals('Merge ../b\n', c.message)
+        self.assertEquals('James Westby <jw+debian@jameswestby.net>', c.author)
         self.assertEquals('James Westby <jw+debian@jameswestby.net>',
-            c.author)
-        self.assertEquals('James Westby <jw+debian@jameswestby.net>',
-            c.committer)
-        self.assertEquals('d80c186a03f423a81b39df39dc87fd269736ca86',
-            c.tree)
+                          c.committer)
+        self.assertEquals('d80c186a03f423a81b39df39dc87fd269736ca86', c.tree)
         self.assertEquals(['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
-                          '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
-            c.parents)
+                           '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                          c.parents)
+        expected_time = datetime.datetime(2007, 3, 24, 15, 1, 59)
+        self.assertEquals(expected_time,
+                          datetime.datetime.fromtimestamp(c.commit_time))
+        self.assertEquals(0, c.commit_timezone)
+        self.assertEquals(expected_time,
+                          datetime.datetime.fromtimestamp(c.author_time))
+        self.assertEquals(0, c.author_timezone)
+        self.assertEquals(None, c.encoding)
 
     def test_custom(self):
-        c = Commit.from_string(
-                'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
-                'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
-                'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
-                'author James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
-                'committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
-                'extra-field data\n'
-                '\n'
-                'Merge ../b\n')
+        c = Commit.from_string(self.make_commit_text(
+          extra={'extra-field': 'data'}))
         self.assertEquals([('extra-field', 'data')], c.extra)
 
+    def test_encoding(self):
+        c = Commit.from_string(self.make_commit_text(encoding='UTF-8'))
+        self.assertEquals('UTF-8', c.encoding)
 
-class TreeTests(unittest.TestCase):
+    def test_check(self):
+        self.assertCheckSucceeds(Commit(), self.make_commit_text())
+        self.assertCheckSucceeds(Commit(), self.make_commit_text(parents=None))
+        self.assertCheckSucceeds(Commit(),
+                                 self.make_commit_text(encoding='UTF-8'))
+
+        self.assertCheckFails(Commit(), self.make_commit_text(tree='xxx'))
+        self.assertCheckFails(Commit(), self.make_commit_text(
+          parents=[a_sha, 'xxx']))
+        bad_committer = "some guy without an email address 1174773719 +0000"
+        self.assertCheckFails(Commit(),
+                              self.make_commit_text(committer=bad_committer))
+        self.assertCheckFails(Commit(),
+                              self.make_commit_text(author=bad_committer))
+        self.assertCheckFails(Commit(), self.make_commit_text(author=None))
+        self.assertCheckFails(Commit(), self.make_commit_text(committer=None))
+        self.assertCheckFails(Commit(), self.make_commit_text(
+          author=None, committer=None))
+
+
+class TreeTests(ShaFileCheckTests):
 
     def test_simple(self):
         myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
@@ -291,6 +356,37 @@ class TreeTests(unittest.TestCase):
             raise TestSkipped('parse_tree extension not found')
         self._do_test_parse_tree(parse_tree)
 
+    def test_check(self):
+        t = Tree()
+        sha = hex_to_sha(a_sha)
+
+        # filenames
+        self.assertCheckSucceeds(t, '100644 .a\0%s' % sha)
+        self.assertCheckFails(t, '100644 \0%s' % sha)
+        self.assertCheckFails(t, '100644 .\0%s' % sha)
+        self.assertCheckFails(t, '100644 a/a\0%s' % sha)
+        self.assertCheckFails(t, '100644 ..\0%s' % sha)
+
+        # modes
+        self.assertCheckSucceeds(t, '100644 a\0%s' % sha)
+        self.assertCheckSucceeds(t, '100755 a\0%s' % sha)
+        self.assertCheckSucceeds(t, '160000 a\0%s' % sha)
+        # TODO more whitelisted modes
+        self.assertCheckFails(t, '123456 a\0%s' % sha)
+        self.assertCheckFails(t, '123abc a\0%s' % sha)
+
+        # shas
+        self.assertCheckFails(t, '100644 a\0%s' % ('x' * 5))
+        self.assertCheckFails(t, '100644 a\0%s' % ('x' * 18 + '\0'))
+        self.assertCheckFails(t, '100644 a\0%s\n100644 b\0%s' % ('x' * 21, sha))
+
+        # ordering
+        sha2 = hex_to_sha(b_sha)
+        self.assertCheckSucceeds(t, '100644 a\0%s\n100644 b\0%s' % (sha, sha))
+        self.assertCheckSucceeds(t, '100644 a\0%s\n100644 b\0%s' % (sha, sha2))
+        self.assertCheckFails(t, '100644 a\0%s\n100755 a\0%s' % (sha, sha2))
+        self.assertCheckFails(t, '100644 b\0%s\n100644 a\0%s' % (sha2, sha))
+
 
 class TagSerializeTests(unittest.TestCase):
 
@@ -310,16 +406,9 @@ tagger Jelmer Vernooij <jelmer@samba.org> 423423423 +0000
 Tag 0.1""", x.as_raw_string())
 
 
-class TagParseTests(unittest.TestCase):
-
-    def test_parse_ctime(self):
-        x = Tag()
-        x.set_raw_string("""object a38d6181ff27824c79fc7df825164a212eff6a3f
-type commit
-tag v2.6.22-rc7
-tagger Linus Torvalds <torvalds@woody.linux-foundation.org> Sun Jul 1 12:54:34 2007 -0700
-
-Linux 2.6.22-rc7
+default_tagger = ('Linus Torvalds <torvalds@woody.linux-foundation.org> '
+                  '1183319674 -0700')
+default_message = """Linux 2.6.22-rc7
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (GNU/Linux)
 
@@ -327,27 +416,94 @@ iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
 OK2XeQOiEeXtT76rV4t2WR4=
 =ivrA
 -----END PGP SIGNATURE-----
-""")
-        self.assertEquals("Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger)
+"""
+
+
+class TagParseTests(ShaFileCheckTests):
+    def make_tag_text(self,
+                      object_sha="a38d6181ff27824c79fc7df825164a212eff6a3f",
+                      object_type_name="commit",
+                      name="v2.6.22-rc7",
+                      tagger=default_tagger,
+                      message=default_message):
+        lines = []
+        if object_sha is not None:
+            lines.append("object %s" % object_sha)
+        if object_type_name is not None:
+            lines.append("type %s" % object_type_name)
+        if name is not None:
+            lines.append("tag %s" % name)
+        if tagger is not None:
+            lines.append("tagger %s" % tagger)
+        lines.append("")
+        if message is not None:
+            lines.append(message)
+        return "\n".join(lines)
+
+    def test_parse(self):
+        x = Tag()
+        x.set_raw_string(self.make_tag_text())
+        self.assertEquals(
+            "Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger)
         self.assertEquals("v2.6.22-rc7", x.name)
+        object_type, object_sha = x.object
+        self.assertEquals("a38d6181ff27824c79fc7df825164a212eff6a3f",
+                          object_sha)
+        self.assertEquals(Commit, object_type)
+        self.assertEquals(datetime.datetime.fromtimestamp(x.tag_time),
+                          datetime.datetime(2007, 7, 1, 12, 54, 34))
+        self.assertEquals(-25200, x.tag_timezone)
 
     def test_parse_no_tagger(self):
         x = Tag()
-        x.set_raw_string("""object a38d6181ff27824c79fc7df825164a212eff6a3f
-type commit
-tag v2.6.22-rc7
-
-Linux 2.6.22-rc7
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.7 (GNU/Linux)
-
-iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
-OK2XeQOiEeXtT76rV4t2WR4=
-=ivrA
------END PGP SIGNATURE-----
-""")
+        x.set_raw_string(self.make_tag_text(tagger=None))
         self.assertEquals(None, x.tagger)
         self.assertEquals("v2.6.22-rc7", x.name)
+
+    def test_check(self):
+        self.assertCheckSucceeds(Tag(), self.make_tag_text())
+        self.assertCheckFails(Tag(), self.make_tag_text(object_sha=None))
+        self.assertCheckFails(Tag(), self.make_tag_text(object_type_name=None))
+        self.assertCheckFails(Tag(), self.make_tag_text(name=None))
+        self.assertCheckFails(Tag(), self.make_tag_text(name=''))
+        self.assertCheckFails(Tag(), self.make_tag_text(
+          object_type_name="foobar"))
+        self.assertCheckFails(Tag(), self.make_tag_text(
+          tagger="some guy without an email address 1183319674 -0700"))
+        self.assertCheckFails(Tag(), self.make_tag_text(
+          tagger=("Linus Torvalds <torvalds@woody.linux-foundation.org> "
+                  "Sun 7 Jul 2007 12:54:34 +0700")))
+        self.assertCheckFails(Tag(), self.make_tag_text(object_sha="xxx"))
+
+
+class CheckTests(unittest.TestCase):
+    def test_check_hexsha(self):
+        check_hexsha(a_sha, "failed to check good sha")
+        self.assertRaises(ObjectFormatException, check_hexsha, '1' * 39,
+                          'sha too short')
+        self.assertRaises(ObjectFormatException, check_hexsha, '1' * 41,
+                          'sha too long')
+        self.assertRaises(ObjectFormatException, check_hexsha, 'x' * 40,
+                          'invalid characters')
+
+    def test_check_identity(self):
+        check_identity("Dave Borowitz <dborowitz@google.com>",
+                       "failed to check good identity")
+        check_identity("<dborowitz@google.com>",
+                       "failed to check good identity")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "Dave Borowitz", "no email")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "Dave Borowitz <dborowitz", "incomplete email")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "dborowitz@google.com>", "incomplete email")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "Dave Borowitz <<dborowitz@google.com>", "typo")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "Dave Borowitz <dborowitz@google.com>>", "typo")
+        self.assertRaises(ObjectFormatException, check_identity,
+                          "Dave Borowitz <dborowitz@google.com>xxx",
+                          "trailing characters")
 
 
 class TimezoneTests(unittest.TestCase):

@@ -36,6 +36,7 @@ from dulwich.errors import (
     NotCommitError,
     NotTagError,
     NotTreeError,
+    ObjectFormatException,
     )
 from dulwich.file import GitFile
 from dulwich.misc import (
@@ -102,6 +103,23 @@ def object_class(type):
     :return: The ShaFile subclass corresponding to the given type.
     """
     return _TYPE_MAP[type]
+
+
+def check_hexsha(hex, error_msg):
+    try:
+        hex_to_sha(hex)
+    except (TypeError, AssertionError):
+        raise ObjectFormatException("%s %s" % (error_msg, hex))
+
+
+def check_identity(identity, error_msg):
+    email_start = identity.find("<")
+    email_end = identity.find(">")
+    if (email_start < 0 or email_end < 0 or email_end <= email_start
+        or identity.find("<", email_start + 1) >= 0
+        or identity.find(">", email_end + 1) >= 0
+        or not identity.endswith(">")):
+        raise ObjectFormatException(error_msg)
 
 
 class ShaFile(object):
@@ -255,6 +273,31 @@ class ShaFile(object):
         obj.set_raw_string(string)
         return obj
 
+    def _check_has_member(self, member, error_msg):
+        """Check that the object has a given member variable.
+
+        :param member: the member variable to check for
+        :param error_msg: the message for an error if the member is missing
+        :raise ObjectFormatException: with the given error_msg if member is
+            missing or is None
+        """
+        if getattr(self, member, None) is None:
+            raise ObjectFormatException(error_msg)
+
+    def check(self):
+        """Check this object for internal consistency.
+
+        :raise ObjectFormatException: if the object is malformed in some way
+        """
+        # TODO: if we find that error-checking during object parsing is a
+        # performance bottleneck, those checks should be moved to the class's
+        # check() method during optimization so we can still check the object
+        # when necessary.
+        try:
+            self._deserialize(self._chunked_text)
+        except Exception, e:
+            raise ObjectFormatException(e)
+
     def _header(self):
         return "%s %lu\0" % (self.type_name, self.raw_length())
 
@@ -343,6 +386,13 @@ class Blob(ShaFile):
             raise NotBlobError(filename)
         return blob
 
+    def check(self):
+        """Check this object for internal consistency.
+
+        :raise ObjectFormatException: if the object is malformed in some way
+        """
+        pass  # it's impossible for raw data to be malformed
+
 
 class Tag(ShaFile):
     """A Git Tag object."""
@@ -368,6 +418,25 @@ class Tag(ShaFile):
         shafile = cls()
         shafile.set_raw_string(string)
         return shafile
+
+    def check(self):
+        """Check this object for internal consistency.
+
+        :raise ObjectFormatException: if the object is malformed in some way
+        """
+        super(Tag, self).check()
+        # TODO(dborowitz): check header order
+        self._check_has_member("_object_sha", "missing object sha")
+        self._check_has_member("_object_class", "missing object type")
+        self._check_has_member("_name", "missing tag name")
+
+        if not self._name:
+            raise ObjectFormatException("empty tag name")
+
+        check_hexsha(self._object_sha, "invalid object sha")
+
+        if getattr(self, "_tagger", None):
+            check_identity(self._tagger, "invalid tagger")
 
     def _serialize(self):
         chunks = []
@@ -410,10 +479,7 @@ class Tag(ShaFile):
                 else:
                     self._tagger = value[0:sep+1]
                     (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
-                    try:
-                        self._tag_time = int(timetext)
-                    except ValueError: #Not a unix timestamp
-                        self._tag_time = time.strptime(timetext)
+                    self._tag_time = int(timetext)
                     self._tag_timezone = parse_timezone(timezonetext)
             else:
                 raise AssertionError("Unknown field %s" % field)
@@ -479,14 +545,17 @@ def sorted_tree_items(entries):
     :param entries: Dictionary mapping names to (mode, sha) tuples
     :return: Iterator over (name, mode, sha)
     """
-    def cmp_entry((name1, value1), (name2, value2)):
-        if stat.S_ISDIR(value1[0]):
-            name1 += "/"
-        if stat.S_ISDIR(value2[0]):
-            name2 += "/"
-        return cmp(name1, name2)
     for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
         yield name, entry[0], entry[1]
+
+
+def cmp_entry((name1, value1), (name2, value2)):
+    """Compare two tree entries."""
+    if stat.S_ISDIR(value1[0]):
+        name1 += "/"
+    if stat.S_ISDIR(value2[0]):
+        name2 += "/"
+    return cmp(name1, name2)
 
 
 class Tree(ShaFile):
@@ -549,8 +618,7 @@ class Tree(ShaFile):
             (mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
     def iteritems(self):
-        """Iterate over all entries in the order in which they would be
-        serialized.
+        """Iterate over entries in the order in which they would be serialized.
 
         :return: Iterator over (name, mode, sha) tuples
         """
@@ -564,6 +632,33 @@ class Tree(ShaFile):
         # if memory efficiency in the large case is a concern, use a genexp.
         self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
         self._needs_parsing = False
+
+    def check(self):
+        """Check this object for internal consistency.
+
+        :raise ObjectFormatException: if the object is malformed in some way
+        """
+        super(Tree, self).check()
+        last = None
+        allowed_modes = (stat.S_IFREG | 0755, stat.S_IFREG | 0644,
+                         stat.S_IFLNK, stat.S_IFDIR, S_IFGITLINK,
+                         # TODO: optionally exclude as in git fsck --strict
+                         stat.S_IFREG | 0664)
+        for name, mode, sha in parse_tree("".join(self._chunked_text)):
+            check_hexsha(sha, 'invalid sha %s' % sha)
+            if '/' in name or name in ('', '.', '..'):
+                raise ObjectFormatException('invalid name %s' % name)
+
+            if mode not in allowed_modes:
+                raise ObjectFormatException('invalid mode %06o' % mode)
+
+            entry = (name, (mode, sha))
+            if last:
+                if cmp_entry(last, entry) > 0:
+                    raise ObjectFormatException('entries not sorted')
+                if name == last[0]:
+                    raise ObjectFormatException('duplicate entry %s' % name)
+            last = entry
 
     def _serialize(self):
         return list(serialize_tree(self.iteritems()))
@@ -645,6 +740,26 @@ class Commit(ShaFile):
             else:
                 self._extra.append((field, value))
         self._message = f.read()
+
+    def check(self):
+        """Check this object for internal consistency.
+
+        :raise ObjectFormatException: if the object is malformed in some way
+        """
+        super(Commit, self).check()
+        # TODO(dborowitz): check header order
+        # TODO(dborowitz): check for duplicate headers
+        self._check_has_member("_tree", "missing tree")
+        self._check_has_member("_author", "missing author")
+        self._check_has_member("_committer", "missing committer")
+        # times are currently checked when set
+
+        for parent in self._parents:
+            check_hexsha(parent, "invalid parent sha")
+        check_hexsha(self._tree, "invalid tree sha")
+
+        check_identity(self._author, "invalid author")
+        check_identity(self._committer, "invalid committer")
 
     def _serialize(self):
         chunks = []

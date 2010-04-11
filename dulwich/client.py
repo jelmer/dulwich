@@ -28,6 +28,7 @@ import subprocess
 
 from dulwich.errors import (
     ChecksumMismatch,
+    HangupException,
     )
 from dulwich.protocol import (
     Protocol,
@@ -119,10 +120,16 @@ class GitClient(object):
                                          len(objects))
         
         # read the final confirmation sha
-        client_sha = self.proto.read(20)
-        if not client_sha in (None, "", sha):
-            raise ChecksumMismatch(sha, client_sha)
-            
+        try:
+            client_sha = self.proto.read_pkt_line()
+        except HangupException:
+            # for git-daemon versions before v1.6.6.1-26-g38a81b4, there is
+            # nothing to read; catch this and hide from the user.
+            pass
+        else:
+            if not client_sha in (None, "", sha):
+                raise ChecksumMismatch(sha, client_sha)
+
         return new_refs
 
     def fetch(self, path, target, determine_wants=None, progress=None):

@@ -103,7 +103,7 @@ class DiskObjectStoreTests(ObjectStoreTests,TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
-        self.store = DiskObjectStore(self.store_dir)
+        self.store = DiskObjectStore.init(self.store_dir)
 
     def tearDown(self):
         TestCase.tearDown(self)

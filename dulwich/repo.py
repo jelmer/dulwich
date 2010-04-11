@@ -62,9 +62,6 @@ REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
 BASE_DIRECTORIES = [
-    [OBJECTDIR], 
-    [OBJECTDIR, "info"], 
-    [OBJECTDIR, "pack"],
     ["branches"],
     [REFSDIR],
     [REFSDIR, REFSDIR_TAGS],
@@ -1016,6 +1013,7 @@ class Repo(BaseRepo):
     def init_bare(cls, path, mkdir=True):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
+        DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
         ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
         ret._put_named_file('description', "Unnamed repository")

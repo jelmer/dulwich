@@ -51,19 +51,6 @@ class ServerTests(object):
         tear_down_repo(self._old_repo)
         tear_down_repo(self._new_repo)
 
-    def assertReposEqual(self, repo1, repo2):
-        self.assertEqual(repo1.get_refs(), repo2.get_refs())
-        self.assertEqual(sorted(set(repo1.object_store)),
-                         sorted(set(repo2.object_store)))
-
-    def assertReposNotEqual(self, repo1, repo2):
-        refs1 = repo1.get_refs()
-        objs1 = set(repo1.object_store)
-        refs2 = repo2.get_refs()
-        objs2 = set(repo2.object_store)
-
-        self.assertFalse(refs1 == refs2 and objs1 == objs2)
-
     def test_push_to_dulwich(self):
         self.assertReposNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)

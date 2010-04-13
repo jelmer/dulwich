@@ -54,7 +54,7 @@ class GitClient(object):
 
     """
 
-    def __init__(self, can_read, read, write, thin_packs=True, 
+    def __init__(self, can_read, read, write, thin_packs=True,
         report_activity=None):
         """Create a new GitClient instance.
 
@@ -90,7 +90,7 @@ class GitClient(object):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return the shas of the 
+        :param generate_pack_contents: Function that can return the shas of the
             objects to upload.
         """
         old_refs, server_capabilities = self.read_refs()
@@ -116,9 +116,9 @@ class GitClient(object):
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
-        (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
+        (entries, sha) = write_pack_data(self.proto.write_file(), objects,
                                          len(objects))
-        
+
         # read the final confirmation sha
         try:
             client_sha = self.proto.read_pkt_line()
@@ -137,7 +137,7 @@ class GitClient(object):
 
         :param path: Path to fetch from
         :param target: Target repository to fetch into
-        :param determine_wants: Optional function to determine what refs 
+        :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
         :return: remote refs
@@ -146,7 +146,7 @@ class GitClient(object):
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
         try:
-            return self.fetch_pack(path, determine_wants, 
+            return self.fetch_pack(path, determine_wants,
                 target.get_graph_walker(), f.write, progress)
         finally:
             commit()
@@ -224,9 +224,9 @@ class TCPGitClient(GitClient):
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Fetch a pack from the remote host.
-        
+
         :param path: Path of the reposiutory on the remote host
-        :param determine_wants: Callback that receives available refs dict and 
+        :param determine_wants: Callback that receives available refs dict and
             should return list of sha's to fetch.
         :param graph_walker: GraphWalker instance used to find missing shas
         :param pack_data: Callback for writing pack data
@@ -262,18 +262,18 @@ class SubprocessGitClient(GitClient):
 
         :param path: Path to the git repository on the server
         :param changed_refs: Dictionary with new values for the refs
-        :param generate_pack_contents: Function that returns an iterator over 
+        :param generate_pack_contents: Function that returns an iterator over
             objects to send
         """
         client = self._connect("git-receive-pack", path)
         return client.send_pack(path, changed_refs, generate_pack_contents)
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
         progress):
         """Retrieve a pack from the server
 
         :param path: Path to the git repository on the server
-        :param determine_wants: Function that receives existing refs 
+        :param determine_wants: Function that receives existing refs
             on the server and returns a list of desired shas
         :param graph_walker: GraphWalker instance
         :param pack_data: Function that can write pack data
@@ -331,7 +331,9 @@ class SSHGitClient(GitClient):
         self._kwargs = kwargs
 
     def send_pack(self, path, determine_wants, generate_pack_contents):
-        remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack '%s'" % path], port=self.port, username=self.username)
+        remote = get_ssh_vendor().connect_ssh(
+            self.host, ["git-receive-pack '%s'" % path],
+            port=self.port, username=self.username)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
         return client.send_pack(path, determine_wants, generate_pack_contents)
 

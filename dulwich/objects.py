@@ -466,7 +466,7 @@ class Blob(ShaFile):
         return self._chunked_text
 
     def _deserialize(self, chunks):
-        return "".join(chunks)
+        self._chunked_text = chunks
 
     chunked = property(_get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")

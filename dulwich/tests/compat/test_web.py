@@ -28,7 +28,10 @@ import threading
 from wsgiref import simple_server
 
 from dulwich.server import (
-    GitBackend,
+    DictBackend,
+    )
+from dulwich.tests import (
+    TestSkipped,
     )
 from dulwich.web import (
     HTTPGitApplication,
@@ -40,7 +43,6 @@ from server_utils import (
     )
 from utils import (
     CompatTestCase,
-    SkipTest,
     )
 
 
@@ -68,7 +70,8 @@ class WebTests(ServerTests):
     protocol = 'http'
 
     def _start_server(self, repo):
-        app = self._make_app(GitBackend(repo))
+        backend = DictBackend({'/': repo})
+        app = self._make_app(backend)
         dul_server = simple_server.make_server('localhost', 0, app,
                                                server_class=WSGIServer)
         threading.Thread(target=dul_server.serve_forever).start()
@@ -95,7 +98,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # TODO(dborowitz): enable after merging thin pack fixes.
-        raise SkipTest('Skipping push test due to known pack bug.')
+        raise TestSkipped('Skipping push test due to known pack bug.')
 
 
 class DumbWebTestCase(WebTests, CompatTestCase):
@@ -114,4 +117,4 @@ class DumbWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # Note: remove this if dumb pushing is supported
-        raise SkipTest('Dumb web pushing not supported.')
+        raise TestSkipped('Dumb web pushing not supported.')

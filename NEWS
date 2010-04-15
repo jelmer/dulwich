@@ -13,6 +13,9 @@
 
   * Implement RefsContainer.__contains__. (Jelmer Vernooij)
 
+  * Cope with \r in ref files on Windows. (
+	http://github.com/jelmer/dulwich/issues/#issue/13, Jelmer Vernooij)
+
  FEATURES
 
   * Add include-tag capability to server. (Dave Borowitz)
@@ -28,6 +31,9 @@
 
   * Repo.get_blob, Repo.commit, Repo.tag and Repo.tree are now deprecated.
     (Jelmer Vernooij)
+
+  * RefsContainer.set_ref() was renamed to RefsContainer.set_symbolic_ref(),
+    for clarity. (Jelmer Vernooij)
 
  API CHANGES
 

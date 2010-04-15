@@ -23,6 +23,7 @@
 import errno
 import itertools
 import os
+import posixpath
 import stat
 import tempfile
 import urllib2
@@ -38,6 +39,7 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     sha_to_hex,
+    hex_to_filename,
     S_ISGITLINK,
     )
 from dulwich.pack import (
@@ -91,14 +93,14 @@ class BaseObjectStore(object):
         """Obtain the raw text for an object.
 
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         raise NotImplementedError(self.get_raw)
 
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""
-        type, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type, uncomp)
+        type_num, uncomp = self.get_raw(sha)
+        return ShaFile.from_raw_string(type_num, uncomp)
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
@@ -137,10 +139,7 @@ class BaseObjectStore(object):
             else:
                 ttree = {}
             for name, oldmode, oldhexsha in stree.iteritems():
-                if path == "":
-                    oldchildpath = name
-                else:
-                    oldchildpath = "%s/%s" % (path, name)
+                oldchildpath = posixpath.join(path, name)
                 try:
                     (newmode, newhexsha) = ttree[name]
                     newchildpath = oldchildpath
@@ -166,10 +165,7 @@ class BaseObjectStore(object):
                             yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
 
             for name, newmode, newhexsha in ttree.iteritems():
-                if path == "":
-                    childpath = name
-                else:
-                    childpath = "%s/%s" % (path, name)
+                childpath = posixpath.join(path, name)
                 if not name in stree:
                     if not stat.S_ISDIR(newmode):
                         yield ((None, childpath), (None, newmode), (None, newhexsha))
@@ -186,10 +182,7 @@ class BaseObjectStore(object):
             (tid, tpath) = todo.pop()
             tree = self[tid]
             for name, mode, hexsha in tree.iteritems(): 
-                if tpath == "":
-                    path = name
-                else:
-                    path = "%s/%s" % (tpath, name)
+                path = posixpath.join(tpath, name)
                 if stat.S_ISDIR(mode):
                     todo.add((hexsha, path))
                 else:
@@ -233,13 +226,14 @@ class BaseObjectStore(object):
         """
         return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
 
-    def generate_pack_contents(self, have, want):
+    def generate_pack_contents(self, have, want, progress=None):
         """Iterate over the contents of a pack file.
 
         :param have: List of SHA1s of objects that should not be sent
         :param want: List of SHA1s of objects that should be sent
+        :param progress: Optional progress reporting method
         """
-        return self.iter_shas(self.find_missing_objects(have, want))
+        return self.iter_shas(self.find_missing_objects(have, want, progress))
 
 
 class PackBasedObjectStore(BaseObjectStore):
@@ -292,9 +286,9 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
-        
+
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         if len(name) == 40:
             sha = hex_to_sha(name)
@@ -313,7 +307,7 @@ class PackBasedObjectStore(BaseObjectStore):
             hexsha = sha_to_hex(name)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
-            return ret.type, ret.as_raw_string()
+            return ret.type_num, ret.as_raw_string()
         raise KeyError(hexsha)
 
     def add_objects(self, objects):
@@ -369,10 +363,8 @@ class DiskObjectStore(PackBasedObjectStore):
             raise
 
     def _get_shafile_path(self, sha):
-        dir = sha[:2]
-        file = sha[2:]
         # Check from object dir
-        return os.path.join(self.path, dir, file)
+        return hex_to_filename(self.path, sha)
 
     def _iter_loose_objects(self):
         for base in os.listdir(self.path):
@@ -385,7 +377,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_file(path)
-        except OSError, e:
+        except (OSError, IOError), e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -484,6 +476,17 @@ class DiskObjectStore(PackBasedObjectStore):
         finally:
             f.close()
 
+    @classmethod
+    def init(cls, path):
+        try:
+            os.mkdir(path)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
+        os.mkdir(os.path.join(path, "info"))
+        os.mkdir(os.path.join(path, PACKDIR))
+        return cls(path)
+
 
 class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
@@ -511,9 +514,9 @@ class MemoryObjectStore(BaseObjectStore):
 
     def get_raw(self, name):
         """Obtain the raw text for an object.
-        
+
         :param name: sha for the object.
-        :return: tuple with object type and object contents.
+        :return: tuple with numeric type and object contents.
         """
         return self[name].as_raw_string()
 
@@ -629,7 +632,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     mode = None
     for p in parts:
         obj = lookup_obj(sha)
-        if type(obj) is not Tree:
+        if not isinstance(obj, Tree):
             raise NotTreeError(sha)
         if p == '':
             continue
@@ -713,11 +716,25 @@ class ObjectStoreGraphWalker(object):
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
-        if sha in self.heads:
-            self.heads.remove(sha)
-        if sha in self.parents:
-            for p in self.parents[sha]:
-                self.ack(p)
+        ancestors = set([sha])
+
+        # stop if we run out of heads to remove
+        while self.heads:
+            for a in ancestors:
+                if a in self.heads:
+                    self.heads.remove(a)
+
+            # collect all ancestors
+            new_ancestors = set()
+            for a in ancestors:
+                if a in self.parents:
+                    new_ancestors.update(self.parents[a])
+
+            # no more ancestors; stop
+            if not new_ancestors:
+                break
+
+            ancestors = new_ancestors
 
     def next(self):
         """Iterate over ancestors of heads in the target."""

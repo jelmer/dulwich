@@ -36,6 +36,7 @@ def test_suite():
         'objects',
         'object_store',
         'pack',
+        'patch',
         'protocol',
         'repository',
         'server',

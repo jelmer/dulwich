@@ -20,6 +20,9 @@
 
   * Add include-tag capability to server. (Dave Borowitz)
 
+  * New dulwich.fastexport module that can generate fastexport 
+    streams. (Jelmer Vernooij)
+
  TESTS
 
   * Add framework for testing compatibility with C Git. (Dave Borowitz)

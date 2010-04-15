@@ -20,7 +20,10 @@
 
 """Fast export/import functionality."""
 
-from dulwich.objects import format_timezone
+from dulwich.objects import (
+    Tree,
+    format_timezone,
+    )
 
 import stat
 
@@ -31,29 +34,49 @@ class FastExporter(object):
         self.outf = outf
         self.store = store
         self.markers = {}
+        self._marker_idx = 0
 
-    def export_blob(self, blob, i):
-        self.outf.write("blob\nmark :%s\n" % i)
+    def _allocate_marker(self):
+        self._marker_idx+=1
+        return self._marker_idx
+
+    def _dump_blob(self, blob, marker):
+        self.outf.write("blob\nmark :%s\n" % marker)
         self.outf.write("data %s\n" % blob.raw_length())
         for chunk in blob.as_raw_chunks():
             self.outf.write(chunk)
         self.outf.write("\n")
 
-    def export_commit(self, commit, branchname):
+    def export_blob(self, blob):
+        i = self._allocate_marker()
+        self.markers[i] = blob.id
+        self._dump_blob(blob, i)
+        return i
+
+    def _dump_commit(self, commit, marker, ref, file_changes):
+        self.outf.write("commit %s\n" % ref)
+        self.outf.write("mark :%s\n" % marker)
+        self.outf.write("author %s %s %s\n" % (commit.author,
+            commit.author_time, format_timezone(commit.author_timezone)))
+        self.outf.write("committer %s %s %s\n" % (commit.committer,
+            commit.commit_time, format_timezone(commit.commit_timezone)))
+        self.outf.write("data %s\n" % len(commit.message))
+        self.outf.write(commit.message)
+        self.outf.write("\n")
+        self.outf.write('\n'.join(file_changes))
+        self.outf.write("\n\n")
+
+    def export_commit(self, commit, ref, base_tree=None):
         file_changes = []
-        for path, mode, hexsha in tree_changes(commit.tree):
-            if stat.S_ISDIR(mode):
-                file_changes.extend(self.dump_file_tree(self.store[hexsha]))
-            else:
-                self.dump_file_blob(self.store[hexsha], i)
-            file_changes.append("M %o :%s %s" % (mode, i, path))
-        return file_changes
-        self.write("commit refs/heads/%s\n" % branchname)
-        self.write("committer %s %s %s\n" % (commit.committer, commit.commit_time, format_timezone(commit.commit_timezone)))
-        self.write("author %s %s %s\n" % (commit.author, commit.author_time, format_timezone(commit.author_timezone)))
-        self.write("data %s\n" % len(commit.message))
-        self.write(commit.message)
-        self.write("\n")
-        file_changes = self.export_tree(self.store[commit.tree])
-        self.write('\n'.join(file_changes))
-        self.write("\n\n")
+        for (old_path, new_path), (old_mode, new_mode), (old_hexsha, new_hexsha) in \
+                self.store.tree_changes(base_tree, commit.tree):
+            if new_path is None:
+                file_changes.append("D %s" % old_path)
+                continue
+            if not stat.S_ISDIR(new_mode):
+                marker = self.export_blob(self.store[new_hexsha])
+            file_changes.append("M %o :%s %s" % (new_mode, marker, new_path))
+
+        i = self._allocate_marker()
+        self._dump_commit(commit, i, ref, file_changes)
+        return i

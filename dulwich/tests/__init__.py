@@ -29,6 +29,7 @@ from nose import SkipTest as TestSkipped
 def test_suite():
     names = [
         'client',
+        'fastexport',
         'file',
         'index',
         'lru_cache',

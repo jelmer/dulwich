@@ -25,6 +25,7 @@ from dulwich.objects import format_timezone
 import stat
 
 class FastExporter(object):
+    """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf, store):
         self.outf = outf
@@ -34,7 +35,8 @@ class FastExporter(object):
     def export_blob(self, blob, i):
         self.outf.write("blob\nmark :%s\n" % i)
         self.outf.write("data %s\n" % blob.raw_length())
-        self.outf.write(blob.as_raw_string())
+        for chunk in blob.as_raw_chunks():
+            self.outf.write(chunk)
         self.outf.write("\n")
 
     def export_commit(self, commit, branchname):

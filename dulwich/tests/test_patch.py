@@ -51,8 +51,11 @@ class WriteCommitPatchTests(TestCase):
             "And this is the second line.\n",
             "\n",
             "\n",
-            "---\n",
-            " 0 files changed\n",
+            "---\n"], lines[3:8])
+        self.assertEquals([
             "\n",
             "CONTENTS-- \n",
-            "custom\n"], lines[3:])
+            "custom\n"], lines[-3:])
+        if len(lines) >= 12:
+            # diffstat may not be present
+            self.assertEquals(lines[8], " 0 files changed\n")

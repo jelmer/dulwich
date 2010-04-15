@@ -49,14 +49,27 @@ from dulwich.protocol import (
     MULTI_ACK_DETAILED,
     ack_type,
     )
-from dulwich.repo import (
-    Repo,
-    )
 from dulwich.pack import (
     write_pack_data,
     )
 
 class Backend(object):
+    """A backend for the Git smart server implementation."""
+
+    def open_repository(self, path):
+        """Open the repository at a path."""
+        raise NotImplementedError(self.open_repository)
+
+
+class BackendRepo(object):
+    """Repository abstraction used by the Git server.
+    
+    Please note that the methods required here are a 
+    subset of those provided by dulwich.repo.Repo.
+    """
+
+    object_store = None
+    refs = None
 
     def get_refs(self):
         """
@@ -66,14 +79,16 @@ class Backend(object):
         """
         raise NotImplementedError
 
-    def apply_pack(self, refs, read, delete_refs=True):
-        """ Import a set of changes into a repository and update the refs
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
 
-        :param refs: list of tuple(name, sha)
-        :param read: callback to read from the incoming pack
-        :param delete_refs: whether to allow deleting refs
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to
+            a tag, this will be the SHA the ref refers to. If no cached
+            information about a tag is available, this method may return None,
+            but it should attempt to peel the tag if possible.
         """
-        raise NotImplementedError
+        return None
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):
@@ -87,71 +102,15 @@ class Backend(object):
         raise NotImplementedError
 
 
-class GitBackend(Backend):
+class DictBackend(Backend):
+    """Trivial backend that looks up Git repositories in a dictionary."""
 
-    def __init__(self, repo=None):
-        if repo is None:
-            repo = Repo(tmpfile.mkdtemp())
-        self.repo = repo
-        self.refs = self.repo.refs
-        self.object_store = self.repo.object_store
-        self.fetch_objects = self.repo.fetch_objects
-        self.get_refs = self.repo.get_refs
+    def __init__(self, repos):
+        self.repos = repos
 
-    def apply_pack(self, refs, read, delete_refs=True):
-        f, commit = self.repo.object_store.add_thin_pack()
-        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
-        status = []
-        unpack_error = None
-        # TODO: more informative error messages than just the exception string
-        try:
-            # TODO: decode the pack as we stream to avoid blocking reads beyond
-            # the end of data (when using HTTP/1.1 chunked encoding)
-            while True:
-                data = read(10240)
-                if not data:
-                    break
-                f.write(data)
-        except all_exceptions, e:
-            unpack_error = str(e).replace('\n', '')
-        try:
-            commit()
-        except all_exceptions, e:
-            if not unpack_error:
-                unpack_error = str(e).replace('\n', '')
-
-        if unpack_error:
-            status.append(('unpack', unpack_error))
-        else:
-            status.append(('unpack', 'ok'))
-
-        for oldsha, sha, ref in refs:
-            ref_error = None
-            try:
-                if sha == ZERO_SHA:
-                    if not delete_refs:
-                        raise GitProtocolError(
-                          'Attempted to delete refs without delete-refs '
-                          'capability.')
-                    try:
-                        del self.repo.refs[ref]
-                    except all_exceptions:
-                        ref_error = 'failed to delete'
-                else:
-                    try:
-                        self.repo.refs[ref] = sha
-                    except all_exceptions:
-                        ref_error = 'failed to write'
-            except KeyError, e:
-                ref_error = 'bad ref'
-            if ref_error:
-                status.append((ref, ref_error))
-            else:
-                status.append((ref, 'ok'))
-
-
-        print "pack applied"
-        return status
+    def open_repository(self, path):
+        # FIXME: What to do in case there is no repo ?
+        return self.repos[path]
 
 
 class Handler(object):
@@ -198,9 +157,10 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
-    def __init__(self, backend, read, write,
+    def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
+        self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
@@ -230,14 +190,14 @@ class UploadPackHandler(Handler):
         if not self.has_capability("include-tag"):
             return {}
         if refs is None:
-            refs = self.backend.get_refs()
+            refs = self.repo.get_refs()
         if repo is None:
-            repo = getattr(self.backend, "repo", None)
+            repo = getattr(self.repo, "repo", None)
             if repo is None:
                 # Bail if we don't have a Repo available; this is ok since
                 # clients must be able to handle if the server doesn't include
                 # all relevant tags.
-                # TODO: either guarantee a Repo, or fix behavior when missing
+                # TODO: fix behavior when missing
                 return {}
         tagged = {}
         for name, sha in refs.iteritems():
@@ -249,8 +209,9 @@ class UploadPackHandler(Handler):
     def handle(self):
         write = lambda x: self.proto.write_sideband(1, x)
 
-        graph_walker = ProtocolGraphWalker(self)
-        objects_iter = self.backend.fetch_objects(
+        graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
+            self.repo.get_peeled)
+        objects_iter = self.repo.fetch_objects(
           graph_walker.determine_wants, graph_walker, self.progress,
           get_tagged=self.get_tagged)
 
@@ -270,9 +231,9 @@ class UploadPackHandler(Handler):
 class ProtocolGraphWalker(object):
     """A graph walker that knows the git protocol.
 
-    As a graph walker, this class implements ack(), next(), and reset(). It also
-    contains some base methods for interacting with the wire and walking the
-    commit tree.
+    As a graph walker, this class implements ack(), next(), and reset(). It
+    also contains some base methods for interacting with the wire and walking
+    the commit tree.
 
     The work of determining which acks to send is passed on to the
     implementation instance stored in _impl. The reason for this is that we do
@@ -280,9 +241,10 @@ class ProtocolGraphWalker(object):
     call to set_ack_level() is required to set up the implementation, before any
     calls to next() or ack() are made.
     """
-    def __init__(self, handler):
+    def __init__(self, handler, object_store, get_peeled):
         self.handler = handler
-        self.store = handler.backend.object_store
+        self.store = object_store
+        self.get_peeled = get_peeled
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
@@ -312,7 +274,7 @@ class ProtocolGraphWalker(object):
                 if not i:
                     line = "%s\x00%s" % (line, self.handler.capability_line())
                 self.proto.write_pkt_line("%s\n" % line)
-                peeled_sha = self.handler.backend.repo.get_peeled(ref)
+                peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line('%s %s^{}\n' %
                                               (peeled_sha, ref))
@@ -421,10 +383,10 @@ class ProtocolGraphWalker(object):
             commit = pending.popleft()
             if commit.id in haves:
                 return True
-            if not getattr(commit, 'get_parents', None):
+            if commit.type_name != "commit":
                 # non-commit wants are assumed to be satisfied
                 continue
-            for parent in commit.get_parents():
+            for parent in commit.parents:
                 parent_obj = self.store[parent]
                 # TODO: handle parents with later commit times than children
                 if parent_obj.commit_time >= earliest:
@@ -559,17 +521,71 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, read, write,
+    def __init__(self, backend, args, read, write,
                  stateless_rpc=False, advertise_refs=False):
         Handler.__init__(self, backend, read, write)
+        self.repo = backend.open_repository(args[0])
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
     def capabilities(self):
         return ("report-status", "delete-refs")
 
+    def _apply_pack(self, refs, read):
+        f, commit = self.repo.object_store.add_thin_pack()
+        all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
+        status = []
+        unpack_error = None
+        # TODO: more informative error messages than just the exception string
+        try:
+            # TODO: decode the pack as we stream to avoid blocking reads beyond
+            # the end of data (when using HTTP/1.1 chunked encoding)
+            while True:
+                data = read(10240)
+                if not data:
+                    break
+                f.write(data)
+        except all_exceptions, e:
+            unpack_error = str(e).replace('\n', '')
+        try:
+            commit()
+        except all_exceptions, e:
+            if not unpack_error:
+                unpack_error = str(e).replace('\n', '')
+
+        if unpack_error:
+            status.append(('unpack', unpack_error))
+        else:
+            status.append(('unpack', 'ok'))
+
+        for oldsha, sha, ref in refs:
+            ref_error = None
+            try:
+                if sha == ZERO_SHA:
+                    if not self.has_capability('delete-refs'):
+                        raise GitProtocolError(
+                          'Attempted to delete refs without delete-refs '
+                          'capability.')
+                    try:
+                        del self.repo.refs[ref]
+                    except all_exceptions:
+                        ref_error = 'failed to delete'
+                else:
+                    try:
+                        self.repo.refs[ref] = sha
+                    except all_exceptions:
+                        ref_error = 'failed to write'
+            except KeyError, e:
+                ref_error = 'bad ref'
+            if ref_error:
+                status.append((ref, ref_error))
+            else:
+                status.append((ref, 'ok'))
+
+        return status
+
     def handle(self):
-        refs = self.backend.get_refs().items()
+        refs = self.repo.get_refs().items()
 
         if self.advertise_refs or not self.stateless_rpc:
             if refs:
@@ -603,8 +619,7 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.backend.apply_pack(client_refs, self.proto.read,
-                                         self.has_capability('delete-refs'))
+        status = self.repo._apply_pack(client_refs, self.proto.read)
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
@@ -633,7 +648,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
         else:
             return
 
-        h = cls(self.server.backend, self.rfile.read, self.wfile.write)
+        h = cls(self.server.backend, args, self.rfile.read, self.wfile.write)
         h.handle()
 
 

@@ -37,18 +37,22 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 
 static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 {
-	char *text, *end;
+	char *text, *start, *end;
 	int len, namelen;
 	PyObject *ret, *item, *name;
 
 	if (!PyArg_ParseTuple(args, "s#", &text, &len))
 		return NULL;
 
-	ret = PyDict_New();
+	/* TODO: currently this returns a list; if memory usage is a concern,
+	* consider rewriting as a custom iterator object */
+	ret = PyList_New(0);
+
 	if (ret == NULL) {
 		return NULL;
 	}
 
+	start = text;
 	end = text + len;
 
 	while (text < end) {
@@ -56,14 +60,14 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		mode = strtol(text, &text, 8);
 
 		if (*text != ' ') {
-			PyErr_SetString(PyExc_RuntimeError, "Expected space");
+			PyErr_SetString(PyExc_ValueError, "Expected space");
 			Py_DECREF(ret);
 			return NULL;
 		}
 
 		text++;
 
-		namelen = strlen(text);
+		namelen = strnlen(text, len - (text - start));
 
 		name = PyString_FromStringAndSize(text, namelen);
 		if (name == NULL) {
@@ -71,19 +75,25 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 			return NULL;
 		}
 
-		item = Py_BuildValue("(lN)", mode,
+		if (text + namelen + 20 >= end) {
+			PyErr_SetString(PyExc_ValueError, "SHA truncated");
+			Py_DECREF(ret);
+			Py_DECREF(name);
+			return NULL;
+		}
+
+		item = Py_BuildValue("(NlN)", name, mode,
 							 sha_to_pyhex((unsigned char *)text+namelen+1));
 		if (item == NULL) {
 			Py_DECREF(ret);
 			Py_DECREF(name);
 			return NULL;
 		}
-		if (PyDict_SetItem(ret, name, item) == -1) {
+		if (PyList_Append(ret, item) == -1) {
 			Py_DECREF(ret);
 			Py_DECREF(item);
 			return NULL;
 		}
-		Py_DECREF(name);
 		Py_DECREF(item);
 
 		text += namelen+21;

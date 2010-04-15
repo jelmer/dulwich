@@ -21,3 +21,7 @@ The project is named after the part of London that Mr. and Mrs. Git live in
 in the particular Monty Python sketch. It is based on the Python-Git module 
 that James Westby <jw+debian@jameswestby.net> released in 2007 and now 
 maintained by Jelmer Vernooij and John Carr.
+
+Please file bugs in the Dulwich project on Launchpad: 
+
+https://bugs.launchpad.net/dulwich/+filebug

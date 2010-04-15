@@ -49,7 +49,7 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
-    num_type_map,
+    object_class,
     )
 import warnings
 
@@ -62,9 +62,6 @@ REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
 BASE_DIRECTORIES = [
-    [OBJECTDIR], 
-    [OBJECTDIR, "info"], 
-    [OBJECTDIR, "pack"],
     ["branches"],
     [REFSDIR],
     [REFSDIR, REFSDIR_TAGS],
@@ -77,7 +74,7 @@ BASE_DIRECTORIES = [
 def read_info_refs(f):
     ret = {}
     for l in f.readlines():
-        (sha, name) = l.rstrip("\n").split("\t", 1)
+        (sha, name) = l.rstrip("\r\n").split("\t", 1)
         ret[name] = sha
     return ret
 
@@ -118,6 +115,12 @@ class RefsContainer(object):
     """A container for refs."""
 
     def set_ref(self, name, other):
+        warnings.warn("RefsContainer.set_ref() is deprecated."
+            "Use set_symblic_ref instead.",
+            category=DeprecationWarning, stacklevel=2)
+        return self.set_symbolic_ref(name, other)
+
+    def set_symbolic_ref(self, name, other):
         """Make a ref point at another ref.
 
         :param name: Name of the ref to set
@@ -200,6 +203,18 @@ class RefsContainer(object):
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
             raise KeyError(name)
 
+    def read_ref(self, refname):
+        """Read a reference without following any references.
+
+        :param refname: The name of the reference
+        :return: The contents of the ref file, or None if it does 
+            not exist.
+        """
+        contents = self.read_loose_ref(refname)
+        if not contents:
+            contents = self.get_packed_refs().get(refname, None)
+        return contents
+
     def read_loose_ref(self, name):
         """Read a loose reference and return its contents.
 
@@ -220,20 +235,16 @@ class RefsContainer(object):
         depth = 0
         while contents.startswith(SYMREF):
             refname = contents[len(SYMREF):]
-            contents = self.read_loose_ref(refname)
+            contents = self.read_ref(refname)
             if not contents:
-                contents = self.get_packed_refs().get(refname, None)
-                if not contents:
-                    break
+                break
             depth += 1
             if depth > 5:
                 raise KeyError(name)
         return refname, contents
 
     def __contains__(self, refname):
-        if self.read_loose_ref(refname):
-            return True
-        if self.get_packed_refs().get(refname, None):
+        if self.read_ref(refname):
             return True
         return False
 
@@ -380,7 +391,7 @@ class DiskRefsContainer(RefsContainer):
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
-                    return header + iter(f).next().rstrip("\n")
+                    return header + iter(f).next().rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40-len(SYMREF))
@@ -572,7 +583,7 @@ def read_packed_refs_with_peeled(f):
     for l in f:
         if l[0] == "#":
             continue
-        l = l.rstrip("\n")
+        l = l.rstrip("\r\n")
         if l[0] == "^":
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
@@ -698,7 +709,7 @@ class BaseRepo(object):
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
         ret = self.get_object(sha)
-        if ret._type != cls._type:
+        if not isinstance(ret, cls):
             if cls is Commit:
                 raise NotCommitError(ret)
             elif cls is Blob:
@@ -708,7 +719,8 @@ class BaseRepo(object):
             elif cls is Tag:
                 raise NotTagError(ret)
             else:
-                raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
+                raise Exception("Type invalid: %r != %r" % (
+                  ret.type_name, cls.type_name))
         return ret
 
     def get_object(self, sha):
@@ -784,9 +796,9 @@ class BaseRepo(object):
         if cached is not None:
             return cached
         obj = self[ref]
-        obj_type = num_type_map[obj.type]
-        while obj_type == Tag:
-            obj_type, sha = obj.object
+        obj_class = object_class(obj.type_name)
+        while obj_class is Tag:
+            obj_class, sha = obj.object
             obj = self.get_object(sha)
         return obj.id
 
@@ -1001,8 +1013,9 @@ class Repo(BaseRepo):
     def init_bare(cls, path, mkdir=True):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
+        DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
         ret._put_named_file('description', "Unnamed repository")
         ret._put_named_file('config', """[core]
     repositoryformatversion = 0

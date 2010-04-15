@@ -31,6 +31,7 @@ from dulwich.object_store import (
     )
 import os
 import shutil
+import tempfile
 
 
 testobject = Blob()
@@ -39,12 +40,18 @@ testobject.data = "yummy data"
 
 class SpecificDiskObjectStoreTests(TestCase):
 
+    def setUp(self):
+        self.store_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.store_dir)
+
     def test_pack_dir(self):
-        o = DiskObjectStore("foo")
-        self.assertEquals(os.path.join("foo", "pack"), o.pack_dir)
+        o = DiskObjectStore(self.store_dir)
+        self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
 
     def test_empty_packs(self):
-        o = DiskObjectStore("foo")
+        o = DiskObjectStore(self.store_dir)
         self.assertEquals([], o.packs)
 
 
@@ -95,10 +102,12 @@ class DiskObjectStoreTests(ObjectStoreTests,TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        if os.path.exists("foo"):
-            shutil.rmtree("foo")
-        os.makedirs(os.path.join("foo", "pack"))
-        self.store = DiskObjectStore("foo")
+        self.store_dir = tempfile.mkdtemp()
+        self.store = DiskObjectStore.init(self.store_dir)
+
+    def tearDown(self):
+        TestCase.tearDown(self)
+        shutil.rmtree(self.store_dir)
 
 
 # TODO: MissingObjectFinderTests

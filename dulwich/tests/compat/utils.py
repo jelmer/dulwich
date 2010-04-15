@@ -24,11 +24,11 @@ import subprocess
 import tempfile
 import unittest
 
-# XXX: Ideally we shouldn't depend on nose but allow other testrunners as well.
-from nose import SkipTest
-
 from dulwich.repo import Repo
 
+from dulwich.tests import (
+    TestSkipped,
+    )
 
 _DEFAULT_GIT = 'git'
 
@@ -67,8 +67,8 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     if found_version < required_version:
         required_version = '.'.join(map(str, required_version))
         found_version = '.'.join(map(str, found_version))
-        raise SkipTest('Test requires git >= %s, found %s' %
-                            (required_version, found_version))
+        raise TestSkipped('Test requires git >= %s, found %s' %
+                         (required_version, found_version))
 
 
 def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,

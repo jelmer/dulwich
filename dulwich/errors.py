@@ -37,40 +37,39 @@ class ChecksumMismatch(Exception):
 
 class WrongObjectException(Exception):
     """Baseclass for all the _ is not a _ exceptions on objects.
-  
+
     Do not instantiate directly.
-  
-    Subclasses should define a _type attribute that indicates what
+
+    Subclasses should define a type_name attribute that indicates what
     was expected if they were raised.
     """
-  
+
     def __init__(self, sha, *args, **kwargs):
-        string = "%s is not a %s" % (sha, self._type)
-        Exception.__init__(self, string)
+        Exception.__init__(self, "%s is not a %s" % (sha, self.type_name))
 
 
 class NotCommitError(WrongObjectException):
     """Indicates that the sha requested does not point to a commit."""
-  
-    _type = 'commit'
+
+    type_name = 'commit'
 
 
 class NotTreeError(WrongObjectException):
     """Indicates that the sha requested does not point to a tree."""
-  
-    _type = 'tree'
+
+    type_name = 'tree'
 
 
 class NotTagError(WrongObjectException):
     """Indicates that the sha requested does not point to a tag."""
 
-    _type = 'tag'
+    type_name = 'tag'
 
 
 class NotBlobError(WrongObjectException):
     """Indicates that the sha requested does not point to a blob."""
-  
-    _type = 'blob'
+
+    type_name = 'blob'
 
 
 class MissingCommitError(Exception):
@@ -122,6 +121,10 @@ class FileFormatException(Exception):
 
 class PackedRefsException(FileFormatException):
     """Indicates an error parsing a packed-refs file."""
+
+
+class ObjectFormatException(FileFormatException):
+    """Indicates an error parsing an object."""
 
 
 class NoIndexPresent(Exception):

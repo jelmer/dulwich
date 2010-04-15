@@ -26,12 +26,15 @@ from dulwich.errors import (
     GitProtocolError,
     )
 from dulwich.server import (
-    UploadPackHandler,
+    Backend,
+    DictBackend,
+    BackendRepo,
     Handler,
-    ProtocolGraphWalker,
-    SingleAckGraphWalkerImpl,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
+    ProtocolGraphWalker,
+    SingleAckGraphWalkerImpl,
+    UploadPackHandler,
     )
 
 
@@ -76,7 +79,7 @@ class TestProto(object):
 class HandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = Handler(None, None, None)
+        self._handler = Handler(Backend(), None, None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
         self._handler.required_capabilities = lambda: ('cap2',)
 
@@ -119,7 +122,9 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = UploadPackHandler(None, None, None)
+        self._backend = DictBackend({"/": BackendRepo()})
+        self._handler = UploadPackHandler(self._backend,
+                ["/", "host=lolcathost"], None, None)
         self._handler.proto = TestProto()
 
     def test_progress(self):
@@ -170,11 +175,9 @@ class TestCommit(object):
 
     def __init__(self, sha, parents, commit_time):
         self.id = sha
-        self._parents = parents
+        self.parents = parents
         self.commit_time = commit_time
-
-    def get_parents(self):
-        return self._parents
+        self.type_name = "commit"
 
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__, self._sha)
@@ -223,7 +226,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
             }
 
         self._walker = ProtocolGraphWalker(
-            TestUploadPackHandler(self._objects, TestProto()))
+            TestUploadPackHandler(self._objects, TestProto()),
+            self._objects, None)
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))
@@ -275,7 +279,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             'want %s' % TWO,
             ])
         heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
-        self._walker.handler.backend.repo.peeled = heads
+        self._walker.get_peeled = heads.get
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
@@ -295,7 +299,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         # advertise branch tips plus tag
         heads = {'ref4': FOUR, 'ref5': FIVE, 'tag6': SIX}
         peeled = {'ref4': FOUR, 'ref5': FIVE, 'tag6': FIVE}
-        self._walker.handler.backend.repo.peeled = peeled
+        self._walker.get_peeled = peeled.get
         self._walker.determine_wants(heads)
         lines = []
         while True:

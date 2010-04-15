@@ -19,13 +19,14 @@
 
 import sys
 from dulwich.repo import Repo
-from dulwich.server import GitBackend, TCPGitServer
+from dulwich.server import DictBackend, TCPGitServer
 
 if __name__ == "__main__":
-    gitdir = None
     if len(sys.argv) > 1:
         gitdir = sys.argv[1]
+    else:
+        gitdir = "."
 
-    backend = GitBackend(Repo(gitdir))
+    backend = DictBackend({"/": Repo(gitdir)})
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()

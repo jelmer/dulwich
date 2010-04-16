@@ -79,7 +79,7 @@ class TestProto(object):
 class HandlerTestCase(TestCase):
 
     def setUp(self):
-        self._handler = Handler(Backend(), None, None)
+        self._handler = Handler(Backend(), None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
         self._handler.required_capabilities = lambda: ('cap2',)
 

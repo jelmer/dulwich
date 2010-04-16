@@ -22,6 +22,7 @@
 
 import errno
 import os
+import tempfile
 
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
@@ -30,6 +31,36 @@ def ensure_dir_exists(dirname):
     except OSError, e:
         if e.errno != errno.EEXIST:
             raise
+
+def fancy_rename(oldname, newname):
+    """Rename file with temporary backup file to rollback if rename fails"""
+    if not os.path.exists(newname):
+        try:
+            os.rename(oldname, newname)
+        except OSError, e:
+            raise
+        return
+
+    # destination file exists
+    try:
+        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        os.close(fd)
+        os.remove(tmpfile)
+    except OSError, e:
+        # either file could not be created (e.g. permission problem)
+        # or could not be deleted (e.g. rude virus scanner)
+        raise
+    try:
+        os.rename(newname, tmpfile)
+    except OSError, e:
+        raise   # no rename occurred
+    try:
+        os.rename(oldname, newname)
+    except OSError, e:
+        os.rename(tmpfile, newname)
+        raise
+    os.remove(tmpfile)
+
 
 def GitFile(filename, mode='r', bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
@@ -129,6 +160,11 @@ class _GitFile(object):
         self._file.close()
         try:
             os.rename(self._lockfilename, self._filename)
+        except OSError, e:
+            # Windows versions prior to Vista don't support atomic renames
+            if e.errno != errno.EEXIST:
+                raise
+            fancy_rename(self._lockfilename, self._filename)
         finally:
             self.abort()
 

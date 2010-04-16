@@ -36,7 +36,6 @@ except ImportError:
     from misc import defaultdict
 
 import difflib
-import errno
 from itertools import (
     chain,
     imap,
@@ -136,7 +135,10 @@ def load_pack_index(path):
     :return: A PackIndex loaded from the given path
     """
     f = GitFile(path, 'rb')
-    return load_pack_index_file(path, f)
+    try:
+        return load_pack_index_file(path, f)
+    finally:
+        f.close()
 
 
 def _load_file_contents(f, size=None):
@@ -540,6 +542,9 @@ class PackData(object):
     def close(self):
         self._file.close()
 
+    def __del__(self):
+        self.close()
+
     def _get_size(self):
         if self._size is not None:
             return self._size
@@ -910,19 +915,21 @@ def write_pack_index_v1(filename, entries, pack_checksum):
     :param pack_checksum: Checksum of the pack file.
     """
     f = GitFile(filename, 'wb')
-    f = SHA1Writer(f)
-    fan_out_table = defaultdict(lambda: 0)
-    for (name, offset, entry_checksum) in entries:
-        fan_out_table[ord(name[0])] += 1
-    # Fan-out table
-    for i in range(0x100):
-        f.write(struct.pack(">L", fan_out_table[i]))
-        fan_out_table[i+1] += fan_out_table[i]
-    for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">L20s", offset, name))
-    assert len(pack_checksum) == 20
-    f.write(pack_checksum)
-    f.close()
+    try:
+        f = SHA1Writer(f)
+        fan_out_table = defaultdict(lambda: 0)
+        for (name, offset, entry_checksum) in entries:
+            fan_out_table[ord(name[0])] += 1
+        # Fan-out table
+        for i in range(0x100):
+            f.write(struct.pack(">L", fan_out_table[i]))
+            fan_out_table[i+1] += fan_out_table[i]
+        for (name, offset, entry_checksum) in entries:
+            f.write(struct.pack(">L20s", offset, name))
+        assert len(pack_checksum) == 20
+        f.write(pack_checksum)
+    finally:
+        f.close()
 
 
 def create_delta(base_buf, target_buf):
@@ -1059,27 +1066,29 @@ def write_pack_index_v2(filename, entries, pack_checksum):
     :param pack_checksum: Checksum of the pack file.
     """
     f = GitFile(filename, 'wb')
-    f = SHA1Writer(f)
-    f.write('\377tOc') # Magic!
-    f.write(struct.pack(">L", 2))
-    fan_out_table = defaultdict(lambda: 0)
-    for (name, offset, entry_checksum) in entries:
-        fan_out_table[ord(name[0])] += 1
-    # Fan-out table
-    for i in range(0x100):
-        f.write(struct.pack(">L", fan_out_table[i]))
-        fan_out_table[i+1] += fan_out_table[i]
-    for (name, offset, entry_checksum) in entries:
-        f.write(name)
-    for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">L", entry_checksum))
-    for (name, offset, entry_checksum) in entries:
-        # FIXME: handle if MSBit is set in offset
-        f.write(struct.pack(">L", offset))
-    # FIXME: handle table for pack files > 8 Gb
-    assert len(pack_checksum) == 20
-    f.write(pack_checksum)
-    f.close()
+    try:
+        f = SHA1Writer(f)
+        f.write('\377tOc') # Magic!
+        f.write(struct.pack(">L", 2))
+        fan_out_table = defaultdict(lambda: 0)
+        for (name, offset, entry_checksum) in entries:
+            fan_out_table[ord(name[0])] += 1
+        # Fan-out table
+        for i in range(0x100):
+            f.write(struct.pack(">L", fan_out_table[i]))
+            fan_out_table[i+1] += fan_out_table[i]
+        for (name, offset, entry_checksum) in entries:
+            f.write(name)
+        for (name, offset, entry_checksum) in entries:
+            f.write(struct.pack(">L", entry_checksum))
+        for (name, offset, entry_checksum) in entries:
+            # FIXME: handle if MSBit is set in offset
+            f.write(struct.pack(">L", offset))
+        # FIXME: handle table for pack files > 8 Gb
+        assert len(pack_checksum) == 20
+        f.write(pack_checksum)
+    finally:
+        f.close()
 
 
 class Pack(object):

@@ -27,19 +27,27 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 
 import collections
+from cStringIO import StringIO
+import socket
 import SocketServer
+import zlib
 
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
     )
+from dulwich.misc import (
+    make_sha,
+    )
 from dulwich.objects import (
     hex_to_sha,
+    sha_to_hex,
     )
 from dulwich.protocol import (
-    Protocol,
     ProtocolFile,
+    Protocol,
+    ReceivableProtocol,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -50,6 +58,8 @@ from dulwich.protocol import (
     ack_type,
     )
 from dulwich.pack import (
+    read_pack_header,
+    unpack_object,
     write_pack_data,
     )
 
@@ -102,6 +112,105 @@ class BackendRepo(object):
         raise NotImplementedError
 
 
+class PackStreamVerifier(object):
+    """Class to verify a pack stream as it is being read.
+
+    The pack is read from a ReceivableProtocol using read() or recv() as
+    appropriate and written out to the given file-like object.
+    """
+
+    def __init__(self, proto, outfile):
+        self.proto = proto
+        self.outfile = outfile
+        self.sha = make_sha()
+        self._rbuf = StringIO()
+        # trailer is a deque to avoid memory allocation on small reads
+        self._trailer = collections.deque()
+
+    def _read(self, read, size):
+        """Read up to size bytes using the given callback.
+
+        As a side effect, update the verifier's hash (excluding the last 20
+        bytes read) and write through to the output file.
+
+        :param read: The read callback to read from.
+        :param size: The maximum number of bytes to read; the particular
+            behavior is callback-specific.
+        """
+        data = read(size)
+
+        # maintain a trailer of the last 20 bytes we've read
+        n = len(data)
+        tn = len(self._trailer)
+        if n >= 20:
+            to_pop = tn
+            to_add = 20
+        else:
+            to_pop = max(n + tn - 20, 0)
+            to_add = n
+        for _ in xrange(to_pop):
+            self.sha.update(self._trailer.popleft())
+        self._trailer.extend(data[-to_add:])
+
+        # hash everything but the trailer
+        self.sha.update(data[:-to_add])
+        self.outfile.write(data)
+        return data
+
+    def _buf_len(self):
+        buf = self._rbuf
+        start = buf.tell()
+        buf.seek(0, 2)
+        end = buf.tell()
+        buf.seek(start)
+        return end - start
+
+    def read(self, size):
+        """Read, blocking until size bytes are read."""
+        buf_len = self._buf_len()
+        if buf_len >= size:
+            return self._rbuf.read(size)
+        buf_data = self._rbuf.read()
+        self._rbuf = StringIO()
+        return buf_data + self._read(self.proto.read, size - buf_len)
+
+    def recv(self, size):
+        """Read up to size bytes, blocking until one byte is read."""
+        buf_len = self._buf_len()
+        if buf_len:
+            data = self._rbuf.read(size)
+            if size >= buf_len:
+                self._rbuf = StringIO()
+            return data
+        return self._read(self.proto.recv, size)
+
+    def verify(self):
+        """Verify a pack stream and write it to the output file.
+
+        :raise AssertionError: if there is an error in the pack format.
+        :raise ChecksumMismatch: if the checksum of the pack contents does not
+            match the checksum in the pack trailer.
+        :raise socket.error: if an error occurred reading from the socket.
+        :raise zlib.error: if an error occurred during zlib decompression.
+        :raise IOError: if an error occurred writing to the output file.
+        """
+        _, num_objects = read_pack_header(self.read)
+        for i in xrange(num_objects):
+            type, _, _, unused = unpack_object(self.read, self.recv)
+
+            # prepend any unused data to current read buffer
+            buf = StringIO()
+            buf.write(unused)
+            buf.write(self._rbuf.read())
+            buf.seek(0)
+            self._rbuf = buf
+
+        pack_sha = sha_to_hex(''.join([c for c in self._trailer]))
+        calculated_sha = self.sha.hexdigest()
+        if pack_sha != calculated_sha:
+            raise ChecksumMismatch(pack_sha, calculated_sha)
+
+
 class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
 
@@ -116,9 +225,9 @@ class DictBackend(Backend):
 class Handler(object):
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, read, write):
+    def __init__(self, backend, proto):
         self.backend = backend
-        self.proto = Protocol(read, write)
+        self.proto = proto
         self._client_capabilities = None
 
     def capability_line(self):
@@ -157,9 +266,9 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
-    def __init__(self, backend, args, read, write,
+    def __init__(self, backend, args, proto,
                  stateless_rpc=False, advertise_refs=False):
-        Handler.__init__(self, backend, read, write)
+        Handler.__init__(self, backend, proto)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.stateless_rpc = stateless_rpc
@@ -521,9 +630,9 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, read, write,
+    def __init__(self, backend, args, proto,
                  stateless_rpc=False, advertise_refs=False):
-        Handler.__init__(self, backend, read, write)
+        Handler.__init__(self, backend, proto)
         self.repo = backend.open_repository(args[0])
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
@@ -531,20 +640,14 @@ class ReceivePackHandler(Handler):
     def capabilities(self):
         return ("report-status", "delete-refs")
 
-    def _apply_pack(self, refs, read):
+    def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError)
         status = []
         unpack_error = None
         # TODO: more informative error messages than just the exception string
         try:
-            # TODO: decode the pack as we stream to avoid blocking reads beyond
-            # the end of data (when using HTTP/1.1 chunked encoding)
-            while True:
-                data = read(10240)
-                if not data:
-                    break
-                f.write(data)
+            PackStreamVerifier(self.proto, f).verify()
         except all_exceptions, e:
             unpack_error = str(e).replace('\n', '')
         try:
@@ -619,7 +722,7 @@ class ReceivePackHandler(Handler):
             ref = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
-        status = self.repo._apply_pack(client_refs, self.proto.read)
+        status = self._apply_pack(client_refs)
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
@@ -637,7 +740,7 @@ class ReceivePackHandler(Handler):
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
-        proto = Protocol(self.rfile.read, self.wfile.write)
+        proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
         command, args = proto.read_cmd()
 
         # switch case to handle the specific git command
@@ -648,7 +751,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
         else:
             return
 
-        h = cls(self.server.backend, args, self.rfile.read, self.wfile.write)
+        h = cls(self.server.backend, args, proto)
         h.handle()
 
 

@@ -23,9 +23,13 @@ on.
 """
 
 from difflib import SequenceMatcher
+import rfc822
 import subprocess
 import time
 
+from dulwich.objects import (
+    Commit,
+    )
 
 def write_commit_patch(f, commit, contents, progress, version=None):
     """Write a individual file patch.
@@ -134,3 +138,32 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents, 
         old_path, new_path))
+
+
+def git_am_patch_split(f):
+    """Parse a git-am-style patch and split it up into bits.
+
+    :param f: File-like object to parse
+    :return: Tuple with commit object, diff contents and git version
+    """
+    msg = rfc822.Message(f)
+    c = Commit()
+    c.author = msg["from"]
+    c.committer = msg["from"]
+    if msg["subject"].startswith("[PATCH "):
+        subject = msg["subject"].split("]", 1)[1]
+    else:
+        subject = msg["subject"]
+    c.message = subject
+    for l in f:
+        if l == "---\n":
+            break
+        c.message += l
+    diff = ""
+    for l in f:
+        if l == "-- \n":
+            break
+        diff += l
+    version = f.readline().rstrip("\n")
+    assert f.read() == ""
+    return c, diff, version

@@ -26,6 +26,7 @@ from dulwich.objects import (
     Tree,
     )
 from dulwich.patch import (
+    git_am_patch_split,
     write_commit_patch,
     )
 
@@ -59,3 +60,30 @@ class WriteCommitPatchTests(TestCase):
         if len(lines) >= 12:
             # diffstat may not be present
             self.assertEquals(lines[8], " 0 files changed\n")
+
+
+class ReadGitAmPatch(TestCase):
+
+    def test_extract(self):
+        text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+From: Jelmer Vernooij <jelmer@samba.org>
+Date: Thu, 15 Apr 2010 15:40:28 +0200
+Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian warning).
+
+---
+ pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+ 1 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100755 => 100644 pixmaps/prey.ico
+
+-- 
+1.7.0.4
+"""
+        c, diff, version = git_am_patch_split(StringIO(text))
+        self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.committer)
+        self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.author)
+        self.assertEquals(""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+ 1 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100755 => 100644 pixmaps/prey.ico
+
+""", diff)
+        self.assertEquals("1.7.0.4", version)

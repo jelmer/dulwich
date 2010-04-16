@@ -30,6 +30,11 @@ try:
 except ImportError:
     from cgi import parse_qs
 
+try:
+    from os import SEEK_END
+except ImportError:
+    SEEK_END = 2
+
 import struct
 
 

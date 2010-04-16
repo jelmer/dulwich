@@ -67,6 +67,7 @@ from dulwich.lru_cache import (
     )
 from dulwich.misc import (
     make_sha,
+    SEEK_END,
     )
 from dulwich.objects import (
     ShaFile,
@@ -553,7 +554,7 @@ class PackStreamReader(object):
     def _buf_len(self):
         buf = self._rbuf
         start = buf.tell()
-        buf.seek(0, os.SEEK_END)
+        buf.seek(0, SEEK_END)
         end = buf.tell()
         buf.seek(start)
         return end - start

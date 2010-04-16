@@ -150,8 +150,8 @@ def git_am_patch_split(f):
     c = Commit()
     c.author = msg["from"]
     c.committer = msg["from"]
-    if msg["subject"].startswith("[PATCH "):
-        subject = msg["subject"].split("]", 1)[1]
+    if msg["subject"].startswith("[PATCH"):
+        subject = msg["subject"].split("]", 1)[1][1:]
     else:
         subject = msg["subject"]
     c.message = subject
@@ -164,6 +164,5 @@ def git_am_patch_split(f):
         if l == "-- \n":
             break
         diff += l
-    version = f.readline().rstrip("\n")
-    assert f.read() == ""
+    version = f.next().rstrip("\n")
     return c, diff, version

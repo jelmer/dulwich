@@ -23,7 +23,60 @@ import shutil
 import tempfile
 import unittest
 
-from dulwich.file import GitFile
+from dulwich.file import GitFile, fancy_rename
+
+
+class FancyRenameTests(unittest.TestCase):
+
+    def setUp(self):
+        self._tempdir = tempfile.mkdtemp()
+        self.foo = self.path('foo')
+        self.bar = self.path('bar')
+        self.create(self.foo, 'foo contents')
+
+    def tearDown(self):
+        shutil.rmtree(self._tempdir)
+
+    def path(self, filename):
+        return os.path.join(self._tempdir, filename)
+
+    def create(self, path, contents):
+        f = open(path, 'wb')
+        f.write(contents)
+        f.close()
+
+    def test_no_dest_exists(self):
+        self.assertFalse(os.path.exists(self.bar))
+        fancy_rename(self.foo, self.bar)
+        self.assertFalse(os.path.exists(self.foo))
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+         
+    def test_dest_exists(self):
+        self.create(self.bar, 'bar contents')
+        fancy_rename(self.foo, self.bar)
+        self.assertFalse(os.path.exists(self.foo))
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+
+    def test_dest_opened(self):
+        self.create(self.bar, 'bar contents')
+        dest_f = open(self.bar, 'rb')
+        self.assertRaises(OSError, fancy_rename, self.foo, self.bar)
+        dest_f.close()
+        self.assertTrue(os.path.exists(self.path('foo')))
+
+        new_f = open(self.foo, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('bar contents', new_f.read())
+        new_f.close()
 
 
 class GitFileTests(unittest.TestCase):

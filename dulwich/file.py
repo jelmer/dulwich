@@ -143,6 +143,7 @@ class _GitFile(object):
             # The file may have been removed already, which is ok.
             if e.errno != errno.ENOENT:
                 raise
+            self._closed = True
 
     def close(self):
         """Close this file, saving the lockfile over the original.

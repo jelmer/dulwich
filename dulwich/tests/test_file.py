@@ -188,3 +188,10 @@ class GitFileTests(unittest.TestCase):
             f.abort()
         except (IOError, OSError):
             self.fail()
+
+    def test_abort_close_removed(self):
+        foo = self.path('foo')
+        f = GitFile(foo, 'wb')
+        os.remove(foo+".lock")
+        f.abort()
+        self.assertTrue(f._closed)

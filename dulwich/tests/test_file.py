@@ -20,10 +20,12 @@
 import errno
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 
 from dulwich.file import GitFile, fancy_rename
+from dulwich.tests import TestSkipped
 
 
 class FancyRenameTests(unittest.TestCase):
@@ -64,6 +66,8 @@ class FancyRenameTests(unittest.TestCase):
         new_f.close()
 
     def test_dest_opened(self):
+        if sys.platform != "win32":
+            raise TestSkipped("platform allows overwriting open files")
         self.create(self.bar, 'bar contents')
         dest_f = open(self.bar, 'rb')
         self.assertRaises(OSError, fancy_rename, self.foo, self.bar)
@@ -140,7 +144,7 @@ class GitFileTests(unittest.TestCase):
         f1.write('new')
         try:
             f2 = GitFile(foo, 'wb')
-            fail()
+            self.fail()
         except OSError, e:
             self.assertEquals(errno.EEXIST, e.errno)
         f1.write(' contents')

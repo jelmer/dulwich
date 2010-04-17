@@ -28,9 +28,7 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 from cStringIO import StringIO
-import socket
 import SocketServer
-import zlib
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -46,7 +44,6 @@ from dulwich.objects import (
     )
 from dulwich.protocol import (
     ProtocolFile,
-    Protocol,
     ReceivableProtocol,
     TCP_GIT_PORT,
     ZERO_SHA,

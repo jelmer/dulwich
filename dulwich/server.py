@@ -28,6 +28,7 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 from cStringIO import StringIO
+import os
 import SocketServer
 
 from dulwich.errors import (
@@ -42,23 +43,24 @@ from dulwich.objects import (
     hex_to_sha,
     sha_to_hex,
     )
-from dulwich.protocol import (
-    ProtocolFile,
-    ReceivableProtocol,
-    TCP_GIT_PORT,
-    ZERO_SHA,
-    extract_capabilities,
-    extract_want_line_capabilities,
-    SINGLE_ACK,
-    MULTI_ACK,
-    MULTI_ACK_DETAILED,
-    ack_type,
-    )
 from dulwich.pack import (
     read_pack_header,
     unpack_object,
     write_pack_data,
     )
+from dulwich.protocol import (
+    MULTI_ACK,
+    MULTI_ACK_DETAILED,
+    ProtocolFile,
+    ReceivableProtocol,
+    SINGLE_ACK,
+    TCP_GIT_PORT,
+    ZERO_SHA,
+    extract_capabilities,
+    extract_want_line_capabilities,
+    ack_type,
+    )
+
 
 class Backend(object):
     """A backend for the Git smart server implementation."""
@@ -157,7 +159,7 @@ class PackStreamVerifier(object):
     def _buf_len(self):
         buf = self._rbuf
         start = buf.tell()
-        buf.seek(0, 2)
+        buf.seek(0, os.SEEK_END)
         end = buf.tell()
         buf.seek(start)
         return end - start

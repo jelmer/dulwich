@@ -111,16 +111,19 @@ class BackendRepo(object):
         raise NotImplementedError
 
 
-class PackStreamVerifier(object):
-    """Class to verify a pack stream as it is being read.
+class PackStreamReader(object):
+    """Class to read a pack stream.
 
     The pack is read from a ReceivableProtocol using read() or recv() as
-    appropriate and written out to the given file-like object.
+    appropriate.
     """
 
-    def __init__(self, proto, outfile):
-        self.proto = proto
-        self.outfile = outfile
+    def __init__(self, read_all, read_some=None):
+        self.read_all = read_all
+        if read_some is None:
+            self.read_some = read_all
+        else:
+            self.read_some = read_some
         self.sha = make_sha()
         self._rbuf = StringIO()
         # trailer is a deque to avoid memory allocation on small reads
@@ -153,7 +156,6 @@ class PackStreamVerifier(object):
 
         # hash everything but the trailer
         self.sha.update(data[:-to_add])
-        self.outfile.write(data)
         return data
 
     def _buf_len(self):
@@ -171,7 +173,7 @@ class PackStreamVerifier(object):
             return self._rbuf.read(size)
         buf_data = self._rbuf.read()
         self._rbuf = StringIO()
-        return buf_data + self._read(self.proto.read, size - buf_len)
+        return buf_data + self._read(self.read_all, size - buf_len)
 
     def recv(self, size):
         """Read up to size bytes, blocking until one byte is read."""
@@ -181,21 +183,21 @@ class PackStreamVerifier(object):
             if size >= buf_len:
                 self._rbuf = StringIO()
             return data
-        return self._read(self.proto.recv, size)
+        return self._read(self.read_some, size)
 
-    def verify(self):
-        """Verify a pack stream and write it to the output file.
+    def read_objects(self):
+        """Read the objects in this pack file.
 
         :raise AssertionError: if there is an error in the pack format.
         :raise ChecksumMismatch: if the checksum of the pack contents does not
             match the checksum in the pack trailer.
-        :raise socket.error: if an error occurred reading from the socket.
         :raise zlib.error: if an error occurred during zlib decompression.
         :raise IOError: if an error occurred writing to the output file.
         """
-        _, num_objects = read_pack_header(self.read)
+        pack_version, num_objects = read_pack_header(self.read)
         for i in xrange(num_objects):
-            type, _, _, unused = unpack_object(self.read, self.recv)
+            type, uncomp, comp_len, unused = unpack_object(self.read, self.recv)
+            yield type, uncomp, comp_len
 
             # prepend any unused data to current read buffer
             buf = StringIO()
@@ -208,6 +210,31 @@ class PackStreamVerifier(object):
         calculated_sha = self.sha.hexdigest()
         if pack_sha != calculated_sha:
             raise ChecksumMismatch(pack_sha, calculated_sha)
+
+
+class PackStreamCopier(PackStreamReader):
+    """Class to verify a pack stream as it is being read.
+
+    The pack is read from a ReceivableProtocol using read() or recv() as
+    appropriate and written out to the given file-like object.
+    """
+
+    def __init__(self, read_all, read_some, outfile):
+        super(PackStreamCopier, self).__init__(read_all, read_some)
+        self.outfile = outfile
+
+    def _read(self, read, size):
+        data = super(PackStreamCopier, self)._read(read, size)
+        self.outfile.write(data)
+        return data
+
+    def verify(self):
+        """Verify a pack stream and write it to the output file.
+
+        See PackStreamReader.iterobjects for a list of exceptions this may throw.
+        """
+        for _, _, _, _ in self.iterobjects():
+            pass
 
 
 class DictBackend(Backend):
@@ -646,7 +673,7 @@ class ReceivePackHandler(Handler):
         unpack_error = None
         # TODO: more informative error messages than just the exception string
         try:
-            PackStreamVerifier(self.proto, f).verify()
+            PackStreamCopier(self.proto.read, self.proto.recv, f).verify()
         except all_exceptions, e:
             unpack_error = str(e).replace('\n', '')
         try:

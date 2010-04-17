@@ -423,6 +423,7 @@ def read_pack_header(read):
     """Read the header of a pack file.
 
     :param read: Read function
+    :return: Tuple with pack version and number of objects
     """
     header = read(12)
     assert header[:4] == "PACK"

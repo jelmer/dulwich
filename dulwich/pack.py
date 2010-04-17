@@ -505,6 +505,7 @@ class PackStreamReader(object):
         else:
             self.read_some = read_some
         self.sha = make_sha()
+        self._offset = 0
         self._rbuf = StringIO()
         # trailer is a deque to avoid memory allocation on small reads
         self._trailer = deque()
@@ -523,6 +524,7 @@ class PackStreamReader(object):
 
         # maintain a trailer of the last 20 bytes we've read
         n = len(data)
+        self._offset += n
         tn = len(self._trailer)
         if n >= 20:
             to_pop = tn
@@ -546,6 +548,10 @@ class PackStreamReader(object):
         buf.seek(start)
         return end - start
 
+    @property
+    def offset(self):
+        return self._offset - self._buf_len()
+
     def read(self, size):
         """Read, blocking until size bytes are read."""
         buf_len = self._buf_len()
@@ -565,6 +571,9 @@ class PackStreamReader(object):
             return data
         return self._read(self.read_some, size)
 
+    def __len__(self):
+        return self._num_objects
+
     def read_objects(self):
         """Read the objects in this pack file.
 
@@ -574,8 +583,8 @@ class PackStreamReader(object):
         :raise zlib.error: if an error occurred during zlib decompression.
         :raise IOError: if an error occurred writing to the output file.
         """
-        pack_version, num_objects = read_pack_header(self.read)
-        for i in xrange(num_objects):
+        pack_version, self._num_objects = read_pack_header(self.read)
+        for i in xrange(self._num_objects):
             type, uncomp, comp_len, unused = unpack_object(self.read, self.recv)
             yield type, uncomp, comp_len
 
@@ -590,6 +599,36 @@ class PackStreamReader(object):
         calculated_sha = self.sha.hexdigest()
         if pack_sha != calculated_sha:
             raise ChecksumMismatch(pack_sha, calculated_sha)
+
+
+class PackObjectIterator(object):
+
+    def __init__(self, pack, progress=None):
+        self.i = 0
+        self.offset = pack._header_size
+        self.num = len(pack)
+        self.map = pack._file
+        self._progress = progress
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return self.num
+
+    def next(self):
+        if self.i == self.num:
+            raise StopIteration
+        self.map.seek(self.offset)
+        (type, obj, total_size, unused) = unpack_object(self.map.read)
+        self.map.seek(self.offset)
+        crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
+        ret = (self.offset, type, obj, crc32)
+        self.offset += total_size
+        if self._progress is not None:
+            self._progress(self.i, self.num)
+        self.i+=1
+        return ret
 
 
 class PackData(object):
@@ -713,36 +752,7 @@ class PackData(object):
         return (type, apply_delta(base_chunks, delta))
 
     def iterobjects(self, progress=None):
-
-        class ObjectIterator(object):
-
-            def __init__(self, pack):
-                self.i = 0
-                self.offset = pack._header_size
-                self.num = len(pack)
-                self.map = pack._file
-
-            def __iter__(self):
-                return self
-
-            def __len__(self):
-                return self.num
-
-            def next(self):
-                if self.i == self.num:
-                    raise StopIteration
-                self.map.seek(self.offset)
-                (type, obj, total_size, unused) = unpack_object(self.map.read)
-                self.map.seek(self.offset)
-                crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
-                ret = (self.offset, type, obj, crc32)
-                self.offset += total_size
-                if progress:
-                    progress(self.i, self.num)
-                self.i+=1
-                return ret
-
-        return ObjectIterator(self)
+        return PackObjectIterator(self, progress)
 
     def iterentries(self, ext_resolve_ref=None, progress=None):
         """Yield entries summarizing the contents of this pack.

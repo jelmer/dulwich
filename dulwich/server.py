@@ -27,8 +27,6 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 
 import collections
-from cStringIO import StringIO
-import os
 import SocketServer
 
 from dulwich.errors import (

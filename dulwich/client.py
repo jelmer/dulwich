@@ -28,7 +28,8 @@ import subprocess
 
 from dulwich.errors import (
     ChecksumMismatch,
-    HangupException,
+    SendPackError,
+    UpdateRefsError,
     )
 from dulwich.protocol import (
     Protocol,
@@ -47,8 +48,11 @@ def _fileno_can_read(fileno):
 
 COMMON_CAPABILITIES = ["ofs-delta"]
 FETCH_CAPABILITIES = ["multi_ack", "side-band-64k"] + COMMON_CAPABILITIES
-SEND_CAPABILITIES = [] + COMMON_CAPABILITIES
+SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
+# TODO(durin42): this doesn't correctly degrade if the server doesn't
+# support some capabilities. This should work properly with servers
+# that don't support side-band-64k and multi_ack.
 class GitClient(object):
     """Git smart server client.
 
@@ -91,8 +95,14 @@ class GitClient(object):
         :param path: Repository path
         :param generate_pack_contents: Function that can return the shas of the
             objects to upload.
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
         """
         old_refs, server_capabilities = self.read_refs()
+        if 'report-status' not in server_capabilities:
+            self._send_capabilities.remove('report-status')
         new_refs = determine_wants(old_refs)
         if not new_refs:
             self.proto.write_pkt_line(None)
@@ -105,7 +115,8 @@ class GitClient(object):
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if old_sha1 != new_sha1:
                 if sent_capabilities:
-                    self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
+                    self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1,
+                                                            refname))
                 else:
                     self.proto.write_pkt_line(
                       "%s %s %s\0%s" % (old_sha1, new_sha1, refname,
@@ -120,17 +131,47 @@ class GitClient(object):
         (entries, sha) = write_pack_data(self.proto.write_file(), objects,
                                          len(objects))
 
-        # read the final confirmation sha
-        try:
-            client_sha = self.proto.read_pkt_line()
-        except HangupException:
-            # for git-daemon versions before v1.6.6.1-26-g38a81b4, there is
-            # nothing to read; catch this and hide from the user.
-            pass
-        else:
-            if not client_sha in (None, "", sha):
-                raise ChecksumMismatch(sha, client_sha)
+        if 'report-status' in self._send_capabilities:
+            unpack = self.proto.read_pkt_line().strip()
+            if unpack != 'unpack ok':
+                st = True
+                # flush remaining error data
+                while st is not None:
+                    st = self.proto.read_pkt_line()
+                raise SendPackError(unpack)
+            statuses = []
+            errs = False
+            ref_status = self.proto.read_pkt_line()
+            while ref_status:
+                ref_status = ref_status.strip()
+                statuses.append(ref_status)
+                if not ref_status.startswith('ok '):
+                    errs = True
+                ref_status = self.proto.read_pkt_line()
 
+            if errs:
+                ref_status = {}
+                ok = set()
+                for status in statuses:
+                    if ' ' not in status:
+                        # malformed response, move on to the next one
+                        continue
+                    status, ref = status.split(' ', 1)
+
+                    if status == 'ng':
+                        if ' ' in ref:
+                            ref, status = ref.split(' ', 1)
+                    else:
+                        ok.add(ref)
+                    ref_status[ref] = status
+                raise UpdateRefsError('%s failed to update' %
+                                      ', '.join([ref for ref in ref_status
+                                                 if ref not in ok]),
+                                      ref_status=ref_status)
+        # wait for EOF before returning
+        data = self.proto.read()
+        if data:
+            raise SendPackError('Unexpected response %r' % data)
         return new_refs
 
     def fetch(self, path, target, determine_wants=None, progress=None):

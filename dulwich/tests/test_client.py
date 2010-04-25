@@ -37,7 +37,7 @@ class GitClientTests(TestCase):
         self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',
                                'thin-pack']),
                           set(self.client._fetch_capabilities))
-        self.assertEquals(set(['ofs-delta']),
+        self.assertEquals(set(['ofs-delta', 'report-status']),
                           set(self.client._send_capabilities))
 
     def test_fetch_pack_none(self):

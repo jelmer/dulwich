@@ -114,6 +114,21 @@ class GitProtocolError(Exception):
         Exception.__init__(self, *args, **kwargs)
 
 
+class SendPackError(GitProtocolError):
+    """An error occurred during send_pack."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class UpdateRefsError(GitProtocolError):
+    """The server reported errors updating refs."""
+
+    def __init__(self, *args, **kwargs):
+        self.ref_status = kwargs.pop('ref_status')
+        Exception.__init__(self, *args, **kwargs)
+
+
 class HangupException(GitProtocolError):
     """Hangup exception."""
 

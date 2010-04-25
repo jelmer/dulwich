@@ -45,9 +45,9 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
-
-CAPABILITIES = ["multi_ack", "side-band-64k", "ofs-delta"]
-
+COMMON_CAPABILITIES = ["ofs-delta"]
+FETCH_CAPABILITIES = ["multi_ack", "side-band-64k"] + COMMON_CAPABILITIES
+SEND_CAPABILITIES = [] + COMMON_CAPABILITIES
 
 class GitClient(object):
     """Git smart server client.
@@ -68,12 +68,10 @@ class GitClient(object):
         """
         self.proto = Protocol(read, write, report_activity)
         self._can_read = can_read
-        self._capabilities = list(CAPABILITIES)
+        self._fetch_capabilities = list(FETCH_CAPABILITIES)
+        self._send_capabilities = list(SEND_CAPABILITIES)
         if thin_packs:
-            self._capabilities.append("thin-pack")
-
-    def capabilities(self):
-        return " ".join(self._capabilities)
+            self._fetch_capabilities.append("thin-pack")
 
     def read_refs(self):
         server_capabilities = None
@@ -86,6 +84,7 @@ class GitClient(object):
             refs[ref] = sha
         return refs, server_capabilities
 
+    # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
 
@@ -108,7 +107,9 @@ class GitClient(object):
                 if sent_capabilities:
                     self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
                 else:
-                    self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
+                    self.proto.write_pkt_line(
+                      "%s %s %s\0%s" % (old_sha1, new_sha1, refname,
+                                        ' '.join(self._send_capabilities)))
                     sent_capabilities = True
             if not new_sha1 in (have, ZERO_SHA):
                 want.append(new_sha1)
@@ -166,7 +167,8 @@ class GitClient(object):
             self.proto.write_pkt_line(None)
             return refs
         assert isinstance(wants, list) and type(wants[0]) == str
-        self.proto.write_pkt_line("want %s %s\n" % (wants[0], self.capabilities()))
+        self.proto.write_pkt_line("want %s %s\n" % (
+            wants[0], ' '.join(self._fetch_capabilities)))
         for want in wants[1:]:
             self.proto.write_pkt_line("want %s\n" % want)
         self.proto.write_pkt_line(None)
@@ -189,6 +191,8 @@ class GitClient(object):
             if len(parts) < 3 or parts[2] != "continue":
                 break
             pkt = self.proto.read_pkt_line()
+        # TODO(durin42): this is broken if the server didn't support the
+        # side-band-64k capability.
         for pkt in self.proto.read_pkt_seq():
             channel = ord(pkt[0])
             pkt = pkt[1:]

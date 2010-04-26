@@ -1025,7 +1025,7 @@ class Repo(BaseRepo):
     bare = false
     logallrefupdates = true
 """)
-        ret._put_named_file(os.path.join('info', 'excludes'), '')
+        ret._put_named_file(os.path.join('info', 'exclude'), '')
         return ret
 
     create = init_bare

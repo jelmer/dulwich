@@ -68,6 +68,11 @@ class SimpleIndexTestCase(IndexTestCase):
                            'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
                           self.get_simple_index("index")["bla"])
 
+    def test_empty(self):
+        i = self.get_simple_index("notanindex")
+        self.assertEquals(0, len(i))
+        self.assertFalse(os.path.exists(i._filename))
+
 
 class SimpleIndexWriterTestCase(IndexTestCase):
 

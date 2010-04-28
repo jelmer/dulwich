@@ -549,6 +549,25 @@ class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
         self.assertEqual('df6800012397fb85c56e7418dd4eb9405dee075c',
                          self._refs['refs/tags/refs-0.1'])
 
+    def test_add_if_new_symbolic(self):
+        # Use an empty repo instead of the default.
+        tear_down_repo(self._repo)
+        repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
+        os.makedirs(repo_dir)
+        self._repo = Repo.init(repo_dir)
+        refs = self._repo.refs
+
+        nines = '9' * 40
+        self.assertEqual('ref: refs/heads/master', refs.read_ref('HEAD'))
+        self.assertFalse('refs/heads/master' in refs)
+        self.assertTrue(refs.add_if_new('HEAD', nines))
+        self.assertEqual('ref: refs/heads/master', refs.read_ref('HEAD'))
+        self.assertEqual(nines, refs['HEAD'])
+        self.assertEqual(nines, refs['refs/heads/master'])
+        self.assertFalse(refs.add_if_new('HEAD', '1' * 40))
+        self.assertEqual(nines, refs['HEAD'])
+        self.assertEqual(nines, refs['refs/heads/master'])
+
     def test_follow(self):
         self.assertEquals(
           ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),

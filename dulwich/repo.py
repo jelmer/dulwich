@@ -126,7 +126,7 @@ class RefsContainer(object):
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
         """
-        self[name] = SYMREF + other + '\n'
+        self[name] = SYMREF + other
 
     def get_packed_refs(self):
         """Get contents of the packed-refs file.
@@ -566,9 +566,23 @@ class DiskRefsContainer(RefsContainer):
         return True
 
     def add_if_new(self, name, ref):
-        """Add a new reference only if it does not already exist."""
-        self._check_refname(name)
-        filename = self.refpath(name)
+        """Add a new reference only if it does not already exist.
+
+        This method follows symrefs, and only ensures that the last ref in the
+        chain does not exist.
+
+        :param name: The refname to set.
+        :param ref: The new sha the refname will refer to.
+        :return: True if the add was successful, False otherwise.
+        """
+        try:
+            realname, contents = self._follow(name)
+            if contents is not None:
+                return False
+        except KeyError:
+            realname = name
+        self._check_refname(realname)
+        filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, 'wb')
         try:

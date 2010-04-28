@@ -28,6 +28,9 @@ import unittest
 import warnings
 
 from dulwich import errors
+from dulwich.object_store import (
+    tree_lookup_path,
+    )
 from dulwich import objects
 from dulwich.repo import (
     check_ref_format,
@@ -302,6 +305,101 @@ class RepositoryTests(unittest.TestCase):
         finally:
             shutil.rmtree(r1_dir)
             shutil.rmtree(r2_dir)
+
+    def _build_initial_repo(self):
+        repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
+        os.makedirs(repo_dir)
+        r = self._repo = Repo.init(repo_dir)
+        self.assertFalse(r.bare)
+        self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
+        self.assertRaises(KeyError, lambda: r.refs['refs/heads/master'])
+
+        f = open(os.path.join(r.path, 'a'), 'wb')
+        try:
+            f.write('file contents')
+        finally:
+            f.close()
+        r.stage(['a'])
+        commit_sha = r.do_commit('msg',
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12345, commit_timezone=0,
+                                 author_timestamp=12345, author_timezone=0)
+        self.assertEqual([], r[commit_sha].parents)
+        return commit_sha
+
+    def test_build_repo(self):
+        commit_sha = self._build_initial_repo()
+        r = self._repo
+        self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
+        self.assertEqual(commit_sha, r.refs['refs/heads/master'])
+        expected_blob = objects.Blob.from_string('file contents')
+        self.assertEqual(expected_blob.data, r[expected_blob.id].data)
+        actual_commit = r[commit_sha]
+        self.assertEqual('msg', actual_commit.message)
+
+    def test_commit_modified(self):
+        parent_sha = self._build_initial_repo()
+        r = self._repo
+        f = open(os.path.join(r.path, 'a'), 'wb')
+        try:
+            f.write('new contents')
+        finally:
+            f.close()
+        r.stage(['a'])
+        commit_sha = r.do_commit('modified a',
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0)
+        self.assertEqual([parent_sha], r[commit_sha].parents)
+        _, blob_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
+        self.assertEqual('new contents', r[blob_id].data)
+
+    def test_commit_deleted(self):
+        parent_sha = self._build_initial_repo()
+        r = self._repo
+        os.remove(os.path.join(r.path, 'a'))
+        r.stage(['a'])
+        commit_sha = r.do_commit('deleted a',
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0)
+        self.assertEqual([parent_sha], r[commit_sha].parents)
+        self.assertEqual([], list(r.open_index()))
+        tree = r[r[commit_sha].tree]
+        self.assertEqual([], tree.iteritems())
+
+    def test_commit_fail_ref(self):
+        repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
+        os.makedirs(repo_dir)
+        r = self._repo = Repo.init(repo_dir)
+
+        def set_if_equals(name, old_ref, new_ref):
+            self.fail('Unexpected call to set_if_equals')
+        r.refs.set_if_equals = set_if_equals
+
+        def add_if_new(name, new_ref):
+            return False
+        r.refs.add_if_new = add_if_new
+
+        self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
+                          committer='Test Committer <test@nodomain.com>',
+                          author='Test Author <test@nodomain.com>',
+                          commit_timestamp=12345, commit_timezone=0,
+                          author_timestamp=12345, author_timezone=0)
+        shas = list(r.object_store)
+        self.assertEqual(2, len(shas))
+        for sha in shas:
+            obj = r[sha]
+            if isinstance(obj, objects.Commit):
+                commit = obj
+            elif isinstance(obj, objects.Tree):
+                tree = obj
+            else:
+                self.fail('Unexpected object found: %s' % sha)
+        self.assertEqual(tree.id, commit.tree)
 
 
 class CheckRefFormatTests(unittest.TestCase):

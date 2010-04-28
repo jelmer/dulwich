@@ -34,6 +34,7 @@ from dulwich.errors import (
     NotTreeError,
     NotTagError,
     PackedRefsException,
+    CommitError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -1008,8 +1009,20 @@ class BaseRepo(object):
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
         c.message = message
-        self.object_store.add_object(c)
-        self.refs["HEAD"] = c.id
+        try:
+            old_head = self.refs["HEAD"]
+            c.parents = [old_head]
+            self.object_store.add_object(c)
+            ok = self.refs.set_if_equals("HEAD", old_head, c.id)
+        except KeyError:
+            c.parents = []
+            self.object_store.add_object(c)
+            ok = self.refs.add_if_new("HEAD", c.id)
+        if not ok:
+            # Fail if the atomic compare-and-swap failed, leaving the commit and
+            # all its objects as garbage.
+            raise CommitError("HEAD changed during commit")
+
         return c.id
 
 
@@ -1075,7 +1088,9 @@ class Repo(BaseRepo):
 
     def has_index(self):
         """Check if an index is present."""
-        return os.path.exists(self.index_path())
+        # Bare repos must never have index files; non-bare repos may have a
+        # missing index file, which is treated as empty.
+        return not self.bare
 
     def stage(self, paths):
         """Stage a set of paths.
@@ -1085,14 +1100,15 @@ class Repo(BaseRepo):
         from dulwich.index import cleanup_mode
         index = self.open_index()
         for path in paths:
+            full_path = os.path.join(self.path, path)
             blob = Blob()
             try:
-                st = os.stat(path)
+                st = os.stat(full_path)
             except OSError:
                 # File no longer exists
                 del index[path]
             else:
-                f = open(path, 'rb')
+                f = open(full_path, 'rb')
                 try:
                     blob.data = f.read()
                 finally:

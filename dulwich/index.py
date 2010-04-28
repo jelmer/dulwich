@@ -256,6 +256,10 @@ class Index(object):
         # Remove the old entry if any
         self._byname[name] = x
 
+    def __delitem__(self, name):
+        assert isinstance(name, str)
+        del self._byname[name]
+
     def iteritems(self):
         return self._byname.iteritems()
 

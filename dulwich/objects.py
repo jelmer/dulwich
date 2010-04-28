@@ -740,10 +740,16 @@ class Tree(ShaFile):
         return self._entries[name]
 
     def __setitem__(self, name, value):
-        assert isinstance(value, tuple)
-        assert len(value) == 2
+        """Set a tree entry by name.
+
+        :param name: The name of the entry, as a string.
+        :param value: A tuple of (mode, hexsha), where mode is the mode of the
+            entry as an integral type and hexsha is the hex SHA of the entry as
+            a string.
+        """
+        mode, hexsha = value
         self._ensure_parsed()
-        self._entries[name] = value
+        self._entries[name] = (mode, hexsha)
         self._needs_serialization = True
 
     def __delitem__(self, name):
@@ -760,9 +766,13 @@ class Tree(ShaFile):
         return iter(self._entries)
 
     def add(self, mode, name, hexsha):
-        assert type(mode) == int
-        assert type(name) == str
-        assert type(hexsha) == str
+        """Add an entry to the tree.
+
+        :param mode: The mode of the entry as an integral type. Not all possible
+            modes are supported by git; see check() for details.
+        :param name: The name of the entry, as a string.
+        :param hexsha: The hex SHA of the entry as a string.
+        """
         self._ensure_parsed()
         self._entries[name] = mode, hexsha
         self._needs_serialization = True

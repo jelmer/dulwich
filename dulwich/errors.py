@@ -151,3 +151,7 @@ class ObjectFormatException(FileFormatException):
 
 class NoIndexPresent(Exception):
     """No index is present."""
+
+
+class CommitError(Exception):
+    """An error occurred while performing a commit."""

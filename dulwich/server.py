@@ -58,6 +58,7 @@ from dulwich.protocol import (
     )
 
 
+
 class Backend(object):
     """A backend for the Git smart server implementation."""
 
@@ -329,10 +330,10 @@ class ProtocolGraphWalker(object):
         while command != None:
             if command != 'want':
                 raise GitProtocolError(
-                    'Protocol got unexpected command %s' % command)
+                  'Protocol got unexpected command %s' % command)
             if sha not in values:
                 raise GitProtocolError(
-                    'Client wants invalid object %s' % sha)
+                  'Client wants invalid object %s' % sha)
             want_revs.append(sha)
             command, sha = self.read_proto_line()
 
@@ -440,10 +441,10 @@ class ProtocolGraphWalker(object):
 
     def set_ack_type(self, ack_type):
         impl_classes = {
-            MULTI_ACK: MultiAckGraphWalkerImpl,
-            MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
-            SINGLE_ACK: SingleAckGraphWalkerImpl,
-            }
+          MULTI_ACK: MultiAckGraphWalkerImpl,
+          MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
+          SINGLE_ACK: SingleAckGraphWalkerImpl,
+          }
         self._impl = impl_classes[ack_type](self)
 
 
@@ -568,7 +569,6 @@ class ReceivePackHandler(Handler):
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
-        unpack_error = None
         # TODO: more informative error messages than just the exception string
         try:
             PackStreamCopier(self.proto.read, self.proto.recv, f).verify()
@@ -655,20 +655,26 @@ class ReceivePackHandler(Handler):
             self.proto.write_pkt_line(None)
 
 
+# Default handler classes for git services.
+DEFAULT_HANDLERS = {
+  'git-upload-pack': UploadPackHandler,
+  'git-receive-pack': ReceivePackHandler,
+  }
+
+
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
+
+    def __init__(self, handlers, *args, **kwargs):
+        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        SocketServer.StreamRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
         proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
         command, args = proto.read_cmd()
 
-        # switch case to handle the specific git command
-        if command == 'git-upload-pack':
-            cls = UploadPackHandler
-        elif command == 'git-receive-pack':
-            cls = ReceivePackHandler
-        else:
-            return
-
+        cls = self.handlers.get(command, None)
+        if not callable(cls):
+            raise GitProtocolError('Invalid service %s' % command)
         h = cls(self.server.backend, args, proto)
         h.handle()
 
@@ -678,6 +684,11 @@ class TCPGitServer(SocketServer.TCPServer):
     allow_reuse_address = True
     serve = SocketServer.TCPServer.serve_forever
 
-    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT):
+    def _make_handler(self, *args, **kwargs):
+        return TCPGitRequestHandler(self.handlers, *args, **kwargs)
+
+    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
         self.backend = backend
-        SocketServer.TCPServer.__init__(self, (listen_addr, port), TCPGitRequestHandler)
+        self.handlers = handlers
+        SocketServer.TCPServer.__init__(self, (listen_addr, port),
+                                        self._make_handler)

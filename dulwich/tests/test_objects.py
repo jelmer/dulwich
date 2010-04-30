@@ -50,6 +50,10 @@ from dulwich.objects import (
 from dulwich.tests import (
     TestSkipped,
     )
+from utils import (
+    make_commit,
+    make_object,
+    )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
 b_sha = '2969be3e8ee1c0222396a5611407e4769f14e54b'
@@ -64,12 +68,14 @@ except ImportError:
     # Implementation of permutations from Python 2.6 documentation:
     # http://docs.python.org/2.6/library/itertools.html#itertools.permutations
     # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+    # Modified syntax slightly to run under Python 2.4.
     def permutations(iterable, r=None):
         # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
         # permutations(range(3)) --> 012 021 102 120 201 210
         pool = tuple(iterable)
         n = len(pool)
-        r = n if r is None else r
+        if r is None:
+            r = n
         if r > n:
             return
         indices = range(n)
@@ -245,55 +251,54 @@ class ShaFileCheckTests(unittest.TestCase):
 
 class CommitSerializationTests(unittest.TestCase):
 
-    def make_base(self):
-        c = Commit()
-        c.tree = 'd80c186a03f423a81b39df39dc87fd269736ca86'
-        c.parents = ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd', '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6']
-        c.author = 'James Westby <jw+debian@jameswestby.net>'
-        c.committer = 'James Westby <jw+debian@jameswestby.net>'
-        c.commit_time = 1174773719
-        c.author_time = 1174773719
-        c.commit_timezone = 0
-        c.author_timezone = 0
-        c.message =  'Merge ../b\n'
-        return c
+    def make_commit(self, **kwargs):
+        attrs = {'tree': 'd80c186a03f423a81b39df39dc87fd269736ca86',
+                 'parents': ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                             '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                 'author': 'James Westby <jw+debian@jameswestby.net>',
+                 'committer': 'James Westby <jw+debian@jameswestby.net>',
+                 'commit_time': 1174773719,
+                 'author_time': 1174773719,
+                 'commit_timezone': 0,
+                 'author_timezone': 0,
+                 'message':  'Merge ../b\n'}
+        attrs.update(kwargs)
+        return make_commit(**attrs)
 
     def test_encoding(self):
-        c = self.make_base()
-        c.encoding = "iso8859-1"
-        self.assertTrue("encoding iso8859-1\n" in c.as_raw_string())        
+        c = self.make_commit(encoding='iso8859-1')
+        self.assertTrue('encoding iso8859-1\n' in c.as_raw_string())
 
     def test_short_timestamp(self):
-        c = self.make_base()
-        c.commit_time = 30
+        c = self.make_commit(commit_time=30)
         c1 = Commit()
         c1.set_raw_string(c.as_raw_string())
         self.assertEquals(30, c1.commit_time)
 
     def test_raw_length(self):
-        c = self.make_base()
+        c = self.make_commit()
         self.assertEquals(len(c.as_raw_string()), c.raw_length())
 
     def test_simple(self):
-        c = self.make_base()
+        c = self.make_commit()
         self.assertEquals(c.id, '5dac377bdded4c9aeb8dff595f0faeebcc8498cc')
         self.assertEquals(
                 'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
                 'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
                 'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
-                'author James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
-                'committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000\n'
+                'author James Westby <jw+debian@jameswestby.net> '
+                '1174773719 +0000\n'
+                'committer James Westby <jw+debian@jameswestby.net> '
+                '1174773719 +0000\n'
                 '\n'
                 'Merge ../b\n', c.as_raw_string())
 
     def test_timezone(self):
-        c = self.make_base()
-        c.commit_timezone = 5 * 60
+        c = self.make_commit(commit_timezone=(5 * 60))
         self.assertTrue(" +0005\n" in c.as_raw_string())
 
     def test_neg_timezone(self):
-        c = self.make_base()
-        c.commit_timezone = -1 * 3600
+        c = self.make_commit(commit_timezone=(-1 * 3600))
         self.assertTrue(" -0100\n" in c.as_raw_string())
 
 
@@ -475,19 +480,20 @@ class TreeTests(ShaFileCheckTests):
 class TagSerializeTests(unittest.TestCase):
 
     def test_serialize_simple(self):
-        x = Tag()
-        x.tagger = "Jelmer Vernooij <jelmer@samba.org>"
-        x.name = "0.1"
-        x.message = "Tag 0.1"
-        x.object = (Blob, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        x.tag_time = 423423423
-        x.tag_timezone = 0
-        self.assertEquals("""object d80c186a03f423a81b39df39dc87fd269736ca86
-type blob
-tag 0.1
-tagger Jelmer Vernooij <jelmer@samba.org> 423423423 +0000
-
-Tag 0.1""", x.as_raw_string())
+        x = make_object(Tag,
+                        tagger='Jelmer Vernooij <jelmer@samba.org>',
+                        name='0.1',
+                        message='Tag 0.1',
+                        object=(Blob, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+                        tag_time=423423423,
+                        tag_timezone=0)
+        self.assertEquals(('object d80c186a03f423a81b39df39dc87fd269736ca86\n'
+                           'type blob\n'
+                           'tag 0.1\n'
+                           'tagger Jelmer Vernooij <jelmer@samba.org> '
+                           '423423423 +0000\n'
+                           '\n'
+                           'Tag 0.1'), x.as_raw_string())
 
 
 default_tagger = ('Linus Torvalds <torvalds@woody.linux-foundation.org> '

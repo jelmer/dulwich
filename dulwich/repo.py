@@ -26,12 +26,12 @@ import errno
 import os
 
 from dulwich.errors import (
-    MissingCommitError, 
+    MissingCommitError,
     NoIndexPresent,
-    NotBlobError, 
-    NotCommitError, 
+    NotBlobError,
+    NotCommitError,
     NotGitRepository,
-    NotTreeError, 
+    NotTreeError,
     NotTagError,
     PackedRefsException,
     )
@@ -269,6 +269,9 @@ class DictRefsContainer(RefsContainer):
 
     def read_loose_ref(self, name):
         return self._refs[name]
+
+    def __setitem__(self, name, value):
+        self._refs[name] = value
 
 
 class DiskRefsContainer(RefsContainer):
@@ -567,7 +570,7 @@ def read_packed_refs(f):
             continue
         if l[0] == "^":
             raise PackedRefsException(
-                "found peeled ref in packed-refs without peeled")
+              "found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 
@@ -664,8 +667,8 @@ class BaseRepo(object):
         if determine_wants is None:
             determine_wants = lambda heads: heads.values()
         target.object_store.add_objects(
-            self.fetch_objects(determine_wants, target.get_graph_walker(),
-                progress))
+          self.fetch_objects(determine_wants, target.get_graph_walker(),
+                             progress))
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
@@ -688,8 +691,8 @@ class BaseRepo(object):
             return []
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(haves, wants, progress,
-                                                   get_tagged))
+          self.object_store.find_missing_objects(haves, wants, progress,
+                                                 get_tagged))
 
     def get_graph_walker(self, heads=None):
         if heads is None:
@@ -924,8 +927,8 @@ class Repo(BaseRepo):
         else:
             raise NotGitRepository(root)
         self.path = root
-        object_store = DiskObjectStore(
-            os.path.join(self.controldir(), OBJECTDIR))
+        object_store = DiskObjectStore(os.path.join(self.controldir(),
+                                                    OBJECTDIR))
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 

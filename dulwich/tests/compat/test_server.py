@@ -76,7 +76,3 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         self._server = dul_server
         _, port = self._server.socket.getsockname()
         return port
-
-    def test_push_to_dulwich(self):
-        # TODO(dborowitz): enable after merging thin pack fixes.
-        raise TestSkipped('Skipping push test due to known deadlock bug.')

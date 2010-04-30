@@ -873,9 +873,9 @@ class PackData(object):
 class ThinPackData(PackData):
     """PackData for thin packs, which require an ObjectStore for resolving."""
 
-    def __init__(self, store, *args, **kwargs):
+    def __init__(self, resolve_ext_ref, *args, **kwargs):
         super(ThinPackData, self).__init__(*args, **kwargs)
-        self.store = store
+        self.resolve_ext_ref = resolve_ext_ref
 
     def get_ref(self, sha):
         """Resolve a reference looking in both this pack and the store."""
@@ -887,7 +887,7 @@ class ThinPackData(PackData):
             # rewritten.
             return super(ThinPackData, self).get_ref(sha)
         except KeyError:
-            type, obj = self.store.get_raw(sha)
+            type, obj = self.resolve_ext_ref(sha)
             return None, type, obj
 
     def iterentries(self, progress=None):

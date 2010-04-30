@@ -392,7 +392,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param path: Path to the pack file.
         """
-        data = ThinPackData(self, path)
+        data = ThinPackData(self.get_raw, path)
 
         # Write index for the thin pack (do we really need this?)
         temppath = os.path.join(self.pack_dir, 

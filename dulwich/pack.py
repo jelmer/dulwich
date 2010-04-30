@@ -65,14 +65,15 @@ from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
     )
+from dulwich.misc import (
+    make_sha,
+    SEEK_END,
+    )
 from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,
     object_header,
-    )
-from dulwich.misc import (
-    make_sha,
     )
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
@@ -128,6 +129,7 @@ def read_zlib_chunks(read_some, dec_size, buffer_size=4096):
         raise zlib.error("decompressed data does not match expected size")
     comp_len = fed - len(obj.unused_data)
     return ret, comp_len, obj.unused_data
+
 
 def iter_sha1(iter):
     """Return the hexdigest of the SHA1 over a set of names.
@@ -552,7 +554,7 @@ class PackStreamReader(object):
     def _buf_len(self):
         buf = self._rbuf
         start = buf.tell()
-        buf.seek(0, os.SEEK_END)
+        buf.seek(0, SEEK_END)
         end = buf.tell()
         buf.seek(start)
         return end - start
@@ -1383,7 +1385,7 @@ class Pack(object):
         for offset, type, obj, crc32 in self.data.iterobjects():
             assert isinstance(offset, int)
             yield ShaFile.from_raw_chunks(
-                    *self.data.resolve_object(offset, type, obj))
+              *self.data.resolve_object(offset, type, obj))
 
 
 try:

@@ -104,7 +104,7 @@ class BlobReadTests(unittest.TestCase):
 
     def get_sha_file(self, cls, base, sha):
         dir = os.path.join(os.path.dirname(__file__), 'data', base)
-        return cls.from_file(hex_to_filename(dir, sha))
+        return cls.from_path(hex_to_filename(dir, sha))
 
     def get_blob(self, sha):
         """Return the blob named sha from the test data dir"""
@@ -424,7 +424,7 @@ class TreeTests(ShaFileCheckTests):
 
     def _do_test_parse_tree(self, parse_tree):
         dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
-        o = Tree.from_file(hex_to_filename(dir, tree_sha))
+        o = Tree.from_path(hex_to_filename(dir, tree_sha))
         o._parse_file()
         self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))

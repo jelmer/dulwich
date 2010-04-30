@@ -378,7 +378,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
         try:
-            return ShaFile.from_file(path)
+            return ShaFile.from_path(path)
         except (OSError, IOError), e:
             if e.errno == errno.ENOENT:
                 return None

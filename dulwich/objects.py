@@ -184,9 +184,7 @@ class ShaFile(object):
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)
-        obj = obj_class()
-        obj._filename = f.name
-        return obj
+        return obj_class()
 
     def _parse_legacy_object(self, f):
         """Parse a legacy object, setting the raw string."""
@@ -233,8 +231,13 @@ class ShaFile(object):
     def _ensure_parsed(self):
         if self._needs_parsing:
             if not self._chunked_text:
-                assert self._filename, "ShaFile needs either text or filename"
-                self._parse_file()
+                if self._file is not None:
+                    self._parse_file(self._file)
+                elif self._path is not None:
+                    self._parse_path()
+                else:
+                    raise AssertionError(
+                        "ShaFile needs either text or filename")
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
@@ -257,9 +260,7 @@ class ShaFile(object):
         obj_class = object_class(num_type)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %d" % num_type)
-        obj = obj_class()
-        obj._filename = f.name
-        return obj
+        return obj_class()
 
     def _parse_object(self, f):
         """Parse a new style object, setting self._text."""
@@ -295,7 +296,8 @@ class ShaFile(object):
     def __init__(self):
         """Don't call this directly"""
         self._sha = None
-        self._filename = None
+        self._path = None
+        self._file = None
         self._chunked_text = []
         self._needs_parsing = False
         self._needs_serialization = True
@@ -306,23 +308,28 @@ class ShaFile(object):
     def _serialize(self):
         raise NotImplementedError(self._serialize)
 
-    def _parse_file(self):
-        f = GitFile(self._filename, 'rb')
+    def _parse_path(self):
+        f = GitFile(self._path, 'rb')
         try:
-            magic = f.read(2)
-            if self._is_legacy_object(magic):
-                self._parse_legacy_object(f)
-            else:
-                self._parse_object(f)
+            self._parse_file(f)
         finally:
             f.close()
+
+    def _parse_file(self, f):
+        magic = f.read(2)
+        if self._is_legacy_object(magic):
+            self._parse_legacy_object(f)
+        else:
+            self._parse_object(f)
 
     @classmethod
     def from_path(cls, path):
         f = GitFile(path, 'rb')
         try:
             obj = cls.from_file(f)
+            obj._path = path
             obj._sha = FixedSha(filename_to_hex(path))
+            obj._file = None
             return obj
         finally:
             f.close()
@@ -335,6 +342,7 @@ class ShaFile(object):
             obj._sha = None
             obj._needs_parsing = True
             obj._needs_serialization = True
+            obj._file = f
             return obj
         except (IndexError, ValueError), e:
             raise ObjectFormatException("invalid object header")

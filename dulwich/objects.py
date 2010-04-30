@@ -256,7 +256,7 @@ class ShaFile(object):
         num_type = (ord(magic[0]) >> 4) & 7
         obj_class = object_class(num_type)
         if not obj_class:
-            raise ObjectFormatError("Not a known type: %d" % num_type)
+            raise ObjectFormatException("Not a known type: %d" % num_type)
         obj = obj_class()
         obj._filename = f.name
         return obj
@@ -318,20 +318,26 @@ class ShaFile(object):
             f.close()
 
     @classmethod
-    def from_file(cls, filename):
-        """Get the contents of a SHA file on disk."""
-        f = GitFile(filename, 'rb')
+    def from_path(cls, path):
+        f = GitFile(path, 'rb')
         try:
-            try:
-                obj = cls._parse_file_header(f)
-                obj._sha = FixedSha(filename_to_hex(filename))
-                obj._needs_parsing = True
-                obj._needs_serialization = True
-                return obj
-            except (IndexError, ValueError), e:
-                raise ObjectFormatException("invalid object header")
+            obj = cls.from_file(f)
+            obj._sha = FixedSha(filename_to_hex(path))
+            return obj
         finally:
             f.close()
+
+    @classmethod
+    def from_file(cls, f):
+        """Get the contents of a SHA file on disk."""
+        try:
+            obj = cls._parse_file_header(f)
+            obj._sha = None
+            obj._needs_parsing = True
+            obj._needs_serialization = True
+            return obj
+        except (IndexError, ValueError), e:
+            raise ObjectFormatException("invalid object header")
 
     @staticmethod
     def from_raw_string(type_num, string):
@@ -491,10 +497,10 @@ class Blob(ShaFile):
         "The text within the blob object, as chunks (not necessarily lines).")
 
     @classmethod
-    def from_file(cls, filename):
-        blob = ShaFile.from_file(filename)
+    def from_path(cls, path):
+        blob = ShaFile.from_path(path)
         if not isinstance(blob, cls):
-            raise NotBlobError(filename)
+            raise NotBlobError(path)
         return blob
 
     def check(self):
@@ -539,8 +545,8 @@ class Tag(ShaFile):
         self._tag_timezone_neg_utc = False
 
     @classmethod
-    def from_file(cls, filename):
-        tag = ShaFile.from_file(filename)
+    def from_path(cls, filename):
+        tag = ShaFile.from_path(filename)
         if not isinstance(tag, cls):
             raise NotTagError(filename)
         return tag
@@ -625,7 +631,7 @@ class Tag(ShaFile):
             elif field is None:
                 self._message = value
             else:
-                raise ObjectFormatError("Unknown field %s" % field)
+                raise ObjectFormatException("Unknown field %s" % field)
 
     def _get_object(self):
         """Get the object pointed to by this tag.
@@ -711,8 +717,8 @@ class Tree(ShaFile):
         self._entries = {}
 
     @classmethod
-    def from_file(cls, filename):
-        tree = ShaFile.from_file(filename)
+    def from_path(cls, filename):
+        tree = ShaFile.from_path(filename)
         if not isinstance(tree, cls):
             raise NotTreeError(filename)
         return tree
@@ -860,10 +866,10 @@ class Commit(ShaFile):
         self._commit_timezone_neg_utc = False
 
     @classmethod
-    def from_file(cls, filename):
-        commit = ShaFile.from_file(filename)
+    def from_path(cls, path):
+        commit = ShaFile.from_path(path)
         if not isinstance(commit, cls):
-            raise NotCommitError(filename)
+            raise NotCommitError(path)
         return commit
 
     def _deserialize(self, chunks):

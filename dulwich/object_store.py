@@ -45,6 +45,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
+    ThinPackData,
     iter_sha1,
     load_pack_index,
     write_pack,
@@ -314,13 +315,14 @@ class PackBasedObjectStore(BaseObjectStore):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over objects, should support __len__.
+        :return: Pack object of the objects written.
         """
         if len(objects) == 0:
             # Don't bother writing an empty pack file
             return
         f, commit = self.add_pack()
         write_pack_data(f, objects, len(objects))
-        commit()
+        return commit()
 
 
 class DiskObjectStore(PackBasedObjectStore):
@@ -390,24 +392,25 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param path: Path to the pack file.
         """
-        data = PackData(path)
+        data = ThinPackData(self, path)
 
         # Write index for the thin pack (do we really need this?)
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".tempidx")
-        data.create_index_v2(temppath, self.get_raw)
+        data.create_index_v2(temppath)
         p = Pack.from_objects(data, load_pack_index(temppath))
 
         # Write a full pack version
         temppath = os.path.join(self.pack_dir, 
             sha_to_hex(urllib2.randombytes(20))+".temppack")
-        write_pack(temppath, ((o, None) for o in p.iterobjects(self.get_raw)), 
-                len(p))
+        write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
         pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
         os.rename(temppath+".idx", newbasename+".idx")
-        self._add_known_pack(Pack(newbasename))
+        final_pack = Pack(newbasename)
+        self._add_known_pack(final_pack)
+        return final_pack
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -424,7 +427,9 @@ class DiskObjectStore(PackBasedObjectStore):
         write_pack_index_v2(basename+".idx", entries, p.get_stored_checksum())
         p.close()
         os.rename(path, basename + ".pack")
-        self._add_known_pack(Pack(basename))
+        final_pack = Pack(basename)
+        self._add_known_pack(final_pack)
+        return final_pack
 
     def add_thin_pack(self):
         """Add a new thin pack to this object store.
@@ -438,7 +443,9 @@ class DiskObjectStore(PackBasedObjectStore):
             os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:
-                self.move_in_thin_pack(path)
+                return self.move_in_thin_pack(path)
+            else:
+                return None
         return f, commit
 
     def add_pack(self):
@@ -453,7 +460,9 @@ class DiskObjectStore(PackBasedObjectStore):
             os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:
-                self.move_in_pack(path)
+                return self.move_in_pack(path)
+            else:
+                return None
         return f, commit
 
     def add_object(self, obj):

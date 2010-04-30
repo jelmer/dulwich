@@ -52,7 +52,7 @@ class TestPack(PackTests):
 
     def test_copy(self):
         origpack = self.get_pack(pack1_sha)
-        self.assertEquals(True, origpack.index.check())
+        self.assertSucceeds(origpack.index.check)
         pack_path = os.path.join(self._tempdir, "Elch")
         write_pack(pack_path, [(x, "") for x in origpack.iterobjects()],
                    len(origpack))

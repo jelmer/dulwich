@@ -1,16 +1,16 @@
 # test_object_store.py -- tests for object_store.py
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # or (at your option) any later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -20,6 +20,8 @@
 """Tests for the object store interface."""
 
 
+import shutil
+import tempfile
 from unittest import TestCase
 
 from dulwich.objects import (
@@ -38,34 +40,16 @@ testobject = Blob()
 testobject.data = "yummy data"
 
 
-class SpecificDiskObjectStoreTests(TestCase):
-
-    def setUp(self):
-        self.store_dir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.store_dir)
-
-    def test_pack_dir(self):
-        o = DiskObjectStore(self.store_dir)
-        self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
-
-    def test_empty_packs(self):
-        o = DiskObjectStore(self.store_dir)
-        self.assertEquals([], o.packs)
-
-
-
 class ObjectStoreTests(object):
 
     def test_iter(self):
         self.assertEquals([], list(self.store))
 
     def test_get_nonexistant(self):
-        self.assertRaises(KeyError, self.store.__getitem__, "a" * 40)
+        self.assertRaises(KeyError, lambda: self.store["a" * 40])
 
     def test_contains_nonexistant(self):
-        self.assertFalse(self.store.__contains__("a" * 40))
+        self.assertFalse(("a" * 40) in self.store)
 
     def test_add_objects_empty(self):
         self.store.add_objects([])
@@ -78,7 +62,7 @@ class ObjectStoreTests(object):
     def test_add_object(self):
         self.store.add_object(testobject)
         self.assertEquals(set([testobject.id]), set(self.store))
-        self.assertTrue(self.store.__contains__(testobject.id))
+        self.assertTrue(testobject.id in self.store)
         r = self.store[testobject.id]
         self.assertEquals(r, testobject)
 
@@ -86,19 +70,19 @@ class ObjectStoreTests(object):
         data = [(testobject, "mypath")]
         self.store.add_objects(data)
         self.assertEquals(set([testobject.id]), set(self.store))
-        self.assertTrue(self.store.__contains__(testobject.id))
+        self.assertTrue(testobject.id in self.store)
         r = self.store[testobject.id]
         self.assertEquals(r, testobject)
 
 
-class MemoryObjectStoreTests(ObjectStoreTests,TestCase):
+class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
 
 
-class DiskObjectStoreTests(ObjectStoreTests,TestCase):
+class DiskObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -108,6 +92,14 @@ class DiskObjectStoreTests(ObjectStoreTests,TestCase):
     def tearDown(self):
         TestCase.tearDown(self)
         shutil.rmtree(self.store_dir)
+
+    def test_pack_dir(self):
+        o = DiskObjectStore(self.store_dir)
+        self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
+
+    def test_empty_packs(self):
+        o = DiskObjectStore(self.store_dir)
+        self.assertEquals([], o.packs)
 
 
 # TODO: MissingObjectFinderTests

@@ -160,12 +160,13 @@ class _GitFile(object):
             return
         self._file.close()
         try:
-            os.rename(self._lockfilename, self._filename)
-        except OSError, e:
-            # Windows versions prior to Vista don't support atomic renames
-            if e.errno != errno.EEXIST:
-                raise
-            fancy_rename(self._lockfilename, self._filename)
+            try:
+                os.rename(self._lockfilename, self._filename)
+            except OSError, e:
+                # Windows versions prior to Vista don't support atomic renames
+                if e.errno != errno.EEXIST:
+                    raise
+                fancy_rename(self._lockfilename, self._filename)
         finally:
             self.abort()
 

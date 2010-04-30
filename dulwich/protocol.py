@@ -27,6 +27,9 @@ from dulwich.errors import (
     HangupException,
     GitProtocolError,
     )
+from dulwich.misc import (
+    SEEK_END,
+    )
 
 TCP_GIT_PORT = 9418
 
@@ -35,6 +38,7 @@ ZERO_SHA = "0" * 40
 SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
+
 
 class ProtocolFile(object):
     """
@@ -181,7 +185,7 @@ class ReceivableProtocol(Protocol):
 
     def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
         super(ReceivableProtocol, self).__init__(self.read, write,
-                                                report_activity)
+                                                 report_activity)
         self._recv = recv
         self._rbuf = StringIO()
         self._rbufsize = rbufsize
@@ -192,7 +196,7 @@ class ReceivableProtocol(Protocol):
         #  - omit the size <= 0 branch
         #  - seek back to start rather than 0 in case some buffer has been
         #    consumed.
-        #  - use os.SEEK_END instead of the magic number.
+        #  - use SEEK_END instead of the magic number.
         # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
         # Licensed under the Python Software Foundation License.
         # TODO: see if buffer is more efficient than cStringIO.
@@ -203,7 +207,7 @@ class ReceivableProtocol(Protocol):
         # rbufsize is large compared to the typical return value of recv().
         buf = self._rbuf
         start = buf.tell()
-        buf.seek(0, os.SEEK_END)
+        buf.seek(0, SEEK_END)
         # buffer may have been partially consumed by recv()
         buf_len = buf.tell() - start
         if buf_len >= size:
@@ -251,7 +255,7 @@ class ReceivableProtocol(Protocol):
 
         buf = self._rbuf
         start = buf.tell()
-        buf.seek(0, os.SEEK_END)
+        buf.seek(0, SEEK_END)
         buf_len = buf.tell()
         buf.seek(start)
 
@@ -302,7 +306,7 @@ def extract_want_line_capabilities(text):
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
     if 'multi_ack_detailed' in capabilities:
-      return MULTI_ACK_DETAILED
+        return MULTI_ACK_DETAILED
     elif 'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK

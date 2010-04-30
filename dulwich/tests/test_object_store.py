@@ -20,6 +20,7 @@
 """Tests for the object store interface."""
 
 
+import os
 import shutil
 import tempfile
 from unittest import TestCase
@@ -31,13 +32,12 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     )
-import os
-import shutil
-import tempfile
+from utils import (
+    make_object,
+    )
 
 
-testobject = Blob()
-testobject.data = "yummy data"
+testobject = make_object(Blob, data="yummy data")
 
 
 class ObjectStoreTests(object):

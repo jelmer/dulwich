@@ -40,15 +40,20 @@ from dulwich.web import (
 
 class WebTestCase(TestCase):
     """Base TestCase that sets up some useful instance vars."""
+
     def setUp(self):
         self._environ = {}
-        self._req = HTTPGitRequest(self._environ, self._start_response)
+        self._req = HTTPGitRequest(self._environ, self._start_response,
+                                   handlers=self._handlers())
         self._status = None
         self._headers = []
 
     def _start_response(self, status, headers):
         self._status = status
         self._headers = list(headers)
+
+    def _handlers(self):
+        return None
 
 
 class DumbHandlersTestCase(WebTestCase):
@@ -133,15 +138,23 @@ class DumbHandlersTestCase(WebTestCase):
             def __init__(self):
                 objects = [blob1, blob2, blob3, tag1]
                 self.repo = TestRepo(objects, {
-                    'HEAD': '000',
-                    'refs/heads/master': blob1.sha(),
-                    'refs/tags/tag-tag': blob2.sha(),
-                    'refs/tags/blob-tag': blob3.sha(),
-                    })
+                  'HEAD': '000',
+                  'refs/heads/master': blob1.sha(),
+                  'refs/tags/tag-tag': blob2.sha(),
+                  'refs/tags/blob-tag': blob3.sha(),
+                  })
 
             def open_repository(self, path):
                 assert path == '/'
                 return self.repo
+
+            def get_refs(self):
+                return {
+                  'HEAD': '000',
+                  'refs/heads/master': blob1.sha(),
+                  'refs/tags/tag-tag': tag1.sha(),
+                  'refs/tags/blob-tag': blob3.sha(),
+                  }
 
         mat = re.search('.*', '//info/refs')
         self.assertEquals(['111\trefs/heads/master\n',
@@ -164,12 +177,12 @@ class SmartHandlersTestCase(WebTestCase):
         def handle(self):
             self.proto.write('handled input: %s' % self.proto.recv(1024))
 
-    def _MakeHandler(self, *args, **kwargs):
+    def _make_handler(self, *args, **kwargs):
         self._handler = self._TestUploadPackHandler(*args, **kwargs)
         return self._handler
 
-    def services(self):
-        return {'git-upload-pack': self._MakeHandler}
+    def _handlers(self):
+        return {'git-upload-pack': self._make_handler}
 
     def test_handle_service_request_unknown(self):
         mat = re.search('.*', '/git-evil-handler')
@@ -179,8 +192,7 @@ class SmartHandlersTestCase(WebTestCase):
     def test_handle_service_request(self):
         self._environ['wsgi.input'] = StringIO('foo')
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat,
-                                                services=self.services()))
+        output = ''.join(handle_service_request(self._req, 'backend', mat))
         self.assertEqual('handled input: foo', output)
         response_type = 'application/x-git-upload-pack-response'
         self.assertTrue(('Content-Type', response_type) in self._headers)
@@ -191,16 +203,14 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['wsgi.input'] = StringIO('foobar')
         self._environ['CONTENT_LENGTH'] = 3
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat,
-                                                services=self.services()))
+        output = ''.join(handle_service_request(self._req, 'backend', mat))
         self.assertEqual('handled input: foo', output)
         response_type = 'application/x-git-upload-pack-response'
         self.assertTrue(('Content-Type', response_type) in self._headers)
 
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
-        list(get_info_refs(self._req, 'backend', None,
-                           services=self.services()))
+        list(get_info_refs(self._req, 'backend', None))
         self.assertEquals(HTTP_FORBIDDEN, self._status)
 
     def test_get_info_refs(self):
@@ -208,8 +218,7 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(get_info_refs(self._req, 'backend', mat,
-                                       services=self.services()))
+        output = ''.join(get_info_refs(self._req, 'backend', mat))
         self.assertEquals(('001e# service=git-upload-pack\n'
                            '0000'
                            # input is ignored by the handler
@@ -262,13 +271,13 @@ class HTTPGitRequestTestCase(WebTestCase):
         self._req.respond(status=402, content_type='some/type',
                           headers=[('X-Foo', 'foo'), ('X-Bar', 'bar')])
         self.assertEquals(set([
-            ('X-Foo', 'foo'),
-            ('X-Bar', 'bar'),
-            ('Content-Type', 'some/type'),
-            ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
-            ('Pragma', 'no-cache'),
-            ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
-            ]), set(self._headers))
+          ('X-Foo', 'foo'),
+          ('X-Bar', 'bar'),
+          ('Content-Type', 'some/type'),
+          ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
+          ('Pragma', 'no-cache'),
+          ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
+          ]), set(self._headers))
         self.assertEquals(402, self._status)
 
 
@@ -285,10 +294,10 @@ class HTTPGitApplicationTestCase(TestCase):
             return 'output'
 
         self._app.services = {
-            ('GET', re.compile('/foo$')): test_handler,
+          ('GET', re.compile('/foo$')): test_handler,
         }
         environ = {
-            'PATH_INFO': '/foo',
-            'REQUEST_METHOD': 'GET',
-            }
+          'PATH_INFO': '/foo',
+          'REQUEST_METHOD': 'GET',
+          }
         self.assertEquals('output', self._app(environ, None))

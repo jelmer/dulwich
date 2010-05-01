@@ -102,6 +102,18 @@ class RepositoryTests(unittest.TestCase):
         r = self._repo = open_repo('a.git')
         self.assertRaises(KeyError, r.get_object, missing_sha)
 
+    def test_contains_object(self):
+        r = self._repo = open_repo('a.git')
+        self.assertTrue(r.head() in r)
+
+    def test_contains_ref(self):
+        r = self._repo = open_repo('a.git')
+        self.assertTrue("HEAD" in r)
+
+    def test_contains_missing(self):
+        r = self._repo = open_repo('a.git')
+        self.assertFalse("bar" in r)
+
     def test_commit(self):
         r = self._repo = open_repo('a.git')
         warnings.simplefilter("ignore", DeprecationWarning)

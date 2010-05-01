@@ -844,8 +844,17 @@ class BaseRepo(object):
 
     def __getitem__(self, name):
         if len(name) in (20, 40):
-            return self.object_store[name]
+            try:
+                return self.object_store[name]
+            except KeyError:
+                pass
         return self.object_store[self.refs[name]]
+
+    def __contains__(self, name):
+        if len(name) in (20, 40):
+            return name in self.object_store or name in self.refs
+        else:
+            return name in self.refs
 
     def __setitem__(self, name, value):
         if name.startswith("refs/") or name == "HEAD":

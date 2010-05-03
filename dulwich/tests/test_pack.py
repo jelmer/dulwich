@@ -136,8 +136,8 @@ class TestPackDeltas(unittest.TestCase):
     test_string_big = 'Z' * 8192
 
     def _test_roundtrip(self, base, target):
-        self.assertEquals([target],
-                          apply_delta(base, create_delta(base, target)))
+        self.assertEquals(target,
+                          ''.join(apply_delta(base, create_delta(base, target))))
 
     def test_nochange(self):
         self._test_roundtrip(self.test_string1, self.test_string1)

@@ -403,6 +403,12 @@ class BuildRepoTests(unittest.TestCase):
         self.assertEqual(r[self._root_commit].tree, new_commit.tree)
         self.assertEqual('failed commit', new_commit.message)
 
+    def test_stage_deleted(self):
+        r = self._repo
+        os.remove(os.path.join(r.path, 'a'))
+        r.stage(['a'])
+        r.stage(['a'])  # double-stage a deleted path
+
 
 class CheckRefFormatTests(unittest.TestCase):
     """Tests for the check_ref_format function.

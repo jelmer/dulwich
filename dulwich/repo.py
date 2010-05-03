@@ -1126,7 +1126,10 @@ class Repo(BaseRepo):
                 st = os.stat(full_path)
             except OSError:
                 # File no longer exists
-                del index[path]
+                try:
+                    del index[path]
+                except KeyError:
+                    pass  # Doesn't exist in the index either
             else:
                 f = open(full_path, 'rb')
                 try:

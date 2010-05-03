@@ -539,6 +539,24 @@ class RefsContainerTests(object):
         self.assertTrue(self._refs.add_if_new('refs/some/ref', nines))
         self.assertEqual(nines, self._refs['refs/some/ref'])
 
+    def test_set_symbolic_ref(self):
+        self._refs.set_symbolic_ref('refs/heads/symbolic', 'refs/heads/master')
+        self.assertEqual('ref: refs/heads/master',
+                         self._refs.read_loose_ref('refs/heads/symbolic'))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['refs/heads/symbolic'])
+
+    def test_set_symbolic_ref_overwrite(self):
+        nines = '9' * 40
+        self.assertFalse('refs/heads/symbolic' in self._refs)
+        self._refs['refs/heads/symbolic'] = nines
+        self.assertEqual(nines, self._refs.read_loose_ref('refs/heads/symbolic'))
+        self._refs.set_symbolic_ref('refs/heads/symbolic', 'refs/heads/master')
+        self.assertEqual('ref: refs/heads/master',
+                         self._refs.read_loose_ref('refs/heads/symbolic'))
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
+                         self._refs['refs/heads/symbolic'])
+
     def test_check_refname(self):
         try:
             self._refs._check_refname('HEAD')

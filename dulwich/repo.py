@@ -127,7 +127,7 @@ class RefsContainer(object):
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
         """
-        self[name] = SYMREF + other
+        raise NotImplementedError(self.set_symbolic_ref)
 
     def get_packed_refs(self):
         """Get contents of the packed-refs file.
@@ -351,13 +351,14 @@ class DictRefsContainer(RefsContainer):
     def get_packed_refs(self):
         return {}
 
-    def __getitem__(self, name):
-        return self._refs[name]
+    def set_symbolic_ref(self, name, other):
+        self._refs[name] = SYMREF + other
 
     def set_if_equals(self, name, old_ref, new_ref):
         if old_ref is not None and self._refs.get(name, None) != old_ref:
             return False
-        self._refs[name] = new_ref
+        realname, _ = self._follow(name)
+        self._refs[realname] = new_ref
         return True
 
     def add_if_new(self, name, ref):
@@ -524,6 +525,25 @@ class DiskRefsContainer(RefsContainer):
             f.close()
         finally:
             f.abort()
+
+    def set_symbolic_ref(self, name, other):
+        """Make a ref point at another ref.
+
+        :param name: Name of the ref to set
+        :param other: Name of the ref to point at
+        """
+        self._check_refname(name)
+        self._check_refname(other)
+        filename = self.refpath(name)
+        try:
+            f = GitFile(filename, 'wb')
+            try:
+                f.write(SYMREF + other + '\n')
+            except (IOError, OSError):
+                f.abort()
+                raise
+        finally:
+            f.close()
 
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.

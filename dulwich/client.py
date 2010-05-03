@@ -293,12 +293,8 @@ class SSHSubprocess(object):
 
     def __init__(self, proc):
         self.proc = proc
-
-    def send(self, data):
-        return os.write(self.proc.stdin.fileno(), data)
-
-    def recv(self, count):
-        return self.proc.stdout.read(count)
+        self.read = self.recv = proc.stdout.read
+        self.write = self.send = proc.stdin.write
 
     def close(self):
         self.proc.stdin.close()

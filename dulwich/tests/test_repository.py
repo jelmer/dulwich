@@ -306,7 +306,15 @@ class RepositoryTests(unittest.TestCase):
             shutil.rmtree(r1_dir)
             shutil.rmtree(r2_dir)
 
-    def _build_initial_repo(self):
+
+class BuildRepoTests(unittest.TestCase):
+    """Tests that build on-disk repos from scratch.
+
+    Repos live in a temp dir and are torn down after each test. They start with
+    a single commit in master having single file named 'a'.
+    """
+
+    def setUp(self):
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
         r = self._repo = Repo.init(repo_dir)
@@ -326,20 +334,21 @@ class RepositoryTests(unittest.TestCase):
                                  commit_timestamp=12345, commit_timezone=0,
                                  author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
-        return commit_sha
+        self._root_commit = commit_sha
+
+    def tearDown(self):
+        tear_down_repo(self._repo)
 
     def test_build_repo(self):
-        commit_sha = self._build_initial_repo()
         r = self._repo
         self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
-        self.assertEqual(commit_sha, r.refs['refs/heads/master'])
+        self.assertEqual(self._root_commit, r.refs['refs/heads/master'])
         expected_blob = objects.Blob.from_string('file contents')
         self.assertEqual(expected_blob.data, r[expected_blob.id].data)
-        actual_commit = r[commit_sha]
+        actual_commit = r[self._root_commit]
         self.assertEqual('msg', actual_commit.message)
 
     def test_commit_modified(self):
-        parent_sha = self._build_initial_repo()
         r = self._repo
         f = open(os.path.join(r.path, 'a'), 'wb')
         try:
@@ -352,12 +361,11 @@ class RepositoryTests(unittest.TestCase):
                                  author='Test Author <test@nodomain.com>',
                                  commit_timestamp=12395, commit_timezone=0,
                                  author_timestamp=12395, author_timezone=0)
-        self.assertEqual([parent_sha], r[commit_sha].parents)
+        self.assertEqual([self._root_commit], r[commit_sha].parents)
         _, blob_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
         self.assertEqual('new contents', r[blob_id].data)
 
     def test_commit_deleted(self):
-        parent_sha = self._build_initial_repo()
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
@@ -366,40 +374,34 @@ class RepositoryTests(unittest.TestCase):
                                  author='Test Author <test@nodomain.com>',
                                  commit_timestamp=12395, commit_timezone=0,
                                  author_timestamp=12395, author_timezone=0)
-        self.assertEqual([parent_sha], r[commit_sha].parents)
+        self.assertEqual([self._root_commit], r[commit_sha].parents)
         self.assertEqual([], list(r.open_index()))
         tree = r[r[commit_sha].tree]
         self.assertEqual([], tree.iteritems())
 
     def test_commit_fail_ref(self):
-        repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
-        os.makedirs(repo_dir)
-        r = self._repo = Repo.init(repo_dir)
+        r = self._repo
 
         def set_if_equals(name, old_ref, new_ref):
-            self.fail('Unexpected call to set_if_equals')
+            return False
         r.refs.set_if_equals = set_if_equals
 
         def add_if_new(name, new_ref):
-            return False
+            self.fail('Unexpected call to add_if_new')
         r.refs.add_if_new = add_if_new
 
+        old_shas = set(r.object_store)
         self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
                           committer='Test Committer <test@nodomain.com>',
                           author='Test Author <test@nodomain.com>',
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
-        shas = list(r.object_store)
-        self.assertEqual(2, len(shas))
-        for sha in shas:
-            obj = r[sha]
-            if isinstance(obj, objects.Commit):
-                commit = obj
-            elif isinstance(obj, objects.Tree):
-                tree = obj
-            else:
-                self.fail('Unexpected object found: %s' % sha)
-        self.assertEqual(tree.id, commit.tree)
+        new_shas = set(r.object_store) - old_shas
+        self.assertEqual(1, len(new_shas))
+        # Check that the new commit (now garbage) was added.
+        new_commit = r[new_shas.pop()]
+        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
+        self.assertEqual('failed commit', new_commit.message)
 
 
 class CheckRefFormatTests(unittest.TestCase):

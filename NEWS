@@ -1,5 +1,9 @@
 0.6.1	UNRELEASED
 
+ BUG FIXES
+
+  * Fix memory leak in C implementation of sorted_tree_items. (Dave Borowitz)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)

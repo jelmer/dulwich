@@ -158,7 +158,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 
 	i = 0;
 	while (PyDict_Next(entries, &pos, &key, &value)) {
-		PyObject *py_mode, *py_sha;
+		PyObject *py_mode, *py_int_mode, *py_sha;
 		
 		if (PyTuple_Size(value) != 2) {
 			PyErr_SetString(PyExc_ValueError, "Tuple has invalid size");
@@ -167,20 +167,22 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		}
 
 		py_mode = PyTuple_GET_ITEM(value, 0);
+		py_int_mode = PyNumber_Int(py_mode);
+		if (!py_int_mode) {
+			PyErr_SetString(PyExc_TypeError, "Mode is not an integral type");
+			free(qsort_entries);
+			return NULL;
+		}
+
 		py_sha = PyTuple_GET_ITEM(value, 1);
-		qsort_entries[i].tuple = Py_BuildValue("(OOO)", key, py_mode, py_sha);
 		if (!PyString_CheckExact(key)) {
 			PyErr_SetString(PyExc_TypeError, "Name is not a string");
 			free(qsort_entries);
 			return NULL;
 		}
 		qsort_entries[i].name = PyString_AS_STRING(key);
-		if (!PyInt_CheckExact(py_mode)) {
-			PyErr_SetString(PyExc_TypeError, "Mode is not an int");
-			free(qsort_entries);
-			return NULL;
-		}
 		qsort_entries[i].mode = PyInt_AS_LONG(py_mode);
+		qsort_entries[i].tuple = PyTuple_Pack(3, key, py_mode, py_sha);
 		i++;
 	}
 

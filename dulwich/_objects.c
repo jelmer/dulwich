@@ -159,7 +159,13 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 	i = 0;
 	while (PyDict_Next(entries, &pos, &key, &value)) {
 		PyObject *py_mode, *py_int_mode, *py_sha;
-		
+
+		if (!PyString_Check(key)) {
+			PyErr_SetString(PyExc_TypeError, "Name is not a string");
+			free(qsort_entries);
+			return NULL;
+		}
+
 		if (PyTuple_Size(value) != 2) {
 			PyErr_SetString(PyExc_ValueError, "Tuple has invalid size");
 			free(qsort_entries);
@@ -175,8 +181,8 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		}
 
 		py_sha = PyTuple_GET_ITEM(value, 1);
-		if (!PyString_CheckExact(key)) {
-			PyErr_SetString(PyExc_TypeError, "Name is not a string");
+		if (!PyString_Check(py_sha)) {
+			PyErr_SetString(PyExc_TypeError, "SHA is not a string");
 			free(qsort_entries);
 			return NULL;
 		}

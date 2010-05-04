@@ -1,3 +1,10 @@
+0.6.1	UNRELEASED
+
+ TESTS
+
+  * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)
+
+
 0.6.0	2010-05-22
 
 note: This list is most likely incomplete for 0.6.0.

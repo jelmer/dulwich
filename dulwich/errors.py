@@ -1,17 +1,17 @@
 # errors.py -- errors for dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # or (at your option) any later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -38,7 +38,7 @@ class ChecksumMismatch(Exception):
                 "Checksum mismatch: Expected %s, got %s" % (expected, got))
         else:
             Exception.__init__(self,
-                "Checksum mismatch: Expected %s, got %s; %s" % 
+                "Checksum mismatch: Expected %s, got %s; %s" %
                 (expected, got, extra))
 
 
@@ -81,21 +81,21 @@ class NotBlobError(WrongObjectException):
 
 class MissingCommitError(Exception):
     """Indicates that a commit was not found in the repository"""
-  
+
     def __init__(self, sha, *args, **kwargs):
         Exception.__init__(self, "%s is not in the revision store" % sha)
 
 
 class ObjectMissing(Exception):
     """Indicates that a requested object is missing."""
-  
+
     def __init__(self, sha, *args, **kwargs):
         Exception.__init__(self, "%s is not in the pack" % sha)
 
 
 class ApplyDeltaError(Exception):
     """Indicates that applying a delta failed."""
-    
+
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
@@ -109,8 +109,23 @@ class NotGitRepository(Exception):
 
 class GitProtocolError(Exception):
     """Git protocol exception."""
-    
+
     def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class SendPackError(GitProtocolError):
+    """An error occurred during send_pack."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class UpdateRefsError(GitProtocolError):
+    """The server reported errors updating refs."""
+
+    def __init__(self, *args, **kwargs):
+        self.ref_status = kwargs.pop('ref_status')
         Exception.__init__(self, *args, **kwargs)
 
 

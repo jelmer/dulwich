@@ -1,16 +1,16 @@
 # test_client.py -- Tests for the git protocol, client side
 # Copyright (C) 2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # or (at your option) any later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -23,16 +23,22 @@ from dulwich.client import (
     GitClient,
     )
 
+
+# TODO(durin42): add unit-level tests of GitClient
 class GitClientTests(TestCase):
 
     def setUp(self):
         self.rout = StringIO()
         self.rin = StringIO()
-        self.client = GitClient(lambda x: True, self.rin.read, 
+        self.client = GitClient(lambda x: True, self.rin.read,
             self.rout.write)
 
     def test_caps(self):
-        self.assertEquals(['multi_ack', 'side-band-64k', 'ofs-delta', 'thin-pack'], self.client._capabilities)
+        self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',
+                               'thin-pack']),
+                          set(self.client._fetch_capabilities))
+        self.assertEquals(set(['ofs-delta', 'report-status']),
+                          set(self.client._send_capabilities))
 
     def test_fetch_pack_none(self):
         self.rin.write(

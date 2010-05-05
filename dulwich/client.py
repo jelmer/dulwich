@@ -28,7 +28,8 @@ import subprocess
 
 from dulwich.errors import (
     ChecksumMismatch,
-    HangupException,
+    SendPackError,
+    UpdateRefsError,
     )
 from dulwich.protocol import (
     Protocol,
@@ -45,16 +46,19 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
+COMMON_CAPABILITIES = ["ofs-delta"]
+FETCH_CAPABILITIES = ["multi_ack", "side-band-64k"] + COMMON_CAPABILITIES
+SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
-CAPABILITIES = ["multi_ack", "side-band-64k", "ofs-delta"]
-
-
+# TODO(durin42): this doesn't correctly degrade if the server doesn't
+# support some capabilities. This should work properly with servers
+# that don't support side-band-64k and multi_ack.
 class GitClient(object):
     """Git smart server client.
 
     """
 
-    def __init__(self, can_read, read, write, thin_packs=True, 
+    def __init__(self, can_read, read, write, thin_packs=True,
         report_activity=None):
         """Create a new GitClient instance.
 
@@ -68,12 +72,10 @@ class GitClient(object):
         """
         self.proto = Protocol(read, write, report_activity)
         self._can_read = can_read
-        self._capabilities = list(CAPABILITIES)
+        self._fetch_capabilities = list(FETCH_CAPABILITIES)
+        self._send_capabilities = list(SEND_CAPABILITIES)
         if thin_packs:
-            self._capabilities.append("thin-pack")
-
-    def capabilities(self):
-        return " ".join(self._capabilities)
+            self._fetch_capabilities.append("thin-pack")
 
     def read_refs(self):
         server_capabilities = None
@@ -86,14 +88,21 @@ class GitClient(object):
             refs[ref] = sha
         return refs, server_capabilities
 
+    # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return the shas of the 
+        :param generate_pack_contents: Function that can return the shas of the
             objects to upload.
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
         """
         old_refs, server_capabilities = self.read_refs()
+        if 'report-status' not in server_capabilities:
+            self._send_capabilities.remove('report-status')
         new_refs = determine_wants(old_refs)
         if not new_refs:
             self.proto.write_pkt_line(None)
@@ -106,9 +115,12 @@ class GitClient(object):
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if old_sha1 != new_sha1:
                 if sent_capabilities:
-                    self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1, refname))
+                    self.proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1,
+                                                            refname))
                 else:
-                    self.proto.write_pkt_line("%s %s %s\0%s" % (old_sha1, new_sha1, refname, self.capabilities()))
+                    self.proto.write_pkt_line(
+                      "%s %s %s\0%s" % (old_sha1, new_sha1, refname,
+                                        ' '.join(self._send_capabilities)))
                     sent_capabilities = True
             if not new_sha1 in (have, ZERO_SHA):
                 want.append(new_sha1)
@@ -116,20 +128,50 @@ class GitClient(object):
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
-        (entries, sha) = write_pack_data(self.proto.write_file(), objects, 
+        (entries, sha) = write_pack_data(self.proto.write_file(), objects,
                                          len(objects))
-        
-        # read the final confirmation sha
-        try:
-            client_sha = self.proto.read_pkt_line()
-        except HangupException:
-            # for git-daemon versions before v1.6.6.1-26-g38a81b4, there is
-            # nothing to read; catch this and hide from the user.
-            pass
-        else:
-            if not client_sha in (None, "", sha):
-                raise ChecksumMismatch(sha, client_sha)
 
+        if 'report-status' in self._send_capabilities:
+            unpack = self.proto.read_pkt_line().strip()
+            if unpack != 'unpack ok':
+                st = True
+                # flush remaining error data
+                while st is not None:
+                    st = self.proto.read_pkt_line()
+                raise SendPackError(unpack)
+            statuses = []
+            errs = False
+            ref_status = self.proto.read_pkt_line()
+            while ref_status:
+                ref_status = ref_status.strip()
+                statuses.append(ref_status)
+                if not ref_status.startswith('ok '):
+                    errs = True
+                ref_status = self.proto.read_pkt_line()
+
+            if errs:
+                ref_status = {}
+                ok = set()
+                for status in statuses:
+                    if ' ' not in status:
+                        # malformed response, move on to the next one
+                        continue
+                    status, ref = status.split(' ', 1)
+
+                    if status == 'ng':
+                        if ' ' in ref:
+                            ref, status = ref.split(' ', 1)
+                    else:
+                        ok.add(ref)
+                    ref_status[ref] = status
+                raise UpdateRefsError('%s failed to update' %
+                                      ', '.join([ref for ref in ref_status
+                                                 if ref not in ok]),
+                                      ref_status=ref_status)
+        # wait for EOF before returning
+        data = self.proto.read()
+        if data:
+            raise SendPackError('Unexpected response %r' % data)
         return new_refs
 
     def fetch(self, path, target, determine_wants=None, progress=None):
@@ -137,7 +179,7 @@ class GitClient(object):
 
         :param path: Path to fetch from
         :param target: Target repository to fetch into
-        :param determine_wants: Optional function to determine what refs 
+        :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
         :return: remote refs
@@ -146,7 +188,7 @@ class GitClient(object):
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
         try:
-            return self.fetch_pack(path, determine_wants, 
+            return self.fetch_pack(path, determine_wants,
                 target.get_graph_walker(), f.write, progress)
         finally:
             commit()
@@ -166,7 +208,8 @@ class GitClient(object):
             self.proto.write_pkt_line(None)
             return refs
         assert isinstance(wants, list) and type(wants[0]) == str
-        self.proto.write_pkt_line("want %s %s\n" % (wants[0], self.capabilities()))
+        self.proto.write_pkt_line("want %s %s\n" % (
+            wants[0], ' '.join(self._fetch_capabilities)))
         for want in wants[1:]:
             self.proto.write_pkt_line("want %s\n" % want)
         self.proto.write_pkt_line(None)
@@ -189,6 +232,8 @@ class GitClient(object):
             if len(parts) < 3 or parts[2] != "continue":
                 break
             pkt = self.proto.read_pkt_line()
+        # TODO(durin42): this is broken if the server didn't support the
+        # side-band-64k capability.
         for pkt in self.proto.read_pkt_seq():
             channel = ord(pkt[0])
             pkt = pkt[1:]
@@ -224,9 +269,9 @@ class TCPGitClient(GitClient):
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data, progress):
         """Fetch a pack from the remote host.
-        
+
         :param path: Path of the reposiutory on the remote host
-        :param determine_wants: Callback that receives available refs dict and 
+        :param determine_wants: Callback that receives available refs dict and
             should return list of sha's to fetch.
         :param graph_walker: GraphWalker instance used to find missing shas
         :param pack_data: Callback for writing pack data
@@ -262,18 +307,18 @@ class SubprocessGitClient(GitClient):
 
         :param path: Path to the git repository on the server
         :param changed_refs: Dictionary with new values for the refs
-        :param generate_pack_contents: Function that returns an iterator over 
+        :param generate_pack_contents: Function that returns an iterator over
             objects to send
         """
         client = self._connect("git-receive-pack", path)
         return client.send_pack(path, changed_refs, generate_pack_contents)
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data, 
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
         progress):
         """Retrieve a pack from the server
 
         :param path: Path to the git repository on the server
-        :param determine_wants: Function that receives existing refs 
+        :param determine_wants: Function that receives existing refs
             on the server and returns a list of desired shas
         :param graph_walker: GraphWalker instance
         :param pack_data: Function that can write pack data
@@ -289,12 +334,8 @@ class SSHSubprocess(object):
 
     def __init__(self, proc):
         self.proc = proc
-
-    def send(self, data):
-        return os.write(self.proc.stdin.fileno(), data)
-
-    def recv(self, count):
-        return self.proc.stdout.read(count)
+        self.read = self.recv = proc.stdout.read
+        self.write = self.send = proc.stdin.write
 
     def close(self):
         self.proc.stdin.close()
@@ -331,7 +372,9 @@ class SSHGitClient(GitClient):
         self._kwargs = kwargs
 
     def send_pack(self, path, determine_wants, generate_pack_contents):
-        remote = get_ssh_vendor().connect_ssh(self.host, ["git-receive-pack '%s'" % path], port=self.port, username=self.username)
+        remote = get_ssh_vendor().connect_ssh(
+            self.host, ["git-receive-pack '%s'" % path],
+            port=self.port, username=self.username)
         client = GitClient(lambda: _fileno_can_read(remote.proc.stdout.fileno()), remote.recv, remote.send, *self._args, **self._kwargs)
         return client.send_pack(path, determine_wants, generate_pack_contents)
 

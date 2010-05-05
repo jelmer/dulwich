@@ -19,12 +19,16 @@
 
 """Utilities for interacting with cgit."""
 
+import errno
 import os
+import socket
 import subprocess
 import tempfile
+import time
 import unittest
 
 from dulwich.repo import Repo
+from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
     TestSkipped,
@@ -108,15 +112,15 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     return stdout
 
 
-def import_repo(name):
+def import_repo_to_dir(name):
     """Import a repo from a fast-export file in a temporary directory.
 
     These are used rather than binary repos for compat tests because they are
     more compact an human-editable, and we already depend on git.
 
     :param name: The name of the repository export file, relative to
-        dulwich/tests/data/repos
-    :returns: An initialized Repo object that lives in a temporary directory.
+        dulwich/tests/data/repos.
+    :returns: The path to the imported repository.
     """
     temp_dir = tempfile.mkdtemp()
     export_path = os.path.join(os.path.dirname(__file__), os.pardir, 'data',
@@ -127,7 +131,44 @@ def import_repo(name):
     run_git_or_fail(['fast-import'], input=export_file.read(),
                     cwd=temp_repo_dir)
     export_file.close()
-    return Repo(temp_repo_dir)
+    return temp_repo_dir
+
+def import_repo(name):
+    """Import a repo from a fast-export file in a temporary directory.
+
+    :param name: The name of the repository export file, relative to
+        dulwich/tests/data/repos.
+    :returns: An initialized Repo object that lives in a temporary directory.
+    """
+    return Repo(import_repo_to_dir(name))
+
+
+def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
+    """Check for a running TCP daemon.
+
+    Defaults to checking 10 times with a delay of 0.1 sec between tries.
+
+    :param limit: Number of attempts before deciding no daemon is running.
+    :param delay: Delay between connection attempts.
+    :param timeout: Socket timeout for connection attempts.
+    :param port: Port on which we expect the daemon to appear.
+    :returns: A boolean, true if a daemon is running on the specified port,
+        false if not.
+    """
+    for _ in xrange(limit):
+        time.sleep(delay)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(delay)
+        try:
+            s.connect(('localhost', port))
+            s.close()
+            return True
+        except socket.error, e:
+            if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
+                raise
+            elif e.args[0] != errno.ECONNREFUSED:
+                raise
+    return False
 
 
 class CompatTestCase(unittest.TestCase):
@@ -141,3 +182,15 @@ class CompatTestCase(unittest.TestCase):
 
     def setUp(self):
         require_git_version(self.min_git_version)
+
+    def assertReposEqual(self, repo1, repo2):
+        self.assertEqual(repo1.get_refs(), repo2.get_refs())
+        self.assertEqual(sorted(set(repo1.object_store)),
+                         sorted(set(repo2.object_store)))
+
+    def assertReposNotEqual(self, repo1, repo2):
+        refs1 = repo1.get_refs()
+        objs1 = set(repo1.object_store)
+        refs2 = repo2.get_refs()
+        objs2 = set(repo2.object_store)
+        self.assertFalse(refs1 == refs2 and objs1 == objs2)

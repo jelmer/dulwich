@@ -13,7 +13,7 @@
 
   * Move named file initilization to BaseRepo. (Dave Borowitz)
 
-  * Add logging utilities and server logging. (Dave Borowitz)
+  * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
 
  TESTS
 

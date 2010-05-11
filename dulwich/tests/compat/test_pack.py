@@ -1,4 +1,4 @@
-# test_pack.py -- Compatibilty tests for git packs.
+# test_pack.py -- Compatibility tests for git packs.
 # Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Compatibilty tests for git packs."""
+"""Compatibility tests for git packs."""
 
 
 import binascii

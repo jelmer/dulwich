@@ -18,6 +18,7 @@
 # MA  02110-1301, USA.
 
 import sys
+from dulwich.log_utils import default_logging_config
 from dulwich.repo import Repo
 from dulwich.server import DictBackend, TCPGitServer
 
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     else:
         gitdir = "."
 
+    default_logging_config()
     backend = DictBackend({"/": Repo(gitdir)})
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()

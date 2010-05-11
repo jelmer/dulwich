@@ -1,3 +1,4 @@
+# lru_cache.py -- Simple LRU cache for dulwich
 # Copyright (C) 2006, 2008 Canonical Ltd
 #
 # This program is free software; you can redistribute it and/or modify

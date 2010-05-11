@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Setup file for bzr-git
+# Setup file for dulwich
 # Copyright (C) 2008-2010 Jelmer Vernooij <jelmer@samba.org>
 
 try:

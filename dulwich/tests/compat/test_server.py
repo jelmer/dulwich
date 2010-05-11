@@ -1,4 +1,4 @@
-# test_server.py -- Compatibilty tests for git server.
+# test_server.py -- Compatibility tests for git server.
 # Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Compatibilty tests between Dulwich and the cgit server.
+"""Compatibility tests between Dulwich and the cgit server.
 
 Warning: these tests should be fairly stable, but when writing/debugging new
 tests, deadlocks may freeze the test process such that it cannot be Ctrl-C'ed.

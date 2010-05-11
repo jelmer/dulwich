@@ -72,13 +72,13 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
-def unified_diff(a, b, fromfile='', tofile='', n=3, lineterm='\n'):
+def unified_diff(a, b, fromfile='', tofile='', n=3):
     """difflib.unified_diff that doesn't write any dates or trailing spaces.
 
     Based on the same function in Python2.6.5-rc2's difflib.py
     """
     started = False
-    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(3):
+    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
             yield '--- %s\n' % fromfile
             yield '+++ %s\n' % tofile
@@ -92,9 +92,13 @@ def unified_diff(a, b, fromfile='', tofile='', n=3, lineterm='\n'):
                 continue
             if tag == 'replace' or tag == 'delete':
                 for line in a[i1:i2]:
+                    if not line[-1] == '\n':
+                        line += '\n\\ No newline at end of file\n'
                     yield '-' + line
             if tag == 'replace' or tag == 'insert':
                 for line in b[j1:j2]:
+                    if not line[-1] == '\n':
+                        line += '\n\\ No newline at end of file\n'
                     yield '+' + line
 
 

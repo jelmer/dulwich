@@ -35,6 +35,7 @@ from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
     Repo,
+    MemoryRepo,
     read_packed_refs,
     read_packed_refs_with_peeled,
     write_packed_refs,
@@ -74,6 +75,10 @@ class CreateRepositoryTests(unittest.TestCase):
             self._check_repo_contents(repo)
         finally:
             shutil.rmtree(tmp_dir)
+
+    def test_create_memory(self):
+        repo = MemoryRepo.init_bare([], {})
+        self._check_repo_contents(repo)
 
 
 class RepositoryTests(unittest.TestCase):

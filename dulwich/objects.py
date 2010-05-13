@@ -434,7 +434,7 @@ class ShaFile(object):
 
     def sha(self):
         """The SHA1 object that is the name of this object."""
-        if self._sha is None:
+        if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
             new_sha = make_sha()
             new_sha.update(self._header())

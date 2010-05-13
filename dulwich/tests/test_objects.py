@@ -187,7 +187,8 @@ class BlobReadTests(unittest.TestCase):
         sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'
         c = self.commit(sha)
         self.assertEqual(c.tree, tree_sha)
-        self.assertEqual(c.parents, ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
+        self.assertEqual(c.parents,
+            ['0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
         self.assertEqual(c.author,
             'James Westby <jw+debian@jameswestby.net>')
         self.assertEqual(c.committer,
@@ -225,13 +226,6 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
-
-    def test_check_id(self):
-        wrong_sha = '1' * 40
-        b = self.get_blob(wrong_sha)
-        self.assertEqual(wrong_sha, b.id)
-        self.assertRaises(ChecksumMismatch, b.check)
-        self.assertEqual('742b386350576589175e374a5706505cbd17680c', b.id)
 
 
 class ShaFileCheckTests(unittest.TestCase):
@@ -418,6 +412,13 @@ class TreeTests(ShaFileCheckTests):
         x["myname"] = (0100755, myhexsha)
         self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
                 x.as_raw_string())
+
+    def test_tree_update_id(self):
+        x = Tree()
+        x["a.c"] = (0100755, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        self.assertEquals("0c5c6bc2c081accfbc250331b19e43b904ab9cdd", x.id)
+        x["a.b"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
+        self.assertEquals("07bfcb5f3ada15bbebdfa3bbb8fd858a363925c8", x.id)
 
     def test_tree_dir_sort(self):
         x = Tree()

@@ -758,7 +758,7 @@ class BaseRepo(object):
                                         'filemode = true\n'
                                         'bare = false\n'
                                         'logallrefupdates = true\n'))
-        self._put_named_file('info/exclude', '')
+        self._put_named_file(os.path.join('info', 'exclude'), '')
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -1095,6 +1095,7 @@ class Repo(BaseRepo):
         :param path: The path to the file, relative to the control dir.
         :contents: A string to write to the file.
         """
+        path = path.lstrip(os.path.sep)
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
         try:
             f.write(contents)
@@ -1111,8 +1112,11 @@ class Repo(BaseRepo):
         :param path: The path to the file, relative to the control dir.
         :return: An open file object, or None if the file does not exist.
         """
+        # TODO(dborowitz): sanitize filenames, since this is used directly by
+        # the dumb web serving code.
+        path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(self.controldir(), path.lstrip('/')), 'rb')
+            return open(os.path.join(self.controldir(), path), 'rb')
         except (IOError, OSError), e:
             if e.errno == errno.ENOENT:
                 return None

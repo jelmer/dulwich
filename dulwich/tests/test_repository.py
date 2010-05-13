@@ -50,11 +50,28 @@ missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 class CreateRepositoryTests(unittest.TestCase):
 
-    def test_create(self):
+    def assertFileContentsEqual(self, expected, repo, path):
+        f = repo.get_named_file(path)
+        if not f:
+            self.assertEqual(expected, None)
+        else:
+            try:
+                self.assertEqual(expected, f.read())
+            finally:
+                f.close()
+
+    def _check_repo_contents(self, repo):
+        self.assertTrue(repo.bare)
+        self.assertFileContentsEqual('Unnamed repository', repo, 'description')
+        self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
+        self.assertFileContentsEqual(None, repo, 'nonexistent file')
+
+    def test_create_disk(self):
         tmp_dir = tempfile.mkdtemp()
         try:
             repo = Repo.init_bare(tmp_dir)
             self.assertEquals(tmp_dir, repo._controldir)
+            self._check_repo_contents(repo)
         finally:
             shutil.rmtree(tmp_dir)
 

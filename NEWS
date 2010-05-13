@@ -14,6 +14,8 @@
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)
 
+  * Add a MemoryRepo that stores everything in memory. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)

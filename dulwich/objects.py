@@ -140,6 +140,13 @@ def check_hexsha(hex, error_msg):
 
 
 def check_identity(identity, error_msg):
+    """Check if the specified identity is valid.
+
+    This will raise an exception if the identity is not valid.
+    
+    :param identity: Identity string
+    :param error_msg: Error message to use in exception
+    """
     email_start = identity.find("<")
     email_end = identity.find(">")
     if (email_start < 0 or email_end < 0 or email_end <= email_start
@@ -267,8 +274,8 @@ class ShaFile(object):
         size = os.path.getsize(f.name)
         map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
         try:
-            # skip type and size; type must have already been determined, and we
-            # trust zlib to fail if it's otherwise corrupted
+            # skip type and size; type must have already been determined, and
+            # we trust zlib to fail if it's otherwise corrupted
             byte = ord(map[0])
             used = 1
             while (byte & 0x80) != 0:

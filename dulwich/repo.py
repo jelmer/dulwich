@@ -750,6 +750,16 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+    def _init_files(self):
+        """Initialize a default set of named files."""
+        self._put_named_file('description', "Unnamed repository")
+        self._put_named_file('config', ('[core]\n'
+                                        'repositoryformatversion = 0\n'
+                                        'filemode = true\n'
+                                        'bare = false\n'
+                                        'logallrefupdates = true\n'))
+        self._put_named_file('info/exclude', '')
+
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
@@ -761,6 +771,14 @@ class BaseRepo(object):
         :return: An open file object, or None if the file does not exist.
         """
         raise NotImplementedError(self.get_named_file)
+
+    def _put_named_file(self, path, contents):
+        """Write a file to the control dir with the given name and contents.
+
+        :param path: The path to the file, relative to the control dir.
+        :contents: A string to write to the file.
+        """
+        raise NotImplementedError(self._put_named_file)
 
     def open_index(self):
         """Open the index for this repository.
@@ -1072,7 +1090,10 @@ class Repo(BaseRepo):
         return self._controldir
 
     def _put_named_file(self, path, contents):
-        """Write a file from the control dir with a specific name and contents.
+        """Write a file to the control dir with the given name and contents.
+
+        :param path: The path to the file, relative to the control dir.
+        :contents: A string to write to the file.
         """
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
         try:
@@ -1162,14 +1183,7 @@ class Repo(BaseRepo):
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
         ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
-        ret._put_named_file('description', "Unnamed repository")
-        ret._put_named_file('config', """[core]
-    repositoryformatversion = 0
-    filemode = true
-    bare = false
-    logallrefupdates = true
-""")
-        ret._put_named_file(os.path.join('info', 'exclude'), '')
+        ret._init_files()
         return ret
 
     create = init_bare

@@ -89,6 +89,8 @@
 
   * Factor out _report_status in ReceivePackHandler. (Dave Borowitz)
 
+  * Factor out a function to convert a line to a pkt-line. (Dave Borowitz)
+
 
 0.6.0	2010-05-22
 

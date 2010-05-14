@@ -240,7 +240,8 @@ class GitClient(object):
             if channel == 1:
                 pack_data(pkt)
             elif channel == 2:
-                progress(pkt)
+                if progress is not None:
+                    progress(pkt)
             else:
                 raise AssertionError("Invalid sideband channel %d" % channel)
         return refs

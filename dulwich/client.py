@@ -122,7 +122,7 @@ class GitClient(object):
                       "%s %s %s\0%s" % (old_sha1, new_sha1, refname,
                                         ' '.join(self._send_capabilities)))
                     sent_capabilities = True
-            if not new_sha1 in (have, ZERO_SHA):
+            if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
         self.proto.write_pkt_line(None)
         if not want:

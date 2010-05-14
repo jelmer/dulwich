@@ -80,7 +80,7 @@ class DulwichClientTest(CompatTestCase):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         self.assertReposEqual(src, dest)
 
-    def test_send_pack(self):
+    def _do_send_pack(self):
         c = client.TCPGitClient('localhost')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
@@ -88,8 +88,16 @@ class DulwichClientTest(CompatTestCase):
         del sendrefs['HEAD']
         c.send_pack('/dest', lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        self.assertReposEqual(src, dest)
+
+    def test_send_pack(self):
+        self._do_send_pack()
+        self.assertDestEqualsSrc()
+
+    def test_send_pack_nothing_to_send(self):
+        self._do_send_pack()
+        self.assertDestEqualsSrc()
+        # nothing to send, but shouldn't raise either.
+        self._do_send_pack()
 
     def test_send_without_report_status(self):
         c = client.TCPGitClient('localhost')

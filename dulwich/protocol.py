@@ -57,6 +57,18 @@ class ProtocolFile(object):
         pass
 
 
+def pkt_line(data):
+    """Wrap data in a pkt-line.
+
+    :param data: The data to wrap, as a str or None.
+    :return: The data prefixed with its length in pkt-line format; if data was
+        None, returns the flush-pkt ('0000')
+    """
+    if data is None:
+        return '0000'
+    return '%04x%s' % (len(data) + 4, data)
+
+
 class Protocol(object):
 
     def __init__(self, read, write, report_activity=None):
@@ -98,14 +110,10 @@ class Protocol(object):
         :param line: A string containing the data to send
         """
         try:
-            if line is None:
-                self.write("0000")
-                if self.report_activity:
-                    self.report_activity(4, 'write')
-            else:
-                self.write("%04x%s" % (len(line)+4, line))
-                if self.report_activity:
-                    self.report_activity(4+len(line), 'write')
+            line = pkt_line(line)
+            self.write(line)
+            if self.report_activity:
+                self.report_activity(len(line), 'write')
         except socket.error, e:
             raise GitProtocolError(e)
 

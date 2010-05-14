@@ -87,6 +87,8 @@
 
   * Move reference WSGI handler to web.py. (Dave Borowitz)
 
+  * Factor out _report_status in ReceivePackHandler. (Dave Borowitz)
+
 
 0.6.0	2010-05-22
 

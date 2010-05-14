@@ -614,6 +614,16 @@ class ReceivePackHandler(Handler):
 
         return status
 
+    def _report_status(self, status):
+        for name, msg in status:
+            if name == 'unpack':
+                self.proto.write_pkt_line('unpack %s\n' % msg)
+            elif msg == 'ok':
+                self.proto.write_pkt_line('ok %s\n' % name)
+            else:
+                self.proto.write_pkt_line('ng %s %s\n' % (name, msg))
+        self.proto.write_pkt_line(None)
+
     def handle(self):
         refs = self.repo.get_refs().items()
 
@@ -654,14 +664,7 @@ class ReceivePackHandler(Handler):
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
         if self.has_capability('report-status'):
-            for name, msg in status:
-                if name == 'unpack':
-                    self.proto.write_pkt_line('unpack %s\n' % msg)
-                elif msg == 'ok':
-                    self.proto.write_pkt_line('ok %s\n' % name)
-                else:
-                    self.proto.write_pkt_line('ng %s %s\n' % (name, msg))
-            self.proto.write_pkt_line(None)
+            self._report_status(status)
 
 
 # Default handler classes for git services.

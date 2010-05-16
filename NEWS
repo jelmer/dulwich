@@ -73,6 +73,8 @@
 
   * Quiet logging output from web tests. (Dave Borowitz)
 
+  * More flexible version checking for compat tests. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)

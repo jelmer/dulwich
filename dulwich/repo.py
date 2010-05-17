@@ -34,6 +34,7 @@ from dulwich.errors import (
     NotTreeError,
     NotTagError,
     PackedRefsException,
+    CommitError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -126,7 +127,7 @@ class RefsContainer(object):
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
         """
-        self[name] = SYMREF + other + '\n'
+        raise NotImplementedError(self.set_symbolic_ref)
 
     def get_packed_refs(self):
         """Get contents of the packed-refs file.
@@ -152,10 +153,14 @@ class RefsContainer(object):
         for name, value in other.iteritems():
             self["%s/%s" % (base, name)] = value
 
+    def allkeys(self):
+        """All refs present in this container."""
+        raise NotImplementedError(self.allkeys)
+
     def keys(self, base=None):
         """Refs present in this container.
 
-        :param base: An optional base to return refs under
+        :param base: An optional base to return refs under.
         :return: An unsorted set of valid refs in this container, including
             packed refs.
         """
@@ -165,10 +170,17 @@ class RefsContainer(object):
             return self.allkeys()
 
     def subkeys(self, base):
+        """Refs present in this container under a base.
+
+        :param base: The base to return refs under.
+        :return: A set of valid refs in this container under the base; the base
+            prefix is stripped from the ref names returned.
+        """
         keys = set()
+        base_len = len(base) + 1
         for refname in self.allkeys():
             if refname.startswith(base):
-                keys.add(refname)
+                keys.add(refname[base_len:])
         return keys
 
     def as_dict(self, base=None):
@@ -258,8 +270,74 @@ class RefsContainer(object):
             raise KeyError(name)
         return sha
 
+    def set_if_equals(self, name, old_ref, new_ref):
+        """Set a refname to new_ref only if it currently equals old_ref.
+
+        This method follows all symbolic references if applicable for the
+        subclass, and can be used to perform an atomic compare-and-swap
+        operation.
+
+        :param name: The refname to set.
+        :param old_ref: The old sha the refname must refer to, or None to set
+            unconditionally.
+        :param new_ref: The new sha the refname will refer to.
+        :return: True if the set was successful, False otherwise.
+        """
+        raise NotImplementedError(self.set_if_equals)
+
+    def add_if_new(self, name, ref):
+        """Add a new reference only if it does not already exist."""
+        raise NotImplementedError(self.add_if_new)
+
+    def __setitem__(self, name, ref):
+        """Set a reference name to point to the given SHA1.
+
+        This method follows all symbolic references if applicable for the
+        subclass.
+
+        :note: This method unconditionally overwrites the contents of a
+            reference. To update atomically only if the reference has not
+            changed, use set_if_equals().
+        :param name: The refname to set.
+        :param ref: The new sha the refname will refer to.
+        """
+        self.set_if_equals(name, None, ref)
+
+    def remove_if_equals(self, name, old_ref):
+        """Remove a refname only if it currently equals old_ref.
+
+        This method does not follow symbolic references, even if applicable for
+        the subclass. It can be used to perform an atomic compare-and-delete
+        operation.
+
+        :param name: The refname to delete.
+        :param old_ref: The old sha the refname must refer to, or None to delete
+            unconditionally.
+        :return: True if the delete was successful, False otherwise.
+        """
+        raise NotImplementedError(self.remove_if_equals)
+
+    def __delitem__(self, name):
+        """Remove a refname.
+
+        This method does not follow symbolic references, even if applicable for
+        the subclass.
+
+        :note: This method unconditionally deletes the contents of a reference.
+            To delete atomically only if the reference has not changed, use
+            remove_if_equals().
+
+        :param name: The refname to delete.
+        """
+        self.remove_if_equals(name, None)
+
 
 class DictRefsContainer(RefsContainer):
+    """RefsContainer backed by a simple dict.
+
+    This container does not support symbolic or packed references and is not
+    threadsafe.
+    """
 
     def __init__(self, refs):
         self._refs = refs
@@ -268,10 +346,32 @@ class DictRefsContainer(RefsContainer):
         return self._refs.keys()
 
     def read_loose_ref(self, name):
-        return self._refs[name]
+        return self._refs.get(name, None)
 
-    def __setitem__(self, name, value):
-        self._refs[name] = value
+    def get_packed_refs(self):
+        return {}
+
+    def set_symbolic_ref(self, name, other):
+        self._refs[name] = SYMREF + other
+
+    def set_if_equals(self, name, old_ref, new_ref):
+        if old_ref is not None and self._refs.get(name, None) != old_ref:
+            return False
+        realname, _ = self._follow(name)
+        self._refs[realname] = new_ref
+        return True
+
+    def add_if_new(self, name, ref):
+        if name in self._refs:
+            return False
+        self._refs[name] = ref
+        return True
+
+    def remove_if_equals(self, name, old_ref):
+        if old_ref is not None and self._refs.get(name, None) != old_ref:
+            return False
+        del self._refs[name]
+        return True
 
 
 class DiskRefsContainer(RefsContainer):
@@ -426,6 +526,25 @@ class DiskRefsContainer(RefsContainer):
         finally:
             f.abort()
 
+    def set_symbolic_ref(self, name, other):
+        """Make a ref point at another ref.
+
+        :param name: Name of the ref to set
+        :param other: Name of the ref to point at
+        """
+        self._check_refname(name)
+        self._check_refname(other)
+        filename = self.refpath(name)
+        try:
+            f = GitFile(filename, 'wb')
+            try:
+                f.write(SYMREF + other + '\n')
+            except (IOError, OSError):
+                f.abort()
+                raise
+        finally:
+            f.close()
+
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.
 
@@ -468,9 +587,23 @@ class DiskRefsContainer(RefsContainer):
         return True
 
     def add_if_new(self, name, ref):
-        """Add a new reference only if it does not already exist."""
-        self._check_refname(name)
-        filename = self.refpath(name)
+        """Add a new reference only if it does not already exist.
+
+        This method follows symrefs, and only ensures that the last ref in the
+        chain does not exist.
+
+        :param name: The refname to set.
+        :param ref: The new sha the refname will refer to.
+        :return: True if the add was successful, False otherwise.
+        """
+        try:
+            realname, contents = self._follow(name)
+            if contents is not None:
+                return False
+        except KeyError:
+            realname = name
+        self._check_refname(realname)
+        filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, 'wb')
         try:
@@ -485,17 +618,6 @@ class DiskRefsContainer(RefsContainer):
         finally:
             f.close()
         return True
-
-    def __setitem__(self, name, ref):
-        """Set a reference name to point to the given SHA1.
-
-        This method follows all symbolic references.
-
-        :note: This method unconditionally overwrites the contents of a reference
-            on disk. To update atomically only if the reference has not changed
-            on disk, use set_if_equals().
-        """
-        self.set_if_equals(name, None, ref)
 
     def remove_if_equals(self, name, old_ref):
         """Remove a refname only if it currently equals old_ref.
@@ -530,16 +652,6 @@ class DiskRefsContainer(RefsContainer):
             # never write, we just wanted the lock
             f.abort()
         return True
-
-    def __delitem__(self, name):
-        """Remove a refname.
-
-        This method does not follow symbolic references.
-        :note: This method unconditionally deletes the contents of a reference
-            on disk. To delete atomically only if the reference has not changed
-            on disk, use set_if_equals().
-        """
-        self.remove_if_equals(name, None)
 
 
 def _split_ref_line(line):
@@ -917,8 +1029,20 @@ class BaseRepo(object):
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
         c.message = message
-        self.object_store.add_object(c)
-        self.refs["HEAD"] = c.id
+        try:
+            old_head = self.refs["HEAD"]
+            c.parents = [old_head]
+            self.object_store.add_object(c)
+            ok = self.refs.set_if_equals("HEAD", old_head, c.id)
+        except KeyError:
+            c.parents = []
+            self.object_store.add_object(c)
+            ok = self.refs.add_if_new("HEAD", c.id)
+        if not ok:
+            # Fail if the atomic compare-and-swap failed, leaving the commit and
+            # all its objects as garbage.
+            raise CommitError("HEAD changed during commit")
+
         return c.id
 
 
@@ -984,7 +1108,9 @@ class Repo(BaseRepo):
 
     def has_index(self):
         """Check if an index is present."""
-        return os.path.exists(self.index_path())
+        # Bare repos must never have index files; non-bare repos may have a
+        # missing index file, which is treated as empty.
+        return not self.bare
 
     def stage(self, paths):
         """Stage a set of paths.
@@ -994,14 +1120,18 @@ class Repo(BaseRepo):
         from dulwich.index import cleanup_mode
         index = self.open_index()
         for path in paths:
+            full_path = os.path.join(self.path, path)
             blob = Blob()
             try:
-                st = os.stat(path)
+                st = os.stat(full_path)
             except OSError:
                 # File no longer exists
-                del index[path]
+                try:
+                    del index[path]
+                except KeyError:
+                    pass  # Doesn't exist in the index either
             else:
-                f = open(path, 'rb')
+                f = open(full_path, 'rb')
                 try:
                     blob.data = f.read()
                 finally:

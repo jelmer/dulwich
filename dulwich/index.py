@@ -204,6 +204,8 @@ class Index(object):
 
     def read(self):
         """Read current contents of index from disk."""
+        if not os.path.exists(self._filename):
+            return
         f = GitFile(self._filename, 'rb')
         try:
             f = SHA1Reader(f)
@@ -253,6 +255,10 @@ class Index(object):
         assert len(x) == 10
         # Remove the old entry if any
         self._byname[name] = x
+
+    def __delitem__(self, name):
+        assert isinstance(name, str)
+        del self._byname[name]
 
     def iteritems(self):
         return self._byname.iteritems()

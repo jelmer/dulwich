@@ -161,16 +161,20 @@ class Handler(object):
         self.proto = proto
         self._client_capabilities = None
 
-    def capability_line(self):
-        return " ".join(self.capabilities())
+    @classmethod
+    def capability_line(cls):
+        return " ".join(cls.capabilities())
 
-    def capabilities(self):
-        raise NotImplementedError(self.capabilities)
+    @classmethod
+    def capabilities(cls):
+        raise NotImplementedError(cls.capabilities)
 
-    def innocuous_capabilities(self):
+    @classmethod
+    def innocuous_capabilities(cls):
         return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         """Return a list of capabilities that we require the client to have."""
         return []
 
@@ -206,11 +210,13 @@ class UploadPackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
                 "ofs-delta", "no-progress", "include-tag")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         return ("side-band-64k", "thin-pack", "ofs-delta")
 
     def progress(self, message):
@@ -569,7 +575,8 @@ class ReceivePackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return ("report-status", "delete-refs")
 
     def _apply_pack(self, refs):

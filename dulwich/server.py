@@ -57,6 +57,7 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    BufferedPktLineWriter,
     )
 from dulwich.repo import (
     Repo,
@@ -577,7 +578,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return ("report-status", "delete-refs")
+        return ("report-status", "delete-refs", "side-band-64k")
 
     def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
@@ -622,14 +623,27 @@ class ReceivePackHandler(Handler):
         return status
 
     def _report_status(self, status):
+        if self.has_capability('side-band-64k'):
+            writer = BufferedPktLineWriter(
+              lambda d: self.proto.write_sideband(1, d))
+            write = writer.write
+
+            def flush():
+                writer.flush()
+                self.proto.write_pkt_line(None)
+        else:
+            write = self.proto.write_pkt_line
+            flush = lambda: None
+
         for name, msg in status:
             if name == 'unpack':
-                self.proto.write_pkt_line('unpack %s\n' % msg)
+                write('unpack %s\n' % msg)
             elif msg == 'ok':
-                self.proto.write_pkt_line('ok %s\n' % name)
+                write('ok %s\n' % name)
             else:
-                self.proto.write_pkt_line('ng %s %s\n' % (name, msg))
-        self.proto.write_pkt_line(None)
+                write('ng %s %s\n' % (name, msg))
+        write(None)
+        flush()
 
     def handle(self):
         refs = self.repo.get_refs().items()

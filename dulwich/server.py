@@ -684,7 +684,7 @@ DEFAULT_HANDLERS = {
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def __init__(self, handlers, *args, **kwargs):
-        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        self.handlers = handlers
         SocketServer.StreamRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
@@ -708,8 +708,10 @@ class TCPGitServer(SocketServer.TCPServer):
         return TCPGitRequestHandler(self.handlers, *args, **kwargs)
 
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
+        self.handlers = dict(DEFAULT_HANDLERS)
+        if handlers is not None:
+            self.handlers.update(handlers)
         self.backend = backend
-        self.handlers = handlers
         logger.info('Listening for TCP connections on %s:%d', listen_addr, port)
         SocketServer.TCPServer.__init__(self, (listen_addr, port),
                                         self._make_handler)

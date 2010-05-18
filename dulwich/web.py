@@ -259,7 +259,7 @@ class HTTPGitRequest(object):
     def __init__(self, environ, start_response, dumb=False, handlers=None):
         self.environ = environ
         self.dumb = dumb
-        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        self.handlers = handlers
         self._start_response = start_response
         self._cache_headers = []
         self._headers = []
@@ -340,7 +340,9 @@ class HTTPGitApplication(object):
     def __init__(self, backend, dumb=False, handlers=None):
         self.backend = backend
         self.dumb = dumb
-        self.handlers = handlers
+        self.handlers = dict(DEFAULT_HANDLERS)
+        if handlers is not None:
+            self.handlers.update(handlers)
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO']

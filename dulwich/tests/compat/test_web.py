@@ -42,6 +42,7 @@ from dulwich.web import (
 from server_utils import (
     ServerTests,
     ShutdownServerMixIn,
+    NoSideBand64kReceivePackHandler,
     )
 from utils import (
     CompatTestCase,
@@ -84,7 +85,10 @@ class WebTests(ServerTests):
 
 
 class SmartWebTestCase(WebTests, CompatTestCase):
-    """Test cases for smart HTTP server."""
+    """Test cases for smart HTTP server.
+
+    This server test case does not use side-band-64k in git-receive-pack.
+    """
 
     min_git_version = (1, 6, 6)
 
@@ -96,8 +100,33 @@ class SmartWebTestCase(WebTests, CompatTestCase):
         WebTests.tearDown(self)
         CompatTestCase.tearDown(self)
 
+    def _handlers(self):
+        return {'git-receive-pack': NoSideBand64kReceivePackHandler}
+
+    def _check_app(self, app):
+        receive_pack_handler_cls = app.handlers['git-receive-pack']
+        caps = receive_pack_handler_cls.capabilities()
+        self.assertFalse('side-band-64k' in caps)
+
     def _make_app(self, backend):
-        return HTTPGitApplication(backend)
+        app = HTTPGitApplication(backend, handlers=self._handlers())
+        self._check_app(app)
+        return app
+
+
+class SmartWebSideBand64kTestCase(SmartWebTestCase):
+    """Test cases for smart HTTP server with side-band-64k support."""
+
+    # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
+    min_git_version = (1, 7, 0, 2)
+
+    def _handlers(self):
+        return None  # default handlers include side-band-64k
+
+    def _check_app(self, app):
+        receive_pack_handler_cls = app.handlers['git-receive-pack']
+        caps = receive_pack_handler_cls.capabilities()
+        self.assertTrue('side-band-64k' in caps)
 
 
 class DumbWebTestCase(WebTests, CompatTestCase):

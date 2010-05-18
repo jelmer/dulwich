@@ -37,6 +37,8 @@
 
   * Change server capabilities methods to classmethods. (Dave Borowitz)
 
+  * Tweak server handler injection. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

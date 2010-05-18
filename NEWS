@@ -77,6 +77,8 @@
 
   * More flexible version checking for compat tests. (Dave Borowitz)
 
+  * Compat tests for servers with and without side-band-64k. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)

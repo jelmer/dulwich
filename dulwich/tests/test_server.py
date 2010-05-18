@@ -76,13 +76,24 @@ class TestProto(object):
             return None
 
 
+class TestGenericHandler(Handler):
+
+    def __init__(self):
+        Handler.__init__(self, Backend(), None)
+
+    @classmethod
+    def capabilities(cls):
+        return ('cap1', 'cap2', 'cap3')
+
+    @classmethod
+    def required_capabilities(cls):
+        return ('cap2',)
+
+
 class HandlerTestCase(TestCase):
 
     def setUp(self):
-        super(HandlerTestCase, self).setUp()
-        self._handler = Handler(Backend(), None)
-        self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
-        self._handler.required_capabilities = lambda: ('cap2',)
+        self._handler = TestGenericHandler()
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -208,7 +219,8 @@ class TestUploadPackHandler(Handler):
         self.stateless_rpc = False
         self.advertise_refs = False
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return ('multi_ack',)
 
 

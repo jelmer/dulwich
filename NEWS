@@ -35,6 +35,8 @@
   * ObjectStore.iter_tree_contents can optionally yield tree objects as well.
     (Dave Borowitz).
 
+  * Change server capabilities methods to classmethods. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

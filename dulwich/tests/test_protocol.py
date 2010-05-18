@@ -30,6 +30,7 @@ from dulwich.protocol import (
     SINGLE_ACK,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
+    BufferedPktLineWriter,
     )
 from dulwich.tests import TestCase
 
@@ -192,3 +193,57 @@ class CapabilitiesTestCase(TestCase):
         self.assertEquals(MULTI_ACK_DETAILED,
                           ack_type(['foo', 'bar', 'multi_ack',
                                     'multi_ack_detailed']))
+
+
+class BufferedPktLineWriterTests(TestCase):
+
+    def setUp(self):
+        self._output = StringIO()
+        self._writer = BufferedPktLineWriter(self._output.write, bufsize=16)
+
+    def assertOutputEquals(self, expected):
+        self.assertEquals(expected, self._output.getvalue())
+
+    def _truncate(self):
+        self._output.seek(0)
+        self._output.truncate()
+
+    def test_write(self):
+        self._writer.write('foo')
+        self.assertOutputEquals('')
+        self._writer.flush()
+        self.assertOutputEquals('0007foo')
+
+    def test_write_none(self):
+        self._writer.write(None)
+        self.assertOutputEquals('')
+        self._writer.flush()
+        self.assertOutputEquals('0000')
+
+    def test_flush_empty(self):
+        self._writer.flush()
+        self.assertOutputEquals('')
+
+    def test_write_multiple(self):
+        self._writer.write('foo')
+        self._writer.write('bar')
+        self.assertOutputEquals('')
+        self._writer.flush()
+        self.assertOutputEquals('0007foo0007bar')
+
+    def test_write_across_boundary(self):
+        self._writer.write('foo')
+        self._writer.write('barbaz')
+        self.assertOutputEquals('0007foo000abarba')
+        self._truncate()
+        self._writer.flush()
+        self.assertOutputEquals('z')
+
+    def test_write_to_boundary(self):
+        self._writer.write('foo')
+        self._writer.write('barba')
+        self.assertOutputEquals('0007foo0009barba')
+        self._truncate()
+        self._writer.write('z')
+        self._writer.flush()
+        self.assertOutputEquals('0005z')

@@ -709,9 +709,6 @@ class PackData(object):
     def close(self):
         self._file.close()
 
-    def __del__(self):
-        self.close()
-
     def _get_size(self):
         if self._size is not None:
             return self._size

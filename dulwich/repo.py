@@ -1,18 +1,18 @@
 # repo.py -- For dealing wih git repositories.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of 
+# of the License or (at your option) any later version of
 # the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -219,7 +219,7 @@ class RefsContainer(object):
         """Read a reference without following any references.
 
         :param refname: The name of the reference
-        :return: The contents of the ref file, or None if it does 
+        :return: The contents of the ref file, or None if it does
             not exist.
         """
         contents = self.read_loose_ref(refname)
@@ -231,7 +231,7 @@ class RefsContainer(object):
         """Read a loose reference and return its contents.
 
         :param name: the refname to read
-        :return: The contents of the ref file, or None if it does 
+        :return: The contents of the ref file, or None if it does
             not exist.
         """
         raise NotImplementedError(self.read_loose_ref)
@@ -762,7 +762,7 @@ class BaseRepo(object):
 
     def open_index(self):
         """Open the index for this repository.
-        
+
         :raises NoIndexPresent: If no index is present
         :return: Index instance
         """
@@ -772,7 +772,7 @@ class BaseRepo(object):
         """Fetch objects into another repository.
 
         :param target: The target repository
-        :param determine_wants: Optional function to determine what refs to 
+        :param determine_wants: Optional function to determine what refs to
             fetch.
         :param progress: Optional progress function
         """
@@ -787,12 +787,12 @@ class BaseRepo(object):
                       get_tagged=None):
         """Fetch the missing objects required for a set of revisions.
 
-        :param determine_wants: Function that takes a dictionary with heads 
+        :param determine_wants: Function that takes a dictionary with heads
             and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions 
-            to fetch and has an "ack" method that will be called to acknowledge 
+        :param graph_walker: Object that can iterate over the list of revisions
+            to fetch and has an "ack" method that will be called to acknowledge
             that a revision is present.
-        :param progress: Simple progress function that will be called with 
+        :param progress: Simple progress function that will be called with
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha -> tag
             sha for including tags.
@@ -984,9 +984,9 @@ class BaseRepo(object):
             del self.refs[name]
         raise ValueError(name)
 
-    def do_commit(self, message, committer=None, 
+    def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
-                  commit_timezone=None, author_timestamp=None, 
+                  commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None):
         """Create a new commit.
 
@@ -996,7 +996,7 @@ class BaseRepo(object):
         :param commit_timestamp: Commit timestamp (defaults to now)
         :param commit_timezone: Commit timestamp timezone (defaults to GMT)
         :param author_timestamp: Author timestamp (defaults to commit timestamp)
-        :param author_timezone: Author timestamp timezone 
+        :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
         :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
         :return: New commit SHA1

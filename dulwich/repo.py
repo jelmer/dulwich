@@ -433,7 +433,10 @@ class DiskRefsContainer(RefsContainer):
         """
         # TODO: invalidate the cache on repacking
         if self._packed_refs is None:
+            # set both to empty because we want _peeled_refs to be
+            # None if and only if _packed_refs is also None.
             self._packed_refs = {}
+            self._peeled_refs = {}
             path = os.path.join(self.path, 'packed-refs')
             try:
                 f = GitFile(path, 'rb')
@@ -445,7 +448,6 @@ class DiskRefsContainer(RefsContainer):
                 first_line = iter(f).next().rstrip()
                 if (first_line.startswith("# pack-refs") and " peeled" in
                         first_line):
-                    self._peeled_refs = {}
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
                         self._packed_refs[name] = sha
                         if peeled:

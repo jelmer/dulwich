@@ -735,6 +735,20 @@ class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
         self.assertFalse(os.path.exists(
             os.path.join(self._refs.path, 'HEAD.lock')))
 
+    def test_remove_packed_without_peeled(self):
+        refs_file = os.path.join(self._repo.path, 'packed-refs')
+        f = open(refs_file)
+        refs_data = f.read()
+        f.close()
+        f = open(refs_file, 'w')
+        f.write('\n'.join(l for l in refs_data.split('\n')
+                          if not l or l[0] not in '#^'))
+        f.close()
+        self._repo = Repo(self._repo.path)
+        refs = self._repo.refs
+        self.assertTrue(refs.remove_if_equals(
+          'refs/heads/packed', '42d06bd4b77fed026b154d16493e5deab78f02ec'))
+
     def test_remove_if_equals_packed(self):
         # test removing ref that is only packed
         self.assertEqual('df6800012397fb85c56e7418dd4eb9405dee075c',

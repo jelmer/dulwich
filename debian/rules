@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+export DH_PYCENTRAL=nomove
+
 DEB_PYTHON_SYSTEM=pycentral
 
 include /usr/share/cdbs/1/rules/debhelper.mk

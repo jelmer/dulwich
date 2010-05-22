@@ -1,17 +1,17 @@
 # test_repository.py -- tests for repository.py
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of 
+# of the License or (at your option) any later version of
 # the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -68,11 +68,11 @@ class RepositoryTests(unittest.TestCase):
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
-  
+
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.controldir(), r.path)
-  
+
     def test_ref(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.ref('refs/heads/master'),
@@ -83,7 +83,7 @@ class RepositoryTests(unittest.TestCase):
         r["refs/tags/foo"] = 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
         self.assertEquals('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                           r["refs/tags/foo"].id)
-  
+
     def test_get_refs(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual({
@@ -92,7 +92,7 @@ class RepositoryTests(unittest.TestCase):
             'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
             'refs/tags/mytag-packed': 'b0931cadc54336e78a1d980420e3268903b57a50',
             }, r.get_refs())
-  
+
     def test_head(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
@@ -216,14 +216,14 @@ class RepositoryTests(unittest.TestCase):
             self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
         finally:
             warnings.resetwarnings()
-    
+
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
                                 '2a72d929692c41d8554c07f6301757ba18a65d91'])
-  
+
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
         history = r.revision_history(r.head())
@@ -233,12 +233,12 @@ class RepositoryTests(unittest.TestCase):
                                 '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
                                 '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
                                 '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
-  
+
     def test_revision_history_missing_commit(self):
         r = self._repo = open_repo('simple_merge.git')
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
-  
+
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
         r = self._repo = open_repo('ooo_merge.git')
@@ -248,7 +248,7 @@ class RepositoryTests(unittest.TestCase):
                                 'f507291b64138b875c28e03469025b1ea20bc614',
                                 'fb5b0425c7ce46959bec94d54b9a157645e114f5',
                                 'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
-  
+
     def test_get_tags_empty(self):
         r = self._repo = open_repo('ooo_merge.git')
         self.assertEqual({}, r.refs.as_dict('refs/tags'))
@@ -735,6 +735,19 @@ class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
         self.assertFalse(os.path.exists(
             os.path.join(self._refs.path, 'HEAD.lock')))
 
+    def test_remove_packed_without_peeled(self):
+        refs_file = os.path.join(self._repo.path, 'packed-refs')
+        f = open(refs_file)
+        refs_data = f.read()
+        f.close()
+        f = open(refs_file, 'w')
+        f.write('\n'.join(l for l in refs_data.split('\n')
+                          if not l or l[0] not in '#^'))
+        f.close()
+        self._repo = Repo(self._repo.path)
+        refs = self._repo.refs
+        self.assertTrue(refs.remove_if_equals(
+          'refs/heads/packed', '42d06bd4b77fed026b154d16493e5deab78f02ec'))
 
     def test_remove_if_equals_packed(self):
         # test removing ref that is only packed
@@ -747,7 +760,7 @@ class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
 
     def test_read_ref(self):
         self.assertEqual('ref: refs/heads/master', self._refs.read_ref("HEAD"))
-        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec', 
+        self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
             self._refs.read_ref("refs/heads/packed"))
         self.assertEqual(None,
             self._refs.read_ref("nonexistant"))

@@ -1,5 +1,8 @@
 Please follow PEP8 with regard to coding style.
 
-All functionality should be available in pure Python. Optional C implementations
-may be written for performance reasons, but should never replace the Python 
-implementation. The C implementations should follow the kernel/git coding style.
+All functionality should be available in pure Python. Optional C
+implementations may be written for performance reasons, but should never
+replace the Python implementation. The C implementations should follow the
+kernel/git coding style.
+
+Where possible please include updates to NEWS along with your improvements.

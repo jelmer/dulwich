@@ -1,8 +1,96 @@
+0.6.0	2010-05-22
+
+note: This list is most likely incomplete for 0.6.0.
+
+ BUG FIXES
+ 
+  * Fix ReceivePackHandler to disallow removing refs without delete-refs.
+    (Dave Borowitz)
+
+  * Deal with capabilities required by the client, even if they 
+    can not be disabled in the server. (Dave Borowitz)
+
+  * Fix trailing newlines in generated patch files.
+    (Jelmer Vernooij)
+
+  * Implement RefsContainer.__contains__. (Jelmer Vernooij)
+
+  * Cope with \r in ref files on Windows. (
+	http://github.com/jelmer/dulwich/issues/#issue/13, Jelmer Vernooij)
+
+  * Fix GitFile breakage on Windows. (Anatoly Techtonik, #557585)
+
+  * Support packed ref deletion with no peeled refs. (Augie Fackler)
+
+  * Fix send pack when there is nothing to fetch. (Augie Fackler)
+
+  * Fix fetch if no progress function is specified. (Augie Fackler)
+
+  * Allow double-staging of files that are deleted in the index. 
+    (Dave Borowitz)
+
+  * Fix RefsContainer.add_if_new to support dangling symrefs.
+    (Dave Borowitz)
+
+  * Non-existant index files in non-bare repositories are now treated as 
+    empty. (Dave Borowitz)
+
+  * Always update ShaFile.id when the contents of the object get changed. 
+    (Jelmer Vernooij)
+
+  * Various Python2.4-compatibility fixes. (Dave Borowitz)
+
+  * Fix thin pack handling. (Dave Borowitz)
+ 
+ FEATURES
+
+  * Add include-tag capability to server. (Dave Borowitz)
+
+  * New dulwich.fastexport module that can generate fastexport 
+    streams. (Jelmer Vernooij)
+
+  * Implemented BaseRepo.__contains__. (Jelmer Vernooij)
+
+  * Add __setitem__ to DictRefsContainer. (Dave Borowitz)
+
+  * Overall improvements checking Git objects. (Dave Borowitz)
+
+  * Packs are now verified while they are received. (Dave Borowitz)
+
+ TESTS
+
+  * Add framework for testing compatibility with C Git. (Dave Borowitz)
+
+  * Add various tests for the use of non-bare repositories. (Dave Borowitz)
+
+  * Cope with diffstat not being available on all platforms. 
+    (Tay Ray Chuan, Jelmer Vernooij)
+
+  * Add make_object and make_commit convenience functions to test utils.
+    (Dave Borowitz)
+
+ API BREAKAGES
+
+  * The 'committer' and 'message' arguments to Repo.do_commit() have 
+    been swapped. 'committer' is now optional. (Jelmer Vernooij)
+
+  * Repo.get_blob, Repo.commit, Repo.tag and Repo.tree are now deprecated.
+    (Jelmer Vernooij)
+
+  * RefsContainer.set_ref() was renamed to RefsContainer.set_symbolic_ref(),
+    for clarity. (Jelmer Vernooij)
+
+ API CHANGES
+
+  * The primary serialization APIs in dulwich.objects now work 
+    with chunks of strings rather than with full-text strings. 
+    (Jelmer Vernooij)
+
 0.5.0	2010-03-03
 
  BUG FIXES
 
-  * Support custom fields in commits.
+  * Support custom fields in commits (readonly). (Jelmer Vernooij)
 
   * Improved ref handling. (Dave Borowitz)
 
@@ -31,13 +119,14 @@
 
  FEATURES
 
-  * Add ObjectStore.iter_tree_contents()
+  * Add ObjectStore.iter_tree_contents(). (Jelmer Vernooij)
 
-  * Add Index.changes_from_tree()
+  * Add Index.changes_from_tree(). (Jelmer Vernooij)
 
-  * Add ObjectStore.tree_changes()
+  * Add ObjectStore.tree_changes(). (Jelmer Vernooij)
 
   * Add functionality for writing patches in dulwich.patch.
+    (Jelmer Vernooij)
 
 0.4.0	2009-10-07
 

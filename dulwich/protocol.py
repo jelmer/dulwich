@@ -19,18 +19,26 @@
 
 """Generic functions for talking the git smart server protocol."""
 
+from cStringIO import StringIO
+import os
 import socket
 
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
     )
+from dulwich.misc import (
+    SEEK_END,
+    )
 
 TCP_GIT_PORT = 9418
+
+ZERO_SHA = "0" * 40
 
 SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
+
 
 class ProtocolFile(object):
     """
@@ -160,6 +168,112 @@ class Protocol(object):
         return cmd, args[:-1].split(chr(0))
 
 
+_RBUFSIZE = 8192  # Default read buffer size.
+
+
+class ReceivableProtocol(Protocol):
+    """Variant of Protocol that allows reading up to a size without blocking.
+
+    This class has a recv() method that behaves like socket.recv() in addition
+    to a read() method.
+
+    If you want to read n bytes from the wire and block until exactly n bytes
+    (or EOF) are read, use read(n). If you want to read at most n bytes from the
+    wire but don't care if you get less, use recv(n). Note that recv(n) will
+    still block until at least one byte is read.
+    """
+
+    def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
+        super(ReceivableProtocol, self).__init__(self.read, write,
+                                                 report_activity)
+        self._recv = recv
+        self._rbuf = StringIO()
+        self._rbufsize = rbufsize
+
+    def read(self, size):
+        # From _fileobj.read in socket.py in the Python 2.6.5 standard library,
+        # with the following modifications:
+        #  - omit the size <= 0 branch
+        #  - seek back to start rather than 0 in case some buffer has been
+        #    consumed.
+        #  - use SEEK_END instead of the magic number.
+        # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+        # Licensed under the Python Software Foundation License.
+        # TODO: see if buffer is more efficient than cStringIO.
+        assert size > 0
+
+        # Our use of StringIO rather than lists of string objects returned by
+        # recv() minimizes memory usage and fragmentation that occurs when
+        # rbufsize is large compared to the typical return value of recv().
+        buf = self._rbuf
+        start = buf.tell()
+        buf.seek(0, SEEK_END)
+        # buffer may have been partially consumed by recv()
+        buf_len = buf.tell() - start
+        if buf_len >= size:
+            # Already have size bytes in our buffer?  Extract and return.
+            buf.seek(start)
+            rv = buf.read(size)
+            self._rbuf = StringIO()
+            self._rbuf.write(buf.read())
+            self._rbuf.seek(0)
+            return rv
+
+        self._rbuf = StringIO()  # reset _rbuf.  we consume it via buf.
+        while True:
+            left = size - buf_len
+            # recv() will malloc the amount of memory given as its
+            # parameter even though it often returns much less data
+            # than that.  The returned data string is short lived
+            # as we copy it into a StringIO and free it.  This avoids
+            # fragmentation issues on many platforms.
+            data = self._recv(left)
+            if not data:
+                break
+            n = len(data)
+            if n == size and not buf_len:
+                # Shortcut.  Avoid buffer data copies when:
+                # - We have no data in our buffer.
+                # AND
+                # - Our call to recv returned exactly the
+                #   number of bytes we were asked to read.
+                return data
+            if n == left:
+                buf.write(data)
+                del data  # explicit free
+                break
+            assert n <= left, "_recv(%d) returned %d bytes" % (left, n)
+            buf.write(data)
+            buf_len += n
+            del data  # explicit free
+            #assert buf_len == buf.tell()
+        buf.seek(start)
+        return buf.read()
+
+    def recv(self, size):
+        assert size > 0
+
+        buf = self._rbuf
+        start = buf.tell()
+        buf.seek(0, SEEK_END)
+        buf_len = buf.tell()
+        buf.seek(start)
+
+        left = buf_len - start
+        if not left:
+            # only read from the wire if our read buffer is exhausted
+            data = self._recv(self._rbufsize)
+            if len(data) == size:
+                # shortcut: skip the buffer if we read exactly size bytes
+                return data
+            buf = StringIO()
+            buf.write(data)
+            buf.seek(0)
+            del data  # explicit free
+            self._rbuf = buf
+        return buf.read(size)
+
+
 def extract_capabilities(text):
     """Extract a capabilities list from a string, if present.
 
@@ -169,7 +283,7 @@ def extract_capabilities(text):
     if not "\0" in text:
         return text, []
     text, capabilities = text.rstrip().split("\0")
-    return (text, capabilities.split(" "))
+    return (text, capabilities.strip().split(" "))
 
 
 def extract_want_line_capabilities(text):
@@ -192,7 +306,7 @@ def extract_want_line_capabilities(text):
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
     if 'multi_ack_detailed' in capabilities:
-      return MULTI_ACK_DETAILED
+        return MULTI_ACK_DETAILED
     elif 'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK

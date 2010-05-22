@@ -22,10 +22,14 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-import difflib
+from difflib import SequenceMatcher
+import rfc822
 import subprocess
 import time
 
+from dulwich.objects import (
+    Commit,
+    )
 
 def write_commit_patch(f, commit, contents, progress, version=None):
     """Write a individual file patch.
@@ -68,6 +72,36 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
+def unified_diff(a, b, fromfile='', tofile='', n=3):
+    """difflib.unified_diff that doesn't write any dates or trailing spaces.
+
+    Based on the same function in Python2.6.5-rc2's difflib.py
+    """
+    started = False
+    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
+        if not started:
+            yield '--- %s\n' % fromfile
+            yield '+++ %s\n' % tofile
+            started = True
+        i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
+        yield "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        for tag, i1, i2, j1, j2 in group:
+            if tag == 'equal':
+                for line in a[i1:i2]:
+                    yield ' ' + line
+                continue
+            if tag == 'replace' or tag == 'delete':
+                for line in a[i1:i2]:
+                    if not line[-1] == '\n':
+                        line += '\n\\ No newline at end of file\n'
+                    yield '-' + line
+            if tag == 'replace' or tag == 'insert':
+                for line in b[j1:j2]:
+                    if not line[-1] == '\n':
+                        line += '\n\\ No newline at end of file\n'
+                    yield '+' + line
+
+
 def write_blob_diff(f, (old_path, old_mode, old_blob), 
                        (new_path, new_mode, new_blob)):
     """Write diff file header.
@@ -98,13 +132,41 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                f.write("old file mode %o\n" % old_mode)
-            f.write("new file mode %o\n" % new_mode) 
+                f.write("old mode %o\n" % old_mode)
+            f.write("new mode %o\n" % new_mode) 
         else:
-            f.write("deleted file mode %o\n" % old_mode)
+            f.write("deleted mode %o\n" % old_mode)
     f.write("index %s..%s %o\n" % (
         blob_id(old_blob), blob_id(new_blob), new_mode))
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
-    f.writelines(difflib.unified_diff(old_contents, new_contents, 
+    f.writelines(unified_diff(old_contents, new_contents, 
         old_path, new_path))
+
+
+def git_am_patch_split(f):
+    """Parse a git-am-style patch and split it up into bits.
+
+    :param f: File-like object to parse
+    :return: Tuple with commit object, diff contents and git version
+    """
+    msg = rfc822.Message(f)
+    c = Commit()
+    c.author = msg["from"]
+    c.committer = msg["from"]
+    if msg["subject"].startswith("[PATCH"):
+        subject = msg["subject"].split("]", 1)[1][1:]
+    else:
+        subject = msg["subject"]
+    c.message = subject
+    for l in f:
+        if l == "---\n":
+            break
+        c.message += l
+    diff = ""
+    for l in f:
+        if l == "-- \n":
+            break
+        diff += l
+    version = f.next().rstrip("\n")
+    return c, diff, version

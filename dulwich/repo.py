@@ -1,18 +1,18 @@
 # repo.py -- For dealing wih git repositories.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of 
+# of the License or (at your option) any later version of
 # the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -26,13 +26,15 @@ import errno
 import os
 
 from dulwich.errors import (
-    MissingCommitError, 
+    MissingCommitError,
     NoIndexPresent,
-    NotBlobError, 
-    NotCommitError, 
+    NotBlobError,
+    NotCommitError,
     NotGitRepository,
-    NotTreeError, 
+    NotTreeError,
+    NotTagError,
     PackedRefsException,
+    CommitError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -48,7 +50,10 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
+    object_class,
     )
+import warnings
+
 
 OBJECTDIR = 'objects'
 SYMREF = 'ref: '
@@ -58,9 +63,6 @@ REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
 
 BASE_DIRECTORIES = [
-    [OBJECTDIR], 
-    [OBJECTDIR, "info"], 
-    [OBJECTDIR, "pack"],
     ["branches"],
     [REFSDIR],
     [REFSDIR, REFSDIR_TAGS],
@@ -73,7 +75,7 @@ BASE_DIRECTORIES = [
 def read_info_refs(f):
     ret = {}
     for l in f.readlines():
-        (sha, name) = l.rstrip("\n").split("\t", 1)
+        (sha, name) = l.rstrip("\r\n").split("\t", 1)
         ret[name] = sha
     return ret
 
@@ -114,12 +116,18 @@ class RefsContainer(object):
     """A container for refs."""
 
     def set_ref(self, name, other):
+        warnings.warn("RefsContainer.set_ref() is deprecated."
+            "Use set_symblic_ref instead.",
+            category=DeprecationWarning, stacklevel=2)
+        return self.set_symbolic_ref(name, other)
+
+    def set_symbolic_ref(self, name, other):
         """Make a ref point at another ref.
 
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
         """
-        self[name] = SYMREF + other + '\n'
+        raise NotImplementedError(self.set_symbolic_ref)
 
     def get_packed_refs(self):
         """Get contents of the packed-refs file.
@@ -131,14 +139,28 @@ class RefsContainer(object):
         """
         raise NotImplementedError(self.get_packed_refs)
 
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
+
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to a
+            tag, this will be the SHA the ref refers to. If the ref may point to
+            a tag, but no cached information is available, None is returned.
+        """
+        return None
+
     def import_refs(self, base, other):
         for name, value in other.iteritems():
             self["%s/%s" % (base, name)] = value
 
+    def allkeys(self):
+        """All refs present in this container."""
+        raise NotImplementedError(self.allkeys)
+
     def keys(self, base=None):
         """Refs present in this container.
 
-        :param base: An optional base to return refs under
+        :param base: An optional base to return refs under.
         :return: An unsorted set of valid refs in this container, including
             packed refs.
         """
@@ -148,10 +170,17 @@ class RefsContainer(object):
             return self.allkeys()
 
     def subkeys(self, base):
+        """Refs present in this container under a base.
+
+        :param base: The base to return refs under.
+        :return: A set of valid refs in this container under the base; the base
+            prefix is stripped from the ref names returned.
+        """
         keys = set()
+        base_len = len(base) + 1
         for refname in self.allkeys():
             if refname.startswith(base):
-                keys.add(refname)
+                keys.add(refname[base_len:])
         return keys
 
     def as_dict(self, base=None):
@@ -186,11 +215,23 @@ class RefsContainer(object):
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
             raise KeyError(name)
 
+    def read_ref(self, refname):
+        """Read a reference without following any references.
+
+        :param refname: The name of the reference
+        :return: The contents of the ref file, or None if it does
+            not exist.
+        """
+        contents = self.read_loose_ref(refname)
+        if not contents:
+            contents = self.get_packed_refs().get(refname, None)
+        return contents
+
     def read_loose_ref(self, name):
         """Read a loose reference and return its contents.
 
         :param name: the refname to read
-        :return: The contents of the ref file, or None if it does 
+        :return: The contents of the ref file, or None if it does
             not exist.
         """
         raise NotImplementedError(self.read_loose_ref)
@@ -206,15 +247,18 @@ class RefsContainer(object):
         depth = 0
         while contents.startswith(SYMREF):
             refname = contents[len(SYMREF):]
-            contents = self.read_loose_ref(refname)
+            contents = self.read_ref(refname)
             if not contents:
-                contents = self.get_packed_refs().get(refname, None)
-                if not contents:
-                    break
+                break
             depth += 1
             if depth > 5:
                 raise KeyError(name)
         return refname, contents
+
+    def __contains__(self, refname):
+        if self.read_ref(refname):
+            return True
+        return False
 
     def __getitem__(self, name):
         """Get the SHA1 for a reference name.
@@ -226,8 +270,74 @@ class RefsContainer(object):
             raise KeyError(name)
         return sha
 
+    def set_if_equals(self, name, old_ref, new_ref):
+        """Set a refname to new_ref only if it currently equals old_ref.
+
+        This method follows all symbolic references if applicable for the
+        subclass, and can be used to perform an atomic compare-and-swap
+        operation.
+
+        :param name: The refname to set.
+        :param old_ref: The old sha the refname must refer to, or None to set
+            unconditionally.
+        :param new_ref: The new sha the refname will refer to.
+        :return: True if the set was successful, False otherwise.
+        """
+        raise NotImplementedError(self.set_if_equals)
+
+    def add_if_new(self, name, ref):
+        """Add a new reference only if it does not already exist."""
+        raise NotImplementedError(self.add_if_new)
+
+    def __setitem__(self, name, ref):
+        """Set a reference name to point to the given SHA1.
+
+        This method follows all symbolic references if applicable for the
+        subclass.
+
+        :note: This method unconditionally overwrites the contents of a
+            reference. To update atomically only if the reference has not
+            changed, use set_if_equals().
+        :param name: The refname to set.
+        :param ref: The new sha the refname will refer to.
+        """
+        self.set_if_equals(name, None, ref)
+
+    def remove_if_equals(self, name, old_ref):
+        """Remove a refname only if it currently equals old_ref.
+
+        This method does not follow symbolic references, even if applicable for
+        the subclass. It can be used to perform an atomic compare-and-delete
+        operation.
+
+        :param name: The refname to delete.
+        :param old_ref: The old sha the refname must refer to, or None to delete
+            unconditionally.
+        :return: True if the delete was successful, False otherwise.
+        """
+        raise NotImplementedError(self.remove_if_equals)
+
+    def __delitem__(self, name):
+        """Remove a refname.
+
+        This method does not follow symbolic references, even if applicable for
+        the subclass.
+
+        :note: This method unconditionally deletes the contents of a reference.
+            To delete atomically only if the reference has not changed, use
+            remove_if_equals().
+
+        :param name: The refname to delete.
+        """
+        self.remove_if_equals(name, None)
+
 
 class DictRefsContainer(RefsContainer):
+    """RefsContainer backed by a simple dict.
+
+    This container does not support symbolic or packed references and is not
+    threadsafe.
+    """
 
     def __init__(self, refs):
         self._refs = refs
@@ -236,7 +346,32 @@ class DictRefsContainer(RefsContainer):
         return self._refs.keys()
 
     def read_loose_ref(self, name):
-        return self._refs[name]
+        return self._refs.get(name, None)
+
+    def get_packed_refs(self):
+        return {}
+
+    def set_symbolic_ref(self, name, other):
+        self._refs[name] = SYMREF + other
+
+    def set_if_equals(self, name, old_ref, new_ref):
+        if old_ref is not None and self._refs.get(name, None) != old_ref:
+            return False
+        realname, _ = self._follow(name)
+        self._refs[realname] = new_ref
+        return True
+
+    def add_if_new(self, name, ref):
+        if name in self._refs:
+            return False
+        self._refs[name] = ref
+        return True
+
+    def remove_if_equals(self, name, old_ref):
+        if old_ref is not None and self._refs.get(name, None) != old_ref:
+            return False
+        del self._refs[name]
+        return True
 
 
 class DiskRefsContainer(RefsContainer):
@@ -245,7 +380,7 @@ class DiskRefsContainer(RefsContainer):
     def __init__(self, path):
         self.path = path
         self._packed_refs = None
-        self._peeled_refs = {}
+        self._peeled_refs = None
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.path)
@@ -298,7 +433,10 @@ class DiskRefsContainer(RefsContainer):
         """
         # TODO: invalidate the cache on repacking
         if self._packed_refs is None:
+            # set both to empty because we want _peeled_refs to be
+            # None if and only if _packed_refs is also None.
             self._packed_refs = {}
+            self._peeled_refs = {}
             path = os.path.join(self.path, 'packed-refs')
             try:
                 f = GitFile(path, 'rb')
@@ -322,6 +460,24 @@ class DiskRefsContainer(RefsContainer):
                 f.close()
         return self._packed_refs
 
+    def get_peeled(self, name):
+        """Return the cached peeled value of a ref, if available.
+
+        :param name: Name of the ref to peel
+        :return: The peeled value of the ref. If the ref is known not point to a
+            tag, this will be the SHA the ref refers to. If the ref may point to
+            a tag, but no cached information is available, None is returned.
+        """
+        self.get_packed_refs()
+        if self._peeled_refs is None or name not in self._packed_refs:
+            # No cache: no peeled refs were read, or this ref is loose
+            return None
+        if name in self._peeled_refs:
+            return self._peeled_refs[name]
+        else:
+            # Known not peelable
+            return self[name]
+
     def read_loose_ref(self, name):
         """Read a reference file and return its contents.
 
@@ -340,7 +496,7 @@ class DiskRefsContainer(RefsContainer):
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
-                    return header + iter(f).next().rstrip("\n")
+                    return header + iter(f).next().rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40-len(SYMREF))
@@ -371,6 +527,25 @@ class DiskRefsContainer(RefsContainer):
             f.close()
         finally:
             f.abort()
+
+    def set_symbolic_ref(self, name, other):
+        """Make a ref point at another ref.
+
+        :param name: Name of the ref to set
+        :param other: Name of the ref to point at
+        """
+        self._check_refname(name)
+        self._check_refname(other)
+        filename = self.refpath(name)
+        try:
+            f = GitFile(filename, 'wb')
+            try:
+                f.write(SYMREF + other + '\n')
+            except (IOError, OSError):
+                f.abort()
+                raise
+        finally:
+            f.close()
 
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.
@@ -414,9 +589,23 @@ class DiskRefsContainer(RefsContainer):
         return True
 
     def add_if_new(self, name, ref):
-        """Add a new reference only if it does not already exist."""
-        self._check_refname(name)
-        filename = self.refpath(name)
+        """Add a new reference only if it does not already exist.
+
+        This method follows symrefs, and only ensures that the last ref in the
+        chain does not exist.
+
+        :param name: The refname to set.
+        :param ref: The new sha the refname will refer to.
+        :return: True if the add was successful, False otherwise.
+        """
+        try:
+            realname, contents = self._follow(name)
+            if contents is not None:
+                return False
+        except KeyError:
+            realname = name
+        self._check_refname(realname)
+        filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, 'wb')
         try:
@@ -431,17 +620,6 @@ class DiskRefsContainer(RefsContainer):
         finally:
             f.close()
         return True
-
-    def __setitem__(self, name, ref):
-        """Set a reference name to point to the given SHA1.
-
-        This method follows all symbolic references.
-
-        :note: This method unconditionally overwrites the contents of a reference
-            on disk. To update atomically only if the reference has not changed
-            on disk, use set_if_equals().
-        """
-        self.set_if_equals(name, None, ref)
 
     def remove_if_equals(self, name, old_ref):
         """Remove a refname only if it currently equals old_ref.
@@ -477,16 +655,6 @@ class DiskRefsContainer(RefsContainer):
             f.abort()
         return True
 
-    def __delitem__(self, name):
-        """Remove a refname.
-
-        This method does not follow symbolic references.
-        :note: This method unconditionally deletes the contents of a reference
-            on disk. To delete atomically only if the reference has not changed
-            on disk, use set_if_equals().
-        """
-        self.remove_if_equals(name, None)
-
 
 def _split_ref_line(line):
     """Split a single ref line into a tuple of SHA1 and name."""
@@ -516,7 +684,7 @@ def read_packed_refs(f):
             continue
         if l[0] == "^":
             raise PackedRefsException(
-                "found peeled ref in packed-refs without peeled")
+              "found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 
@@ -532,7 +700,7 @@ def read_packed_refs_with_peeled(f):
     for l in f:
         if l[0] == "#":
             continue
-        l = l.rstrip("\n")
+        l = l.rstrip("\r\n")
         if l[0] == "^":
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
@@ -558,6 +726,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 
     :param f: empty file-like object to write to
     :param packed_refs: dict of refname to sha of packed refs to write
+    :param peeled_refs: dict of refname to peeled value of sha
     """
     if peeled_refs is None:
         peeled_refs = {}
@@ -595,7 +764,7 @@ class BaseRepo(object):
 
     def open_index(self):
         """Open the index for this repository.
-        
+
         :raises NoIndexPresent: If no index is present
         :return: Index instance
         """
@@ -605,33 +774,39 @@ class BaseRepo(object):
         """Fetch objects into another repository.
 
         :param target: The target repository
-        :param determine_wants: Optional function to determine what refs to 
+        :param determine_wants: Optional function to determine what refs to
             fetch.
         :param progress: Optional progress function
         """
         if determine_wants is None:
             determine_wants = lambda heads: heads.values()
         target.object_store.add_objects(
-            self.fetch_objects(determine_wants, target.get_graph_walker(),
-                progress))
+          self.fetch_objects(determine_wants, target.get_graph_walker(),
+                             progress))
         return self.get_refs()
 
-    def fetch_objects(self, determine_wants, graph_walker, progress):
+    def fetch_objects(self, determine_wants, graph_walker, progress,
+                      get_tagged=None):
         """Fetch the missing objects required for a set of revisions.
 
-        :param determine_wants: Function that takes a dictionary with heads 
+        :param determine_wants: Function that takes a dictionary with heads
             and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions 
-            to fetch and has an "ack" method that will be called to acknowledge 
+        :param graph_walker: Object that can iterate over the list of revisions
+            to fetch and has an "ack" method that will be called to acknowledge
             that a revision is present.
-        :param progress: Simple progress function that will be called with 
+        :param progress: Simple progress function that will be called with
             updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
+            sha for including tags.
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
+        if not wants:
+            return []
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(haves, wants, progress))
+          self.object_store.find_missing_objects(haves, wants, progress,
+                                                 get_tagged))
 
     def get_graph_walker(self, heads=None):
         if heads is None:
@@ -653,15 +828,18 @@ class BaseRepo(object):
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
         ret = self.get_object(sha)
-        if ret._type != cls._type:
+        if not isinstance(ret, cls):
             if cls is Commit:
                 raise NotCommitError(ret)
             elif cls is Blob:
                 raise NotBlobError(ret)
             elif cls is Tree:
                 raise NotTreeError(ret)
+            elif cls is Tag:
+                raise NotTagError(ret)
             else:
-                raise Exception("Type invalid: %r != %r" % (ret._type, cls._type))
+                raise Exception("Type invalid: %r != %r" % (
+                  ret.type_name, cls.type_name))
         return ret
 
     def get_object(self, sha):
@@ -678,16 +856,70 @@ class BaseRepo(object):
                     for section in p.sections())
 
     def commit(self, sha):
+        """Retrieve the commit with a particular SHA.
+
+        :param sha: SHA of the commit to retrieve
+        :raise NotCommitError: If the SHA provided doesn't point at a Commit
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Commit` object
+        """
+        warnings.warn("Repo.commit(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Commit)
 
     def tree(self, sha):
+        """Retrieve the tree with a particular SHA.
+
+        :param sha: SHA of the tree to retrieve
+        :raise NotTreeError: If the SHA provided doesn't point at a Tree
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Tree` object
+        """
+        warnings.warn("Repo.tree(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Tree)
 
     def tag(self, sha):
+        """Retrieve the tag with a particular SHA.
+
+        :param sha: SHA of the tag to retrieve
+        :raise NotTagError: If the SHA provided doesn't point at a Tag
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Tag` object
+        """
+        warnings.warn("Repo.tag(sha) is deprecated. Use Repo[sha] instead.",
+            category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Tag)
 
     def get_blob(self, sha):
+        """Retrieve the blob with a particular SHA.
+
+        :param sha: SHA of the blob to retrieve
+        :raise NotBlobError: If the SHA provided doesn't point at a Blob
+        :raise KeyError: If the SHA provided didn't exist
+        :return: A `Blob` object
+        """
+        warnings.warn("Repo.get_blob(sha) is deprecated. Use Repo[sha] "
+            "instead.", category=DeprecationWarning, stacklevel=2)
         return self._get_object(sha, Blob)
+
+    def get_peeled(self, ref):
+        """Get the peeled value of a ref.
+
+        :param ref: the refname to peel
+        :return: the fully-peeled SHA1 of a tag object, after peeling all
+            intermediate tags; if the original ref does not point to a tag, this
+            will equal the original SHA1.
+        """
+        cached = self.refs.get_peeled(ref)
+        if cached is not None:
+            return cached
+        obj = self[ref]
+        obj_class = object_class(obj.type_name)
+        while obj_class is Tag:
+            obj_class, sha = obj.object
+            obj = self.get_object(sha)
+        return obj.id
 
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.
@@ -707,9 +939,11 @@ class BaseRepo(object):
         while pending_commits != []:
             head = pending_commits.pop(0)
             try:
-                commit = self.commit(head)
+                commit = self[head]
             except KeyError:
                 raise MissingCommitError(head)
+            if type(commit) != Commit:
+                raise NotCommitError(commit)
             if commit in history:
                 continue
             i = 0
@@ -718,15 +952,23 @@ class BaseRepo(object):
                     break
                 i += 1
             history.insert(i, commit)
-            parents = commit.parents
-            pending_commits += parents
+            pending_commits += commit.parents
         history.reverse()
         return history
 
     def __getitem__(self, name):
         if len(name) in (20, 40):
-            return self.object_store[name]
+            try:
+                return self.object_store[name]
+            except KeyError:
+                pass
         return self.object_store[self.refs[name]]
+
+    def __contains__(self, name):
+        if len(name) in (20, 40):
+            return name in self.object_store or name in self.refs
+        else:
+            return name in self.refs
 
     def __setitem__(self, name, value):
         if name.startswith("refs/") or name == "HEAD":
@@ -736,43 +978,47 @@ class BaseRepo(object):
                 self.refs[name] = value
             else:
                 raise TypeError(value)
-        raise ValueError(name)
+        else:
+            raise ValueError(name)
 
     def __delitem__(self, name):
         if name.startswith("refs") or name == "HEAD":
             del self.refs[name]
         raise ValueError(name)
 
-    def do_commit(self, committer, message,
+    def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
-                  commit_timezone=None, author_timestamp=None, 
+                  commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None):
         """Create a new commit.
 
-        :param committer: Committer fullname
         :param message: Commit message
+        :param committer: Committer fullname
         :param author: Author fullname (defaults to committer)
         :param commit_timestamp: Commit timestamp (defaults to now)
         :param commit_timezone: Commit timestamp timezone (defaults to GMT)
         :param author_timestamp: Author timestamp (defaults to commit timestamp)
-        :param author_timezone: Author timestamp timezone 
+        :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
         :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
         :return: New commit SHA1
         """
-        from dulwich.index import commit_index
         import time
         index = self.open_index()
         c = Commit()
         if tree is None:
-            c.tree = commit_index(self.object_store, index)
+            c.tree = index.commit(self.object_store)
         else:
             c.tree = tree
+        # TODO: Allow username to be missing, and get it from .git/config
+        if committer is None:
+            raise ValueError("committer not set")
         c.committer = committer
         if commit_timestamp is None:
             commit_timestamp = time.time()
         c.commit_time = int(commit_timestamp)
         if commit_timezone is None:
+            # FIXME: Use current user timezone rather than UTC
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
@@ -785,8 +1031,20 @@ class BaseRepo(object):
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
         c.message = message
-        self.object_store.add_object(c)
-        self.refs["HEAD"] = c.id
+        try:
+            old_head = self.refs["HEAD"]
+            c.parents = [old_head]
+            self.object_store.add_object(c)
+            ok = self.refs.set_if_equals("HEAD", old_head, c.id)
+        except KeyError:
+            c.parents = []
+            self.object_store.add_object(c)
+            ok = self.refs.add_if_new("HEAD", c.id)
+        if not ok:
+            # Fail if the atomic compare-and-swap failed, leaving the commit and
+            # all its objects as garbage.
+            raise CommitError("HEAD changed during commit")
+
         return c.id
 
 
@@ -804,8 +1062,8 @@ class Repo(BaseRepo):
         else:
             raise NotGitRepository(root)
         self.path = root
-        object_store = DiskObjectStore(
-            os.path.join(self.controldir(), OBJECTDIR))
+        object_store = DiskObjectStore(os.path.join(self.controldir(),
+                                                    OBJECTDIR))
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
@@ -852,7 +1110,40 @@ class Repo(BaseRepo):
 
     def has_index(self):
         """Check if an index is present."""
-        return os.path.exists(self.index_path())
+        # Bare repos must never have index files; non-bare repos may have a
+        # missing index file, which is treated as empty.
+        return not self.bare
+
+    def stage(self, paths):
+        """Stage a set of paths.
+
+        :param paths: List of paths, relative to the repository path
+        """
+        from dulwich.index import cleanup_mode
+        index = self.open_index()
+        for path in paths:
+            full_path = os.path.join(self.path, path)
+            blob = Blob()
+            try:
+                st = os.stat(full_path)
+            except OSError:
+                # File no longer exists
+                try:
+                    del index[path]
+                except KeyError:
+                    pass  # Doesn't exist in the index either
+            else:
+                f = open(full_path, 'rb')
+                try:
+                    blob.data = f.read()
+                finally:
+                    f.close()
+                self.object_store.add_object(blob)
+                # XXX: Cleanup some of the other file properties as well?
+                index[path] = (st.st_ctime, st.st_mtime, st.st_dev, st.st_ino,
+                    cleanup_mode(st.st_mode), st.st_uid, st.st_gid, st.st_size,
+                    blob.id, 0)
+        index.write()
 
     def __repr__(self):
         return "<Repo at %r>" % self.path
@@ -868,8 +1159,9 @@ class Repo(BaseRepo):
     def init_bare(cls, path, mkdir=True):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
+        DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
         ret._put_named_file('description', "Unnamed repository")
         ret._put_named_file('config', """[core]
     repositoryformatversion = 0
@@ -877,7 +1169,7 @@ class Repo(BaseRepo):
     bare = false
     logallrefupdates = true
 """)
-        ret._put_named_file(os.path.join('info', 'excludes'), '')
+        ret._put_named_file(os.path.join('info', 'exclude'), '')
         return ret
 
     create = init_bare

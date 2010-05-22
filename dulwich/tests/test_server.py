@@ -20,32 +20,34 @@
 """Tests for the smart protocol server."""
 
 
-from cStringIO import StringIO
 from unittest import TestCase
 
 from dulwich.errors import (
     GitProtocolError,
     )
 from dulwich.server import (
-    UploadPackHandler,
-    ProtocolGraphWalker,
-    SingleAckGraphWalkerImpl,
+    Backend,
+    DictBackend,
+    BackendRepo,
+    Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
+    ProtocolGraphWalker,
+    SingleAckGraphWalkerImpl,
+    UploadPackHandler,
     )
 
-from dulwich.protocol import (
-    SINGLE_ACK,
-    MULTI_ACK,
-    )
 
 ONE = '1' * 40
 TWO = '2' * 40
 THREE = '3' * 40
 FOUR = '4' * 40
 FIVE = '5' * 40
+SIX = '6' * 40
+
 
 class TestProto(object):
+
     def __init__(self):
         self._output = []
         self._received = {0: [], 1: [], 2: [], 3: []}
@@ -75,76 +77,158 @@ class TestProto(object):
             return None
 
 
-class UploadPackHandlerTestCase(TestCase):
+class HandlerTestCase(TestCase):
+
     def setUp(self):
-        self._handler = UploadPackHandler(None, None, None)
+        self._handler = Handler(Backend(), None)
+        self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
+        self._handler.required_capabilities = lambda: ('cap2',)
+
+    def assertSucceeds(self, func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except GitProtocolError, e:
+            self.fail(e)
+
+    def test_capability_line(self):
+        self.assertEquals('cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
-        try:
-            self._handler.set_client_capabilities([])
-        except GitProtocolError:
-            self.fail()
+        set_caps = self._handler.set_client_capabilities
+        self.assertSucceeds(set_caps, ['cap2'])
+        self.assertSucceeds(set_caps, ['cap1', 'cap2'])
 
-        try:
-            self._handler.set_client_capabilities([
-                'multi_ack', 'side-band-64k', 'thin-pack', 'ofs-delta'])
-        except GitProtocolError:
-            self.fail()
+        # different order
+        self.assertSucceeds(set_caps, ['cap3', 'cap1', 'cap2'])
 
-    def test_set_client_capabilities_error(self):
-        self.assertRaises(GitProtocolError,
-                          self._handler.set_client_capabilities,
-                          ['weird_ack_level', 'ofs-delta'])
-        try:
-            self._handler.set_client_capabilities(['include-tag'])
-        except GitProtocolError:
-            self.fail()
+        # error cases
+        self.assertRaises(GitProtocolError, set_caps, ['capxxx', 'cap2'])
+        self.assertRaises(GitProtocolError, set_caps, ['cap1', 'cap3'])
+
+        # ignore innocuous but unknown capabilities
+        self.assertRaises(GitProtocolError, set_caps, ['cap2', 'ignoreme'])
+        self.assertFalse('ignoreme' in self._handler.capabilities())
+        self._handler.innocuous_capabilities = lambda: ('ignoreme',)
+        self.assertSucceeds(set_caps, ['cap2', 'ignoreme'])
+
+    def test_has_capability(self):
+        self.assertRaises(GitProtocolError, self._handler.has_capability, 'cap')
+        caps = self._handler.capabilities()
+        self._handler.set_client_capabilities(caps)
+        for cap in caps:
+            self.assertTrue(self._handler.has_capability(cap))
+        self.assertFalse(self._handler.has_capability('capxxx'))
+
+
+class UploadPackHandlerTestCase(TestCase):
+
+    def setUp(self):
+        self._backend = DictBackend({"/": BackendRepo()})
+        self._handler = UploadPackHandler(self._backend,
+                ["/", "host=lolcathost"], None, None)
+        self._handler.proto = TestProto()
+
+    def test_progress(self):
+        caps = self._handler.required_capabilities()
+        self._handler.set_client_capabilities(caps)
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual('first message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual('second message',
+                         self._handler.proto.get_received_line(2))
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+    def test_no_progress(self):
+        caps = list(self._handler.required_capabilities()) + ['no-progress']
+        self._handler.set_client_capabilities(caps)
+        self._handler.progress('first message')
+        self._handler.progress('second message')
+        self.assertEqual(None, self._handler.proto.get_received_line(2))
+
+    def test_get_tagged(self):
+        refs = {
+            'refs/tags/tag1': ONE,
+            'refs/tags/tag2': TWO,
+            'refs/heads/master': FOUR,  # not a tag, no peeled value
+            }
+        peeled = {
+            'refs/tags/tag1': '1234',
+            'refs/tags/tag2': '5678',
+            }
+
+        class TestRepo(object):
+            def get_peeled(self, ref):
+                return peeled.get(ref, refs[ref])
+
+        caps = list(self._handler.required_capabilities()) + ['include-tag']
+        self._handler.set_client_capabilities(caps)
+        self.assertEquals({'1234': ONE, '5678': TWO},
+                          self._handler.get_tagged(refs, repo=TestRepo()))
+
+        # non-include-tag case
+        caps = self._handler.required_capabilities()
+        self._handler.set_client_capabilities(caps)
+        self.assertEquals({}, self._handler.get_tagged(refs, repo=TestRepo()))
 
 
 class TestCommit(object):
+
     def __init__(self, sha, parents, commit_time):
         self.id = sha
-        self._parents = parents
+        self.parents = parents
         self.commit_time = commit_time
-
-    def get_parents(self):
-        return self._parents
+        self.type_name = "commit"
 
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__, self._sha)
 
 
+class TestRepo(object):
+    def __init__(self):
+        self.peeled = {}
+
+    def get_peeled(self, name):
+        return self.peeled[name]
+
+
 class TestBackend(object):
-    def __init__(self, objects):
+
+    def __init__(self, repo, objects):
+        self.repo = repo
         self.object_store = objects
 
 
-class TestHandler(object):
+class TestUploadPackHandler(Handler):
+
     def __init__(self, objects, proto):
-        self.backend = TestBackend(objects)
+        self.backend = TestBackend(TestRepo(), objects)
         self.proto = proto
         self.stateless_rpc = False
         self.advertise_refs = False
 
     def capabilities(self):
-        return 'multi_ack'
+        return ('multi_ack',)
 
 
 class ProtocolGraphWalkerTestCase(TestCase):
+
     def setUp(self):
         # Create the following commit tree:
         #   3---5
         #  /
         # 1---2---4
         self._objects = {
-            ONE: TestCommit(ONE, [], 111),
-            TWO: TestCommit(TWO, [ONE], 222),
-            THREE: TestCommit(THREE, [ONE], 333),
-            FOUR: TestCommit(FOUR, [TWO], 444),
-            FIVE: TestCommit(FIVE, [THREE], 555),
-            }
+          ONE: TestCommit(ONE, [], 111),
+          TWO: TestCommit(TWO, [ONE], 222),
+          THREE: TestCommit(THREE, [ONE], 333),
+          FOUR: TestCommit(FOUR, [TWO], 444),
+          FIVE: TestCommit(FIVE, [THREE], 555),
+          }
+
         self._walker = ProtocolGraphWalker(
-            TestHandler(self._objects, TestProto()))
+            TestUploadPackHandler(self._objects, TestProto()),
+            self._objects, None)
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))
@@ -173,13 +257,13 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def test_read_proto_line(self):
         self._walker.proto.set_output([
-            'want %s' % ONE,
-            'want %s' % TWO,
-            'have %s' % THREE,
-            'foo %s' % FOUR,
-            'bar',
-            'done',
-            ])
+          'want %s' % ONE,
+          'want %s' % TWO,
+          'have %s' % THREE,
+          'foo %s' % FOUR,
+          'bar',
+          'done',
+          ])
         self.assertEquals(('want', ONE), self._walker.read_proto_line())
         self.assertEquals(('want', TWO), self._walker.read_proto_line())
         self.assertEquals(('have', THREE), self._walker.read_proto_line())
@@ -192,10 +276,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
 
         self._walker.proto.set_output([
-            'want %s multi_ack' % ONE,
-            'want %s' % TWO,
-            ])
+          'want %s multi_ack' % ONE,
+          'want %s' % TWO,
+          ])
         heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
+        self._walker.get_peeled = heads.get
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
@@ -210,10 +295,40 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
+    def test_determine_wants_advertisement(self):
+        self._walker.proto.set_output([])
+        # advertise branch tips plus tag
+        heads = {'ref4': FOUR, 'ref5': FIVE, 'tag6': SIX}
+        peeled = {'ref4': FOUR, 'ref5': FIVE, 'tag6': FIVE}
+        self._walker.get_peeled = peeled.get
+        self._walker.determine_wants(heads)
+        lines = []
+        while True:
+            line = self._walker.proto.get_received_line()
+            if line == 'None':
+                break
+            # strip capabilities list if present
+            if '\x00' in line:
+                line = line[:line.index('\x00')]
+            lines.append(line.rstrip())
+
+        self.assertEquals([
+          '%s ref4' % FOUR,
+          '%s ref5' % FIVE,
+          '%s tag6^{}' % FIVE,
+          '%s tag6' % SIX,
+          ], sorted(lines))
+
+        # ensure peeled tag was advertised immediately following tag
+        for i, line in enumerate(lines):
+            if line.endswith(' tag6'):
+                self.assertEquals('%s tag6^{}' % FIVE, lines[i+1])
+
     # TODO: test commit time cutoff
 
 
 class TestProtocolGraphWalker(object):
+
     def __init__(self):
         self.acks = []
         self.lines = []
@@ -241,14 +356,15 @@ class TestProtocolGraphWalker(object):
 
 class AckGraphWalkerImplTestCase(TestCase):
     """Base setup and asserts for AckGraphWalker tests."""
+
     def setUp(self):
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
-            ('have', TWO),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self._impl = self.impl_cls(self._walker)
 
     def assertNoAck(self):
@@ -270,6 +386,7 @@ class AckGraphWalkerImplTestCase(TestCase):
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = SingleAckGraphWalkerImpl
 
     def test_single_ack(self):
@@ -335,7 +452,9 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(None)
         self.assertNak()
 
+
 class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = MultiAckGraphWalkerImpl
 
     def test_multi_ack(self):
@@ -371,17 +490,17 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     def test_multi_ack_flush(self):
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self.assertNak() # nak the flush-pkt
+        self.assertNak()  # nak the flush-pkt
 
         self._walker.done = True
         self._impl.ack(ONE)
@@ -407,7 +526,9 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(None)
         self.assertNak()
 
+
 class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
+
     impl_cls = MultiAckDetailedGraphWalkerImpl
 
     def test_multi_ack(self):
@@ -444,17 +565,17 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_flush(self):
         # same as ack test but contains a flush-pkt in the middle
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self.assertNak() # nak the flush-pkt
+        self.assertNak()  # nak the flush-pkt
 
         self._walker.done = True
         self._impl.ack(ONE)
@@ -483,12 +604,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_nak_flush(self):
         # same as nak test but contains a flush-pkt in the middle
         self._walker.lines = [
-            ('have', TWO),
-            (None, None),
-            ('have', ONE),
-            ('have', THREE),
-            ('done', None),
-            ]
+          ('have', TWO),
+          (None, None),
+          ('have', ONE),
+          ('have', THREE),
+          ('done', None),
+          ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 

@@ -4,3 +4,4 @@ MANIFEST
 dist
 apidocs
 *,cover
+.testrepository

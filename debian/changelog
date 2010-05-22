@@ -1,3 +1,9 @@
+dulwich (0.6.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 22 May 2010 23:06:20 +0200
+
 dulwich (0.5.0-1) unstable; urgency=low
 
   * New upstream release.

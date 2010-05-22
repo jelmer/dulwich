@@ -15,15 +15,26 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-"""Misc utilities to work with python2.4.
+"""Misc utilities to work with python <2.6.
 
 These utilities can all be deleted when dulwich decides it wants to stop
-support for python 2.4.
+support for python <2.6.
 """
 try:
     import hashlib
 except ImportError:
     import sha
+
+try:
+    from urlparse import parse_qs
+except ImportError:
+    from cgi import parse_qs
+
+try:
+    from os import SEEK_END
+except ImportError:
+    SEEK_END = 2
+
 import struct
 
 
@@ -87,4 +98,3 @@ def unpack_from(fmt, buf, offset=0):
     except AttributeError:
         b = buf[offset:offset+struct.calcsize(fmt)]
         return struct.unpack(fmt, b)
-

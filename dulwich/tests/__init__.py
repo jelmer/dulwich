@@ -18,3 +18,33 @@
 # MA  02110-1301, USA.
 
 """Tests for Dulwich."""
+
+import unittest
+
+# XXX: Ideally we should allow other test runners as well, 
+# but unfortunately unittest doesn't have a SkipTest/TestSkipped
+# exception.
+from nose import SkipTest as TestSkipped
+
+def test_suite():
+    names = [
+        'client',
+        'fastexport',
+        'file',
+        'index',
+        'lru_cache',
+        'objects',
+        'object_store',
+        'pack',
+        'patch',
+        'protocol',
+        'repository',
+        'server',
+        'web',
+        ]
+    module_names = ['dulwich.tests.test_' + name for name in names]
+    result = unittest.TestSuite()
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromNames(module_names)
+    result.addTests(suite)
+    return result

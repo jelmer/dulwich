@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# dul-daemon - Simple git smart server client
+# dulwich - Simple command-line interface to Dulwich
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
 # 
 # This program is free software; you can redistribute it and/or
@@ -17,21 +17,25 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Simple command-line interface to Dulwich>
+
+This is a very simple command-line wrapper for Dulwich. It is by 
+no means intended to be a full-blown Git command-line interface but just 
+a way to test Dulwich.
+"""
+
+import os
 import sys
 from getopt import getopt
 
-def get_transport_and_path(uri):
-    from dulwich.client import TCPGitClient, SSHGitClient, SubprocessGitClient
-    for handler, transport in (("git://", TCPGitClient), ("git+ssh://", SSHGitClient)):
-        if uri.startswith(handler):
-            host, path = uri[len(handler):].split("/", 1)
-            return transport(host), "/"+path
-    # if its not git or git+ssh, try a local url..
-    return SubprocessGitClient(), uri
+from dulwich.client import get_transport_and_path
+from dulwich.errors import ApplyDeltaError
+from dulwich.index import Index
+from dulwich.pack import Pack, sha_to_hex
+from dulwich.repo import Repo
 
 
 def cmd_fetch_pack(args):
-    from dulwich.repo import Repo
     opts, args = getopt(args, "", ["all"])
     opts = dict(opts)
     client, path = get_transport_and_path(args.pop(0))
@@ -45,9 +49,12 @@ def cmd_fetch_pack(args):
 
 
 def cmd_log(args):
-    from dulwich.repo import Repo
     opts, args = getopt(args, "", [])
-    r = Repo(".")
+    if len(args) > 0:
+        path = args.pop(0)
+    else:
+        path = "."
+    r = Repo(path)
     todo = [r.head()]
     done = set()
     while todo:
@@ -56,7 +63,7 @@ def cmd_log(args):
         if sha in done:
             continue
         done.add(sha)
-        commit = r.commit(sha)
+        commit = r[sha]
         print "-" * 50
         print "commit: %s" % sha
         if len(commit.parents) > 1:
@@ -70,11 +77,6 @@ def cmd_log(args):
 
 
 def cmd_dump_pack(args):
-    from dulwich.errors import ApplyDeltaError
-    from dulwich.pack import Pack, sha_to_hex
-    import os
-    import sys
-
     opts, args = getopt(args, "", [])
 
     if args == []:
@@ -98,8 +100,6 @@ def cmd_dump_pack(args):
 
 
 def cmd_dump_index(args):
-    from dulwich.index import Index
-
     opts, args = getopt(args, "", [])
 
     if args == []:
@@ -114,8 +114,6 @@ def cmd_dump_index(args):
 
 
 def cmd_init(args):
-    from dulwich.repo import Repo
-    import os
     opts, args = getopt(args, "", ["--bare"])
     opts = dict(opts)
 
@@ -134,16 +132,13 @@ def cmd_init(args):
 
 
 def cmd_clone(args):
-    from dulwich.repo import Repo
-    import os
-    import sys
     opts, args = getopt(args, "", [])
     opts = dict(opts)
 
     if args == []:
         print "usage: dulwich clone host:path [PATH]"
         sys.exit(1)
-        client, host_path = get_transport_and_path(args.pop(0))
+    client, host_path = get_transport_and_path(args.pop(0))
 
     if len(args) > 0:
         path = args.pop(0)
@@ -152,18 +147,14 @@ def cmd_clone(args):
 
     if not os.path.exists(path):
         os.mkdir(path)
-    Repo.init(path)
-    r = Repo(path)
-    graphwalker = r.get_graph_walker()
-    f, commit = r.object_store.add_pack()
-    client.fetch_pack(host_path, r.object_store.determine_wants_all, 
-                      graphwalker, f.write, sys.stdout.write)
-    commit()
+    r = Repo.init(path)
+    remote_refs = client.fetch(host_path, r,
+        determine_wants=r.object_store.determine_wants_all,
+        progress=sys.stdout.write)
+    r["HEAD"] = remote_refs["HEAD"]
 
 
 def cmd_commit(args):
-    from dulwich.repo import Repo
-    import os
     opts, args = getopt(args, "", ["message"])
     opts = dict(opts)
     r = Repo(".")
@@ -172,6 +163,7 @@ def cmd_commit(args):
     author = "%s <%s>" % (os.getenv("GIT_AUTHOR_NAME"), 
                           os.getenv("GIT_AUTHOR_EMAIL"))
     r.do_commit(committer=committer, author=author, message=opts["--message"])
+
 
 commands = {
     "commit": cmd_commit,

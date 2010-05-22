@@ -204,6 +204,8 @@ class Index(object):
 
     def read(self):
         """Read current contents of index from disk."""
+        if not os.path.exists(self._filename):
+            return
         f = GitFile(self._filename, 'rb')
         try:
             f = SHA1Reader(f)
@@ -254,6 +256,10 @@ class Index(object):
         # Remove the old entry if any
         self._byname[name] = x
 
+    def __delitem__(self, name):
+        assert isinstance(name, str)
+        del self._byname[name]
+
     def iteritems(self):
         return self._byname.iteritems()
 
@@ -282,6 +288,14 @@ class Index(object):
         # Mention added files
         for name in mine:
             yield ((None, name), (None, self.get_mode(name)), (None, self.get_sha1(name)))
+
+    def commit(self, object_store):
+        """Create a new tree from an index.
+
+        :param object_store: Object store to save the tree in
+        :return: Root tree SHA
+        """
+        return commit_tree(object_store, self.iterblobs())
 
 
 def commit_tree(object_store, blobs):
@@ -327,5 +341,7 @@ def commit_index(object_store, index):
 
     :param object_store: Object store to save the tree in
     :param index: Index file
+    :note: This function is deprecated, use index.commit() instead.
+    :return: Root tree sha.
     """
     return commit_tree(object_store, index.iterblobs())

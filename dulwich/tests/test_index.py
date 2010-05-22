@@ -1,16 +1,16 @@
 # test_index.py -- Tests for the git index
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
 # or (at your option) any later version of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -24,8 +24,10 @@ from cStringIO import (
     StringIO,
     )
 import os
+import shutil
 import stat
 import struct
+import tempfile
 from unittest import TestCase
 
 from dulwich.index import (
@@ -43,6 +45,7 @@ from dulwich.objects import (
     Blob,
     )
 
+
 class IndexTestCase(TestCase):
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/indexes')
@@ -51,7 +54,7 @@ class IndexTestCase(TestCase):
         return Index(os.path.join(self.datadir, name))
 
 
-class SimpleIndexTestcase(IndexTestCase):
+class SimpleIndexTestCase(IndexTestCase):
 
     def test_len(self):
         self.assertEquals(1, len(self.get_simple_index("index")))
@@ -60,21 +63,38 @@ class SimpleIndexTestcase(IndexTestCase):
         self.assertEquals(['bla'], list(self.get_simple_index("index")))
 
     def test_getitem(self):
-        self.assertEquals( ((1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)
-            , 
-                self.get_simple_index("index")["bla"])
+        self.assertEquals(((1230680220, 0), (1230680220, 0), 2050, 3761020,
+                           33188, 1000, 1000, 0,
+                           'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
+                          self.get_simple_index("index")["bla"])
+
+    def test_empty(self):
+        i = self.get_simple_index("notanindex")
+        self.assertEquals(0, len(i))
+        self.assertFalse(os.path.exists(i._filename))
 
 
 class SimpleIndexWriterTestCase(IndexTestCase):
 
+    def setUp(self):
+        IndexTestCase.setUp(self)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        IndexTestCase.tearDown(self)
+        shutil.rmtree(self.tempdir)
+
     def test_simple_write(self):
-        entries = [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020, 33188, 1000, 1000, 0, 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)]
-        x = open('test-simple-write-index', 'w+')
+        entries = [('barbla', (1230680220, 0), (1230680220, 0), 2050, 3761020,
+                    33188, 1000, 1000, 0,
+                    'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)]
+        filename = os.path.join(self.tempdir, 'test-simple-write-index')
+        x = open(filename, 'w+')
         try:
             write_index(x, entries)
         finally:
             x.close()
-        x = open('test-simple-write-index', 'r')
+        x = open(filename, 'r')
         try:
             self.assertEquals(entries, list(read_index(x)))
         finally:
@@ -108,7 +128,7 @@ class CommitTreeTests(TestCase):
         self.assertEquals(dirid, "c1a1deb9788150829579a8b4efa6311e7b638650")
         self.assertEquals((stat.S_IFDIR, dirid), self.store[rootid]["bla"])
         self.assertEquals((stat.S_IFREG, blob.id), self.store[dirid]["bar"])
-        self.assertEquals(set([rootid, dirid, blob.id]), 
+        self.assertEquals(set([rootid, dirid, blob.id]),
                           set(self.store._data.keys()))
 
 

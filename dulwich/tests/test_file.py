@@ -20,12 +20,71 @@
 import errno
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 
-from dulwich.file import GitFile
+from dulwich.file import GitFile, fancy_rename
+from dulwich.tests import TestSkipped
+
+
+class FancyRenameTests(unittest.TestCase):
+
+    def setUp(self):
+        self._tempdir = tempfile.mkdtemp()
+        self.foo = self.path('foo')
+        self.bar = self.path('bar')
+        self.create(self.foo, 'foo contents')
+
+    def tearDown(self):
+        shutil.rmtree(self._tempdir)
+
+    def path(self, filename):
+        return os.path.join(self._tempdir, filename)
+
+    def create(self, path, contents):
+        f = open(path, 'wb')
+        f.write(contents)
+        f.close()
+
+    def test_no_dest_exists(self):
+        self.assertFalse(os.path.exists(self.bar))
+        fancy_rename(self.foo, self.bar)
+        self.assertFalse(os.path.exists(self.foo))
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+         
+    def test_dest_exists(self):
+        self.create(self.bar, 'bar contents')
+        fancy_rename(self.foo, self.bar)
+        self.assertFalse(os.path.exists(self.foo))
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+
+    def test_dest_opened(self):
+        if sys.platform != "win32":
+            raise TestSkipped("platform allows overwriting open files")
+        self.create(self.bar, 'bar contents')
+        dest_f = open(self.bar, 'rb')
+        self.assertRaises(OSError, fancy_rename, self.foo, self.bar)
+        dest_f.close()
+        self.assertTrue(os.path.exists(self.path('foo')))
+
+        new_f = open(self.foo, 'rb')
+        self.assertEquals('foo contents', new_f.read())
+        new_f.close()
+
+        new_f = open(self.bar, 'rb')
+        self.assertEquals('bar contents', new_f.read())
+        new_f.close()
+
 
 class GitFileTests(unittest.TestCase):
+
     def setUp(self):
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path('foo'), 'wb')
@@ -85,7 +144,7 @@ class GitFileTests(unittest.TestCase):
         f1.write('new')
         try:
             f2 = GitFile(foo, 'wb')
-            fail()
+            self.fail()
         except OSError, e:
             self.assertEquals(errno.EEXIST, e.errno)
         f1.write(' contents')
@@ -129,3 +188,10 @@ class GitFileTests(unittest.TestCase):
             f.abort()
         except (IOError, OSError):
             self.fail()
+
+    def test_abort_close_removed(self):
+        foo = self.path('foo')
+        f = GitFile(foo, 'wb')
+        os.remove(foo+".lock")
+        f.abort()
+        self.assertTrue(f._closed)

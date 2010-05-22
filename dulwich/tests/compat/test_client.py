@@ -75,7 +75,12 @@ class DulwichClientTest(CompatTestCase):
             pass
         shutil.rmtree(self.gitroot)
 
-    def test_send_pack(self):
+    def assertDestEqualsSrc(self):
+        src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        self.assertReposEqual(src, dest)
+
+    def _do_send_pack(self):
         c = client.TCPGitClient('localhost')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
@@ -83,8 +88,16 @@ class DulwichClientTest(CompatTestCase):
         del sendrefs['HEAD']
         c.send_pack('/dest', lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        self.assertReposEqual(src, dest)
+
+    def test_send_pack(self):
+        self._do_send_pack()
+        self.assertDestEqualsSrc()
+
+    def test_send_pack_nothing_to_send(self):
+        self._do_send_pack()
+        self.assertDestEqualsSrc()
+        # nothing to send, but shouldn't raise either.
+        self._do_send_pack()
 
     def test_send_without_report_status(self):
         c = client.TCPGitClient('localhost')
@@ -95,8 +108,7 @@ class DulwichClientTest(CompatTestCase):
         del sendrefs['HEAD']
         c.send_pack('/dest', lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        self.assertReposEqual(src, dest)
+        self.assertDestEqualsSrc()
 
     def disable_ff_and_make_dummy_commit(self):
         # disable non-fast-forward pushes to the server
@@ -148,3 +160,20 @@ class DulwichClientTest(CompatTestCase):
             self.assertEqual({'refs/heads/branch': 'non-fast-forward',
                               'refs/heads/master': 'non-fast-forward'},
                              e.ref_status)
+
+    def test_fetch_pack(self):
+        c = client.TCPGitClient('localhost')
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        refs = c.fetch('/server_new.export', dest)
+        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        self.assertDestEqualsSrc()
+
+    def test_incremental_fetch_pack(self):
+        self.test_fetch_pack()
+        dest, dummy = self.disable_ff_and_make_dummy_commit()
+        dest.refs['refs/heads/master'] = dummy
+        c = client.TCPGitClient('localhost')
+        dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
+        refs = c.fetch('/dest', dest)
+        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        self.assertDestEqualsSrc()

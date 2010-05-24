@@ -1,3 +1,9 @@
+dulwich (0.6.0-2) unstable; urgency=high
+
+  * Add dependency on git, required for the testsuite. Closes: #582740
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 24 May 2010 16:13:32 +0200
+
 dulwich (0.6.0-1) unstable; urgency=low
 
   * New upstream release.

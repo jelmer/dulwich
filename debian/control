@@ -3,7 +3,7 @@ Section: python
 Priority: optional
 Maintainer: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
-Build-Depends: python-central (>= 0.5), cdbs (>= 0.4.43), python-all-dev, debhelper (>= 5.0.37.2), python-nose
+Build-Depends: python-central (>= 0.5), cdbs (>= 0.4.43), python-all-dev, debhelper (>= 5.0.37.2), python-nose, git
 Standards-Version: 3.8.4
 XS-Python-Version: >= 2.4
 Vcs-Bzr: http://bzr.debian.org/users/jelmer/dulwich/unstable

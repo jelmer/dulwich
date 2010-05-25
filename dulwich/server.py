@@ -59,6 +59,7 @@ from dulwich.errors import (
 from dulwich import log_utils
 from dulwich.objects import (
     hex_to_sha,
+    Commit,
     )
 from dulwich.pack import (
     write_pack_objects,
@@ -321,6 +322,44 @@ def _split_proto_line(line, allowed):
     except (TypeError, AssertionError), e:
         raise GitProtocolError(e)
     raise GitProtocolError('Received invalid line from client: %s' % line)
+
+
+def _find_shallow(store, heads, depth):
+    """Find shallow commits according to a given depth.
+
+    :param store: An ObjectStore for looking up objects.
+    :param heads: Iterable of head SHAs to start walking from.
+    :param depth: The depth of ancestors to include.
+    :return: A tuple of (shallow, not_shallow), sets of SHAs that should be
+        considered shallow and unshallow according to the arguments. Note that
+        these sets may overlap if a commit is reachable along multiple paths.
+    """
+    parents = {}
+    def get_parents(sha):
+        result = parents.get(sha, None)
+        if not result:
+            result = store[sha].parents
+            parents[sha] = result
+        return result
+
+    todo = []  # stack of (sha, depth)
+    for head_sha in heads:
+        obj = store.peel_sha(head_sha)
+        if isinstance(obj, Commit):
+            todo.append((obj.id, 0))
+
+    not_shallow = set()
+    shallow = set()
+    while todo:
+        sha, cur_depth = todo.pop()
+        if cur_depth < depth:
+            not_shallow.add(sha)
+            new_depth = cur_depth + 1
+            todo.extend((p, new_depth) for p in get_parents(sha))
+        else:
+            shallow.add(sha)
+
+    return shallow, not_shallow
 
 
 class ProtocolGraphWalker(object):

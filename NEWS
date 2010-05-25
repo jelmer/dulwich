@@ -11,6 +11,9 @@
 
   * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
 
+  * Correct short-circuiting operation for no-op fetches in the server.
+    (Dave Borowitz)
+
  FEATURES
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)

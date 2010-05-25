@@ -88,6 +88,18 @@ class ServerTests(object):
         self._old_repo.object_store._pack_cache = None
         self.assertReposEqual(self._old_repo, self._new_repo)
 
+    def test_fetch_from_dulwich_no_op(self):
+        self._old_repo = import_repo('server_old.export')
+        self._new_repo = import_repo('server_old.export')
+        self.assertReposEqual(self._old_repo, self._new_repo)
+        port = self._start_server(self._new_repo)
+
+        run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
+                        cwd=self._old_repo.path)
+        # flush the pack cache so any new packs are picked up
+        self._old_repo.object_store._pack_cache = None
+        self.assertReposEqual(self._old_repo, self._new_repo)
+
 
 class ShutdownServerMixIn:
     """Mixin that allows serve_forever to be shut down.

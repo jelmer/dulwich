@@ -29,6 +29,8 @@
 
   * Delegate SHA peeling to the object store.  (Dave Borowitz)
 
+  * Add eof() and unread_pkt_line() methods to Protocol. (Dave Borowitz)
+
  TESTS
 
   * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)

@@ -1,3 +1,10 @@
+dulwich (0.6.0-3) unstable; urgency=low
+
+  * Clean up properly in clean target. Closes: #583130
+  * Rebuild with proper version of pycentral. Closes: #583114
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 28 May 2010 03:17:32 +0200
+
 dulwich (0.6.0-2) unstable; urgency=high
 
   * Add dependency on git, required for the testsuite. Closes: #582740

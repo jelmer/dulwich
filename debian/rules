@@ -15,4 +15,5 @@ debian/stamp-check:
 
 clean::
 	rm -f debian/stamp-check
+	rm -f dulwich/*.so
 endif

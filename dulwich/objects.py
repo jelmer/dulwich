@@ -706,10 +706,15 @@ def sorted_tree_items(entries):
     the items would be serialized.
 
     :param entries: Dictionary mapping names to (mode, sha) tuples
-    :return: Iterator over (name, mode, sha)
+    :return: Iterator over (name, mode, hexsha)
     """
     for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
-        yield name, entry[0], entry[1]
+        mode, hexsha = entry
+        # Stricter type checks than normal to mirror checks in the C version.
+        mode = int(mode)
+        if not isinstance(hexsha, str):
+            raise TypeError('Expected a string for SHA, got %r' % hexsha)
+        yield name, mode, hexsha
 
 
 def cmp_entry((name1, value1), (name2, value2)):

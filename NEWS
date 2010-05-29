@@ -8,6 +8,10 @@
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)
 
+ CLEANUP
+
+  * Clean up file headers. (Dave Borowitz)
+
 
 0.6.0	2010-05-22
 

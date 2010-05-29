@@ -1,4 +1,4 @@
-# repo.py -- For dealing wih git repositories.
+# repo.py -- For dealing with git repositories.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 #

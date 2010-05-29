@@ -1,5 +1,5 @@
 # test_web.py -- Tests for the git HTTP server
-# Copryight (C) 2010 Google, Inc.
+# Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

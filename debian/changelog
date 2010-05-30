@@ -1,3 +1,9 @@
+dulwich (0.6.0-4) unstable; urgency=low
+
+  * Switch to python-support. Closes: #583114
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 May 2010 20:12:30 +0200
+
 dulwich (0.6.0-3) unstable; urgency=low
 
   * Clean up properly in clean target. Closes: #583130

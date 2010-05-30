@@ -21,13 +21,11 @@
 
 __docformat__ = 'restructuredText'
 
-import os
 import select
 import socket
 import subprocess
 
 from dulwich.errors import (
-    ChecksumMismatch,
     SendPackError,
     UpdateRefsError,
     )
@@ -402,5 +400,6 @@ def get_transport_and_path(uri):
         if uri.startswith(handler):
             host, path = uri[len(handler):].split("/", 1)
             return transport(host), "/"+path
+    # FIXME: Parse rsync-like git URLs (user@host:/path), bug 568493
     # if its not git or git+ssh, try a local url..
     return SubprocessGitClient(), uri

@@ -21,7 +21,7 @@
 
 """Repository access."""
 
-
+from cStringIO import StringIO
 import errno
 import os
 
@@ -42,6 +42,7 @@ from dulwich.file import (
     )
 from dulwich.object_store import (
     DiskObjectStore,
+    MemoryObjectStore,
     )
 from dulwich.objects import (
     Blob,
@@ -750,6 +751,16 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+    def _init_files(self):
+        """Initialize a default set of named files."""
+        self._put_named_file('description', "Unnamed repository")
+        self._put_named_file('config', ('[core]\n'
+                                        'repositoryformatversion = 0\n'
+                                        'filemode = true\n'
+                                        'bare = false\n'
+                                        'logallrefupdates = true\n'))
+        self._put_named_file(os.path.join('info', 'exclude'), '')
+
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
@@ -761,6 +772,14 @@ class BaseRepo(object):
         :return: An open file object, or None if the file does not exist.
         """
         raise NotImplementedError(self.get_named_file)
+
+    def _put_named_file(self, path, contents):
+        """Write a file to the control dir with the given name and contents.
+
+        :param path: The path to the file, relative to the control dir.
+        :contents: A string to write to the file.
+        """
+        raise NotImplementedError(self._put_named_file)
 
     def open_index(self):
         """Open the index for this repository.
@@ -1072,8 +1091,12 @@ class Repo(BaseRepo):
         return self._controldir
 
     def _put_named_file(self, path, contents):
-        """Write a file from the control dir with a specific name and contents.
+        """Write a file to the control dir with the given name and contents.
+
+        :param path: The path to the file, relative to the control dir.
+        :contents: A string to write to the file.
         """
+        path = path.lstrip(os.path.sep)
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
         try:
             f.write(contents)
@@ -1090,8 +1113,11 @@ class Repo(BaseRepo):
         :param path: The path to the file, relative to the control dir.
         :return: An open file object, or None if the file does not exist.
         """
+        # TODO(dborowitz): sanitize filenames, since this is used directly by
+        # the dumb web serving code.
+        path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(self.controldir(), path.lstrip('/')), 'rb')
+            return open(os.path.join(self.controldir(), path), 'rb')
         except (IOError, OSError), e:
             if e.errno == errno.ENOENT:
                 return None
@@ -1162,14 +1188,57 @@ class Repo(BaseRepo):
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
         ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
-        ret._put_named_file('description', "Unnamed repository")
-        ret._put_named_file('config', """[core]
-    repositoryformatversion = 0
-    filemode = true
-    bare = false
-    logallrefupdates = true
-""")
-        ret._put_named_file(os.path.join('info', 'exclude'), '')
+        ret._init_files()
         return ret
 
     create = init_bare
+
+
+class MemoryRepo(BaseRepo):
+    """Repo that stores refs, objects, and named files in memory.
+
+    MemoryRepos are always bare: they have no working tree and no index, since
+    those have a stronger dependency on the filesystem.
+    """
+
+    def __init__(self):
+        BaseRepo.__init__(self, MemoryObjectStore(), DictRefsContainer({}))
+        self._named_files = {}
+        self.bare = True
+
+    def _put_named_file(self, path, contents):
+        """Write a file to the control dir with the given name and contents.
+
+        :param path: The path to the file, relative to the control dir.
+        :contents: A string to write to the file.
+        """
+        self._named_files[path] = contents
+
+    def get_named_file(self, path):
+        """Get a file from the control dir with a specific name.
+
+        Although the filename should be interpreted as a filename relative to
+        the control dir in a disk-baked Repo, the object returned need not be
+        pointing to a file in that location.
+
+        :param path: The path to the file, relative to the control dir.
+        :return: An open file object, or None if the file does not exist.
+        """
+        contents = self._named_files.get(path, None)
+        if contents is None:
+            return None
+        return StringIO(contents)
+
+    def open_index(self):
+        """Fail to open index for this repo, since it is bare."""
+        raise NoIndexPresent()
+
+    @classmethod
+    def init_bare(cls, objects, refs):
+        ret = cls()
+        for obj in objects:
+            ret.object_store.add_object(obj)
+        for refname, sha in refs.iteritems():
+            ret.refs[refname] = sha
+        ret._init_files()
+        return ret

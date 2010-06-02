@@ -4,9 +4,17 @@
 
   * Fix memory leak in C implementation of sorted_tree_items. (Dave Borowitz)
 
+  * Use correct path separators for named repo files. (Dave Borowitz)
+
+ FEATURES
+
+  * Move named file initilization to BaseRepo. (Dave Borowitz)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)
+
+  * Add a MemoryRepo that stores everything in memory. (Dave Borowitz)
 
  CLEANUP
 

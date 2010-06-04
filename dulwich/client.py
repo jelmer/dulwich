@@ -21,13 +21,11 @@
 
 __docformat__ = 'restructuredText'
 
-import os
 import select
 import socket
 import subprocess
 
 from dulwich.errors import (
-    ChecksumMismatch,
     SendPackError,
     UpdateRefsError,
     )
@@ -88,6 +86,45 @@ class GitClient(object):
             refs[ref] = sha
         return refs, server_capabilities
 
+    def _parse_status_report(self):
+        unpack = self.proto.read_pkt_line().strip()
+        if unpack != 'unpack ok':
+            st = True
+            # flush remaining error data
+            while st is not None:
+                st = self.proto.read_pkt_line()
+            raise SendPackError(unpack)
+        statuses = []
+        errs = False
+        ref_status = self.proto.read_pkt_line()
+        while ref_status:
+            ref_status = ref_status.strip()
+            statuses.append(ref_status)
+            if not ref_status.startswith('ok '):
+                errs = True
+            ref_status = self.proto.read_pkt_line()
+
+        if errs:
+            ref_status = {}
+            ok = set()
+            for status in statuses:
+                if ' ' not in status:
+                    # malformed response, move on to the next one
+                    continue
+                status, ref = status.split(' ', 1)
+
+                if status == 'ng':
+                    if ' ' in ref:
+                        ref, status = ref.split(' ', 1)
+                else:
+                    ok.add(ref)
+                ref_status[ref] = status
+            raise UpdateRefsError('%s failed to update' %
+                                  ', '.join([ref for ref in ref_status
+                                             if ref not in ok]),
+                                  ref_status=ref_status)
+
+
     # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
@@ -132,42 +169,7 @@ class GitClient(object):
                                          len(objects))
 
         if 'report-status' in self._send_capabilities:
-            unpack = self.proto.read_pkt_line().strip()
-            if unpack != 'unpack ok':
-                st = True
-                # flush remaining error data
-                while st is not None:
-                    st = self.proto.read_pkt_line()
-                raise SendPackError(unpack)
-            statuses = []
-            errs = False
-            ref_status = self.proto.read_pkt_line()
-            while ref_status:
-                ref_status = ref_status.strip()
-                statuses.append(ref_status)
-                if not ref_status.startswith('ok '):
-                    errs = True
-                ref_status = self.proto.read_pkt_line()
-
-            if errs:
-                ref_status = {}
-                ok = set()
-                for status in statuses:
-                    if ' ' not in status:
-                        # malformed response, move on to the next one
-                        continue
-                    status, ref = status.split(' ', 1)
-
-                    if status == 'ng':
-                        if ' ' in ref:
-                            ref, status = ref.split(' ', 1)
-                    else:
-                        ok.add(ref)
-                    ref_status[ref] = status
-                raise UpdateRefsError('%s failed to update' %
-                                      ', '.join([ref for ref in ref_status
-                                                 if ref not in ok]),
-                                      ref_status=ref_status)
+            self._parse_status_report()
         # wait for EOF before returning
         data = self.proto.read()
         if data:
@@ -402,5 +404,6 @@ def get_transport_and_path(uri):
         if uri.startswith(handler):
             host, path = uri[len(handler):].split("/", 1)
             return transport(host), "/"+path
+    # FIXME: Parse rsync-like git URLs (user@host:/path), bug 568493
     # if its not git or git+ssh, try a local url..
     return SubprocessGitClient(), uri

@@ -1,5 +1,5 @@
 # web.py -- WSGI smart-http server
-# Copryight (C) 2010 Google, Inc.
+# Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
 from cStringIO import StringIO
+import os
 import re
 import time
 
@@ -98,9 +99,14 @@ def send_file(req, f, content_type):
         raise
 
 
+def _url_to_path(url):
+    return url.replace('/', os.path.sep)
+
+
 def get_text_file(req, backend, mat):
     req.nocache()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'text/plain')
 
 
@@ -121,13 +127,15 @@ def get_loose_object(req, backend, mat):
 
 def get_pack_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects-toc')
 
 

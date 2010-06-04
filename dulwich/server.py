@@ -1,5 +1,5 @@
 # server.py -- Implementation of the server side git protocols
-# Copryight (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

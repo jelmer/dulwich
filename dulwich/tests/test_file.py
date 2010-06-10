@@ -32,6 +32,7 @@ from dulwich.tests import (
 class FancyRenameTests(TestCase):
 
     def setUp(self):
+        super(FancyRenameTests, self).setUp()
         self._tempdir = tempfile.mkdtemp()
         self.foo = self.path('foo')
         self.bar = self.path('bar')
@@ -39,6 +40,7 @@ class FancyRenameTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
+        super(FancyRenameTests, self).tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
@@ -87,6 +89,7 @@ class FancyRenameTests(TestCase):
 class GitFileTests(TestCase):
 
     def setUp(self):
+        super(GitFileTests, self).setUp()
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path('foo'), 'wb')
         f.write('foo contents')
@@ -94,6 +97,7 @@ class GitFileTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
+        super(GitFileTests, self).tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)

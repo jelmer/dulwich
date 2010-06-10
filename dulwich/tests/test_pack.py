@@ -60,10 +60,12 @@ class PackTests(TestCase):
     """Base class for testing packs"""
 
     def setUp(self):
+        super(PackTests, self).setUp()
         self.tempdir = tempfile.mkdtemp()
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
+        super(PackTests, self).tearDown()
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/packs')
 
@@ -361,6 +363,7 @@ class ReadZlibTests(TestCase):
     extra = 'nextobject'
 
     def setUp(self):
+        super(ReadZlibTests, self).setUp()
         self.read = StringIO(self.comp + self.extra).read
 
     def test_decompress_size(self):

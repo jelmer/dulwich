@@ -20,10 +20,12 @@
 
 from cStringIO import StringIO
 import re
-from unittest import TestCase
 
 from dulwich.objects import (
     Blob,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 from dulwich.web import (
     HTTP_OK,

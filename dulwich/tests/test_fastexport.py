@@ -19,7 +19,6 @@
 
 from cStringIO import StringIO
 import stat
-from unittest import TestCase
 
 from dulwich.fastexport import (
     FastExporter,
@@ -31,6 +30,9 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tree,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 
 

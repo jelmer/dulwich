@@ -17,10 +17,12 @@
 # MA  02110-1301, USA.
 
 from cStringIO import StringIO
-from unittest import TestCase
 
 from dulwich.client import (
     GitClient,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 
 

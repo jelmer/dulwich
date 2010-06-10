@@ -29,7 +29,6 @@ from dulwich import errors
 from dulwich import file
 from dulwich import index
 from dulwich import protocol
-from dulwich import object_store
 from dulwich import objects
 from dulwich import repo
 from dulwich.tests import (

@@ -25,12 +25,12 @@ import socket
 import subprocess
 import tempfile
 import time
-import unittest
 
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
+    TestCase,
     TestSkipped,
     )
 
@@ -171,7 +171,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
     return False
 
 
-class CompatTestCase(unittest.TestCase):
+class CompatTestCase(TestCase):
     """Test case that requires git for compatibility checks.
 
     Subclasses can change the git version required by overriding

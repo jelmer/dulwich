@@ -21,7 +21,10 @@
 
 import unittest
 
-from unittest import TestCase
+try:
+    from testtools.testcase import TestCase
+except ImportError:
+    from unittest import TestCase
 
 try:
     # If Python itself provides an exception, use that

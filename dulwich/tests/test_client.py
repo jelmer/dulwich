@@ -30,6 +30,7 @@ from dulwich.tests import (
 class GitClientTests(TestCase):
 
     def setUp(self):
+        super(GitClientTests, self).setUp()
         self.rout = StringIO()
         self.rin = StringIO()
         self.client = GitClient(lambda x: True, self.rin.read,

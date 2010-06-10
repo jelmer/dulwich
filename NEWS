@@ -6,6 +6,9 @@
 
   * Use correct path separators for named repo files. (Dave Borowitz)
 
+  * python > 2.7 and testtools-based test runners will now also pick up skipped
+    tests correctly. (Jelmer Vernooij)
+
  FEATURES
 
   * Move named file initilization to BaseRepo. (Dave Borowitz)

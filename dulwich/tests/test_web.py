@@ -44,6 +44,7 @@ class WebTestCase(TestCase):
     """Base TestCase that sets up some useful instance vars."""
 
     def setUp(self):
+        super(WebTestCase, self).setUp()
         self._environ = {}
         self._req = HTTPGitRequest(self._environ, self._start_response,
                                    handlers=self._handlers())
@@ -284,7 +285,9 @@ class HTTPGitRequestTestCase(WebTestCase):
 
 
 class HTTPGitApplicationTestCase(TestCase):
+
     def setUp(self):
+        super(HTTPGitApplicationTestCase, self).setUp()
         self._app = HTTPGitApplication('backend')
 
     def test_call(self):

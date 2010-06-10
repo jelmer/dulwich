@@ -86,11 +86,13 @@ class CreateRepositoryTests(TestCase):
 class RepositoryTests(TestCase):
 
     def setUp(self):
+        super(RepositoryTests, self).setUp()
         self._repo = None
 
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
+        super(RepositoryTests, self).tearDown()
 
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
@@ -338,6 +340,7 @@ class BuildRepoTests(TestCase):
     """
 
     def setUp(self):
+        super(BuildRepoTests, self).setUp()
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
         r = self._repo = Repo.init(repo_dir)
@@ -361,6 +364,7 @@ class BuildRepoTests(TestCase):
 
     def tearDown(self):
         tear_down_repo(self._repo)
+        super(BuildRepoTests, self).tearDown()
 
     def test_build_repo(self):
         r = self._repo
@@ -624,17 +628,20 @@ class RefsContainerTests(object):
 class DictRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
+        TestCase.setUp(self)
         self._refs = DictRefsContainer(dict(_TEST_REFS))
 
 
 class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
+        TestCase.setUp(self)
         self._repo = open_repo('refs.git')
         self._refs = self._repo.refs
 
     def tearDown(self):
         tear_down_repo(self._repo)
+        TestCase.tearDown(self)
 
     def test_get_packed_refs(self):
         self.assertEqual({

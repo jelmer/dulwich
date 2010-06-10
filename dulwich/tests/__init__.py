@@ -21,6 +21,8 @@
 
 import unittest
 
+from unittest import TestCase
+
 try:
     # If Python itself provides an exception, use that
     from unittest import SkipTest as TestSkipped

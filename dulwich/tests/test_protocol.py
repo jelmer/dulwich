@@ -20,7 +20,6 @@
 
 
 from StringIO import StringIO
-from unittest import TestCase
 
 from dulwich.protocol import (
     Protocol,
@@ -32,6 +31,8 @@ from dulwich.protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     )
+from dulwich.tests import TestCase
+
 
 class BaseProtocolTests(object):
 

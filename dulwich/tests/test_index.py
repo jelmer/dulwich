@@ -27,7 +27,6 @@ import shutil
 import stat
 import struct
 import tempfile
-from unittest import TestCase
 
 from dulwich.index import (
     Index,
@@ -43,6 +42,7 @@ from dulwich.object_store import (
 from dulwich.objects import (
     Blob,
     )
+from dulwich.tests import TestCase
 
 
 class IndexTestCase(TestCase):

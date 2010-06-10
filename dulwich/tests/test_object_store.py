@@ -22,7 +22,6 @@
 import os
 import shutil
 import tempfile
-from unittest import TestCase
 
 from dulwich.objects import (
     Blob,
@@ -30,6 +29,9 @@ from dulwich.objects import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 from utils import (
     make_object,

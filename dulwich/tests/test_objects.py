@@ -25,10 +25,8 @@
 import datetime
 import os
 import stat
-import unittest
 
 from dulwich.errors import (
-    ChecksumMismatch,
     ObjectFormatException,
     )
 from dulwich.objects import (
@@ -49,6 +47,7 @@ from dulwich.objects import (
     _sorted_tree_items_py,
     )
 from dulwich.tests import (
+    TestCase,
     TestSkipped,
     )
 from utils import (
@@ -97,7 +96,7 @@ except ImportError:
                 return
 
 
-class TestHexToSha(unittest.TestCase):
+class TestHexToSha(TestCase):
 
     def test_simple(self):
         self.assertEquals("\xab\xcd" * 10, hex_to_sha("abcd" * 10))
@@ -106,7 +105,7 @@ class TestHexToSha(unittest.TestCase):
         self.assertEquals("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
-class BlobReadTests(unittest.TestCase):
+class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
     def get_sha_file(self, cls, base, sha):
@@ -229,7 +228,7 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.message, 'Merge ../b\n')
 
 
-class ShaFileCheckTests(unittest.TestCase):
+class ShaFileCheckTests(TestCase):
 
     def assertCheckFails(self, cls, data):
         obj = cls()
@@ -244,7 +243,7 @@ class ShaFileCheckTests(unittest.TestCase):
         self.assertEqual(None, obj.check())
 
 
-class CommitSerializationTests(unittest.TestCase):
+class CommitSerializationTests(TestCase):
 
     def make_commit(self, **kwargs):
         attrs = {'tree': 'd80c186a03f423a81b39df39dc87fd269736ca86',
@@ -517,7 +516,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEquals(set(["foo"]), set(t))
 
 
-class TagSerializeTests(unittest.TestCase):
+class TagSerializeTests(TestCase):
 
     def test_serialize_simple(self):
         x = make_object(Tag,
@@ -629,7 +628,7 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Tag, text)
 
 
-class CheckTests(unittest.TestCase):
+class CheckTests(TestCase):
 
     def test_check_hexsha(self):
         check_hexsha(a_sha, "failed to check good sha")
@@ -660,7 +659,7 @@ class CheckTests(unittest.TestCase):
                           "trailing characters")
 
 
-class TimezoneTests(unittest.TestCase):
+class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
         self.assertEquals((0, False), parse_timezone("+0000"))

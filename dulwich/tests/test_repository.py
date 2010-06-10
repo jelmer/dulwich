@@ -23,7 +23,6 @@ from cStringIO import StringIO
 import os
 import shutil
 import tempfile
-import unittest
 import warnings
 
 from dulwich import errors
@@ -41,6 +40,9 @@ from dulwich.repo import (
     write_packed_refs,
     _split_ref_line,
     )
+from dulwich.tests import (
+    TestCase,
+    )
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
@@ -49,7 +51,7 @@ from dulwich.tests.utils import (
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
-class CreateRepositoryTests(unittest.TestCase):
+class CreateRepositoryTests(TestCase):
 
     def assertFileContentsEqual(self, expected, repo, path):
         f = repo.get_named_file(path)
@@ -81,7 +83,7 @@ class CreateRepositoryTests(unittest.TestCase):
         self._check_repo_contents(repo)
 
 
-class RepositoryTests(unittest.TestCase):
+class RepositoryTests(TestCase):
 
     def setUp(self):
         self._repo = None
@@ -328,7 +330,7 @@ class RepositoryTests(unittest.TestCase):
             shutil.rmtree(r2_dir)
 
 
-class BuildRepoTests(unittest.TestCase):
+class BuildRepoTests(TestCase):
     """Tests that build on-disk repos from scratch.
 
     Repos live in a temp dir and are torn down after each test. They start with
@@ -431,7 +433,7 @@ class BuildRepoTests(unittest.TestCase):
         r.stage(['a'])  # double-stage a deleted path
 
 
-class CheckRefFormatTests(unittest.TestCase):
+class CheckRefFormatTests(TestCase):
     """Tests for the check_ref_format function.
 
     These are the same tests as in the git test suite.
@@ -462,7 +464,7 @@ TWOS = "2" * 40
 THREES = "3" * 40
 FOURS = "4" * 40
 
-class PackedRefsFileTests(unittest.TestCase):
+class PackedRefsFileTests(TestCase):
 
     def test_split_ref_line_errors(self):
         self.assertRaises(errors.PackedRefsException, _split_ref_line,
@@ -619,13 +621,13 @@ class RefsContainerTests(object):
         self.assertFalse('refs/tags/refs-0.2' in self._refs)
 
 
-class DictRefsContainerTests(RefsContainerTests, unittest.TestCase):
+class DictRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
         self._refs = DictRefsContainer(dict(_TEST_REFS))
 
 
-class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
+class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
         self._repo = open_repo('refs.git')

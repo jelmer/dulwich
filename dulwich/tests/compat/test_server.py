@@ -30,9 +30,6 @@ from dulwich.server import (
     DictBackend,
     TCPGitServer,
     )
-from dulwich.tests import (
-    TestSkipped,
-    )
 from server_utils import (
     ServerTests,
     ShutdownServerMixIn,

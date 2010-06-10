@@ -21,10 +21,32 @@
 
 import unittest
 
-# XXX: Ideally we should allow other test runners as well, 
-# but unfortunately unittest doesn't have a SkipTest/TestSkipped
-# exception.
-from nose import SkipTest as TestSkipped
+try:
+    # If Python itself provides an exception, use that
+    from unittest import SkipTest as TestSkipped
+except ImportError:
+    # Check if the nose exception can be used
+    try:
+        import nose
+    except ImportError:
+        try:
+            import testtools.testcase
+        except ImportError:
+            class TestSkipped(Exception):
+                def __init__(self, msg):
+                    self.msg = msg
+        else:
+            TestSkipped = testtools.testcase.TestCase.skipException
+    else:
+        TestSkipped = nose.SkipTest
+        try:
+            import testtools.testcase
+        except ImportError:
+            pass
+        else:
+            # Make testtools use the same exception class as nose
+            testtools.testcase.TestCase.skipException = TestSkipped
+
 
 def test_suite():
     names = [

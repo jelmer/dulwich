@@ -21,13 +21,15 @@ import os
 import shutil
 import sys
 import tempfile
-import unittest
 
 from dulwich.file import GitFile, fancy_rename
-from dulwich.tests import TestSkipped
+from dulwich.tests import (
+    TestCase,
+    TestSkipped,
+    )
 
 
-class FancyRenameTests(unittest.TestCase):
+class FancyRenameTests(TestCase):
 
     def setUp(self):
         self._tempdir = tempfile.mkdtemp()
@@ -82,7 +84,7 @@ class FancyRenameTests(unittest.TestCase):
         new_f.close()
 
 
-class GitFileTests(unittest.TestCase):
+class GitFileTests(TestCase):
 
     def setUp(self):
         self._tempdir = tempfile.mkdtemp()

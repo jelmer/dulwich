@@ -19,7 +19,6 @@
 """Tests for patch.py."""
 
 from cStringIO import StringIO
-from unittest import TestCase
 
 from dulwich.objects import (
     Commit,
@@ -29,6 +28,7 @@ from dulwich.patch import (
     git_am_patch_split,
     write_commit_patch,
     )
+from dulwich.tests import TestCase
 
 
 class WriteCommitPatchTests(TestCase):

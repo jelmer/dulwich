@@ -19,8 +19,6 @@
 """Tests for the smart protocol server."""
 
 
-from unittest import TestCase
-
 from dulwich.errors import (
     GitProtocolError,
     )
@@ -35,6 +33,8 @@ from dulwich.server import (
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
     )
+from dulwich.tests import TestCase
+
 
 
 ONE = '1' * 40

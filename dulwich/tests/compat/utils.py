@@ -181,6 +181,7 @@ class CompatTestCase(TestCase):
     min_git_version = (1, 5, 0)
 
     def setUp(self):
+        super(CompatTestCase, self).setUp()
         require_git_version(self.min_git_version)
 
     def assertReposEqual(self, repo1, repo2):

@@ -1281,18 +1281,26 @@ class Pack(object):
 
     def __init__(self, basename):
         self._basename = basename
-        self._data_path = self._basename + ".pack"
-        self._idx_path = self._basename + ".idx"
         self._data = None
         self._idx = None
+        self._data_load = lambda: PackData(self._basename + ".pack")
+        self._idx_load = lambda: load_pack_index(self._basename + ".idx")
+
+    @classmethod
+    def from_lazy_objects(self, data_fn, idx_fn):
+        """Create a new pack object from callables to load pack data and 
+        index objects."""
+        ret = Pack("")
+        ret._data_load = data_fn
+        ret._idx_load = idx_fn
+        return ret
 
     @classmethod
     def from_objects(self, data, idx):
         """Create a new pack object from pack data and index objects."""
         ret = Pack("")
-        ret._data = data
-        ret._idx = idx
-        data.pack = ret
+        ret._data_load = lambda: data
+        ret._idx_load = lambda: idx
         return ret
 
     def name(self):
@@ -1303,7 +1311,7 @@ class Pack(object):
     def data(self):
         """The pack data object being used."""
         if self._data is None:
-            self._data = PackData(self._data_path)
+            self._data = self._data_load()
             self._data.pack = self
             assert len(self.index) == len(self._data)
             idx_stored_checksum = self.index.get_pack_checksum()
@@ -1320,7 +1328,7 @@ class Pack(object):
         :note: This may be an in-memory index
         """
         if self._idx is None:
-            self._idx = load_pack_index(self._idx_path)
+            self._idx = self._idx_load()
         return self._idx
 
     def close(self):

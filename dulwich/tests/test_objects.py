@@ -22,6 +22,7 @@
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
 
+from cStringIO import StringIO
 import datetime
 import os
 import stat
@@ -146,6 +147,13 @@ class BlobReadTests(TestCase):
         b = Blob.from_string(string)
         self.assertEqual(b.data, string)
         self.assertEqual(b.sha().hexdigest(), b_sha)
+
+    def test_legacy_from_file(self):
+        b1 = Blob.from_string("foo")
+        b_raw = b1.as_legacy_object()
+        open('x', 'w+').write(b_raw)
+        b2 = b1.from_file(StringIO(b_raw))
+        self.assertEquals(b1, b2)
 
     def test_chunks(self):
         string = 'test 5\n'

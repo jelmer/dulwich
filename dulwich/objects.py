@@ -181,7 +181,9 @@ class ShaFile(object):
         start = 0
         end = -1
         while end < 0:
-            header += decomp.decompress(f.read(bufsize))
+            extra = f.read(bufsize)
+            header += decomp.decompress(extra)
+            magic += extra
             end = header.find("\0", start)
             start = len(header)
         header = header[:end]
@@ -190,19 +192,16 @@ class ShaFile(object):
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)
-        return obj_class()
+        ret = obj_class()
+        ret._magic = magic
+        return ret
 
-    def _parse_legacy_object(self, f):
+    def _parse_legacy_object(self, map):
         """Parse a legacy object, setting the raw string."""
-        size = os.path.getsize(f.name)
-        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-        try:
-            text = _decompress(map)
-        finally:
-            map.close()
+        text = _decompress(map)
         header_end = text.find('\0')
         if header_end < 0:
-            raise ObjectFormatException("Invalid object header")
+            raise ObjectFormatException("Invalid object header, no \\0")
         self.set_raw_string(text[header_end+1:])
 
     def as_legacy_object_chunks(self):
@@ -239,6 +238,7 @@ class ShaFile(object):
             if not self._chunked_text:
                 if self._file is not None:
                     self._parse_file(self._file)
+                    self._file = None
                 elif self._path is not None:
                     self._parse_path()
                 else:
@@ -265,25 +265,22 @@ class ShaFile(object):
         num_type = (ord(magic[0]) >> 4) & 7
         obj_class = object_class(num_type)
         if not obj_class:
-            raise ObjectFormatException("Not a known type: %d" % num_type)
-        return obj_class()
+            raise ObjectFormatException("Not a known type %d" % num_type)
+        ret = obj_class()
+        ret._magic = magic
+        return ret
 
-    def _parse_object(self, f):
+    def _parse_object(self, map):
         """Parse a new style object, setting self._text."""
-        size = os.path.getsize(f.name)
-        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-        try:
-            # skip type and size; type must have already been determined, and
-            # we trust zlib to fail if it's otherwise corrupted
-            byte = ord(map[0])
-            used = 1
-            while (byte & 0x80) != 0:
-                byte = ord(map[used])
-                used += 1
-            raw = map[used:]
-            self.set_raw_string(_decompress(raw))
-        finally:
-            map.close()
+        # skip type and size; type must have already been determined, and
+        # we trust zlib to fail if it's otherwise corrupted
+        byte = ord(map[0])
+        used = 1
+        while (byte & 0x80) != 0:
+            byte = ord(map[used])
+            used += 1
+        raw = map[used:]
+        self.set_raw_string(_decompress(raw))
 
     @classmethod
     def _is_legacy_object(cls, magic):
@@ -304,6 +301,7 @@ class ShaFile(object):
         self._sha = None
         self._path = None
         self._file = None
+        self._magic = None
         self._chunked_text = []
         self._needs_parsing = False
         self._needs_serialization = True
@@ -322,11 +320,14 @@ class ShaFile(object):
             f.close()
 
     def _parse_file(self, f):
-        magic = f.read(2)
-        if self._is_legacy_object(magic):
-            self._parse_legacy_object(f)
+        magic = self._magic
+        if magic is None:
+            magic = f.read(2)
+        map = magic + f.read()
+        if self._is_legacy_object(magic[:2]):
+            self._parse_legacy_object(map)
         else:
-            self._parse_object(f)
+            self._parse_object(map[2:])
 
     @classmethod
     def from_path(cls, path):

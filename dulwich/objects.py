@@ -24,7 +24,6 @@ import binascii
 from cStringIO import (
     StringIO,
     )
-import mmap
 import os
 import stat
 import zlib
@@ -337,6 +336,7 @@ class ShaFile(object):
             obj._path = path
             obj._sha = FixedSha(filename_to_hex(path))
             obj._file = None
+            obj._magic = None
             return obj
         finally:
             f.close()

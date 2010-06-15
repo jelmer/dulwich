@@ -326,7 +326,7 @@ class ShaFile(object):
         if self._is_legacy_object(magic[:2]):
             self._parse_legacy_object(map)
         else:
-            self._parse_object(map[2:])
+            self._parse_object(map)
 
     @classmethod
     def from_path(cls, path):

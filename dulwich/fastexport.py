@@ -21,7 +21,6 @@
 """Fast export/import functionality."""
 
 from dulwich.objects import (
-    Tree,
     format_timezone,
     )
 

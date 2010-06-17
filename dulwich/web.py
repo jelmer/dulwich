@@ -32,8 +32,6 @@ from dulwich.protocol import (
     ReceivableProtocol,
     )
 from dulwich.server import (
-    ReceivePackHandler,
-    UploadPackHandler,
     DEFAULT_HANDLERS,
     )
 

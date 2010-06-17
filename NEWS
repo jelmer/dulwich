@@ -13,6 +13,8 @@
 
   * Move named file initilization to BaseRepo. (Dave Borowitz)
 
+  * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)

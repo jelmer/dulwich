@@ -27,6 +27,7 @@ try:
     from urlparse import parse_qs
 except ImportError:
     from dulwich.misc import parse_qs
+from dulwich import log_utils
 from dulwich.protocol import (
     ReceivableProtocol,
     )
@@ -35,6 +36,9 @@ from dulwich.server import (
     UploadPackHandler,
     DEFAULT_HANDLERS,
     )
+
+
+logger = log_utils.getLogger(__name__)
 
 
 # HTTP error strings
@@ -106,12 +110,14 @@ def _url_to_path(url):
 def get_text_file(req, backend, mat):
     req.nocache()
     path = _url_to_path(mat.group())
+    logger.info('Sending plain text file %s', path)
     return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'text/plain')
 
 
 def get_loose_object(req, backend, mat):
     sha = mat.group(1) + mat.group(2)
+    logger.info('Sending loose object %s', sha)
     object_store = get_repo(backend, mat).object_store
     if not object_store.contains_loose(sha):
         yield req.not_found('Object not found')
@@ -128,6 +134,7 @@ def get_loose_object(req, backend, mat):
 def get_pack_file(req, backend, mat):
     req.cache_forever()
     path = _url_to_path(mat.group())
+    logger.info('Sending pack file %s', path)
     return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects')
 
@@ -135,6 +142,7 @@ def get_pack_file(req, backend, mat):
 def get_idx_file(req, backend, mat):
     req.cache_forever()
     path = _url_to_path(mat.group())
+    logger.info('Sending pack file %s', path)
     return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects-toc')
 
@@ -162,6 +170,7 @@ def get_info_refs(req, backend, mat):
         # TODO: select_getanyfile() (see http-backend.c)
         req.nocache()
         req.respond(HTTP_OK, 'text/plain')
+        logger.info('Emulating dumb info/refs')
         repo = get_repo(backend, mat)
         refs = repo.get_refs()
         for name in sorted(refs.iterkeys()):
@@ -182,6 +191,7 @@ def get_info_refs(req, backend, mat):
 def get_info_packs(req, backend, mat):
     req.nocache()
     req.respond(HTTP_OK, 'text/plain')
+    logger.info('Emulating dumb info/packs')
     for pack in get_repo(backend, mat).object_store.packs:
         yield 'P pack-%s.pack\n' % pack.name()
 
@@ -211,6 +221,7 @@ class _LengthLimitedFile(object):
 
 def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
+    logger.info('Handling service request for %s', service)
     handler_cls = req.handlers.get(service, None)
     if handler_cls is None:
         yield req.forbidden('Unsupported service %s' % service)
@@ -263,12 +274,14 @@ class HTTPGitRequest(object):
     def not_found(self, message):
         """Begin a HTTP 404 response and return the text of a message."""
         self._cache_headers = []
+        logger.info('Not found: %s', message)
         self.respond(HTTP_NOT_FOUND, 'text/plain')
         return message
 
     def forbidden(self, message):
         """Begin a HTTP 403 response and return the text of a message."""
         self._cache_headers = []
+        logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
         return message
 

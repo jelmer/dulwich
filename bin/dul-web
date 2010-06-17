@@ -19,10 +19,37 @@
 
 import os
 import sys
+from dulwich.log_utils import default_logging_config
 from dulwich.repo import Repo
 from dulwich.server import DictBackend
-from dulwich.web import HTTPGitApplication
-from wsgiref.simple_server import make_server
+from dulwich.web import (
+    logger,
+    HTTPGitApplication,
+    )
+from wsgiref.simple_server import (
+    WSGIRequestHandler,
+    make_server,
+    )
+
+
+class HTTPGitRequestHandler(WSGIRequestHandler):
+    """Handler that uses dulwich's logger for logging exceptions."""
+
+    def log_exception(self, exc_info):
+        logger.exception('Exception happened during processing of request',
+                         exc_info=exc_info)
+
+    def log_message(self, format, *args):
+        logger.info(format, *args)
+
+    def log_error(self, *args):
+        logger.error(*args)
+
+
+# TODO: allow serving on other addresses/ports via command-line flag
+LISTEN_ADDR=''
+PORT = 8000
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
@@ -30,8 +57,10 @@ if __name__ == "__main__":
     else:
         gitdir = os.getcwd()
 
+    default_logging_config()
     backend = DictBackend({"/": Repo(gitdir)})
     app = HTTPGitApplication(backend)
-    # TODO: allow serving on other ports via command-line flag
-    server = make_server('', 8000, app)
+    server = make_server(LISTEN_ADDR, PORT, app,
+                         handler_class=HTTPGitRequestHandler)
+    logger.info('Listening for HTTP connections on %s:%d', LISTEN_ADDR, PORT)
     server.serve_forever()

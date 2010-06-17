@@ -28,8 +28,9 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 import collections
 import socket
-import zlib
 import SocketServer
+import sys
+import zlib
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -37,6 +38,7 @@ from dulwich.errors import (
     GitProtocolError,
     ObjectFormatException,
     )
+from dulwich import log_utils
 from dulwich.objects import (
     hex_to_sha,
     )
@@ -57,6 +59,8 @@ from dulwich.protocol import (
     extract_want_line_capabilities,
     )
 
+
+logger = log_utils.getLogger(__name__)
 
 
 class Backend(object):
@@ -141,6 +145,7 @@ class DictBackend(Backend):
         self.repos = repos
 
     def open_repository(self, path):
+        logger.debug('Opening repository at %s', path)
         # FIXME: What to do in case there is no repo ?
         return self.repos[path]
 
@@ -178,6 +183,7 @@ class Handler(object):
                 raise GitProtocolError('Client does not support required '
                                        'capability %s.' % cap)
         self._client_capabilities = set(caps)
+        logger.info('Client capabilities: %s', caps)
 
     def has_capability(self, cap):
         if self._client_capabilities is None:
@@ -671,6 +677,7 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
     def handle(self):
         proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
         command, args = proto.read_cmd()
+        logger.info('Handling %s request, args=%s', command, args)
 
         cls = self.handlers.get(command, None)
         if not callable(cls):
@@ -690,5 +697,14 @@ class TCPGitServer(SocketServer.TCPServer):
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
         self.backend = backend
         self.handlers = handlers
+        logger.info('Listening for TCP connections on %s:%d', listen_addr, port)
         SocketServer.TCPServer.__init__(self, (listen_addr, port),
                                         self._make_handler)
+
+    def verify_request(self, request, client_address):
+        logger.info('Handling request from %s', client_address)
+        return True
+
+    def handle_error(self, request, client_address):
+        logger.exception('Exception happened during processing of request '
+                         'from %s', client_address)

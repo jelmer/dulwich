@@ -1,3 +1,10 @@
+dulwich (0.6.0-5) UNRELEASED; urgency=low
+
+  * Support building on older platforms that still have C Git as git-
+    core.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 23 Jun 2010 16:17:43 +0200
+
 dulwich (0.6.0-4) unstable; urgency=low
 
   * Switch to python-support. Closes: #583114

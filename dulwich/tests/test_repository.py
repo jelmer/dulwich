@@ -404,7 +404,7 @@ class BuildRepoTests(TestCase):
         self.assertEqual([self._root_commit], r[commit_sha].parents)
         self.assertEqual([], list(r.open_index()))
         tree = r[r[commit_sha].tree]
-        self.assertEqual([], tree.iteritems())
+        self.assertEqual([], list(tree.iteritems()))
 
     def test_commit_fail_ref(self):
         r = self._repo

@@ -683,12 +683,20 @@ def parse_tree(text):
     l = len(text)
     while count < l:
         mode_end = text.index(' ', count)
-        mode = int(text[count:mode_end], 8)
+        mode_text = text[count:mode_end]
+        assert mode_text[0] != '0'
+        try:
+            mode = int(mode_text, 8)
+        except ValueError:
+            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         name_end = text.index('\0', mode_end)
         name = text[mode_end+1:name_end]
         count = name_end+21
         sha = text[name_end+1:count]
-        yield (name, mode, sha_to_hex(sha))
+        if len(sha) != 20:
+            raise ObjectFormatException("Sha has invalid length")
+        hexsha = sha_to_hex(sha)
+        yield (name, mode, hexsha)
 
 
 def serialize_tree(items):

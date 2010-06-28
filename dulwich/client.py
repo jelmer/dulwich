@@ -349,10 +349,14 @@ class SSHGitClient(GitClient):
         self.port = port
         self.username = username
         GitClient.__init__(self, *args, **kwargs)
+        self.alternative_paths = {}
+
+    def _get_cmd_path(self, cmd):
+        return self.alternative_paths.get(cmd, 'git-%s' % cmd)
 
     def _connect(self, cmd, path):
         con = get_ssh_vendor().connect_ssh(
-            self.host, ["%s '%s'" % ('git-' + cmd, path)],
+            self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
         return Protocol(con.read, con.write), con.can_read
 

@@ -272,10 +272,27 @@ class PackBasedObjectStore(BaseObjectStore):
         return self._pack_cache
 
     def _iter_loose_objects(self):
+        """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
     def _get_loose_object(self, sha):
         raise NotImplementedError(self._get_loose_object)
+
+    def _remove_loose_object(self, sha):
+        raise NotImplementedError(self._remove_loose_object)
+
+    def pack_loose_objects(self):
+        """Pack loose objects.
+        
+        :return: Number of objects packed
+        """
+        objects = set()
+        for sha in self._iter_loose_objects():
+            objects.add((self._get_loose_object(sha), None))
+        self.add_objects(objects)
+        for obj, path in objects:
+            self._remove_loose_object(obj.id)
+        return len(objects)
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
@@ -384,6 +401,9 @@ class DiskObjectStore(PackBasedObjectStore):
             if e.errno == errno.ENOENT:
                 return None
             raise
+
+    def _remove_loose_object(self, sha):
+        os.remove(self._get_shafile_path(sha))
 
     def move_in_thin_pack(self, path):
         """Move a specific file containing a pack into the pack directory.

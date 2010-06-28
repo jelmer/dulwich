@@ -86,19 +86,17 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def test_empty_packs(self):
-        o = DiskObjectStore(self.store_dir)
-        self.assertEquals([], o.packs)
+        self.assertEquals([], self.store.packs)
 
     def test_pack_loose_objects(self):
-        o = DiskObjectStore(self.store_dir)
         b1 = make_object(Blob, data="yummy data")
-        o.add_object(b1)
+        self.store.add_object(b1)
         b2 = make_object(Blob, data="more yummy data")
-        o.add_object(b2)
-        self.assertEquals([], o.packs)
-        self.assertEquals(2, o.pack_loose_objects())
-        self.assertNotEquals([], o.packs)
-        self.assertEquals(0, o.pack_loose_objects())
+        self.store.add_object(b2)
+        self.assertEquals([], self.store.packs)
+        self.assertEquals(2, self.store.pack_loose_objects())
+        self.assertNotEquals([], self.store.packs)
+        self.assertEquals(0, self.store.pack_loose_objects())
 
 
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):

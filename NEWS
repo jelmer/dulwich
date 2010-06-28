@@ -33,6 +33,11 @@
 
   * Clean up file headers. (Dave Borowitz)
 
+ API CHANGES
+
+  * dulwich.pack.write_pack_index_v{1,2} now take a file-like object
+    rather than a filename. (Jelmer Vernooij)
+
 
 0.6.0	2010-05-22
 

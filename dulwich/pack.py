@@ -814,18 +814,28 @@ class PackData(object):
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        write_pack_index_v1(filename, entries, self.calculate_checksum())
+        f = GitFile(filename, 'wb')
+        try:
+            return write_pack_index_v1(f, entries, self.calculate_checksum())
+        finally:
+            f.close()
 
     def create_index_v2(self, filename, progress=None):
         """Create a version 2 index file for this data file.
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        write_pack_index_v2(filename, entries, self.calculate_checksum())
+        f = GitFile(filename, 'wb')
+        try:
+            return write_pack_index_v2(f, entries, self.calculate_checksum())
+        finally:
+            f.close()
 
     def create_index(self, filename, progress=None,
                      version=2):
@@ -833,11 +843,12 @@ class PackData(object):
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         if version == 1:
-            self.create_index_v1(filename, progress)
+            return self.create_index_v1(filename, progress)
         elif version == 2:
-            self.create_index_v2(filename, progress)
+            return self.create_index_v2(filename, progress)
         else:
             raise ValueError("unknown index format %d" % version)
 
@@ -1034,6 +1045,7 @@ def write_pack(filename, objects, num_objects):
     :param filename: Path to the new pack file (without .pack extension)
     :param objects: Iterable over (object, path) tuples to write
     :param num_objects: Number of objects to write
+    :return: Tuple with checksum of pack file and index file
     """
     f = GitFile(filename + ".pack", 'wb')
     try:
@@ -1041,7 +1053,11 @@ def write_pack(filename, objects, num_objects):
     finally:
         f.close()
     entries.sort()
-    write_pack_index_v2(filename + ".idx", entries, data_sum)
+    f = GitFile(filename + ".idx", 'wb')
+    try:
+        return data_sum, write_pack_index_v2(f, entries, data_sum)
+    finally:
+        f.close()
 
 
 def write_pack_data(f, objects, num_objects, window=10):
@@ -1091,30 +1107,28 @@ def write_pack_data(f, objects, num_objects, window=10):
     return entries, f.write_sha()
 
 
-def write_pack_index_v1(filename, entries, pack_checksum):
+def write_pack_index_v1(f, entries, pack_checksum):
     """Write a new pack index file.
 
-    :param filename: The filename of the new pack index file.
+    :param f: A file-like object to write to
     :param entries: List of tuples with object name (sha), offset_in_pack,
         and crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
+    :return: The SHA of the written index file
     """
-    f = GitFile(filename, 'wb')
-    try:
-        f = SHA1Writer(f)
-        fan_out_table = defaultdict(lambda: 0)
-        for (name, offset, entry_checksum) in entries:
-            fan_out_table[ord(name[0])] += 1
-        # Fan-out table
-        for i in range(0x100):
-            f.write(struct.pack(">L", fan_out_table[i]))
-            fan_out_table[i+1] += fan_out_table[i]
-        for (name, offset, entry_checksum) in entries:
-            f.write(struct.pack(">L20s", offset, name))
-        assert len(pack_checksum) == 20
-        f.write(pack_checksum)
-    finally:
-        f.close()
+    f = SHA1Writer(f)
+    fan_out_table = defaultdict(lambda: 0)
+    for (name, offset, entry_checksum) in entries:
+        fan_out_table[ord(name[0])] += 1
+    # Fan-out table
+    for i in range(0x100):
+        f.write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
+    for (name, offset, entry_checksum) in entries:
+        f.write(struct.pack(">L20s", offset, name))
+    assert len(pack_checksum) == 20
+    f.write(pack_checksum)
+    return f.write_sha()
 
 
 def create_delta(base_buf, target_buf):
@@ -1242,38 +1256,36 @@ def apply_delta(src_buf, delta):
     return out
 
 
-def write_pack_index_v2(filename, entries, pack_checksum):
+def write_pack_index_v2(f, entries, pack_checksum):
     """Write a new pack index file.
 
-    :param filename: The filename of the new pack index file.
+    :param f: File-like object to write to
     :param entries: List of tuples with object name (sha), offset_in_pack, and
         crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
+    :return: The SHA of the index file written
     """
-    f = GitFile(filename, 'wb')
-    try:
-        f = SHA1Writer(f)
-        f.write('\377tOc') # Magic!
-        f.write(struct.pack(">L", 2))
-        fan_out_table = defaultdict(lambda: 0)
-        for (name, offset, entry_checksum) in entries:
-            fan_out_table[ord(name[0])] += 1
-        # Fan-out table
-        for i in range(0x100):
-            f.write(struct.pack(">L", fan_out_table[i]))
-            fan_out_table[i+1] += fan_out_table[i]
-        for (name, offset, entry_checksum) in entries:
-            f.write(name)
-        for (name, offset, entry_checksum) in entries:
-            f.write(struct.pack(">L", entry_checksum))
-        for (name, offset, entry_checksum) in entries:
-            # FIXME: handle if MSBit is set in offset
-            f.write(struct.pack(">L", offset))
-        # FIXME: handle table for pack files > 8 Gb
-        assert len(pack_checksum) == 20
-        f.write(pack_checksum)
-    finally:
-        f.close()
+    f = SHA1Writer(f)
+    f.write('\377tOc') # Magic!
+    f.write(struct.pack(">L", 2))
+    fan_out_table = defaultdict(lambda: 0)
+    for (name, offset, entry_checksum) in entries:
+        fan_out_table[ord(name[0])] += 1
+    # Fan-out table
+    for i in range(0x100):
+        f.write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
+    for (name, offset, entry_checksum) in entries:
+        f.write(name)
+    for (name, offset, entry_checksum) in entries:
+        f.write(struct.pack(">L", entry_checksum))
+    for (name, offset, entry_checksum) in entries:
+        # FIXME: handle if MSBit is set in offset
+        f.write(struct.pack(">L", offset))
+    # FIXME: handle table for pack files > 8 Gb
+    assert len(pack_checksum) == 20
+    f.write(pack_checksum)
+    return f.write_sha()
 
 
 class Pack(object):

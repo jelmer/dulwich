@@ -21,6 +21,8 @@
   * Allow overriding paths to executables in GitSSHClient. 
     (Ross Light, Jelmer Vernooij, #585204)
 
+  * Add PackBasedObjectStore.pack_loose_objects(). (Jelmer Vernooij)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)

@@ -83,7 +83,25 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.store = MemoryObjectStore()
 
 
-class DiskObjectStoreTests(ObjectStoreTests, TestCase):
+class PackBasedObjectStoreTests(ObjectStoreTests):
+
+    def test_empty_packs(self):
+        o = DiskObjectStore(self.store_dir)
+        self.assertEquals([], o.packs)
+
+    def test_pack_loose_objects(self):
+        o = DiskObjectStore(self.store_dir)
+        b1 = make_object(Blob, data="yummy data")
+        o.add_object(b1)
+        b2 = make_object(Blob, data="more yummy data")
+        o.add_object(b2)
+        self.assertEquals([], o.packs)
+        self.assertEquals(2, o.pack_loose_objects())
+        self.assertNotEquals([], o.packs)
+        self.assertEquals(0, o.pack_loose_objects())
+
+
+class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -97,10 +115,5 @@ class DiskObjectStoreTests(ObjectStoreTests, TestCase):
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)
         self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
-
-    def test_empty_packs(self):
-        o = DiskObjectStore(self.store_dir)
-        self.assertEquals([], o.packs)
-
 
 # TODO: MissingObjectFinderTests

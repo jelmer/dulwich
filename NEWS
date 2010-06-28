@@ -18,6 +18,9 @@
   * The GitClient interface has been cleaned up and instances are now reusable.
     (Augie Fackler)
 
+  * Allow overriding paths to executables in GitSSHClient. 
+    (Ross Light, Jelmer Vernooij, #585204)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)

@@ -20,6 +20,7 @@ from cStringIO import StringIO
 
 from dulwich.client import (
     GitClient,
+    SSHGitClient,
     )
 from dulwich.tests import (
     TestCase,
@@ -64,3 +65,18 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
         self.client.fetch_pack("bla", lambda heads: [], None, None, None)
         self.assertEquals(self.rout.getvalue(), "0000")
+
+
+class SSHGitClientTests(TestCase):
+
+    def setUp(self):
+        super(SSHGitClientTests, self).setUp()
+        self.client = SSHGitClient("git.samba.org")
+
+    def test_default_command(self):
+        self.assertEquals("git-upload-pack", self.client._get_cmd_path("upload-pack"))
+
+    def test_alternative_command_path(self):
+        self.client.alternative_paths["upload-pack"] = "/usr/lib/git/git-upload-pack"
+        self.assertEquals("/usr/lib/git/git-upload-pack", self.client._get_cmd_path("upload-pack"))
+

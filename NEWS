@@ -15,6 +15,9 @@
 
   * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
 
+  * The GitClient interface has been cleaned up and instances are now reusable.
+    (Augie Fackler)
+
  TESTS
 
   * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)

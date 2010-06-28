@@ -53,6 +53,7 @@ from dulwich.pack import (
     write_pack_index_v2,
     )
 
+INFODIR = 'info'
 PACKDIR = 'pack'
 
 

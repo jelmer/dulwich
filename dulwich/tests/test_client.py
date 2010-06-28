@@ -24,6 +24,20 @@ from dulwich.client import (
 from dulwich.tests import (
     TestCase,
     )
+from dulwich.protocol import (
+    Protocol,
+    )
+
+
+class DummyClient(GitClient):
+    def __init__(self, can_read, read, write):
+        self.can_read = can_read
+        self.read = read
+        self.write = write
+        GitClient.__init__(self)
+
+    def _connect(self, service, path):
+        return Protocol(self.read, self.write), self.can_read
 
 
 # TODO(durin42): add unit-level tests of GitClient
@@ -33,8 +47,8 @@ class GitClientTests(TestCase):
         super(GitClientTests, self).setUp()
         self.rout = StringIO()
         self.rin = StringIO()
-        self.client = GitClient(lambda x: True, self.rin.read,
-            self.rout.write)
+        self.client = DummyClient(lambda x: True, self.rin.read,
+                                  self.rout.write)
 
     def test_caps(self):
         self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',

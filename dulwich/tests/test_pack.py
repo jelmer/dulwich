@@ -29,6 +29,9 @@ import zlib
 from dulwich.errors import (
     ChecksumMismatch,
     )
+from dulwich.file import (
+    GitFile,
+    )
 from dulwich.objects import (
     hex_to_sha,
     sha_to_hex,
@@ -291,9 +294,17 @@ class BaseTestPackIndexWriting(object):
         except ChecksumMismatch, e:
             self.fail(e)
 
+    def writeIndex(self, filename, entries, pack_checksum):
+        # FIXME: Write to StringIO instead rather than hitting disk ?
+        f = GitFile(filename, "wb")
+        try:
+            self._write_fn(f, entries, pack_checksum)
+        finally:
+            f.close()
+
     def test_empty(self):
         filename = os.path.join(self.tempdir, 'empty.idx')
-        self._write_fn(filename, [], pack_checksum)
+        self.writeIndex(filename, [], pack_checksum)
         idx = load_pack_index(filename)
         self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
@@ -303,7 +314,7 @@ class BaseTestPackIndexWriting(object):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
         filename = os.path.join(self.tempdir, 'single.idx')
-        self._write_fn(filename, my_entries, pack_checksum)
+        self.writeIndex(filename, my_entries, pack_checksum)
         idx = load_pack_index(filename)
         self.assertEquals(idx.version, self._expected_version)
         self.assertSucceeds(idx.check)

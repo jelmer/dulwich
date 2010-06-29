@@ -50,7 +50,7 @@ class DulwichClientTestBase(object):
         self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
         dest = os.path.join(self.gitroot, 'dest')
         file.ensure_dir_exists(dest)
-        run_git(['init', '--bare'], cwd=dest)
+        run_git(['init', '--quiet', '--bare'], cwd=dest)
 
     def tearDown(self):
         shutil.rmtree(self.gitroot)

@@ -127,7 +127,7 @@ def import_repo_to_dir(name):
                                'repos', name)
     temp_repo_dir = os.path.join(temp_dir, name)
     export_file = open(export_path, 'rb')
-    run_git_or_fail(['init', '--bare', temp_repo_dir])
+    run_git_or_fail(['init', '--quiet', '--bare', temp_repo_dir])
     run_git_or_fail(['fast-import'], input=export_file.read(),
                     cwd=temp_repo_dir)
     export_file.close()

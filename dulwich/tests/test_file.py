@@ -197,6 +197,9 @@ class GitFileTests(TestCase):
     def test_abort_close_removed(self):
         foo = self.path('foo')
         f = GitFile(foo, 'wb')
+
+        f._file.close()
         os.remove(foo+".lock")
+
         f.abort()
         self.assertTrue(f._closed)

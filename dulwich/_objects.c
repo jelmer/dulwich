@@ -1,16 +1,16 @@
-/* 
+/*
  * Copyright (C) 2009 Jelmer Vernooij <jelmer@samba.org>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  * of the License or (at your option) a later version of the License.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -35,7 +35,7 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 		hexsha[i*2] = bytehex((sha[i] & 0xF0) >> 4);
 		hexsha[i*2+1] = bytehex(sha[i] & 0x0F);
 	}
-	
+
 	return PyString_FromStringAndSize(hexsha, 40);
 }
 
@@ -121,7 +121,7 @@ int cmp_tree_item(const void *_a, const void *_b)
 		common = strlen(b->name);
 		remain_a = a->name + common;
 		remain_b = (S_ISDIR(b->mode)?"/":"");
-	} else if (strlen(b->name) > strlen(a->name)) { 
+	} else if (strlen(b->name) > strlen(a->name)) {
 		common = strlen(a->name);
 		remain_a = (S_ISDIR(a->mode)?"/":"");
 		remain_b = b->name + common;
@@ -149,7 +149,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 	struct tree_item *qsort_entries;
 	int num, i;
 	PyObject *ret;
-	Py_ssize_t pos = 0; 
+	Py_ssize_t pos = 0;
 	PyObject *key, *value;
 
 	if (!PyDict_Check(entries)) {

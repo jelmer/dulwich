@@ -770,7 +770,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         f = open(refs_file)
         refs_data = f.read()
         f.close()
-        f = open(refs_file, 'w')
+        f = open(refs_file, 'wb')
         f.write('\n'.join(l for l in refs_data.split('\n')
                           if not l or l[0] not in '#^'))
         f.close()

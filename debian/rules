@@ -5,13 +5,16 @@ DEB_PYTHON_SYSTEM=pysupport
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/python-distutils.mk
 
+DEB_PYTHON_BUILD_ARGS += --executable=/usr/bin/python
+
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 common-build-arch common-build-indep:: debian/stamp-check
 debian/stamp-check: 
 	$(MAKE) check
 	touch $@
+endif
 
 clean::
 	rm -f debian/stamp-check
 	rm -f dulwich/*.so
-endif
+	rm -rf *.egg-info

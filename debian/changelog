@@ -1,9 +1,11 @@
-dulwich (0.6.0-5) UNRELEASED; urgency=low
+dulwich (0.6.0-5) unstable; urgency=low
 
   * Support building on older platforms that still have C Git as git-
     core.
+  * Avoid use of versioned shebang lines. Thanks Stefano Rivera. Closes:
+    #587362
 
- -- Jelmer Vernooij <jelmer@debian.org>  Wed, 23 Jun 2010 16:17:43 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 20 Jul 2010 16:27:44 +0200
 
 dulwich (0.6.0-4) unstable; urgency=low
 

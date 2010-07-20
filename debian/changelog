@@ -1,3 +1,9 @@
+dulwich (0.6.0-5ubuntu1) UNRELEASED; urgency=low
+
+  * Bump standards version to 3.9.0.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 20 Jul 2010 18:32:01 +0200
+
 dulwich (0.6.0-5) unstable; urgency=low
 
   * Support building on older platforms that still have C Git as git-

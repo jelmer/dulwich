@@ -58,6 +58,9 @@ from dulwich.protocol import (
     extract_capabilities,
     extract_want_line_capabilities,
     )
+from dulwich.repo import (
+    Repo,
+    )
 
 
 logger = log_utils.getLogger(__name__)
@@ -708,3 +711,16 @@ class TCPGitServer(SocketServer.TCPServer):
     def handle_error(self, request, client_address):
         logger.exception('Exception happened during processing of request '
                          'from %s', client_address)
+
+
+def main(argv=sys.argv):
+    """Entry point for starting a TCP git server."""
+    if len(argv) > 1:
+        gitdir = argv[1]
+    else:
+        gitdir = '.'
+
+    log_utils.default_logging_config()
+    backend = DictBackend({'/': Repo(gitdir)})
+    server = TCPGitServer(backend, 'localhost')
+    server.serve_forever()

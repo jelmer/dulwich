@@ -21,6 +21,7 @@
 from cStringIO import StringIO
 import os
 import re
+import sys
 import time
 
 try:
@@ -31,7 +32,11 @@ from dulwich import log_utils
 from dulwich.protocol import (
     ReceivableProtocol,
     )
+from dulwich.repo import (
+    Repo,
+    )
 from dulwich.server import (
+    DictBackend,
     DEFAULT_HANDLERS,
     )
 
@@ -351,6 +356,7 @@ class HTTPGitApplication(object):
 try:
     from wsgiref.simple_server import (
         WSGIRequestHandler,
+        make_server,
         )
 
     class HTTPGitRequestHandler(WSGIRequestHandler):
@@ -365,7 +371,32 @@ try:
 
         def log_error(self, *args):
             logger.error(*args)
+
+
+    def main(argv=sys.argv):
+        """Entry point for starting an HTTP git server."""
+        if len(argv) > 1:
+            gitdir = argv[1]
+        else:
+            gitdir = os.getcwd()
+
+        # TODO: allow serving on other addresses/ports via command-line flag
+        listen_addr=''
+        port = 8000
+
+        log_utils.default_logging_config()
+        backend = DictBackend({'/': Repo(gitdir)})
+        app = HTTPGitApplication(backend)
+        server = make_server(listen_addr, port, app,
+                             handler_class=HTTPGitRequestHandler)
+        logger.info('Listening for HTTP connections on %s:%d', listen_addr,
+                    port)
+        server.serve_forever()
+
 except ImportError:
     # No wsgiref found; don't provide the reference functionality, but leave the
     # rest of the WSGI-based implementation.
-    pass
+    def main(argv=sys.argv):
+        """Stub entry point for failing to start a server without wsgiref."""
+        sys.stderr.write('Sorry, the wsgiref module is required for dul-web.\n')
+        sys.exit(1)

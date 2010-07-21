@@ -530,9 +530,9 @@ def _parse_tag_or_commit(text):
     """Parse tag or commit text.
 
     :param text: the raw text of the tag or commit object.
-    :yield: tuples of (field, value), one per header line, in the order read
-        from the text, possibly including duplicates. Includes a field named
-        None for the freeform tag/commit text.
+    :return: iterator of tuples of (field, value), one per header line, in the
+        order read from the text, possibly including duplicates. Includes a
+        field named None for the freeform tag/commit text.
     """
     f = StringIO(text)
     for l in f:
@@ -677,7 +677,7 @@ def parse_tree(text):
     """Parse a tree text.
 
     :param text: Serialized text to parse
-    :yields: tuples of (name, mode, sha)
+    :return: iterator of tuples of (name, mode, sha)
     """
     count = 0
     l = len(text)

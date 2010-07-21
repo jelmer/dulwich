@@ -16,9 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Safe access to git files."""
-
 
 import errno
 import os
@@ -65,7 +63,9 @@ def fancy_rename(oldname, newname):
 def GitFile(filename, mode='r', bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
 
-    See _GitFile for a description of the file locking protocol.
+    :return: a builtin file object or a _GitFile object
+
+    :note: See _GitFile for a description of the file locking protocol.
 
     Only read-only and write-only (binary) modes are supported; r+, w+, and a
     are not.  To read and write from the same file, you can take advantage of
@@ -86,8 +86,6 @@ def GitFile(filename, mode='r', bufsize=-1):
     Traceback (most recent call last):
         ...
     OSError: [Errno 17] File exists: 'filename.lock'
-
-    :return: a builtin file object or a _GitFile object
     """
     if 'a' in mode:
         raise IOError('append mode not supported for Git files')

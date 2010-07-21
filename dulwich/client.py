@@ -262,7 +262,7 @@ class GitClient(object):
 def can_read(f):
     """Check if a file descriptor is readable.
 
-    :args f: either the number of the file descriptor or a file-like
+    :param f: either the number of the file descriptor or a file-like
              object which returns the fileno when f.fileno() is called.
     """
     return len(select.select([f], [], [], 0)[0]) > 0

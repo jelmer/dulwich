@@ -310,7 +310,8 @@ class PackIndex(object):
     def iterentries(self):
         """Iterate over the entries in this pack index.
 
-        :yields: tuples with object name, offset in packfile and crc32 checksum.
+        :return: iterator over tuples with object name, offset in packfile and
+            crc32 checksum.
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
@@ -787,9 +788,9 @@ class PackData(object):
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
 
-        :param progress: Progress function, called with current and total object
-            count.
-        :yields: tuples with (sha, offset, crc32)
+        :param progress: Progress function, called with current and total
+            object count.
+        :return: iterator of tuples with (sha, offset, crc32)
         """
         for offset, type, obj, crc32 in self.iterobjects(progress=progress):
             assert isinstance(offset, int)
@@ -801,8 +802,8 @@ class PackData(object):
     def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
 
-        :param progress: Progress function, called with current and total object
-            count
+        :param progress: Progress function, called with current and total
+            object count
         :return: List of tuples with (sha, offset, crc32)
         """
         ret = list(self.iterentries(progress=progress))

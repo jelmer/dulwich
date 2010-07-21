@@ -675,9 +675,8 @@ def _split_ref_line(line):
 def read_packed_refs(f):
     """Read a packed refs file.
 
-    Yields tuples with SHA1s and ref names.
-
     :param f: file-like object to read from
+    :return: Iterator over tuples with SHA1s and ref names.
     """
     for l in f:
         if l[0] == "#":
@@ -777,7 +776,7 @@ class BaseRepo(object):
         """Write a file to the control dir with the given name and contents.
 
         :param path: The path to the file, relative to the control dir.
-        :contents: A string to write to the file.
+        :param contents: A string to write to the file.
         """
         raise NotImplementedError(self._put_named_file)
 
@@ -1094,7 +1093,7 @@ class Repo(BaseRepo):
         """Write a file to the control dir with the given name and contents.
 
         :param path: The path to the file, relative to the control dir.
-        :contents: A string to write to the file.
+        :param contents: A string to write to the file.
         """
         path = path.lstrip(os.path.sep)
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
@@ -1210,7 +1209,7 @@ class MemoryRepo(BaseRepo):
         """Write a file to the control dir with the given name and contents.
 
         :param path: The path to the file, relative to the control dir.
-        :contents: A string to write to the file.
+        :param contents: A string to write to the file.
         """
         self._named_files[path] = contents
 

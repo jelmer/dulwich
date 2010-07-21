@@ -85,7 +85,7 @@ def send_file(req, f, content_type):
     :param req: The HTTPGitRequest object to send output to.
     :param f: An open file-like object to send; will be closed.
     :param content_type: The MIME type for the file.
-    :yield: The contents of the file.
+    :return: Iterator over the contents of the file, as chunks.
     """
     if f is None:
         yield req.not_found('File not found')

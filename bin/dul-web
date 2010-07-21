@@ -25,25 +25,11 @@ from dulwich.server import DictBackend
 from dulwich.web import (
     logger,
     HTTPGitApplication,
+    HTTPGitRequestHandler,
     )
 from wsgiref.simple_server import (
-    WSGIRequestHandler,
     make_server,
     )
-
-
-class HTTPGitRequestHandler(WSGIRequestHandler):
-    """Handler that uses dulwich's logger for logging exceptions."""
-
-    def log_exception(self, exc_info):
-        logger.exception('Exception happened during processing of request',
-                         exc_info=exc_info)
-
-    def log_message(self, format, *args):
-        logger.info(format, *args)
-
-    def log_error(self, *args):
-        logger.error(*args)
 
 
 # TODO: allow serving on other addresses/ports via command-line flag

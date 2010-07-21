@@ -343,3 +343,29 @@ class HTTPGitApplication(object):
         if handler is None:
             return req.not_found('Sorry, that method is not supported')
         return handler(req, self.backend, mat)
+
+
+# The reference server implementation is based on wsgiref, which is not
+# distributed with python 2.4. If wsgiref is not present, users will not be able
+# to use the HTTP server without a little extra work.
+try:
+    from wsgiref.simple_server import (
+        WSGIRequestHandler,
+        )
+
+    class HTTPGitRequestHandler(WSGIRequestHandler):
+        """Handler that uses dulwich's logger for logging exceptions."""
+
+        def log_exception(self, exc_info):
+            logger.exception('Exception happened during processing of request',
+                             exc_info=exc_info)
+
+        def log_message(self, format, *args):
+            logger.info(format, *args)
+
+        def log_error(self, *args):
+            logger.error(*args)
+except ImportError:
+    # No wsgiref found; don't provide the reference functionality, but leave the
+    # rest of the WSGI-based implementation.
+    pass

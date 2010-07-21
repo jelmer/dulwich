@@ -17,36 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
-import sys
-from dulwich.log_utils import default_logging_config
-from dulwich.repo import Repo
-from dulwich.server import DictBackend
-from dulwich.web import (
-    logger,
-    HTTPGitApplication,
-    HTTPGitRequestHandler,
-    )
-from wsgiref.simple_server import (
-    make_server,
-    )
+from dulwich.web import main
 
-
-# TODO: allow serving on other addresses/ports via command-line flag
-LISTEN_ADDR=''
-PORT = 8000
-
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        gitdir = sys.argv[1]
-    else:
-        gitdir = os.getcwd()
-
-    default_logging_config()
-    backend = DictBackend({"/": Repo(gitdir)})
-    app = HTTPGitApplication(backend)
-    server = make_server(LISTEN_ADDR, PORT, app,
-                         handler_class=HTTPGitRequestHandler)
-    logger.info('Listening for HTTP connections on %s:%d', LISTEN_ADDR, PORT)
-    server.serve_forever()
+if __name__ == '__main__':
+    main()

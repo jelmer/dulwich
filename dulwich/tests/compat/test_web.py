@@ -27,6 +27,7 @@ On *nix, you can kill the tests with Ctrl-Z, "kill %".
 import threading
 from wsgiref import simple_server
 
+import dulwich
 from dulwich.server import (
     DictBackend,
     )
@@ -35,6 +36,7 @@ from dulwich.tests import (
     )
 from dulwich.web import (
     HTTPGitApplication,
+    HTTPGitRequestHandler,
     )
 
 from server_utils import (
@@ -72,8 +74,9 @@ class WebTests(ServerTests):
     def _start_server(self, repo):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
-        dul_server = simple_server.make_server('localhost', 0, app,
-                                               server_class=WSGIServer)
+        dul_server = simple_server.make_server(
+          'localhost', 0, app, server_class=WSGIServer,
+          handler_class=HTTPGitRequestHandler)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server
         _, port = dul_server.socket.getsockname()

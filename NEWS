@@ -29,6 +29,8 @@
 
   * Add a MemoryRepo that stores everything in memory. (Dave Borowitz)
 
+  * Quiet logging output from web tests. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)

@@ -17,18 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import sys
-from dulwich.log_utils import default_logging_config
-from dulwich.repo import Repo
-from dulwich.server import DictBackend, TCPGitServer
+from dulwich.server import main
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        gitdir = sys.argv[1]
-    else:
-        gitdir = "."
-
-    default_logging_config()
-    backend = DictBackend({"/": Repo(gitdir)})
-    server = TCPGitServer(backend, 'localhost')
-    server.serve_forever()
+if __name__ == '__main__':
+    main()

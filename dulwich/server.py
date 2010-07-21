@@ -16,13 +16,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Git smart network protocol server implementation.
 
 For more detailed implementation on the network protocol, see the
 Documentation/technical directory in the cgit distribution, and in particular:
-    Documentation/technical/protocol-capabilities.txt
-    Documentation/technical/pack-protocol.txt
+
+* Documentation/technical/protocol-capabilities.txt
+* Documentation/technical/pack-protocol.txt
 """
 
 

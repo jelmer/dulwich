@@ -157,6 +157,8 @@ def check_identity(identity, error_msg):
 class FixedSha(object):
     """SHA object that behaves like hashlib's but is given a fixed value."""
 
+    __slots__ = ('_hexsha', '_sha')
+
     def __init__(self, hexsha):
         self._hexsha = hexsha
         self._sha = hex_to_sha(hexsha)
@@ -170,6 +172,9 @@ class FixedSha(object):
 
 class ShaFile(object):
     """A git SHA file."""
+
+    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path', 
+                 '_sha', '_needs_serialization', '_magic')
 
     @staticmethod
     def _parse_legacy_object_header(magic, f):
@@ -555,6 +560,10 @@ class Tag(ShaFile):
     type_name = 'tag'
     type_num = 4
 
+    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha', 
+                 '_object_class', '_tag_time', '_tag_timezone',
+                 '_tagger', '_message')
+
     def __init__(self):
         super(Tag, self).__init__()
         self._tag_timezone_neg_utc = False
@@ -740,6 +749,8 @@ class Tree(ShaFile):
     type_name = 'tree'
     type_num = 2
 
+    __slots__ = ('_entries')
+
     def __init__(self):
         super(Tree, self).__init__()
         self._entries = {}
@@ -894,6 +905,12 @@ class Commit(ShaFile):
 
     type_name = 'commit'
     type_num = 1
+
+    __slots__ = ('_parents', '_encoding', '_extra', '_author_timezone_neg_utc',
+                 '_commit_timezone_neg_utc', '_commit_time',
+                 '_author_time', '_author_timezone', '_commit_timezone',
+                 '_author', '_committer', '_parents', '_extra',
+                 '_encoding', '_tree', '_message')
 
     def __init__(self):
         super(Commit, self).__init__()

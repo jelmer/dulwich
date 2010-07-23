@@ -1,5 +1,9 @@
 0.6.2	UNRELEASED
 
+ FEATURES
+
+  * Use slots for core objects to save up on memory. (Jelmer Vernooij)
+
 0.6.1	2010-07-22
 
  BUG FIXES

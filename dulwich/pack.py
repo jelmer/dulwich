@@ -1061,11 +1061,21 @@ def write_pack(filename, objects, num_objects):
         f.close()
 
 
-def write_pack_data(f, objects, num_objects, window=10):
-    """Write a new pack file.
+def write_pack_header(f, num_objects):
+    """Write a pack header for the given number of objects."""
+    f.write('PACK')                          # Pack header
+    f.write(struct.pack('>L', 2))            # Pack version
+    f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
-    :param filename: The filename of the new pack file.
-    :param objects: List of objects to write (tuples with object and path)
+
+def write_pack_data(f, objects, num_objects, window=10):
+    """Write a new pack data file.
+
+    :param f: File to write to
+    :param objects: Iterable over (object, path) tuples to write
+    :param num_objects: Number of objects to write
+    :param window: Sliding window size for searching for deltas; currently
+                   unimplemented
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
     recency = list(objects)
@@ -1085,9 +1095,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     # Write the pack
     entries = []
     f = SHA1Writer(f)
-    f.write("PACK")               # Pack header
-    f.write(struct.pack(">L", 2)) # Pack version
-    f.write(struct.pack(">L", num_objects)) # Number of objects in pack
+    write_pack_header(f, num_objects)
     for o, path in recency:
         sha1 = o.sha().digest()
         orig_t = o.type_num

@@ -159,15 +159,13 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden('Unsupported service %s' % service)
             return
         req.nocache()
-        req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
-        output = StringIO()
-        proto = ReceivableProtocol(StringIO().read, output.write)
+        write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
+        proto = ReceivableProtocol(StringIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               stateless_rpc=True, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
         handler.proto.write_pkt_line(None)
         handler.handle()
-        yield output.getvalue()
     else:
         # non-smart fallback
         # TODO: select_getanyfile() (see http-backend.c)
@@ -230,9 +228,8 @@ def handle_service_request(req, backend, mat):
         yield req.forbidden('Unsupported service %s' % service)
         return
     req.nocache()
-    req.respond(HTTP_OK, 'application/x-%s-response' % service)
+    write = req.respond(HTTP_OK, 'application/x-%s-response' % service)
 
-    output = StringIO()
     input = req.environ['wsgi.input']
     # This is not necessary if this app is run from a conforming WSGI server.
     # Unfortunately, there's no way to tell that at this point.
@@ -241,10 +238,9 @@ def handle_service_request(req, backend, mat):
     content_length = req.environ.get('CONTENT_LENGTH', '')
     if content_length:
         input = _LengthLimitedFile(input, int(content_length))
-    proto = ReceivableProtocol(input.read, output.write)
+    proto = ReceivableProtocol(input.read, write)
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()
-    yield output.getvalue()
 
 
 class HTTPGitRequest(object):
@@ -273,7 +269,7 @@ class HTTPGitRequest(object):
             self._headers.append(('Content-Type', content_type))
         self._headers.extend(self._cache_headers)
 
-        self._start_response(status, self._headers)
+        return self._start_response(status, self._headers)
 
     def not_found(self, message):
         """Begin a HTTP 404 response and return the text of a message."""

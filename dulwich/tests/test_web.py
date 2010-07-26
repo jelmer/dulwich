@@ -50,10 +50,12 @@ class WebTestCase(TestCase):
                                    handlers=self._handlers())
         self._status = None
         self._headers = []
+        self._output = StringIO()
 
     def _start_response(self, status, headers):
         self._status = status
         self._headers = list(headers)
+        return self._output.write
 
     def _handlers(self):
         return None
@@ -197,8 +199,12 @@ class SmartHandlersTestCase(WebTestCase):
         if content_length is not None:
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat))
-        self.assertEqual('handled input: foo', output)
+        handler_output = ''.join(
+          handle_service_request(self._req, 'backend', mat))
+        write_output = self._output.getvalue()
+        # Ensure all output was written via the write callback.
+        self.assertEqual('', handler_output)
+        self.assertEqual('handled input: foo', write_output)
         response_type = 'application/x-git-upload-pack-response'
         self.assertTrue(('Content-Type', response_type) in self._headers)
         self.assertFalse(self._handler.advertise_refs)
@@ -223,11 +229,14 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
         mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(get_info_refs(self._req, 'backend', mat))
+        handler_output = ''.join(get_info_refs(self._req, 'backend', mat))
+        write_output = self._output.getvalue()
         self.assertEquals(('001e# service=git-upload-pack\n'
                            '0000'
                            # input is ignored by the handler
-                           'handled input: '), output)
+                           'handled input: '), write_output)
+        # Ensure all output was written via the write callback.
+        self.assertEquals('', handler_output)
         self.assertTrue(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
 

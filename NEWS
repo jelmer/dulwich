@@ -4,6 +4,8 @@
 
   * HTTP server correctly handles empty CONTENT_LENGTH. (Dave Borowitz)
 
+  * Don't error when creating GitFiles with the default mode. (Dave Borowitz)
+
  FEATURES
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)

@@ -26,6 +26,9 @@ import tempfile
 import warnings
 
 from dulwich import errors
+from dulwich.file import (
+    GitFile,
+    )
 from dulwich.object_store import (
     tree_lookup_path,
     )
@@ -767,10 +770,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_remove_packed_without_peeled(self):
         refs_file = os.path.join(self._repo.path, 'packed-refs')
-        f = open(refs_file)
+        f = GitFile(refs_file)
         refs_data = f.read()
         f.close()
-        f = open(refs_file, 'wb')
+        f = GitFile(refs_file, 'wb')
         f.write('\n'.join(l for l in refs_data.split('\n')
                           if not l or l[0] not in '#^'))
         f.close()

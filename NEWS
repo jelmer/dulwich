@@ -10,6 +10,8 @@
 
   * Web server supports streaming progress/pack output. (Dave Borowitz)
 
+  * New public function dulwich.pack.write_pack_header. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

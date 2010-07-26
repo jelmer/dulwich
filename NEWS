@@ -1,5 +1,9 @@
 0.6.2	UNRELEASED
 
+ BUG FIXES
+
+  * HTTP server correctly handles empty CONTENT_LENGTH. (Dave Borowitz)
+
  FEATURES
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)

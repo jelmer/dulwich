@@ -238,8 +238,9 @@ def handle_service_request(req, backend, mat):
     # Unfortunately, there's no way to tell that at this point.
     # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
     # content-length
-    if 'CONTENT_LENGTH' in req.environ:
-        input = _LengthLimitedFile(input, int(req.environ['CONTENT_LENGTH']))
+    content_length = req.environ.get('CONTENT_LENGTH', '')
+    if content_length:
+        input = _LengthLimitedFile(input, int(content_length))
     proto = ReceivableProtocol(input.read, output.write)
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()

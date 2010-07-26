@@ -192,8 +192,10 @@ class SmartHandlersTestCase(WebTestCase):
         list(handle_service_request(self._req, 'backend', mat))
         self.assertEquals(HTTP_FORBIDDEN, self._status)
 
-    def test_handle_service_request(self):
+    def _run_handle_service_request(self, content_length=None):
         self._environ['wsgi.input'] = StringIO('foo')
+        if content_length is not None:
+            self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
         output = ''.join(handle_service_request(self._req, 'backend', mat))
         self.assertEqual('handled input: foo', output)
@@ -202,14 +204,14 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertFalse(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
 
+    def test_handle_service_request(self):
+        self._run_handle_service_request()
+
     def test_handle_service_request_with_length(self):
-        self._environ['wsgi.input'] = StringIO('foobar')
-        self._environ['CONTENT_LENGTH'] = 3
-        mat = re.search('.*', '/git-upload-pack')
-        output = ''.join(handle_service_request(self._req, 'backend', mat))
-        self.assertEqual('handled input: foo', output)
-        response_type = 'application/x-git-upload-pack-response'
-        self.assertTrue(('Content-Type', response_type) in self._headers)
+        self._run_handle_service_request(content_length='3')
+
+    def test_handle_service_request_empty_length(self):
+        self._run_handle_service_request(content_length='')
 
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'

@@ -44,6 +44,7 @@ from dulwich.pack import (
     create_delta,
     load_pack_index,
     read_zlib_chunks,
+    write_pack_header,
     write_pack_index_v1,
     write_pack_index_v2,
     write_pack,
@@ -275,6 +276,15 @@ class TestPack(PackTests):
     def test_name(self):
         p = self.get_pack(pack1_sha)
         self.assertEquals(pack1_sha, p.name())
+
+
+class WritePackHeaderTests(TestCase):
+
+    def test_simple(self):
+        f = StringIO()
+        write_pack_header(f, 42)
+        self.assertEquals('PACK\x00\x00\x00\x02\x00\x00\x00*',
+                f.getvalue())
 
 
 pack_checksum = hex_to_sha('721980e866af9a5f93ad674144e1459b8ba3e7b7')

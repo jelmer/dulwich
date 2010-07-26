@@ -151,7 +151,6 @@ class BlobReadTests(TestCase):
     def test_legacy_from_file(self):
         b1 = Blob.from_string("foo")
         b_raw = b1.as_legacy_object()
-        open('x', 'w+').write(b_raw)
         b2 = b1.from_file(StringIO(b_raw))
         self.assertEquals(b1, b2)
 

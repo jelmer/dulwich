@@ -888,6 +888,10 @@ class ThinPackData(PackData):
         super(ThinPackData, self).__init__(*args, **kwargs)
         self.resolve_ext_ref = resolve_ext_ref
 
+    @classmethod
+    def from_file(cls, resolve_ext_ref, file, size):
+        return cls(resolve_ext_ref, str(file), file=file, size=size)
+
     def get_ref(self, sha):
         """Resolve a reference looking in both this pack and the store."""
         try:

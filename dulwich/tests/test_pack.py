@@ -40,6 +40,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
+    ThinPackData,
     apply_delta,
     create_delta,
     load_pack_index,
@@ -162,6 +163,25 @@ class TestPackData(PackTests):
 
     def test_create_pack(self):
         p = self.get_pack_data(pack1_sha)
+
+    def test_from_file(self):
+        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
+        PackData.from_file(open(path), os.path.getsize(path))
+
+    # TODO: more ThinPackData tests.
+    def test_thin_from_file(self):
+        test_sha = '1' * 40
+
+        def resolve(sha):
+            self.assertEqual(test_sha, sha)
+            return 3, 'data'
+
+        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
+        data = ThinPackData.from_file(resolve, open(path),
+                                      os.path.getsize(path))
+        idx = self.get_pack_index(pack1_sha)
+        Pack.from_objects(data, idx)
+        self.assertEqual((None, 3, 'data'), data.get_ref(test_sha))
 
     def test_pack_len(self):
         p = self.get_pack_data(pack1_sha)

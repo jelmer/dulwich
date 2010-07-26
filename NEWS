@@ -52,6 +52,10 @@
 
   * Clean up file headers. (Dave Borowitz)
 
+ TESTS
+
+  * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)
+
  API CHANGES
 
   * dulwich.pack.write_pack_index_v{1,2} now take a file-like object

@@ -8,6 +8,9 @@
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)
 
+  * Web server supports streaming progress/pack output. (Dave Borowitz)
+
+
 0.6.1	2010-07-22
 
  BUG FIXES

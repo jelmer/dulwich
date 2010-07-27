@@ -878,6 +878,13 @@ class Tree(ShaFile):
 
 
 def parse_timezone(text):
+    """Parse a timezone text fragment (e.g. '+0100').
+
+    :param text: Text to parse.
+    :return: Tuple with timezone as seconds difference to UTC 
+        and a boolean indicating whether this was a UTC timezone
+        prefixed with a negative sign (-0000).
+    """
     offset = int(text)
     negative_utc = (offset == 0 and text[0] == '-')
     signum = (offset < 0) and -1 or 1
@@ -888,6 +895,12 @@ def parse_timezone(text):
 
 
 def format_timezone(offset, negative_utc=False):
+    """Format a timezone for Git serialization.
+
+    :param offset: Timezone offset as seconds difference to UTC
+    :param negative_utc: Whether to use a minus sign for UTC
+        (-0000 rather than +0000).
+    """
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
     if offset < 0 or (offset == 0 and negative_utc):

@@ -479,6 +479,8 @@ class ShaFile(object):
 class Blob(ShaFile):
     """A Git Blob object."""
 
+    __slots__ = ()
+
     type_name = 'blob'
     type_num = 3
 

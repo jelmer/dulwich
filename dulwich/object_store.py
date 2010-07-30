@@ -175,21 +175,24 @@ class BaseObjectStore(object):
                     else:
                         todo.add((None, newhexsha, childpath))
 
-    def iter_tree_contents(self, tree):
-        """Yield (path, mode, hexsha) tuples for all non-Tree objects in a tree.
+    def iter_tree_contents(self, tree_id):
+        """Iterate the contents of a tree and all subtrees.
 
-        :param tree: SHA1 of the root of the tree
+        Iteration is depth-first, as in e.g. os.walk.
+
+        :param tree_id: SHA1 of the tree.
+        :yield: Tuples of (path, mode, hexhsa) for objects in a tree.
         """
-        todo = set([(tree, "")])
+        todo = [('', stat.S_IFDIR, tree_id)]
         while todo:
-            (tid, tpath) = todo.pop()
-            tree = self[tid]
-            for name, mode, hexsha in tree.iteritems():
-                path = posixpath.join(tpath, name)
-                if stat.S_ISDIR(mode):
-                    todo.add((hexsha, path))
-                else:
-                    yield path, mode, hexsha
+            path, mode, hexsha = todo.pop()
+            if stat.S_ISDIR(mode):
+                entries = reversed(self[hexsha].iteritems())
+                for name, entry_mode, entry_hexsha in entries:
+                    entry_path = posixpath.join(path, name)
+                    todo.append((entry_path, entry_mode, entry_hexsha))
+            else:
+                yield path, mode, hexsha
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None):

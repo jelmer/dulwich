@@ -17,6 +17,11 @@
 
   * New public function dulwich.pack.write_pack_header. (Dave Borowitz)
 
+ API CHANGES
+
+  * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted
+    order. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

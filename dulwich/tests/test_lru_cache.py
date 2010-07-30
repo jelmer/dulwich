@@ -19,10 +19,12 @@
 from dulwich import (
     lru_cache,
     )
-import unittest
+from dulwich.tests import (
+    TestCase,
+    )
 
 
-class TestLRUCache(unittest.TestCase):
+class TestLRUCache(TestCase):
     """Test that LRU cache properly keeps track of entries."""
 
     def test_cache_size(self):
@@ -285,7 +287,7 @@ class TestLRUCache(unittest.TestCase):
         self.assertEqual([6, 7, 8, 9, 10, 11], sorted(cache.keys()))
 
 
-class TestLRUSizeCache(unittest.TestCase):
+class TestLRUSizeCache(TestCase):
 
     def test_basic_init(self):
         cache = lru_cache.LRUSizeCache()

@@ -16,21 +16,23 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 import errno
 import os
 import shutil
 import sys
 import tempfile
-import unittest
 
 from dulwich.file import GitFile, fancy_rename
-from dulwich.tests import TestSkipped
+from dulwich.tests import (
+    TestCase,
+    TestSkipped,
+    )
 
 
-class FancyRenameTests(unittest.TestCase):
+class FancyRenameTests(TestCase):
 
     def setUp(self):
+        super(FancyRenameTests, self).setUp()
         self._tempdir = tempfile.mkdtemp()
         self.foo = self.path('foo')
         self.bar = self.path('bar')
@@ -38,6 +40,7 @@ class FancyRenameTests(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
+        super(FancyRenameTests, self).tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
@@ -83,9 +86,10 @@ class FancyRenameTests(unittest.TestCase):
         new_f.close()
 
 
-class GitFileTests(unittest.TestCase):
+class GitFileTests(TestCase):
 
     def setUp(self):
+        super(GitFileTests, self).setUp()
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path('foo'), 'wb')
         f.write('foo contents')
@@ -93,6 +97,7 @@ class GitFileTests(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
+        super(GitFileTests, self).tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
@@ -192,6 +197,9 @@ class GitFileTests(unittest.TestCase):
     def test_abort_close_removed(self):
         foo = self.path('foo')
         f = GitFile(foo, 'wb')
+
+        f._file.close()
         os.remove(foo+".lock")
+
         f.abort()
         self.assertTrue(f._closed)

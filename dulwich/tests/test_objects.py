@@ -1,35 +1,33 @@
 # test_objects.py -- tests for objects.py
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of 
+# of the License or (at your option) any later version of
 # the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-
 
 """Tests for git base objects."""
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
 
+from cStringIO import StringIO
 import datetime
 import os
 import stat
-import unittest
 
 from dulwich.errors import (
-    ChecksumMismatch,
     ObjectFormatException,
     )
 from dulwich.objects import (
@@ -46,8 +44,11 @@ from dulwich.objects import (
     parse_timezone,
     parse_tree,
     _parse_tree_py,
+    sorted_tree_items,
+    _sorted_tree_items_py,
     )
 from dulwich.tests import (
+    TestCase,
     TestSkipped,
     )
 from utils import (
@@ -96,7 +97,7 @@ except ImportError:
                 return
 
 
-class TestHexToSha(unittest.TestCase):
+class TestHexToSha(TestCase):
 
     def test_simple(self):
         self.assertEquals("\xab\xcd" * 10, hex_to_sha("abcd" * 10))
@@ -105,7 +106,7 @@ class TestHexToSha(unittest.TestCase):
         self.assertEquals("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
-class BlobReadTests(unittest.TestCase):
+class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
     def get_sha_file(self, cls, base, sha):
@@ -146,6 +147,13 @@ class BlobReadTests(unittest.TestCase):
         b = Blob.from_string(string)
         self.assertEqual(b.data, string)
         self.assertEqual(b.sha().hexdigest(), b_sha)
+
+    def test_legacy_from_file(self):
+        b1 = Blob.from_string("foo")
+        b_raw = b1.as_legacy_object()
+        open('x', 'w+').write(b_raw)
+        b2 = b1.from_file(StringIO(b_raw))
+        self.assertEquals(b1, b2)
 
     def test_chunks(self):
         string = 'test 5\n'
@@ -228,7 +236,7 @@ class BlobReadTests(unittest.TestCase):
         self.assertEqual(c.message, 'Merge ../b\n')
 
 
-class ShaFileCheckTests(unittest.TestCase):
+class ShaFileCheckTests(TestCase):
 
     def assertCheckFails(self, cls, data):
         obj = cls()
@@ -243,7 +251,7 @@ class ShaFileCheckTests(unittest.TestCase):
         self.assertEqual(None, obj.check())
 
 
-class CommitSerializationTests(unittest.TestCase):
+class CommitSerializationTests(TestCase):
 
     def make_commit(self, **kwargs):
         attrs = {'tree': 'd80c186a03f423a81b39df39dc87fd269736ca86',
@@ -404,6 +412,19 @@ class CommitParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Commit, text)
 
 
+_TREE_ITEMS = {
+  'a.c': (0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  'a': (stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  'a/c': (stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  }
+
+_SORTED_TREE_ITEMS = [
+  ('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  ('a', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  ('a/c', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  ]
+
+
 class TreeTests(ShaFileCheckTests):
 
     def test_simple(self):
@@ -422,10 +443,9 @@ class TreeTests(ShaFileCheckTests):
 
     def test_tree_dir_sort(self):
         x = Tree()
-        x["a.c"] = (0100755, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        x["a"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        x["a/c"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        self.assertEquals(["a.c", "a", "a/c"], [p[0] for p in x.iteritems()])
+        for name, item in _TREE_ITEMS.iteritems():
+            x[name] = item
+        self.assertEquals(_SORTED_TREE_ITEMS, list(x.iteritems()))
 
     def _do_test_parse_tree(self, parse_tree):
         dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
@@ -440,6 +460,32 @@ class TreeTests(ShaFileCheckTests):
         if parse_tree is _parse_tree_py:
             raise TestSkipped('parse_tree extension not found')
         self._do_test_parse_tree(parse_tree)
+
+    def _do_test_sorted_tree_items(self, sorted_tree_items):
+        def do_sort(entries):
+            return list(sorted_tree_items(entries))
+
+        self.assertEqual(_SORTED_TREE_ITEMS, do_sort(_TREE_ITEMS))
+
+        # C/Python implementations may differ in specific error types, but
+        # should all error on invalid inputs.
+        # For example, the C implementation has stricter type checks, so may
+        # raise TypeError where the Python implementation raises AttributeError.
+        errors = (TypeError, ValueError, AttributeError)
+        self.assertRaises(errors, do_sort, 'foo')
+        self.assertRaises(errors, do_sort, {'foo': (1, 2, 3)})
+
+        myhexsha = 'd80c186a03f423a81b39df39dc87fd269736ca86'
+        self.assertRaises(errors, do_sort, {'foo': ('xxx', myhexsha)})
+        self.assertRaises(errors, do_sort, {'foo': (0100755, 12345)})
+
+    def test_sorted_tree_items(self):
+        self._do_test_sorted_tree_items(_sorted_tree_items_py)
+
+    def test_sorted_tree_items_extension(self):
+        if sorted_tree_items is _sorted_tree_items_py:
+            raise TestSkipped('sorted_tree_items extension not found')
+        self._do_test_sorted_tree_items(sorted_tree_items)
 
     def test_check(self):
         t = Tree
@@ -478,7 +524,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEquals(set(["foo"]), set(t))
 
 
-class TagSerializeTests(unittest.TestCase):
+class TagSerializeTests(TestCase):
 
     def test_serialize_simple(self):
         x = make_object(Tag,
@@ -590,7 +636,7 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Tag, text)
 
 
-class CheckTests(unittest.TestCase):
+class CheckTests(TestCase):
 
     def test_check_hexsha(self):
         check_hexsha(a_sha, "failed to check good sha")
@@ -621,7 +667,7 @@ class CheckTests(unittest.TestCase):
                           "trailing characters")
 
 
-class TimezoneTests(unittest.TestCase):
+class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
         self.assertEquals((0, False), parse_timezone("+0000"))

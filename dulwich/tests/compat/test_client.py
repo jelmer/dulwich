@@ -22,6 +22,7 @@
 import os
 import shutil
 import signal
+import subprocess
 import tempfile
 
 from dulwich import client
@@ -29,7 +30,6 @@ from dulwich import errors
 from dulwich import file
 from dulwich import index
 from dulwich import protocol
-from dulwich import object_store
 from dulwich import objects
 from dulwich import repo
 from dulwich.tests import (
@@ -43,36 +43,16 @@ from utils import (
     run_git,
     )
 
-class DulwichClientTest(CompatTestCase):
+class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 
     def setUp(self):
-        if check_for_daemon(limit=1):
-            raise TestSkipped('git-daemon was already running on port %s' %
-                              protocol.TCP_GIT_PORT)
-        CompatTestCase.setUp(self)
-        fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
-                                            suffix=".pid")
-        os.fdopen(fd).close()
         self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
         dest = os.path.join(self.gitroot, 'dest')
         file.ensure_dir_exists(dest)
-        run_git(['init', '--bare'], cwd=dest)
-        run_git(
-            ['daemon', '--verbose', '--export-all',
-             '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
-             '--detach', '--reuseaddr', '--enable=receive-pack',
-             '--listen=localhost', self.gitroot], cwd=self.gitroot)
-        if not check_for_daemon():
-            raise TestSkipped('git-daemon failed to start')
+        run_git(['init', '--quiet', '--bare'], cwd=dest)
 
     def tearDown(self):
-        CompatTestCase.tearDown(self)
-        try:
-            os.kill(int(open(self.pidfile).read().strip()), signal.SIGKILL)
-            os.unlink(self.pidfile)
-        except (OSError, IOError):
-            pass
         shutil.rmtree(self.gitroot)
 
     def assertDestEqualsSrc(self):
@@ -80,13 +60,19 @@ class DulwichClientTest(CompatTestCase):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         self.assertReposEqual(src, dest)
 
+    def _client(self):
+        raise NotImplementedError()
+
+    def _build_path(self):
+        raise NotImplementedError()
+
     def _do_send_pack(self):
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
         sendrefs = dict(src.get_refs())
         del sendrefs['HEAD']
-        c.send_pack('/dest', lambda _: sendrefs,
+        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
 
     def test_send_pack(self):
@@ -100,20 +86,21 @@ class DulwichClientTest(CompatTestCase):
         self._do_send_pack()
 
     def test_send_without_report_status(self):
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         c._send_capabilities.remove('report-status')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
         src = repo.Repo(srcpath)
         sendrefs = dict(src.get_refs())
         del sendrefs['HEAD']
-        c.send_pack('/dest', lambda _: sendrefs,
+        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
                     src.object_store.generate_pack_contents)
         self.assertDestEqualsSrc()
 
     def disable_ff_and_make_dummy_commit(self):
         # disable non-fast-forward pushes to the server
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        run_git(['config', 'receive.denyNonFastForwards', 'true'], cwd=dest.path)
+        run_git(['config', 'receive.denyNonFastForwards', 'true'],
+                cwd=dest.path)
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
         t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
@@ -137,9 +124,9 @@ class DulwichClientTest(CompatTestCase):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
         dest.refs['refs/heads/master'] = dummy_commit
         sendrefs, gen_pack = self.compute_send()
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         try:
-            c.send_pack('/dest', lambda _: sendrefs, gen_pack)
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         except errors.UpdateRefsError, e:
             self.assertEqual('refs/heads/master failed to update', str(e))
             self.assertEqual({'refs/heads/branch': 'ok',
@@ -151,9 +138,9 @@ class DulwichClientTest(CompatTestCase):
         # set up for two non-ff errors
         dest.refs['refs/heads/branch'] = dest.refs['refs/heads/master'] = dummy
         sendrefs, gen_pack = self.compute_send()
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         try:
-            c.send_pack('/dest', lambda _: sendrefs, gen_pack)
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         except errors.UpdateRefsError, e:
             self.assertEqual('refs/heads/branch, refs/heads/master failed to '
                              'update', str(e))
@@ -162,9 +149,9 @@ class DulwichClientTest(CompatTestCase):
                              e.ref_status)
 
     def test_fetch_pack(self):
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        refs = c.fetch('/server_new.export', dest)
+        refs = c.fetch(self._build_path('/server_new.export'), dest)
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
 
@@ -172,8 +159,87 @@ class DulwichClientTest(CompatTestCase):
         self.test_fetch_pack()
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         dest.refs['refs/heads/master'] = dummy
-        c = client.TCPGitClient('localhost')
+        c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
-        refs = c.fetch('/dest', dest)
+        refs = c.fetch(self._build_path('/dest'), dest)
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
+
+
+class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
+    def setUp(self):
+        CompatTestCase.setUp(self)
+        DulwichClientTestBase.setUp(self)
+        if check_for_daemon(limit=1):
+            raise TestSkipped('git-daemon was already running on port %s' %
+                              protocol.TCP_GIT_PORT)
+        fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
+                                            suffix=".pid")
+        os.fdopen(fd).close()
+        run_git(
+            ['daemon', '--verbose', '--export-all',
+             '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
+             '--detach', '--reuseaddr', '--enable=receive-pack',
+             '--listen=localhost', self.gitroot], cwd=self.gitroot)
+        if not check_for_daemon():
+            raise TestSkipped('git-daemon failed to start')
+
+    def tearDown(self):
+        try:
+            os.kill(int(open(self.pidfile).read().strip()), signal.SIGKILL)
+            os.unlink(self.pidfile)
+        except (OSError, IOError):
+            pass
+        DulwichClientTestBase.tearDown(self)
+        CompatTestCase.tearDown(self)
+
+    def _client(self):
+        return client.TCPGitClient('localhost')
+
+    def _build_path(self, path):
+        return path
+
+
+class TestSSHVendor(object):
+    @staticmethod
+    def connect_ssh(host, command, username=None, port=None):
+        cmd, path = command[0].replace("'", '').split(' ')
+        cmd = cmd.split('-', 1)
+        p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return client.SubprocessWrapper(p)
+
+
+class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
+    def setUp(self):
+        CompatTestCase.setUp(self)
+        DulwichClientTestBase.setUp(self)
+        self.real_vendor = client.get_ssh_vendor
+        client.get_ssh_vendor = TestSSHVendor
+
+    def tearDown(self):
+        DulwichClientTestBase.tearDown(self)
+        CompatTestCase.tearDown(self)
+        client.get_ssh_vendor = self.real_vendor
+
+    def _client(self):
+        return client.SSHGitClient('localhost')
+
+    def _build_path(self, path):
+        return self.gitroot + path
+
+
+class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
+    def setUp(self):
+        CompatTestCase.setUp(self)
+        DulwichClientTestBase.setUp(self)
+
+    def tearDown(self):
+        DulwichClientTestBase.tearDown(self)
+        CompatTestCase.tearDown(self)
+
+    def _client(self):
+        return client.SubprocessGitClient()
+
+    def _build_path(self, path):
+        return self.gitroot + path

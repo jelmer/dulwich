@@ -1,17 +1,17 @@
 # __init__.py -- The tests for dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of 
+# of the License or (at your option) any later version of
 # the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -21,10 +21,37 @@
 
 import unittest
 
-# XXX: Ideally we should allow other test runners as well, 
-# but unfortunately unittest doesn't have a SkipTest/TestSkipped
-# exception.
-from nose import SkipTest as TestSkipped
+try:
+    from testtools.testcase import TestCase
+except ImportError:
+    from unittest import TestCase
+
+try:
+    # If Python itself provides an exception, use that
+    from unittest import SkipTest as TestSkipped
+except ImportError:
+    # Check if the nose exception can be used
+    try:
+        import nose
+    except ImportError:
+        try:
+            import testtools.testcase
+        except ImportError:
+            class TestSkipped(Exception):
+                def __init__(self, msg):
+                    self.msg = msg
+        else:
+            TestSkipped = testtools.testcase.TestCase.skipException
+    else:
+        TestSkipped = nose.SkipTest
+        try:
+            import testtools.testcase
+        except ImportError:
+            pass
+        else:
+            # Make testtools use the same exception class as nose
+            testtools.testcase.TestCase.skipException = TestSkipped
+
 
 def test_suite():
     names = [

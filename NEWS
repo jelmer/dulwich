@@ -1,3 +1,51 @@
+0.6.1	2010-07-22
+
+ BUG FIXES
+
+  * Fix memory leak in C implementation of sorted_tree_items. (Dave Borowitz)
+
+  * Use correct path separators for named repo files. (Dave Borowitz)
+
+  * python > 2.7 and testtools-based test runners will now also pick up skipped
+    tests correctly. (Jelmer Vernooij)
+
+ FEATURES
+
+  * Move named file initilization to BaseRepo. (Dave Borowitz)
+
+  * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
+
+  * The GitClient interface has been cleaned up and instances are now reusable.
+    (Augie Fackler)
+
+  * Allow overriding paths to executables in GitSSHClient. 
+    (Ross Light, Jelmer Vernooij, #585204)
+
+  * Add PackBasedObjectStore.pack_loose_objects(). (Jelmer Vernooij)
+
+ TESTS
+
+  * Add tests for sorted_tree_items and C implementation. (Dave Borowitz)
+
+  * Add a MemoryRepo that stores everything in memory. (Dave Borowitz)
+
+  * Quiet logging output from web tests. (Dave Borowitz)
+
+ CLEANUP
+
+  * Clean up file headers. (Dave Borowitz)
+
+ API CHANGES
+
+  * dulwich.pack.write_pack_index_v{1,2} now take a file-like object
+    rather than a filename. (Jelmer Vernooij)
+
+  * Make dul-daemon/dul-web trivial wrappers around server functionality.
+    (Dave Borowitz)
+
+  * Move reference WSGI handler to web.py. (Dave Borowitz)
+
+
 0.6.0	2010-05-22
 
 note: This list is most likely incomplete for 0.6.0.

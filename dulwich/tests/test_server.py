@@ -16,11 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Tests for the smart protocol server."""
 
-
-from unittest import TestCase
 
 from dulwich.errors import (
     GitProtocolError,
@@ -36,6 +33,8 @@ from dulwich.server import (
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
     )
+from dulwich.tests import TestCase
+
 
 
 ONE = '1' * 40
@@ -80,6 +79,7 @@ class TestProto(object):
 class HandlerTestCase(TestCase):
 
     def setUp(self):
+        super(HandlerTestCase, self).setUp()
         self._handler = Handler(Backend(), None)
         self._handler.capabilities = lambda: ('cap1', 'cap2', 'cap3')
         self._handler.required_capabilities = lambda: ('cap2',)
@@ -123,6 +123,7 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
+        super(UploadPackHandlerTestCase, self).setUp()
         self._backend = DictBackend({"/": BackendRepo()})
         self._handler = UploadPackHandler(self._backend,
                 ["/", "host=lolcathost"], None, None)
@@ -214,6 +215,7 @@ class TestUploadPackHandler(Handler):
 class ProtocolGraphWalkerTestCase(TestCase):
 
     def setUp(self):
+        super(ProtocolGraphWalkerTestCase, self).setUp()
         # Create the following commit tree:
         #   3---5
         #  /
@@ -358,6 +360,7 @@ class AckGraphWalkerImplTestCase(TestCase):
     """Base setup and asserts for AckGraphWalker tests."""
 
     def setUp(self):
+        super(AckGraphWalkerImplTestCase, self).setUp()
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
           ('have', TWO),

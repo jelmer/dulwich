@@ -16,14 +16,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Tests for the object store interface."""
 
 
 import os
 import shutil
 import tempfile
-from unittest import TestCase
 
 from dulwich.objects import (
     Blob,
@@ -31,6 +29,9 @@ from dulwich.objects import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 from utils import (
     make_object,
@@ -82,7 +83,23 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.store = MemoryObjectStore()
 
 
-class DiskObjectStoreTests(ObjectStoreTests, TestCase):
+class PackBasedObjectStoreTests(ObjectStoreTests):
+
+    def test_empty_packs(self):
+        self.assertEquals([], self.store.packs)
+
+    def test_pack_loose_objects(self):
+        b1 = make_object(Blob, data="yummy data")
+        self.store.add_object(b1)
+        b2 = make_object(Blob, data="more yummy data")
+        self.store.add_object(b2)
+        self.assertEquals([], self.store.packs)
+        self.assertEquals(2, self.store.pack_loose_objects())
+        self.assertNotEquals([], self.store.packs)
+        self.assertEquals(0, self.store.pack_loose_objects())
+
+
+class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -96,10 +113,5 @@ class DiskObjectStoreTests(ObjectStoreTests, TestCase):
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)
         self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
-
-    def test_empty_packs(self):
-        o = DiskObjectStore(self.store_dir)
-        self.assertEquals([], o.packs)
-
 
 # TODO: MissingObjectFinderTests

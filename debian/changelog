@@ -1,8 +1,9 @@
-dulwich (0.6.0-5ubuntu1) UNRELEASED; urgency=low
+dulwich (0.6.1-1) unstable; urgency=low
 
-  * Bump standards version to 3.9.0.
+  * New upstream release.
+  * Bump standards version to 3.9.1.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Tue, 20 Jul 2010 18:32:01 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 30 Jul 2010 13:22:11 +0200
 
 dulwich (0.6.0-5) unstable; urgency=low
 

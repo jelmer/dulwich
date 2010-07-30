@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # dul-web - HTTP-based git server
-# Copyright (C) 2010 David Borowitz <dborowitz@google.com>
+# Copyright (C) 2010 Google, Inc. <dborowitz@google.com>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,21 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
-import sys
-from dulwich.repo import Repo
-from dulwich.server import DictBackend
-from dulwich.web import HTTPGitApplication
-from wsgiref.simple_server import make_server
+from dulwich.web import main
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        gitdir = sys.argv[1]
-    else:
-        gitdir = os.getcwd()
-
-    backend = DictBackend({"/": Repo(gitdir)})
-    app = HTTPGitApplication(backend)
-    # TODO: allow serving on other ports via command-line flag
-    server = make_server('', 8000, app)
-    server.serve_forever()
+if __name__ == '__main__':
+    main()

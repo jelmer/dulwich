@@ -1,5 +1,5 @@
 # web.py -- WSGI smart-http server
-# Copryight (C) 2010 Google, Inc.
+# Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,21 +19,29 @@
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
 from cStringIO import StringIO
+import os
 import re
+import sys
 import time
 
 try:
     from urlparse import parse_qs
 except ImportError:
     from dulwich.misc import parse_qs
+from dulwich import log_utils
 from dulwich.protocol import (
     ReceivableProtocol,
     )
+from dulwich.repo import (
+    Repo,
+    )
 from dulwich.server import (
-    ReceivePackHandler,
-    UploadPackHandler,
+    DictBackend,
     DEFAULT_HANDLERS,
     )
+
+
+logger = log_utils.getLogger(__name__)
 
 
 # HTTP error strings
@@ -77,7 +85,7 @@ def send_file(req, f, content_type):
     :param req: The HTTPGitRequest object to send output to.
     :param f: An open file-like object to send; will be closed.
     :param content_type: The MIME type for the file.
-    :yield: The contents of the file.
+    :return: Iterator over the contents of the file, as chunks.
     """
     if f is None:
         yield req.not_found('File not found')
@@ -98,14 +106,21 @@ def send_file(req, f, content_type):
         raise
 
 
+def _url_to_path(url):
+    return url.replace('/', os.path.sep)
+
+
 def get_text_file(req, backend, mat):
     req.nocache()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    logger.info('Sending plain text file %s', path)
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'text/plain')
 
 
 def get_loose_object(req, backend, mat):
     sha = mat.group(1) + mat.group(2)
+    logger.info('Sending loose object %s', sha)
     object_store = get_repo(backend, mat).object_store
     if not object_store.contains_loose(sha):
         yield req.not_found('Object not found')
@@ -121,13 +136,17 @@ def get_loose_object(req, backend, mat):
 
 def get_pack_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    logger.info('Sending pack file %s', path)
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
-    return send_file(req, get_repo(backend, mat).get_named_file(mat.group()),
+    path = _url_to_path(mat.group())
+    logger.info('Sending pack file %s', path)
+    return send_file(req, get_repo(backend, mat).get_named_file(path),
                      'application/x-git-packed-objects-toc')
 
 
@@ -154,6 +173,7 @@ def get_info_refs(req, backend, mat):
         # TODO: select_getanyfile() (see http-backend.c)
         req.nocache()
         req.respond(HTTP_OK, 'text/plain')
+        logger.info('Emulating dumb info/refs')
         repo = get_repo(backend, mat)
         refs = repo.get_refs()
         for name in sorted(refs.iterkeys()):
@@ -174,6 +194,7 @@ def get_info_refs(req, backend, mat):
 def get_info_packs(req, backend, mat):
     req.nocache()
     req.respond(HTTP_OK, 'text/plain')
+    logger.info('Emulating dumb info/packs')
     for pack in get_repo(backend, mat).object_store.packs:
         yield 'P pack-%s.pack\n' % pack.name()
 
@@ -203,6 +224,7 @@ class _LengthLimitedFile(object):
 
 def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
+    logger.info('Handling service request for %s', service)
     handler_cls = req.handlers.get(service, None)
     if handler_cls is None:
         yield req.forbidden('Unsupported service %s' % service)
@@ -255,12 +277,14 @@ class HTTPGitRequest(object):
     def not_found(self, message):
         """Begin a HTTP 404 response and return the text of a message."""
         self._cache_headers = []
+        logger.info('Not found: %s', message)
         self.respond(HTTP_NOT_FOUND, 'text/plain')
         return message
 
     def forbidden(self, message):
         """Begin a HTTP 403 response and return the text of a message."""
         self._cache_headers = []
+        logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
         return message
 
@@ -324,3 +348,55 @@ class HTTPGitApplication(object):
         if handler is None:
             return req.not_found('Sorry, that method is not supported')
         return handler(req, self.backend, mat)
+
+
+# The reference server implementation is based on wsgiref, which is not
+# distributed with python 2.4. If wsgiref is not present, users will not be able
+# to use the HTTP server without a little extra work.
+try:
+    from wsgiref.simple_server import (
+        WSGIRequestHandler,
+        make_server,
+        )
+
+    class HTTPGitRequestHandler(WSGIRequestHandler):
+        """Handler that uses dulwich's logger for logging exceptions."""
+
+        def log_exception(self, exc_info):
+            logger.exception('Exception happened during processing of request',
+                             exc_info=exc_info)
+
+        def log_message(self, format, *args):
+            logger.info(format, *args)
+
+        def log_error(self, *args):
+            logger.error(*args)
+
+
+    def main(argv=sys.argv):
+        """Entry point for starting an HTTP git server."""
+        if len(argv) > 1:
+            gitdir = argv[1]
+        else:
+            gitdir = os.getcwd()
+
+        # TODO: allow serving on other addresses/ports via command-line flag
+        listen_addr=''
+        port = 8000
+
+        log_utils.default_logging_config()
+        backend = DictBackend({'/': Repo(gitdir)})
+        app = HTTPGitApplication(backend)
+        server = make_server(listen_addr, port, app,
+                             handler_class=HTTPGitRequestHandler)
+        logger.info('Listening for HTTP connections on %s:%d', listen_addr,
+                    port)
+        server.serve_forever()
+
+except ImportError:
+    # No wsgiref found; don't provide the reference functionality, but leave the
+    # rest of the WSGI-based implementation.
+    def main(argv=sys.argv):
+        """Stub entry point for failing to start a server without wsgiref."""
+        sys.stderr.write('Sorry, the wsgiref module is required for dul-web.\n')
+        sys.exit(1)

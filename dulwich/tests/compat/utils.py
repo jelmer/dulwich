@@ -25,12 +25,12 @@ import socket
 import subprocess
 import tempfile
 import time
-import unittest
 
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
+    TestCase,
     TestSkipped,
     )
 
@@ -127,7 +127,7 @@ def import_repo_to_dir(name):
                                'repos', name)
     temp_repo_dir = os.path.join(temp_dir, name)
     export_file = open(export_path, 'rb')
-    run_git_or_fail(['init', '--bare', temp_repo_dir])
+    run_git_or_fail(['init', '--quiet', '--bare', temp_repo_dir])
     run_git_or_fail(['fast-import'], input=export_file.read(),
                     cwd=temp_repo_dir)
     export_file.close()
@@ -171,7 +171,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
     return False
 
 
-class CompatTestCase(unittest.TestCase):
+class CompatTestCase(TestCase):
     """Test case that requires git for compatibility checks.
 
     Subclasses can change the git version required by overriding
@@ -181,6 +181,7 @@ class CompatTestCase(unittest.TestCase):
     min_git_version = (1, 5, 0)
 
     def setUp(self):
+        super(CompatTestCase, self).setUp()
         require_git_version(self.min_git_version)
 
     def assertReposEqual(self, repo1, repo2):

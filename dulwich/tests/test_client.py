@@ -17,21 +17,39 @@
 # MA  02110-1301, USA.
 
 from cStringIO import StringIO
-from unittest import TestCase
 
 from dulwich.client import (
     GitClient,
+    SSHGitClient,
     )
+from dulwich.tests import (
+    TestCase,
+    )
+from dulwich.protocol import (
+    Protocol,
+    )
+
+
+class DummyClient(GitClient):
+    def __init__(self, can_read, read, write):
+        self.can_read = can_read
+        self.read = read
+        self.write = write
+        GitClient.__init__(self)
+
+    def _connect(self, service, path):
+        return Protocol(self.read, self.write), self.can_read
 
 
 # TODO(durin42): add unit-level tests of GitClient
 class GitClientTests(TestCase):
 
     def setUp(self):
+        super(GitClientTests, self).setUp()
         self.rout = StringIO()
         self.rin = StringIO()
-        self.client = GitClient(lambda x: True, self.rin.read,
-            self.rout.write)
+        self.client = DummyClient(lambda x: True, self.rin.read,
+                                  self.rout.write)
 
     def test_caps(self):
         self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',
@@ -47,3 +65,18 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
         self.client.fetch_pack("bla", lambda heads: [], None, None, None)
         self.assertEquals(self.rout.getvalue(), "0000")
+
+
+class SSHGitClientTests(TestCase):
+
+    def setUp(self):
+        super(SSHGitClientTests, self).setUp()
+        self.client = SSHGitClient("git.samba.org")
+
+    def test_default_command(self):
+        self.assertEquals("git-upload-pack", self.client._get_cmd_path("upload-pack"))
+
+    def test_alternative_command_path(self):
+        self.client.alternative_paths["upload-pack"] = "/usr/lib/git/git-upload-pack"
+        self.assertEquals("/usr/lib/git/git-upload-pack", self.client._get_cmd_path("upload-pack"))
+

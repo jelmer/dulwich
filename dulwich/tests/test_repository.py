@@ -17,14 +17,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Tests for the repository."""
 
 from cStringIO import StringIO
 import os
 import shutil
 import tempfile
-import unittest
 import warnings
 
 from dulwich import errors
@@ -36,10 +34,14 @@ from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
     Repo,
+    MemoryRepo,
     read_packed_refs,
     read_packed_refs_with_peeled,
     write_packed_refs,
     _split_ref_line,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 from dulwich.tests.utils import (
     open_repo,
@@ -49,25 +51,48 @@ from dulwich.tests.utils import (
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
-class CreateRepositoryTests(unittest.TestCase):
+class CreateRepositoryTests(TestCase):
 
-    def test_create(self):
+    def assertFileContentsEqual(self, expected, repo, path):
+        f = repo.get_named_file(path)
+        if not f:
+            self.assertEqual(expected, None)
+        else:
+            try:
+                self.assertEqual(expected, f.read())
+            finally:
+                f.close()
+
+    def _check_repo_contents(self, repo):
+        self.assertTrue(repo.bare)
+        self.assertFileContentsEqual('Unnamed repository', repo, 'description')
+        self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
+        self.assertFileContentsEqual(None, repo, 'nonexistent file')
+
+    def test_create_disk(self):
         tmp_dir = tempfile.mkdtemp()
         try:
             repo = Repo.init_bare(tmp_dir)
             self.assertEquals(tmp_dir, repo._controldir)
+            self._check_repo_contents(repo)
         finally:
             shutil.rmtree(tmp_dir)
 
+    def test_create_memory(self):
+        repo = MemoryRepo.init_bare([], {})
+        self._check_repo_contents(repo)
 
-class RepositoryTests(unittest.TestCase):
+
+class RepositoryTests(TestCase):
 
     def setUp(self):
+        super(RepositoryTests, self).setUp()
         self._repo = None
 
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
+        super(RepositoryTests, self).tearDown()
 
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
@@ -307,7 +332,7 @@ class RepositoryTests(unittest.TestCase):
             shutil.rmtree(r2_dir)
 
 
-class BuildRepoTests(unittest.TestCase):
+class BuildRepoTests(TestCase):
     """Tests that build on-disk repos from scratch.
 
     Repos live in a temp dir and are torn down after each test. They start with
@@ -315,6 +340,7 @@ class BuildRepoTests(unittest.TestCase):
     """
 
     def setUp(self):
+        super(BuildRepoTests, self).setUp()
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
         r = self._repo = Repo.init(repo_dir)
@@ -338,6 +364,7 @@ class BuildRepoTests(unittest.TestCase):
 
     def tearDown(self):
         tear_down_repo(self._repo)
+        super(BuildRepoTests, self).tearDown()
 
     def test_build_repo(self):
         r = self._repo
@@ -377,7 +404,7 @@ class BuildRepoTests(unittest.TestCase):
         self.assertEqual([self._root_commit], r[commit_sha].parents)
         self.assertEqual([], list(r.open_index()))
         tree = r[r[commit_sha].tree]
-        self.assertEqual([], tree.iteritems())
+        self.assertEqual([], list(tree.iteritems()))
 
     def test_commit_fail_ref(self):
         r = self._repo
@@ -410,7 +437,7 @@ class BuildRepoTests(unittest.TestCase):
         r.stage(['a'])  # double-stage a deleted path
 
 
-class CheckRefFormatTests(unittest.TestCase):
+class CheckRefFormatTests(TestCase):
     """Tests for the check_ref_format function.
 
     These are the same tests as in the git test suite.
@@ -441,7 +468,7 @@ TWOS = "2" * 40
 THREES = "3" * 40
 FOURS = "4" * 40
 
-class PackedRefsFileTests(unittest.TestCase):
+class PackedRefsFileTests(TestCase):
 
     def test_split_ref_line_errors(self):
         self.assertRaises(errors.PackedRefsException, _split_ref_line,
@@ -598,20 +625,23 @@ class RefsContainerTests(object):
         self.assertFalse('refs/tags/refs-0.2' in self._refs)
 
 
-class DictRefsContainerTests(RefsContainerTests, unittest.TestCase):
+class DictRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
+        TestCase.setUp(self)
         self._refs = DictRefsContainer(dict(_TEST_REFS))
 
 
-class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
+class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
+        TestCase.setUp(self)
         self._repo = open_repo('refs.git')
         self._refs = self._repo.refs
 
     def tearDown(self):
         tear_down_repo(self._repo)
+        TestCase.tearDown(self)
 
     def test_get_packed_refs(self):
         self.assertEqual({
@@ -740,7 +770,7 @@ class DiskRefsContainerTests(RefsContainerTests, unittest.TestCase):
         f = open(refs_file)
         refs_data = f.read()
         f.close()
-        f = open(refs_file, 'w')
+        f = open(refs_file, 'wb')
         f.write('\n'.join(l for l in refs_data.split('\n')
                           if not l or l[0] not in '#^'))
         f.close()

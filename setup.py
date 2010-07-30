@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Setup file for bzr-git
+# Setup file for dulwich
 # Copyright (C) 2008-2010 Jelmer Vernooij <jelmer@samba.org>
 
 try:
@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.6.0'
+dulwich_version_string = '0.6.1'
 
 include_dirs = []
 # Windows MSVC support

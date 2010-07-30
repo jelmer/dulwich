@@ -1,5 +1,5 @@
 # test_web.py -- Tests for the git HTTP server
-# Copryight (C) 2010 Google, Inc.
+# Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,10 +20,12 @@
 
 from cStringIO import StringIO
 import re
-from unittest import TestCase
 
 from dulwich.objects import (
     Blob,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 from dulwich.web import (
     HTTP_OK,
@@ -42,6 +44,7 @@ class WebTestCase(TestCase):
     """Base TestCase that sets up some useful instance vars."""
 
     def setUp(self):
+        super(WebTestCase, self).setUp()
         self._environ = {}
         self._req = HTTPGitRequest(self._environ, self._start_response,
                                    handlers=self._handlers())
@@ -282,7 +285,9 @@ class HTTPGitRequestTestCase(WebTestCase):
 
 
 class HTTPGitApplicationTestCase(TestCase):
+
     def setUp(self):
+        super(HTTPGitApplicationTestCase, self).setUp()
         self._app = HTTPGitApplication('backend')
 
     def test_call(self):

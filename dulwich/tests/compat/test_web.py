@@ -1,4 +1,4 @@
-# test_web.py -- Compatibilty tests for the git web server.
+# test_web.py -- Compatibility tests for the git web server.
 # Copyright (C) 2010 Google, Inc.
 #
 # This program is free software; you can redistribute it and/or
@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Compatibilty tests between Dulwich and the cgit HTTP server.
+"""Compatibility tests between Dulwich and the cgit HTTP server.
 
 Warning: these tests should be fairly stable, but when writing/debugging new
 tests, deadlocks may freeze the test process such that it cannot be Ctrl-C'ed.
@@ -27,6 +27,7 @@ On *nix, you can kill the tests with Ctrl-Z, "kill %".
 import threading
 from wsgiref import simple_server
 
+import dulwich
 from dulwich.server import (
     DictBackend,
     )
@@ -35,6 +36,7 @@ from dulwich.tests import (
     )
 from dulwich.web import (
     HTTPGitApplication,
+    HTTPGitRequestHandler,
     )
 
 from server_utils import (
@@ -72,8 +74,9 @@ class WebTests(ServerTests):
     def _start_server(self, repo):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
-        dul_server = simple_server.make_server('localhost', 0, app,
-                                               server_class=WSGIServer)
+        dul_server = simple_server.make_server(
+          'localhost', 0, app, server_class=WSGIServer,
+          handler_class=HTTPGitRequestHandler)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server
         _, port = dul_server.socket.getsockname()

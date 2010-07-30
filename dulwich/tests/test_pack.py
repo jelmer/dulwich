@@ -17,7 +17,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Tests for Dulwich packs."""
 
 
@@ -25,11 +24,13 @@ from cStringIO import StringIO
 import os
 import shutil
 import tempfile
-import unittest
 import zlib
 
 from dulwich.errors import (
     ChecksumMismatch,
+    )
+from dulwich.file import (
+    GitFile,
     )
 from dulwich.objects import (
     hex_to_sha,
@@ -42,12 +43,13 @@ from dulwich.pack import (
     apply_delta,
     create_delta,
     load_pack_index,
-    hex_to_sha,
     read_zlib_chunks,
-    sha_to_hex,
     write_pack_index_v1,
     write_pack_index_v2,
     write_pack,
+    )
+from dulwich.tests import (
+    TestCase,
     )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -57,14 +59,16 @@ tree_sha = 'b2a2766a2879c209ab1176e7e778b81ae422eeaa'
 commit_sha = 'f18faa16531ac570a3fdc8c7ca16682548dafd12'
 
 
-class PackTests(unittest.TestCase):
+class PackTests(TestCase):
     """Base class for testing packs"""
 
     def setUp(self):
+        super(PackTests, self).setUp()
         self.tempdir = tempfile.mkdtemp()
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
+        super(PackTests, self).tearDown()
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/packs')
 
@@ -126,7 +130,7 @@ class PackIndexTests(PackTests):
         self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
 
 
-class TestPackDeltas(unittest.TestCase):
+class TestPackDeltas(TestCase):
 
     test_string1 = 'The answer was flailing in the wind'
     test_string2 = 'The answer was falling down the pipe'
@@ -290,9 +294,17 @@ class BaseTestPackIndexWriting(object):
         except ChecksumMismatch, e:
             self.fail(e)
 
+    def writeIndex(self, filename, entries, pack_checksum):
+        # FIXME: Write to StringIO instead rather than hitting disk ?
+        f = GitFile(filename, "wb")
+        try:
+            self._write_fn(f, entries, pack_checksum)
+        finally:
+            f.close()
+
     def test_empty(self):
         filename = os.path.join(self.tempdir, 'empty.idx')
-        self._write_fn(filename, [], pack_checksum)
+        self.writeIndex(filename, [], pack_checksum)
         idx = load_pack_index(filename)
         self.assertSucceeds(idx.check)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
@@ -302,7 +314,7 @@ class BaseTestPackIndexWriting(object):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
         filename = os.path.join(self.tempdir, 'single.idx')
-        self._write_fn(filename, my_entries, pack_checksum)
+        self.writeIndex(filename, my_entries, pack_checksum)
         idx = load_pack_index(filename)
         self.assertEquals(idx.version, self._expected_version)
         self.assertSucceeds(idx.check)
@@ -321,35 +333,35 @@ class BaseTestPackIndexWriting(object):
                 self.assertTrue(actual_crc is None)
 
 
-class TestPackIndexWritingv1(unittest.TestCase, BaseTestPackIndexWriting):
+class TestPackIndexWritingv1(TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
-        unittest.TestCase.setUp(self)
+        TestCase.setUp(self)
         BaseTestPackIndexWriting.setUp(self)
         self._has_crc32_checksum = False
         self._expected_version = 1
         self._write_fn = write_pack_index_v1
 
     def tearDown(self):
-        unittest.TestCase.tearDown(self)
+        TestCase.tearDown(self)
         BaseTestPackIndexWriting.tearDown(self)
 
 
-class TestPackIndexWritingv2(unittest.TestCase, BaseTestPackIndexWriting):
+class TestPackIndexWritingv2(TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
-        unittest.TestCase.setUp(self)
+        TestCase.setUp(self)
         BaseTestPackIndexWriting.setUp(self)
         self._has_crc32_checksum = True
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
 
     def tearDown(self):
-        unittest.TestCase.tearDown(self)
+        TestCase.tearDown(self)
         BaseTestPackIndexWriting.tearDown(self)
 
 
-class ReadZlibTests(unittest.TestCase):
+class ReadZlibTests(TestCase):
 
     decomp = (
       'tree 4ada885c9196b6b6fa08744b5862bf92896fc002\n'
@@ -362,6 +374,7 @@ class ReadZlibTests(unittest.TestCase):
     extra = 'nextobject'
 
     def setUp(self):
+        super(ReadZlibTests, self).setUp()
         self.read = StringIO(self.comp + self.extra).read
 
     def test_decompress_size(self):

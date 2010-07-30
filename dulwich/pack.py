@@ -1,6 +1,6 @@
-# pack.py -- For dealing wih packed git objects.
+# pack.py -- For dealing with packed git objects.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copryight (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -310,7 +310,8 @@ class PackIndex(object):
     def iterentries(self):
         """Iterate over the entries in this pack index.
 
-        :yields: tuples with object name, offset in packfile and crc32 checksum.
+        :return: iterator over tuples with object name, offset in packfile and
+            crc32 checksum.
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
@@ -787,9 +788,9 @@ class PackData(object):
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
 
-        :param progress: Progress function, called with current and total object
-            count.
-        :yields: tuples with (sha, offset, crc32)
+        :param progress: Progress function, called with current and total
+            object count.
+        :return: iterator of tuples with (sha, offset, crc32)
         """
         for offset, type, obj, crc32 in self.iterobjects(progress=progress):
             assert isinstance(offset, int)
@@ -801,8 +802,8 @@ class PackData(object):
     def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
 
-        :param progress: Progress function, called with current and total object
-            count
+        :param progress: Progress function, called with current and total
+            object count
         :return: List of tuples with (sha, offset, crc32)
         """
         ret = list(self.iterentries(progress=progress))
@@ -814,18 +815,28 @@ class PackData(object):
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        write_pack_index_v1(filename, entries, self.calculate_checksum())
+        f = GitFile(filename, 'wb')
+        try:
+            return write_pack_index_v1(f, entries, self.calculate_checksum())
+        finally:
+            f.close()
 
     def create_index_v2(self, filename, progress=None):
         """Create a version 2 index file for this data file.
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        write_pack_index_v2(filename, entries, self.calculate_checksum())
+        f = GitFile(filename, 'wb')
+        try:
+            return write_pack_index_v2(f, entries, self.calculate_checksum())
+        finally:
+            f.close()
 
     def create_index(self, filename, progress=None,
                      version=2):
@@ -833,11 +844,12 @@ class PackData(object):
 
         :param filename: Index filename.
         :param progress: Progress report function
+        :return: Checksum of index file
         """
         if version == 1:
-            self.create_index_v1(filename, progress)
+            return self.create_index_v1(filename, progress)
         elif version == 2:
-            self.create_index_v2(filename, progress)
+            return self.create_index_v2(filename, progress)
         else:
             raise ValueError("unknown index format %d" % version)
 
@@ -1034,6 +1046,7 @@ def write_pack(filename, objects, num_objects):
     :param filename: Path to the new pack file (without .pack extension)
     :param objects: Iterable over (object, path) tuples to write
     :param num_objects: Number of objects to write
+    :return: Tuple with checksum of pack file and index file
     """
     f = GitFile(filename + ".pack", 'wb')
     try:
@@ -1041,7 +1054,11 @@ def write_pack(filename, objects, num_objects):
     finally:
         f.close()
     entries.sort()
-    write_pack_index_v2(filename + ".idx", entries, data_sum)
+    f = GitFile(filename + ".idx", 'wb')
+    try:
+        return data_sum, write_pack_index_v2(f, entries, data_sum)
+    finally:
+        f.close()
 
 
 def write_pack_data(f, objects, num_objects, window=10):
@@ -1091,30 +1108,28 @@ def write_pack_data(f, objects, num_objects, window=10):
     return entries, f.write_sha()
 
 
-def write_pack_index_v1(filename, entries, pack_checksum):
+def write_pack_index_v1(f, entries, pack_checksum):
     """Write a new pack index file.
 
-    :param filename: The filename of the new pack index file.
+    :param f: A file-like object to write to
     :param entries: List of tuples with object name (sha), offset_in_pack,
         and crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
+    :return: The SHA of the written index file
     """
-    f = GitFile(filename, 'wb')
-    try:
-        f = SHA1Writer(f)
-        fan_out_table = defaultdict(lambda: 0)
-        for (name, offset, entry_checksum) in entries:
-            fan_out_table[ord(name[0])] += 1
-        # Fan-out table
-        for i in range(0x100):
-            f.write(struct.pack(">L", fan_out_table[i]))
-            fan_out_table[i+1] += fan_out_table[i]
-        for (name, offset, entry_checksum) in entries:
-            f.write(struct.pack(">L20s", offset, name))
-        assert len(pack_checksum) == 20
-        f.write(pack_checksum)
-    finally:
-        f.close()
+    f = SHA1Writer(f)
+    fan_out_table = defaultdict(lambda: 0)
+    for (name, offset, entry_checksum) in entries:
+        fan_out_table[ord(name[0])] += 1
+    # Fan-out table
+    for i in range(0x100):
+        f.write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
+    for (name, offset, entry_checksum) in entries:
+        f.write(struct.pack(">L20s", offset, name))
+    assert len(pack_checksum) == 20
+    f.write(pack_checksum)
+    return f.write_sha()
 
 
 def create_delta(base_buf, target_buf):
@@ -1242,38 +1257,36 @@ def apply_delta(src_buf, delta):
     return out
 
 
-def write_pack_index_v2(filename, entries, pack_checksum):
+def write_pack_index_v2(f, entries, pack_checksum):
     """Write a new pack index file.
 
-    :param filename: The filename of the new pack index file.
+    :param f: File-like object to write to
     :param entries: List of tuples with object name (sha), offset_in_pack, and
         crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
+    :return: The SHA of the index file written
     """
-    f = GitFile(filename, 'wb')
-    try:
-        f = SHA1Writer(f)
-        f.write('\377tOc') # Magic!
-        f.write(struct.pack(">L", 2))
-        fan_out_table = defaultdict(lambda: 0)
-        for (name, offset, entry_checksum) in entries:
-            fan_out_table[ord(name[0])] += 1
-        # Fan-out table
-        for i in range(0x100):
-            f.write(struct.pack(">L", fan_out_table[i]))
-            fan_out_table[i+1] += fan_out_table[i]
-        for (name, offset, entry_checksum) in entries:
-            f.write(name)
-        for (name, offset, entry_checksum) in entries:
-            f.write(struct.pack(">L", entry_checksum))
-        for (name, offset, entry_checksum) in entries:
-            # FIXME: handle if MSBit is set in offset
-            f.write(struct.pack(">L", offset))
-        # FIXME: handle table for pack files > 8 Gb
-        assert len(pack_checksum) == 20
-        f.write(pack_checksum)
-    finally:
-        f.close()
+    f = SHA1Writer(f)
+    f.write('\377tOc') # Magic!
+    f.write(struct.pack(">L", 2))
+    fan_out_table = defaultdict(lambda: 0)
+    for (name, offset, entry_checksum) in entries:
+        fan_out_table[ord(name[0])] += 1
+    # Fan-out table
+    for i in range(0x100):
+        f.write(struct.pack(">L", fan_out_table[i]))
+        fan_out_table[i+1] += fan_out_table[i]
+    for (name, offset, entry_checksum) in entries:
+        f.write(name)
+    for (name, offset, entry_checksum) in entries:
+        f.write(struct.pack(">L", entry_checksum))
+    for (name, offset, entry_checksum) in entries:
+        # FIXME: handle if MSBit is set in offset
+        f.write(struct.pack(">L", offset))
+    # FIXME: handle table for pack files > 8 Gb
+    assert len(pack_checksum) == 20
+    f.write(pack_checksum)
+    return f.write_sha()
 
 
 class Pack(object):
@@ -1281,18 +1294,28 @@ class Pack(object):
 
     def __init__(self, basename):
         self._basename = basename
-        self._data_path = self._basename + ".pack"
-        self._idx_path = self._basename + ".idx"
         self._data = None
         self._idx = None
+        self._idx_path = self._basename + ".idx"
+        self._data_path = self._basename + ".pack"
+        self._data_load = lambda: PackData(self._data_path)
+        self._idx_load = lambda: load_pack_index(self._idx_path)
+
+    @classmethod
+    def from_lazy_objects(self, data_fn, idx_fn):
+        """Create a new pack object from callables to load pack data and 
+        index objects."""
+        ret = Pack("")
+        ret._data_load = data_fn
+        ret._idx_load = idx_fn
+        return ret
 
     @classmethod
     def from_objects(self, data, idx):
         """Create a new pack object from pack data and index objects."""
         ret = Pack("")
-        ret._data = data
-        ret._idx = idx
-        data.pack = ret
+        ret._data_load = lambda: data
+        ret._idx_load = lambda: idx
         return ret
 
     def name(self):
@@ -1303,7 +1326,7 @@ class Pack(object):
     def data(self):
         """The pack data object being used."""
         if self._data is None:
-            self._data = PackData(self._data_path)
+            self._data = self._data_load()
             self._data.pack = self
             assert len(self.index) == len(self._data)
             idx_stored_checksum = self.index.get_pack_checksum()
@@ -1320,7 +1343,7 @@ class Pack(object):
         :note: This may be an in-memory index
         """
         if self._idx is None:
-            self._idx = load_pack_index(self._idx_path)
+            self._idx = self._idx_load()
         return self._idx
 
     def close(self):

@@ -17,7 +17,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Access to base git objects."""
 
 
@@ -25,7 +24,6 @@ import binascii
 from cStringIO import (
     StringIO,
     )
-import mmap
 import os
 import stat
 import zlib
@@ -182,7 +180,9 @@ class ShaFile(object):
         start = 0
         end = -1
         while end < 0:
-            header += decomp.decompress(f.read(bufsize))
+            extra = f.read(bufsize)
+            header += decomp.decompress(extra)
+            magic += extra
             end = header.find("\0", start)
             start = len(header)
         header = header[:end]
@@ -191,19 +191,16 @@ class ShaFile(object):
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)
-        return obj_class()
+        ret = obj_class()
+        ret._magic = magic
+        return ret
 
-    def _parse_legacy_object(self, f):
+    def _parse_legacy_object(self, map):
         """Parse a legacy object, setting the raw string."""
-        size = os.path.getsize(f.name)
-        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-        try:
-            text = _decompress(map)
-        finally:
-            map.close()
+        text = _decompress(map)
         header_end = text.find('\0')
         if header_end < 0:
-            raise ObjectFormatException("Invalid object header")
+            raise ObjectFormatException("Invalid object header, no \\0")
         self.set_raw_string(text[header_end+1:])
 
     def as_legacy_object_chunks(self):
@@ -240,6 +237,7 @@ class ShaFile(object):
             if not self._chunked_text:
                 if self._file is not None:
                     self._parse_file(self._file)
+                    self._file = None
                 elif self._path is not None:
                     self._parse_path()
                 else:
@@ -266,25 +264,22 @@ class ShaFile(object):
         num_type = (ord(magic[0]) >> 4) & 7
         obj_class = object_class(num_type)
         if not obj_class:
-            raise ObjectFormatException("Not a known type: %d" % num_type)
-        return obj_class()
+            raise ObjectFormatException("Not a known type %d" % num_type)
+        ret = obj_class()
+        ret._magic = magic
+        return ret
 
-    def _parse_object(self, f):
+    def _parse_object(self, map):
         """Parse a new style object, setting self._text."""
-        size = os.path.getsize(f.name)
-        map = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
-        try:
-            # skip type and size; type must have already been determined, and
-            # we trust zlib to fail if it's otherwise corrupted
-            byte = ord(map[0])
-            used = 1
-            while (byte & 0x80) != 0:
-                byte = ord(map[used])
-                used += 1
-            raw = map[used:]
-            self.set_raw_string(_decompress(raw))
-        finally:
-            map.close()
+        # skip type and size; type must have already been determined, and
+        # we trust zlib to fail if it's otherwise corrupted
+        byte = ord(map[0])
+        used = 1
+        while (byte & 0x80) != 0:
+            byte = ord(map[used])
+            used += 1
+        raw = map[used:]
+        self.set_raw_string(_decompress(raw))
 
     @classmethod
     def _is_legacy_object(cls, magic):
@@ -305,6 +300,7 @@ class ShaFile(object):
         self._sha = None
         self._path = None
         self._file = None
+        self._magic = None
         self._chunked_text = []
         self._needs_parsing = False
         self._needs_serialization = True
@@ -323,11 +319,14 @@ class ShaFile(object):
             f.close()
 
     def _parse_file(self, f):
-        magic = f.read(2)
-        if self._is_legacy_object(magic):
-            self._parse_legacy_object(f)
+        magic = self._magic
+        if magic is None:
+            magic = f.read(2)
+        map = magic + f.read()
+        if self._is_legacy_object(magic[:2]):
+            self._parse_legacy_object(map)
         else:
-            self._parse_object(f)
+            self._parse_object(map)
 
     @classmethod
     def from_path(cls, path):
@@ -337,6 +336,7 @@ class ShaFile(object):
             obj._path = path
             obj._sha = FixedSha(filename_to_hex(path))
             obj._file = None
+            obj._magic = None
             return obj
         finally:
             f.close()
@@ -530,9 +530,9 @@ def _parse_tag_or_commit(text):
     """Parse tag or commit text.
 
     :param text: the raw text of the tag or commit object.
-    :yield: tuples of (field, value), one per header line, in the order read
-        from the text, possibly including duplicates. Includes a field named
-        None for the freeform tag/commit text.
+    :return: iterator of tuples of (field, value), one per header line, in the
+        order read from the text, possibly including duplicates. Includes a
+        field named None for the freeform tag/commit text.
     """
     f = StringIO(text)
     for l in f:
@@ -677,18 +677,26 @@ def parse_tree(text):
     """Parse a tree text.
 
     :param text: Serialized text to parse
-    :yields: tuples of (name, mode, sha)
+    :return: iterator of tuples of (name, mode, sha)
     """
     count = 0
     l = len(text)
     while count < l:
         mode_end = text.index(' ', count)
-        mode = int(text[count:mode_end], 8)
+        mode_text = text[count:mode_end]
+        assert mode_text[0] != '0'
+        try:
+            mode = int(mode_text, 8)
+        except ValueError:
+            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         name_end = text.index('\0', mode_end)
         name = text[mode_end+1:name_end]
         count = name_end+21
         sha = text[name_end+1:count]
-        yield (name, mode, sha_to_hex(sha))
+        if len(sha) != 20:
+            raise ObjectFormatException("Sha has invalid length")
+        hexsha = sha_to_hex(sha)
+        yield (name, mode, hexsha)
 
 
 def serialize_tree(items):
@@ -706,10 +714,15 @@ def sorted_tree_items(entries):
     the items would be serialized.
 
     :param entries: Dictionary mapping names to (mode, sha) tuples
-    :return: Iterator over (name, mode, sha)
+    :return: Iterator over (name, mode, hexsha)
     """
     for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
-        yield name, entry[0], entry[1]
+        mode, hexsha = entry
+        # Stricter type checks than normal to mirror checks in the C version.
+        mode = int(mode)
+        if not isinstance(hexsha, str):
+            raise TypeError('Expected a string for SHA, got %r' % hexsha)
+        yield name, mode, hexsha
 
 
 def cmp_entry((name1, value1), (name2, value2)):

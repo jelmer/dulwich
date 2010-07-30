@@ -22,6 +22,9 @@
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted
     order. (Dave Borowitz)
 
+  * ObjectStore.iter_tree_contents can optionally yield tree objects as well.
+    (Dave Borowitz).
+
 
 0.6.1	2010-07-22
 

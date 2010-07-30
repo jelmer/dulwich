@@ -23,6 +23,9 @@ import os
 import shutil
 import tempfile
 
+from dulwich.index import (
+    commit_tree,
+    )
 from dulwich.objects import (
     Blob,
     )
@@ -74,6 +77,24 @@ class ObjectStoreTests(object):
         self.assertTrue(testobject.id in self.store)
         r = self.store[testobject.id]
         self.assertEquals(r, testobject)
+
+    def test_iter_tree_contents(self):
+        blob_a = make_object(Blob, data='a')
+        blob_b = make_object(Blob, data='b')
+        blob_c = make_object(Blob, data='c')
+        for blob in [blob_a, blob_b, blob_c]:
+            self.store.add_object(blob)
+
+        blobs = [
+          ('a', blob_a.id, 0100644),
+          ('ad/b', blob_b.id, 0100644),
+          ('ad/bd/c', blob_c.id, 0100755),
+          ('ad/c', blob_c.id, 0100644),
+          ('c', blob_c.id, 0100644),
+          ]
+        tree_id = commit_tree(self.store, blobs)
+        self.assertEquals([(p, m, h) for (p, h, m) in blobs],
+                          list(self.store.iter_tree_contents(tree_id)))
 
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):

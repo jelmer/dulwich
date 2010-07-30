@@ -96,6 +96,34 @@ class ObjectStoreTests(object):
         self.assertEquals([(p, m, h) for (p, h, m) in blobs],
                           list(self.store.iter_tree_contents(tree_id)))
 
+    def test_iter_tree_contents_include_trees(self):
+        blob_a = make_object(Blob, data='a')
+        blob_b = make_object(Blob, data='b')
+        blob_c = make_object(Blob, data='c')
+        for blob in [blob_a, blob_b, blob_c]:
+            self.store.add_object(blob)
+
+        blobs = [
+          ('a', blob_a.id, 0100644),
+          ('ad/b', blob_b.id, 0100644),
+          ('ad/bd/c', blob_c.id, 0100755),
+          ]
+        tree_id = commit_tree(self.store, blobs)
+        tree = self.store[tree_id]
+        tree_ad = self.store[tree['ad'][1]]
+        tree_bd = self.store[tree_ad['bd'][1]]
+
+        expected = [
+          ('', 0040000, tree_id),
+          ('a', 0100644, blob_a.id),
+          ('ad', 0040000, tree_ad.id),
+          ('ad/b', 0100644, blob_b.id),
+          ('ad/bd', 0040000, tree_bd.id),
+          ('ad/bd/c', 0100755, blob_c.id),
+          ]
+        actual = self.store.iter_tree_contents(tree_id, include_trees=True)
+        self.assertEquals(expected, list(actual))
+
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 

@@ -24,6 +24,9 @@
 
   * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)
 
+  * New tests in test_web with better coverage and fewer ad-hoc mocks.
+    (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

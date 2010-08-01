@@ -55,7 +55,7 @@ from utils import make_object
 
 
 class WebTestCase(TestCase):
-    """Base TestCase that sets up some useful instance vars."""
+    """Base TestCase with useful instance vars and utility functions."""
 
     def setUp(self):
         super(WebTestCase, self).setUp()
@@ -74,6 +74,9 @@ class WebTestCase(TestCase):
     def _handlers(self):
         return None
 
+    def assertContentTypeEquals(self, expected):
+        self.assertTrue(('Content-Type', expected) in self._headers)
+
 
 class DumbHandlersTestCase(WebTestCase):
 
@@ -83,10 +86,10 @@ class DumbHandlersTestCase(WebTestCase):
 
     def test_send_file(self):
         f = StringIO('foobar')
-        output = ''.join(send_file(self._req, f, 'text/plain'))
+        output = ''.join(send_file(self._req, f, 'some/thing'))
         self.assertEquals('foobar', output)
         self.assertEquals(HTTP_OK, self._status)
-        self.assertTrue(('Content-Type', 'text/plain') in self._headers)
+        self.assertContentTypeEquals('some/thing')
         self.assertTrue(f.closed)
 
     def test_send_file_buffered(self):
@@ -94,24 +97,25 @@ class DumbHandlersTestCase(WebTestCase):
         xs = 'x' * bufsize
         f = StringIO(2 * xs)
         self.assertEquals([xs, xs],
-                          list(send_file(self._req, f, 'text/plain')))
+                          list(send_file(self._req, f, 'some/thing')))
         self.assertEquals(HTTP_OK, self._status)
-        self.assertTrue(('Content-Type', 'text/plain') in self._headers)
+        self.assertContentTypeEquals('some/thing')
         self.assertTrue(f.closed)
 
     def test_send_file_error(self):
         class TestFile(object):
-            def __init__(self):
+            def __init__(self, exc_class):
                 self.closed = False
+                self._exc_class = exc_class
 
             def read(self, size=-1):
-                raise IOError
+                raise self._exc_class()
 
             def close(self):
                 self.closed = True
 
-        f = TestFile()
-        list(send_file(self._req, f, 'text/plain'))
+        f = TestFile(IOError)
+        list(send_file(self._req, f, 'some/thing'))
         self.assertEquals(HTTP_ERROR, self._status)
         self.assertTrue(f.closed)
 
@@ -182,8 +186,7 @@ class SmartHandlersTestCase(WebTestCase):
         # Ensure all output was written via the write callback.
         self.assertEqual('', handler_output)
         self.assertEqual('handled input: foo', write_output)
-        response_type = 'application/x-git-upload-pack-response'
-        self.assertTrue(('Content-Type', response_type) in self._headers)
+        self.assertContentTypeEquals('application/x-git-upload-pack-response')
         self.assertFalse(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
 

@@ -17,6 +17,13 @@
 
   * New public function dulwich.pack.write_pack_header. (Dave Borowitz)
 
+  * Distinguish between missing files and read errors in HTTP server.
+    (Dave Borowitz)
+
+ TESTS
+
+  * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

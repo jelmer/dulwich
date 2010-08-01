@@ -48,6 +48,7 @@ logger = log_utils.getLogger(__name__)
 HTTP_OK = '200 OK'
 HTTP_NOT_FOUND = '404 Not Found'
 HTTP_FORBIDDEN = '403 Forbidden'
+HTTP_ERROR = '500 Internal Server Error'
 
 
 def date_time_string(timestamp=None):
@@ -100,7 +101,7 @@ def send_file(req, f, content_type):
         f.close()
     except IOError:
         f.close()
-        yield req.not_found('Error reading file')
+        yield req.error('Error reading file')
     except:
         f.close()
         raise
@@ -128,7 +129,7 @@ def get_loose_object(req, backend, mat):
     try:
         data = object_store[sha].as_legacy_object()
     except IOError:
-        yield req.not_found('Error reading object')
+        yield req.error('Error reading object')
     req.cache_forever()
     req.respond(HTTP_OK, 'application/x-git-loose-object')
     yield data
@@ -283,6 +284,13 @@ class HTTPGitRequest(object):
         self._cache_headers = []
         logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
+        return message
+
+    def error(self, message):
+        """Begin a HTTP 500 response and return the text of a message."""
+        self._cache_headers = []
+        logger.error('Error: %s', message)
+        self.respond(HTTP_ERROR, 'text/plain')
         return message
 
     def nocache(self):

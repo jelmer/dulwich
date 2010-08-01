@@ -135,6 +135,7 @@ def get_loose_object(req, backend, mat):
         data = object_store[sha].as_legacy_object()
     except IOError:
         yield req.error('Error reading object')
+        return
     req.cache_forever()
     req.respond(HTTP_OK, 'application/x-git-loose-object')
     yield data

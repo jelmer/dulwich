@@ -21,8 +21,19 @@
 from cStringIO import StringIO
 import re
 
+from dulwich.object_store import (
+    MemoryObjectStore,
+    )
 from dulwich.objects import (
     Blob,
+    Tag,
+    )
+from dulwich.repo import (
+    DictRefsContainer,
+    MemoryRepo,
+    )
+from dulwich.server import (
+    DictBackend,
     )
 from dulwich.tests import (
     TestCase,
@@ -39,6 +50,8 @@ from dulwich.web import (
     HTTPGitRequest,
     HTTPGitApplication,
     )
+
+from utils import make_object
 
 
 class WebTestCase(TestCase):
@@ -105,69 +118,32 @@ class DumbHandlersTestCase(WebTestCase):
     def test_get_info_refs(self):
         self._environ['QUERY_STRING'] = ''
 
-        class TestTag(object):
-            def __init__(self, sha, obj_class, obj_sha):
-                self.sha = lambda: sha
-                self.object = (obj_class, obj_sha)
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        blob3 = make_object(Blob, data='3')
 
-        class TestBlob(object):
-            def __init__(self, sha):
-                self.sha = lambda: sha
+        tag1 = make_object(Tag, name='tag-tag',
+                           tagger='Test <test@example.com>',
+                           tag_time=12345,
+                           tag_timezone=0,
+                           message='message',
+                           object=(Blob, blob2.id))
 
-        blob1 = TestBlob('111')
-        blob2 = TestBlob('222')
-        blob3 = TestBlob('333')
-
-        tag1 = TestTag('aaa', Blob, '222')
-
-        class TestRepo(object):
-
-            def __init__(self, objects, peeled):
-                self._objects = dict((o.sha(), o) for o in objects)
-                self._peeled = peeled
-
-            def get_peeled(self, sha):
-                return self._peeled[sha]
-
-            def __getitem__(self, sha):
-                return self._objects[sha]
-
-            def get_refs(self):
-                return {
-                    'HEAD': '000',
-                    'refs/heads/master': blob1.sha(),
-                    'refs/tags/tag-tag': tag1.sha(),
-                    'refs/tags/blob-tag': blob3.sha(),
-                    }
-
-        class TestBackend(object):
-            def __init__(self):
-                objects = [blob1, blob2, blob3, tag1]
-                self.repo = TestRepo(objects, {
-                  'HEAD': '000',
-                  'refs/heads/master': blob1.sha(),
-                  'refs/tags/tag-tag': blob2.sha(),
-                  'refs/tags/blob-tag': blob3.sha(),
-                  })
-
-            def open_repository(self, path):
-                assert path == '/'
-                return self.repo
-
-            def get_refs(self):
-                return {
-                  'HEAD': '000',
-                  'refs/heads/master': blob1.sha(),
-                  'refs/tags/tag-tag': tag1.sha(),
-                  'refs/tags/blob-tag': blob3.sha(),
-                  }
+        objects = [blob1, blob2, blob3, tag1]
+        refs = {
+          'HEAD': '000',
+          'refs/heads/master': blob1.id,
+          'refs/tags/tag-tag': tag1.id,
+          'refs/tags/blob-tag': blob3.id,
+          }
+        backend = DictBackend({'/': MemoryRepo.init_bare(objects, refs)})
 
         mat = re.search('.*', '//info/refs')
-        self.assertEquals(['111\trefs/heads/master\n',
-                           '333\trefs/tags/blob-tag\n',
-                           'aaa\trefs/tags/tag-tag\n',
-                           '222\trefs/tags/tag-tag^{}\n'],
-                          list(get_info_refs(self._req, TestBackend(), mat)))
+        self.assertEquals(['%s\trefs/heads/master\n' % blob1.id,
+                           '%s\trefs/tags/blob-tag\n' % blob3.id,
+                           '%s\trefs/tags/tag-tag\n' % tag1.id,
+                           '%s\trefs/tags/tag-tag^{}\n' % blob2.id],
+                          list(get_info_refs(self._req, backend, mat)))
 
 
 class SmartHandlersTestCase(WebTestCase):

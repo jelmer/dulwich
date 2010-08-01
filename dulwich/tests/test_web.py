@@ -31,6 +31,7 @@ from dulwich.web import (
     HTTP_OK,
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
+    HTTP_ERROR,
     send_file,
     get_info_refs,
     handle_service_request,
@@ -98,7 +99,7 @@ class DumbHandlersTestCase(WebTestCase):
 
         f = TestFile()
         list(send_file(self._req, f, 'text/plain'))
-        self.assertEquals(HTTP_NOT_FOUND, self._status)
+        self.assertEquals(HTTP_ERROR, self._status)
         self.assertTrue(f.closed)
 
     def test_get_info_refs(self):

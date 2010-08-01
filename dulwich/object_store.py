@@ -191,7 +191,7 @@ class BaseObjectStore(object):
             if not is_subtree or include_trees:
                 yield path, mode, hexsha
             if is_subtree:
-                entries = reversed(self[hexsha].iteritems())
+                entries = reversed(list(self[hexsha].iteritems()))
                 for name, entry_mode, entry_hexsha in entries:
                     entry_path = posixpath.join(path, name)
                     todo.append((entry_path, entry_mode, entry_hexsha))

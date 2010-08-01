@@ -52,7 +52,12 @@ HTTP_ERROR = '500 Internal Server Error'
 
 
 def date_time_string(timestamp=None):
-    # Based on BaseHTTPServer.py in python2.5
+    # From BaseHTTPRequestHandler.date_time_string in BaseHTTPServer.py in the
+    # Python 2.6.5 standard library, following modifications:
+    #  - Made a global rather than an instance method.
+    #  - weekdayname and monthname are renamed and locals rather than class
+    #    variables.
+    # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
     weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     months = [None,
               'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

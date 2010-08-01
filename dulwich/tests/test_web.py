@@ -60,14 +60,30 @@ from dulwich.web import (
 from utils import make_object
 
 
+class TestHTTPGitRequest(HTTPGitRequest):
+    """HTTPGitRequest with overridden methods to help test caching."""
+
+    def __init__(self, *args, **kwargs):
+        HTTPGitRequest.__init__(self, *args, **kwargs)
+        self.cached = None
+
+    def nocache(self):
+        self.cached = False
+
+    def cache_forever(self):
+        self.cached = True
+
+
 class WebTestCase(TestCase):
     """Base TestCase with useful instance vars and utility functions."""
+
+    _req_class = TestHTTPGitRequest
 
     def setUp(self):
         super(WebTestCase, self).setUp()
         self._environ = {}
-        self._req = HTTPGitRequest(self._environ, self._start_response,
-                                   handlers=self._handlers())
+        self._req = self._req_class(self._environ, self._start_response,
+                                    handlers=self._handlers())
         self._status = None
         self._headers = []
         self._output = StringIO()
@@ -135,12 +151,14 @@ class DumbHandlersTestCase(WebTestCase):
         list(send_file(self._req, f, 'some/thing'))
         self.assertEquals(HTTP_ERROR, self._status)
         self.assertTrue(f.closed)
+        self.assertFalse(self._req.cached)
 
         # non-IOErrors are reraised
         f = TestFile(AttributeError)
         self.assertRaises(AttributeError, list,
                           send_file(self._req, f, 'some/thing'))
         self.assertTrue(f.closed)
+        self.assertFalse(self._req.cached)
 
     def test_get_text_file(self):
         backend = _test_backend([], named_files={'description': 'foo'})
@@ -149,6 +167,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals('foo', output)
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
+        self.assertFalse(self._req.cached)
 
     def test_get_loose_object(self):
         blob = make_object(Blob, data='foo')
@@ -158,6 +177,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals(blob.as_legacy_object(), output)
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('application/x-git-loose-object')
+        self.assertTrue(self._req.cached)
 
     def test_get_loose_object_missing(self):
         mat = re.search('^(..)(.{38})$', '1' * 40)
@@ -184,6 +204,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals('pack contents', output)
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('application/x-git-packed-objects')
+        self.assertTrue(self._req.cached)
 
     def test_get_idx_file(self):
         idx_name = 'objects/pack/pack-%s.idx' % ('1' * 40)
@@ -193,6 +214,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals('idx contents', output)
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('application/x-git-packed-objects-toc')
+        self.assertTrue(self._req.cached)
 
     def test_get_info_refs(self):
         self._environ['QUERY_STRING'] = ''
@@ -225,6 +247,7 @@ class DumbHandlersTestCase(WebTestCase):
                           list(get_info_refs(self._req, backend, mat)))
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
+        self.assertFalse(self._req.cached)
 
     def test_get_info_packs(self):
         class TestPack(object):
@@ -252,6 +275,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals(expected, output)
         self.assertEquals(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
+        self.assertFalse(self._req.cached)
 
 
 class SmartHandlersTestCase(WebTestCase):
@@ -278,6 +302,7 @@ class SmartHandlersTestCase(WebTestCase):
         mat = re.search('.*', '/git-evil-handler')
         list(handle_service_request(self._req, 'backend', mat))
         self.assertEquals(HTTP_FORBIDDEN, self._status)
+        self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
         self._environ['wsgi.input'] = StringIO('foo')
@@ -293,6 +318,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertContentTypeEquals('application/x-git-upload-pack-response')
         self.assertFalse(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
+        self.assertFalse(self._req.cached)
 
     def test_handle_service_request(self):
         self._run_handle_service_request()
@@ -307,6 +333,7 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
         list(get_info_refs(self._req, 'backend', None))
         self.assertEquals(HTTP_FORBIDDEN, self._status)
+        self.assertFalse(self._req.cached)
 
     def test_get_info_refs(self):
         self._environ['wsgi.input'] = StringIO('foo')
@@ -323,6 +350,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertEquals('', handler_output)
         self.assertTrue(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
+        self.assertFalse(self._req.cached)
 
 
 class LengthLimitedFileTestCase(TestCase):
@@ -343,6 +371,10 @@ class LengthLimitedFileTestCase(TestCase):
 
 
 class HTTPGitRequestTestCase(WebTestCase):
+
+    # This class tests the contents of the actual cache headers
+    _req_class = HTTPGitRequest
+
     def test_not_found(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = 'Something not found'

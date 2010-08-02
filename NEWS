@@ -35,6 +35,12 @@
   * ObjectStore.iter_tree_contents can optionally yield tree objects as well.
     (Dave Borowitz).
 
+  * Add side-band-64k support to ReceivePackHandler. (Dave Borowitz)
+
+  * Change server capabilities methods to classmethods. (Dave Borowitz)
+
+  * Tweak server handler injection. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 
@@ -69,6 +75,10 @@
 
   * Quiet logging output from web tests. (Dave Borowitz)
 
+  * More flexible version checking for compat tests. (Dave Borowitz)
+
+  * Compat tests for servers with and without side-band-64k. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)
@@ -86,6 +96,10 @@
     (Dave Borowitz)
 
   * Move reference WSGI handler to web.py. (Dave Borowitz)
+
+  * Factor out _report_status in ReceivePackHandler. (Dave Borowitz)
+
+  * Factor out a function to convert a line to a pkt-line. (Dave Borowitz)
 
 
 0.6.0	2010-05-22

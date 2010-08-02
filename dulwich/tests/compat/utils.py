@@ -35,6 +35,7 @@ from dulwich.tests import (
     )
 
 _DEFAULT_GIT = 'git'
+_VERSION_LEN = 4
 
 
 def git_version(git_path=_DEFAULT_GIT):
@@ -42,8 +43,8 @@ def git_version(git_path=_DEFAULT_GIT):
 
     :param git_path: Path to the git executable; defaults to the version in
         the system path.
-    :return: A tuple of ints of the form (major, minor, point), or None if no
-        git installation was found.
+    :return: A tuple of ints of the form (major, minor, point, sub-point), or
+        None if no git installation was found.
     """
     try:
         _, output = run_git(['--version'], git_path=git_path,
@@ -53,21 +54,40 @@ def git_version(git_path=_DEFAULT_GIT):
     version_prefix = 'git version '
     if not output.startswith(version_prefix):
         return None
-    output = output[len(version_prefix):]
-    nums = output.split('.')
-    if len(nums) == 2:
-        nums.add('0')
-    else:
-        nums = nums[:3]
-    try:
-        return tuple(int(x) for x in nums)
-    except ValueError:
-        return None
+
+    parts = output[len(version_prefix):].split('.')
+    nums = []
+    for part in parts:
+        try:
+            nums.append(int(part))
+        except ValueError:
+            break
+
+    while len(nums) < _VERSION_LEN:
+        nums.append(0)
+    return tuple(nums[:_VERSION_LEN])
 
 
 def require_git_version(required_version, git_path=_DEFAULT_GIT):
-    """Require git version >= version, or skip the calling test."""
+    """Require git version >= version, or skip the calling test.
+
+    :param required_version: A tuple of ints of the form (major, minor, point,
+        sub-point); ommitted components default to 0.
+    :param git_path: Path to the git executable; defaults to the version in
+        the system path.
+    :raise ValueError: if the required version tuple has too many parts.
+    :raise TestSkipped: if no suitable git version was found at the given path.
+    """
     found_version = git_version(git_path=git_path)
+    if len(required_version) > _VERSION_LEN:
+        raise ValueError('Invalid version tuple %s, expected %i parts' %
+                         (required_version, _VERSION_LEN))
+
+    required_version = list(required_version)
+    while len(found_version) < len(required_version):
+        required_version.append(0)
+    required_version = tuple(required_version)
+
     if found_version < required_version:
         required_version = '.'.join(map(str, required_version))
         found_version = '.'.join(map(str, found_version))

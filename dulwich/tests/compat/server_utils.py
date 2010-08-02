@@ -24,6 +24,9 @@ import select
 import socket
 import threading
 
+from dulwich.server import (
+    ReceivePackHandler,
+    )
 from dulwich.tests.utils import (
     tear_down_repo,
     )
@@ -155,3 +158,15 @@ class ShutdownServerMixIn:
             except:
                 self.handle_error(request, client_address)
                 self.close_request(request)
+
+
+# TODO(dborowitz): Come up with a better way of testing various permutations of
+# capabilities. The only reason it is the way it is now is that side-band-64k
+# was only recently introduced into git-receive-pack.
+class NoSideBand64kReceivePackHandler(ReceivePackHandler):
+    """ReceivePackHandler that does not support side-band-64k."""
+
+    @classmethod
+    def capabilities(cls):
+        return tuple(c for c in ReceivePackHandler.capabilities()
+                     if c != 'side-band-64k')

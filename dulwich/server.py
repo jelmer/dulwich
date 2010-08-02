@@ -57,6 +57,7 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    BufferedPktLineWriter,
     )
 from dulwich.repo import (
     Repo,
@@ -161,16 +162,20 @@ class Handler(object):
         self.proto = proto
         self._client_capabilities = None
 
-    def capability_line(self):
-        return " ".join(self.capabilities())
+    @classmethod
+    def capability_line(cls):
+        return " ".join(cls.capabilities())
 
-    def capabilities(self):
-        raise NotImplementedError(self.capabilities)
+    @classmethod
+    def capabilities(cls):
+        raise NotImplementedError(cls.capabilities)
 
-    def innocuous_capabilities(self):
+    @classmethod
+    def innocuous_capabilities(cls):
         return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         """Return a list of capabilities that we require the client to have."""
         return []
 
@@ -206,11 +211,13 @@ class UploadPackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
                 "ofs-delta", "no-progress", "include-tag")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         return ("side-band-64k", "thin-pack", "ofs-delta")
 
     def progress(self, message):
@@ -569,8 +576,9 @@ class ReceivePackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
-        return ("report-status", "delete-refs")
+    @classmethod
+    def capabilities(cls):
+        return ("report-status", "delete-refs", "side-band-64k")
 
     def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
@@ -614,6 +622,29 @@ class ReceivePackHandler(Handler):
 
         return status
 
+    def _report_status(self, status):
+        if self.has_capability('side-band-64k'):
+            writer = BufferedPktLineWriter(
+              lambda d: self.proto.write_sideband(1, d))
+            write = writer.write
+
+            def flush():
+                writer.flush()
+                self.proto.write_pkt_line(None)
+        else:
+            write = self.proto.write_pkt_line
+            flush = lambda: None
+
+        for name, msg in status:
+            if name == 'unpack':
+                write('unpack %s\n' % msg)
+            elif msg == 'ok':
+                write('ok %s\n' % name)
+            else:
+                write('ng %s %s\n' % (name, msg))
+        write(None)
+        flush()
+
     def handle(self):
         refs = self.repo.get_refs().items()
 
@@ -654,14 +685,7 @@ class ReceivePackHandler(Handler):
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
         if self.has_capability('report-status'):
-            for name, msg in status:
-                if name == 'unpack':
-                    self.proto.write_pkt_line('unpack %s\n' % msg)
-                elif msg == 'ok':
-                    self.proto.write_pkt_line('ok %s\n' % name)
-                else:
-                    self.proto.write_pkt_line('ng %s %s\n' % (name, msg))
-            self.proto.write_pkt_line(None)
+            self._report_status(status)
 
 
 # Default handler classes for git services.
@@ -674,7 +698,7 @@ DEFAULT_HANDLERS = {
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def __init__(self, handlers, *args, **kwargs):
-        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        self.handlers = handlers
         SocketServer.StreamRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
@@ -698,8 +722,10 @@ class TCPGitServer(SocketServer.TCPServer):
         return TCPGitRequestHandler(self.handlers, *args, **kwargs)
 
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
+        self.handlers = dict(DEFAULT_HANDLERS)
+        if handlers is not None:
+            self.handlers.update(handlers)
         self.backend = backend
-        self.handlers = handlers
         logger.info('Listening for TCP connections on %s:%d', listen_addr, port)
         SocketServer.TCPServer.__init__(self, (listen_addr, port),
                                         self._make_handler)

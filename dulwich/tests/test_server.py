@@ -93,6 +93,7 @@ class TestGenericHandler(Handler):
 class HandlerTestCase(TestCase):
 
     def setUp(self):
+        super(HandlerTestCase, self).setUp()
         self._handler = TestGenericHandler()
 
     def assertSucceeds(self, func, *args, **kwargs):

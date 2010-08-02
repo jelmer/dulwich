@@ -198,6 +198,7 @@ class CapabilitiesTestCase(TestCase):
 class BufferedPktLineWriterTests(TestCase):
 
     def setUp(self):
+        TestCase.setUp(self)
         self._output = StringIO()
         self._writer = BufferedPktLineWriter(self._output.write, bufsize=16)
 

@@ -20,8 +20,14 @@
 
 """Fast export/import functionality."""
 
+from dulwich.index import (
+    commit_tree,
+    )
 from dulwich.objects import (
+    Blob,
+    Commit,
     format_timezone,
+    parse_timezone,
     )
 
 import stat
@@ -79,3 +85,111 @@ class FastExporter(object):
         i = self._allocate_marker()
         self._dump_commit(commit, i, ref, file_changes)
         return i
+
+
+class FastImporter(object):
+    """Class for importing fastimport streams.
+
+    Please note that this is mostly a stub implementation at the moment,
+    doing the bare mimimum.
+    """
+
+    def __init__(self, repo):
+        self.repo = repo
+
+    def _parse_person(self, line):
+        (name, timestr, timezonestr) = line.rsplit(" ", 2)
+        return name, int(timestr), parse_timezone(timezonestr)[0]
+
+    def _read_blob(self, stream):
+        line = stream.readline()
+        if line.startswith("mark :"):
+            mark = line[len("mark :"):-1]
+            line = stream.readline()
+        else:
+            mark = None
+        if not line.startswith("data "):
+            raise ValueError("Blob without valid data line: %s" % line)
+        size = int(line[len("data "):])
+        o = Blob()
+        o.data = stream.read(size)
+        stream.readline()
+        self.repo.object_store.add_object(o)
+        return mark, o.id
+
+    def _read_commit(self, stream, contents, marks):
+        line = stream.readline()
+        if line.startswith("mark :"):
+            mark = line[len("mark :"):-1]
+            line = stream.readline()
+        else:
+            mark = None
+        o = Commit()
+        o.author = None
+        o.author_time = None
+        while line.startswith("author "):
+            (o.author, o.author_time, o.author_timezone) = \
+                    self._parse_person(line[len("author "):-1])
+            line = stream.readline()
+        while line.startswith("committer "):
+            (o.committer, o.commit_time, o.commit_timezone) = \
+                    self._parse_person(line[len("committer "):-1])
+            line = stream.readline()
+        if o.author is None:
+            o.author = o.committer
+        if o.author_time is None:
+            o.author_time = o.commit_time
+            o.author_timezone = o.commit_timezone
+        if not line.startswith("data "):
+            raise ValueError("Blob without valid data line: %s" % line)
+        size = int(line[len("data "):])
+        o.message = stream.read(size)
+        stream.readline()
+        line = stream.readline()[:-1]
+        while line:
+            if line.startswith("M "):
+                (kind, modestr, val, path) = line.split(" ")
+                if val[0] == ":":
+                    val = marks[int(val[1:])]
+                contents[path] = (int(modestr, 8), val)
+            else:
+                raise ValueError(line)
+            line = stream.readline()[:-1]
+        try:
+            o.parents = (self.repo.head(),)
+        except KeyError:
+            o.parents = ()
+        o.tree = commit_tree(self.repo.object_store,
+            ((path, hexsha, mode) for (path, (mode, hexsha)) in
+                contents.iteritems()))
+        self.repo.object_store.add_object(o)
+        return mark, o.id
+
+    def import_stream(self, stream):
+        """Import from a file-like object.
+
+        :param stream: File-like object to read a fastimport stream from.
+        :return: Dictionary with marks
+        """
+        contents = {}
+        marks = {}
+        while True:
+            line = stream.readline()
+            if not line:
+                break
+            line = line[:-1]
+            if line == "" or line[0] == "#":
+                continue
+            if line.startswith("blob"):
+                mark, hexsha = self._read_blob(stream)
+                if mark is not None:
+                    marks[int(mark)] = hexsha
+            elif line.startswith("commit "):
+                ref = line[len("commit "):-1]
+                mark, hexsha = self._read_commit(stream, contents, marks)
+                if mark is not None:
+                    marks[int(mark)] = hexsha
+                self.repo.refs["HEAD"] = self.repo.refs[ref] = hexsha
+            else:
+                raise ValueError("invalid command '%s'" % line)
+        return marks

@@ -20,6 +20,8 @@
   * Distinguish between missing files and read errors in HTTP server.
     (Dave Borowitz)
 
+  * Initial work on a fastimport parser. (Jelmer Vernooij)
+
  TESTS
 
   * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)

@@ -53,6 +53,8 @@
 
   * Add docstrings for various functions in dulwich.objects. (Jelmer Vernooij)
 
+  * Clean up docstrings in dulwich.protocol. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

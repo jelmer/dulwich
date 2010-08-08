@@ -137,6 +137,17 @@ class HangupException(GitProtocolError):
             "The remote server unexpectedly closed the connection.")
 
 
+class UnexpectedCommandError(GitProtocolError):
+    """Unexpected command received in a proto line."""
+
+    def __init__(self, command):
+        if command is None:
+            command = 'flush-pkt'
+        else:
+            command = 'command %s' % command
+        GitProtocolError.__init__(self, 'Protocol got unexpected %s' % command)
+
+
 class FileFormatException(Exception):
     """Base class for exceptions relating to reading git file formats."""
 

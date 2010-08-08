@@ -40,7 +40,7 @@ from utils import (
     CompatTestCase,
     check_for_daemon,
     import_repo_to_dir,
-    run_git,
+    run_git_or_fail,
     )
 
 class DulwichClientTestBase(object):
@@ -50,7 +50,7 @@ class DulwichClientTestBase(object):
         self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
         dest = os.path.join(self.gitroot, 'dest')
         file.ensure_dir_exists(dest)
-        run_git(['init', '--quiet', '--bare'], cwd=dest)
+        run_git_or_fail(['init', '--quiet', '--bare'], cwd=dest)
 
     def tearDown(self):
         shutil.rmtree(self.gitroot)
@@ -99,8 +99,8 @@ class DulwichClientTestBase(object):
     def disable_ff_and_make_dummy_commit(self):
         # disable non-fast-forward pushes to the server
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        run_git(['config', 'receive.denyNonFastForwards', 'true'],
-                cwd=dest.path)
+        run_git_or_fail(['config', 'receive.denyNonFastForwards', 'true'],
+                        cwd=dest.path)
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
         t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
@@ -176,7 +176,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
-        run_git(
+        run_git_or_fail(
             ['daemon', '--verbose', '--export-all',
              '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
              '--detach', '--reuseaddr', '--enable=receive-pack',

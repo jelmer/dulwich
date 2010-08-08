@@ -32,7 +32,7 @@ from dulwich.tests.utils import (
     )
 from utils import (
     import_repo,
-    run_git,
+    run_git_or_fail,
     )
 
 
@@ -61,9 +61,8 @@ class ServerTests(object):
         all_branches = ['master', 'branch']
         branch_args = ['%s:%s' % (b, b) for b in all_branches]
         url = '%s://localhost:%s/' % (self.protocol, port)
-        returncode, _ = run_git(['push', url] + branch_args,
-                                cwd=self._new_repo.path)
-        self.assertEqual(0, returncode)
+        run_git_or_fail(['push', url] + branch_args,
+                        cwd=self._new_repo.path)
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_fetch_from_dulwich(self):
@@ -73,11 +72,10 @@ class ServerTests(object):
         all_branches = ['master', 'branch']
         branch_args = ['%s:%s' % (b, b) for b in all_branches]
         url = '%s://localhost:%s/' % (self.protocol, port)
-        returncode, _ = run_git(['fetch', url] + branch_args,
-                                cwd=self._old_repo.path)
+        run_git_or_fail(['fetch', url] + branch_args,
+                        cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache = None
-        self.assertEqual(0, returncode)
         self.assertReposEqual(self._old_repo, self._new_repo)
 
 

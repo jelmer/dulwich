@@ -33,6 +33,9 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     )
+from dulwich.pack import (
+    write_pack_data,
+    )
 from dulwich.tests import (
     TestCase,
     )
@@ -162,5 +165,20 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)
         self.assertEquals(os.path.join(self.store_dir, "pack"), o.pack_dir)
+
+    def test_add_pack(self):
+        o = DiskObjectStore(self.store_dir)
+        f, commit = o.add_pack()
+        b = make_object(Blob, data="more yummy data")
+        write_pack_data(f, [(b, None)], 1)
+        commit()
+
+    def test_add_thin_pack(self):
+        o = DiskObjectStore(self.store_dir)
+        f, commit = o.add_thin_pack()
+        b = make_object(Blob, data="more yummy data")
+        write_pack_data(f, [(b, None)], 1)
+        commit()
+
 
 # TODO: MissingObjectFinderTests

@@ -24,6 +24,8 @@
 
   * New dulwich.pack.MemoryPackIndex class. (Jelmer Vernooij)
 
+  * Delegate SHA peeling to the object store.  (Dave Borowitz)
+
  TESTS
 
   * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)

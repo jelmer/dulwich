@@ -41,6 +41,7 @@ from dulwich.objects import (
     sha_to_hex,
     hex_to_filename,
     S_ISGITLINK,
+    object_class,
     )
 from dulwich.pack import (
     Pack,
@@ -242,6 +243,21 @@ class BaseObjectStore(object):
         :param progress: Optional progress reporting method
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
+
+    def peel_sha(self, sha):
+        """Peel all tags from a SHA.
+
+        :param sha: The object SHA to peel.
+        :return: The fully-peeled SHA1 of a tag object, after peeling all
+            intermediate tags; if the original ref does not point to a tag, this
+            will equal the original SHA1.
+        """
+        obj = self[sha]
+        obj_class = object_class(obj.type_name)
+        while obj_class is Tag:
+            obj_class, sha = obj.object
+            obj = self[sha]
+        return obj
 
 
 class PackBasedObjectStore(BaseObjectStore):

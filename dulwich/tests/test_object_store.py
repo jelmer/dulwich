@@ -27,7 +27,9 @@ from dulwich.index import (
     commit_tree,
     )
 from dulwich.objects import (
+    object_class,
     Blob,
+    Tag,
     )
 from dulwich.object_store import (
     DiskObjectStore,
@@ -126,6 +128,22 @@ class ObjectStoreTests(object):
           ]
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEquals(expected, list(actual))
+
+    def make_tag(self, name, obj):
+        tag = make_object(Tag, name=name, message='',
+                          tag_time=12345, tag_timezone=0,
+                          tagger='Test Tagger <test@example.com>',
+                          object=(object_class(obj.type_name), obj.id))
+        self.store.add_object(tag)
+        return tag
+
+    def test_peel_sha(self):
+        self.store.add_object(testobject)
+        tag1 = self.make_tag('1', testobject)
+        tag2 = self.make_tag('2', testobject)
+        tag3 = self.make_tag('3', testobject)
+        for obj in [testobject, tag1, tag2, tag3]:
+            self.assertEqual(testobject, self.store.peel_sha(obj.id))
 
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):

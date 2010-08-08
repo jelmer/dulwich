@@ -31,6 +31,10 @@
 
   * Standardize quote delimiters in test_protocol. (Dave Borowitz)
 
+  * Fix use when testtools is installed. (Jelmer Vernooij)
+
+  * Add trivial test for write_pack_header. (Jelmer Vernooij)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted
@@ -44,6 +48,10 @@
   * Change server capabilities methods to classmethods. (Dave Borowitz)
 
   * Tweak server handler injection. (Dave Borowitz)
+
+ DOCUMENTATION
+
+  * Add docstrings for various functions in dulwich.objects. (Jelmer Vernooij)
 
 
 0.6.1	2010-07-22

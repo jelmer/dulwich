@@ -22,6 +22,8 @@
 
   * Initial work on a fastimport parser. (Jelmer Vernooij)
 
+  * New dulwich.pack.MemoryPackIndex class. (Jelmer Vernooij)
+
  TESTS
 
   * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)

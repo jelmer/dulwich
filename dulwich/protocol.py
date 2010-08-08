@@ -41,10 +41,7 @@ MULTI_ACK_DETAILED = 2
 
 
 class ProtocolFile(object):
-    """
-    Some network ops are like file ops. The file ops expect to operate on
-    file objects, so provide them with a dummy file.
-    """
+    """A dummy file for network ops that expect file-like objects."""
 
     def __init__(self, read, write):
         self.read = read
@@ -62,7 +59,7 @@ def pkt_line(data):
 
     :param data: The data to wrap, as a str or None.
     :return: The data prefixed with its length in pkt-line format; if data was
-        None, returns the flush-pkt ('0000')
+        None, returns the flush-pkt ('0000').
     """
     if data is None:
         return '0000'
@@ -70,6 +67,16 @@ def pkt_line(data):
 
 
 class Protocol(object):
+    """Class for interacting with a remote git process over the wire.
+
+    Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
+    consists of the length of the line as a 4-byte hex string, followed by the
+    payload data. The length includes the 4-byte header. The special line '0000'
+    indicates the end of a section of input and is called a 'flush-pkt'.
+
+    For details on the pkt-line format, see the cgit distribution:
+        Documentation/technical/protocol-common.txt
+    """
 
     def __init__(self, read, write, report_activity=None):
         self.read = read
@@ -77,10 +84,10 @@ class Protocol(object):
         self.report_activity = report_activity
 
     def read_pkt_line(self):
-        """
-        Reads a 'pkt line' from the remote git process
+        """Reads a pkt-line from the remote git process.
 
-        :return: The next string from the stream
+        :return: The next string from the stream, without the length prefix, or
+            None for a flush-pkt ('0000').
         """
         try:
             sizestr = self.read(4)
@@ -98,16 +105,20 @@ class Protocol(object):
             raise GitProtocolError(e)
 
     def read_pkt_seq(self):
+        """Read a sequence of pkt-lines from the remote git process.
+
+        :yield: Each line of data up to but not including the next flush-pkt.
+        """
         pkt = self.read_pkt_line()
         while pkt:
             yield pkt
             pkt = self.read_pkt_line()
 
     def write_pkt_line(self, line):
-        """
-        Sends a 'pkt line' to the remote git process
+        """Sends a pkt-line to the remote git process.
 
-        :param line: A string containing the data to send
+        :param line: A string containing the data to send, without the length
+            prefix.
         """
         try:
             line = pkt_line(line)
@@ -118,6 +129,8 @@ class Protocol(object):
             raise GitProtocolError(e)
 
     def write_file(self):
+        """Return a writable file-like object for this protocol."""
+
         class ProtocolFile(object):
 
             def __init__(self, proto):
@@ -137,11 +150,10 @@ class Protocol(object):
         return ProtocolFile(self)
 
     def write_sideband(self, channel, blob):
-        """
-        Write data to the sideband (a git multiplexing method)
+        """Write multiplexed data to the sideband.
 
-        :param channel: int specifying which channel to write to
-        :param blob: a blob of data (as a string) to send on this channel
+        :param channel: An int specifying the channel to write to.
+        :param blob: A blob of data (as a string) to send on this channel.
         """
         # a pktline can be a max of 65520. a sideband line can therefore be
         # 65520-5 = 65515
@@ -151,23 +163,21 @@ class Protocol(object):
             blob = blob[65515:]
 
     def send_cmd(self, cmd, *args):
-        """
-        Send a command and some arguments to a git server
+        """Send a command and some arguments to a git server.
 
-        Only used for git://
+        Only used for the TCP git protocol (git://).
 
-        :param cmd: The remote service to access
-        :param args: List of arguments to send to remove service
+        :param cmd: The remote service to access.
+        :param args: List of arguments to send to remove service.
         """
         self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
 
     def read_cmd(self):
-        """
-        Read a command and some arguments from the git client
+        """Read a command and some arguments from the git client
 
-        Only used for git://
+        Only used for the TCP git protocol (git://).
 
-        :return: A tuple of (command, [list of arguments])
+        :return: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
         splice_at = line.find(" ")

@@ -222,6 +222,65 @@ class PackIndex(object):
 
     Given a sha id of an object a pack index can tell you the location in the
     packfile of that object if it has it.
+    """
+
+    def __eq__(self, other):
+        if not isinstance(other, PackIndex):
+            return False
+
+        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
+                                                 other.iterentries()):
+            if name1 != name2:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __len__(self):
+        """Return the number of entries in this pack index."""
+        raise NotImplementedError(self.__len__)
+
+    def __iter__(self):
+        """Iterate over the SHAs in this pack."""
+        raise NotImplementedError(self.__iter__)
+
+    def iterentries(self):
+        """Iterate over the entries in this pack index.
+
+        :return: iterator over tuples with object name, offset in packfile and
+            crc32 checksum.
+        """
+        raise NotImplementedError(self.iterentries)
+
+    def get_pack_checksum(self):
+        """Return the SHA1 checksum stored for the corresponding packfile.
+
+        :return: 20-byte binary digest
+        """
+        raise NotImplementedError(self.get_pack_checksum)
+
+    def object_index(self, sha):
+        """Return the index in to the corresponding packfile for the object.
+
+        Given the name of an object it will return the offset that object
+        lives at within the corresponding pack file. If the pack file doesn't
+        have the object then None will be returned.
+        """
+        if len(sha) == 40:
+            sha = hex_to_sha(sha)
+        return self._object_index(sha)
+
+    def _object_index(self, sha):
+        """See object_index.
+
+        :param sha: A *binary* SHA string. (20 characters long)_
+        """
+        raise NotImplementedError(self._object_index)
+
+
+class FilePackIndex(PackIndex):
+    """Pack index that is based on a file.
 
     To do the loop it opens the file, and indexes first 256 4 byte groups
     with the first byte of the sha id. The value in the four byte group indexed
@@ -250,20 +309,11 @@ class PackIndex(object):
             self._contents, self._size = (contents, size)
 
     def __eq__(self, other):
-        if not isinstance(other, PackIndex):
+        # Quick optimization:
+        if isinstance(other, FilePackIndex) and self._fan_out_table != other._fan_out_table:
             return False
 
-        if self._fan_out_table != other._fan_out_table:
-            return False
-
-        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
-                                                 other.iterentries()):
-            if name1 != name2:
-                return False
-        return True
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
+        return super(FilePackIndex, self).__eq__(other)
 
     def close(self):
         self._file.close()
@@ -351,17 +401,6 @@ class PackIndex(object):
         """
         return str(self._contents[-20:])
 
-    def object_index(self, sha):
-        """Return the index in to the corresponding packfile for the object.
-
-        Given the name of an object it will return the offset that object
-        lives at within the corresponding pack file. If the pack file doesn't
-        have the object then None will be returned.
-        """
-        if len(sha) == 40:
-            sha = hex_to_sha(sha)
-        return self._object_index(sha)
-
     def _object_index(self, sha):
         """See object_index.
 
@@ -380,11 +419,11 @@ class PackIndex(object):
         return self._unpack_offset(i)
 
 
-class PackIndex1(PackIndex):
-    """Version 1 Pack Index."""
+class PackIndex1(FilePackIndex):
+    """Version 1 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        PackIndex.__init__(self, filename, file, contents, size)
+        super(PackIndex1, self).__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
@@ -406,11 +445,11 @@ class PackIndex1(PackIndex):
         return None
 
 
-class PackIndex2(PackIndex):
-    """Version 2 Pack Index."""
+class PackIndex2(FilePackIndex):
+    """Version 2 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        PackIndex.__init__(self, filename, file, contents, size)
+        super(PackIndex2, self).__init__(filename, file, contents, size)
         assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
         (self.version, ) = unpack_from(">L", self._contents, 4)
         assert self.version == 2, "Version was %d" % self.version

@@ -49,6 +49,9 @@
 
   * Tweak server handler injection. (Dave Borowitz)
 
+  * PackIndex1 and PackIndex2 now subclass FilePackIndex, which is 
+    itself a subclass of PackIndex. (Jelmer Vernooij)
+
  DOCUMENTATION
 
   * Add docstrings for various functions in dulwich.objects. (Jelmer Vernooij)

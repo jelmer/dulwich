@@ -276,6 +276,33 @@ class UploadPackHandler(Handler):
         self.proto.write("0000")
 
 
+def _split_proto_line(line):
+    """Split a line read from the wire.
+
+    :return: a tuple having one of the following forms:
+        ('want', obj_id)
+        ('have', obj_id)
+        ('done', None)
+        (None, None)  (for a flush-pkt)
+
+    :raise GitProtocolError: if the line cannot be parsed into one of the
+        possible return values.
+    """
+    if not line:
+        fields = [None]
+    else:
+        fields = line.rstrip('\n').split(' ', 1)
+    if len(fields) == 1 and fields[0] in ('done', None):
+        return (fields[0], None)
+    elif len(fields) == 2 and fields[0] in ('want', 'have'):
+        try:
+            hex_to_sha(fields[1])
+            return tuple(fields)
+        except (TypeError, AssertionError), e:
+            raise GitProtocolError(e)
+    raise GitProtocolError('Received invalid line from client:\n%s' % line)
+
+
 class ProtocolGraphWalker(object):
     """A graph walker that knows the git protocol.
 
@@ -340,7 +367,7 @@ class ProtocolGraphWalker(object):
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        command, sha = self._split_proto_line(line)
+        command, sha = _split_proto_line(line)
 
         want_revs = []
         while command != None:
@@ -373,34 +400,13 @@ class ProtocolGraphWalker(object):
             return None
         return self._cache[self._cache_index]
 
-    def _split_proto_line(self, line):
-        fields = line.rstrip('\n').split(' ', 1)
-        if len(fields) == 1 and fields[0] == 'done':
-            return ('done', None)
-        elif len(fields) == 2 and fields[0] in ('want', 'have'):
-            try:
-                hex_to_sha(fields[1])
-                return tuple(fields)
-            except (TypeError, AssertionError), e:
-                raise GitProtocolError(e)
-        raise GitProtocolError('Received invalid line from client:\n%s' % line)
-
     def read_proto_line(self):
-        """Read a line from the wire.
+        """Read and split a line from the wire.
 
-        :return: a tuple having one of the following forms:
-            ('want', obj_id)
-            ('have', obj_id)
-            ('done', None)
-            (None, None)  (for a flush-pkt)
-
-        :raise GitProtocolError: if the line cannot be parsed into one of the
-            possible return values.
+        :return: A tuple of (command, value); see _split_proto_line.
+        :raise GitProtocolError: If an error occurred reading the line.
         """
-        line = self.proto.read_pkt_line()
-        if not line:
-            return (None, None)
-        return self._split_proto_line(line)
+        return _split_proto_line(self.proto.read_pkt_line())
 
     def send_ack(self, sha, ack_type=''):
         if ack_type:

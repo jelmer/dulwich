@@ -278,6 +278,52 @@ class PackIndex(object):
         """
         raise NotImplementedError(self._object_index)
 
+    def __iter__(self):
+        """Iterate over the SHAs in this pack."""
+        return imap(sha_to_hex, self._itersha())
+
+    def objects_sha1(self):
+        """Return the hex SHA1 over all the shas of all objects in this pack.
+
+        :note: This is used for the filename of the pack.
+        """
+        return iter_sha1(self._itersha())
+
+    def _itersha(self):
+        """Yield all the SHA1's of the objects in the index, sorted."""
+        raise NotImplementedError(self._itersha)
+
+
+class MemoryPackIndex(PackIndex):
+    """Pack index that is stored entirely in memory."""
+
+    def __init__(self, entries, pack_checksum=None):
+        """Create a new MemoryPackIndex.
+
+        :param entries: Sequence of name, idx, crc32 (sorted)
+        :param pack_checksum: Optional pack checksum
+        """
+        self._by_sha = {}
+        for name, idx, crc32 in entries:
+            self._by_sha[name] = idx
+        self._entries = entries
+        self._pack_checksum = pack_checksum
+
+    def get_pack_checksum(self):
+        return self._pack_checksum
+
+    def __len__(self):
+        return len(self._entries)
+
+    def _object_index(self, sha):
+        return self._by_sha[sha][0]
+
+    def _itersha(self):
+        return iter(self._by_sha)
+
+    def iterentries(self):
+        return iter(self._entries)
+
 
 class FilePackIndex(PackIndex):
     """Pack index that is based on a file.
@@ -310,7 +356,8 @@ class FilePackIndex(PackIndex):
 
     def __eq__(self, other):
         # Quick optimization:
-        if isinstance(other, FilePackIndex) and self._fan_out_table != other._fan_out_table:
+        if (isinstance(other, FilePackIndex) and
+            self._fan_out_table != other._fan_out_table):
             return False
 
         return super(FilePackIndex, self).__eq__(other)
@@ -342,20 +389,9 @@ class FilePackIndex(PackIndex):
         """Unpack the crc32 checksum for the i-th object from the index file."""
         raise NotImplementedError(self._unpack_crc32_checksum)
 
-    def __iter__(self):
-        """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
-
     def _itersha(self):
         for i in range(len(self)):
             yield self._unpack_name(i)
-
-    def objects_sha1(self):
-        """Return the hex SHA1 over all the shas of all objects in this pack.
-
-        :note: This is used for the filename of the pack.
-        """
-        return iter_sha1(self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.

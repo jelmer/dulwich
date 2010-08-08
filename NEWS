@@ -60,6 +60,9 @@
 
   * Clean up docstrings in dulwich.protocol. (Dave Borowitz)
 
+  * Explicitly specify allowed protocol commands to
+    ProtocolGraphWalker.read_proto_line.  (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

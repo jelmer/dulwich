@@ -21,6 +21,7 @@
 
 from dulwich.errors import (
     GitProtocolError,
+    UnexpectedCommandError,
     )
 from dulwich.server import (
     Backend,
@@ -272,15 +273,20 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertTrue(self._walker.all_wants_satisfied([TWO, THREE]))
 
     def test_split_proto_line(self):
-        self.assertEquals(('want', ONE), _split_proto_line('want %s\n' % ONE))
-        self.assertEquals(('want', TWO), _split_proto_line('want %s\n' % TWO))
-        self.assertEquals(('have', THREE),
-                          _split_proto_line('have %s\n' % THREE))
-        self.assertRaises(GitProtocolError,
-                          _split_proto_line, 'foo %s\n' % FOUR)
-        self.assertRaises(GitProtocolError, _split_proto_line, 'bar')
-        self.assertEquals(('done', None), _split_proto_line('done\n'))
-        self.assertEquals((None, None), _split_proto_line(''))
+        allowed = ('want', 'done', None)
+        self.assertEquals(('want', ONE),
+                          _split_proto_line('want %s\n' % ONE, allowed))
+        self.assertEquals(('want', TWO),
+                          _split_proto_line('want %s\n' % TWO, allowed))
+        self.assertRaises(GitProtocolError, _split_proto_line,
+                          'want xxxx\n', allowed)
+        self.assertRaises(UnexpectedCommandError, _split_proto_line,
+                          'have %s\n' % THREE, allowed)
+        self.assertRaises(GitProtocolError, _split_proto_line,
+                          'foo %s\n' % FOUR, allowed)
+        self.assertRaises(GitProtocolError, _split_proto_line, 'bar', allowed)
+        self.assertEquals(('done', None), _split_proto_line('done\n', allowed))
+        self.assertEquals((None, None), _split_proto_line('', allowed))
 
     def test_determine_wants(self):
         self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
@@ -346,8 +352,11 @@ class TestProtocolGraphWalker(object):
         self.stateless_rpc = False
         self.advertise_refs = False
 
-    def read_proto_line(self):
-        return self.lines.pop(0)
+    def read_proto_line(self, allowed):
+        command, sha = self.lines.pop(0)
+        if allowed is not None:
+            assert command in allowed
+        return command, sha
 
     def send_ack(self, sha, ack_type=''):
         self.acks.append((sha, ack_type))

@@ -593,7 +593,7 @@ class ObjectImporter(object):
         raise NotImplementedError(self.add_object)
 
     def finish(self, object):
-        """Finish the imoprt and write objects to disk."""
+        """Finish the import and write objects to disk."""
         raise NotImplementedError(self.finish)
 
 

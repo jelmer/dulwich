@@ -29,6 +29,8 @@
   * New tests in test_web with better coverage and fewer ad-hoc mocks.
     (Dave Borowitz)
 
+  * Standardize quote delimiters in test_protocol. (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

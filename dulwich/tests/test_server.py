@@ -29,6 +29,7 @@ from dulwich.server import (
     Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
+    _split_proto_line,
     ProtocolGraphWalker,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
@@ -270,22 +271,16 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertFalse(self._walker.all_wants_satisfied([THREE]))
         self.assertTrue(self._walker.all_wants_satisfied([TWO, THREE]))
 
-    def test_read_proto_line(self):
-        self._walker.proto.set_output([
-          'want %s' % ONE,
-          'want %s' % TWO,
-          'have %s' % THREE,
-          'foo %s' % FOUR,
-          'bar',
-          'done',
-          ])
-        self.assertEquals(('want', ONE), self._walker.read_proto_line())
-        self.assertEquals(('want', TWO), self._walker.read_proto_line())
-        self.assertEquals(('have', THREE), self._walker.read_proto_line())
-        self.assertRaises(GitProtocolError, self._walker.read_proto_line)
-        self.assertRaises(GitProtocolError, self._walker.read_proto_line)
-        self.assertEquals(('done', None), self._walker.read_proto_line())
-        self.assertEquals((None, None), self._walker.read_proto_line())
+    def test_split_proto_line(self):
+        self.assertEquals(('want', ONE), _split_proto_line('want %s\n' % ONE))
+        self.assertEquals(('want', TWO), _split_proto_line('want %s\n' % TWO))
+        self.assertEquals(('have', THREE),
+                          _split_proto_line('have %s\n' % THREE))
+        self.assertRaises(GitProtocolError,
+                          _split_proto_line, 'foo %s\n' % FOUR)
+        self.assertRaises(GitProtocolError, _split_proto_line, 'bar')
+        self.assertEquals(('done', None), _split_proto_line('done\n'))
+        self.assertEquals((None, None), _split_proto_line(''))
 
     def test_determine_wants(self):
         self.assertRaises(GitProtocolError, self._walker.determine_wants, {})

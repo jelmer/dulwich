@@ -37,6 +37,8 @@
 
   * Add trivial test for write_pack_header. (Jelmer Vernooij)
 
+  * Refactor some of dulwich.tests.compat.server_utils. (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

@@ -47,8 +47,7 @@ def git_version(git_path=_DEFAULT_GIT):
         None if no git installation was found.
     """
     try:
-        _, output = run_git(['--version'], git_path=git_path,
-                            capture_stdout=True)
+        output = run_git_or_fail(['--version'], git_path=git_path)
     except OSError:
         return None
     version_prefix = 'git version '

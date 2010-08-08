@@ -34,7 +34,7 @@ from dulwich.tests.test_pack import (
     )
 from utils import (
     require_git_version,
-    run_git,
+    run_git_or_fail,
     )
 
 
@@ -56,10 +56,7 @@ class TestPack(PackTests):
         pack_path = os.path.join(self._tempdir, "Elch")
         write_pack(pack_path, [(x, "") for x in origpack.iterobjects()],
                    len(origpack))
-
-        returncode, output = run_git(['verify-pack', '-v', pack_path],
-                                     capture_stdout=True)
-        self.assertEquals(0, returncode)
+        output = run_git_or_fail(['verify-pack', '-v', pack_path])
 
         pack_shas = set()
         for line in output.splitlines():

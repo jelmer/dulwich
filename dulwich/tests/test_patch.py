@@ -28,7 +28,9 @@ from dulwich.patch import (
     git_am_patch_split,
     write_commit_patch,
     )
-from dulwich.tests import TestCase
+from dulwich.tests import (
+    TestCase,
+    )
 
 
 class WriteCommitPatchTests(TestCase):

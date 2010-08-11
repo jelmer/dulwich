@@ -234,6 +234,13 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
 
+    def test_stub_sha(self):
+        sha = '5' * 40
+        c = make_commit(id=sha, message='foo')
+        self.assertTrue(isinstance(c, Commit))
+        self.assertEqual(sha, c.id)
+        self.assertNotEqual(sha, c._make_sha())
+
 
 class ShaFileCheckTests(TestCase):
 

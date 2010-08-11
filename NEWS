@@ -69,6 +69,8 @@
   * Explicitly specify allowed protocol commands to
     ProtocolGraphWalker.read_proto_line.  (Dave Borowitz)
 
+  * Add utility functions to DictRefsContainer. (Dave Borowitz)
+
 
 0.6.1	2010-07-22
 

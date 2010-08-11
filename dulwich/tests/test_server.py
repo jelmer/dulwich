@@ -29,7 +29,6 @@ from dulwich.repo import (
 from dulwich.server import (
     Backend,
     DictBackend,
-    BackendRepo,
     Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
@@ -142,6 +141,7 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
+        super(UploadPackHandlerTestCase, self).setUp()
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': self._repo})
         self._handler = UploadPackHandler(

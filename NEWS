@@ -41,6 +41,8 @@
 
   * Refactor some of dulwich.tests.compat.server_utils. (Dave Borowitz)
 
+  * Allow overwriting id property of objects in test utils. (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

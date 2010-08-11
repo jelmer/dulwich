@@ -26,7 +26,10 @@ import shutil
 import tempfile
 import time
 
-from dulwich.objects import Commit
+from dulwich.objects import (
+    FixedSha,
+    Commit,
+    )
 from dulwich.repo import Repo
 
 
@@ -75,7 +78,12 @@ def make_object(cls, **attrs):
 
     obj = TestObject()
     for name, value in attrs.iteritems():
-        setattr(obj, name, value)
+        if name == 'id':
+            # id property is read-only, so we overwrite sha instead.
+            sha = FixedSha(value)
+            obj.sha = lambda: sha
+        else:
+            setattr(obj, name, value)
     return obj
 
 

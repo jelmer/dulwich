@@ -23,6 +23,9 @@ from dulwich.errors import (
     GitProtocolError,
     UnexpectedCommandError,
     )
+from dulwich.repo import (
+    MemoryRepo,
+    )
 from dulwich.server import (
     Backend,
     DictBackend,
@@ -36,7 +39,9 @@ from dulwich.server import (
     UploadPackHandler,
     )
 from dulwich.tests import TestCase
-
+from utils import (
+    make_commit,
+    )
 
 
 ONE = '1' * 40
@@ -137,11 +142,10 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
-        super(UploadPackHandlerTestCase, self).setUp()
-        self._backend = DictBackend({"/": BackendRepo()})
-        self._handler = UploadPackHandler(self._backend,
-                ["/", "host=lolcathost"], None, None)
-        self._handler.proto = TestProto()
+        self._repo = MemoryRepo.init_bare([], {})
+        backend = DictBackend({'/': self._repo})
+        self._handler = UploadPackHandler(
+          backend, ['/', 'host=lolcathost'], TestProto())
 
     def test_progress(self):
         caps = self._handler.required_capabilities()
@@ -167,64 +171,30 @@ class UploadPackHandlerTestCase(TestCase):
             'refs/tags/tag2': TWO,
             'refs/heads/master': FOUR,  # not a tag, no peeled value
             }
+        # repo needs to peel this object
+        self._repo.object_store.add_object(make_commit(id=FOUR))
+        self._repo.refs._update(refs)
         peeled = {
-            'refs/tags/tag1': '1234',
-            'refs/tags/tag2': '5678',
+            'refs/tags/tag1': '1234' * 10,
+            'refs/tags/tag2': '5678' * 10,
             }
-
-        class TestRepo(object):
-            def get_peeled(self, ref):
-                return peeled.get(ref, refs[ref])
+        self._repo.refs._update_peeled(peeled)
 
         caps = list(self._handler.required_capabilities()) + ['include-tag']
         self._handler.set_client_capabilities(caps)
-        self.assertEquals({'1234': ONE, '5678': TWO},
-                          self._handler.get_tagged(refs, repo=TestRepo()))
+        self.assertEquals({'1234' * 10: ONE, '5678' * 10: TWO},
+                          self._handler.get_tagged(refs, repo=self._repo))
 
         # non-include-tag case
         caps = self._handler.required_capabilities()
         self._handler.set_client_capabilities(caps)
-        self.assertEquals({}, self._handler.get_tagged(refs, repo=TestRepo()))
+        self.assertEquals({}, self._handler.get_tagged(refs, repo=self._repo))
 
 
-class TestCommit(object):
-
-    def __init__(self, sha, parents, commit_time):
-        self.id = sha
-        self.parents = parents
-        self.commit_time = commit_time
-        self.type_name = "commit"
-
-    def __repr__(self):
-        return '%s(%s)' % (self.__class__.__name__, self._sha)
-
-
-class TestRepo(object):
-    def __init__(self):
-        self.peeled = {}
-
-    def get_peeled(self, name):
-        return self.peeled[name]
-
-
-class TestBackend(object):
-
-    def __init__(self, repo, objects):
-        self.repo = repo
-        self.object_store = objects
-
-
-class TestUploadPackHandler(Handler):
-
-    def __init__(self, objects, proto):
-        self.backend = TestBackend(TestRepo(), objects)
-        self.proto = proto
-        self.stateless_rpc = False
-        self.advertise_refs = False
-
+class TestUploadPackHandler(UploadPackHandler):
     @classmethod
-    def capabilities(cls):
-        return ('multi_ack',)
+    def required_capabilities(self):
+        return ()
 
 
 class ProtocolGraphWalkerTestCase(TestCase):
@@ -235,17 +205,18 @@ class ProtocolGraphWalkerTestCase(TestCase):
         #   3---5
         #  /
         # 1---2---4
-        self._objects = {
-          ONE: TestCommit(ONE, [], 111),
-          TWO: TestCommit(TWO, [ONE], 222),
-          THREE: TestCommit(THREE, [ONE], 333),
-          FOUR: TestCommit(FOUR, [TWO], 444),
-          FIVE: TestCommit(FIVE, [THREE], 555),
-          }
-
+        commits = [
+          make_commit(id=ONE, parents=[], commit_time=111),
+          make_commit(id=TWO, parents=[ONE], commit_time=222),
+          make_commit(id=THREE, parents=[ONE], commit_time=333),
+          make_commit(id=FOUR, parents=[TWO], commit_time=444),
+          make_commit(id=FIVE, parents=[THREE], commit_time=555),
+          ]
+        self._repo = MemoryRepo.init_bare(commits, {})
+        backend = DictBackend({'/': self._repo})
         self._walker = ProtocolGraphWalker(
-            TestUploadPackHandler(self._objects, TestProto()),
-            self._objects, None)
+            TestUploadPackHandler(backend, ['/', 'host=lolcats'], TestProto()),
+            self._repo.object_store, self._repo.get_peeled)
 
     def test_is_satisfied_no_haves(self):
         self.assertFalse(self._walker._is_satisfied([], ONE, 0))
@@ -295,8 +266,12 @@ class ProtocolGraphWalkerTestCase(TestCase):
           'want %s multi_ack' % ONE,
           'want %s' % TWO,
           ])
-        heads = {'ref1': ONE, 'ref2': TWO, 'ref3': THREE}
-        self._walker.get_peeled = heads.get
+        heads = {
+          'refs/heads/ref1': ONE,
+          'refs/heads/ref2': TWO,
+          'refs/heads/ref3': THREE,
+          }
+        self._repo.refs._update(heads)
         self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
@@ -314,9 +289,14 @@ class ProtocolGraphWalkerTestCase(TestCase):
     def test_determine_wants_advertisement(self):
         self._walker.proto.set_output([])
         # advertise branch tips plus tag
-        heads = {'ref4': FOUR, 'ref5': FIVE, 'tag6': SIX}
-        peeled = {'ref4': FOUR, 'ref5': FIVE, 'tag6': FIVE}
-        self._walker.get_peeled = peeled.get
+        heads = {
+          'refs/heads/ref4': FOUR,
+          'refs/heads/ref5': FIVE,
+          'refs/heads/tag6': SIX,
+          }
+        self._repo.refs._update(heads)
+        self._repo.refs._update_peeled(heads)
+        self._repo.refs._update_peeled({'refs/heads/tag6': FIVE})
         self._walker.determine_wants(heads)
         lines = []
         while True:
@@ -329,16 +309,16 @@ class ProtocolGraphWalkerTestCase(TestCase):
             lines.append(line.rstrip())
 
         self.assertEquals([
-          '%s ref4' % FOUR,
-          '%s ref5' % FIVE,
-          '%s tag6^{}' % FIVE,
-          '%s tag6' % SIX,
+          '%s refs/heads/ref4' % FOUR,
+          '%s refs/heads/ref5' % FIVE,
+          '%s refs/heads/tag6^{}' % FIVE,
+          '%s refs/heads/tag6' % SIX,
           ], sorted(lines))
 
         # ensure peeled tag was advertised immediately following tag
         for i, line in enumerate(lines):
-            if line.endswith(' tag6'):
-                self.assertEquals('%s tag6^{}' % FIVE, lines[i+1])
+            if line.endswith(' refs/heads/tag6'):
+                self.assertEquals('%s refs/heads/tag6^{}' % FIVE, lines[i+1])
 
     # TODO: test commit time cutoff
 

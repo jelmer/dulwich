@@ -342,6 +342,7 @@ class DictRefsContainer(RefsContainer):
 
     def __init__(self, refs):
         self._refs = refs
+        self._peeled = {}
 
     def allkeys(self):
         return self._refs.keys()
@@ -373,6 +374,19 @@ class DictRefsContainer(RefsContainer):
             return False
         del self._refs[name]
         return True
+
+    def get_peeled(self, name):
+        return self._peeled.get(name)
+
+    def _update(self, refs):
+        """Update multiple refs; intended only for testing."""
+        # TODO(dborowitz): replace this with a public function that uses
+        # set_if_equal.
+        self._refs.update(refs)
+
+    def _update_peeled(self, peeled):
+        """Update cached peeled refs; intended only for testing."""
+        self._peeled.update(peeled)
 
 
 class DiskRefsContainer(RefsContainer):

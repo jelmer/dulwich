@@ -43,6 +43,9 @@
 
   * Allow overwriting id property of objects in test utils. (Dave Borowitz)
 
+  * Use real in-memory objects rather than stubs for server tests.
+    (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

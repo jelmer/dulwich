@@ -9,6 +9,8 @@
   * ThinPackData.from_file now works with resolve_ext_ref callback.
     (Dave Borowitz)
 
+  * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
+
  FEATURES
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)

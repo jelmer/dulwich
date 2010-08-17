@@ -25,6 +25,14 @@
 typedef int Py_ssize_t;
 #endif
 
+#ifdef __MINGW32_VERSION
+size_t strnlen(char *text, size_t maxlen)
+{
+	const char *last = memchr(text, '\0', maxlen);
+	return last ? (size_t) (last - text) : maxlen;
+}
+#endif
+
 #define bytehex(x) (((x)<0xa)?('0'+(x)):('a'-0xa+(x)))
 
 static PyObject *sha_to_pyhex(const unsigned char *sha)

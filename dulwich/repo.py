@@ -770,7 +770,7 @@ class BaseRepo(object):
         self._put_named_file('config', ('[core]\n'
                                         'repositoryformatversion = 0\n'
                                         'filemode = true\n'
-                                        'bare = false\n'
+                                        'bare = ' + str(self.bare).lower() + '\n'
                                         'logallrefupdates = true\n'))
         self._put_named_file(os.path.join('info', 'exclude'), '')
 
@@ -1031,9 +1031,9 @@ class BaseRepo(object):
         :return: New commit SHA1
         """
         import time
-        index = self.open_index()
         c = Commit()
         if tree is None:
+            index = self.open_index()
             c.tree = index.commit(self.object_store)
         else:
             c.tree = tree

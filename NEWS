@@ -48,6 +48,8 @@
   * Use real in-memory objects rather than stubs for server tests.
     (Dave Borowitz)
 
+  * Clean up MissingObjectFinder. (Dave Borowitz)
+
  API CHANGES
 
   * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted

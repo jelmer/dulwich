@@ -711,8 +711,10 @@ class MissingObjectFinder(object):
 
     def __init__(self, object_store, haves, wants, progress=None,
                  get_tagged=None):
-        self.sha_done = set(haves)
-        self.objects_to_send = set([(w, None, False) for w in wants if w not in haves])
+        haves = set(haves)
+        self.sha_done = haves
+        self.objects_to_send = set([(w, None, False) for w in wants
+                                    if w not in haves])
         self.object_store = object_store
         if progress is None:
             self.progress = lambda x: None
@@ -721,10 +723,13 @@ class MissingObjectFinder(object):
         self._tagged = get_tagged and get_tagged() or {}
 
     def add_todo(self, entries):
-        self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
+        self.objects_to_send.update([e for e in entries
+                                     if not e[0] in self.sha_done])
 
     def parse_tree(self, tree):
-        self.add_todo([(sha, name, not stat.S_ISDIR(mode)) for (mode, name, sha) in tree.entries() if not S_ISGITLINK(mode)])
+        self.add_todo([(sha, name, not stat.S_ISDIR(mode))
+                       for mode, name, sha in tree.entries()
+                       if not S_ISGITLINK(mode)])
 
     def parse_commit(self, commit):
         self.add_todo([(commit.tree, "", False)])

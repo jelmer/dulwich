@@ -20,9 +20,6 @@
 from cStringIO import StringIO
 import stat
 
-from dulwich.fastexport import (
-    FastExporter,
-    )
 from dulwich.object_store import (
     MemoryObjectStore,
     )
@@ -33,21 +30,26 @@ from dulwich.objects import (
     )
 from dulwich.tests import (
     TestCase,
+    TestSkipped,
     )
 
 
-class FastExporterTests(TestCase):
+class GitFastExporterTests(TestCase):
 
     def setUp(self):
-        super(FastExporterTests, self).setUp()
+        super(GitFastExporterTests, self).setUp()
         self.store = MemoryObjectStore()
         self.stream = StringIO()
-        self.fastexporter = FastExporter(self.stream, self.store)
+        try:
+            from dulwich.fastexport import GitFastExporter
+        except ImportError:
+            raise TestSkipped("python-fastimport not available")
+        self.fastexporter = GitFastExporter(self.stream, self.store)
 
     def test_export_blob(self):
         b = Blob()
         b.data = "fooBAR"
-        self.assertEquals(1, self.fastexporter.export_blob(b))
+        self.assertEquals('1', self.fastexporter.export_blob(b))
         self.assertEquals('blob\nmark :1\ndata 6\nfooBAR\n',
             self.stream.getvalue())
 

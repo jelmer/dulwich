@@ -26,13 +26,20 @@ from dulwich.index import (
 from dulwich.objects import (
     Blob,
     Commit,
+    Tag,
     format_timezone,
     parse_timezone,
+    )
+from fastimport import (
+    commands,
+    errors as fastimport_errors,
+    processor,
     )
 
 import stat
 
-class FastExporter(object):
+
+class GitFastExporter(object):
     """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf, store):
@@ -43,14 +50,11 @@ class FastExporter(object):
 
     def _allocate_marker(self):
         self._marker_idx+=1
-        return self._marker_idx
+        return str(self._marker_idx)
 
-    def _dump_blob(self, blob, marker):
-        self.outf.write("blob\nmark :%s\n" % marker)
-        self.outf.write("data %s\n" % blob.raw_length())
-        for chunk in blob.as_raw_chunks():
-            self.outf.write(chunk)
-        self.outf.write("\n")
+    def _dump_blob(self, blob, mark):
+        cmd = commands.BlobCommand(mark, blob.data)
+        self.outf.write(str(cmd)+"\n")
 
     def export_blob(self, blob):
         i = self._allocate_marker()
@@ -58,32 +62,33 @@ class FastExporter(object):
         self._dump_blob(blob, i)
         return i
 
-    def _dump_commit(self, commit, marker, ref, file_changes):
-        self.outf.write("commit %s\n" % ref)
-        self.outf.write("mark :%s\n" % marker)
-        self.outf.write("author %s %s %s\n" % (commit.author,
-            commit.author_time, format_timezone(commit.author_timezone)))
-        self.outf.write("committer %s %s %s\n" % (commit.committer,
-            commit.commit_time, format_timezone(commit.commit_timezone)))
-        self.outf.write("data %s\n" % len(commit.message))
-        self.outf.write(commit.message)
-        self.outf.write("\n")
-        self.outf.write('\n'.join(file_changes))
-        self.outf.write("\n\n")
+    def _dump_commit(self, commit, mark, ref, file_cmds):
+        if commit.parents:
+            from_ = commit.parents[0]
+            merges = commit.parents[1:]
+        else:
+            from_ = None
+            merges = []
+        cmd = commands.CommitCommand(ref, mark,
+            commit.author, commit.committer,
+            commit.message, from_, merges, file_cmds)
+        self.outf.write(str(cmd))
 
     def export_commit(self, commit, ref, base_tree=None):
-        file_changes = []
+        file_cmds = []
         for (old_path, new_path), (old_mode, new_mode), (old_hexsha, new_hexsha) in \
                 self.store.tree_changes(base_tree, commit.tree):
             if new_path is None:
-                file_changes.append("D %s" % old_path)
+                file_cmds.append(commands.FileDeleteCommand(old_path))
                 continue
             if not stat.S_ISDIR(new_mode):
                 marker = self.export_blob(self.store[new_hexsha])
-            file_changes.append("M %o :%s %s" % (new_mode, marker, new_path))
-
+            if old_path != new_path and old_path is not None:
+                file_cmds.append(commands.FileRenameCommand(old_path, new_path))
+            if old_mode != new_mode or old_hexsha != new_hexsha:
+                file_cmds.append(commands.FileModifyCommand(new_mode, marker, new_path))
         i = self._allocate_marker()
-        self._dump_commit(commit, i, ref, file_changes)
+        self._dump_commit(commit, i, ref, file_cmds)
         return i
 
 
@@ -193,3 +198,57 @@ class FastImporter(object):
             else:
                 raise ValueError("invalid command '%s'" % line)
         return marks
+
+
+class GitImportProcessor(processor.ImportProcessor):
+    """An import processor that imports into a Git repository using Dulwich.
+
+    """
+
+    def __init__(self, repo, params=None, verbose=False, outf=None):
+        processor.ImportProcessor.__init__(self, params, verbose)
+        self.repo = repo
+        self.last_commit = None
+
+    def blob_handler(self, cmd):
+        """Process a BlobCommand."""
+        self.repo.object_store.add_object(Blob.from_string(cmd.data))
+
+    def checkpoint_handler(self, cmd):
+        """Process a CheckpointCommand."""
+        pass
+
+    def commit_handler(self, cmd):
+        """Process a CommitCommand."""
+        commit = Commit()
+        commit.author = cmd.author
+        commit.committer = cmd.committer
+        commit.message = cmd.message
+        commit.parents = []
+        if self.last_commit is not None:
+            commit.parents.append(self.last_commit)
+        commit.parents += cmd.merges
+        self.repo[cmd.ref] = commit.id
+        self.last_commit = commit.id
+
+    def progress_handler(self, cmd):
+        """Process a ProgressCommand."""
+        pass
+
+    def reset_handler(self, cmd):
+        """Process a ResetCommand."""
+        self.last_commit = cmd.from_
+        self.rep.refs[cmd.from_] = cmd.id
+
+    def tag_handler(self, cmd):
+        """Process a TagCommand."""
+        tag = Tag()
+        tag.tagger = cmd.tagger
+        tag.message = cmd.message
+        tag.name = cmd.tag
+        self.repo.add_object(tag)
+        self.repo.refs["refs/tags/" + tag.name] = tag.id
+
+    def feature_handler(self, cmd):
+        """Process a FeatureCommand."""
+        raise fastimport_errors.UnknownFeature(cmd.feature_name)

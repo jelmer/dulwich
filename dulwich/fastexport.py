@@ -27,7 +27,6 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tag,
-    format_timezone,
     parse_timezone,
     )
 from fastimport import (
@@ -39,6 +38,11 @@ from fastimport import (
 import stat
 
 
+def split_email(text):
+    (name, email) = text.rsplit(" <", 1)
+    return (name, email.rstrip(">"))
+
+
 class GitFastExporter(object):
     """Generate a fast-export output stream for Git objects."""
 
@@ -48,48 +52,58 @@ class GitFastExporter(object):
         self.markers = {}
         self._marker_idx = 0
 
+    def print_cmd(self, cmd):
+        self.outf.write("%r\n" % cmd)
+
     def _allocate_marker(self):
         self._marker_idx+=1
         return str(self._marker_idx)
 
-    def _dump_blob(self, blob, mark):
-        cmd = commands.BlobCommand(mark, blob.data)
-        self.outf.write(str(cmd)+"\n")
+    def _export_blob(self, blob):
+        marker = self._allocate_marker()
+        self.markers[marker] = blob.id
+        return (commands.BlobCommand(marker, blob.data), marker)
 
-    def export_blob(self, blob):
-        i = self._allocate_marker()
-        self.markers[i] = blob.id
-        self._dump_blob(blob, i)
-        return i
+    def emit_blob(self, blob):
+        (cmd, marker) = self._export_blob(blob)
+        self.print_cmd(cmd)
+        return marker
 
-    def _dump_commit(self, commit, mark, ref, file_cmds):
+    def _iter_files(self, base_tree, new_tree):
+        for (old_path, new_path), (old_mode, new_mode), (old_hexsha, new_hexsha) in \
+                self.store.tree_changes(base_tree, new_tree):
+            if new_path is None:
+                yield commands.FileDeleteCommand(old_path)
+                continue
+            if not stat.S_ISDIR(new_mode):
+                blob = self.store[new_hexsha]
+                marker = self.emit_blob(blob)
+            if old_path != new_path and old_path is not None:
+                yield commands.FileRenameCommand(old_path, new_path)
+            if old_mode != new_mode or old_hexsha != new_hexsha:
+                yield commands.FileModifyCommand(new_path, new_mode, marker, None)
+
+    def _export_commit(self, commit, ref, base_tree=None):
+        file_cmds = list(self._iter_files(base_tree, commit.tree))
+        marker = self._allocate_marker()
         if commit.parents:
             from_ = commit.parents[0]
             merges = commit.parents[1:]
         else:
             from_ = None
             merges = []
-        cmd = commands.CommitCommand(ref, mark,
-            commit.author, commit.committer,
+        author, author_email = split_email(commit.author)
+        committer, committer_email = split_email(commit.committer)
+        cmd = commands.CommitCommand(ref, marker,
+            (author, author_email, commit.author_time, commit.author_timezone),
+            (committer, committer_email, commit.commit_time, commit.commit_timezone),
             commit.message, from_, merges, file_cmds)
-        self.outf.write(str(cmd))
+        return (cmd, marker)
 
-    def export_commit(self, commit, ref, base_tree=None):
-        file_cmds = []
-        for (old_path, new_path), (old_mode, new_mode), (old_hexsha, new_hexsha) in \
-                self.store.tree_changes(base_tree, commit.tree):
-            if new_path is None:
-                file_cmds.append(commands.FileDeleteCommand(old_path))
-                continue
-            if not stat.S_ISDIR(new_mode):
-                marker = self.export_blob(self.store[new_hexsha])
-            if old_path != new_path and old_path is not None:
-                file_cmds.append(commands.FileRenameCommand(old_path, new_path))
-            if old_mode != new_mode or old_hexsha != new_hexsha:
-                file_cmds.append(commands.FileModifyCommand(new_mode, marker, new_path))
-        i = self._allocate_marker()
-        self._dump_commit(commit, i, ref, file_cmds)
-        return i
+    def emit_commit(self, commit, ref, base_tree=None):
+        cmd, marker = self._export_commit(commit, ref, base_tree)
+        self.print_cmd(cmd)
+        return marker
 
 
 class FastImporter(object):

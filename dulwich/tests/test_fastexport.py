@@ -46,37 +46,35 @@ class GitFastExporterTests(TestCase):
             raise TestSkipped("python-fastimport not available")
         self.fastexporter = GitFastExporter(self.stream, self.store)
 
-    def test_export_blob(self):
+    def test_emit_blob(self):
         b = Blob()
         b.data = "fooBAR"
-        self.assertEquals('1', self.fastexporter.export_blob(b))
+        self.fastexporter.emit_blob(b)
         self.assertEquals('blob\nmark :1\ndata 6\nfooBAR\n',
             self.stream.getvalue())
 
-    def test_export_commit(self):
+    def test_emit_commit(self):
         b = Blob()
         b.data = "FOO"
         t = Tree()
         t.add(stat.S_IFREG | 0644, "foo", b.id)
         c = Commit()
         c.committer = c.author = "Jelmer <jelmer@host>"
-        c.author_time = c.commit_time = 1271345553.47
+        c.author_time = c.commit_time = 1271345553
         c.author_timezone = c.commit_timezone = 0
         c.message = "msg"
         c.tree = t.id
         self.store.add_objects([(b, None), (t, None), (c, None)])
-        self.assertEquals(2,
-                self.fastexporter.export_commit(c, "refs/heads/master"))
+        self.fastexporter.emit_commit(c, "refs/heads/master")
         self.assertEquals("""blob
 mark :1
 data 3
 FOO
 commit refs/heads/master
 mark :2
-author Jelmer <jelmer@host> 1271345553.47 +0000
-committer Jelmer <jelmer@host> 1271345553.47 +0000
+author Jelmer <jelmer@host> 1271345553 +0000
+committer Jelmer <jelmer@host> 1271345553 +0000
 data 3
 msg
-M 100644 :1 foo
-
+M 644 1 foo
 """, self.stream.getvalue())

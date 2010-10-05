@@ -26,14 +26,20 @@ import tempfile
 from dulwich.index import (
     commit_tree,
     )
+from dulwich.errors import (
+    NotTreeError,
+    )
 from dulwich.objects import (
     object_class,
     Blob,
+    ShaFile,
     Tag,
+    Tree,
     )
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    tree_lookup_path,
     )
 from dulwich.pack import (
     write_pack_data,
@@ -198,5 +204,46 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         write_pack_data(f, [(b, None)], 1)
         commit()
 
+
+class TreeLookupPathTests(TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        self.store = MemoryObjectStore()
+        blob_a = make_object(Blob, data='a')
+        blob_b = make_object(Blob, data='b')
+        blob_c = make_object(Blob, data='c')
+        for blob in [blob_a, blob_b, blob_c]:
+            self.store.add_object(blob)
+
+        blobs = [
+          ('a', blob_a.id, 0100644),
+          ('ad/b', blob_b.id, 0100644),
+          ('ad/bd/c', blob_c.id, 0100755),
+          ('ad/c', blob_c.id, 0100644),
+          ('c', blob_c.id, 0100644),
+          ]
+        self.tree_id = commit_tree(self.store, blobs)
+
+    def get_object(self, sha):
+        return self.store[sha]
+
+    def test_lookup_blob(self):
+        o_id = tree_lookup_path(self.get_object, self.tree_id, 'a')[1]
+        self.assertTrue(isinstance(self.store[o_id], Blob))
+
+    def test_lookup_tree(self):
+        o_id = tree_lookup_path(self.get_object, self.tree_id, 'ad')[1]
+        self.assertTrue(isinstance(self.store[o_id], Tree))
+        o_id = tree_lookup_path(self.get_object, self.tree_id, 'ad/bd')[1]
+        self.assertTrue(isinstance(self.store[o_id], Tree))
+        o_id = tree_lookup_path(self.get_object, self.tree_id, 'ad/bd/')[1]
+        self.assertTrue(isinstance(self.store[o_id], Tree))
+
+    def test_lookup_nonexistent(self):
+        self.assertRaises(KeyError, tree_lookup_path, self.get_object, self.tree_id, 'j')
+
+    def test_lookup_not_tree(self):
+        self.assertRaises(NotTreeError, tree_lookup_path, self.get_object, self.tree_id, 'ad/b/j')
 
 # TODO: MissingObjectFinderTests

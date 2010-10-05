@@ -155,7 +155,8 @@ def git_am_patch_split(f):
     c.author = msg["from"]
     c.committer = msg["from"]
     if msg["subject"].startswith("[PATCH"):
-        subject = msg["subject"].split("]", 1)[1][1:]
+        close = msg["subject"].index("] ")
+        subject = msg["subject"][close+2:]
     else:
         subject = msg["subject"]
     c.message = subject

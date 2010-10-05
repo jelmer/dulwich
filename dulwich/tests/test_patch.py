@@ -82,6 +82,8 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
         c, diff, version = git_am_patch_split(StringIO(text))
         self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.author)
+        self.assertEquals("Remove executable bit from prey.ico "
+            "(triggers a lintian warning).", c.message)
         self.assertEquals(""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico

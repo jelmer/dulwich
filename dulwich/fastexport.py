@@ -169,7 +169,7 @@ class FastImporter(object):
             if line.startswith("M "):
                 (kind, modestr, val, path) = line.split(" ")
                 if val[0] == ":":
-                    val = marks[int(val[1:])]
+                    val = marks[val[1:]]
                 contents[path] = (int(modestr, 8), val)
             else:
                 raise ValueError(line)
@@ -202,12 +202,12 @@ class FastImporter(object):
             if line.startswith("blob"):
                 mark, hexsha = self._read_blob(stream)
                 if mark is not None:
-                    marks[int(mark)] = hexsha
+                    marks[mark] = hexsha
             elif line.startswith("commit "):
                 ref = line[len("commit "):-1]
                 mark, hexsha = self._read_commit(stream, contents, marks)
                 if mark is not None:
-                    marks[int(mark)] = hexsha
+                    marks[mark] = hexsha
                 self.repo.refs["HEAD"] = self.repo.refs[ref] = hexsha
             else:
                 raise ValueError("invalid command '%s'" % line)

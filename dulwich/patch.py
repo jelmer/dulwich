@@ -154,15 +154,21 @@ def git_am_patch_split(f):
     c = Commit()
     c.author = msg["from"]
     c.committer = msg["from"]
-    if msg["subject"].startswith("[PATCH"):
-        close = msg["subject"].index("] ")
-        subject = msg["subject"][close+2:]
-    else:
+    try:
+        patch_tag_start = msg["subject"].index("[PATCH")
+    except ValueError:
         subject = msg["subject"]
-    c.message = subject
+    else:
+        close = msg["subject"].index("] ", patch_tag_start)
+        subject = msg["subject"][close+2:]
+    c.message = subject.replace("\n", "") + "\n"
+    first = True
     for l in f:
         if l == "---\n":
             break
+        if first:
+            c.message += "\n"
+            first = False
         c.message += l
     diff = ""
     for l in f:

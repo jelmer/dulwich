@@ -29,10 +29,12 @@ import threading
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
+    ReceivePackHandler,
     )
 from server_utils import (
     ServerTests,
     ShutdownServerMixIn,
+    NoSideBand64kReceivePackHandler,
     )
 from utils import (
     CompatTestCase,
@@ -54,7 +56,10 @@ if not getattr(TCPGitServer, 'shutdown', None):
 
 
 class GitServerTestCase(ServerTests, CompatTestCase):
-    """Tests for client/server compatibility."""
+    """Tests for client/server compatibility.
+
+    This server test case does not use side-band-64k in git-receive-pack.
+    """
 
     protocol = 'git'
 
@@ -66,10 +71,35 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         ServerTests.tearDown(self)
         CompatTestCase.tearDown(self)
 
+    def _handlers(self):
+        return {'git-receive-pack': NoSideBand64kReceivePackHandler}
+
+    def _check_server(self, dul_server):
+        receive_pack_handler_cls = dul_server.handlers['git-receive-pack']
+        caps = receive_pack_handler_cls.capabilities()
+        self.assertFalse('side-band-64k' in caps)
+
     def _start_server(self, repo):
         backend = DictBackend({'/': repo})
-        dul_server = TCPGitServer(backend, 'localhost', 0)
+        dul_server = TCPGitServer(backend, 'localhost', 0,
+                                  handlers=self._handlers())
+        self._check_server(dul_server)
         threading.Thread(target=dul_server.serve).start()
         self._server = dul_server
         _, port = self._server.socket.getsockname()
         return port
+
+
+class GitServerSideBand64kTestCase(GitServerTestCase):
+    """Tests for client/server compatibility with side-band-64k support."""
+
+    # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
+    min_git_version = (1, 7, 0, 2)
+
+    def _handlers(self):
+        return None  # default handlers include side-band-64k
+
+    def _check_server(self, server):
+        receive_pack_handler_cls = server.handlers['git-receive-pack']
+        caps = receive_pack_handler_cls.capabilities()
+        self.assertTrue('side-band-64k' in caps)

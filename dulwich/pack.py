@@ -222,6 +222,111 @@ class PackIndex(object):
 
     Given a sha id of an object a pack index can tell you the location in the
     packfile of that object if it has it.
+    """
+
+    def __eq__(self, other):
+        if not isinstance(other, PackIndex):
+            return False
+
+        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
+                                                 other.iterentries()):
+            if name1 != name2:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __len__(self):
+        """Return the number of entries in this pack index."""
+        raise NotImplementedError(self.__len__)
+
+    def __iter__(self):
+        """Iterate over the SHAs in this pack."""
+        raise NotImplementedError(self.__iter__)
+
+    def iterentries(self):
+        """Iterate over the entries in this pack index.
+
+        :return: iterator over tuples with object name, offset in packfile and
+            crc32 checksum.
+        """
+        raise NotImplementedError(self.iterentries)
+
+    def get_pack_checksum(self):
+        """Return the SHA1 checksum stored for the corresponding packfile.
+
+        :return: 20-byte binary digest
+        """
+        raise NotImplementedError(self.get_pack_checksum)
+
+    def object_index(self, sha):
+        """Return the index in to the corresponding packfile for the object.
+
+        Given the name of an object it will return the offset that object
+        lives at within the corresponding pack file. If the pack file doesn't
+        have the object then None will be returned.
+        """
+        if len(sha) == 40:
+            sha = hex_to_sha(sha)
+        return self._object_index(sha)
+
+    def _object_index(self, sha):
+        """See object_index.
+
+        :param sha: A *binary* SHA string. (20 characters long)_
+        """
+        raise NotImplementedError(self._object_index)
+
+    def __iter__(self):
+        """Iterate over the SHAs in this pack."""
+        return imap(sha_to_hex, self._itersha())
+
+    def objects_sha1(self):
+        """Return the hex SHA1 over all the shas of all objects in this pack.
+
+        :note: This is used for the filename of the pack.
+        """
+        return iter_sha1(self._itersha())
+
+    def _itersha(self):
+        """Yield all the SHA1's of the objects in the index, sorted."""
+        raise NotImplementedError(self._itersha)
+
+
+class MemoryPackIndex(PackIndex):
+    """Pack index that is stored entirely in memory."""
+
+    def __init__(self, entries, pack_checksum=None):
+        """Create a new MemoryPackIndex.
+
+        :param entries: Sequence of name, idx, crc32 (sorted)
+        :param pack_checksum: Optional pack checksum
+        """
+        self._by_sha = {}
+        for name, idx, crc32 in entries:
+            self._by_sha[name] = idx
+        self._entries = entries
+        self._pack_checksum = pack_checksum
+
+    def get_pack_checksum(self):
+        return self._pack_checksum
+
+    def __len__(self):
+        return len(self._entries)
+
+    def _object_index(self, sha):
+        return self._by_sha[sha][0]
+
+    def _itersha(self):
+        return iter(self._by_sha)
+
+    def iterentries(self):
+        return iter(self._entries)
+
+
+class FilePackIndex(PackIndex):
+    """Pack index that is based on a file.
 
     To do the loop it opens the file, and indexes first 256 4 byte groups
     with the first byte of the sha id. The value in the four byte group indexed
@@ -250,20 +355,12 @@ class PackIndex(object):
             self._contents, self._size = (contents, size)
 
     def __eq__(self, other):
-        if not isinstance(other, PackIndex):
+        # Quick optimization:
+        if (isinstance(other, FilePackIndex) and
+            self._fan_out_table != other._fan_out_table):
             return False
 
-        if self._fan_out_table != other._fan_out_table:
-            return False
-
-        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
-                                                 other.iterentries()):
-            if name1 != name2:
-                return False
-        return True
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
+        return super(FilePackIndex, self).__eq__(other)
 
     def close(self):
         self._file.close()
@@ -292,20 +389,9 @@ class PackIndex(object):
         """Unpack the crc32 checksum for the i-th object from the index file."""
         raise NotImplementedError(self._unpack_crc32_checksum)
 
-    def __iter__(self):
-        """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
-
     def _itersha(self):
         for i in range(len(self)):
             yield self._unpack_name(i)
-
-    def objects_sha1(self):
-        """Return the hex SHA1 over all the shas of all objects in this pack.
-
-        :note: This is used for the filename of the pack.
-        """
-        return iter_sha1(self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.
@@ -351,17 +437,6 @@ class PackIndex(object):
         """
         return str(self._contents[-20:])
 
-    def object_index(self, sha):
-        """Return the index in to the corresponding packfile for the object.
-
-        Given the name of an object it will return the offset that object
-        lives at within the corresponding pack file. If the pack file doesn't
-        have the object then None will be returned.
-        """
-        if len(sha) == 40:
-            sha = hex_to_sha(sha)
-        return self._object_index(sha)
-
     def _object_index(self, sha):
         """See object_index.
 
@@ -380,11 +455,11 @@ class PackIndex(object):
         return self._unpack_offset(i)
 
 
-class PackIndex1(PackIndex):
-    """Version 1 Pack Index."""
+class PackIndex1(FilePackIndex):
+    """Version 1 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        PackIndex.__init__(self, filename, file, contents, size)
+        super(PackIndex1, self).__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
@@ -406,11 +481,11 @@ class PackIndex1(PackIndex):
         return None
 
 
-class PackIndex2(PackIndex):
-    """Version 2 Pack Index."""
+class PackIndex2(FilePackIndex):
+    """Version 2 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        PackIndex.__init__(self, filename, file, contents, size)
+        super(PackIndex2, self).__init__(filename, file, contents, size)
         assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
         (self.version, ) = unpack_from(">L", self._contents, 4)
         assert self.version == 2, "Version was %d" % self.version
@@ -888,6 +963,10 @@ class ThinPackData(PackData):
         super(ThinPackData, self).__init__(*args, **kwargs)
         self.resolve_ext_ref = resolve_ext_ref
 
+    @classmethod
+    def from_file(cls, resolve_ext_ref, file, size):
+        return cls(resolve_ext_ref, str(file), file=file, size=size)
+
     def get_ref(self, sha):
         """Resolve a reference looking in both this pack and the store."""
         try:
@@ -1061,11 +1140,21 @@ def write_pack(filename, objects, num_objects):
         f.close()
 
 
-def write_pack_data(f, objects, num_objects, window=10):
-    """Write a new pack file.
+def write_pack_header(f, num_objects):
+    """Write a pack header for the given number of objects."""
+    f.write('PACK')                          # Pack header
+    f.write(struct.pack('>L', 2))            # Pack version
+    f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
-    :param filename: The filename of the new pack file.
-    :param objects: List of objects to write (tuples with object and path)
+
+def write_pack_data(f, objects, num_objects, window=10):
+    """Write a new pack data file.
+
+    :param f: File to write to
+    :param objects: Iterable over (object, path) tuples to write
+    :param num_objects: Number of objects to write
+    :param window: Sliding window size for searching for deltas; currently
+                   unimplemented
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
     recency = list(objects)
@@ -1085,9 +1174,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     # Write the pack
     entries = []
     f = SHA1Writer(f)
-    f.write("PACK")               # Pack header
-    f.write(struct.pack(">L", 2)) # Pack version
-    f.write(struct.pack(">L", num_objects)) # Number of objects in pack
+    write_pack_header(f, num_objects)
     for o, path in recency:
         sha1 = o.sha().digest()
         orig_t = o.type_num

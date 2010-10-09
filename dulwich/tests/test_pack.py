@@ -38,12 +38,15 @@ from dulwich.objects import (
     Tree,
     )
 from dulwich.pack import (
+    MemoryPackIndex,
     Pack,
     PackData,
+    ThinPackData,
     apply_delta,
     create_delta,
     load_pack_index,
     read_zlib_chunks,
+    write_pack_header,
     write_pack_index_v1,
     write_pack_index_v2,
     write_pack,
@@ -162,6 +165,25 @@ class TestPackData(PackTests):
     def test_create_pack(self):
         p = self.get_pack_data(pack1_sha)
 
+    def test_from_file(self):
+        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
+        PackData.from_file(open(path), os.path.getsize(path))
+
+    # TODO: more ThinPackData tests.
+    def test_thin_from_file(self):
+        test_sha = '1' * 40
+
+        def resolve(sha):
+            self.assertEqual(test_sha, sha)
+            return 3, 'data'
+
+        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
+        data = ThinPackData.from_file(resolve, open(path),
+                                      os.path.getsize(path))
+        idx = self.get_pack_index(pack1_sha)
+        Pack.from_objects(data, idx)
+        self.assertEqual((None, 3, 'data'), data.get_ref(test_sha))
+
     def test_pack_len(self):
         p = self.get_pack_data(pack1_sha)
         self.assertEquals(3, len(p))
@@ -277,16 +299,19 @@ class TestPack(PackTests):
         self.assertEquals(pack1_sha, p.name())
 
 
+class WritePackHeaderTests(TestCase):
+
+    def test_simple(self):
+        f = StringIO()
+        write_pack_header(f, 42)
+        self.assertEquals('PACK\x00\x00\x00\x02\x00\x00\x00*',
+                f.getvalue())
+
+
 pack_checksum = hex_to_sha('721980e866af9a5f93ad674144e1459b8ba3e7b7')
 
 
 class BaseTestPackIndexWriting(object):
-
-    def setUp(self):
-        self.tempdir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.tempdir)
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -294,30 +319,18 @@ class BaseTestPackIndexWriting(object):
         except ChecksumMismatch, e:
             self.fail(e)
 
-    def writeIndex(self, filename, entries, pack_checksum):
-        # FIXME: Write to StringIO instead rather than hitting disk ?
-        f = GitFile(filename, "wb")
-        try:
-            self._write_fn(f, entries, pack_checksum)
-        finally:
-            f.close()
+    def index(self, filename, entries, pack_checksum):
+        raise NotImplementedError(self.index)
 
     def test_empty(self):
-        filename = os.path.join(self.tempdir, 'empty.idx')
-        self.writeIndex(filename, [], pack_checksum)
-        idx = load_pack_index(filename)
-        self.assertSucceeds(idx.check)
+        idx = self.index('empty.idx', [], pack_checksum)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(0, len(idx))
 
     def test_single(self):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
-        filename = os.path.join(self.tempdir, 'single.idx')
-        self.writeIndex(filename, my_entries, pack_checksum)
-        idx = load_pack_index(filename)
-        self.assertEquals(idx.version, self._expected_version)
-        self.assertSucceeds(idx.check)
+        idx = self.index('single.idx', my_entries, pack_checksum)
         self.assertEquals(idx.get_pack_checksum(), pack_checksum)
         self.assertEquals(1, len(idx))
         actual_entries = list(idx.iterentries())
@@ -333,32 +346,70 @@ class BaseTestPackIndexWriting(object):
                 self.assertTrue(actual_crc is None)
 
 
-class TestPackIndexWritingv1(TestCase, BaseTestPackIndexWriting):
+class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tempdir)
+
+    def index(self, filename, entries, pack_checksum):
+        path = os.path.join(self.tempdir, filename)
+        self.writeIndex(path, entries, pack_checksum)
+        idx = load_pack_index(path)
+        self.assertSucceeds(idx.check)
+        self.assertEquals(idx.version, self._expected_version)
+        return idx
+
+    def writeIndex(self, filename, entries, pack_checksum):
+        # FIXME: Write to StringIO instead rather than hitting disk ?
+        f = GitFile(filename, "wb")
+        try:
+            self._write_fn(f, entries, pack_checksum)
+        finally:
+            f.close()
+
+
+class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
         TestCase.setUp(self)
-        BaseTestPackIndexWriting.setUp(self)
+        self._has_crc32_checksum = True
+
+    def index(self, filename, entries, pack_checksum):
+        return MemoryPackIndex(entries, pack_checksum)
+
+    def tearDown(self):
+        TestCase.tearDown(self)
+
+
+class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        BaseTestFilePackIndexWriting.setUp(self)
         self._has_crc32_checksum = False
         self._expected_version = 1
         self._write_fn = write_pack_index_v1
 
     def tearDown(self):
         TestCase.tearDown(self)
-        BaseTestPackIndexWriting.tearDown(self)
+        BaseTestFilePackIndexWriting.tearDown(self)
 
 
-class TestPackIndexWritingv2(TestCase, BaseTestPackIndexWriting):
+class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
 
     def setUp(self):
         TestCase.setUp(self)
-        BaseTestPackIndexWriting.setUp(self)
+        BaseTestFilePackIndexWriting.setUp(self)
         self._has_crc32_checksum = True
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
 
     def tearDown(self):
         TestCase.tearDown(self)
-        BaseTestPackIndexWriting.tearDown(self)
+        BaseTestFilePackIndexWriting.tearDown(self)
 
 
 class ReadZlibTests(TestCase):

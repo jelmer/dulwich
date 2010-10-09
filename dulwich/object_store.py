@@ -41,6 +41,7 @@ from dulwich.objects import (
     sha_to_hex,
     hex_to_filename,
     S_ISGITLINK,
+    object_class,
     )
 from dulwich.pack import (
     Pack,
@@ -175,21 +176,26 @@ class BaseObjectStore(object):
                     else:
                         todo.add((None, newhexsha, childpath))
 
-    def iter_tree_contents(self, tree):
-        """Yield (path, mode, hexsha) tuples for all non-Tree objects in a tree.
+    def iter_tree_contents(self, tree_id, include_trees=False):
+        """Iterate the contents of a tree and all subtrees.
 
-        :param tree: SHA1 of the root of the tree
+        Iteration is depth-first pre-order, as in e.g. os.walk.
+
+        :param tree_id: SHA1 of the tree.
+        :param include_trees: If True, include tree objects in the iteration.
+        :yield: Tuples of (path, mode, hexhsa) for objects in a tree.
         """
-        todo = set([(tree, "")])
+        todo = [('', stat.S_IFDIR, tree_id)]
         while todo:
-            (tid, tpath) = todo.pop()
-            tree = self[tid]
-            for name, mode, hexsha in tree.iteritems():
-                path = posixpath.join(tpath, name)
-                if stat.S_ISDIR(mode):
-                    todo.add((hexsha, path))
-                else:
-                    yield path, mode, hexsha
+            path, mode, hexsha = todo.pop()
+            is_subtree = stat.S_ISDIR(mode)
+            if not is_subtree or include_trees:
+                yield path, mode, hexsha
+            if is_subtree:
+                entries = reversed(list(self[hexsha].iteritems()))
+                for name, entry_mode, entry_hexsha in entries:
+                    entry_path = posixpath.join(path, name)
+                    todo.append((entry_path, entry_mode, entry_hexsha))
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None):
@@ -237,6 +243,21 @@ class BaseObjectStore(object):
         :param progress: Optional progress reporting method
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
+
+    def peel_sha(self, sha):
+        """Peel all tags from a SHA.
+
+        :param sha: The object SHA to peel.
+        :return: The fully-peeled SHA1 of a tag object, after peeling all
+            intermediate tags; if the original ref does not point to a tag, this
+            will equal the original SHA1.
+        """
+        obj = self[sha]
+        obj_class = object_class(obj.type_name)
+        while obj_class is Tag:
+            obj_class, sha = obj.object
+            obj = self[sha]
+        return obj
 
 
 class PackBasedObjectStore(BaseObjectStore):
@@ -588,7 +609,7 @@ class ObjectImporter(object):
         raise NotImplementedError(self.add_object)
 
     def finish(self, object):
-        """Finish the imoprt and write objects to disk."""
+        """Finish the import and write objects to disk."""
         raise NotImplementedError(self.finish)
 
 
@@ -690,8 +711,10 @@ class MissingObjectFinder(object):
 
     def __init__(self, object_store, haves, wants, progress=None,
                  get_tagged=None):
-        self.sha_done = set(haves)
-        self.objects_to_send = set([(w, None, False) for w in wants if w not in haves])
+        haves = set(haves)
+        self.sha_done = haves
+        self.objects_to_send = set([(w, None, False) for w in wants
+                                    if w not in haves])
         self.object_store = object_store
         if progress is None:
             self.progress = lambda x: None
@@ -700,10 +723,13 @@ class MissingObjectFinder(object):
         self._tagged = get_tagged and get_tagged() or {}
 
     def add_todo(self, entries):
-        self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
+        self.objects_to_send.update([e for e in entries
+                                     if not e[0] in self.sha_done])
 
     def parse_tree(self, tree):
-        self.add_todo([(sha, name, not stat.S_ISDIR(mode)) for (mode, name, sha) in tree.entries() if not S_ISGITLINK(mode)])
+        self.add_todo([(sha, name, not stat.S_ISDIR(mode))
+                       for mode, name, sha in tree.entries()
+                       if not S_ISGITLINK(mode)])
 
     def parse_commit(self, commit):
         self.add_todo([(commit.tree, "", False)])

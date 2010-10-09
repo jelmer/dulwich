@@ -35,7 +35,7 @@ from dulwich.tests.utils import (
     )
 
 from utils import (
-    run_git,
+    run_git_or_fail,
     import_repo,
     CompatTestCase,
     )
@@ -53,10 +53,7 @@ class ObjectStoreTestCase(CompatTestCase):
         tear_down_repo(self._repo)
 
     def _run_git(self, args):
-        returncode, output = run_git(args, capture_stdout=True,
-                                     cwd=self._repo.path)
-        self.assertEqual(0, returncode)
-        return output
+        return run_git_or_fail(args, cwd=self._repo.path)
 
     def _parse_refs(self, output):
         refs = {}

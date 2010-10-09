@@ -36,6 +36,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    UnexpectedCommandError,
     ObjectFormatException,
     )
 from dulwich import log_utils
@@ -57,6 +58,7 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    BufferedPktLineWriter,
     )
 from dulwich.repo import (
     Repo,
@@ -161,16 +163,20 @@ class Handler(object):
         self.proto = proto
         self._client_capabilities = None
 
-    def capability_line(self):
-        return " ".join(self.capabilities())
+    @classmethod
+    def capability_line(cls):
+        return " ".join(cls.capabilities())
 
-    def capabilities(self):
-        raise NotImplementedError(self.capabilities)
+    @classmethod
+    def capabilities(cls):
+        raise NotImplementedError(cls.capabilities)
 
-    def innocuous_capabilities(self):
+    @classmethod
+    def innocuous_capabilities(cls):
         return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         """Return a list of capabilities that we require the client to have."""
         return []
 
@@ -206,11 +212,13 @@ class UploadPackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
                 "ofs-delta", "no-progress", "include-tag")
 
-    def required_capabilities(self):
+    @classmethod
+    def required_capabilities(cls):
         return ("side-band-64k", "thin-pack", "ofs-delta")
 
     def progress(self, message):
@@ -267,6 +275,41 @@ class UploadPackHandler(Handler):
         self.progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
+
+
+def _split_proto_line(line, allowed):
+    """Split a line read from the wire.
+
+    :param line: The line read from the wire.
+    :param allowed: An iterable of command names that should be allowed.
+        Command names not listed below as possible return values will be
+        ignored.  If None, any commands from the possible return values are
+        allowed.
+    :return: a tuple having one of the following forms:
+        ('want', obj_id)
+        ('have', obj_id)
+        ('done', None)
+        (None, None)  (for a flush-pkt)
+
+    :raise UnexpectedCommandError: if the line cannot be parsed into one of the
+        allowed return values.
+    """
+    if not line:
+        fields = [None]
+    else:
+        fields = line.rstrip('\n').split(' ', 1)
+    command = fields[0]
+    if allowed is not None and command not in allowed:
+        raise UnexpectedCommandError(command)
+    try:
+        if len(fields) == 1 and command in ('done', None):
+            return (command, None)
+        elif len(fields) == 2 and command in ('want', 'have'):
+            hex_to_sha(fields[1])
+            return tuple(fields)
+    except (TypeError, AssertionError), e:
+        raise GitProtocolError(e)
+    raise GitProtocolError('Received invalid line from client: %s' % line)
 
 
 class ProtocolGraphWalker(object):
@@ -333,18 +376,16 @@ class ProtocolGraphWalker(object):
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        command, sha = self._split_proto_line(line)
+        allowed = ('want', None)
+        command, sha = _split_proto_line(line, allowed)
 
         want_revs = []
         while command != None:
-            if command != 'want':
-                raise GitProtocolError(
-                  'Protocol got unexpected command %s' % command)
             if sha not in values:
                 raise GitProtocolError(
                   'Client wants invalid object %s' % sha)
             want_revs.append(sha)
-            command, sha = self.read_proto_line()
+            command, sha = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
         return want_revs
@@ -366,34 +407,14 @@ class ProtocolGraphWalker(object):
             return None
         return self._cache[self._cache_index]
 
-    def _split_proto_line(self, line):
-        fields = line.rstrip('\n').split(' ', 1)
-        if len(fields) == 1 and fields[0] == 'done':
-            return ('done', None)
-        elif len(fields) == 2 and fields[0] in ('want', 'have'):
-            try:
-                hex_to_sha(fields[1])
-                return tuple(fields)
-            except (TypeError, AssertionError), e:
-                raise GitProtocolError(e)
-        raise GitProtocolError('Received invalid line from client:\n%s' % line)
-
-    def read_proto_line(self):
+    def read_proto_line(self, allowed):
         """Read a line from the wire.
 
-        :return: a tuple having one of the following forms:
-            ('want', obj_id)
-            ('have', obj_id)
-            ('done', None)
-            (None, None)  (for a flush-pkt)
-
-        :raise GitProtocolError: if the line cannot be parsed into one of the
-            possible return values.
+        :param allowed: An iterable of command names that should be allowed.
+        :return: A tuple of (command, value); see _split_proto_line.
+        :raise GitProtocolError: If an error occurred reading the line.
         """
-        line = self.proto.read_pkt_line()
-        if not line:
-            return (None, None)
-        return self._split_proto_line(line)
+        return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
     def send_ack(self, sha, ack_type=''):
         if ack_type:
@@ -457,6 +478,9 @@ class ProtocolGraphWalker(object):
         self._impl = impl_classes[ack_type](self)
 
 
+_GRAPH_WALKER_COMMANDS = ('have', 'done', None)
+
+
 class SingleAckGraphWalkerImpl(object):
     """Graph walker implementation that speaks the single-ack protocol."""
 
@@ -470,7 +494,7 @@ class SingleAckGraphWalkerImpl(object):
             self._sent_ack = True
 
     def next(self):
-        command, sha = self.walker.read_proto_line()
+        command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
         if command in (None, 'done'):
             if not self._sent_ack:
                 self.walker.send_nak()
@@ -497,7 +521,7 @@ class MultiAckGraphWalkerImpl(object):
 
     def next(self):
         while True:
-            command, sha = self.walker.read_proto_line()
+            command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
                 self.walker.send_nak()
                 # in multi-ack mode, a flush-pkt indicates the client wants to
@@ -537,7 +561,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
 
     def next(self):
         while True:
-            command, sha = self.walker.read_proto_line()
+            command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
                 self.walker.send_nak()
                 if self.walker.stateless_rpc:
@@ -569,8 +593,9 @@ class ReceivePackHandler(Handler):
         self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
-        return ("report-status", "delete-refs")
+    @classmethod
+    def capabilities(cls):
+        return ("report-status", "delete-refs", "side-band-64k")
 
     def _apply_pack(self, refs):
         f, commit = self.repo.object_store.add_thin_pack()
@@ -614,6 +639,29 @@ class ReceivePackHandler(Handler):
 
         return status
 
+    def _report_status(self, status):
+        if self.has_capability('side-band-64k'):
+            writer = BufferedPktLineWriter(
+              lambda d: self.proto.write_sideband(1, d))
+            write = writer.write
+
+            def flush():
+                writer.flush()
+                self.proto.write_pkt_line(None)
+        else:
+            write = self.proto.write_pkt_line
+            flush = lambda: None
+
+        for name, msg in status:
+            if name == 'unpack':
+                write('unpack %s\n' % msg)
+            elif msg == 'ok':
+                write('ok %s\n' % name)
+            else:
+                write('ng %s %s\n' % (name, msg))
+        write(None)
+        flush()
+
     def handle(self):
         refs = self.repo.get_refs().items()
 
@@ -654,14 +702,7 @@ class ReceivePackHandler(Handler):
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
         if self.has_capability('report-status'):
-            for name, msg in status:
-                if name == 'unpack':
-                    self.proto.write_pkt_line('unpack %s\n' % msg)
-                elif msg == 'ok':
-                    self.proto.write_pkt_line('ok %s\n' % name)
-                else:
-                    self.proto.write_pkt_line('ng %s %s\n' % (name, msg))
-            self.proto.write_pkt_line(None)
+            self._report_status(status)
 
 
 # Default handler classes for git services.
@@ -674,7 +715,7 @@ DEFAULT_HANDLERS = {
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
 
     def __init__(self, handlers, *args, **kwargs):
-        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        self.handlers = handlers
         SocketServer.StreamRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
@@ -698,8 +739,10 @@ class TCPGitServer(SocketServer.TCPServer):
         return TCPGitRequestHandler(self.handlers, *args, **kwargs)
 
     def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
+        self.handlers = dict(DEFAULT_HANDLERS)
+        if handlers is not None:
+            self.handlers.update(handlers)
         self.backend = backend
-        self.handlers = handlers
         logger.info('Listening for TCP connections on %s:%d', listen_addr, port)
         SocketServer.TCPServer.__init__(self, (listen_addr, port),
                                         self._make_handler)

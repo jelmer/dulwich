@@ -60,7 +60,7 @@ def fancy_rename(oldname, newname):
     os.remove(tmpfile)
 
 
-def GitFile(filename, mode='r', bufsize=-1):
+def GitFile(filename, mode='rb', bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
 
     :return: a builtin file object or a _GitFile object

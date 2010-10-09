@@ -151,7 +151,6 @@ class BlobReadTests(TestCase):
     def test_legacy_from_file(self):
         b1 = Blob.from_string("foo")
         b_raw = b1.as_legacy_object()
-        open('x', 'w+').write(b_raw)
         b2 = b1.from_file(StringIO(b_raw))
         self.assertEquals(b1, b2)
 
@@ -234,6 +233,13 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Merge ../b\n')
+
+    def test_stub_sha(self):
+        sha = '5' * 40
+        c = make_commit(id=sha, message='foo')
+        self.assertTrue(isinstance(c, Commit))
+        self.assertEqual(sha, c.id)
+        self.assertNotEqual(sha, c._make_sha())
 
 
 class ShaFileCheckTests(TestCase):

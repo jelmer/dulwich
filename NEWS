@@ -1,3 +1,85 @@
+0.6.2	UNRELEASED
+
+ BUG FIXES
+
+  * HTTP server correctly handles empty CONTENT_LENGTH. (Dave Borowitz)
+
+  * Don't error when creating GitFiles with the default mode. (Dave Borowitz)
+
+  * ThinPackData.from_file now works with resolve_ext_ref callback.
+    (Dave Borowitz)
+
+  * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
+
+ FEATURES
+
+  * Use slots for core objects to save up on memory. (Jelmer Vernooij)
+
+  * Web server supports streaming progress/pack output. (Dave Borowitz)
+
+  * New public function dulwich.pack.write_pack_header. (Dave Borowitz)
+
+  * Distinguish between missing files and read errors in HTTP server.
+    (Dave Borowitz)
+
+  * Initial work on support for fastimport using python-fastimport.
+    (Jelmer Vernooij)
+
+  * New dulwich.pack.MemoryPackIndex class. (Jelmer Vernooij)
+
+  * Delegate SHA peeling to the object store.  (Dave Borowitz)
+
+ TESTS
+
+  * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)
+
+  * New tests in test_web with better coverage and fewer ad-hoc mocks.
+    (Dave Borowitz)
+
+  * Standardize quote delimiters in test_protocol. (Dave Borowitz)
+
+  * Fix use when testtools is installed. (Jelmer Vernooij)
+
+  * Add trivial test for write_pack_header. (Jelmer Vernooij)
+
+  * Refactor some of dulwich.tests.compat.server_utils. (Dave Borowitz)
+
+  * Allow overwriting id property of objects in test utils. (Dave Borowitz)
+
+  * Use real in-memory objects rather than stubs for server tests.
+    (Dave Borowitz)
+
+  * Clean up MissingObjectFinder. (Dave Borowitz)
+
+ API CHANGES
+
+  * ObjectStore.iter_tree_contents now walks contents in depth-first, sorted
+    order. (Dave Borowitz)
+
+  * ObjectStore.iter_tree_contents can optionally yield tree objects as well.
+    (Dave Borowitz).
+
+  * Add side-band-64k support to ReceivePackHandler. (Dave Borowitz)
+
+  * Change server capabilities methods to classmethods. (Dave Borowitz)
+
+  * Tweak server handler injection. (Dave Borowitz)
+
+  * PackIndex1 and PackIndex2 now subclass FilePackIndex, which is 
+    itself a subclass of PackIndex. (Jelmer Vernooij)
+
+ DOCUMENTATION
+
+  * Add docstrings for various functions in dulwich.objects. (Jelmer Vernooij)
+
+  * Clean up docstrings in dulwich.protocol. (Dave Borowitz)
+
+  * Explicitly specify allowed protocol commands to
+    ProtocolGraphWalker.read_proto_line.  (Dave Borowitz)
+
+  * Add utility functions to DictRefsContainer. (Dave Borowitz)
+
+
 0.6.1	2010-07-22
 
  BUG FIXES
@@ -31,9 +113,17 @@
 
   * Quiet logging output from web tests. (Dave Borowitz)
 
+  * More flexible version checking for compat tests. (Dave Borowitz)
+
+  * Compat tests for servers with and without side-band-64k. (Dave Borowitz)
+
  CLEANUP
 
   * Clean up file headers. (Dave Borowitz)
+
+ TESTS
+
+  * Use GitFile when modifying packed-refs in tests. (Dave Borowitz)
 
  API CHANGES
 
@@ -44,6 +134,10 @@
     (Dave Borowitz)
 
   * Move reference WSGI handler to web.py. (Dave Borowitz)
+
+  * Factor out _report_status in ReceivePackHandler. (Dave Borowitz)
+
+  * Factor out a function to convert a line to a pkt-line. (Dave Borowitz)
 
 
 0.6.0	2010-05-22

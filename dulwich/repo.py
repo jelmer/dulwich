@@ -342,6 +342,7 @@ class DictRefsContainer(RefsContainer):
 
     def __init__(self, refs):
         self._refs = refs
+        self._peeled = {}
 
     def allkeys(self):
         return self._refs.keys()
@@ -373,6 +374,19 @@ class DictRefsContainer(RefsContainer):
             return False
         del self._refs[name]
         return True
+
+    def get_peeled(self, name):
+        return self._peeled.get(name)
+
+    def _update(self, refs):
+        """Update multiple refs; intended only for testing."""
+        # TODO(dborowitz): replace this with a public function that uses
+        # set_if_equal.
+        self._refs.update(refs)
+
+    def _update_peeled(self, peeled):
+        """Update cached peeled refs; intended only for testing."""
+        self._peeled.update(peeled)
 
 
 class DiskRefsContainer(RefsContainer):
@@ -924,20 +938,15 @@ class BaseRepo(object):
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 
-        :param ref: the refname to peel
-        :return: the fully-peeled SHA1 of a tag object, after peeling all
+        :param ref: The refname to peel.
+        :return: The fully-peeled SHA1 of a tag object, after peeling all
             intermediate tags; if the original ref does not point to a tag, this
             will equal the original SHA1.
         """
         cached = self.refs.get_peeled(ref)
         if cached is not None:
             return cached
-        obj = self[ref]
-        obj_class = object_class(obj.type_name)
-        while obj_class is Tag:
-            obj_class, sha = obj.object
-            obj = self.get_object(sha)
-        return obj.id
+        return self.object_store.peel_sha(self.refs[ref]).id
 
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.

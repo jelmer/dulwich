@@ -41,10 +41,7 @@ MULTI_ACK_DETAILED = 2
 
 
 class ProtocolFile(object):
-    """
-    Some network ops are like file ops. The file ops expect to operate on
-    file objects, so provide them with a dummy file.
-    """
+    """A dummy file for network ops that expect file-like objects."""
 
     def __init__(self, read, write):
         self.read = read
@@ -57,7 +54,29 @@ class ProtocolFile(object):
         pass
 
 
+def pkt_line(data):
+    """Wrap data in a pkt-line.
+
+    :param data: The data to wrap, as a str or None.
+    :return: The data prefixed with its length in pkt-line format; if data was
+        None, returns the flush-pkt ('0000').
+    """
+    if data is None:
+        return '0000'
+    return '%04x%s' % (len(data) + 4, data)
+
+
 class Protocol(object):
+    """Class for interacting with a remote git process over the wire.
+
+    Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
+    consists of the length of the line as a 4-byte hex string, followed by the
+    payload data. The length includes the 4-byte header. The special line '0000'
+    indicates the end of a section of input and is called a 'flush-pkt'.
+
+    For details on the pkt-line format, see the cgit distribution:
+        Documentation/technical/protocol-common.txt
+    """
 
     def __init__(self, read, write, report_activity=None):
         self.read = read
@@ -65,10 +84,10 @@ class Protocol(object):
         self.report_activity = report_activity
 
     def read_pkt_line(self):
-        """
-        Reads a 'pkt line' from the remote git process
+        """Reads a pkt-line from the remote git process.
 
-        :return: The next string from the stream
+        :return: The next string from the stream, without the length prefix, or
+            None for a flush-pkt ('0000').
         """
         try:
             sizestr = self.read(4)
@@ -86,30 +105,32 @@ class Protocol(object):
             raise GitProtocolError(e)
 
     def read_pkt_seq(self):
+        """Read a sequence of pkt-lines from the remote git process.
+
+        :yield: Each line of data up to but not including the next flush-pkt.
+        """
         pkt = self.read_pkt_line()
         while pkt:
             yield pkt
             pkt = self.read_pkt_line()
 
     def write_pkt_line(self, line):
-        """
-        Sends a 'pkt line' to the remote git process
+        """Sends a pkt-line to the remote git process.
 
-        :param line: A string containing the data to send
+        :param line: A string containing the data to send, without the length
+            prefix.
         """
         try:
-            if line is None:
-                self.write("0000")
-                if self.report_activity:
-                    self.report_activity(4, 'write')
-            else:
-                self.write("%04x%s" % (len(line)+4, line))
-                if self.report_activity:
-                    self.report_activity(4+len(line), 'write')
+            line = pkt_line(line)
+            self.write(line)
+            if self.report_activity:
+                self.report_activity(len(line), 'write')
         except socket.error, e:
             raise GitProtocolError(e)
 
     def write_file(self):
+        """Return a writable file-like object for this protocol."""
+
         class ProtocolFile(object):
 
             def __init__(self, proto):
@@ -129,11 +150,10 @@ class Protocol(object):
         return ProtocolFile(self)
 
     def write_sideband(self, channel, blob):
-        """
-        Write data to the sideband (a git multiplexing method)
+        """Write multiplexed data to the sideband.
 
-        :param channel: int specifying which channel to write to
-        :param blob: a blob of data (as a string) to send on this channel
+        :param channel: An int specifying the channel to write to.
+        :param blob: A blob of data (as a string) to send on this channel.
         """
         # a pktline can be a max of 65520. a sideband line can therefore be
         # 65520-5 = 65515
@@ -143,23 +163,21 @@ class Protocol(object):
             blob = blob[65515:]
 
     def send_cmd(self, cmd, *args):
-        """
-        Send a command and some arguments to a git server
+        """Send a command and some arguments to a git server.
 
-        Only used for git://
+        Only used for the TCP git protocol (git://).
 
-        :param cmd: The remote service to access
-        :param args: List of arguments to send to remove service
+        :param cmd: The remote service to access.
+        :param args: List of arguments to send to remove service.
         """
         self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
 
     def read_cmd(self):
-        """
-        Read a command and some arguments from the git client
+        """Read a command and some arguments from the git client
 
-        Only used for git://
+        Only used for the TCP git protocol (git://).
 
-        :return: A tuple of (command, [list of arguments])
+        :return: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
         splice_at = line.find(" ")
@@ -310,3 +328,46 @@ def ack_type(capabilities):
     elif 'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK
+
+
+class BufferedPktLineWriter(object):
+    """Writer that wraps its data in pkt-lines and has an independent buffer.
+
+    Consecutive calls to write() wrap the data in a pkt-line and then buffers it
+    until enough lines have been written such that their total length (including
+    length prefix) reach the buffer size.
+    """
+
+    def __init__(self, write, bufsize=65515):
+        """Initialize the BufferedPktLineWriter.
+
+        :param write: A write callback for the underlying writer.
+        :param bufsize: The internal buffer size, including length prefixes.
+        """
+        self._write = write
+        self._bufsize = bufsize
+        self._wbuf = StringIO()
+        self._buflen = 0
+
+    def write(self, data):
+        """Write data, wrapping it in a pkt-line."""
+        line = pkt_line(data)
+        line_len = len(line)
+        over = self._buflen + line_len - self._bufsize
+        if over >= 0:
+            start = line_len - over
+            self._wbuf.write(line[:start])
+            self.flush()
+        else:
+            start = 0
+        saved = line[start:]
+        self._wbuf.write(saved)
+        self._buflen += len(saved)
+
+    def flush(self):
+        """Flush all data from the buffer."""
+        data = self._wbuf.getvalue()
+        if data:
+            self._write(data)
+        self._len = 0
+        self._wbuf = StringIO()

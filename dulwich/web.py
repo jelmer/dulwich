@@ -48,10 +48,16 @@ logger = log_utils.getLogger(__name__)
 HTTP_OK = '200 OK'
 HTTP_NOT_FOUND = '404 Not Found'
 HTTP_FORBIDDEN = '403 Forbidden'
+HTTP_ERROR = '500 Internal Server Error'
 
 
 def date_time_string(timestamp=None):
-    # Based on BaseHTTPServer.py in python2.5
+    # From BaseHTTPRequestHandler.date_time_string in BaseHTTPServer.py in the
+    # Python 2.6.5 standard library, following modifications:
+    #  - Made a global rather than an instance method.
+    #  - weekdayname and monthname are renamed and locals rather than class
+    #    variables.
+    # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
     weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     months = [None,
               'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -100,7 +106,7 @@ def send_file(req, f, content_type):
         f.close()
     except IOError:
         f.close()
-        yield req.not_found('Error reading file')
+        yield req.error('Error reading file')
     except:
         f.close()
         raise
@@ -128,7 +134,8 @@ def get_loose_object(req, backend, mat):
     try:
         data = object_store[sha].as_legacy_object()
     except IOError:
-        yield req.not_found('Error reading object')
+        yield req.error('Error reading object')
+        return
     req.cache_forever()
     req.respond(HTTP_OK, 'application/x-git-loose-object')
     yield data
@@ -159,15 +166,13 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden('Unsupported service %s' % service)
             return
         req.nocache()
-        req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
-        output = StringIO()
-        proto = ReceivableProtocol(StringIO().read, output.write)
+        write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
+        proto = ReceivableProtocol(StringIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               stateless_rpc=True, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
         handler.proto.write_pkt_line(None)
         handler.handle()
-        yield output.getvalue()
     else:
         # non-smart fallback
         # TODO: select_getanyfile() (see http-backend.c)
@@ -230,20 +235,19 @@ def handle_service_request(req, backend, mat):
         yield req.forbidden('Unsupported service %s' % service)
         return
     req.nocache()
-    req.respond(HTTP_OK, 'application/x-%s-response' % service)
+    write = req.respond(HTTP_OK, 'application/x-%s-response' % service)
 
-    output = StringIO()
     input = req.environ['wsgi.input']
     # This is not necessary if this app is run from a conforming WSGI server.
     # Unfortunately, there's no way to tell that at this point.
     # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
     # content-length
-    if 'CONTENT_LENGTH' in req.environ:
-        input = _LengthLimitedFile(input, int(req.environ['CONTENT_LENGTH']))
-    proto = ReceivableProtocol(input.read, output.write)
+    content_length = req.environ.get('CONTENT_LENGTH', '')
+    if content_length:
+        input = _LengthLimitedFile(input, int(content_length))
+    proto = ReceivableProtocol(input.read, write)
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()
-    yield output.getvalue()
 
 
 class HTTPGitRequest(object):
@@ -255,7 +259,7 @@ class HTTPGitRequest(object):
     def __init__(self, environ, start_response, dumb=False, handlers=None):
         self.environ = environ
         self.dumb = dumb
-        self.handlers = handlers and handlers or DEFAULT_HANDLERS
+        self.handlers = handlers
         self._start_response = start_response
         self._cache_headers = []
         self._headers = []
@@ -272,7 +276,7 @@ class HTTPGitRequest(object):
             self._headers.append(('Content-Type', content_type))
         self._headers.extend(self._cache_headers)
 
-        self._start_response(status, self._headers)
+        return self._start_response(status, self._headers)
 
     def not_found(self, message):
         """Begin a HTTP 404 response and return the text of a message."""
@@ -286,6 +290,13 @@ class HTTPGitRequest(object):
         self._cache_headers = []
         logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
+        return message
+
+    def error(self, message):
+        """Begin a HTTP 500 response and return the text of a message."""
+        self._cache_headers = []
+        logger.error('Error: %s', message)
+        self.respond(HTTP_ERROR, 'text/plain')
         return message
 
     def nocache(self):
@@ -329,7 +340,9 @@ class HTTPGitApplication(object):
     def __init__(self, backend, dumb=False, handlers=None):
         self.backend = backend
         self.dumb = dumb
-        self.handlers = handlers
+        self.handlers = dict(DEFAULT_HANDLERS)
+        if handlers is not None:
+            self.handlers.update(handlers)
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO']

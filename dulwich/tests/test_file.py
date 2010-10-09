@@ -119,6 +119,11 @@ class GitFileTests(TestCase):
         self.assertEquals('contents', f.read())
         f.close()
 
+    def test_default_mode(self):
+        f = GitFile(self.path('foo'))
+        self.assertEquals('foo contents', f.read())
+        f.close()
+
     def test_write(self):
         foo = self.path('foo')
         foo_lock = '%s.lock' % foo

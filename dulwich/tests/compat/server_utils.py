@@ -24,12 +24,15 @@ import select
 import socket
 import threading
 
+from dulwich.server import (
+    ReceivePackHandler,
+    )
 from dulwich.tests.utils import (
     tear_down_repo,
     )
 from utils import (
     import_repo,
-    run_git,
+    run_git_or_fail,
     )
 
 
@@ -40,41 +43,49 @@ class ServerTests(object):
     """
 
     def setUp(self):
-        self._old_repo = import_repo('server_old.export')
-        self._new_repo = import_repo('server_new.export')
+        self._old_repo = None
+        self._new_repo = None
         self._server = None
 
     def tearDown(self):
         if self._server is not None:
             self._server.shutdown()
             self._server = None
-        tear_down_repo(self._old_repo)
-        tear_down_repo(self._new_repo)
+        if self._old_repo is not None:
+            tear_down_repo(self._old_repo)
+        if self._new_repo is not None:
+            tear_down_repo(self._new_repo)
+
+    def import_repos(self):
+        self._old_repo = import_repo('server_old.export')
+        self._new_repo = import_repo('server_new.export')
+
+    def url(self, port):
+        return '%s://localhost:%s/' % (self.protocol, port)
+
+    def branch_args(self, branches=None):
+        if branches is None:
+            branches = ['master', 'branch']
+        return ['%s:%s' % (b, b) for b in branches]
 
     def test_push_to_dulwich(self):
+        self.import_repos()
         self.assertReposNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
-        all_branches = ['master', 'branch']
-        branch_args = ['%s:%s' % (b, b) for b in all_branches]
-        url = '%s://localhost:%s/' % (self.protocol, port)
-        returncode, _ = run_git(['push', url] + branch_args,
-                                cwd=self._new_repo.path)
-        self.assertEqual(0, returncode)
+        run_git_or_fail(['push', self.url(port)] + self.branch_args(),
+                        cwd=self._new_repo.path)
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_fetch_from_dulwich(self):
+        self.import_repos()
         self.assertReposNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
-        all_branches = ['master', 'branch']
-        branch_args = ['%s:%s' % (b, b) for b in all_branches]
-        url = '%s://localhost:%s/' % (self.protocol, port)
-        returncode, _ = run_git(['fetch', url] + branch_args,
-                                cwd=self._old_repo.path)
+        run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
+                        cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache = None
-        self.assertEqual(0, returncode)
         self.assertReposEqual(self._old_repo, self._new_repo)
 
 
@@ -155,3 +166,15 @@ class ShutdownServerMixIn:
             except:
                 self.handle_error(request, client_address)
                 self.close_request(request)
+
+
+# TODO(dborowitz): Come up with a better way of testing various permutations of
+# capabilities. The only reason it is the way it is now is that side-band-64k
+# was only recently introduced into git-receive-pack.
+class NoSideBand64kReceivePackHandler(ReceivePackHandler):
+    """ReceivePackHandler that does not support side-band-64k."""
+
+    @classmethod
+    def capabilities(cls):
+        return tuple(c for c in ReceivePackHandler.capabilities()
+                     if c != 'side-band-64k')

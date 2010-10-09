@@ -26,7 +26,10 @@ import shutil
 import tempfile
 import time
 
-from dulwich.objects import Commit
+from dulwich.objects import (
+    FixedSha,
+    Commit,
+    )
 from dulwich.repo import Repo
 
 
@@ -57,12 +60,30 @@ def tear_down_repo(repo):
 def make_object(cls, **attrs):
     """Make an object for testing and assign some members.
 
+    This method creates a new subclass to allow arbitrary attribute
+    reassignment, which is not otherwise possible with objects having __slots__.
+
     :param attrs: dict of attributes to set on the new object.
     :return: A newly initialized object of type cls.
     """
-    obj = cls()
+
+    class TestObject(cls):
+        """Class that inherits from the given class, but without __slots__.
+
+        Note that classes with __slots__ can't have arbitrary attributes monkey-
+        patched in, so this is a class that is exactly the same only with a
+        __dict__ instead of __slots__.
+        """
+        pass
+
+    obj = TestObject()
     for name, value in attrs.iteritems():
-        setattr(obj, name, value)
+        if name == 'id':
+            # id property is read-only, so we overwrite sha instead.
+            sha = FixedSha(value)
+            obj.sha = lambda: sha
+        else:
+            setattr(obj, name, value)
     return obj
 
 

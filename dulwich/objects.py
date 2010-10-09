@@ -157,6 +157,8 @@ def check_identity(identity, error_msg):
 class FixedSha(object):
     """SHA object that behaves like hashlib's but is given a fixed value."""
 
+    __slots__ = ('_hexsha', '_sha')
+
     def __init__(self, hexsha):
         self._hexsha = hexsha
         self._sha = hex_to_sha(hexsha)
@@ -170,6 +172,9 @@ class FixedSha(object):
 
 class ShaFile(object):
     """A git SHA file."""
+
+    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path', 
+                 '_sha', '_needs_serialization', '_magic')
 
     @staticmethod
     def _parse_legacy_object_header(magic, f):
@@ -474,6 +479,8 @@ class ShaFile(object):
 class Blob(ShaFile):
     """A Git Blob object."""
 
+    __slots__ = ()
+
     type_name = 'blob'
     type_num = 3
 
@@ -554,6 +561,10 @@ class Tag(ShaFile):
 
     type_name = 'tag'
     type_num = 4
+
+    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha', 
+                 '_object_class', '_tag_time', '_tag_timezone',
+                 '_tagger', '_message')
 
     def __init__(self):
         super(Tag, self).__init__()
@@ -740,6 +751,8 @@ class Tree(ShaFile):
     type_name = 'tree'
     type_num = 2
 
+    __slots__ = ('_entries')
+
     def __init__(self):
         super(Tree, self).__init__()
         self._entries = {}
@@ -865,6 +878,13 @@ class Tree(ShaFile):
 
 
 def parse_timezone(text):
+    """Parse a timezone text fragment (e.g. '+0100').
+
+    :param text: Text to parse.
+    :return: Tuple with timezone as seconds difference to UTC 
+        and a boolean indicating whether this was a UTC timezone
+        prefixed with a negative sign (-0000).
+    """
     offset = int(text)
     negative_utc = (offset == 0 and text[0] == '-')
     signum = (offset < 0) and -1 or 1
@@ -875,6 +895,12 @@ def parse_timezone(text):
 
 
 def format_timezone(offset, negative_utc=False):
+    """Format a timezone for Git serialization.
+
+    :param offset: Timezone offset as seconds difference to UTC
+    :param negative_utc: Whether to use a minus sign for UTC
+        (-0000 rather than +0000).
+    """
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
     if offset < 0 or (offset == 0 and negative_utc):
@@ -894,6 +920,12 @@ class Commit(ShaFile):
 
     type_name = 'commit'
     type_num = 1
+
+    __slots__ = ('_parents', '_encoding', '_extra', '_author_timezone_neg_utc',
+                 '_commit_timezone_neg_utc', '_commit_time',
+                 '_author_time', '_author_timezone', '_commit_timezone',
+                 '_author', '_committer', '_parents', '_extra',
+                 '_encoding', '_tree', '_message')
 
     def __init__(self):
         super(Commit, self).__init__()

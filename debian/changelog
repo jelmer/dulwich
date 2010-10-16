@@ -1,3 +1,9 @@
+dulwich (0.6.2-2) UNRELEASED; urgency=low
+
+  * Recommend python-fastimport.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 16 Oct 2010 20:02:32 +0200
+
 dulwich (0.6.2-1) unstable; urgency=low
 
   * Build older versions of Python modules as well. Closes: #593751

@@ -447,11 +447,17 @@ class TreeTests(ShaFileCheckTests):
         x["a.b"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         self.assertEquals("07bfcb5f3ada15bbebdfa3bbb8fd858a363925c8", x.id)
 
-    def test_tree_dir_sort(self):
+    def test_tree_iteritems_dir_sort(self):
         x = Tree()
         for name, item in _TREE_ITEMS.iteritems():
             x[name] = item
         self.assertEquals(_SORTED_TREE_ITEMS, list(x.iteritems()))
+
+    def test_tree_items_dir_sort(self):
+        x = Tree()
+        for name, item in _TREE_ITEMS.iteritems():
+            x[name] = item
+        self.assertEquals(_SORTED_TREE_ITEMS, x.items())
 
     def _do_test_parse_tree(self, parse_tree):
         dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')

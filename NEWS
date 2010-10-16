@@ -1,5 +1,9 @@
 0.7.0	UNRELEASED
 
+ FEATURES
+
+  * Add Tree.items(). (Jelmer Vernooij)
+
 0.6.2	2010-10-16
 
  BUG FIXES

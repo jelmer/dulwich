@@ -11,6 +11,8 @@
 
   * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
 
+  * Set bare=true in the configuratin for bare repositories. (Dirk Neumann)
+
  FEATURES
 
   * Use slots for core objects to save up on memory. (Jelmer Vernooij)

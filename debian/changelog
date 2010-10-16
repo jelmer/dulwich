@@ -1,8 +1,7 @@
-dulwich (0.6.2-1) UNRELEASED; urgency=low
+dulwich (0.6.2-1) unstable; urgency=low
 
   * Build older versions of Python modules as well. Closes: #593751
   * New upstream release.
-   + Add dependency on python-fastimport.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sat, 16 Oct 2010 19:49:12 +0200
 

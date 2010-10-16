@@ -811,7 +811,12 @@ class Tree(ShaFile):
         self._needs_serialization = True
 
     def entries(self):
-        """Return a list of tuples describing the tree entries"""
+        """Return a list of tuples describing the tree entries.
+        
+        :note: The order of the tuples that are returned is different from that 
+            returned by the items and iteritems methods. This function will be 
+            deprecated in the future.
+        """
         self._ensure_parsed()
         # The order of this is different from iteritems() for historical
         # reasons
@@ -825,6 +830,13 @@ class Tree(ShaFile):
         """
         self._ensure_parsed()
         return sorted_tree_items(self._entries)
+
+    def items(self):
+        """Return the sorted entries in this tree.
+
+        :return: List with (name, mode, sha) tuples
+        """
+        return list(self.iteritems())
 
     def _deserialize(self, chunks):
         """Grab the entries in the tree"""

@@ -32,6 +32,7 @@ from dulwich.objects import (
 from fastimport import (
     commands,
     errors as fastimport_errors,
+    parser,
     processor,
     )
 
@@ -106,114 +107,6 @@ class GitFastExporter(object):
         return marker
 
 
-class FastImporter(object):
-    """Class for importing fastimport streams.
-
-    Please note that this is mostly a stub implementation at the moment,
-    doing the bare mimimum.
-    """
-
-    def __init__(self, repo):
-        self.repo = repo
-
-    def _parse_person(self, line):
-        (name, timestr, timezonestr) = line.rsplit(" ", 2)
-        return name, int(timestr), parse_timezone(timezonestr)[0]
-
-    def _read_blob(self, stream):
-        line = stream.readline()
-        if line.startswith("mark :"):
-            mark = line[len("mark :"):-1]
-            line = stream.readline()
-        else:
-            mark = None
-        if not line.startswith("data "):
-            raise ValueError("Blob without valid data line: %s" % line)
-        size = int(line[len("data "):])
-        o = Blob()
-        o.data = stream.read(size)
-        stream.readline()
-        self.repo.object_store.add_object(o)
-        return mark, o.id
-
-    def _read_commit(self, stream, contents, marks):
-        line = stream.readline()
-        if line.startswith("mark :"):
-            mark = line[len("mark :"):-1]
-            line = stream.readline()
-        else:
-            mark = None
-        o = Commit()
-        o.author = None
-        o.author_time = None
-        while line.startswith("author "):
-            (o.author, o.author_time, o.author_timezone) = \
-                    self._parse_person(line[len("author "):-1])
-            line = stream.readline()
-        while line.startswith("committer "):
-            (o.committer, o.commit_time, o.commit_timezone) = \
-                    self._parse_person(line[len("committer "):-1])
-            line = stream.readline()
-        if o.author is None:
-            o.author = o.committer
-        if o.author_time is None:
-            o.author_time = o.commit_time
-            o.author_timezone = o.commit_timezone
-        if not line.startswith("data "):
-            raise ValueError("Blob without valid data line: %s" % line)
-        size = int(line[len("data "):])
-        o.message = stream.read(size)
-        stream.readline()
-        line = stream.readline()[:-1]
-        while line:
-            if line.startswith("M "):
-                (kind, modestr, val, path) = line.split(" ")
-                if val[0] == ":":
-                    val = marks[val[1:]]
-                contents[path] = (int(modestr, 8), val)
-            else:
-                raise ValueError(line)
-            line = stream.readline()[:-1]
-        try:
-            o.parents = (self.repo.head(),)
-        except KeyError:
-            o.parents = ()
-        o.tree = commit_tree(self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in
-                contents.iteritems()))
-        self.repo.object_store.add_object(o)
-        return mark, o.id
-
-    def import_stream(self, stream):
-        """Import from a file-like object.
-
-        :param stream: File-like object to read a fastimport stream from.
-        :return: Dictionary with marks
-        """
-        contents = {}
-        marks = {}
-        while True:
-            line = stream.readline()
-            if not line:
-                break
-            line = line[:-1]
-            if line == "" or line[0] == "#":
-                continue
-            if line.startswith("blob"):
-                mark, hexsha = self._read_blob(stream)
-                if mark is not None:
-                    marks[mark] = hexsha
-            elif line.startswith("commit "):
-                ref = line[len("commit "):-1]
-                mark, hexsha = self._read_commit(stream, contents, marks)
-                if mark is not None:
-                    marks[mark] = hexsha
-                self.repo.refs["HEAD"] = self.repo.refs[ref] = hexsha
-            else:
-                raise ValueError("invalid command '%s'" % line)
-        return marks
-
-
 class GitImportProcessor(processor.ImportProcessor):
     """An import processor that imports into a Git repository using Dulwich.
 
@@ -223,6 +116,10 @@ class GitImportProcessor(processor.ImportProcessor):
         processor.ImportProcessor.__init__(self, params, verbose)
         self.repo = repo
         self.last_commit = None
+
+    def import_stream(self, stream):
+        p = parser.ImportParser(stream)
+        self.process(p.iter_commands)
 
     def blob_handler(self, cmd):
         """Process a BlobCommand."""
@@ -239,9 +136,14 @@ class GitImportProcessor(processor.ImportProcessor):
         commit.committer = cmd.committer
         commit.message = cmd.message
         commit.parents = []
+        contents = {}
+        commit.tree = commit_tree(self.repo.object_store,
+            ((path, hexsha, mode) for (path, (mode, hexsha)) in
+                contents.iteritems()))
         if self.last_commit is not None:
             commit.parents.append(self.last_commit)
         commit.parents += cmd.merges
+        self.repo.object_store.add_object(commit)
         self.repo[cmd.ref] = commit.id
         self.last_commit = commit.id
 

@@ -1,6 +1,6 @@
 dulwich (0.6.2-2) UNRELEASED; urgency=low
 
-  * Recommend python-fastimport.
+  * Recommend python-fastimport. Closes: #600392
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sat, 16 Oct 2010 20:02:32 +0200
 

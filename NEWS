@@ -4,6 +4,8 @@
 
   * Add Tree.items(). (Jelmer Vernooij)
 
+  * Add eof() and unread_pkt_line() methods to Protocol. (Dave Borowitz)
+
 0.6.2	2010-10-16
 
  BUG FIXES

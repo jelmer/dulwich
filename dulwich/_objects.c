@@ -35,6 +35,8 @@ size_t strnlen(char *text, size_t maxlen)
 
 #define bytehex(x) (((x)<0xa)?('0'+(x)):('a'-0xa+(x)))
 
+static PyObject *tree_entry_cls;
+
 static PyObject *sha_to_pyhex(const unsigned char *sha)
 {
 	char hexsha[41];
@@ -147,7 +149,8 @@ int cmp_tree_item(const void *_a, const void *_b)
 static void free_tree_items(struct tree_item *items, int num) {
 	int i;
 	for (i = 0; i < num; i++) {
-		Py_DECREF(items[i].tuple);
+		if (items[i].tuple != NULL)
+			Py_DECREF(items[i].tuple);
 	}
 	free(items);
 }
@@ -205,8 +208,14 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		}
 		qsort_entries[i].name = PyString_AS_STRING(key);
 		qsort_entries[i].mode = PyInt_AS_LONG(py_mode);
-		qsort_entries[i].tuple = PyTuple_Pack(3, key, py_int_mode, py_sha);
+
+		qsort_entries[i].tuple = PyObject_CallFunctionObjArgs(
+				tree_entry_cls, key, py_int_mode, py_sha, NULL);
 		Py_DECREF(py_int_mode);
+		if (qsort_entries[i].tuple == NULL) {
+			free_tree_items(qsort_entries, i);
+			return NULL;
+		}
 		i++;
 	}
 
@@ -234,11 +243,21 @@ static PyMethodDef py_objects_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
-void init_objects(void)
+PyMODINIT_FUNC
+init_objects(void)
 {
-	PyObject *m;
+	PyObject *m, *misc_mod;
 
 	m = Py_InitModule3("_objects", py_objects_methods, NULL);
 	if (m == NULL)
+		return;
+
+	misc_mod = PyImport_ImportModule("dulwich.misc");
+	if (misc_mod == NULL)
+		return;
+
+	tree_entry_cls = PyObject_GetAttrString(misc_mod, "TreeEntry");
+	Py_DECREF(misc_mod);
+	if (tree_entry_cls == NULL)
 		return;
 }

@@ -30,6 +30,9 @@ import stat
 from dulwich.errors import (
     ObjectFormatException,
     )
+from dulwich.misc import (
+    TreeEntry,
+    )
 from dulwich.objects import (
     Blob,
     Tree,
@@ -425,9 +428,9 @@ _TREE_ITEMS = {
   }
 
 _SORTED_TREE_ITEMS = [
-  ('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
-  ('a', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
-  ('a/c', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a/c', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
   ]
 
 
@@ -477,7 +480,9 @@ class TreeTests(ShaFileCheckTests):
         def do_sort(entries):
             return list(sorted_tree_items(entries))
 
-        self.assertEqual(_SORTED_TREE_ITEMS, do_sort(_TREE_ITEMS))
+        actual = do_sort(_TREE_ITEMS)
+        self.assertEqual(_SORTED_TREE_ITEMS, actual)
+        self.assertTrue(isinstance(actual[0], TreeEntry))
 
         # C/Python implementations may differ in specific error types, but
         # should all error on invalid inputs.

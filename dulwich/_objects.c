@@ -146,95 +146,79 @@ int cmp_tree_item(const void *_a, const void *_b)
 	return strcmp(remain_a, remain_b);
 }
 
-static void free_tree_items(struct tree_item *items, int num) {
-	int i;
-	for (i = 0; i < num; i++) {
-		if (items[i].tuple != NULL)
-			Py_DECREF(items[i].tuple);
-	}
-	free(items);
-}
-
 static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 {
-	struct tree_item *qsort_entries;
-	int num, i;
-	PyObject *ret;
+	struct tree_item *qsort_entries = NULL;
+	int num_entries, n = 0, i;
+	PyObject *ret, *key, *value, *py_mode, *py_sha;
 	Py_ssize_t pos = 0;
-	PyObject *key, *value;
 
 	if (!PyDict_Check(entries)) {
 		PyErr_SetString(PyExc_TypeError, "Argument not a dictionary");
-		return NULL;
+		goto error;
 	}
 
-	num = PyDict_Size(entries);
-	qsort_entries = malloc(num * sizeof(struct tree_item));
-	if (qsort_entries == NULL) {
+	num_entries = PyDict_Size(entries);
+	if (PyErr_Occurred())
+		goto error;
+	qsort_entries = PyMem_New(struct tree_item, num_entries);
+	if (!qsort_entries) {
 		PyErr_NoMemory();
-		return NULL;
+		goto error;
 	}
 
-	i = 0;
 	while (PyDict_Next(entries, &pos, &key, &value)) {
-		PyObject *py_mode, *py_int_mode, *py_sha;
-
 		if (!PyString_Check(key)) {
 			PyErr_SetString(PyExc_TypeError, "Name is not a string");
-			free_tree_items(qsort_entries, i);
-			return NULL;
+			goto error;
 		}
 
 		if (PyTuple_Size(value) != 2) {
 			PyErr_SetString(PyExc_ValueError, "Tuple has invalid size");
-			free_tree_items(qsort_entries, i);
-			return NULL;
+			goto error;
 		}
 
 		py_mode = PyTuple_GET_ITEM(value, 0);
-		py_int_mode = PyNumber_Int(py_mode);
-		if (!py_int_mode) {
+		if (!PyInt_Check(py_mode)) {
 			PyErr_SetString(PyExc_TypeError, "Mode is not an integral type");
-			free_tree_items(qsort_entries, i);
-			return NULL;
+			goto error;
 		}
 
 		py_sha = PyTuple_GET_ITEM(value, 1);
 		if (!PyString_Check(py_sha)) {
 			PyErr_SetString(PyExc_TypeError, "SHA is not a string");
-			Py_DECREF(py_int_mode);
-			free_tree_items(qsort_entries, i);
-			return NULL;
+			goto error;
 		}
-		qsort_entries[i].name = PyString_AS_STRING(key);
-		qsort_entries[i].mode = PyInt_AS_LONG(py_mode);
+		qsort_entries[n].name = PyString_AS_STRING(key);
+		qsort_entries[n].mode = PyInt_AS_LONG(py_mode);
 
-		qsort_entries[i].tuple = PyObject_CallFunctionObjArgs(
-				tree_entry_cls, key, py_int_mode, py_sha, NULL);
-		Py_DECREF(py_int_mode);
-		if (qsort_entries[i].tuple == NULL) {
-			free_tree_items(qsort_entries, i);
-			return NULL;
-		}
-		i++;
+		qsort_entries[n].tuple = PyObject_CallFunctionObjArgs(
+				tree_entry_cls, key, py_mode, py_sha, NULL);
+		if (qsort_entries[n].tuple == NULL)
+			goto error;
+		n++;
 	}
 
-	qsort(qsort_entries, num, sizeof(struct tree_item), cmp_tree_item);
+	qsort(qsort_entries, num_entries, sizeof(struct tree_item), cmp_tree_item);
 
-	ret = PyList_New(num);
+	ret = PyList_New(num_entries);
 	if (ret == NULL) {
-		free_tree_items(qsort_entries, i);
 		PyErr_NoMemory();
-		return NULL;
+		goto error;
 	}
 
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < num_entries; i++) {
 		PyList_SET_ITEM(ret, i, qsort_entries[i].tuple);
 	}
-
-	free(qsort_entries);
-
+	PyMem_Free(qsort_entries);
 	return ret;
+
+error:
+	for (i = 0; i < n; i++) {
+		Py_XDECREF(qsort_entries[i].tuple);
+	}
+	PyMem_Free(qsort_entries);
+	return NULL;
 }
 
 static PyMethodDef py_objects_methods[] = {

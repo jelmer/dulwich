@@ -30,9 +30,6 @@ import stat
 from dulwich.errors import (
     ObjectFormatException,
     )
-from dulwich.misc import (
-    TreeEntry,
-    )
 from dulwich.objects import (
     Blob,
     Tree,
@@ -45,6 +42,7 @@ from dulwich.objects import (
     check_hexsha,
     check_identity,
     parse_timezone,
+    TreeEntry,
     parse_tree,
     _parse_tree_py,
     sorted_tree_items,

@@ -104,7 +104,7 @@ def unpack_from(fmt, buf, offset=0):
 try:
     from collections import namedtuple
 
-    TreeEntry = namedtuple('TreeEntry', ['path', 'mode', 'sha'])
+    TreeEntryTuple = namedtuple('TreeEntryTuple', ['path', 'mode', 'sha'])
 except ImportError:
     # Provide manual implementations of namedtuples for Python <2.5.
     # If the class definitions change, be sure to keep these in sync by running
@@ -115,8 +115,8 @@ except ImportError:
     _property = property
     from operator import itemgetter as _itemgetter
 
-    class TreeEntry(tuple):
-            'TreeEntry(path, mode, sha)'
+    class TreeEntryTuple(tuple):
+            'TreeEntryTuple(path, mode, sha)'
 
             __slots__ = ()
 
@@ -127,21 +127,21 @@ except ImportError:
 
             @classmethod
             def _make(cls, iterable, new=tuple.__new__, len=len):
-                'Make a new TreeEntry object from a sequence or iterable'
+                'Make a new TreeEntryTuple object from a sequence or iterable'
                 result = new(cls, iterable)
                 if len(result) != 3:
                     raise TypeError('Expected 3 arguments, got %d' % len(result))
                 return result
 
             def __repr__(self):
-                return 'TreeEntry(path=%r, mode=%r, sha=%r)' % self
+                return 'TreeEntryTuple(path=%r, mode=%r, sha=%r)' % self
 
             def _asdict(t):
                 'Return a new dict which maps field names to their values'
                 return {'path': t[0], 'mode': t[1], 'sha': t[2]}
 
             def _replace(_self, **kwds):
-                'Return a new TreeEntry object replacing specified fields with new values'
+                'Return a new TreeEntryTuple object replacing specified fields with new values'
                 result = _self._make(map(kwds.pop, ('path', 'mode', 'sha'), _self))
                 if kwds:
                     raise ValueError('Got unexpected field names: %r' % kwds.keys())

@@ -25,6 +25,7 @@ from cStringIO import (
     StringIO,
     )
 import os
+import posixpath
 import stat
 import zlib
 
@@ -39,7 +40,7 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich.misc import (
     make_sha,
-    TreeEntry,
+    TreeEntryTuple,
     )
 
 
@@ -683,6 +684,14 @@ class Tag(ShaFile):
     tag_timezone = serializable_property("tag_timezone",
         "The timezone that tag_time is in.")
     message = serializable_property("message", "The message attached to this tag")
+
+
+class TreeEntry(TreeEntryTuple):
+    """Namedtuple encapsulating a single tree entry."""
+
+    def in_path(self, path):
+        """Return a copy of this entry with the given path prepended."""
+        return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
 def parse_tree(text):

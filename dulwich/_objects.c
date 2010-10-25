@@ -246,18 +246,20 @@ static PyMethodDef py_objects_methods[] = {
 PyMODINIT_FUNC
 init_objects(void)
 {
-	PyObject *m, *misc_mod;
+	PyObject *m, *objects_mod;
 
 	m = Py_InitModule3("_objects", py_objects_methods, NULL);
 	if (m == NULL)
 		return;
 
-	misc_mod = PyImport_ImportModule("dulwich.misc");
-	if (misc_mod == NULL)
+	/* This is a circular import but should be safe since this module is
+	 * imported at at the very bottom of objects.py. */
+	objects_mod = PyImport_ImportModule("dulwich.objects");
+	if (objects_mod == NULL)
 		return;
 
-	tree_entry_cls = PyObject_GetAttrString(misc_mod, "TreeEntry");
-	Py_DECREF(misc_mod);
+	tree_entry_cls = PyObject_GetAttrString(objects_mod, "TreeEntry");
+	Py_DECREF(objects_mod);
 	if (tree_entry_cls == NULL)
 		return;
 }

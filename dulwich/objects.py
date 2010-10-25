@@ -39,6 +39,7 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich.misc import (
     make_sha,
+    TreeEntry,
     )
 
 
@@ -733,7 +734,7 @@ def sorted_tree_items(entries):
         mode = int(mode)
         if not isinstance(hexsha, str):
             raise TypeError('Expected a string for SHA, got %r' % hexsha)
-        yield name, mode, hexsha
+        yield TreeEntry(name, mode, hexsha)
 
 
 def cmp_entry((name1, value1), (name2, value2)):

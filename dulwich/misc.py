@@ -99,3 +99,57 @@ def unpack_from(fmt, buf, offset=0):
     except AttributeError:
         b = buf[offset:offset+struct.calcsize(fmt)]
         return struct.unpack(fmt, b)
+
+
+try:
+    from collections import namedtuple
+
+    TreeEntry = namedtuple('TreeEntry', ['path', 'mode', 'sha'])
+except ImportError:
+    # Provide manual implementations of namedtuples for Python <2.5.
+    # If the class definitions change, be sure to keep these in sync by running
+    # namedtuple(..., verbose=True) in a recent Python and pasting the output.
+
+    # Necessary globals go here.
+    _tuple = tuple
+    _property = property
+    from operator import itemgetter as _itemgetter
+
+    class TreeEntry(tuple):
+            'TreeEntry(path, mode, sha)'
+
+            __slots__ = ()
+
+            _fields = ('path', 'mode', 'sha')
+
+            def __new__(_cls, path, mode, sha):
+                return _tuple.__new__(_cls, (path, mode, sha))
+
+            @classmethod
+            def _make(cls, iterable, new=tuple.__new__, len=len):
+                'Make a new TreeEntry object from a sequence or iterable'
+                result = new(cls, iterable)
+                if len(result) != 3:
+                    raise TypeError('Expected 3 arguments, got %d' % len(result))
+                return result
+
+            def __repr__(self):
+                return 'TreeEntry(path=%r, mode=%r, sha=%r)' % self
+
+            def _asdict(t):
+                'Return a new dict which maps field names to their values'
+                return {'path': t[0], 'mode': t[1], 'sha': t[2]}
+
+            def _replace(_self, **kwds):
+                'Return a new TreeEntry object replacing specified fields with new values'
+                result = _self._make(map(kwds.pop, ('path', 'mode', 'sha'), _self))
+                if kwds:
+                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
+                return result
+
+            def __getnewargs__(self):
+                return tuple(self)
+
+            path = _property(_itemgetter(0))
+            mode = _property(_itemgetter(1))
+            sha = _property(_itemgetter(2))

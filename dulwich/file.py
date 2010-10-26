@@ -30,6 +30,7 @@ def ensure_dir_exists(dirname):
         if e.errno != errno.EEXIST:
             raise
 
+
 def fancy_rename(oldname, newname):
     """Rename file with temporary backup file to rollback if rename fails"""
     if not os.path.exists(newname):

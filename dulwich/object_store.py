@@ -183,7 +183,7 @@ class BaseObjectStore(object):
 
         :param tree_id: SHA1 of the tree.
         :param include_trees: If True, include tree objects in the iteration.
-        :yield: Tuples of (path, mode, hexhsa) for objects in a tree.
+        :return: Yields tuples of (path, mode, hexhsa) for objects in a tree.
         """
         todo = [('', stat.S_IFDIR, tree_id)]
         while todo:

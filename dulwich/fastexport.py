@@ -27,7 +27,6 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tag,
-    parse_timezone,
     )
 from fastimport import (
     commands,
@@ -132,8 +131,18 @@ class GitImportProcessor(processor.ImportProcessor):
     def commit_handler(self, cmd):
         """Process a CommitCommand."""
         commit = Commit()
-        commit.author = cmd.author
-        commit.committer = cmd.committer
+        if cmd.author is not None:
+            author = cmd.author
+        else:
+            author = cmd.committer
+        (author_name, author_email, author_timestamp, author_timezone) = author
+        (committer_name, committer_email, commit_timestamp, commit_timezone) = cmd.committer
+        commit.author = "%s <%s>" % (author_name, author_email)
+        commit.author_timezone = author_timezone
+        commit.author_time = author_timestamp
+        commit.committer = "%s <%s>" % (committer_name, committer_email)
+        commit.commit_timezone = commit_timezone
+        commit.commit_time = commit_timestamp
         commit.message = cmd.message
         commit.parents = []
         contents = {}

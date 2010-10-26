@@ -51,7 +51,6 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
-    object_class,
     )
 import warnings
 

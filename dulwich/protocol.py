@@ -143,7 +143,7 @@ class Protocol(object):
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
 
-        :yield: Each line of data up to but not including the next flush-pkt.
+        :return: Yields each line of data up to but not including the next flush-pkt.
         """
         pkt = self.read_pkt_line()
         while pkt:

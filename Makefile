@@ -19,21 +19,21 @@ install::
 	$(SETUP) install
 
 check:: build
-	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) dulwich
-	which git > /dev/null && PYTHONPATH=. $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) -i compat
+	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) dulwich
+	which git > /dev/null && PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) -i compat
 
 check-noextensions:: clean
-	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) dulwich
+	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) dulwich
 
 check-compat:: build
-	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) -i compat
+	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) -i compat
 
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
 
 coverage:: build
-	PYTHONPATH=. $(PYTHON) $(TESTRUNNER) --cover-package=dulwich --with-coverage --cover-erase --cover-inclusive dulwich
+	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) --cover-package=dulwich --with-coverage --cover-erase --cover-inclusive dulwich
 
 coverage-annotate: coverage
 	python-coverage -a -o /usr

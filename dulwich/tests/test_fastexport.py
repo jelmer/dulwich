@@ -28,6 +28,9 @@ from dulwich.objects import (
     Commit,
     Tree,
     )
+from dulwich.repo import (
+    MemoryRepo,
+    )
 from dulwich.tests import (
     TestCase,
     TestSkipped,
@@ -35,6 +38,7 @@ from dulwich.tests import (
 
 
 class GitFastExporterTests(TestCase):
+    """Tests for the GitFastExporter tests."""
 
     def setUp(self):
         super(GitFastExporterTests, self).setUp()
@@ -78,3 +82,52 @@ data 3
 msg
 M 644 1 foo
 """, self.stream.getvalue())
+
+
+class GitImportProcessorTests(TestCase):
+    """Tests for the GitImportProcessor tests."""
+
+    def setUp(self):
+        super(GitImportProcessorTests, self).setUp()
+        self.repo = MemoryRepo()
+        try:
+            from dulwich.fastexport import GitImportProcessor
+        except ImportError:
+            raise TestSkipped("python-fastimport not available")
+        self.processor = GitImportProcessor(self.repo)
+
+    def test_commit_handler(self):
+        from fastimport import commands
+        cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            "FOO", None, [], [])
+        self.processor.commit_handler(cmd)
+        commit = self.repo[self.processor.last_commit]
+        self.assertEquals("Jelmer <jelmer@samba.org>", commit.author)
+        self.assertEquals("Jelmer <jelmer@samba.org>", commit.committer)
+        self.assertEquals("FOO", commit.message)
+        self.assertEquals([], commit.parents)
+        self.assertEquals(432432432.0, commit.commit_time)
+        self.assertEquals(432432432.0, commit.author_time)
+        self.assertEquals(3600, commit.commit_timezone)
+        self.assertEquals(3600, commit.author_timezone)
+        self.assertEquals(commit, self.repo["refs/heads/foo"])
+
+    def test_import_stream(self):
+        markers = self.processor.import_stream(StringIO("""blob
+mark :1
+data 11
+text for a
+
+commit refs/heads/master
+mark :2
+committer Joe Foo <joe@foo.com> 1288287382 +0000
+data 20
+<The commit message>
+M 100644 :1 a
+
+"""))
+        self.assertEquals(2, len(markers))
+        self.assertIsInstance(self.repo[markers["1"]], Blob)
+        self.assertIsInstance(self.repo[markers["2"]], Commit)

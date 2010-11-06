@@ -25,6 +25,7 @@ from cStringIO import (
     StringIO,
     )
 import os
+import posixpath
 import stat
 import zlib
 
@@ -39,6 +40,7 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich.misc import (
     make_sha,
+    TreeEntryTuple,
     )
 
 
@@ -684,6 +686,14 @@ class Tag(ShaFile):
     message = serializable_property("message", "The message attached to this tag")
 
 
+class TreeEntry(TreeEntryTuple):
+    """Namedtuple encapsulating a single tree entry."""
+
+    def in_path(self, path):
+        """Return a copy of this entry with the given path prepended."""
+        return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
+
+
 def parse_tree(text):
     """Parse a tree text.
 
@@ -733,7 +743,7 @@ def sorted_tree_items(entries):
         mode = int(mode)
         if not isinstance(hexsha, str):
             raise TypeError('Expected a string for SHA, got %r' % hexsha)
-        yield name, mode, hexsha
+        yield TreeEntry(name, mode, hexsha)
 
 
 def cmp_entry((name1, value1), (name2, value2)):
@@ -811,7 +821,12 @@ class Tree(ShaFile):
         self._needs_serialization = True
 
     def entries(self):
-        """Return a list of tuples describing the tree entries"""
+        """Return a list of tuples describing the tree entries.
+        
+        :note: The order of the tuples that are returned is different from that 
+            returned by the items and iteritems methods. This function will be 
+            deprecated in the future.
+        """
         self._ensure_parsed()
         # The order of this is different from iteritems() for historical
         # reasons
@@ -825,6 +840,13 @@ class Tree(ShaFile):
         """
         self._ensure_parsed()
         return sorted_tree_items(self._entries)
+
+    def items(self):
+        """Return the sorted entries in this tree.
+
+        :return: List with (name, mode, sha) tuples
+        """
+        return list(self.iteritems())
 
     def _deserialize(self, chunks):
         """Grab the entries in the tree"""

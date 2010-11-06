@@ -51,7 +51,6 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
-    object_class,
     )
 import warnings
 
@@ -833,8 +832,10 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if not wants:
-            return []
+        if wants is None:
+            # TODO(dborowitz): find a way to short-circuit that doesn't change
+            # this interface.
+            return None
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(haves, wants, progress,

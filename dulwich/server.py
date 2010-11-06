@@ -264,8 +264,9 @@ class UploadPackHandler(Handler):
           graph_walker.determine_wants, graph_walker, self.progress,
           get_tagged=self.get_tagged)
 
-        # Do they want any objects?
-        if len(objects_iter) == 0:
+        # Did the process short-circuit (e.g. in a stateless RPC call)? Note
+        # that the client still expects a 0-object pack in most cases.
+        if objects_iter is None:
             return
 
         self.progress("dul-daemon says what\n")
@@ -367,7 +368,7 @@ class ProtocolGraphWalker(object):
             self.proto.write_pkt_line(None)
 
             if self.advertise_refs:
-                return []
+                return None
 
         # Now client will sending want want want commands
         want = self.proto.read_pkt_line()
@@ -388,6 +389,13 @@ class ProtocolGraphWalker(object):
             command, sha = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
+
+        if self.stateless_rpc and self.proto.eof():
+            # The client may close the socket at this point, expecting a
+            # flush-pkt from the server. We might be ready to send a packfile at
+            # this point, so we need to explicitly short-circuit in this case.
+            return None
+
         return want_revs
 
     def ack(self, have_ref):

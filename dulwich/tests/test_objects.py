@@ -42,6 +42,7 @@ from dulwich.objects import (
     check_hexsha,
     check_identity,
     parse_timezone,
+    TreeEntry,
     parse_tree,
     _parse_tree_py,
     sorted_tree_items,
@@ -425,9 +426,9 @@ _TREE_ITEMS = {
   }
 
 _SORTED_TREE_ITEMS = [
-  ('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
-  ('a', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
-  ('a/c', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+  TreeEntry('a/c', stat.S_IFDIR, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
   ]
 
 
@@ -447,11 +448,17 @@ class TreeTests(ShaFileCheckTests):
         x["a.b"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
         self.assertEquals("07bfcb5f3ada15bbebdfa3bbb8fd858a363925c8", x.id)
 
-    def test_tree_dir_sort(self):
+    def test_tree_iteritems_dir_sort(self):
         x = Tree()
         for name, item in _TREE_ITEMS.iteritems():
             x[name] = item
         self.assertEquals(_SORTED_TREE_ITEMS, list(x.iteritems()))
+
+    def test_tree_items_dir_sort(self):
+        x = Tree()
+        for name, item in _TREE_ITEMS.iteritems():
+            x[name] = item
+        self.assertEquals(_SORTED_TREE_ITEMS, x.items())
 
     def _do_test_parse_tree(self, parse_tree):
         dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
@@ -471,7 +478,9 @@ class TreeTests(ShaFileCheckTests):
         def do_sort(entries):
             return list(sorted_tree_items(entries))
 
-        self.assertEqual(_SORTED_TREE_ITEMS, do_sort(_TREE_ITEMS))
+        actual = do_sort(_TREE_ITEMS)
+        self.assertEqual(_SORTED_TREE_ITEMS, actual)
+        self.assertTrue(isinstance(actual[0], TreeEntry))
 
         # C/Python implementations may differ in specific error types, but
         # should all error on invalid inputs.

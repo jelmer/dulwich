@@ -82,15 +82,24 @@ class Protocol(object):
         self.read = read
         self.write = write
         self.report_activity = report_activity
+        self._readahead = None
 
     def read_pkt_line(self):
         """Reads a pkt-line from the remote git process.
 
+        This method may read from the readahead buffer; see unread_pkt_line.
+
         :return: The next string from the stream, without the length prefix, or
             None for a flush-pkt ('0000').
         """
+        if self._readahead is None:
+            read = self.read
+        else:
+            read = self._readahead.read
+            self._readahead = None
+
         try:
-            sizestr = self.read(4)
+            sizestr = read(4)
             if not sizestr:
                 raise HangupException()
             size = int(sizestr, 16)
@@ -100,14 +109,41 @@ class Protocol(object):
                 return None
             if self.report_activity:
                 self.report_activity(size, 'read')
-            return self.read(size-4)
+            return read(size-4)
         except socket.error, e:
             raise GitProtocolError(e)
+
+    def eof(self):
+        """Test whether the protocol stream has reached EOF.
+
+        Note that this refers to the actual stream EOF and not just a flush-pkt.
+
+        :return: True if the stream is at EOF, False otherwise.
+        """
+        try:
+            next_line = self.read_pkt_line()
+        except HangupException:
+            return True
+        self.unread_pkt_line(next_line)
+        return False
+
+    def unread_pkt_line(self, data):
+        """Unread a single line of data into the readahead buffer.
+
+        This method can be used to unread a single pkt-line into a fixed
+        readahead buffer.
+
+        :param data: The data to unread, without the length prefix.
+        :raise ValueError: If more than one pkt-line is unread.
+        """
+        if self._readahead is not None:
+            raise ValueError('Attempted to unread multiple pkt-lines.')
+        self._readahead = StringIO(pkt_line(data))
 
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
 
-        :yield: Each line of data up to but not including the next flush-pkt.
+        :return: Yields each line of data up to but not including the next flush-pkt.
         """
         pkt = self.read_pkt_line()
         while pkt:

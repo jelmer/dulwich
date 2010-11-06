@@ -1,8 +1,9 @@
-dulwich (0.6.2-2) UNRELEASED; urgency=low
+dulwich (0.6.2+bzr701-1) unstable; urgency=low
 
   * Recommend python-fastimport. Closes: #600392
+  * New upstream snapshot.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Sat, 16 Oct 2010 20:02:32 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 06 Nov 2010 22:56:35 +0100
 
 dulwich (0.6.2-1) unstable; urgency=low
 

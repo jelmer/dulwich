@@ -27,7 +27,6 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tag,
-    parse_timezone,
     )
 from fastimport import (
     commands,
@@ -111,19 +110,25 @@ class GitImportProcessor(processor.ImportProcessor):
     """An import processor that imports into a Git repository using Dulwich.
 
     """
+    # FIXME: Batch creation of objects?
 
     def __init__(self, repo, params=None, verbose=False, outf=None):
         processor.ImportProcessor.__init__(self, params, verbose)
         self.repo = repo
         self.last_commit = None
+        self.markers = {}
 
     def import_stream(self, stream):
         p = parser.ImportParser(stream)
         self.process(p.iter_commands)
+        return self.markers
 
     def blob_handler(self, cmd):
         """Process a BlobCommand."""
-        self.repo.object_store.add_object(Blob.from_string(cmd.data))
+        blob = Blob.from_string(cmd.data)
+        self.repo.object_store.add_object(blob)
+        if cmd.mark:
+            self.markers[cmd.mark] = blob.id
 
     def checkpoint_handler(self, cmd):
         """Process a CheckpointCommand."""
@@ -132,8 +137,18 @@ class GitImportProcessor(processor.ImportProcessor):
     def commit_handler(self, cmd):
         """Process a CommitCommand."""
         commit = Commit()
-        commit.author = cmd.author
-        commit.committer = cmd.committer
+        if cmd.author is not None:
+            author = cmd.author
+        else:
+            author = cmd.committer
+        (author_name, author_email, author_timestamp, author_timezone) = author
+        (committer_name, committer_email, commit_timestamp, commit_timezone) = cmd.committer
+        commit.author = "%s <%s>" % (author_name, author_email)
+        commit.author_timezone = author_timezone
+        commit.author_time = int(author_timestamp)
+        commit.committer = "%s <%s>" % (committer_name, committer_email)
+        commit.commit_timezone = commit_timezone
+        commit.commit_time = int(commit_timestamp)
         commit.message = cmd.message
         commit.parents = []
         contents = {}
@@ -146,6 +161,8 @@ class GitImportProcessor(processor.ImportProcessor):
         self.repo.object_store.add_object(commit)
         self.repo[cmd.ref] = commit.id
         self.last_commit = commit.id
+        if cmd.mark:
+            self.markers[cmd.mark] = commit.id
 
     def progress_handler(self, cmd):
         """Process a ProgressCommand."""

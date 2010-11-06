@@ -18,7 +18,7 @@
 
 """Classes for dealing with git am-style patches.
 
-These patches are basically unified diffs with some extra metadata tacked 
+These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
@@ -46,7 +46,7 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     f.write("\n")
     f.write("---\n")
     try:
-        p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE, 
+        p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
                              stdin=subprocess.PIPE)
     except OSError, e:
         pass # diffstat not available?
@@ -65,7 +65,7 @@ def write_commit_patch(f, commit, contents, progress, version=None):
 
 def get_summary(commit):
     """Determine the summary line for use in a filename.
-    
+
     :param commit: Commit
     :return: Summary string
     """
@@ -102,7 +102,7 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
                     yield '+' + line
 
 
-def write_blob_diff(f, (old_path, old_mode, old_blob), 
+def write_blob_diff(f, (old_path, old_mode, old_blob),
                        (new_path, new_mode, new_blob)):
     """Write diff file header.
 
@@ -133,14 +133,14 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
         if new_mode is not None:
             if old_mode is not None:
                 f.write("old mode %o\n" % old_mode)
-            f.write("new mode %o\n" % new_mode) 
+            f.write("new mode %o\n" % new_mode)
         else:
             f.write("deleted mode %o\n" % old_mode)
     f.write("index %s..%s %o\n" % (
         blob_id(old_blob), blob_id(new_blob), new_mode))
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
-    f.writelines(unified_diff(old_contents, new_contents, 
+    f.writelines(unified_diff(old_contents, new_contents,
         old_path, new_path))
 
 
@@ -167,9 +167,13 @@ def git_am_patch_split(f):
         if l == "---\n":
             break
         if first:
-            c.message += "\n"
+            if l.startswith("From: "):
+                c.author = l[len("From: "):].rstrip()
+            else:
+                c.message += "\n" + l
             first = False
-        c.message += l
+        else:
+            c.message += l
     diff = ""
     for l in f:
         if l == "-- \n":

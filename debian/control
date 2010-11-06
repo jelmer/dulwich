@@ -3,7 +3,7 @@ Section: python
 Priority: optional
 Maintainer: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
-Build-Depends: python-support (>= 0.90), cdbs (>= 0.4.43), python-all-dev, debhelper (>= 5.0.37.2), python-nose, git (>= 1:1.7.0.4-2) | git-core, python-fastimport
+Build-Depends: python-support (>= 0.90), cdbs (>= 0.4.43), python-all-dev, debhelper (>= 5.0.37.2), python-nose, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293)
 Standards-Version: 3.9.1
 XS-Python-Version: >= 2.4
 Vcs-Bzr: http://bzr.debian.org/users/jelmer/dulwich/unstable

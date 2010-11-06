@@ -129,5 +129,5 @@ M 100644 :1 a
 
 """))
         self.assertEquals(2, len(markers))
-        self.assertIsInstance(self.repo[markers["1"]], Blob)
-        self.assertIsInstance(self.repo[markers["2"]], Commit)
+        self.assertTrue(isinstance(self.repo[markers["1"]], Blob))
+        self.assertTrue(isinstance(self.repo[markers["2"]], Commit))

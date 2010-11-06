@@ -1,4 +1,4 @@
-dulwich (0.6.2+bzr701-1) unstable; urgency=low
+dulwich (0.6.2+bzr702-1) unstable; urgency=low
 
   * Recommend python-fastimport. Closes: #600392
   * New upstream snapshot.

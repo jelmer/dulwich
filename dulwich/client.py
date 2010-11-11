@@ -259,15 +259,6 @@ class GitClient(object):
         return refs
 
 
-def can_read(f):
-    """Check if a file descriptor is readable.
-
-    :param f: either the number of the file descriptor or a file-like
-             object which returns the fileno when f.fileno() is called.
-    """
-    return len(select.select([f], [], [], 0)[0]) > 0
-
-
 class TCPGitClient(GitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
@@ -288,7 +279,7 @@ class TCPGitClient(GitClient):
         proto = Protocol(rfile.read, wfile.write,
                          report_activity=self._report_activity)
         proto.send_cmd('git-%s' % cmd, path, 'host=%s' % self._host)
-        return proto, lambda: can_read(s)
+        return proto, lambda: _fileno_can_read(s)
 
 
 class SubprocessWrapper(object):
@@ -300,7 +291,7 @@ class SubprocessWrapper(object):
         self.write = proc.stdin.write
 
     def can_read(self):
-        return can_read(self.proc.stdout.fileno())
+        return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self):
         self.proc.stdin.close()

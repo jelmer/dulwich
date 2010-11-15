@@ -179,5 +179,8 @@ def git_am_patch_split(f):
         if l == "-- \n":
             break
         diff += l
-    version = f.next().rstrip("\n")
+    try:
+        version = f.next().rstrip("\n")
+    except StopIteration:
+        version = None
     return c, diff, version

@@ -28,6 +28,7 @@ import subprocess
 import time
 
 from dulwich.objects import (
+    Blob,
     Commit,
     )
 
@@ -136,12 +137,35 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
             f.write("new mode %o\n" % new_mode)
         else:
             f.write("deleted mode %o\n" % old_mode)
-    f.write("index %s..%s %o\n" % (
-        blob_id(old_blob), blob_id(new_blob), new_mode))
+    f.write("index %s..%s" % (blob_id(old_blob), blob_id(new_blob)))
+    if new_mode is not None:
+        f.write(" %o" % new_mode)
+    f.write("\n")
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
         old_path, new_path))
+
+
+def write_tree_diff(f, store, old_tree, new_tree):
+    """Write tree diff.
+
+    :param f: File-like object to write to.
+    :param old_tree: Old tree id
+    :param new_tree: New tree id
+    """
+    changes = store.tree_changes(old_tree, new_tree)
+    for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
+        if oldsha is None:
+            old_blob = Blob.from_string("")
+        else:
+            old_blob = store[oldsha]
+        if newsha is None:
+            new_blob = Blob.from_string("")
+        else:
+            new_blob = store[newsha]
+        write_blob_diff(f, (oldpath, oldmode, old_blob),
+                           (newpath, newmode, new_blob))
 
 
 def git_am_patch_split(f):

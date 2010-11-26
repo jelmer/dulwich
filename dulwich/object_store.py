@@ -338,7 +338,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError
+            raise AssertionError("Invalid object name %r" % name)
         for pack in self.packs:
             try:
                 return pack.get_raw(sha)

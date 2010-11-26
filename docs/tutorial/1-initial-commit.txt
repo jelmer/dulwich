@@ -22,7 +22,7 @@ Let's create a folder and turn it into a repository, like ``git init`` would::
   >>> mkdir("myrepo")
   >>> repo = Repo.init("myrepo")
   >>> repo
-  <Repo at '/tmp/myrepo/'>
+  <Repo at 'myrepo'>
 
 You can already look a the structure of the "myrepo/.git" folder, though it
 is mostly empty for now.
@@ -61,7 +61,7 @@ job of the commit::
   >>> author = "Your Name <your.email@example.com>"
   >>> commit.author = commit.committer = author
   >>> commit.commit_time = commit.author_time = int(time())
-  >>> tz = parse_timezone('-0200')
+  >>> tz = parse_timezone('-0200')[0]
   >>> commit.commit_timezone = commit.author_timezone = tz
   >>> commit.encoding = "UTF-8"
   >>> commit.message = "Initial commit"

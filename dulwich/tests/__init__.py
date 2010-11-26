@@ -80,8 +80,9 @@ def test_suite():
     result.addTests(suite)
     tutorial = [
         '0-introduction',
-        '1-initial-commit',
-        '2-change-file',
+        '1-repo',
+        '2-object-store',
+        '3-conclusion',
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
     def setup(test):

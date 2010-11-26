@@ -22,6 +22,8 @@
 import doctest
 import os
 import unittest
+import shutil
+import tempfile
 
 try:
     from testtools.testcase import TestCase
@@ -78,8 +80,15 @@ def test_suite():
     result.addTests(suite)
     tutorial = [
         '0-introduction',
+        '1-initial-commit',
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
-    suite = doctest.DocFileSuite(*tutorial_files)
+    def setup(test):
+        test.__dulwich_tempdir = tempfile.mkdtemp()
+        os.chdir(test.__dulwich_tempdir)
+    def teardown(test):
+        shutil.rmtree(test.__dulwich_tempdir)
+    suite = doctest.DocFileSuite(*tutorial_files, setUp=setup,
+        tearDown=teardown)
     result.addTests(suite)
     return result

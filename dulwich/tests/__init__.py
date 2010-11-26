@@ -19,6 +19,8 @@
 
 """Tests for Dulwich."""
 
+import doctest
+import os
 import unittest
 
 try:
@@ -73,5 +75,11 @@ def test_suite():
     result = unittest.TestSuite()
     loader = unittest.TestLoader()
     suite = loader.loadTestsFromNames(module_names)
+    result.addTests(suite)
+    tutorial = [
+        '0-introduction',
+        ]
+    tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+    suite = doctest.DocFileSuite(*tutorial_files)
     result.addTests(suite)
     return result

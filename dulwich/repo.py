@@ -1028,7 +1028,8 @@ class BaseRepo(object):
         :param author_timestamp: Author timestamp (defaults to commit timestamp)
         :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
-        :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
+        :param tree: SHA1 of the tree root to use (if not specified the
+            current index will be committed).
         :return: New commit SHA1
         """
         import time
@@ -1037,6 +1038,8 @@ class BaseRepo(object):
             index = self.open_index()
             c.tree = index.commit(self.object_store)
         else:
+            if len(tree) != 40:
+                raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
         # TODO: Allow username to be missing, and get it from .git/config
         if committer is None:

@@ -1187,14 +1187,16 @@ class Repo(BaseRepo):
         return "<Repo at %r>" % self.path
 
     @classmethod
-    def init(cls, path, mkdir=True):
+    def init(cls, path, mkdir=False):
+        if mkdir:
+            os.mkdir(path)
         controldir = os.path.join(path, ".git")
         os.mkdir(controldir)
         cls.init_bare(controldir)
         return cls(path)
 
     @classmethod
-    def init_bare(cls, path, mkdir=True):
+    def init_bare(cls, path):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))

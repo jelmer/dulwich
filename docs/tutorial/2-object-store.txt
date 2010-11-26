@@ -1,34 +1,13 @@
-The Repository
-==============
+The object store
+================
 
-After this introduction, let's start directly with code::
+The objects are stored in the ``object store`` of the repository.
 
   >>> from dulwich.repo import Repo
-
-The access to every object is through the Repo object. You can open an
-existing repository or you can create a new one. There are two types of Git
-repositories:
-
-  Regular Repositories -- They are the ones you create using ``git init`` and
-  you daily use. They contain a ``.git`` folder.
-
-  Bare Repositories -- There is not ".git" folder. The top-level folder
-  contains itself the "branches", "hooks"... folders. These are used for
-  published repositories (mirrors).
-
-Let's create a folder and turn it into a repository, like ``git init`` would::
-
-  >>> from os import mkdir
-  >>> mkdir("myrepo")
-  >>> repo = Repo.init("myrepo")
-  >>> repo
-  <Repo at 'myrepo'>
-
-You can already look a the structure of the "myrepo/.git" folder, though it
-is mostly empty for now.
+  >>> repo = Repo.init("myrepo", mkdir=True)
 
 Initial commit
-==============
+--------------
 
 When you use Git, you generally add or modify content. As our repository is
 empty for now, we'll start by adding a new file::
@@ -94,7 +73,7 @@ Now our repository is officialy tracking a branch named "master" refering to a
 single commit.
 
 Playing again with Git
-======================
+----------------------
 
 At this point you can come back to the shell, go into the "myrepo" folder and
 type ``git status`` to let Git confirm that this is a regular repository on
@@ -115,5 +94,77 @@ blob::
   $ cat spam
   My file content
 
-.. attention:: Remember to recreate the repo object when you modify the
-               repository outside of Dulwich!
+Changing a File and Committing it
+---------------------------------
+
+Now we have a first commit, the next one will show a difference.
+
+As seen in the introduction, it's about making a path in a tree point to a
+new blob. The old blob will remain to compute the diff. The tree is altered
+and the new commit'task is to point to this new version.
+
+Let's first build the blob::
+
+  >>> from dulwich.objects import Blob
+  >>> spam = Blob.from_string("My new file content\n")
+  >>> spam.id
+  '16ee2682887a962f854ebd25a61db16ef4efe49f'
+
+An alternative is to alter the previously constructed blob object::
+
+  >>> blob.data = "My new file content\n"
+  >>> blob.id
+  '16ee2682887a962f854ebd25a61db16ef4efe49f'
+
+In any case, update the blob id known as "spam". You also have the
+opportunity of changing its mode::
+
+  >>> tree["spam"] = (0100644, spam.id)
+
+Now let's record the change::
+
+  >>> from dulwich.objects import Commit
+  >>> from time import time
+  >>> c2 = Commit()
+  >>> c2.tree = tree.id
+  >>> c2.parents = [commit.id]
+  >>> c2.author = c2.committer = "John Doe <john@example.com>"
+  >>> c2.commit_time = c2.author_time = int(time())
+  >>> c2.commit_timezone = c2.author_timezone = 0
+  >>> c2.encoding = "UTF-8"
+  >>> c2.message = 'Changing "spam"'
+
+In this new commit we record the changed tree id, and most important, the
+previous commit as the parent. Parents are actually a list because a commit
+may happen to have several parents after merging branches.
+
+Let's put the objects in the object store::
+
+  >>> repo.object_store.add_object(spam)
+  >>> repo.object_store.add_object(tree)
+  >>> repo.object_store.add_object(c2)
+
+You can already ask git to introspect this commit using ``git show`` and the
+value of ``c2.id`` as an argument. You'll see the difference will the
+previous blob recorded as "spam".
+
+The diff between the previous head and the new one can be printed using
+write_tree_diff::
+
+  >>> from dulwich.patch import write_tree_diff
+  >>> import sys
+  >>> write_tree_diff(sys.stdout, repo.object_store, commit.tree, tree.id)
+  diff --git a/spam b/spam
+  index c55063a..16ee268 100644
+  --- a/spam
+  +++ b/spam
+  @@ -1,1 +1,1 @@
+  -My file content
+  +My new file content
+
+You won't see it using git log because the head is still the previous
+commit. It's easy to remedy::
+
+  >>> repo.refs['refs/heads/master'] = c2.id
+
+Now all git tools will work as expected.

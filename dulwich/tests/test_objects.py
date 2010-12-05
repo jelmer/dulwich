@@ -117,21 +117,21 @@ class BlobReadTests(TestCase):
     def get_blob(self, sha):
         """Return the blob named sha from the test data dir"""
         return self.get_sha_file(Blob, 'blobs', sha)
-  
+
     def get_tree(self, sha):
         return self.get_sha_file(Tree, 'trees', sha)
-  
+
     def get_tag(self, sha):
         return self.get_sha_file(Tag, 'tags', sha)
-  
+
     def commit(self, sha):
         return self.get_sha_file(Commit, 'commits', sha)
-  
+
     def test_decompress_simple_blob(self):
         b = self.get_blob(a_sha)
         self.assertEqual(b.data, 'test 1\n')
         self.assertEqual(b.sha().hexdigest(), a_sha)
-  
+
     def test_hash(self):
         b = self.get_blob(a_sha)
         self.assertEqual(hash(b.id), hash(b))
@@ -142,7 +142,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(b.data, '')
         self.assertEqual(b.id, sha)
         self.assertEqual(b.sha().hexdigest(), sha)
-  
+
     def test_create_blob_from_string(self):
         string = 'test 2\n'
         b = Blob.from_string(string)
@@ -166,23 +166,23 @@ class BlobReadTests(TestCase):
         self.assertEqual('test 5\n', b.data)
         b.chunked = ['te', 'st', ' 6\n']
         self.assertEqual('test 6\n', b.as_raw_string())
-  
+
     def test_parse_legacy_blob(self):
         string = 'test 3\n'
         b = self.get_blob(c_sha)
         self.assertEqual(b.data, string)
         self.assertEqual(b.sha().hexdigest(), c_sha)
-  
+
     def test_eq(self):
         blob1 = self.get_blob(a_sha)
         blob2 = self.get_blob(a_sha)
         self.assertEqual(blob1, blob2)
-  
+
     def test_read_tree_from_file(self):
         t = self.get_tree(tree_sha)
         self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
         self.assertEqual(t.entries()[1], (33188, 'b', b_sha))
-  
+
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)
         self.assertEqual(t.object, (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
@@ -190,7 +190,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
         self.assertEqual(t.tag_time, 1231203091)
         self.assertEqual(t.message, 'This is a signed tag\n-----BEGIN PGP SIGNATURE-----\nVersion: GnuPG v1.4.9 (GNU/Linux)\n\niEYEABECAAYFAkliqx8ACgkQqSMmLy9u/kcx5ACfakZ9NnPl02tOyYP6pkBoEkU1\n5EcAn0UFgokaSvS371Ym/4W9iJj6vh3h\n=ql7y\n-----END PGP SIGNATURE-----\n')
-  
+
     def test_read_commit_from_file(self):
         sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'
         c = self.commit(sha)
@@ -205,7 +205,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
-  
+
     def test_read_commit_no_parents(self):
         sha = '0d89f20333fbb1d2f3a94da77f4981373d8f4310'
         c = self.commit(sha)
@@ -219,7 +219,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
-  
+
     def test_read_commit_two_parents(self):
         sha = '5dac377bdded4c9aeb8dff595f0faeebcc8498cc'
         c = self.commit(sha)

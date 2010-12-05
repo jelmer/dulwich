@@ -158,7 +158,43 @@ From: Jelmer Vernooy <jelmer@debian.org>
 
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertIs(None, version)
+        self.assertEquals(None, version)
+
+    def test_extract_mercurial(self):
+        expected_diff = """diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
+--- a/dulwich/tests/test_patch.py
++++ b/dulwich/tests/test_patch.py
+@@ -158,7 +158,7 @@
+ 
+ '''
+         c, diff, version = git_am_patch_split(StringIO(text))
+-        self.assertIs(None, version)
++        self.assertEquals(None, version)
+ 
+ 
+ class DiffTests(TestCase):
+"""
+        text = """From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net Mon Nov 29 00:58:18 2010
+Date: Sun, 28 Nov 2010 17:57:27 -0600
+From: Augie Fackler <durin42@gmail.com>
+To: dulwich-users <dulwich-users@lists.launchpad.net>
+Subject: [Dulwich-users] [PATCH] test_patch: fix tests on Python 2.6
+Content-Transfer-Encoding: 8bit
+
+Change-Id: I5e51313d4ae3a65c3f00c665002a7489121bb0d6
+
+%s
+
+_______________________________________________
+Mailing list: https://launchpad.net/~dulwich-users
+Post to     : dulwich-users@lists.launchpad.net
+Unsubscribe : https://launchpad.net/~dulwich-users
+More help   : https://help.launchpad.net/ListHelp
+
+""" % expected_diff
+        c, diff, version = git_am_patch_split(StringIO(text))
+        self.assertEquals(expected_diff, diff)
+        self.assertEquals(None, version)
 
 
 class DiffTests(TestCase):

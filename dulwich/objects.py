@@ -143,7 +143,7 @@ def check_identity(identity, error_msg):
     """Check if the specified identity is valid.
 
     This will raise an exception if the identity is not valid.
-    
+
     :param identity: Identity string
     :param error_msg: Error message to use in exception
     """
@@ -175,7 +175,7 @@ class FixedSha(object):
 class ShaFile(object):
     """A git SHA file."""
 
-    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path', 
+    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path',
                  '_sha', '_needs_serialization', '_magic')
 
     @staticmethod
@@ -564,7 +564,7 @@ class Tag(ShaFile):
     type_name = 'tag'
     type_num = 4
 
-    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha', 
+    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha',
                  '_object_class', '_tag_time', '_tag_timezone',
                  '_tagger', '_message')
 
@@ -731,7 +731,7 @@ def serialize_tree(items):
 
 
 def sorted_tree_items(entries):
-    """Iterate over a tree entries dictionary in the order in which 
+    """Iterate over a tree entries dictionary in the order in which
     the items would be serialized.
 
     :param entries: Dictionary mapping names to (mode, sha) tuples
@@ -822,9 +822,9 @@ class Tree(ShaFile):
 
     def entries(self):
         """Return a list of tuples describing the tree entries.
-        
-        :note: The order of the tuples that are returned is different from that 
-            returned by the items and iteritems methods. This function will be 
+
+        :note: The order of the tuples that are returned is different from that
+            returned by the items and iteritems methods. This function will be
             deprecated in the future.
         """
         self._ensure_parsed()
@@ -903,7 +903,7 @@ def parse_timezone(text):
     """Parse a timezone text fragment (e.g. '+0100').
 
     :param text: Text to parse.
-    :return: Tuple with timezone as seconds difference to UTC 
+    :return: Tuple with timezone as seconds difference to UTC
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """

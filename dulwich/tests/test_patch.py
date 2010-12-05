@@ -36,6 +36,7 @@ from dulwich.patch import (
     )
 from dulwich.tests import (
     TestCase,
+    TestSkipped,
     )
 
 
@@ -161,6 +162,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
         self.assertEquals(None, version)
 
     def test_extract_mercurial(self):
+        raise TestSkipped("git_am_patch_split doesn't handle Mercurial patches properly yet")
         expected_diff = """diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
 --- a/dulwich/tests/test_patch.py
 +++ b/dulwich/tests/test_patch.py

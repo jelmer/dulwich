@@ -66,24 +66,35 @@ class CreateRepositoryTests(TestCase):
             finally:
                 f.close()
 
-    def _check_repo_contents(self, repo):
-        self.assertTrue(repo.bare)
+    def _check_repo_contents(self, repo, expect_bare):
+        self.assertEquals(expect_bare, repo.bare)
         self.assertFileContentsEqual('Unnamed repository', repo, 'description')
         self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
+        barestr = 'bare = %s' % str(expect_bare).lower()
+        self.assertTrue(barestr in repo.get_named_file('config').read())
 
-    def test_create_disk(self):
+    def test_create_disk_bare(self):
         tmp_dir = tempfile.mkdtemp()
         try:
             repo = Repo.init_bare(tmp_dir)
             self.assertEquals(tmp_dir, repo._controldir)
-            self._check_repo_contents(repo)
+            self._check_repo_contents(repo, True)
+        finally:
+            shutil.rmtree(tmp_dir)
+
+    def test_create_disk_non_bare(self):
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            repo = Repo.init(tmp_dir)
+            self.assertEquals(os.path.join(tmp_dir, '.git'), repo._controldir)
+            self._check_repo_contents(repo, False)
         finally:
             shutil.rmtree(tmp_dir)
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})
-        self._check_repo_contents(repo)
+        self._check_repo_contents(repo, True)
 
 
 class RepositoryTests(TestCase):

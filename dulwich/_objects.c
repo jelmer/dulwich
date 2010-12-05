@@ -59,7 +59,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		return NULL;
 
 	/* TODO: currently this returns a list; if memory usage is a concern,
-	* consider rewriting as a custom iterator object */
+	 * consider rewriting as a custom iterator object */
 	ret = PyList_New(0);
 
 	if (ret == NULL) {
@@ -97,7 +97,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		}
 
 		item = Py_BuildValue("(NlN)", name, mode,
-							 sha_to_pyhex((unsigned char *)text+namelen+1));
+		                     sha_to_pyhex((unsigned char *)text+namelen+1));
 		if (item == NULL) {
 			Py_DECREF(ret);
 			Py_DECREF(name);
@@ -193,7 +193,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		qsort_entries[n].mode = PyInt_AS_LONG(py_mode);
 
 		qsort_entries[n].tuple = PyObject_CallFunctionObjArgs(
-				tree_entry_cls, key, py_mode, py_sha, NULL);
+		                tree_entry_cls, key, py_mode, py_sha, NULL);
 		if (qsort_entries[n].tuple == NULL)
 			goto error;
 		n++;

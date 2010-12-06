@@ -579,6 +579,10 @@ class MemoryObjectStore(BaseObjectStore):
     def __getitem__(self, name):
         return self._data[name]
 
+    def __delitem__(self, name):
+        """Delete an object from this store, for testing only."""
+        del self._data[name]
+
     def add_object(self, obj):
         """Add a single object to this object store.
 

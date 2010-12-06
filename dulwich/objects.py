@@ -730,14 +730,17 @@ def serialize_tree(items):
         yield "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
 
 
-def sorted_tree_items(entries):
-    """Iterate over a tree entries dictionary in the order in which
-    the items would be serialized.
+def sorted_tree_items(entries, name_order):
+    """Iterate over a tree entries dictionary.
 
+    :param name_order: If True, iterate entries in order of their name. If
+        False, iterate entries in tree order, that is, treat subtree entries as
+        having '/' appended.
     :param entries: Dictionary mapping names to (mode, sha) tuples
     :return: Iterator over (name, mode, hexsha)
     """
-    for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
+    cmp_func = name_order and cmp_entry_name_order or cmp_entry
+    for name, entry in sorted(entries.iteritems(), cmp=cmp_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)
@@ -747,12 +750,17 @@ def sorted_tree_items(entries):
 
 
 def cmp_entry((name1, value1), (name2, value2)):
-    """Compare two tree entries."""
+    """Compare two tree entries in tree order."""
     if stat.S_ISDIR(value1[0]):
         name1 += "/"
     if stat.S_ISDIR(value2[0]):
         name2 += "/"
     return cmp(name1, name2)
+
+
+def cmp_entry_name_order(entry1, entry2):
+    """Compare two tree entries in name order."""
+    return cmp(entry1[0], entry2[0])
 
 
 class Tree(ShaFile):
@@ -833,13 +841,14 @@ class Tree(ShaFile):
         return [
             (mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
-    def iteritems(self):
-        """Iterate over entries in the order in which they would be serialized.
+    def iteritems(self, name_order=False):
+        """Iterate over entries.
 
+        :param name_order: If True, iterate in name order instead of tree order.
         :return: Iterator over (name, mode, sha) tuples
         """
         self._ensure_parsed()
-        return sorted_tree_items(self._entries)
+        return sorted_tree_items(self._entries, name_order)
 
     def items(self):
         """Return the sorted entries in this tree.

@@ -476,7 +476,7 @@ class TreeTests(ShaFileCheckTests):
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
         def do_sort(entries):
-            return list(sorted_tree_items(entries))
+            return list(sorted_tree_items(entries, False))
 
         actual = do_sort(_TREE_ITEMS)
         self.assertEqual(_SORTED_TREE_ITEMS, actual)
@@ -501,6 +501,23 @@ class TreeTests(ShaFileCheckTests):
         if sorted_tree_items is _sorted_tree_items_py:
             raise TestSkipped('sorted_tree_items extension not found')
         self._do_test_sorted_tree_items(sorted_tree_items)
+
+    def _do_test_sorted_tree_items_name_order(self, sorted_tree_items):
+        self.assertEqual([
+          TreeEntry('a', stat.S_IFDIR,
+                    'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          TreeEntry('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          TreeEntry('a/c', stat.S_IFDIR,
+                    'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          ], list(sorted_tree_items(_TREE_ITEMS, True)))
+
+    def test_sorted_tree_items_name_order(self):
+        self._do_test_sorted_tree_items_name_order(_sorted_tree_items_py)
+
+    def test_sorted_tree_items_name_order_extension(self):
+        if sorted_tree_items is _sorted_tree_items_py:
+            raise TestSkipped('sorted_tree_items extension not found')
+        self._do_test_sorted_tree_items_name_order(sorted_tree_items)
 
     def test_check(self):
         t = Tree

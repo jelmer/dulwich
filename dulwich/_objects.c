@@ -146,17 +146,31 @@ int cmp_tree_item(const void *_a, const void *_b)
 	return strcmp(remain_a, remain_b);
 }
 
-static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
+int cmp_tree_item_name_order(const void *_a, const void *_b) {
+	const struct tree_item *a = _a, *b = _b;
+	return strcmp(a->name, b->name);
+}
+
+static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 {
 	struct tree_item *qsort_entries = NULL;
-	int num_entries, n = 0, i;
-	PyObject *ret, *key, *value, *py_mode, *py_sha;
+	int name_order, num_entries, n = 0, i;
+	PyObject *entries, *py_name_order, *ret, *key, *value, *py_mode, *py_sha;
 	Py_ssize_t pos = 0;
+	int (*cmp)(const void *, const void *);
+
+	if (!PyArg_ParseTuple(args, "OO", &entries, &py_name_order))
+		goto error;
 
 	if (!PyDict_Check(entries)) {
 		PyErr_SetString(PyExc_TypeError, "Argument not a dictionary");
 		goto error;
 	}
+
+	name_order = PyObject_IsTrue(py_name_order);
+	if (name_order == -1)
+		goto error;
+	cmp = name_order ? cmp_tree_item_name_order : cmp_tree_item;
 
 	num_entries = PyDict_Size(entries);
 	if (PyErr_Occurred())
@@ -199,7 +213,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		n++;
 	}
 
-	qsort(qsort_entries, num_entries, sizeof(struct tree_item), cmp_tree_item);
+	qsort(qsort_entries, num_entries, sizeof(struct tree_item), cmp);
 
 	ret = PyList_New(num_entries);
 	if (ret == NULL) {
@@ -223,7 +237,7 @@ error:
 
 static PyMethodDef py_objects_methods[] = {
 	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS, NULL },
-	{ "sorted_tree_items", (PyCFunction)py_sorted_tree_items, METH_O, NULL },
+	{ "sorted_tree_items", py_sorted_tree_items, METH_VARARGS, NULL },
 	{ NULL, NULL, 0, NULL }
 };
 

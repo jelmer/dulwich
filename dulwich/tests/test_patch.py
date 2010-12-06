@@ -262,7 +262,7 @@ class DiffTests(TestCase):
         tree2 = Tree()
         tree2.add(0644, "added.txt", added.id)
         tree2.add(0644, "changed.txt", changed2.id)
-        tree1.add(0644, "unchanged.txt", changed1.id)
+        tree2.add(0644, "unchanged.txt", changed1.id)
         store.add_objects([(o, None) for o in [
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
@@ -281,14 +281,6 @@ class DiffTests(TestCase):
             '--- a/removed.txt',
             '+++ /dev/null',
             '@@ -1,1 +1,0 @@',
-            '-removed',
-            'diff --git a/unchanged.txt /dev/null',
-            'deleted mode 644',
-            'index bf84e48..e69de29',
-            '--- a/unchanged.txt',
-            '+++ /dev/null',
-            '@@ -1,2 +1,0 @@',
-            '-unchanged',
             '-removed',
             'diff --git /dev/null b/added.txt',
             'new mode 644',

@@ -694,18 +694,20 @@ class TreeEntry(TreeEntryTuple):
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
-def parse_tree(text):
+def parse_tree(text, strict=False):
     """Parse a tree text.
 
     :param text: Serialized text to parse
     :return: iterator of tuples of (name, mode, sha)
+    :raise ObjectFormatException: if the object was malformed in some way
     """
     count = 0
     l = len(text)
     while count < l:
         mode_end = text.index(' ', count)
         mode_text = text[count:mode_end]
-        assert mode_text[0] != '0'
+        if strict and mode_text.startswith('0'):
+            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         try:
             mode = int(mode_text, 8)
         except ValueError:
@@ -878,7 +880,8 @@ class Tree(ShaFile):
                          stat.S_IFLNK, stat.S_IFDIR, S_IFGITLINK,
                          # TODO: optionally exclude as in git fsck --strict
                          stat.S_IFREG | 0664)
-        for name, mode, sha in parse_tree("".join(self._chunked_text)):
+        for name, mode, sha in parse_tree(''.join(self._chunked_text),
+                                          True):
             check_hexsha(sha, 'invalid sha %s' % sha)
             if '/' in name or name in ('', '.', '..'):
                 raise ObjectFormatException('invalid name %s' % name)
@@ -977,7 +980,7 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
-        for field, value in parse_commit("".join(self._chunked_text)):
+        for field, value in parse_commit(''.join(self._chunked_text)):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:

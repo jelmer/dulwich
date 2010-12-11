@@ -23,6 +23,7 @@
 
 
 from cStringIO import StringIO
+import binascii
 import datetime
 import os
 import stat
@@ -434,6 +435,16 @@ class TreeTests(ShaFileCheckTests):
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
         self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))
+        # test a broken tree that has a leading 0 on the file mode
+        broken_tree = '0100644 foo\0' + hex_to_sha(a_sha)
+
+        def eval_parse_tree(*args, **kwargs):
+            return list(parse_tree(*args, **kwargs))
+
+        self.assertEquals([('foo', 0100644, a_sha)],
+                          eval_parse_tree(broken_tree))
+        self.assertRaises(ObjectFormatException,
+                          eval_parse_tree, broken_tree, strict=True)
 
     def test_parse_tree(self):
         self._do_test_parse_tree(_parse_tree_py)
@@ -506,6 +517,8 @@ class TreeTests(ShaFileCheckTests):
         # TODO more whitelisted modes
         self.assertCheckFails(t, '123456 a\0%s' % sha)
         self.assertCheckFails(t, '123abc a\0%s' % sha)
+        # should fail check, but parses ok
+        self.assertCheckFails(t, '0100644 foo\0' + sha)
 
         # shas
         self.assertCheckFails(t, '100644 a\0%s' % ('x' * 5))

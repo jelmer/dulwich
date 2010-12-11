@@ -1017,7 +1017,7 @@ class BaseRepo(object):
     def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
-                  author_timezone=None, tree=None):
+                  author_timezone=None, tree=None, encoding=None):
         """Create a new commit.
 
         :param message: Commit message
@@ -1030,6 +1030,7 @@ class BaseRepo(object):
             (defaults to commit timestamp timezone)
         :param tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
+        :param encoding: Encoding
         :return: New commit SHA1
         """
         import time
@@ -1061,6 +1062,8 @@ class BaseRepo(object):
         if author_timezone is None:
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
+        if encoding is not None:
+            c.encoding = encoding
         c.message = message
         try:
             old_head = self.refs["HEAD"]

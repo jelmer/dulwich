@@ -420,6 +420,16 @@ class BuildRepoTests(TestCase):
         tree = r[r[commit_sha].tree]
         self.assertEqual([], list(tree.iteritems()))
 
+    def test_commit_encoding(self):
+        r = self._repo
+        commit_sha = r.do_commit('commit with strange character \xee',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             encoding="iso8859-1")
+        self.assertEquals("iso8859-1", r[commit_sha].encoding)
+
     def test_commit_fail_ref(self):
         r = self._repo
 

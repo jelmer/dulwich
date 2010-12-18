@@ -29,6 +29,7 @@ from dulwich.diff_tree import (
     _count_blocks,
     _similarity_score,
     _tree_change_key,
+    RenameDetector,
     )
 from dulwich.index import (
     commit_tree,
@@ -253,7 +254,7 @@ class TreeChangesTest(DiffTestCase):
           tree1, tree2)
 
 
-class RenameDetectionTest(TestCase):
+class RenameDetectionTest(DiffTestCase):
 
     def test_count_blocks(self):
         blob = make_object(Blob, data='a\nb\na\n')
@@ -327,3 +328,64 @@ class RenameDetectionTest(TestCase):
         for perm in permutations(expected_entries):
             self.assertEqual(expected_entries,
                              sorted(perm, key=_tree_change_key))
+
+    def detect_renames(self, tree1, tree2, **kwargs):
+        detector = RenameDetector(self.store, tree1.id, tree2.id, **kwargs)
+        return detector.changes_with_renames()
+
+    def test_exact_rename_one_to_one(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob2)])
+        tree2 = self.commit_tree([('c', blob1), ('d', blob2)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('c', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, blob2.id), ('d', F, blob2.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_exact_rename_split_different_type(self):
+        blob = make_object(Blob, data='/foo')
+        tree1 = self.commit_tree([('a', blob, 0100644)])
+        tree2 = self.commit_tree([('a', blob, 0120000)])
+        self.assertEqual(
+          [TreeChange.add(('a', 0120000, blob.id)),
+           TreeChange.delete(('a', 0100644, blob.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_exact_rename_and_different_type(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        tree1 = self.commit_tree([('a', blob1)])
+        tree2 = self.commit_tree([('a', blob2, 0120000), ('b', blob1)])
+        self.assertEqual(
+          [TreeChange.add(('a', 0120000, blob2.id)),
+           TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('b', F, blob1.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_exact_rename_one_to_many(self):
+        blob = make_object(Blob, data='1')
+        tree1 = self.commit_tree([('a', blob)])
+        tree2 = self.commit_tree([('b', blob), ('c', blob)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob.id), ('b', F, blob.id)),
+           TreeChange(CHANGE_COPY, ('a', F, blob.id), ('c', F, blob.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_exact_rename_many_to_one(self):
+        blob = make_object(Blob, data='1')
+        tree1 = self.commit_tree([('a', blob), ('b', blob)])
+        tree2 = self.commit_tree([('c', blob)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob.id), ('c', F, blob.id)),
+           TreeChange.delete(('b', F, blob.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_exact_rename_many_to_many(self):
+        blob = make_object(Blob, data='1')
+        tree1 = self.commit_tree([('a', blob), ('b', blob)])
+        tree2 = self.commit_tree([('c', blob), ('d', blob), ('e', blob)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob.id), ('c', F, blob.id)),
+           TreeChange(CHANGE_COPY, ('a', F, blob.id), ('e', F, blob.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, blob.id), ('d', F, blob.id))],
+          self.detect_renames(tree1, tree2))

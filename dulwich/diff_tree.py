@@ -252,3 +252,78 @@ def _tree_change_key(entry):
     if path2 is None:
         path2 = path1
     return (path1, path2)
+
+
+class RenameDetector(object):
+    """Object for handling rename detection between two trees."""
+
+    def __init__(self, store, tree1_id, tree2_id):
+        """Initialize the rename detector.
+
+        :param store: An ObjectStore for looking up objects.
+        :param tree1_id: The SHA of the first Tree.
+        :param tree2_id: The SHA of the second Tree.
+        """
+        self._tree1_id = tree1_id
+        self._tree2_id = tree2_id
+        self._store = store
+
+        self._adds = []
+        self._deletes = []
+        self._changes = []
+
+    def _collect_changes(self):
+        for change in tree_changes(self._store, self._tree1_id, self._tree2_id):
+            if change.type == CHANGE_ADD:
+                self._adds.append(change)
+            elif change.type == CHANGE_DELETE:
+                self._deletes.append(change)
+            else:
+                self._changes.append(change)
+
+    def _prune(self, add_paths, delete_paths):
+        self._adds = [a for a in self._adds if a.new.path not in add_paths]
+        self._deletes = [d for d in self._deletes
+                         if d.old.path not in delete_paths]
+
+    def _find_exact_renames(self):
+        add_map = defaultdict(list)
+        for add in self._adds:
+            add_map[add.new.sha].append(add.new)
+        delete_map = defaultdict(list)
+        for delete in self._deletes:
+            delete_map[delete.old.sha].append(delete.old)
+
+        add_paths = set()
+        delete_paths = set()
+        for sha, sha_deletes in delete_map.iteritems():
+            sha_adds = add_map[sha]
+            for old, new in itertools.izip(sha_deletes, sha_adds):
+                if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):
+                    continue
+                delete_paths.add(old.path)
+                add_paths.add(new.path)
+                self._changes.append(TreeChange(CHANGE_RENAME, old, new))
+
+            num_extra_adds = len(sha_adds) - len(sha_deletes)
+            # TODO(dborowitz): Less arbitrary way of dealing with extra copies.
+            old = sha_deletes[0]
+            if num_extra_adds:
+                for new in sha_adds[-num_extra_adds:]:
+                    add_paths.add(new.path)
+                    self._changes.append(TreeChange(CHANGE_COPY, old, new))
+        self._prune(add_paths, delete_paths)
+
+    def _sorted_changes(self):
+        result = []
+        result.extend(self._adds)
+        result.extend(self._deletes)
+        result.extend(self._changes)
+        result.sort(key=_tree_change_key)
+        return result
+
+    def changes_with_renames(self):
+        """Iterate TreeChanges between the two trees, with rename detection."""
+        self._collect_changes()
+        self._find_exact_renames()
+        return self._sorted_changes()

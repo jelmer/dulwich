@@ -20,15 +20,21 @@
 
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
+    CHANGE_RENAME,
+    CHANGE_COPY,
     CHANGE_UNCHANGED,
     TreeChange,
     _merge_entries,
     tree_changes,
     _count_blocks,
     _similarity_score,
+    _tree_change_key,
     )
 from dulwich.index import (
     commit_tree,
+    )
+from dulwich.misc import (
+    permutations,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -36,6 +42,7 @@ from dulwich.object_store import (
 from dulwich.objects import (
     ShaFile,
     Blob,
+    TreeEntry,
     )
 from dulwich.tests import (
     TestCase,
@@ -303,3 +310,20 @@ class RenameDetectionTest(TestCase):
         blob2.raw_length = lambda: 3
         self.assertEqual(
           50, _similarity_score(blob1, blob2, block_cache=block_cache))
+
+    def test_tree_entry_sort(self):
+        sha = 'abcd' * 10
+        expected_entries = [
+          TreeChange.add(TreeEntry('aaa', F, sha)),
+          TreeChange(CHANGE_COPY, TreeEntry('bbb', F, sha),
+                     TreeEntry('aab', F, sha)),
+          TreeChange(CHANGE_MODIFY, TreeEntry('bbb', F, sha),
+                     TreeEntry('bbb', F, 'dabc' * 10)),
+          TreeChange(CHANGE_RENAME, TreeEntry('bbc', F, sha),
+                     TreeEntry('ddd', F, sha)),
+          TreeChange.delete(TreeEntry('ccc', F, sha)),
+          ]
+
+        for perm in permutations(expected_entries):
+            self.assertEqual(expected_entries,
+                             sorted(perm, key=_tree_change_key))

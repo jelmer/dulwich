@@ -54,11 +54,12 @@ from dulwich.objects import (
     )
 from dulwich.tests import (
     TestCase,
-    TestSkipped,
     )
 from utils import (
     make_commit,
     make_object,
+    functest_builder,
+    ext_functest_builder,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -446,13 +447,9 @@ class TreeTests(ShaFileCheckTests):
         self.assertRaises(ObjectFormatException,
                           eval_parse_tree, broken_tree, strict=True)
 
-    def test_parse_tree(self):
-        self._do_test_parse_tree(_parse_tree_py)
-
-    def test_parse_tree_extension(self):
-        if parse_tree is _parse_tree_py:
-            raise TestSkipped('parse_tree extension not found')
-        self._do_test_parse_tree(parse_tree)
+    test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
+    test_parse_tree_extension = ext_functest_builder(_do_test_parse_tree,
+                                                     parse_tree)
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
         def do_sort(entries):
@@ -474,13 +471,10 @@ class TreeTests(ShaFileCheckTests):
         self.assertRaises(errors, do_sort, {'foo': ('xxx', myhexsha)})
         self.assertRaises(errors, do_sort, {'foo': (0100755, 12345)})
 
-    def test_sorted_tree_items(self):
-        self._do_test_sorted_tree_items(_sorted_tree_items_py)
-
-    def test_sorted_tree_items_extension(self):
-        if sorted_tree_items is _sorted_tree_items_py:
-            raise TestSkipped('sorted_tree_items extension not found')
-        self._do_test_sorted_tree_items(sorted_tree_items)
+    test_sorted_tree_items = functest_builder(_do_test_sorted_tree_items,
+                                              _sorted_tree_items_py)
+    test_sorted_tree_items_extension = ext_functest_builder(
+      _do_test_sorted_tree_items, sorted_tree_items)
 
     def _do_test_sorted_tree_items_name_order(self, sorted_tree_items):
         self.assertEqual([
@@ -491,13 +485,10 @@ class TreeTests(ShaFileCheckTests):
                     'd80c186a03f423a81b39df39dc87fd269736ca86'),
           ], list(sorted_tree_items(_TREE_ITEMS, True)))
 
-    def test_sorted_tree_items_name_order(self):
-        self._do_test_sorted_tree_items_name_order(_sorted_tree_items_py)
-
-    def test_sorted_tree_items_name_order_extension(self):
-        if sorted_tree_items is _sorted_tree_items_py:
-            raise TestSkipped('sorted_tree_items extension not found')
-        self._do_test_sorted_tree_items_name_order(sorted_tree_items)
+    test_sorted_tree_items_name_order = functest_builder(
+      _do_test_sorted_tree_items_name_order, _sorted_tree_items_py)
+    test_sorted_tree_items_name_order_extension = ext_functest_builder(
+      _do_test_sorted_tree_items_name_order, sorted_tree_items)
 
     def test_check(self):
         t = Tree

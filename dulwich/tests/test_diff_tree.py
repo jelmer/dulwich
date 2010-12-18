@@ -31,6 +31,7 @@ from dulwich.diff_tree import (
     _tree_change_key,
     RenameDetector,
     _is_tree,
+    _is_tree_py
     )
 from dulwich.index import (
     commit_tree,
@@ -48,6 +49,7 @@ from dulwich.objects import (
     )
 from dulwich.tests import (
     TestCase,
+    TestSkipped,
     )
 from dulwich.tests.utils import (
     make_object,
@@ -121,14 +123,22 @@ class TreeChangesTest(DiffTestCase):
           (('c', 0100755, blob_c2.id), (None, None, None)),
           ], _merge_entries('', tree2, tree1))
 
+    def _do_test_is_tree(self, is_tree):
+        self.assertFalse(is_tree(TreeEntry(None, None, None)))
+        self.assertFalse(is_tree(TreeEntry('a', 0100644, 'a' * 40)))
+        self.assertFalse(is_tree(TreeEntry('a', 0100755, 'a' * 40)))
+        self.assertFalse(is_tree(TreeEntry('a', 0120000, 'a' * 40)))
+        self.assertTrue(is_tree(TreeEntry('a', 0040000, 'a' * 40)))
+        self.assertRaises(TypeError, is_tree, TreeEntry('a', 'x', 'a' * 40))
+        self.assertRaises(AttributeError, is_tree, 1234)
+
     def test_is_tree(self):
-        self.assertFalse(_is_tree(TreeEntry(None, None, None)))
-        self.assertFalse(_is_tree(TreeEntry('a', 0100644, 'a' * 40)))
-        self.assertFalse(_is_tree(TreeEntry('a', 0100755, 'a' * 40)))
-        self.assertFalse(_is_tree(TreeEntry('a', 0120000, 'a' * 40)))
-        self.assertTrue(_is_tree(TreeEntry('a', 0040000, 'a' * 40)))
-        self.assertRaises(TypeError, _is_tree, TreeEntry('a', 'x', 'a' * 40))
-        self.assertRaises(AttributeError, _is_tree, 1234)
+        self._do_test_is_tree(_is_tree_py)
+
+    def test_is_tree_extension(self):
+        if _is_tree is _is_tree_py:
+            raise TestSkipped('is_tree extension not found')
+        self._do_test_is_tree(_is_tree)
 
     def assertChangesEqual(self, expected, tree1, tree2, **kwargs):
         actual = list(tree_changes(self.store, tree1.id, tree2.id, **kwargs))

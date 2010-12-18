@@ -27,6 +27,7 @@ from dulwich.diff_tree import (
     TreeChange,
     _merge_entries,
     tree_changes,
+    _count_blocks,
     )
 from dulwich.index import (
     commit_tree,
@@ -35,6 +36,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     )
 from dulwich.objects import (
+    ShaFile,
     Blob,
     )
 from dulwich.tests import (
@@ -248,3 +250,25 @@ class TreeChangesTest(TestCase):
           [TreeChange(CHANGE_MODIFY, ('a', 0100644, blob_a1.id),
                       ('a', 0100644, blob_a2.id))],
           tree1, tree2)
+
+
+class RenameDetectionTest(TestCase):
+
+    def test_count_blocks(self):
+        blob = make_object(Blob, data='a\nb\na\n')
+        self.assertEqual({'a\n': 2, 'b\n': 1}, _count_blocks(blob))
+
+    def test_count_blocks_no_newline(self):
+        blob = make_object(Blob, data='a\na')
+        self.assertEqual({'a\n': 1, 'a': 1}, _count_blocks(blob))
+
+    def test_count_blocks_chunks(self):
+        blob = ShaFile.from_raw_chunks(Blob.type_num, ['a\nb', '\na\n'])
+        self.assertEqual({'a\n': 2, 'b\n': 1}, _count_blocks(blob))
+
+    def test_count_blocks_long_lines(self):
+        a = 'a' * 64
+        data = a + 'xxx\ny\n' + a + 'zzz\n'
+        blob = make_object(Blob, data=data)
+        self.assertEqual({'a' * 64: 2, 'xxx\n': 1, 'y\n': 1, 'zzz\n': 1},
+                         _count_blocks(blob))

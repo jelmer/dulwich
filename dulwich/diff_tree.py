@@ -27,6 +27,7 @@ from dulwich.misc import (
     TreeChangeTuple,
     )
 from dulwich.objects import (
+    S_ISGITLINK,
     TreeEntry,
     )
 
@@ -41,6 +42,7 @@ CHANGE_UNCHANGED = 'unchanged'
 _NULL_ENTRY = TreeEntry(None, None, None)
 
 _MAX_SCORE = 100
+_RENAME_THRESHOLD = 60
 
 
 class TreeChange(TreeChangeTuple):
@@ -257,16 +259,20 @@ def _tree_change_key(entry):
 class RenameDetector(object):
     """Object for handling rename detection between two trees."""
 
-    def __init__(self, store, tree1_id, tree2_id):
+    def __init__(self, store, tree1_id, tree2_id,
+                 rename_threshold=_RENAME_THRESHOLD):
         """Initialize the rename detector.
 
         :param store: An ObjectStore for looking up objects.
         :param tree1_id: The SHA of the first Tree.
         :param tree2_id: The SHA of the second Tree.
+        :param rename_threshold: The threshold similarity score for considering
+            an add/delete pair to be a rename/copy; see _similarity_score.
         """
         self._tree1_id = tree1_id
         self._tree2_id = tree2_id
         self._store = store
+        self._rename_threshold = rename_threshold
 
         self._adds = []
         self._deletes = []
@@ -314,6 +320,45 @@ class RenameDetector(object):
                     self._changes.append(TreeChange(CHANGE_COPY, old, new))
         self._prune(add_paths, delete_paths)
 
+    def _find_content_renames(self):
+        # TODO: Optimizations:
+        #  - Compare object sizes before counting blocks.
+        #  - Skip if delete's S_IFMT differs from all adds.
+        #  - Skip if adds or deletes is empty.
+        candidates = []
+        for delete in self._deletes:
+            if S_ISGITLINK(delete.old.mode):
+                continue  # Git links don't exist in this repo.
+            old_sha = delete.old.sha
+            old_obj = self._store[old_sha]
+            old_blocks = _count_blocks(old_obj)
+            for add in self._adds:
+                if stat.S_IFMT(delete.old.mode) != stat.S_IFMT(add.new.mode):
+                    continue
+                new_obj = self._store[add.new.sha]
+                score = _similarity_score(old_obj, new_obj,
+                                          block_cache={old_sha: old_blocks})
+                if score > self._rename_threshold:
+                    rename = TreeChange(CHANGE_RENAME, delete.old, add.new)
+                    candidates.append((-score, rename))
+
+        # Sort scores from highest to lowest, but keep names in ascending order.
+        candidates.sort()
+
+        delete_paths = set()
+        add_paths = set()
+        for _, change in candidates:
+            new_path = change.new.path
+            if new_path in add_paths:
+                continue
+            old_path = change.old.path
+            if old_path in delete_paths:
+                change = TreeChange(CHANGE_COPY, change.old, change.new)
+            delete_paths.add(old_path)
+            add_paths.add(new_path)
+            self._changes.append(change)
+        self._prune(add_paths, delete_paths)
+
     def _sorted_changes(self):
         result = []
         result.extend(self._adds)
@@ -326,4 +371,5 @@ class RenameDetector(object):
         """Iterate TreeChanges between the two trees, with rename detection."""
         self._collect_changes()
         self._find_exact_renames()
+        self._find_content_renames()
         return self._sorted_changes()

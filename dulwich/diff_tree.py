@@ -204,15 +204,24 @@ def _count_blocks(obj):
     """
     block_counts = defaultdict(int)
     block = StringIO()
+    n = 0
+
+    # Cache attrs as locals to avoid expensive lookups in the inner loop.
+    block_write = block.write
+    block_seek = block.seek
+    block_truncate = block.truncate
+    block_getvalue = block.getvalue
+
     for c in itertools.chain(*obj.as_raw_chunks()):
-        block.write(c)
-        if c == '\n' or block.tell() == _BLOCK_SIZE:
-            block_counts[block.getvalue()] += 1
-            block.seek(0)
-            block.truncate()
-    last_block = block.getvalue()
-    if last_block:
-        block_counts[last_block] += 1
+        block_write(c)
+        n += 1
+        if c == '\n' or n == _BLOCK_SIZE:
+            block_counts[block_getvalue()] += 1
+            block_seek(0)
+            block_truncate()
+            n = 0
+    if n > 0:
+        block_counts[block_getvalue()] += 1
     return block_counts
 
 

@@ -456,8 +456,9 @@ class RenameDetector(object):
 # Hold on to the pure-python implementations for testing.
 _is_tree_py = _is_tree
 _merge_entries_py = _merge_entries
+_count_blocks_py = _count_blocks
 try:
     # Try to import C versions
-    from dulwich._diff_tree import _is_tree, _merge_entries
+    from dulwich._diff_tree import _is_tree, _merge_entries, _count_blocks
 except ImportError:
     pass

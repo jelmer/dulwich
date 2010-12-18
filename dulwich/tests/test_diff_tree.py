@@ -407,6 +407,24 @@ class RenameDetectionTest(DiffTestCase):
            TreeChange.add(('b', F, blob2.id))],
           self.detect_renames(tree1, tree2, rename_threshold=75))
 
+    def test_content_rename_max_files(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd')
+        blob4 = make_object(Blob, data='a\nb\nc\ne\n')
+        blob2 = make_object(Blob, data='e\nf\ng\nh\n')
+        blob3 = make_object(Blob, data='e\nf\ng\ni\n')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob2)])
+        tree2 = self.commit_tree([('c', blob3), ('d', blob4)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('d', F, blob4.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, blob2.id), ('c', F, blob3.id))],
+          self.detect_renames(tree1, tree2))
+        self.assertEqual(
+          [TreeChange.delete(('a', F, blob1.id)),
+           TreeChange.delete(('b', F, blob2.id)),
+           TreeChange.add(('c', F, blob3.id)),
+           TreeChange.add(('d', F, blob4.id))],
+          self.detect_renames(tree1, tree2, max_files=1))
+
     def test_content_rename_one_to_one(self):
         b11 = make_object(Blob, data='a\nb\nc\nd\n')
         b12 = make_object(Blob, data='a\nb\nc\ne\n')

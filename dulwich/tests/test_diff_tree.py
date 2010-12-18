@@ -48,6 +48,7 @@ from dulwich.tests.utils import (
 class TreeChangesTest(TestCase):
 
     def setUp(self):
+        super(TreeChangesTest, self).setUp()
         self.store = MemoryObjectStore()
         self.empty_tree = self.commit_tree([])
 

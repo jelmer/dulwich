@@ -393,3 +393,98 @@ class RenameDetectionTest(DiffTestCase):
            TreeChange(CHANGE_COPY, ('a', F, blob.id), ('e', F, blob.id)),
            TreeChange(CHANGE_RENAME, ('b', F, blob.id), ('d', F, blob.id))],
           self.detect_renames(tree1, tree2))
+
+    def test_content_rename_threshold(self):
+        blob1 = make_object(Blob, data='a\nb\nc\n')
+        blob2 = make_object(Blob, data='a\nb\nd\n')
+        tree1 = self.commit_tree([('a', blob1)])
+        tree2 = self.commit_tree([('b', blob2)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2, rename_threshold=50))
+        self.assertEqual(
+          [TreeChange.delete(('a', F, blob1.id)),
+           TreeChange.add(('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2, rename_threshold=75))
+
+    def test_content_rename_one_to_one(self):
+        b11 = make_object(Blob, data='a\nb\nc\nd\n')
+        b12 = make_object(Blob, data='a\nb\nc\ne\n')
+        b21 = make_object(Blob, data='e\nf\ng\n\h')
+        b22 = make_object(Blob, data='e\nf\ng\n\i')
+        tree1 = self.commit_tree([('a', b11), ('b', b21)])
+        tree2 = self.commit_tree([('c', b12), ('d', b22)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, b11.id), ('c', F, b12.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, b21.id), ('d', F, b22.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_content_rename_one_to_one_ordering(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\ne\nf\n')
+        blob2 = make_object(Blob, data='a\nb\nc\nd\ng\nh\n')
+        # 6/10 match to blob1, 8/10 match to blob2
+        blob3 = make_object(Blob, data='a\nb\nc\nd\ng\ni\n')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob2)])
+        tree2 = self.commit_tree([('c', blob3)])
+        self.assertEqual(
+          [TreeChange.delete(('a', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, blob2.id), ('c', F, blob3.id))],
+          self.detect_renames(tree1, tree2))
+
+        tree3 = self.commit_tree([('a', blob2), ('b', blob1)])
+        tree4 = self.commit_tree([('c', blob3)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob2.id), ('c', F, blob3.id)),
+           TreeChange.delete(('b', F, blob1.id))],
+          self.detect_renames(tree3, tree4))
+
+    def test_content_rename_one_to_many(self):
+        blob1 = make_object(Blob, data='aa\nb\nc\nd\ne\n')
+        blob2 = make_object(Blob, data='ab\nb\nc\nd\ne\n')  # 8/11 match
+        blob3 = make_object(Blob, data='aa\nb\nc\nd\nf\n')  # 9/11 match
+        tree1 = self.commit_tree([('a', blob1)])
+        tree2 = self.commit_tree([('b', blob2), ('c', blob3)])
+        self.assertEqual(
+          [TreeChange(CHANGE_COPY, ('a', F, blob1.id), ('b', F, blob2.id)),
+           TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('c', F, blob3.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_content_rename_many_to_one(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        blob3 = make_object(Blob, data='a\nb\nc\nf\n')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob2)])
+        tree2 = self.commit_tree([('c', blob3)])
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('c', F, blob3.id)),
+           TreeChange.delete(('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_content_rename_many_to_many(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        blob3 = make_object(Blob, data='a\nb\nc\nf\n')
+        blob4 = make_object(Blob, data='a\nb\nc\ng\n')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob2)])
+        tree2 = self.commit_tree([('c', blob3), ('d', blob4)])
+        # TODO(dborowitz): Distribute renames rather than greedily choosing
+        # copies.
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('c', F, blob3.id)),
+           TreeChange(CHANGE_COPY, ('a', F, blob1.id), ('d', F, blob4.id)),
+           TreeChange.delete(('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2))
+
+    def test_content_rename_gitlink(self):
+        blob1 = make_object(Blob, data='blob1')
+        blob2 = make_object(Blob, data='blob2')
+        link1 = '1' * 40
+        link2 = '2' * 40
+        tree1 = self.commit_tree([('a', blob1), ('b', link1, 0160000)])
+        tree2 = self.commit_tree([('c', blob2), ('d', link2, 0160000)])
+        self.assertEqual(
+          [TreeChange.delete(('a', 0100644, blob1.id)),
+           TreeChange.delete(('b', 0160000, link1)),
+           TreeChange.add(('c', 0100644, blob2.id)),
+           TreeChange.add(('d', 0160000, link2))],
+          self.detect_renames(tree1, tree2))

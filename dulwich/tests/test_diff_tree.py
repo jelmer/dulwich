@@ -301,21 +301,22 @@ class RenameDetectionTest(DiffTestCase):
 
     def test_count_blocks(self):
         blob = make_object(Blob, data='a\nb\na\n')
-        self.assertEqual({'a\n': 2, 'b\n': 1}, _count_blocks(blob))
+        self.assertEqual({hash('a\n'): 4, hash('b\n'): 2}, _count_blocks(blob))
 
     def test_count_blocks_no_newline(self):
         blob = make_object(Blob, data='a\na')
-        self.assertEqual({'a\n': 1, 'a': 1}, _count_blocks(blob))
+        self.assertEqual({hash('a\n'): 2, hash('a'): 1}, _count_blocks(blob))
 
     def test_count_blocks_chunks(self):
         blob = ShaFile.from_raw_chunks(Blob.type_num, ['a\nb', '\na\n'])
-        self.assertEqual({'a\n': 2, 'b\n': 1}, _count_blocks(blob))
+        self.assertEqual({hash('a\n'): 4, hash('b\n'): 2}, _count_blocks(blob))
 
     def test_count_blocks_long_lines(self):
         a = 'a' * 64
         data = a + 'xxx\ny\n' + a + 'zzz\n'
         blob = make_object(Blob, data=data)
-        self.assertEqual({'a' * 64: 2, 'xxx\n': 1, 'y\n': 1, 'zzz\n': 1},
+        self.assertEqual({hash('a' * 64): 128, hash('xxx\n'): 4, hash('y\n'): 2,
+                          hash('zzz\n'): 4},
                          _count_blocks(blob))
 
     def assertSimilar(self, expected_score, blob1, blob2):

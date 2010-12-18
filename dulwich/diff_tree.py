@@ -200,7 +200,7 @@ def _count_blocks(obj):
     Splits the data into blocks either on lines or <=64-byte chunks of lines.
 
     :param obj: The object to count blocks for.
-    :return: A dict of block -> number of occurrences.
+    :return: A dict of block hashcode -> total bytes occurring.
     """
     block_counts = defaultdict(int)
     block = StringIO()
@@ -216,17 +216,25 @@ def _count_blocks(obj):
         block_write(c)
         n += 1
         if c == '\n' or n == _BLOCK_SIZE:
-            block_counts[block_getvalue()] += 1
+            value = block_getvalue()
+            block_counts[hash(value)] += len(value)
             block_seek(0)
             block_truncate()
             n = 0
     if n > 0:
-        block_counts[block_getvalue()] += 1
+        last_block = block_getvalue()
+        block_counts[hash(last_block)] += len(last_block)
     return block_counts
 
 
 def _common_bytes(blocks1, blocks2):
-    """Count the number of common bytes in two block count dicts."""
+    """Count the number of common bytes in two block count dicts.
+
+    :param block1: The first dict of block hashcode -> total bytes.
+    :param block2: The second dict of block hashcode -> total bytes.
+    :return: The number of bytes in common between blocks1 and blocks2. This is
+        only approximate due to possible hash collisions.
+    """
     # Iterate over the smaller of the two dicts, since this is symmetrical.
     if len(blocks1) > len(blocks2):
         blocks1, blocks2 = blocks2, blocks1
@@ -234,7 +242,7 @@ def _common_bytes(blocks1, blocks2):
     for block, count1 in blocks1.iteritems():
         count2 = blocks2.get(block)
         if count2:
-            score += min(count1, count2) * len(block)
+            score += min(count1, count2)
     return score
 
 

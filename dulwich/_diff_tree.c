@@ -35,7 +35,8 @@ static int block_size;
 /**
  * Free an array of PyObject pointers, decrementing any references.
  */
-static void free_objects(PyObject **objs, Py_ssize_t n) {
+static void free_objects(PyObject **objs, Py_ssize_t n)
+{
 	Py_ssize_t i;
 	for (i = 0; i < n; i++)
 		Py_XDECREF(objs[i]);
@@ -53,7 +54,8 @@ static void free_objects(PyObject **objs, Py_ssize_t n) {
  *     in tree.
  */
 static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
-		Py_ssize_t *n) {
+		Py_ssize_t *n)
+{
 	PyObject *iteritems, *items, **result = NULL;
 	PyObject *old_entry, *name, *sha;
 	Py_ssize_t i = 0, name_len, new_path_len;
@@ -137,9 +139,10 @@ error:
 /**
  * Use strcmp to compare the paths of two TreeEntry objects.
  */
-static int entry_path_cmp(PyObject *entry1, PyObject *entry2) {
+static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
+{
 	PyObject *path1 = NULL, *path2 = NULL;
-	int result;
+	int result = 0;
 
 	path1 = PyObject_GetAttrString(entry1, "path");
 	if (!path1)
@@ -268,7 +271,8 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 	return result;
 }
 
-static int add_hash(PyObject *get, PyObject *set, char *str, int n) {
+static int add_hash(PyObject *get, PyObject *set, char *str, int n)
+{
 	PyObject *str_obj = NULL, *hash_obj = NULL, *value = NULL,
 		*set_value = NULL;
 	long hash;

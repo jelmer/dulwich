@@ -51,10 +51,11 @@ from dulwich.objects import (
     )
 from dulwich.tests import (
     TestCase,
-    TestSkipped,
     )
 from dulwich.tests.utils import (
     make_object,
+    functest_builder,
+    ext_functest_builder,
     )
 
 # Shorthand mode for Files.
@@ -134,13 +135,10 @@ class TreeChangesTest(DiffTestCase):
         self.assertMergeFails(merge_entries, 'a', 'deadbeef', '1' * 40)
         self.assertMergeFails(merge_entries, 'a', 0100644, 0xdeadbeef)
 
-    def test_merge_entries(self):
-        self._do_test_merge_entries(_merge_entries_py)
-
-    def test_merge_entries_extension(self):
-        if _merge_entries is _merge_entries_py:
-            raise TestSkipped('merge_entries extension not found')
-        self._do_test_merge_entries(_merge_entries)
+    test_merge_entries = functest_builder(_do_test_merge_entries,
+                                          _merge_entries_py)
+    test_merge_entries_extension = ext_functest_builder(_do_test_merge_entries,
+                                                        _merge_entries)
 
     def _do_test_is_tree(self, is_tree):
         self.assertFalse(is_tree(TreeEntry(None, None, None)))
@@ -151,13 +149,8 @@ class TreeChangesTest(DiffTestCase):
         self.assertRaises(TypeError, is_tree, TreeEntry('a', 'x', 'a' * 40))
         self.assertRaises(AttributeError, is_tree, 1234)
 
-    def test_is_tree(self):
-        self._do_test_is_tree(_is_tree_py)
-
-    def test_is_tree_extension(self):
-        if _is_tree is _is_tree_py:
-            raise TestSkipped('is_tree extension not found')
-        self._do_test_is_tree(_is_tree)
+    test_is_tree = functest_builder(_do_test_is_tree, _is_tree_py)
+    test_is_tree_extension = ext_functest_builder(_do_test_is_tree, _is_tree)
 
     def assertChangesEqual(self, expected, tree1, tree2, **kwargs):
         actual = list(tree_changes(self.store, tree1.id, tree2.id, **kwargs))

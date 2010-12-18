@@ -28,6 +28,9 @@ import stat
 import tempfile
 import urllib2
 
+from dulwich.diff_tree import (
+    tree_changes,
+    )
 from dulwich.errors import (
     NotTreeError,
     )
@@ -129,52 +132,14 @@ class BaseObjectStore(object):
         :param object_store: Object store to use for retrieving tree contents
         :param tree: SHA1 of the root tree
         :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :return: Iterator over tuples with
+            (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
-        todo = set([(source, target, "")])
-        while todo:
-            (sid, tid, path) = todo.pop()
-            if sid is not None:
-                stree = self[sid]
-            else:
-                stree = {}
-            if tid is not None:
-                ttree = self[tid]
-            else:
-                ttree = {}
-            for name, oldmode, oldhexsha in stree.iteritems():
-                oldchildpath = posixpath.join(path, name)
-                try:
-                    (newmode, newhexsha) = ttree[name]
-                    newchildpath = oldchildpath
-                except KeyError:
-                    newmode = None
-                    newhexsha = None
-                    newchildpath = None
-                if (want_unchanged or oldmode != newmode or
-                    oldhexsha != newhexsha):
-                    if stat.S_ISDIR(oldmode):
-                        if newmode is None or stat.S_ISDIR(newmode):
-                            todo.add((oldhexsha, newhexsha, oldchildpath))
-                        else:
-                            # entry became a file
-                            todo.add((oldhexsha, None, oldchildpath))
-                            yield ((None, newchildpath), (None, newmode), (None, newhexsha))
-                    else:
-                        if newmode is not None and stat.S_ISDIR(newmode):
-                            # entry became a dir
-                            yield ((oldchildpath, None), (oldmode, None), (oldhexsha, None))
-                            todo.add((None, newhexsha, newchildpath))
-                        else:
-                            yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
-
-            for name, newmode, newhexsha in ttree.iteritems():
-                childpath = posixpath.join(path, name)
-                if not name in stree:
-                    if not stat.S_ISDIR(newmode):
-                        yield ((None, childpath), (None, newmode), (None, newhexsha))
-                    else:
-                        todo.add((None, newhexsha, childpath))
+        for change in tree_changes(self, source, target,
+                                   want_unchanged=want_unchanged):
+            yield ((change.old.path, change.new.path),
+                   (change.old.mode, change.new.mode),
+                   (change.old.sha, change.new.sha))
 
     def iter_tree_contents(self, tree_id, include_trees=False):
         """Iterate the contents of a tree and all subtrees.

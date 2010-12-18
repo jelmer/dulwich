@@ -43,6 +43,7 @@ _NULL_ENTRY = TreeEntry(None, None, None)
 
 _MAX_SCORE = 100
 _RENAME_THRESHOLD = 60
+_MAX_FILES = 200
 
 
 class TreeChange(TreeChangeTuple):
@@ -260,7 +261,7 @@ class RenameDetector(object):
     """Object for handling rename detection between two trees."""
 
     def __init__(self, store, tree1_id, tree2_id,
-                 rename_threshold=_RENAME_THRESHOLD):
+                 rename_threshold=_RENAME_THRESHOLD, max_files=_MAX_FILES):
         """Initialize the rename detector.
 
         :param store: An ObjectStore for looking up objects.
@@ -268,11 +269,17 @@ class RenameDetector(object):
         :param tree2_id: The SHA of the second Tree.
         :param rename_threshold: The threshold similarity score for considering
             an add/delete pair to be a rename/copy; see _similarity_score.
+        :param max_files: The maximum number of adds and deletes to consider, or
+            None for no limit. The detector is guaranteed to compare no more
+            than max_files ** 2 add/delete pairs. This limit is provided because
+            rename detection can be quadratic in the project size. If the limit
+            is exceeded, no content rename detection is attempted.
         """
         self._tree1_id = tree1_id
         self._tree2_id = tree2_id
         self._store = store
         self._rename_threshold = rename_threshold
+        self._max_files = max_files
 
         self._adds = []
         self._deletes = []
@@ -325,6 +332,11 @@ class RenameDetector(object):
         #  - Compare object sizes before counting blocks.
         #  - Skip if delete's S_IFMT differs from all adds.
         #  - Skip if adds or deletes is empty.
+        # Match C git's behavior of not attempting to find content renames if
+        # the matrix size exceeds the threshold.
+        if len(self._adds) * len(self._deletes) > self._max_files ** 2:
+            return
+
         candidates = []
         for delete in self._deletes:
             if S_ISGITLINK(delete.old.mode):

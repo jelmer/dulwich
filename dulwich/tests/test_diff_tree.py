@@ -45,10 +45,10 @@ from dulwich.tests.utils import (
     )
 
 
-class TreeChangesTest(TestCase):
+class DiffTestCase(TestCase):
 
     def setUp(self):
-        super(TreeChangesTest, self).setUp()
+        super(DiffTestCase, self).setUp()
         self.store = MemoryObjectStore()
         self.empty_tree = self.commit_tree([])
 
@@ -58,6 +58,9 @@ class TreeChangesTest(TestCase):
             self.store.add_object(blob)
             commit_blobs.append((path, blob.id, mode))
         return self.store[commit_tree(self.store, commit_blobs)]
+
+
+class TreeChangesTest(DiffTestCase):
 
     def test_merge_entries(self):
         blob_a1 = make_object(Blob, data='a1')

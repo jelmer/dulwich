@@ -104,6 +104,13 @@ def _merge_entries(path, tree1, tree2):
     return result
 
 
+def _is_tree(entry):
+    mode = entry.mode
+    if mode is None:
+        return False
+    return stat.S_ISDIR(mode)
+
+
 def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     """Recursively walk all the entries of two trees.
 
@@ -124,8 +131,8 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     todo = [(TreeEntry('', mode1, tree1_id), TreeEntry('', mode2, tree2_id))]
     while todo:
         entry1, entry2 = todo.pop()
-        is_tree1 = entry1.mode and stat.S_ISDIR(entry1.mode)
-        is_tree2 = entry2.mode and stat.S_ISDIR(entry2.mode)
+        is_tree1 = _is_tree(entry1)
+        is_tree2 = _is_tree(entry2)
         if prune_identical and is_tree1 and is_tree2 and entry1 == entry2:
             continue
 

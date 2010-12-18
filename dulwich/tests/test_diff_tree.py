@@ -25,6 +25,7 @@ from dulwich.diff_tree import (
     CHANGE_UNCHANGED,
     TreeChange,
     _merge_entries,
+    _merge_entries_py,
     tree_changes,
     _count_blocks,
     _similarity_score,
@@ -46,6 +47,7 @@ from dulwich.objects import (
     ShaFile,
     Blob,
     TreeEntry,
+    Tree,
     )
 from dulwich.tests import (
     TestCase,
@@ -85,7 +87,12 @@ class DiffTestCase(TestCase):
 
 class TreeChangesTest(DiffTestCase):
 
-    def test_merge_entries(self):
+    def assertMergeFails(self, merge_entries, name, mode, sha):
+        t = Tree()
+        t[name] = (mode, sha)
+        self.assertRaises(TypeError, merge_entries, '', t, t)
+
+    def _do_test_merge_entries(self, merge_entries):
         blob_a1 = make_object(Blob, data='a1')
         blob_a2 = make_object(Blob, data='a2')
         blob_b1 = make_object(Blob, data='b1')
@@ -95,33 +102,45 @@ class TreeChangesTest(DiffTestCase):
         tree2 = self.commit_tree([('a', blob_a2, 0100644),
                                   ('c', blob_c2, 0100755)])
 
-        self.assertEqual([], _merge_entries('', self.empty_tree,
-                                            self.empty_tree))
+        self.assertEqual([], merge_entries('', self.empty_tree,
+                                           self.empty_tree))
         self.assertEqual([
           ((None, None, None), ('a', 0100644, blob_a1.id)),
           ((None, None, None), ('b', 0100755, blob_b1.id)),
-          ], _merge_entries('', self.empty_tree, tree1))
+          ], merge_entries('', self.empty_tree, tree1))
         self.assertEqual([
           ((None, None, None), ('x/a', 0100644, blob_a1.id)),
           ((None, None, None), ('x/b', 0100755, blob_b1.id)),
-          ], _merge_entries('x', self.empty_tree, tree1))
+          ], merge_entries('x', self.empty_tree, tree1))
 
         self.assertEqual([
           (('a', 0100644, blob_a2.id), (None, None, None)),
           (('c', 0100755, blob_c2.id), (None, None, None)),
-          ], _merge_entries('', tree2, self.empty_tree))
+          ], merge_entries('', tree2, self.empty_tree))
 
         self.assertEqual([
           (('a', 0100644, blob_a1.id), ('a', 0100644, blob_a2.id)),
           (('b', 0100755, blob_b1.id), (None, None, None)),
           ((None, None, None), ('c', 0100755, blob_c2.id)),
-          ], _merge_entries('', tree1, tree2))
+          ], merge_entries('', tree1, tree2))
 
         self.assertEqual([
           (('a', 0100644, blob_a2.id), ('a', 0100644, blob_a1.id)),
           ((None, None, None), ('b', 0100755, blob_b1.id)),
           (('c', 0100755, blob_c2.id), (None, None, None)),
-          ], _merge_entries('', tree2, tree1))
+          ], merge_entries('', tree2, tree1))
+
+        self.assertMergeFails(merge_entries, 0xdeadbeef, 0100644, '1' * 40)
+        self.assertMergeFails(merge_entries, 'a', 'deadbeef', '1' * 40)
+        self.assertMergeFails(merge_entries, 'a', 0100644, 0xdeadbeef)
+
+    def test_merge_entries(self):
+        self._do_test_merge_entries(_merge_entries_py)
+
+    def test_merge_entries_extension(self):
+        if _merge_entries is _merge_entries_py:
+            raise TestSkipped('merge_entries extension not found')
+        self._do_test_merge_entries(_merge_entries)
 
     def _do_test_is_tree(self, is_tree):
         self.assertFalse(is_tree(TreeEntry(None, None, None)))

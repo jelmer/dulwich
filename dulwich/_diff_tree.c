@@ -28,7 +28,9 @@ typedef int Py_ssize_t;
 #define Py_SIZE(x) Py_Size(x)
 #endif
 
-static PyObject *tree_entry_cls, *null_entry;
+static PyObject *tree_entry_cls = NULL, *null_entry = NULL,
+	*defaultdict_cls = NULL, *int_cls = NULL;
+static int block_size;
 
 /**
  * Free an array of PyObject pointers, decrementing any references.
@@ -266,34 +268,178 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 	return result;
 }
 
+static int add_hash(PyObject *get, PyObject *set, char *str, int n) {
+	PyObject *str_obj = NULL, *hash_obj = NULL, *value = NULL,
+		*set_value = NULL;
+	long hash;
+
+	/* It would be nice to hash without copying str into a PyString, but that
+	 * isn't exposed by the API. */
+	str_obj = PyString_FromStringAndSize(str, n);
+	if (!str_obj)
+		goto error;
+	hash = PyObject_Hash(str_obj);
+	if (hash == -1)
+		goto error;
+	hash_obj = PyInt_FromLong(hash);
+	if (!hash_obj)
+		goto error;
+
+	value = PyObject_CallFunctionObjArgs(get, hash_obj, NULL);
+	if (!value)
+		goto error;
+	set_value = PyObject_CallFunction(set, "(Ol)", hash_obj,
+		PyInt_AS_LONG(value) + n);
+	if (!set_value)
+		goto error;
+
+	Py_DECREF(str_obj);
+	Py_DECREF(hash_obj);
+	Py_DECREF(value);
+	Py_DECREF(set_value);
+	return 0;
+
+error:
+	Py_XDECREF(str_obj);
+	Py_XDECREF(hash_obj);
+	Py_XDECREF(value);
+	Py_XDECREF(set_value);
+	return -1;
+}
+
+static PyObject *py_count_blocks(PyObject *self, PyObject *args)
+{
+	PyObject *obj, *chunks = NULL, *chunk, *counts = NULL, *get = NULL,
+		*set = NULL;
+	char *chunk_str, *block = NULL;
+	Py_ssize_t num_chunks, chunk_len;
+	int i, j, n = 0;
+	char c;
+
+	if (!PyArg_ParseTuple(args, "O", &obj))
+		goto error;
+
+	counts = PyObject_CallFunctionObjArgs(defaultdict_cls, int_cls, NULL);
+	if (!counts)
+		goto error;
+	get = PyObject_GetAttrString(counts, "__getitem__");
+	set = PyObject_GetAttrString(counts, "__setitem__");
+
+	chunks = PyObject_CallMethod(obj, "as_raw_chunks", NULL);
+	if (!chunks)
+		goto error;
+	if (!PyList_Check(chunks)) {
+		PyErr_SetString(PyExc_TypeError,
+			"as_raw_chunks() did not return a list");
+		goto error;
+	}
+	num_chunks = PyList_GET_SIZE(chunks);
+	block = PyMem_New(char, block_size);
+	if (!block) {
+		PyErr_SetNone(PyExc_MemoryError);
+		goto error;
+	}
+
+	for (i = 0; i < num_chunks; i++) {
+		chunk = PyList_GET_ITEM(chunks, i);
+		if (!PyString_Check(chunk)) {
+			PyErr_SetString(PyExc_TypeError, "chunk is not a string");
+			goto error;
+		}
+		if (PyString_AsStringAndSize(chunk, &chunk_str, &chunk_len) == -1)
+			goto error;
+
+		for (j = 0; j < chunk_len; j++) {
+			c = chunk_str[j];
+			block[n++] = c;
+			if (c == '\n' || n == block_size) {
+				if (add_hash(get, set, block, n) == -1)
+					goto error;
+				n = 0;
+			}
+		}
+	}
+	if (n && add_hash(get, set, block, n) == -1)
+		goto error;
+
+	Py_DECREF(chunks);
+	Py_DECREF(get);
+	Py_DECREF(set);
+	PyMem_Free(block);
+	return counts;
+
+error:
+	Py_XDECREF(chunks);
+	Py_XDECREF(get);
+	Py_XDECREF(set);
+	Py_XDECREF(counts);
+	PyMem_Free(block);
+	return NULL;
+}
+
 static PyMethodDef py_diff_tree_methods[] = {
 	{ "_is_tree", (PyCFunction)py_is_tree, METH_VARARGS, NULL },
 	{ "_merge_entries", (PyCFunction)py_merge_entries, METH_VARARGS, NULL },
+	{ "_count_blocks", (PyCFunction)py_count_blocks, METH_VARARGS, NULL },
 	{ NULL, NULL, 0, NULL }
 };
 
 PyMODINIT_FUNC
 init_diff_tree(void)
 {
-	PyObject *m, *objects_mod, *diff_mod;
+	PyObject *m, *objects_mod = NULL, *diff_tree_mod = NULL;
+        PyObject *block_size_obj = NULL;
 	m = Py_InitModule("_diff_tree", py_diff_tree_methods);
 	if (!m)
-		return;
+		goto error;
 
 	objects_mod = PyImport_ImportModule("dulwich.objects");
 	if (!objects_mod)
-		return;
+		goto error;
 
 	tree_entry_cls = PyObject_GetAttrString(objects_mod, "TreeEntry");
 	Py_DECREF(objects_mod);
 	if (!tree_entry_cls)
-		return;
+		goto error;
 
-	diff_mod = PyImport_ImportModule("dulwich.diff");
-	if (!diff_mod)
-		return;
-	null_entry = PyObject_GetAttrString(diff_mod, "_NULL_ENTRY");
-	Py_DECREF(diff_mod);
+	diff_tree_mod = PyImport_ImportModule("dulwich.diff_tree");
+	if (!diff_tree_mod)
+		goto error;
+
+	null_entry = PyObject_GetAttrString(diff_tree_mod, "_NULL_ENTRY");
 	if (!null_entry)
-		return;
+		goto error;
+
+	block_size_obj = PyObject_GetAttrString(diff_tree_mod, "_BLOCK_SIZE");
+	if (!block_size_obj)
+		goto error;
+	block_size = (int)PyInt_AsLong(block_size_obj);
+
+	if (PyErr_Occurred())
+		goto error;
+
+	defaultdict_cls = PyObject_GetAttrString(diff_tree_mod, "defaultdict");
+	if (!defaultdict_cls)
+		goto error;
+
+	/* This is kind of hacky, but I don't know of a better way to get the
+	 * PyObject* version of int. */
+	int_cls = PyDict_GetItemString(PyEval_GetBuiltins(), "int");
+	if (!int_cls) {
+		PyErr_SetString(PyExc_NameError, "int");
+		goto error;
+	}
+
+	Py_DECREF(objects_mod);
+	Py_DECREF(diff_tree_mod);
+	return;
+
+error:
+	Py_XDECREF(objects_mod);
+	Py_XDECREF(diff_tree_mod);
+	Py_XDECREF(null_entry);
+	Py_XDECREF(block_size_obj);
+	Py_XDECREF(defaultdict_cls);
+	Py_XDECREF(int_cls);
+	return;
 }

@@ -19,11 +19,8 @@
 """Tests for file and tree diff utilities."""
 
 from dulwich.diff_tree import (
-    CHANGE_ADD,
     CHANGE_MODIFY,
-    CHANGE_DELETE,
     CHANGE_UNCHANGED,
-    _NULL_ENTRY,
     TreeChange,
     _merge_entries,
     tree_changes,
@@ -128,12 +125,12 @@ class TreeChangesTest(TestCase):
         tree = self.commit_tree([('a', blob_a, 0100644),
                                  ('x/b', blob_b, 0100755)])
         self.assertChangesEqual(
-          [TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a', 0100644, blob_a.id)),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('x/b', 0100755, blob_b.id))],
+          [TreeChange.add(('a', 0100644, blob_a.id)),
+           TreeChange.add(('x/b', 0100755, blob_b.id))],
           self.empty_tree, tree)
         self.assertChangesEqual(
-          [TreeChange(CHANGE_DELETE, ('a', 0100644, blob_a.id), _NULL_ENTRY),
-           TreeChange(CHANGE_DELETE, ('x/b', 0100755, blob_b.id), _NULL_ENTRY)],
+          [TreeChange.delete(('a', 0100644, blob_a.id)),
+           TreeChange.delete(('x/b', 0100755, blob_b.id))],
           tree, self.empty_tree)
 
     def test_tree_changes_modify_contents(self):
@@ -159,8 +156,8 @@ class TreeChangesTest(TestCase):
         tree1 = self.commit_tree([('a', blob_a1, 0100644)])
         tree2 = self.commit_tree([('a', blob_a2, 0120000)])
         self.assertChangesEqual(
-          [TreeChange(CHANGE_DELETE, ('a', 0100644, blob_a1.id), _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a', 0120000, blob_a2.id))],
+          [TreeChange.delete(('a', 0100644, blob_a1.id)),
+           TreeChange.add(('a', 0120000, blob_a2.id))],
           tree1, tree2)
 
     def test_tree_changes_to_tree(self):
@@ -169,8 +166,8 @@ class TreeChangesTest(TestCase):
         tree1 = self.commit_tree([('a', blob_a, 0100644)])
         tree2 = self.commit_tree([('a/x', blob_x, 0100644)])
         self.assertChangesEqual(
-          [TreeChange(CHANGE_DELETE, ('a', 0100644, blob_a.id), _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a/x', 0100644, blob_x.id))],
+          [TreeChange.delete(('a', 0100644, blob_a.id)),
+           TreeChange.add(('a/x', 0100644, blob_x.id))],
           tree1, tree2)
 
     def test_tree_changes_complex(self):
@@ -201,14 +198,11 @@ class TreeChangesTest(TestCase):
         self.assertChangesEqual(
           [TreeChange(CHANGE_MODIFY, ('a', 0100644, blob_a_1.id),
                       ('a', 0100644, blob_a_2.id)),
-           TreeChange(CHANGE_DELETE, ('b/x/2', 0100644, blob_bx2_1.id),
-                      _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('b/y', 0100644, blob_by_2.id)),
-           TreeChange(CHANGE_DELETE, ('b/y/1', 0100644, blob_by1_1.id),
-                      _NULL_ENTRY),
-           TreeChange(CHANGE_DELETE, ('b/y/2', 0100644, blob_by2_1.id),
-                      _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('c', 0100644, blob_c_2.id))],
+           TreeChange.delete(('b/x/2', 0100644, blob_bx2_1.id)),
+           TreeChange.add(('b/y', 0100644, blob_by_2.id)),
+           TreeChange.delete(('b/y/1', 0100644, blob_by1_1.id)),
+           TreeChange.delete(('b/y/2', 0100644, blob_by2_1.id)),
+           TreeChange.add(('c', 0100644, blob_c_2.id))],
           tree1, tree2)
 
     def test_tree_changes_name_order(self):
@@ -227,10 +221,10 @@ class TreeChangesTest(TestCase):
           ])
 
         self.assertChangesEqual(
-          [TreeChange(CHANGE_DELETE, ('a', 0100644, blob.id), _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a/x', 0100644, blob.id)),
-           TreeChange(CHANGE_DELETE, ('a.', 0100644, blob.id), _NULL_ENTRY),
-           TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a./x', 0100644, blob.id))],
+          [TreeChange.delete(('a', 0100644, blob.id)),
+           TreeChange.add(('a/x', 0100644, blob.id)),
+           TreeChange.delete(('a.', 0100644, blob.id)),
+           TreeChange.add(('a./x', 0100644, blob.id))],
           tree1, tree2)
 
     def test_tree_changes_prune(self):

@@ -18,9 +18,12 @@
 
 """Utilities for diffing files and trees."""
 
+from cStringIO import StringIO
+import itertools
 import stat
 
 from dulwich.misc import (
+    defaultdict,
     TreeChangeTuple,
     )
 from dulwich.objects import (
@@ -166,3 +169,28 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
             # Both were None because at least one was a tree.
             continue
         yield TreeChange(change_type, entry1, entry2)
+
+
+_BLOCK_SIZE = 64
+
+
+def _count_blocks(obj):
+    """Count the blocks in an object.
+
+    Splits the data into blocks either on lines or <=64-byte chunks of lines.
+
+    :param obj: The object to count blocks for.
+    :return: A dict of block -> number of occurrences.
+    """
+    block_counts = defaultdict(int)
+    block = StringIO()
+    for c in itertools.chain(*obj.as_raw_chunks()):
+        block.write(c)
+        if c == '\n' or block.tell() == _BLOCK_SIZE:
+            block_counts[block.getvalue()] += 1
+            block.seek(0)
+            block.truncate()
+    last_block = block.getvalue()
+    if last_block:
+        block_counts[last_block] += 1
+    return block_counts

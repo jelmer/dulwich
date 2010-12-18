@@ -40,6 +40,8 @@ CHANGE_UNCHANGED = 'unchanged'
 
 _NULL_ENTRY = TreeEntry(None, None, None)
 
+_MAX_SCORE = 100
+
 
 class TreeChange(TreeChangeTuple):
     """Class encapsulating a single change between two trees."""
@@ -194,3 +196,41 @@ def _count_blocks(obj):
     if last_block:
         block_counts[last_block] += 1
     return block_counts
+
+
+def _common_bytes(blocks1, blocks2):
+    """Count the number of common bytes in two block count dicts."""
+    # Iterate over the smaller of the two dicts, since this is symmetrical.
+    if len(blocks1) > len(blocks2):
+        blocks1, blocks2 = blocks2, blocks1
+    score = 0
+    for block, count1 in blocks1.iteritems():
+        count2 = blocks2.get(block)
+        if count2:
+            score += min(count1, count2) * len(block)
+    return score
+
+
+def _similarity_score(obj1, obj2, block_cache=None):
+    """Compute a similarity score for two objects.
+
+    :param obj1: The first object to score.
+    :param obj2: The second object to score.
+    :param block_cache: An optional dict of SHA to block counts to cache results
+        between calls.
+    :return: The similarity score between the two objects, defined as the number
+        of bytes in common between the two objects divided by the maximum size,
+        scaled to the range 0-100.
+    """
+    if block_cache is None:
+        block_cache = {}
+    if obj1.id not in block_cache:
+        block_cache[obj1.id] = _count_blocks(obj1)
+    if obj2.id not in block_cache:
+        block_cache[obj2.id] = _count_blocks(obj2)
+
+    common_bytes = _common_bytes(block_cache[obj1.id], block_cache[obj2.id])
+    max_size = max(obj1.raw_length(), obj2.raw_length())
+    if not max_size:
+        return _MAX_SCORE
+    return int(float(common_bytes) * _MAX_SCORE / max_size)

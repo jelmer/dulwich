@@ -28,6 +28,7 @@ from dulwich.diff_tree import (
     _merge_entries,
     tree_changes,
     _count_blocks,
+    _similarity_score,
     )
 from dulwich.index import (
     commit_tree,
@@ -272,3 +273,40 @@ class RenameDetectionTest(TestCase):
         blob = make_object(Blob, data=data)
         self.assertEqual({'a' * 64: 2, 'xxx\n': 1, 'y\n': 1, 'zzz\n': 1},
                          _count_blocks(blob))
+
+    def assertSimilar(self, expected_score, blob1, blob2):
+        self.assertEqual(expected_score, _similarity_score(blob1, blob2))
+        self.assertEqual(expected_score, _similarity_score(blob2, blob1))
+
+    def test_similarity_score(self):
+        blob0 = make_object(Blob, data='')
+        blob1 = make_object(Blob, data='ab\ncd\ncd\n')
+        blob2 = make_object(Blob, data='ab\n')
+        blob3 = make_object(Blob, data='cd\n')
+        blob4 = make_object(Blob, data='cd\ncd\n')
+
+        self.assertSimilar(100, blob0, blob0)
+        self.assertSimilar(0, blob0, blob1)
+        self.assertSimilar(33, blob1, blob2)
+        self.assertSimilar(33, blob1, blob3)
+        self.assertSimilar(66, blob1, blob4)
+        self.assertSimilar(0, blob2, blob3)
+        self.assertSimilar(50, blob3, blob4)
+
+    def test_similarity_score_cache(self):
+        blob1 = make_object(Blob, data='ab\ncd\n')
+        blob2 = make_object(Blob, data='ab\n')
+
+        block_cache = {}
+        self.assertEqual(
+          50, _similarity_score(blob1, blob2, block_cache=block_cache))
+        self.assertEqual(set([blob1.id, blob2.id]), set(block_cache))
+
+        def fail_chunks():
+            self.fail('Unexpected call to as_raw_chunks()')
+
+        blob1.as_raw_chunks = blob2.as_raw_chunks = fail_chunks
+        blob1.raw_length = lambda: 6
+        blob2.raw_length = lambda: 3
+        self.assertEqual(
+          50, _similarity_score(blob1, blob2, block_cache=block_cache))

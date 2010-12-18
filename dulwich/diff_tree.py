@@ -44,6 +44,7 @@ _NULL_ENTRY = TreeEntry(None, None, None)
 _MAX_SCORE = 100
 _RENAME_THRESHOLD = 60
 _MAX_FILES = 200
+_REWRITE_THRESHOLD = None
 
 
 class TreeChange(TreeChangeTuple):
@@ -268,7 +269,8 @@ class RenameDetector(object):
     """Object for handling rename detection between two trees."""
 
     def __init__(self, store, tree1_id, tree2_id,
-                 rename_threshold=_RENAME_THRESHOLD, max_files=_MAX_FILES):
+                 rename_threshold=_RENAME_THRESHOLD, max_files=_MAX_FILES,
+                 rewrite_threshold=_REWRITE_THRESHOLD):
         """Initialize the rename detector.
 
         :param store: An ObjectStore for looking up objects.
@@ -281,16 +283,28 @@ class RenameDetector(object):
             than max_files ** 2 add/delete pairs. This limit is provided because
             rename detection can be quadratic in the project size. If the limit
             is exceeded, no content rename detection is attempted.
+        :param rewrite_threshold: The threshold similarity score below which a
+            modify should be considered a delete/add, or None to not break
+            modifies; see _similarity_score.
         """
         self._tree1_id = tree1_id
         self._tree2_id = tree2_id
         self._store = store
         self._rename_threshold = rename_threshold
+        self._rewrite_threshold = rewrite_threshold
         self._max_files = max_files
 
         self._adds = []
         self._deletes = []
         self._changes = []
+
+    def _should_split(self, change):
+        if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or
+            change.old.sha == change.new.sha):
+            return False
+        old_obj = self._store[change.old.sha]
+        new_obj = self._store[change.new.sha]
+        return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
 
     def _collect_changes(self):
         for change in tree_changes(self._store, self._tree1_id, self._tree2_id):
@@ -298,6 +312,9 @@ class RenameDetector(object):
                 self._adds.append(change)
             elif change.type == CHANGE_DELETE:
                 self._deletes.append(change)
+            elif self._should_split(change):
+                self._deletes.append(TreeChange.delete(change.old))
+                self._adds.append(TreeChange.add(change.new))
             else:
                 self._changes.append(change)
 
@@ -344,6 +361,7 @@ class RenameDetector(object):
         if len(self._adds) * len(self._deletes) > self._max_files ** 2:
             return
 
+        check_paths = self._rename_threshold is not None
         candidates = []
         for delete in self._deletes:
             if S_ISGITLINK(delete.old.mode):
@@ -358,7 +376,13 @@ class RenameDetector(object):
                 score = _similarity_score(old_obj, new_obj,
                                           block_cache={old_sha: old_blocks})
                 if score > self._rename_threshold:
-                    rename = TreeChange(CHANGE_RENAME, delete.old, add.new)
+                    if check_paths and delete.old.path == add.new.path:
+                        # If the paths match, this must be a split modify, so
+                        # make sure it comes out as a modify.
+                        new_type = CHANGE_MODIFY
+                    else:
+                        new_type = CHANGE_RENAME
+                    rename = TreeChange(new_type, delete.old, add.new)
                     candidates.append((-score, rename))
 
         # Sort scores from highest to lowest, but keep names in ascending order.
@@ -378,6 +402,23 @@ class RenameDetector(object):
             self._changes.append(change)
         self._prune(add_paths, delete_paths)
 
+    def _join_modifies(self):
+        if self._rewrite_threshold is None:
+            return
+
+        modifies = {}
+        delete_map = dict((d.old.path, d) for d in self._deletes)
+        for add in self._adds:
+            path = add.new.path
+            delete = delete_map.get(path)
+            if (delete is not None and
+              stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+                modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
+
+        self._adds = [a for a in self._adds if a.new.path not in modifies]
+        self._deletes = [a for a in self._deletes if a.new.path not in modifies]
+        self._changes += modifies.values()
+
     def _sorted_changes(self):
         result = []
         result.extend(self._adds)
@@ -391,6 +432,7 @@ class RenameDetector(object):
         self._collect_changes()
         self._find_exact_renames()
         self._find_content_renames()
+        self._join_modifies()
         return self._sorted_changes()
 
 

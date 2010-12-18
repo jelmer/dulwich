@@ -267,6 +267,13 @@ class DiffTests(TestCase):
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEquals([
+            'diff --git /dev/null b/added.txt',
+            'new mode 644',
+            'index e69de29..76d4bb8 644',
+            '--- /dev/null',
+            '+++ b/added.txt',
+            '@@ -1,0 +1,1 @@',
+            '+add',
             'diff --git a/changed.txt b/changed.txt',
             'index bf84e48..1be2436 644',
             '--- a/changed.txt',
@@ -282,11 +289,4 @@ class DiffTests(TestCase):
             '+++ /dev/null',
             '@@ -1,1 +1,0 @@',
             '-removed',
-            'diff --git /dev/null b/added.txt',
-            'new mode 644',
-            'index e69de29..76d4bb8 644',
-            '--- /dev/null',
-            '+++ b/added.txt',
-            '@@ -1,0 +1,1 @@',
-            '+add'
             ], f.getvalue().splitlines())

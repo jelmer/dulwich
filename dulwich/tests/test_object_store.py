@@ -89,6 +89,25 @@ class ObjectStoreTests(object):
         r = self.store[testobject.id]
         self.assertEquals(r, testobject)
 
+    def test_tree_changes(self):
+        blob_a1 = make_object(Blob, data='a1')
+        blob_a2 = make_object(Blob, data='a2')
+        blob_b = make_object(Blob, data='b')
+        for blob in [blob_a1, blob_a2, blob_b]:
+            self.store.add_object(blob)
+
+        blobs_1 = [('a', blob_a1.id, 0100644), ('b', blob_b.id, 0100644)]
+        tree1_id = commit_tree(self.store, blobs_1)
+        blobs_2 = [('a', blob_a2.id, 0100644), ('b', blob_b.id, 0100644)]
+        tree2_id = commit_tree(self.store, blobs_2)
+        change_a = (('a', 'a'), (0100644, 0100644), (blob_a1.id, blob_a2.id))
+        self.assertEquals([change_a],
+                          list(self.store.tree_changes(tree1_id, tree2_id)))
+        self.assertEquals(
+          [change_a, (('b', 'b'), (0100644, 0100644), (blob_b.id, blob_b.id))],
+          list(self.store.tree_changes(tree1_id, tree2_id,
+                                       want_unchanged=True)))
+
     def test_iter_tree_contents(self):
         blob_a = make_object(Blob, data='a')
         blob_b = make_object(Blob, data='b')

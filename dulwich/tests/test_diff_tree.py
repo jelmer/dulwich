@@ -63,16 +63,20 @@ class DiffTestCase(TestCase):
         self.store = MemoryObjectStore()
         self.empty_tree = self.commit_tree([])
 
-    def commit_tree(self, blobs):
+    def commit_tree(self, entries):
         commit_blobs = []
-        for entry in blobs:
+        for entry in entries:
             if len(entry) == 2:
-                path, blob = entry
+                path, obj = entry
                 mode = F
             else:
-                path, blob, mode = entry
-            self.store.add_object(blob)
-            commit_blobs.append((path, blob.id, mode))
+                path, obj, mode = entry
+            if isinstance(obj, Blob):
+                self.store.add_object(obj)
+                sha = obj.id
+            else:
+                sha = obj
+            commit_blobs.append((path, sha, mode))
         return self.store[commit_tree(self.store, commit_blobs)]
 
 

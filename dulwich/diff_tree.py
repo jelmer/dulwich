@@ -287,7 +287,8 @@ class RenameDetector(object):
 
     def __init__(self, store, tree1_id, tree2_id,
                  rename_threshold=_RENAME_THRESHOLD, max_files=_MAX_FILES,
-                 rewrite_threshold=_REWRITE_THRESHOLD):
+                 rewrite_threshold=_REWRITE_THRESHOLD,
+                 find_copies_harder=False):
         """Initialize the rename detector.
 
         :param store: An ObjectStore for looking up objects.
@@ -303,6 +304,8 @@ class RenameDetector(object):
         :param rewrite_threshold: The threshold similarity score below which a
             modify should be considered a delete/add, or None to not break
             modifies; see _similarity_score.
+        :param find_copies_harder: If True, consider unmodified files when
+            detecting copies.
         """
         self._tree1_id = tree1_id
         self._tree2_id = tree2_id
@@ -310,6 +313,7 @@ class RenameDetector(object):
         self._rename_threshold = rename_threshold
         self._rewrite_threshold = rewrite_threshold
         self._max_files = max_files
+        self._find_copies_harder = find_copies_harder
 
         self._adds = []
         self._deletes = []
@@ -324,7 +328,8 @@ class RenameDetector(object):
         return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
 
     def _collect_changes(self):
-        for change in tree_changes(self._store, self._tree1_id, self._tree2_id):
+        for change in tree_changes(self._store, self._tree1_id, self._tree2_id,
+                                   want_unchanged=self._find_copies_harder):
             if change.type == CHANGE_ADD:
                 self._adds.append(change)
             elif change.type == CHANGE_DELETE:
@@ -332,6 +337,11 @@ class RenameDetector(object):
             elif self._should_split(change):
                 self._deletes.append(TreeChange.delete(change.old))
                 self._adds.append(TreeChange.add(change.new))
+            elif (self._find_copies_harder and (
+              change.type == CHANGE_MODIFY or change.type == CHANGE_UNCHANGED)):
+                # Treat modified/unchanged as deleted rather than splitting it,
+                # to avoid spurious renames.
+                self._deletes.append(change)
             else:
                 self._changes.append(change)
 
@@ -346,22 +356,27 @@ class RenameDetector(object):
             add_map[add.new.sha].append(add.new)
         delete_map = defaultdict(list)
         for delete in self._deletes:
-            delete_map[delete.old.sha].append(delete.old)
+            # Keep track of whether the delete was actually marked as a delete.
+            # If not, it must have been added due to find_copies_harder, and
+            # needs to be marked as a copy.
+            is_delete = delete.type == CHANGE_DELETE
+            delete_map[delete.old.sha].append((delete.old, is_delete))
 
         add_paths = set()
         delete_paths = set()
         for sha, sha_deletes in delete_map.iteritems():
             sha_adds = add_map[sha]
-            for old, new in itertools.izip(sha_deletes, sha_adds):
+            for (old, is_delete), new in itertools.izip(sha_deletes, sha_adds):
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):
                     continue
                 delete_paths.add(old.path)
                 add_paths.add(new.path)
-                self._changes.append(TreeChange(CHANGE_RENAME, old, new))
+                new_type = is_delete and CHANGE_RENAME or CHANGE_COPY
+                self._changes.append(TreeChange(new_type, old, new))
 
             num_extra_adds = len(sha_adds) - len(sha_deletes)
             # TODO(dborowitz): Less arbitrary way of dealing with extra copies.
-            old = sha_deletes[0]
+            old = sha_deletes[0][0]
             if num_extra_adds:
                 for new in sha_adds[-num_extra_adds:]:
                     add_paths.add(new.path)
@@ -397,6 +412,11 @@ class RenameDetector(object):
                         # If the paths match, this must be a split modify, so
                         # make sure it comes out as a modify.
                         new_type = CHANGE_MODIFY
+                    elif delete.type != CHANGE_DELETE:
+                        # If it's in deletes but not marked as a delete, it must
+                        # have been added due to find_copies_harder, and needs
+                        # to be marked as a copy.
+                        new_type = CHANGE_COPY
                     else:
                         new_type = CHANGE_RENAME
                     rename = TreeChange(new_type, delete.old, add.new)
@@ -412,9 +432,14 @@ class RenameDetector(object):
             if new_path in add_paths:
                 continue
             old_path = change.old.path
+            orig_type = change.type
             if old_path in delete_paths:
                 change = TreeChange(CHANGE_COPY, change.old, change.new)
-            delete_paths.add(old_path)
+
+            # If the candidate was originally a copy, that means it came from a
+            # modified or unchanged path, so we don't want to prune it.
+            if orig_type != CHANGE_COPY:
+                delete_paths.add(old_path)
             add_paths.add(new_path)
             self._changes.append(change)
         self._prune(add_paths, delete_paths)
@@ -444,12 +469,16 @@ class RenameDetector(object):
         result.sort(key=_tree_change_key)
         return result
 
+    def _prune_unchanged(self):
+        self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
+
     def changes_with_renames(self):
         """Iterate TreeChanges between the two trees, with rename detection."""
         self._collect_changes()
         self._find_exact_renames()
         self._find_content_renames()
         self._join_modifies()
+        self._prune_unchanged()
         return self._sorted_changes()
 
 

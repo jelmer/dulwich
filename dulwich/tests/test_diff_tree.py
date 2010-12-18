@@ -616,3 +616,56 @@ class RenameDetectionTest(DiffTestCase):
           [TreeChange.add(('a', F, blob3.id)),
            TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('b', F, blob2.id))],
           self.detect_renames(tree1, tree2, rewrite_threshold=80))
+
+    def test_find_copies_harder_exact(self):
+        blob = make_object(Blob, data='blob')
+        tree1 = self.commit_tree([('a', blob)])
+        tree2 = self.commit_tree([('a', blob), ('b', blob)])
+        self.assertEqual([TreeChange.add(('b', F, blob.id))],
+                         self.detect_renames(tree1, tree2))
+        self.assertEqual(
+          [TreeChange(CHANGE_COPY, ('a', F, blob.id), ('b', F, blob.id))],
+          self.detect_renames(tree1, tree2, find_copies_harder=True))
+
+    def test_find_copies_harder_content(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        tree1 = self.commit_tree([('a', blob1)])
+        tree2 = self.commit_tree([('a', blob1), ('b', blob2)])
+        self.assertEqual([TreeChange.add(('b', F, blob2.id))],
+                         self.detect_renames(tree1, tree2))
+        self.assertEqual(
+          [TreeChange(CHANGE_COPY, ('a', F, blob1.id), ('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2, find_copies_harder=True))
+
+    def test_find_copies_harder_modify(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        tree1 = self.commit_tree([('a', blob1)])
+        tree2 = self.commit_tree([('a', blob2), ('b', blob2)])
+        self.assertEqual(
+          [TreeChange(CHANGE_MODIFY, ('a', F, blob1.id), ('a', F, blob2.id)),
+           TreeChange.add(('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2))
+        self.assertEqual(
+          [TreeChange(CHANGE_MODIFY, ('a', F, blob1.id), ('a', F, blob2.id)),
+           TreeChange(CHANGE_COPY, ('a', F, blob1.id), ('b', F, blob2.id))],
+          self.detect_renames(tree1, tree2, find_copies_harder=True))
+
+    def test_find_copies_harder_with_rewrites(self):
+        blob_a1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob_a2 = make_object(Blob, data='f\ng\nh\ni\n')
+        blob_b2 = make_object(Blob, data='a\nb\nc\ne\n')
+        tree1 = self.commit_tree([('a', blob_a1)])
+        tree2 = self.commit_tree([('a', blob_a2), ('b', blob_b2)])
+        self.assertEqual(
+          [TreeChange(CHANGE_MODIFY, ('a', F, blob_a1.id),
+                      ('a', F, blob_a2.id)),
+           TreeChange(CHANGE_COPY, ('a', F, blob_a1.id), ('b', F, blob_b2.id))],
+          self.detect_renames(tree1, tree2, find_copies_harder=True))
+        self.assertEqual(
+          [TreeChange.add(('a', F, blob_a2.id)),
+           TreeChange(CHANGE_RENAME, ('a', F, blob_a1.id),
+                      ('b', F, blob_b2.id))],
+          self.detect_renames(tree1, tree2, rewrite_threshold=50,
+                              find_copies_harder=True))

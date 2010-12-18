@@ -392,3 +392,12 @@ class RenameDetector(object):
         self._find_exact_renames()
         self._find_content_renames()
         return self._sorted_changes()
+
+
+# Hold on to the pure-python implementations for testing.
+_is_tree_py = _is_tree
+try:
+    # Try to import C versions
+    from dulwich._diff_tree import _is_tree
+except ImportError:
+    pass

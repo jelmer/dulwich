@@ -89,7 +89,7 @@ def _merge_entries(path, tree1, tree2):
     return result
 
 
-def walk_trees(store, tree1_id, tree2_id):
+def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     """Recursively walk all the entries of two trees.
 
     Iteration is depth-first pre-order, as in e.g. os.walk.
@@ -97,6 +97,7 @@ def walk_trees(store, tree1_id, tree2_id):
     :param store: An ObjectStore for looking up objects.
     :param tree1_id: The SHA of the first Tree object to iterate, or None.
     :param tree2_id: The SHA of the second Tree object to iterate, or None.
+    :param prune_identical: If True, identical subtrees will not be walked.
     :yield: Pairs of TreeEntry objects for each pair of entries in the trees and
         their subtrees recursively. If an entry exists in one tree but not the
         other, the other entry will have all attributes set to None. If neither
@@ -110,6 +111,8 @@ def walk_trees(store, tree1_id, tree2_id):
         entry1, entry2 = todo.pop()
         is_tree1 = entry1.mode and stat.S_ISDIR(entry1.mode)
         is_tree2 = entry2.mode and stat.S_ISDIR(entry2.mode)
+        if prune_identical and is_tree1 and is_tree2 and entry1 == entry2:
+            continue
 
         tree1 = is_tree1 and store[entry1.sha] or None
         tree2 = is_tree2 and store[entry2.sha] or None
@@ -135,7 +138,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
     :yield: TreeChange instances for each change between the source and target
         tree.
     """
-    entries = walk_trees(store, tree1_id, tree2_id)
+    entries = walk_trees(store, tree1_id, tree2_id,
+                         prune_identical=(not want_unchanged))
     for entry1, entry2 in entries:
         if entry1 == entry2 and not want_unchanged:
             continue

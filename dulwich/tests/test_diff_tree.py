@@ -229,3 +229,22 @@ class TreeChangesTest(TestCase):
            TreeChange(CHANGE_DELETE, ('a.', 0100644, blob.id), _NULL_ENTRY),
            TreeChange(CHANGE_ADD, _NULL_ENTRY, ('a./x', 0100644, blob.id))],
           tree1, tree2)
+
+    def test_tree_changes_prune(self):
+        blob_a1 = make_object(Blob, data='a1')
+        blob_a2 = make_object(Blob, data='a2')
+        blob_x = make_object(Blob, data='x')
+        tree1 = self.commit_tree([('a', blob_a1, 0100644),
+                                  ('b/x', blob_x, 0100644)])
+        tree2 = self.commit_tree([('a', blob_a2, 0100644),
+                                  ('b/x', blob_x, 0100644)])
+        # Remove identical items so lookups will fail unless we prune.
+        subtree = self.store[tree1['b'][1]]
+        for entry in subtree.iteritems():
+            del self.store[entry.sha]
+        del self.store[subtree.id]
+
+        self.assertChangesEqual(
+          [TreeChange(CHANGE_MODIFY, ('a', 0100644, blob_a1.id),
+                      ('a', 0100644, blob_a2.id))],
+          tree1, tree2)

@@ -35,6 +35,7 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    TreeEntry,
     )
 from dulwich.object_store import (
     DiskObjectStore,
@@ -123,7 +124,7 @@ class ObjectStoreTests(object):
           ('c', blob_c.id, 0100644),
           ]
         tree_id = commit_tree(self.store, blobs)
-        self.assertEquals([(p, m, h) for (p, h, m) in blobs],
+        self.assertEquals([TreeEntry(p, m, h) for (p, h, m) in blobs],
                           list(self.store.iter_tree_contents(tree_id)))
 
     def test_iter_tree_contents_include_trees(self):
@@ -144,12 +145,12 @@ class ObjectStoreTests(object):
         tree_bd = self.store[tree_ad['bd'][1]]
 
         expected = [
-          ('', 0040000, tree_id),
-          ('a', 0100644, blob_a.id),
-          ('ad', 0040000, tree_ad.id),
-          ('ad/b', 0100644, blob_b.id),
-          ('ad/bd', 0040000, tree_bd.id),
-          ('ad/bd/c', 0100755, blob_c.id),
+          TreeEntry('', 0040000, tree_id),
+          TreeEntry('a', 0100644, blob_a.id),
+          TreeEntry('ad', 0040000, tree_ad.id),
+          TreeEntry('ad/b', 0100644, blob_b.id),
+          TreeEntry('ad/bd', 0040000, tree_bd.id),
+          TreeEntry('ad/bd/c', 0100755, blob_c.id),
           ]
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEquals(expected, list(actual))

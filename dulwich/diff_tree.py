@@ -58,6 +58,7 @@ class TreeChange(TreeChangeTuple):
     def delete(cls, old):
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
+
 def _tree_entries(path, tree):
     result = []
     if not tree:

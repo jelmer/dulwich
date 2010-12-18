@@ -46,6 +46,13 @@ _MAX_SCORE = 100
 class TreeChange(TreeChangeTuple):
     """Class encapsulating a single change between two trees."""
 
+    @classmethod
+    def add(cls, new):
+        return cls(CHANGE_ADD, _NULL_ENTRY, new)
+
+    @classmethod
+    def delete(cls, old):
+        return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 def _tree_entries(path, tree):
     result = []
@@ -156,7 +163,7 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
         if entry1 != _NULL_ENTRY and entry2 != _NULL_ENTRY:
             if stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode):
                 # File type changed: report as delete/add.
-                yield TreeChange(CHANGE_DELETE, entry1, _NULL_ENTRY)
+                yield TreeChange.delete(entry1)
                 entry1 = _NULL_ENTRY
                 change_type = CHANGE_ADD
             elif entry1 == entry2:

@@ -30,6 +30,7 @@ import urllib2
 
 from dulwich.diff_tree import (
     tree_changes,
+    walk_trees,
     )
 from dulwich.errors import (
     NotTreeError,
@@ -148,19 +149,11 @@ class BaseObjectStore(object):
 
         :param tree_id: SHA1 of the tree.
         :param include_trees: If True, include tree objects in the iteration.
-        :return: Yields tuples of (path, mode, hexhsa) for objects in a tree.
+        :yield: TreeEntry namedtuples for all the objects in a tree.
         """
-        todo = [('', stat.S_IFDIR, tree_id)]
-        while todo:
-            path, mode, hexsha = todo.pop()
-            is_subtree = stat.S_ISDIR(mode)
-            if not is_subtree or include_trees:
-                yield path, mode, hexsha
-            if is_subtree:
-                entries = reversed(list(self[hexsha].iteritems()))
-                for name, entry_mode, entry_hexsha in entries:
-                    entry_path = posixpath.join(path, name)
-                    todo.append((entry_path, entry_mode, entry_hexsha))
+        for entry, _ in walk_trees(self, tree_id, None):
+            if not stat.S_ISDIR(entry.mode) or include_trees:
+                yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None):

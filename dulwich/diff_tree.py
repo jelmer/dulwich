@@ -241,3 +241,14 @@ def _similarity_score(obj1, obj2, block_cache=None):
     if not max_size:
         return _MAX_SCORE
     return int(float(common_bytes) * _MAX_SCORE / max_size)
+
+
+def _tree_change_key(entry):
+    # Sort by old path then new path. If only one exists, use it for both keys.
+    path1 = entry.old.path
+    path2 = entry.new.path
+    if path1 is None:
+        path1 = path2
+    if path2 is None:
+        path2 = path1
+    return (path1, path2)

@@ -28,6 +28,7 @@ from dulwich.diff_tree import (
     _merge_entries_py,
     tree_changes,
     _count_blocks,
+    _count_blocks_py,
     _similarity_score,
     _tree_change_key,
     RenameDetector,
@@ -292,25 +293,45 @@ class TreeChangesTest(DiffTestCase):
 
 class RenameDetectionTest(DiffTestCase):
 
-    def test_count_blocks(self):
+    def _do_test_count_blocks(self, count_blocks):
         blob = make_object(Blob, data='a\nb\na\n')
-        self.assertEqual({hash('a\n'): 4, hash('b\n'): 2}, _count_blocks(blob))
+        self.assertEqual({hash('a\n'): 4, hash('b\n'): 2}, count_blocks(blob))
 
-    def test_count_blocks_no_newline(self):
+    test_count_blocks = functest_builder(_do_test_count_blocks,
+                                         _count_blocks_py)
+    test_count_blocks_extension = ext_functest_builder(_do_test_count_blocks,
+                                                       _count_blocks)
+
+    def _do_test_count_blocks_no_newline(self, count_blocks):
         blob = make_object(Blob, data='a\na')
         self.assertEqual({hash('a\n'): 2, hash('a'): 1}, _count_blocks(blob))
 
-    def test_count_blocks_chunks(self):
+    test_count_blocks_no_newline = functest_builder(
+      _do_test_count_blocks_no_newline, _count_blocks_py)
+    test_count_blocks_no_newline_extension = ext_functest_builder(
+       _do_test_count_blocks_no_newline, _count_blocks)
+
+    def _do_test_count_blocks_chunks(self, count_blocks):
         blob = ShaFile.from_raw_chunks(Blob.type_num, ['a\nb', '\na\n'])
         self.assertEqual({hash('a\n'): 4, hash('b\n'): 2}, _count_blocks(blob))
 
-    def test_count_blocks_long_lines(self):
+    test_count_blocks_chunks = functest_builder(_do_test_count_blocks_chunks,
+                                                _count_blocks_py)
+    test_count_blocks_chunks_extension = ext_functest_builder(
+      _do_test_count_blocks_chunks, _count_blocks)
+
+    def _do_test_count_blocks_long_lines(self, count_blocks):
         a = 'a' * 64
         data = a + 'xxx\ny\n' + a + 'zzz\n'
         blob = make_object(Blob, data=data)
         self.assertEqual({hash('a' * 64): 128, hash('xxx\n'): 4, hash('y\n'): 2,
                           hash('zzz\n'): 4},
                          _count_blocks(blob))
+
+    test_count_blocks_long_lines = functest_builder(
+      _do_test_count_blocks_long_lines, _count_blocks_py)
+    test_count_blocks_long_lines_extension = ext_functest_builder(
+      _do_test_count_blocks_long_lines, _count_blocks)
 
     def assertSimilar(self, expected_score, blob1, blob2):
         self.assertEqual(expected_score, _similarity_score(blob1, blob2))

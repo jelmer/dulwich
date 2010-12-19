@@ -38,7 +38,7 @@ from dulwich.diff_tree import (
 from dulwich.index import (
     commit_tree,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     permutations,
     )
 from dulwich.object_store import (

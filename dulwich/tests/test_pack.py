@@ -73,7 +73,8 @@ class PackTests(TestCase):
         shutil.rmtree(self.tempdir)
         super(PackTests, self).tearDown()
 
-    datadir = os.path.join(os.path.dirname(__file__), 'data/packs')
+    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        'data/packs'))
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""

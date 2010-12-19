@@ -122,10 +122,11 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     :param tree1_id: The SHA of the first Tree object to iterate, or None.
     :param tree2_id: The SHA of the second Tree object to iterate, or None.
     :param prune_identical: If True, identical subtrees will not be walked.
-    :yield: Pairs of TreeEntry objects for each pair of entries in the trees and
-        their subtrees recursively. If an entry exists in one tree but not the
-        other, the other entry will have all attributes set to None. If neither
-        entry's path is None, they are guaranteed to match.
+    :return: Iterator over Pairs of TreeEntry objects for each pair of entries
+        in the trees and their subtrees recursively. If an entry exists in one
+        tree but not the other, the other entry will have all attributes set
+        to None. If neither entry's path is None, they are guaranteed to
+        match.
     """
     # This could be fairly easily generalized to >2 trees if we find a use case.
     mode1 = tree1_id and stat.S_IFDIR or None
@@ -159,8 +160,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
     :param tree2_id: The SHA of the target tree.
     :param want_unchanged: If True, include TreeChanges for unmodified entries
         as well.
-    :yield: TreeChange instances for each change between the source and target
-        tree.
+    :return: Iterator over TreeChange instances for each change between the
+        source and target tree.
     """
     entries = walk_trees(store, tree1_id, tree2_id,
                          prune_identical=(not want_unchanged))

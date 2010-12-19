@@ -80,6 +80,10 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     :raise TestSkipped: if no suitable git version was found at the given path.
     """
     found_version = git_version(git_path=git_path)
+    if found_version is None:
+        raise TestSkipped('Test requires git >= %s, but c git not found' %
+                         (required_version, ))
+
     if len(required_version) > _VERSION_LEN:
         raise ValueError('Invalid version tuple %s, expected %i parts' %
                          (required_version, _VERSION_LEN))
@@ -152,6 +156,7 @@ def import_repo_to_dir(name):
                     cwd=temp_repo_dir)
     export_file.close()
     return temp_repo_dir
+
 
 def import_repo(name):
     """Import a repo from a fast-export file in a temporary directory.

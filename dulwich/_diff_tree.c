@@ -25,7 +25,7 @@ typedef int Py_ssize_t;
 #endif
 
 #if (PY_VERSION_HEX < 0x02060000)
-#define Py_SIZE(x) Py_Size(x)
+#define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
 #endif
 
 static PyObject *tree_entry_cls = NULL, *null_entry = NULL,

@@ -149,7 +149,8 @@ class BaseObjectStore(object):
 
         :param tree_id: SHA1 of the tree.
         :param include_trees: If True, include tree objects in the iteration.
-        :yield: TreeEntry namedtuples for all the objects in a tree.
+        :return: Iterator over TreeEntry namedtuples for all the objects in a
+            tree.
         """
         for entry, _ in walk_trees(self, tree_id, None):
             if not stat.S_ISDIR(entry.mode) or include_trees:

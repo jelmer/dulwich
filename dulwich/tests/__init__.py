@@ -90,7 +90,7 @@ def test_suite():
         os.chdir(test.__dulwich_tempdir)
     def teardown(test):
         shutil.rmtree(test.__dulwich_tempdir)
-    suite = doctest.DocFileSuite(*tutorial_files, setUp=setup,
-        tearDown=teardown)
+    suite = doctest.DocFileSuite(setUp=setup, tearDown=teardown,
+        *tutorial_files)
     result.addTests(suite)
     return result

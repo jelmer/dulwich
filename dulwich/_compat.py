@@ -1,4 +1,4 @@
-# misc.py -- For dealing with python2.4 oddness
+# _compat.py -- For dealing with python2.4 oddness
 # Copyright (C) 2008 Canonical Ltd.
 #
 # This program is free software; you can redistribute it and/or

@@ -36,6 +36,8 @@ from dulwich.tests import (
 
 _DEFAULT_GIT = 'git'
 _VERSION_LEN = 4
+_REPOS_DATA_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), os.pardir, 'data', 'repos'))
 
 
 def git_version(git_path=_DEFAULT_GIT):
@@ -142,8 +144,7 @@ def import_repo_to_dir(name):
     :returns: The path to the imported repository.
     """
     temp_dir = tempfile.mkdtemp()
-    export_path = os.path.join(os.path.dirname(__file__), os.pardir, 'data',
-                               'repos', name)
+    export_path = os.path.join(_REPOS_DATA_DIR, name)
     temp_repo_dir = os.path.join(temp_dir, name)
     export_file = open(export_path, 'rb')
     run_git_or_fail(['init', '--quiet', '--bare', temp_repo_dir])

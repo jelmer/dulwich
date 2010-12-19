@@ -19,9 +19,9 @@
 
 """Compatibility tests between Dulwich and the cgit HTTP server.
 
-Warning: these tests should be fairly stable, but when writing/debugging new
-tests, deadlocks may freeze the test process such that it cannot be Ctrl-C'ed.
-On *nix, you can kill the tests with Ctrl-Z, "kill %".
+warning: these tests should be fairly stable, but when writing/debugging new
+    tests, deadlocks may freeze the test process such that it cannot be
+    Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
 """
 
 import threading

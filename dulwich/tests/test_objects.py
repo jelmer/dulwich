@@ -23,7 +23,6 @@
 
 
 from cStringIO import StringIO
-import binascii
 import datetime
 import os
 import stat
@@ -31,7 +30,7 @@ import stat
 from dulwich.errors import (
     ObjectFormatException,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     permutations,
     )
 from dulwich.objects import (

@@ -22,7 +22,7 @@ from cStringIO import StringIO
 import itertools
 import stat
 
-from dulwich.misc import (
+from dulwich._compat import (
     defaultdict,
     TreeChangeTuple,
     )

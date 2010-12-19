@@ -33,7 +33,7 @@ a pointer in to the corresponding packfile.
 try:
     from collections import defaultdict
 except ImportError:
-    from misc import defaultdict
+    from _compat import defaultdict
 
 from cStringIO import (
     StringIO,
@@ -53,7 +53,7 @@ import struct
 try:
     from struct import unpack_from
 except ImportError:
-    from dulwich.misc import unpack_from
+    from dulwich._compat import unpack_from
 import sys
 import zlib
 
@@ -65,7 +65,7 @@ from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     make_sha,
     SEEK_END,
     )

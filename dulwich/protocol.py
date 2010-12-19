@@ -27,7 +27,7 @@ from dulwich.errors import (
     HangupException,
     GitProtocolError,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     SEEK_END,
     )
 

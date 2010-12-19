@@ -38,7 +38,7 @@ from dulwich.errors import (
     ObjectFormatException,
     )
 from dulwich.file import GitFile
-from dulwich.misc import (
+from dulwich._compat import (
     make_sha,
     TreeEntryTuple,
     )

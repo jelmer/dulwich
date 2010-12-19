@@ -93,4 +93,6 @@ def test_suite():
     suite = doctest.DocFileSuite(setUp=setup, tearDown=teardown,
         *tutorial_files)
     result.addTests(suite)
+    from dulwich.tests.compat import test_suite as compat_test_suite
+    result.addTests(compat_test_suite())
     return result

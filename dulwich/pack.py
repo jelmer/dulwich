@@ -243,7 +243,7 @@ class PackIndex(object):
 
     def __iter__(self):
         """Iterate over the SHAs in this pack."""
-        raise NotImplementedError(self.__iter__)
+        return imap(sha_to_hex, self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.
@@ -277,10 +277,6 @@ class PackIndex(object):
         :param sha: A *binary* SHA string. (20 characters long)_
         """
         raise NotImplementedError(self._object_index)
-
-    def __iter__(self):
-        """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
 
     def objects_sha1(self):
         """Return the hex SHA1 over all the shas of all objects in this pack.

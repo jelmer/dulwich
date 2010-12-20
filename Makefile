@@ -21,6 +21,9 @@ install::
 check:: build
 	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) dulwich
 
+check-nocompat:: build
+	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) -e compat dulwich
+
 check-noextensions:: clean
 	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) dulwich
 

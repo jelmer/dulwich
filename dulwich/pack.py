@@ -360,6 +360,8 @@ class FilePackIndex(PackIndex):
 
     def close(self):
         self._file.close()
+        if getattr(self._contents, "close", None) is not None:
+            self._contents.close()
 
     def __len__(self):
         """Return the number of entries in this pack index."""

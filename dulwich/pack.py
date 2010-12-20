@@ -346,7 +346,7 @@ class FilePackIndex(PackIndex):
         else:
             self._file = file
         if contents is None:
-            self._contents, self._size = _load_file_contents(file, size)
+            self._contents, self._size = _load_file_contents(self._file, size)
         else:
             self._contents, self._size = (contents, size)
 

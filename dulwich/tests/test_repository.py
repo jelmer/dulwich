@@ -617,18 +617,13 @@ class RefsContainerTests(object):
                          self._refs['refs/heads/symbolic'])
 
     def test_check_refname(self):
-        try:
-            self._refs._check_refname('HEAD')
-        except KeyError:
-            self.fail()
+        self._refs._check_refname('HEAD')
+        self._refs._check_refname('refs/heads/foo')
 
-        try:
-            self._refs._check_refname('refs/heads/foo')
-        except KeyError:
-            self.fail()
-
-        self.assertRaises(KeyError, self._refs._check_refname, 'refs')
-        self.assertRaises(KeyError, self._refs._check_refname, 'notrefs/foo')
+        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+                          'refs')
+        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+                          'notrefs/foo')
 
     def test_contains(self):
         self.assertTrue('refs/heads/master' in self._refs)
@@ -753,7 +748,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEquals(
           ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),
           self._refs._follow('refs/heads/master'))
-        self.assertRaises(KeyError, self._refs._follow, 'notrefs/foo')
+        self.assertRaises(errors.RefFormatError, self._refs._follow,
+                          'notrefs/foo')
         self.assertRaises(KeyError, self._refs._follow, 'refs/heads/loop')
 
     def test_delitem(self):

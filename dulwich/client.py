@@ -24,6 +24,7 @@ __docformat__ = 'restructuredText'
 import select
 import socket
 import subprocess
+import urlparse
 
 from dulwich.errors import (
     SendPackError,
@@ -358,11 +359,23 @@ def get_transport_and_path(uri):
     :param uri: URI or path
     :return: Tuple with client instance and relative path.
     """
-    from dulwich.client import TCPGitClient, SSHGitClient, SubprocessGitClient
-    for handler, transport in (("git://", TCPGitClient), ("git+ssh://", SSHGitClient)):
-        if uri.startswith(handler):
-            host, path = uri[len(handler):].split("/", 1)
-            return transport(host), "/"+path
-    # FIXME: Parse rsync-like git URLs (user@host:/path), bug 568493
-    # if its not git or git+ssh, try a local url..
+    parsed = urlparse.urlparse(uri)
+    if parsed.scheme == 'git':
+        return TCPGitClient(parsed.hostname, port=parsed.port), parsed.path
+    elif parsed.scheme == 'git+ssh':
+        return SSHGitClient(parsed.hostname, port=parsed.port,
+                            username=parsed.username), parsed.path
+
+    if parsed.scheme and not parsed.netloc:
+        # SSH with no user@, zero or one leading slash.
+        return SSHGitClient(parsed.scheme), parsed.path
+    elif parsed.scheme:
+        raise ValueError('Unknown git protocol scheme: %s' % parsed.scheme)
+    elif '@' in parsed.path and ':' in parsed.path:
+        # SSH with user@host:foo.
+        user_host, path = parsed.path.split(':')
+        user, host = user_host.rsplit('@')
+        return SSHGitClient(host, username=user), path
+
+    # Otherwise, assume it's a local path.
     return SubprocessGitClient(), uri

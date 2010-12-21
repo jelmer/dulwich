@@ -30,7 +30,6 @@ from dulwich.objects import (
     )
 from dulwich.repo import (
     BaseRepo,
-    DictRefsContainer,
     MemoryRepo,
     )
 from dulwich.server import (

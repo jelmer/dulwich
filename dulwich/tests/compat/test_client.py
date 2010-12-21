@@ -43,6 +43,7 @@ from utils import (
     run_git_or_fail,
     )
 
+
 class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 

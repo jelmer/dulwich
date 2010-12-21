@@ -23,7 +23,6 @@
 import errno
 import itertools
 import os
-import posixpath
 import stat
 import tempfile
 import urllib2

@@ -27,7 +27,6 @@ warning: these tests should be fairly stable, but when writing/debugging new
 import threading
 from wsgiref import simple_server
 
-import dulwich
 from dulwich.server import (
     DictBackend,
     )

@@ -35,6 +35,7 @@ from dulwich.errors import (
     NotTagError,
     PackedRefsException,
     CommitError,
+    RefFormatError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -213,7 +214,7 @@ class RefsContainer(object):
         if name == 'HEAD':
             return
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
-            raise KeyError(name)
+            raise RefFormatError(name)
 
     def read_ref(self, refname):
         """Read a reference without following any references.
@@ -990,7 +991,10 @@ class BaseRepo(object):
                 return self.object_store[name]
             except KeyError:
                 pass
-        return self.object_store[self.refs[name]]
+        try:
+            return self.object_store[self.refs[name]]
+        except RefFormatError:
+            raise KeyError(name)
 
     def __contains__(self, name):
         if len(name) in (20, 40):

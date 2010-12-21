@@ -64,12 +64,26 @@ Let's create the master branch like Git would::
 
   >>> repo.refs['refs/heads/master'] = commit.id
 
-The master branch now has a commit where to start, but Git itself would not
-known what is the current branch. That's another reference::
+The master branch now has a commit where to start. When we commit to master, we
+are also moving HEAD, which is Git's currently checked out branch:
 
-  >>> repo.refs['HEAD'] = 'ref: refs/heads/master'
+  >>> head = repo.refs['HEAD']
+  >>> head == commit.id
+  True
+  >>> head = repo.refs['refs/heads/master']
+  True
 
-Now our repository is officialy tracking a branch named "master" refering to a
+How did that work? As it turns out, HEAD is a special kind of ref called a
+symbolic ref, and it points at master. Most functions on the refs container
+work transparently with symbolic refs, but we can also take a peek inside HEAD:
+
+  >>> repo.read_ref('HEAD')
+  'ref: refs/heads/master'
+
+Normally, you won't need to use read_ref. If you want to change what ref HEAD
+points to, in order to check out another branch, just use set_symbolic_ref.
+
+Now our repository is officially tracking a branch named "master" referring to a
 single commit.
 
 Playing again with Git

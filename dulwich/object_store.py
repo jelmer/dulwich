@@ -402,10 +402,14 @@ class DiskObjectStore(PackBasedObjectStore):
         data.create_index_v2(temppath)
         p = Pack.from_objects(data, load_pack_index(temppath))
 
-        # Write a full pack version
-        temppath = os.path.join(self.pack_dir,
-            sha_to_hex(urllib2.randombytes(20))+".temppack")
-        write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
+        try:
+            # Write a full pack version
+            temppath = os.path.join(self.pack_dir,
+                sha_to_hex(urllib2.randombytes(20))+".temppack")
+            write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
+        finally:
+            p.close()
+
         pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")

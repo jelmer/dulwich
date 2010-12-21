@@ -181,6 +181,10 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
+    def tearDown(self):
+        for pack in self.store.packs:
+            pack.close()
+
     def test_empty_packs(self):
         self.assertEquals([], self.store.packs)
 
@@ -204,6 +208,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def tearDown(self):
         TestCase.tearDown(self)
+        PackBasedObjectStoreTests.tearDown(self)
         shutil.rmtree(self.store_dir)
 
     def test_pack_dir(self):

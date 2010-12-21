@@ -272,21 +272,30 @@ class TestPack(PackTests):
 
     def test_copy(self):
         origpack = self.get_pack(pack1_sha)
-        self.assertSucceeds(origpack.index.check)
-        basename = os.path.join(self.tempdir, 'Elch')
-        write_pack(basename, [(x, '') for x in origpack.iterobjects()],
-                   len(origpack))
-        newpack = Pack(basename)
-        self.assertEquals(origpack, newpack)
-        self.assertSucceeds(newpack.index.check)
-        self.assertEquals(origpack.name(), newpack.name())
-        self.assertEquals(origpack.index.get_pack_checksum(),
-                          newpack.index.get_pack_checksum())
 
-        wrong_version = origpack.index.version != newpack.index.version
-        orig_checksum = origpack.index.get_stored_checksum()
-        new_checksum = newpack.index.get_stored_checksum()
-        self.assertTrue(wrong_version or orig_checksum == new_checksum)
+        try:
+            self.assertSucceeds(origpack.index.check)
+            basename = os.path.join(self.tempdir, 'Elch')
+            write_pack(basename, [(x, '') for x in origpack.iterobjects()],
+                       len(origpack))
+            newpack = Pack(basename)
+
+            try:
+                self.assertEquals(origpack, newpack)
+                self.assertSucceeds(newpack.index.check)
+                self.assertEquals(origpack.name(), newpack.name())
+                self.assertEquals(origpack.index.get_pack_checksum(),
+                                  newpack.index.get_pack_checksum())
+
+                wrong_version = origpack.index.version != newpack.index.version
+                orig_checksum = origpack.index.get_stored_checksum()
+                new_checksum = newpack.index.get_stored_checksum()
+                self.assertTrue(wrong_version or orig_checksum == new_checksum)
+            finally:
+                newpack.close()
+        finally:
+            origpack.close()
+
 
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)

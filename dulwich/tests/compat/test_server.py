@@ -29,7 +29,6 @@ import threading
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
-    ReceivePackHandler,
     )
 from server_utils import (
     ServerTests,

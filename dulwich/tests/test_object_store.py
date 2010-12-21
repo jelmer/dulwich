@@ -32,7 +32,6 @@ from dulwich.errors import (
 from dulwich.objects import (
     object_class,
     Blob,
-    ShaFile,
     Tag,
     Tree,
     TreeEntry,

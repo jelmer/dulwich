@@ -17,19 +17,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+from dulwich.server import serve_command, ReceivePackHandler
 import sys
-from dulwich.repo import Repo
-from dulwich.server import GitBackend, ReceivePackHandler
-
-def send_fn(data):
-    sys.stdout.write(data)
-    sys.stdout.flush()
-
-if __name__ == "__main__":
-    gitdir = None
-    if len(sys.argv) > 1:
-        gitdir = sys.argv[1]
-
-    backend = GitBackend(Repo(gitdir))
-    handler = ReceivePackHandler(backend, sys.stdin.read, send_fn)
-    handler.handle()
+sys.exit(serve_command(ReceivePackHandler))

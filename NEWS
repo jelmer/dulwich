@@ -8,6 +8,9 @@
 
   * Add write_tree_diff(). (Jelmer Vernooij)
 
+  * Add `serve_command` function for git server commands as executables.
+    (Jelmer Vernooij)
+
  BUG FIXES
 
   * Correct short-circuiting operation for no-op fetches in the server.

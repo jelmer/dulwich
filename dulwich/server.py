@@ -155,6 +155,14 @@ class DictBackend(Backend):
         return self.repos[path]
 
 
+class FileSystemBackend(Backend):
+    """Simple backend that looks up Git repositories in the local file system."""
+
+    def open_repository(self, path):
+        logger.debug('opening repository at %s', path)
+        return Repo(path)
+
+
 class Handler(object):
     """Smart protocol command handler base class."""
 

@@ -42,3 +42,26 @@ class GitReceivePackTests(BlackboxTestCase):
         self.assertEquals('', stderr)
         self.assertEquals('0000', stdout[-4:])
         self.assertEquals(0, process.returncode)
+
+    def test_missing_arg(self):
+        process = self.run_command("dul-receive-pack", [])
+        (stdout, stderr) = process.communicate()
+        self.assertEquals('usage: dul-receive-pack <git-dir>\n', stderr)
+        self.assertEquals('', stdout)
+        self.assertEquals(1, process.returncode)
+
+
+class GitUploadPackTests(BlackboxTestCase):
+    """Blackbox tests for dul-upload-pack."""
+
+    def setUp(self):
+        super(GitUploadPackTests, self).setUp()
+        self.path = tempfile.mkdtemp()
+        self.repo = Repo.init(self.path)
+
+    def test_missing_arg(self):
+        process = self.run_command("dul-upload-pack", [])
+        (stdout, stderr) = process.communicate()
+        self.assertEquals('usage: dul-upload-pack <git-dir>\n', stderr)
+        self.assertEquals('', stdout)
+        self.assertEquals(1, process.returncode)

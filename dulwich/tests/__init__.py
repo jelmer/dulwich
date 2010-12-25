@@ -57,8 +57,34 @@ except ImportError:
             testtools.testcase.TestCase.skipException = TestSkipped
 
 
+class BlackboxTestCase(TestCase):
+    """Blackbox testing."""
+
+    bin_directory = os.path.abspath(os.path.join(os.path.dirname(__file__),
+        "..", "..", "bin"))
+
+    def bin_path(self, name):
+        """Determine the full path of a binary.
+
+        :param name: Name of the script
+        :return: Full path
+        """
+        return os.path.join(self.bin_directory, name)
+
+    def run_command(self, name, args):
+        """Run a Dulwich command.
+
+        :param name: Name of the command, as it exists in bin/
+        :param args: Arguments to the command
+        """
+        import subprocess
+        return subprocess.Popen([self.bin_path(name)] + args, stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
 def test_suite():
     names = [
+        'blackbox',
         'client',
         'fastexport',
         'file',

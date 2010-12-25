@@ -18,17 +18,22 @@
 
 """Tests for the smart protocol server."""
 
+import os
+import tempfile
 
 from dulwich.errors import (
     GitProtocolError,
+    NotGitRepository,
     UnexpectedCommandError,
     )
 from dulwich.repo import (
     MemoryRepo,
+    Repo,
     )
 from dulwich.server import (
     Backend,
     DictBackend,
+    FileSystemBackend,
     Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
@@ -638,3 +643,25 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(None)
         self.assertNak()
+
+
+class FileSystemBackendTests(TestCase):
+    """Tests for FileSystemBackend."""
+
+    def setUp(self):
+        super(FileSystemBackendTests, self).setUp()
+        self.path = tempfile.mkdtemp()
+        self.repo = Repo.init(self.path)
+        self.backend = FileSystemBackend()
+
+    def test_nonexistant(self):
+        self.assertRaises(NotGitRepository,
+            self.backend.open_repository, "/does/not/exist/unless/foo")
+
+    def test_absolute(self):
+        repo = self.backend.open_repository(self.path)
+        self.assertEquals(repo.path, self.repo.path)
+
+    def test_child(self):
+        self.assertRaises(NotGitRepository,
+            self.backend.open_repository, os.path.join(self.path, "foo"))

@@ -18,5 +18,11 @@
 # MA  02110-1301, USA.
 
 from dulwich.server import serve_command, ReceivePackHandler
+import os
 import sys
+
+if len(sys.argv) < 2:
+    print >>sys.stderr, "usage: %s <git-dir>" % os.path.basename(sys.argv[0])
+    sys.exit(1)
+
 sys.exit(serve_command(ReceivePackHandler))

@@ -18,6 +18,7 @@
 
 """Tests for the smart protocol server."""
 
+from cStringIO import StringIO
 import os
 import tempfile
 
@@ -38,7 +39,9 @@ from dulwich.server import (
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
     _split_proto_line,
+    serve_command,
     ProtocolGraphWalker,
+    ReceivePackHandler,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
     )
@@ -665,3 +668,28 @@ class FileSystemBackendTests(TestCase):
     def test_child(self):
         self.assertRaises(NotGitRepository,
             self.backend.open_repository, os.path.join(self.path, "foo"))
+
+
+class ServeCommandTests(TestCase):
+    """Tests for serve_command."""
+
+    def setUp(self):
+        super(ServeCommandTests, self).setUp()
+        self.backend = DictBackend({})
+
+    def serve_command(self, handler_cls, args, inf, outf):
+        return serve_command(handler_cls, ["test"] + args, backend=self.backend,
+            inf=inf, outf=outf)
+
+    def test_receive_pack(self):
+        commit = make_commit(id=ONE, parents=[], commit_time=111)
+        self.backend.repos["/"] = MemoryRepo.init_bare(
+            [commit], {"refs/heads/master": commit.id})
+        outf = StringIO()
+        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEquals(2, len(outlines))
+        self.assertEquals("1111111111111111111111111111111111111111 refs/heads/master",
+            outlines[0][4:].split("\x00")[0])
+        self.assertEquals("0000", outlines[-1])
+        self.assertEquals(0, exitcode)

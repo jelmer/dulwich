@@ -23,6 +23,8 @@ import doctest
 import os
 import unittest
 import shutil
+import subprocess
+import sys
 import tempfile
 
 try:
@@ -77,9 +79,12 @@ class BlackboxTestCase(TestCase):
         :param name: Name of the command, as it exists in bin/
         :param args: Arguments to the command
         """
-        import subprocess
-        return subprocess.Popen([self.bin_path(name)] + args, stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(sys.path)
+        return subprocess.Popen([self.bin_path(name)] + args,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env)
 
 
 def test_suite():

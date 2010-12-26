@@ -87,7 +87,7 @@ class BlackboxTestCase(TestCase):
             env=env)
 
 
-def test_suite():
+def self_test_suite():
     names = [
         'blackbox',
         'client',
@@ -105,10 +105,11 @@ def test_suite():
         'web',
         ]
     module_names = ['dulwich.tests.test_' + name for name in names]
-    result = unittest.TestSuite()
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromNames(module_names)
-    result.addTests(suite)
+    return loader.loadTestsFromNames(module_names)
+
+
+def tutorial_test_suite():
     tutorial = [
         '0-introduction',
         '1-repo',
@@ -121,9 +122,21 @@ def test_suite():
         os.chdir(test.__dulwich_tempdir)
     def teardown(test):
         shutil.rmtree(test.__dulwich_tempdir)
-    suite = doctest.DocFileSuite(setUp=setup, tearDown=teardown,
+    return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
         *tutorial_files)
-    result.addTests(suite)
+
+
+def nocompat_test_suite():
+    result = unittest.TestSuite()
+    result.addTests(self_test_suite())
+    result.addTests(tutorial_test_suite())
+    return result
+
+
+def test_suite():
+    result = unittest.TestSuite()
+    result.addTests(self_test_suite())
+    result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())
     return result

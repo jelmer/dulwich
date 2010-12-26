@@ -81,7 +81,16 @@ class BlackboxTestCase(TestCase):
         """
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(sys.path)
-        return subprocess.Popen([self.bin_path(name)] + args,
+        args.insert(0, self.bin_path(name))
+
+        # Since they don't have any extensions, Windows can't recognize
+        # executablility of the Python files in /bin. Even then, we'd have to
+        # expect the user to set up file associations for .py files.
+        #
+        # Save us from all that headache and call python with the bin script.
+        if os.name == "nt":
+            args.insert(0, sys.executable)
+        return subprocess.Popen(args,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE,
             env=env)

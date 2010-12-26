@@ -70,14 +70,14 @@ are also moving HEAD, which is Git's currently checked out branch:
   >>> head = repo.refs['HEAD']
   >>> head == commit.id
   True
-  >>> head = repo.refs['refs/heads/master']
+  >>> head == repo.refs['refs/heads/master']
   True
 
 How did that work? As it turns out, HEAD is a special kind of ref called a
 symbolic ref, and it points at master. Most functions on the refs container
 work transparently with symbolic refs, but we can also take a peek inside HEAD:
 
-  >>> repo.read_ref('HEAD')
+  >>> repo.refs.read_ref('HEAD')
   'ref: refs/heads/master'
 
 Normally, you won't need to use read_ref. If you want to change what ref HEAD

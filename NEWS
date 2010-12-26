@@ -2,6 +2,9 @@
 
  FEATURES
 
+  * New `dulwich.diff_tree` module for simple content-based rename detection.
+    (Dave Borowitz)
+
   * Add Tree.items(). (Jelmer Vernooij)
 
   * Add eof() and unread_pkt_line() methods to Protocol. (Dave Borowitz)
@@ -31,6 +34,8 @@
 
   * The ref format is now checked when setting a ref rather than when reading it back.
     (Dave Borowitz, #653527)
+
+  * Make sure pack files are closed correctly. (Tay Ray Chuan)
 
  DOCUMENTATION
 

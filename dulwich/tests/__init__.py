@@ -28,35 +28,20 @@ import sys
 import tempfile
 
 try:
-    from testtools.testcase import TestCase
-except ImportError:
-    from unittest import TestCase
-
-try:
     # If Python itself provides an exception, use that
     from unittest import SkipTest as TestSkipped
 except ImportError:
-    # Check if the nose exception can be used
     try:
-        import nose
+        from unittest2 import SkipTest as TestSkipped
     except ImportError:
-        try:
-            import testtools.testcase
-        except ImportError:
-            class TestSkipped(Exception):
-                def __init__(self, msg):
-                    self.msg = msg
-        else:
-            TestSkipped = testtools.testcase.TestCase.skipException
-    else:
-        TestSkipped = nose.SkipTest
-        try:
-            import testtools.testcase
-        except ImportError:
-            pass
-        else:
-            # Make testtools use the same exception class as nose
-            testtools.testcase.TestCase.skipException = TestSkipped
+        from testtools.testcase import TestSkipped
+
+try:
+    from testtools.testcase import TestCase
+except ImportError:
+    from unittest import TestCase
+else:
+    TestCase.skipException = TestSkipped
 
 
 class BlackboxTestCase(TestCase):

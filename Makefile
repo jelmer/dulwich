@@ -1,8 +1,12 @@
 PYTHON = python
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
-TESTRUNNER = $(shell which nosetests)
-TESTFLAGS =
+ifeq ($(shell $(PYTHON) -c "import sys; print sys.version_info >= (2, 7)"),True)
+TESTRUNNER ?= unittest
+else
+TESTRUNNER ?= unittest2
+endif
+RUNTEST = PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER)
 
 all: build
 
@@ -19,20 +23,14 @@ install::
 	$(SETUP) install
 
 check:: build
-	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) dulwich
+	$(RUNTEST) dulwich.tests.test_suite
 
 check-nocompat:: build
-	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) -e compat dulwich
+	$(RUNTEST) dulwich.tests.nocompat_test_suite
 
 check-noextensions:: clean
-	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) $(TESTFLAGS) dulwich
+	$(RUNTEST) dulwich.tests.test_suite
 
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
-
-coverage:: build
-	PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) $(TESTRUNNER) --cover-package=dulwich --with-coverage --cover-erase --cover-inclusive dulwich
-
-coverage-annotate: coverage
-	python-coverage -a -o /usr

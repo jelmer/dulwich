@@ -33,7 +33,7 @@ a pointer in to the corresponding packfile.
 try:
     from collections import defaultdict
 except ImportError:
-    from misc import defaultdict
+    from _compat import defaultdict
 
 from cStringIO import (
     StringIO,
@@ -53,7 +53,7 @@ import struct
 try:
     from struct import unpack_from
 except ImportError:
-    from dulwich.misc import unpack_from
+    from dulwich._compat import unpack_from
 import sys
 import zlib
 
@@ -65,7 +65,7 @@ from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     make_sha,
     SEEK_END,
     )
@@ -243,7 +243,7 @@ class PackIndex(object):
 
     def __iter__(self):
         """Iterate over the SHAs in this pack."""
-        raise NotImplementedError(self.__iter__)
+        return imap(sha_to_hex, self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.
@@ -277,10 +277,6 @@ class PackIndex(object):
         :param sha: A *binary* SHA string. (20 characters long)_
         """
         raise NotImplementedError(self._object_index)
-
-    def __iter__(self):
-        """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
 
     def objects_sha1(self):
         """Return the hex SHA1 over all the shas of all objects in this pack.
@@ -350,7 +346,7 @@ class FilePackIndex(PackIndex):
         else:
             self._file = file
         if contents is None:
-            self._contents, self._size = _load_file_contents(file, size)
+            self._contents, self._size = _load_file_contents(self._file, size)
         else:
             self._contents, self._size = (contents, size)
 
@@ -364,6 +360,8 @@ class FilePackIndex(PackIndex):
 
     def close(self):
         self._file.close()
+        if getattr(self._contents, "close", None) is not None:
+            self._contents.close()
 
     def __len__(self):
         """Return the number of entries in this pack index."""

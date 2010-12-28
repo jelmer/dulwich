@@ -66,24 +66,35 @@ class CreateRepositoryTests(TestCase):
             finally:
                 f.close()
 
-    def _check_repo_contents(self, repo):
-        self.assertTrue(repo.bare)
+    def _check_repo_contents(self, repo, expect_bare):
+        self.assertEquals(expect_bare, repo.bare)
         self.assertFileContentsEqual('Unnamed repository', repo, 'description')
         self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
+        barestr = 'bare = %s' % str(expect_bare).lower()
+        self.assertTrue(barestr in repo.get_named_file('config').read())
 
-    def test_create_disk(self):
+    def test_create_disk_bare(self):
         tmp_dir = tempfile.mkdtemp()
         try:
             repo = Repo.init_bare(tmp_dir)
             self.assertEquals(tmp_dir, repo._controldir)
-            self._check_repo_contents(repo)
+            self._check_repo_contents(repo, True)
+        finally:
+            shutil.rmtree(tmp_dir)
+
+    def test_create_disk_non_bare(self):
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            repo = Repo.init(tmp_dir)
+            self.assertEquals(os.path.join(tmp_dir, '.git'), repo._controldir)
+            self._check_repo_contents(repo, False)
         finally:
             shutil.rmtree(tmp_dir)
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})
-        self._check_repo_contents(repo)
+        self._check_repo_contents(repo, True)
 
 
 class RepositoryTests(TestCase):
@@ -409,6 +420,16 @@ class BuildRepoTests(TestCase):
         tree = r[r[commit_sha].tree]
         self.assertEqual([], list(tree.iteritems()))
 
+    def test_commit_encoding(self):
+        r = self._repo
+        commit_sha = r.do_commit('commit with strange character \xee',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             encoding="iso8859-1")
+        self.assertEquals("iso8859-1", r[commit_sha].encoding)
+
     def test_commit_fail_ref(self):
         r = self._repo
 
@@ -596,18 +617,13 @@ class RefsContainerTests(object):
                          self._refs['refs/heads/symbolic'])
 
     def test_check_refname(self):
-        try:
-            self._refs._check_refname('HEAD')
-        except KeyError:
-            self.fail()
+        self._refs._check_refname('HEAD')
+        self._refs._check_refname('refs/heads/foo')
 
-        try:
-            self._refs._check_refname('refs/heads/foo')
-        except KeyError:
-            self.fail()
-
-        self.assertRaises(KeyError, self._refs._check_refname, 'refs')
-        self.assertRaises(KeyError, self._refs._check_refname, 'notrefs/foo')
+        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+                          'refs')
+        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+                          'notrefs/foo')
 
     def test_contains(self):
         self.assertTrue('refs/heads/master' in self._refs)
@@ -732,7 +748,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEquals(
           ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),
           self._refs._follow('refs/heads/master'))
-        self.assertRaises(KeyError, self._refs._follow, 'notrefs/foo')
+        self.assertRaises(errors.RefFormatError, self._refs._follow,
+                          'notrefs/foo')
         self.assertRaises(KeyError, self._refs._follow, 'refs/heads/loop')
 
     def test_delitem(self):

@@ -1,4 +1,4 @@
-# misc.py -- For dealing with python2.4 oddness
+# _compat.py -- For dealing with python2.4 oddness
 # Copyright (C) 2008 Canonical Ltd.
 #
 # This program is free software; you can redistribute it and/or
@@ -102,9 +102,44 @@ def unpack_from(fmt, buf, offset=0):
 
 
 try:
+    from itertools import permutations
+except ImportError:
+    # Implementation of permutations from Python 2.6 documentation:
+    # http://docs.python.org/2.6/library/itertools.html#itertools.permutations
+    # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+    # Modified syntax slightly to run under Python 2.4.
+    def permutations(iterable, r=None):
+        # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
+        # permutations(range(3)) --> 012 021 102 120 201 210
+        pool = tuple(iterable)
+        n = len(pool)
+        if r is None:
+            r = n
+        if r > n:
+            return
+        indices = range(n)
+        cycles = range(n, n-r, -1)
+        yield tuple(pool[i] for i in indices[:r])
+        while n:
+            for i in reversed(range(r)):
+                cycles[i] -= 1
+                if cycles[i] == 0:
+                    indices[i:] = indices[i+1:] + indices[i:i+1]
+                    cycles[i] = n - i
+                else:
+                    j = cycles[i]
+                    indices[i], indices[-j] = indices[-j], indices[i]
+                    yield tuple(pool[i] for i in indices[:r])
+                    break
+            else:
+                return
+
+
+try:
     from collections import namedtuple
 
     TreeEntryTuple = namedtuple('TreeEntryTuple', ['path', 'mode', 'sha'])
+    TreeChangeTuple = namedtuple('TreeChangeTuple', ['type', 'old', 'new'])
 except ImportError:
     # Provide manual implementations of namedtuples for Python <2.5.
     # If the class definitions change, be sure to keep these in sync by running
@@ -153,3 +188,43 @@ except ImportError:
             path = _property(_itemgetter(0))
             mode = _property(_itemgetter(1))
             sha = _property(_itemgetter(2))
+
+
+    class TreeChangeTuple(tuple):
+            'TreeChangeTuple(type, old, new)'
+
+            __slots__ = ()
+
+            _fields = ('type', 'old', 'new')
+
+            def __new__(_cls, type, old, new):
+                return _tuple.__new__(_cls, (type, old, new))
+
+            @classmethod
+            def _make(cls, iterable, new=tuple.__new__, len=len):
+                'Make a new TreeChangeTuple object from a sequence or iterable'
+                result = new(cls, iterable)
+                if len(result) != 3:
+                    raise TypeError('Expected 3 arguments, got %d' % len(result))
+                return result
+
+            def __repr__(self):
+                return 'TreeChangeTuple(type=%r, old=%r, new=%r)' % self
+
+            def _asdict(t):
+                'Return a new dict which maps field names to their values'
+                return {'type': t[0], 'old': t[1], 'new': t[2]}
+
+            def _replace(_self, **kwds):
+                'Return a new TreeChangeTuple object replacing specified fields with new values'
+                result = _self._make(map(kwds.pop, ('type', 'old', 'new'), _self))
+                if kwds:
+                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
+                return result
+
+            def __getnewargs__(self):
+                return tuple(self)
+
+            type = _property(_itemgetter(0))
+            old = _property(_itemgetter(1))
+            new = _property(_itemgetter(2))

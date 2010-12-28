@@ -32,9 +32,9 @@ from dulwich.errors import (
 from dulwich.objects import (
     object_class,
     Blob,
-    ShaFile,
     Tag,
     Tree,
+    TreeEntry,
     )
 from dulwich.object_store import (
     DiskObjectStore,
@@ -89,6 +89,25 @@ class ObjectStoreTests(object):
         r = self.store[testobject.id]
         self.assertEquals(r, testobject)
 
+    def test_tree_changes(self):
+        blob_a1 = make_object(Blob, data='a1')
+        blob_a2 = make_object(Blob, data='a2')
+        blob_b = make_object(Blob, data='b')
+        for blob in [blob_a1, blob_a2, blob_b]:
+            self.store.add_object(blob)
+
+        blobs_1 = [('a', blob_a1.id, 0100644), ('b', blob_b.id, 0100644)]
+        tree1_id = commit_tree(self.store, blobs_1)
+        blobs_2 = [('a', blob_a2.id, 0100644), ('b', blob_b.id, 0100644)]
+        tree2_id = commit_tree(self.store, blobs_2)
+        change_a = (('a', 'a'), (0100644, 0100644), (blob_a1.id, blob_a2.id))
+        self.assertEquals([change_a],
+                          list(self.store.tree_changes(tree1_id, tree2_id)))
+        self.assertEquals(
+          [change_a, (('b', 'b'), (0100644, 0100644), (blob_b.id, blob_b.id))],
+          list(self.store.tree_changes(tree1_id, tree2_id,
+                                       want_unchanged=True)))
+
     def test_iter_tree_contents(self):
         blob_a = make_object(Blob, data='a')
         blob_b = make_object(Blob, data='b')
@@ -104,7 +123,7 @@ class ObjectStoreTests(object):
           ('c', blob_c.id, 0100644),
           ]
         tree_id = commit_tree(self.store, blobs)
-        self.assertEquals([(p, m, h) for (p, h, m) in blobs],
+        self.assertEquals([TreeEntry(p, m, h) for (p, h, m) in blobs],
                           list(self.store.iter_tree_contents(tree_id)))
 
     def test_iter_tree_contents_include_trees(self):
@@ -125,12 +144,12 @@ class ObjectStoreTests(object):
         tree_bd = self.store[tree_ad['bd'][1]]
 
         expected = [
-          ('', 0040000, tree_id),
-          ('a', 0100644, blob_a.id),
-          ('ad', 0040000, tree_ad.id),
-          ('ad/b', 0100644, blob_b.id),
-          ('ad/bd', 0040000, tree_bd.id),
-          ('ad/bd/c', 0100755, blob_c.id),
+          TreeEntry('', 0040000, tree_id),
+          TreeEntry('a', 0100644, blob_a.id),
+          TreeEntry('ad', 0040000, tree_ad.id),
+          TreeEntry('ad/b', 0100644, blob_b.id),
+          TreeEntry('ad/bd', 0040000, tree_bd.id),
+          TreeEntry('ad/bd/c', 0100755, blob_c.id),
           ]
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEquals(expected, list(actual))
@@ -161,6 +180,10 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
+    def tearDown(self):
+        for pack in self.store.packs:
+            pack.close()
+
     def test_empty_packs(self):
         self.assertEquals([], self.store.packs)
 
@@ -184,6 +207,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def tearDown(self):
         TestCase.tearDown(self)
+        PackBasedObjectStoreTests.tearDown(self)
         shutil.rmtree(self.store_dir)
 
     def test_pack_dir(self):

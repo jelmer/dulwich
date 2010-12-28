@@ -36,6 +36,7 @@ size_t strnlen(char *text, size_t maxlen)
 #define bytehex(x) (((x)<0xa)?('0'+(x)):('a'-0xa+(x)))
 
 static PyObject *tree_entry_cls;
+static PyObject *object_format_exception_cls;
 
 static PyObject *sha_to_pyhex(const unsigned char *sha)
 {
@@ -49,17 +50,22 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 	return PyString_FromStringAndSize(hexsha, 40);
 }
 
-static PyObject *py_parse_tree(PyObject *self, PyObject *args)
+static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 {
 	char *text, *start, *end;
-	int len, namelen;
-	PyObject *ret, *item, *name;
+	int len, namelen, strict;
+	PyObject *ret, *item, *name, *py_strict = NULL;
+	static char *kwlist[] = {"text", "strict", NULL};
 
-	if (!PyArg_ParseTuple(args, "s#", &text, &len))
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "s#|O", kwlist,
+	                                 &text, &len, &py_strict))
 		return NULL;
 
+
+	strict = py_strict ?  PyObject_IsTrue(py_strict) : 0;
+
 	/* TODO: currently this returns a list; if memory usage is a concern,
-	* consider rewriting as a custom iterator object */
+	 * consider rewriting as a custom iterator object */
 	ret = PyList_New(0);
 
 	if (ret == NULL) {
@@ -71,6 +77,13 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 
 	while (text < end) {
 		long mode;
+		if (strict && text[0] == '0') {
+			PyErr_SetString(object_format_exception_cls,
+			                "Illegal leading zero on mode");
+			Py_DECREF(ret);
+			return NULL;
+		}
+
 		mode = strtol(text, &text, 8);
 
 		if (*text != ' ') {
@@ -97,7 +110,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args)
 		}
 
 		item = Py_BuildValue("(NlN)", name, mode,
-							 sha_to_pyhex((unsigned char *)text+namelen+1));
+		                     sha_to_pyhex((unsigned char *)text+namelen+1));
 		if (item == NULL) {
 			Py_DECREF(ret);
 			Py_DECREF(name);
@@ -146,17 +159,31 @@ int cmp_tree_item(const void *_a, const void *_b)
 	return strcmp(remain_a, remain_b);
 }
 
-static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
+int cmp_tree_item_name_order(const void *_a, const void *_b) {
+	const struct tree_item *a = _a, *b = _b;
+	return strcmp(a->name, b->name);
+}
+
+static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 {
 	struct tree_item *qsort_entries = NULL;
-	int num_entries, n = 0, i;
-	PyObject *ret, *key, *value, *py_mode, *py_sha;
+	int name_order, num_entries, n = 0, i;
+	PyObject *entries, *py_name_order, *ret, *key, *value, *py_mode, *py_sha;
 	Py_ssize_t pos = 0;
+	int (*cmp)(const void *, const void *);
+
+	if (!PyArg_ParseTuple(args, "OO", &entries, &py_name_order))
+		goto error;
 
 	if (!PyDict_Check(entries)) {
 		PyErr_SetString(PyExc_TypeError, "Argument not a dictionary");
 		goto error;
 	}
+
+	name_order = PyObject_IsTrue(py_name_order);
+	if (name_order == -1)
+		goto error;
+	cmp = name_order ? cmp_tree_item_name_order : cmp_tree_item;
 
 	num_entries = PyDict_Size(entries);
 	if (PyErr_Occurred())
@@ -193,13 +220,13 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *entries)
 		qsort_entries[n].mode = PyInt_AS_LONG(py_mode);
 
 		qsort_entries[n].tuple = PyObject_CallFunctionObjArgs(
-				tree_entry_cls, key, py_mode, py_sha, NULL);
+		                tree_entry_cls, key, py_mode, py_sha, NULL);
 		if (qsort_entries[n].tuple == NULL)
 			goto error;
 		n++;
 	}
 
-	qsort(qsort_entries, num_entries, sizeof(struct tree_item), cmp_tree_item);
+	qsort(qsort_entries, num_entries, sizeof(struct tree_item), cmp);
 
 	ret = PyList_New(num_entries);
 	if (ret == NULL) {
@@ -222,18 +249,30 @@ error:
 }
 
 static PyMethodDef py_objects_methods[] = {
-	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS, NULL },
-	{ "sorted_tree_items", (PyCFunction)py_sorted_tree_items, METH_O, NULL },
+	{ "parse_tree", (PyCFunction)py_parse_tree, METH_VARARGS | METH_KEYWORDS,
+	  NULL },
+	{ "sorted_tree_items", py_sorted_tree_items, METH_VARARGS, NULL },
 	{ NULL, NULL, 0, NULL }
 };
 
 PyMODINIT_FUNC
 init_objects(void)
 {
-	PyObject *m, *objects_mod;
+	PyObject *m, *objects_mod, *errors_mod;
 
 	m = Py_InitModule3("_objects", py_objects_methods, NULL);
 	if (m == NULL)
+		return;
+
+
+	errors_mod = PyImport_ImportModule("dulwich.errors");
+	if (errors_mod == NULL)
+		return;
+
+	object_format_exception_cls = PyObject_GetAttrString(
+		errors_mod, "ObjectFormatException");
+	Py_DECREF(errors_mod);
+	if (object_format_exception_cls == NULL)
 		return;
 
 	/* This is a circular import but should be safe since this module is

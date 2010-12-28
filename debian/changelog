@@ -1,8 +1,9 @@
-dulwich (0.6.2+bzr704-1) UNRELEASED; urgency=low
+dulwich (0.6.2+bzr788-1) UNRELEASED; urgency=low
 
   * New upstream snapshot.
+  * Drop Pure- from the description.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Sat, 20 Nov 2010 15:19:03 +0100
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 28 Dec 2010 01:50:22 +0100
 
 dulwich (0.6.2+bzr702-1) unstable; urgency=low
 

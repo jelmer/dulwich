@@ -38,7 +38,7 @@ from dulwich.errors import (
     ObjectFormatException,
     )
 from dulwich.file import GitFile
-from dulwich.misc import (
+from dulwich._compat import (
     make_sha,
     TreeEntryTuple,
     )
@@ -143,7 +143,7 @@ def check_identity(identity, error_msg):
     """Check if the specified identity is valid.
 
     This will raise an exception if the identity is not valid.
-    
+
     :param identity: Identity string
     :param error_msg: Error message to use in exception
     """
@@ -175,7 +175,7 @@ class FixedSha(object):
 class ShaFile(object):
     """A git SHA file."""
 
-    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path', 
+    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path',
                  '_sha', '_needs_serialization', '_magic')
 
     @staticmethod
@@ -564,7 +564,7 @@ class Tag(ShaFile):
     type_name = 'tag'
     type_num = 4
 
-    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha', 
+    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha',
                  '_object_class', '_tag_time', '_tag_timezone',
                  '_tagger', '_message')
 
@@ -694,18 +694,20 @@ class TreeEntry(TreeEntryTuple):
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
-def parse_tree(text):
+def parse_tree(text, strict=False):
     """Parse a tree text.
 
     :param text: Serialized text to parse
     :return: iterator of tuples of (name, mode, sha)
+    :raise ObjectFormatException: if the object was malformed in some way
     """
     count = 0
     l = len(text)
     while count < l:
         mode_end = text.index(' ', count)
         mode_text = text[count:mode_end]
-        assert mode_text[0] != '0'
+        if strict and mode_text.startswith('0'):
+            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         try:
             mode = int(mode_text, 8)
         except ValueError:
@@ -730,14 +732,17 @@ def serialize_tree(items):
         yield "%04o %s\0%s" % (mode, name, hex_to_sha(hexsha))
 
 
-def sorted_tree_items(entries):
-    """Iterate over a tree entries dictionary in the order in which 
-    the items would be serialized.
+def sorted_tree_items(entries, name_order):
+    """Iterate over a tree entries dictionary.
 
+    :param name_order: If True, iterate entries in order of their name. If
+        False, iterate entries in tree order, that is, treat subtree entries as
+        having '/' appended.
     :param entries: Dictionary mapping names to (mode, sha) tuples
     :return: Iterator over (name, mode, hexsha)
     """
-    for name, entry in sorted(entries.iteritems(), cmp=cmp_entry):
+    cmp_func = name_order and cmp_entry_name_order or cmp_entry
+    for name, entry in sorted(entries.iteritems(), cmp=cmp_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)
@@ -747,12 +752,17 @@ def sorted_tree_items(entries):
 
 
 def cmp_entry((name1, value1), (name2, value2)):
-    """Compare two tree entries."""
+    """Compare two tree entries in tree order."""
     if stat.S_ISDIR(value1[0]):
         name1 += "/"
     if stat.S_ISDIR(value2[0]):
         name2 += "/"
     return cmp(name1, name2)
+
+
+def cmp_entry_name_order(entry1, entry2):
+    """Compare two tree entries in name order."""
+    return cmp(entry1[0], entry2[0])
 
 
 class Tree(ShaFile):
@@ -822,9 +832,9 @@ class Tree(ShaFile):
 
     def entries(self):
         """Return a list of tuples describing the tree entries.
-        
-        :note: The order of the tuples that are returned is different from that 
-            returned by the items and iteritems methods. This function will be 
+
+        :note: The order of the tuples that are returned is different from that
+            returned by the items and iteritems methods. This function will be
             deprecated in the future.
         """
         self._ensure_parsed()
@@ -833,13 +843,14 @@ class Tree(ShaFile):
         return [
             (mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
 
-    def iteritems(self):
-        """Iterate over entries in the order in which they would be serialized.
+    def iteritems(self, name_order=False):
+        """Iterate over entries.
 
+        :param name_order: If True, iterate in name order instead of tree order.
         :return: Iterator over (name, mode, sha) tuples
         """
         self._ensure_parsed()
-        return sorted_tree_items(self._entries)
+        return sorted_tree_items(self._entries, name_order)
 
     def items(self):
         """Return the sorted entries in this tree.
@@ -869,7 +880,8 @@ class Tree(ShaFile):
                          stat.S_IFLNK, stat.S_IFDIR, S_IFGITLINK,
                          # TODO: optionally exclude as in git fsck --strict
                          stat.S_IFREG | 0664)
-        for name, mode, sha in parse_tree("".join(self._chunked_text)):
+        for name, mode, sha in parse_tree(''.join(self._chunked_text),
+                                          True):
             check_hexsha(sha, 'invalid sha %s' % sha)
             if '/' in name or name in ('', '.', '..'):
                 raise ObjectFormatException('invalid name %s' % name)
@@ -903,7 +915,7 @@ def parse_timezone(text):
     """Parse a timezone text fragment (e.g. '+0100').
 
     :param text: Text to parse.
-    :return: Tuple with timezone as seconds difference to UTC 
+    :return: Tuple with timezone as seconds difference to UTC
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
@@ -968,7 +980,7 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
-        for field, value in parse_commit("".join(self._chunked_text)):
+        for field, value in parse_commit(''.join(self._chunked_text)):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:

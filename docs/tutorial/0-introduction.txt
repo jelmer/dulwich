@@ -45,16 +45,16 @@ tree.
 The Tree
 --------
 
-A tree is a collection of file information, the state of your working copy at
+A tree is a collection of file information, the state of a single directory at
 a given point in time.
 
 A tree file looks like this::
 
-  tree <content length><NUL><file mode> <filename><NUL><blob sha>...
+  tree <content length><NUL><file mode> <filename><NUL><item sha>...
 
 And repeats for every file in the tree.
 
-Note that for a unknown reason, the SHA-1 digest is in binary form here.
+Note that the SHA-1 digest is in binary form here.
 
 The file mode is like the octal argument you could give to the ``chmod``
 command.  Except it is in extended form to tell regular files from
@@ -88,14 +88,15 @@ accelerate operations and reduce space.
 More About Git formats
 ----------------------
 
-These three objects make 90 % of a Git repository. The rest is branch
-information and optimizations.
+These three objects make up most of the contents of a Git repository and are
+used for the history. They can either appear as simple files on disk (one file
+per object) or in a ``pack`` file, which is a container for a number of these
+objects.
 
-For instance there is an index of the current state of the working copy.
-There are also pack files to group several small objects in a single indexed
-file.
+The is also an index of the current state of the working copy in the
+repository as well as files to track the existing branches and tags.
 
-For a more detailled explanation of object formats and SHA-1 digests, see:
+For a more detailed explanation of object formats and SHA-1 digests, see:
 http://www-cs-students.stanford.edu/~blynn/gitmagic/ch08.html
 
 Just note that recent versions of Git compress object files using zlib.

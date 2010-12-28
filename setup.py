@@ -54,6 +54,8 @@ setup(name='dulwich',
                     include_dirs=include_dirs),
           Extension('dulwich._pack', ['dulwich/_pack.c'],
               include_dirs=include_dirs),
+          Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+              include_dirs=include_dirs),
           ],
       distclass=DulwichDistribution,
       )

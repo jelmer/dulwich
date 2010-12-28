@@ -17,19 +17,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+from dulwich.server import serve_command, UploadPackHandler
+import os
 import sys
-from dulwich.repo import Repo
-from dulwich.server import GitBackend, UploadPackHandler
 
-def send_fn(data):
-    sys.stdout.write(data)
-    sys.stdout.flush()
+if len(sys.argv) < 2:
+    print >>sys.stderr, "usage: %s <git-dir>" % os.path.basename(sys.argv[0])
+    sys.exit(1)
 
-if __name__ == "__main__":
-    gitdir = None
-    if len(sys.argv) > 1:
-        gitdir = sys.argv[1]
-
-    backend = GitBackend(Repo(gitdir))
-    handler = UploadPackHandler(backend, sys.stdin.read, send_fn)
-    handler.handle()
+sys.exit(serve_command(UploadPackHandler))

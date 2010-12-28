@@ -131,3 +131,72 @@ M 100644 :1 a
         self.assertEquals(2, len(markers))
         self.assertTrue(isinstance(self.repo[markers["1"]], Blob))
         self.assertTrue(isinstance(self.repo[markers["2"]], Commit))
+
+    def test_file_add(self):
+        from fastimport import commands
+        cmd = commands.BlobCommand("23", "data")
+        self.processor.blob_handler(cmd)
+        cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            "FOO", None, [], [commands.FileModifyCommand("path", 0100644, ":23", None)])
+        self.processor.commit_handler(cmd)
+        commit = self.repo[self.processor.last_commit]
+        self.assertEquals([
+            ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172')],
+            self.repo[commit.tree].items())
+
+    def simple_commit(self):
+        from fastimport import commands
+        cmd = commands.BlobCommand("23", "data")
+        self.processor.blob_handler(cmd)
+        cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            "FOO", None, [], [commands.FileModifyCommand("path", 0100644, ":23", None)])
+        self.processor.commit_handler(cmd)
+        commit = self.repo[self.processor.last_commit]
+        return commit
+
+    def make_file_commit(self, file_cmds):
+        """Create a trivial commit with the specified file commands.
+
+        :param file_cmds: File commands to run.
+        :return: The created commit object
+        """
+        from fastimport import commands
+        cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
+            "FOO", None, [], file_cmds)
+        self.processor.commit_handler(cmd)
+        return self.repo[self.processor.last_commit]
+
+    def test_file_copy(self):
+        from fastimport import commands
+        self.simple_commit()
+        commit = self.make_file_commit([commands.FileCopyCommand("path", "new_path")])
+        self.assertEquals([
+            ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ], self.repo[commit.tree].items())
+
+    def test_file_move(self):
+        from fastimport import commands
+        self.simple_commit()
+        commit = self.make_file_commit([commands.FileRenameCommand("path", "new_path")])
+        self.assertEquals([
+            ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ], self.repo[commit.tree].items())
+
+    def test_file_delete(self):
+        from fastimport import commands
+        self.simple_commit()
+        commit = self.make_file_commit([commands.FileDeleteCommand("path")])
+        self.assertEquals([], self.repo[commit.tree].items())
+
+    def test_file_deleteall(self):
+        from fastimport import commands
+        self.simple_commit()
+        commit = self.make_file_commit([commands.FileDeleteAllCommand()])
+        self.assertEquals([], self.repo[commit.tree].items())

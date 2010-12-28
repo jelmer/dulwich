@@ -1,11 +1,11 @@
-#!/usr/bin/python
-# dul-receive-pack - git-receive-pack in python
-# Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# __init__.py -- Compatibility tests for dulwich
+# Copyright (C) 2010 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# or (at your option) a later version of the License.
+# of the License or (at your option) any later version of
+# the License.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,12 +17,21 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.server import serve_command, ReceivePackHandler
-import os
-import sys
+"""Compatibility tests for Dulwich."""
 
-if len(sys.argv) < 2:
-    print >>sys.stderr, "usage: %s <git-dir>" % os.path.basename(sys.argv[0])
-    sys.exit(1)
+import unittest
 
-sys.exit(serve_command(ReceivePackHandler))
+def test_suite():
+    names = [
+        'client',
+        'pack',
+        'repository',
+        'server',
+        'utils',
+        ]
+    module_names = ['dulwich.tests.compat.test_' + name for name in names]
+    result = unittest.TestSuite()
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromNames(module_names)
+    result.addTests(suite)
+    return result

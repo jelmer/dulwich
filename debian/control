@@ -14,7 +14,7 @@ Provides: ${python:Provides}
 Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
 XB-Python-Version: ${python:Versions}
 Recommends: python-fastimport
-Description: Pure-python Git library
+Description: Python Git library
  Dulwich is a Python implementation of the file formats and protocols 
  used by the Git version control system. It can currently read from and write 
  to existing Git repositories and implements the protocol for pushing and 

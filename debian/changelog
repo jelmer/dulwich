@@ -1,6 +1,7 @@
 dulwich (0.6.2+bzr788-1) UNRELEASED; urgency=low
 
   * New upstream snapshot.
+   + Changes default test runner from nose to unittest/unittest2.
   * Drop Pure- from the description.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Tue, 28 Dec 2010 01:50:22 +0100

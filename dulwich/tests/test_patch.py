@@ -21,15 +21,22 @@
 from cStringIO import StringIO
 
 from dulwich.objects import (
+    Blob,
     Commit,
     Tree,
     )
+from dulwich.object_store import (
+    MemoryObjectStore,
+    )
 from dulwich.patch import (
     git_am_patch_split,
+    write_blob_diff,
     write_commit_patch,
+    write_tree_diff,
     )
 from dulwich.tests import (
     TestCase,
+    TestSkipped,
     )
 
 
@@ -152,4 +159,134 @@ From: Jelmer Vernooy <jelmer@debian.org>
 
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertIs(None, version)
+        self.assertEquals(None, version)
+
+    def test_extract_mercurial(self):
+        raise TestSkipped("git_am_patch_split doesn't handle Mercurial patches properly yet")
+        expected_diff = """diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
+--- a/dulwich/tests/test_patch.py
++++ b/dulwich/tests/test_patch.py
+@@ -158,7 +158,7 @@
+ 
+ '''
+         c, diff, version = git_am_patch_split(StringIO(text))
+-        self.assertIs(None, version)
++        self.assertEquals(None, version)
+ 
+ 
+ class DiffTests(TestCase):
+"""
+        text = """From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net Mon Nov 29 00:58:18 2010
+Date: Sun, 28 Nov 2010 17:57:27 -0600
+From: Augie Fackler <durin42@gmail.com>
+To: dulwich-users <dulwich-users@lists.launchpad.net>
+Subject: [Dulwich-users] [PATCH] test_patch: fix tests on Python 2.6
+Content-Transfer-Encoding: 8bit
+
+Change-Id: I5e51313d4ae3a65c3f00c665002a7489121bb0d6
+
+%s
+
+_______________________________________________
+Mailing list: https://launchpad.net/~dulwich-users
+Post to     : dulwich-users@lists.launchpad.net
+Unsubscribe : https://launchpad.net/~dulwich-users
+More help   : https://help.launchpad.net/ListHelp
+
+""" % expected_diff
+        c, diff, version = git_am_patch_split(StringIO(text))
+        self.assertEquals(expected_diff, diff)
+        self.assertEquals(None, version)
+
+
+class DiffTests(TestCase):
+    """Tests for write_blob_diff and write_tree_diff."""
+
+    def test_blob_diff(self):
+        f = StringIO()
+        write_blob_diff(f, ("foo.txt", 0644, Blob.from_string("old\nsame\n")),
+                           ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
+        self.assertEquals([
+            "diff --git a/foo.txt b/bar.txt",
+            "index 3b0f961..a116b51 644",
+            "--- a/foo.txt",
+            "+++ b/bar.txt",
+            "@@ -1,2 +1,2 @@",
+            "-old",
+            "+new",
+            " same"
+            ], f.getvalue().splitlines())
+
+    def test_blob_add(self):
+        f = StringIO()
+        write_blob_diff(f, (None, None, None),
+                           ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
+        self.assertEquals([
+            'diff --git /dev/null b/bar.txt',
+             'new mode 644',
+             'index 0000000..a116b51 644',
+             '--- /dev/null',
+             '+++ b/bar.txt',
+             '@@ -1,0 +1,2 @@',
+             '+new',
+             '+same'
+            ], f.getvalue().splitlines())
+
+    def test_blob_remove(self):
+        f = StringIO()
+        write_blob_diff(f, ("bar.txt", 0644, Blob.from_string("new\nsame\n")),
+                           (None, None, None))
+        self.assertEquals([
+            'diff --git a/bar.txt /dev/null',
+            'deleted mode 644',
+            'index a116b51..0000000',
+            '--- a/bar.txt',
+            '+++ /dev/null',
+            '@@ -1,2 +1,0 @@',
+            '-new',
+            '-same'
+            ], f.getvalue().splitlines())
+
+    def test_tree_diff(self):
+        f = StringIO()
+        store = MemoryObjectStore()
+        added = Blob.from_string("add\n")
+        removed = Blob.from_string("removed\n")
+        changed1 = Blob.from_string("unchanged\nremoved\n")
+        changed2 = Blob.from_string("unchanged\nadded\n")
+        unchanged = Blob.from_string("unchanged\n")
+        tree1 = Tree()
+        tree1.add(0644, "removed.txt", removed.id)
+        tree1.add(0644, "changed.txt", changed1.id)
+        tree1.add(0644, "unchanged.txt", changed1.id)
+        tree2 = Tree()
+        tree2.add(0644, "added.txt", added.id)
+        tree2.add(0644, "changed.txt", changed2.id)
+        tree2.add(0644, "unchanged.txt", changed1.id)
+        store.add_objects([(o, None) for o in [
+            tree1, tree2, added, removed, changed1, changed2, unchanged]])
+        write_tree_diff(f, store, tree1.id, tree2.id)
+        self.assertEquals([
+            'diff --git /dev/null b/added.txt',
+            'new mode 644',
+            'index e69de29..76d4bb8 644',
+            '--- /dev/null',
+            '+++ b/added.txt',
+            '@@ -1,0 +1,1 @@',
+            '+add',
+            'diff --git a/changed.txt b/changed.txt',
+            'index bf84e48..1be2436 644',
+            '--- a/changed.txt',
+            '+++ b/changed.txt',
+            '@@ -1,2 +1,2 @@',
+            ' unchanged',
+            '-removed',
+            '+added',
+            'diff --git a/removed.txt /dev/null',
+            'deleted mode 644',
+            'index 2c3f0b3..e69de29',
+            '--- a/removed.txt',
+            '+++ /dev/null',
+            '@@ -1,1 +1,0 @@',
+            '-removed',
+            ], f.getvalue().splitlines())

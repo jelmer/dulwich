@@ -20,14 +20,13 @@
 """Generic functions for talking the git smart server protocol."""
 
 from cStringIO import StringIO
-import os
 import socket
 
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
     )
-from dulwich.misc import (
+from dulwich._compat import (
     SEEK_END,
     )
 

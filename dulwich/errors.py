@@ -166,3 +166,7 @@ class NoIndexPresent(Exception):
 
 class CommitError(Exception):
     """An error occurred while performing a commit."""
+
+
+class RefFormatError(Exception):
+    """Indicates an invalid ref name."""

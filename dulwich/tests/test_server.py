@@ -18,22 +18,30 @@
 
 """Tests for the smart protocol server."""
 
+from cStringIO import StringIO
+import os
+import tempfile
 
 from dulwich.errors import (
     GitProtocolError,
+    NotGitRepository,
     UnexpectedCommandError,
     )
 from dulwich.repo import (
     MemoryRepo,
+    Repo,
     )
 from dulwich.server import (
     Backend,
     DictBackend,
+    FileSystemBackend,
     Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
     _split_proto_line,
+    serve_command,
     ProtocolGraphWalker,
+    ReceivePackHandler,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
     )
@@ -638,3 +646,50 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(None)
         self.assertNak()
+
+
+class FileSystemBackendTests(TestCase):
+    """Tests for FileSystemBackend."""
+
+    def setUp(self):
+        super(FileSystemBackendTests, self).setUp()
+        self.path = tempfile.mkdtemp()
+        self.repo = Repo.init(self.path)
+        self.backend = FileSystemBackend()
+
+    def test_nonexistant(self):
+        self.assertRaises(NotGitRepository,
+            self.backend.open_repository, "/does/not/exist/unless/foo")
+
+    def test_absolute(self):
+        repo = self.backend.open_repository(self.path)
+        self.assertEquals(repo.path, self.repo.path)
+
+    def test_child(self):
+        self.assertRaises(NotGitRepository,
+            self.backend.open_repository, os.path.join(self.path, "foo"))
+
+
+class ServeCommandTests(TestCase):
+    """Tests for serve_command."""
+
+    def setUp(self):
+        super(ServeCommandTests, self).setUp()
+        self.backend = DictBackend({})
+
+    def serve_command(self, handler_cls, args, inf, outf):
+        return serve_command(handler_cls, ["test"] + args, backend=self.backend,
+            inf=inf, outf=outf)
+
+    def test_receive_pack(self):
+        commit = make_commit(id=ONE, parents=[], commit_time=111)
+        self.backend.repos["/"] = MemoryRepo.init_bare(
+            [commit], {"refs/heads/master": commit.id})
+        outf = StringIO()
+        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEquals(2, len(outlines))
+        self.assertEquals("1111111111111111111111111111111111111111 refs/heads/master",
+            outlines[0][4:].split("\x00")[0])
+        self.assertEquals("0000", outlines[-1])
+        self.assertEquals(0, exitcode)

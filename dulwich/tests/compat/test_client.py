@@ -43,6 +43,7 @@ from utils import (
     run_git_or_fail,
     )
 
+
 class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 
@@ -167,6 +168,7 @@ class DulwichClientTestBase(object):
 
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
+
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
@@ -211,6 +213,7 @@ class TestSSHVendor(object):
 
 
 class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
+
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
@@ -230,6 +233,7 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
 
 
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
+
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)

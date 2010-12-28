@@ -35,6 +35,7 @@ from dulwich.errors import (
     NotTagError,
     PackedRefsException,
     CommitError,
+    RefFormatError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -213,7 +214,7 @@ class RefsContainer(object):
         if name == 'HEAD':
             return
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
-            raise KeyError(name)
+            raise RefFormatError(name)
 
     def read_ref(self, refname):
         """Read a reference without following any references.
@@ -763,13 +764,13 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
-    def _init_files(self):
+    def _init_files(self, bare):
         """Initialize a default set of named files."""
         self._put_named_file('description', "Unnamed repository")
         self._put_named_file('config', ('[core]\n'
                                         'repositoryformatversion = 0\n'
                                         'filemode = true\n'
-                                        'bare = ' + str(self.bare).lower() + '\n'
+                                        'bare = ' + str(bare).lower() + '\n'
                                         'logallrefupdates = true\n'))
         self._put_named_file(os.path.join('info', 'exclude'), '')
 
@@ -777,7 +778,7 @@ class BaseRepo(object):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-baked Repo, the object returned need not be
+        the control dir in a disk-based Repo, the object returned need not be
         pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
@@ -990,7 +991,10 @@ class BaseRepo(object):
                 return self.object_store[name]
             except KeyError:
                 pass
-        return self.object_store[self.refs[name]]
+        try:
+            return self.object_store[self.refs[name]]
+        except RefFormatError:
+            raise KeyError(name)
 
     def __contains__(self, name):
         if len(name) in (20, 40):
@@ -1017,7 +1021,7 @@ class BaseRepo(object):
     def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
-                  author_timezone=None, tree=None):
+                  author_timezone=None, tree=None, encoding=None):
         """Create a new commit.
 
         :param message: Commit message
@@ -1028,7 +1032,9 @@ class BaseRepo(object):
         :param author_timestamp: Author timestamp (defaults to commit timestamp)
         :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
-        :param tree: SHA1 of the tree root to use (if not specified the current index will be committed).
+        :param tree: SHA1 of the tree root to use (if not specified the
+            current index will be committed).
+        :param encoding: Encoding
         :return: New commit SHA1
         """
         import time
@@ -1037,6 +1043,8 @@ class BaseRepo(object):
             index = self.open_index()
             c.tree = index.commit(self.object_store)
         else:
+            if len(tree) != 40:
+                raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
         # TODO: Allow username to be missing, and get it from .git/config
         if committer is None:
@@ -1058,6 +1066,8 @@ class BaseRepo(object):
         if author_timezone is None:
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
+        if encoding is not None:
+            c.encoding = encoding
         c.message = message
         try:
             old_head = self.refs["HEAD"]
@@ -1116,7 +1126,7 @@ class Repo(BaseRepo):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-baked Repo, the object returned need not be
+        the control dir in a disk-based Repo, the object returned need not be
         pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
@@ -1184,21 +1194,27 @@ class Repo(BaseRepo):
         return "<Repo at %r>" % self.path
 
     @classmethod
-    def init(cls, path, mkdir=True):
-        controldir = os.path.join(path, ".git")
-        os.mkdir(controldir)
-        cls.init_bare(controldir)
-        return cls(path)
-
-    @classmethod
-    def init_bare(cls, path, mkdir=True):
+    def _init_maybe_bare(cls, path, bare):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
         ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
-        ret._init_files()
+        ret._init_files(bare)
         return ret
+
+    @classmethod
+    def init(cls, path, mkdir=False):
+        if mkdir:
+            os.mkdir(path)
+        controldir = os.path.join(path, ".git")
+        os.mkdir(controldir)
+        cls._init_maybe_bare(controldir, False)
+        return cls(path)
+
+    @classmethod
+    def init_bare(cls, path):
+        return cls._init_maybe_bare(path, True)
 
     create = init_bare
 
@@ -1249,5 +1265,5 @@ class MemoryRepo(BaseRepo):
             ret.object_store.add_object(obj)
         for refname, sha in refs.iteritems():
             ret.refs[refname] = sha
-        ret._init_files()
+        ret._init_files(bare=True)
         return ret

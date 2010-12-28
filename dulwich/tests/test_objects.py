@@ -30,6 +30,9 @@ import stat
 from dulwich.errors import (
     ObjectFormatException,
     )
+from dulwich._compat import (
+    permutations,
+    )
 from dulwich.objects import (
     Blob,
     Tree,
@@ -50,11 +53,12 @@ from dulwich.objects import (
     )
 from dulwich.tests import (
     TestCase,
-    TestSkipped,
     )
 from utils import (
     make_commit,
     make_object,
+    functest_builder,
+    ext_functest_builder,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -62,40 +66,6 @@ b_sha = '2969be3e8ee1c0222396a5611407e4769f14e54b'
 c_sha = '954a536f7819d40e6f637f849ee187dd10066349'
 tree_sha = '70c190eb48fa8bbb50ddc692a17b44cb781af7f6'
 tag_sha = '71033db03a03c6a36721efcf1968dd8f8e0cf023'
-
-
-try:
-    from itertools import permutations
-except ImportError:
-    # Implementation of permutations from Python 2.6 documentation:
-    # http://docs.python.org/2.6/library/itertools.html#itertools.permutations
-    # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
-    # Modified syntax slightly to run under Python 2.4.
-    def permutations(iterable, r=None):
-        # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
-        # permutations(range(3)) --> 012 021 102 120 201 210
-        pool = tuple(iterable)
-        n = len(pool)
-        if r is None:
-            r = n
-        if r > n:
-            return
-        indices = range(n)
-        cycles = range(n, n-r, -1)
-        yield tuple(pool[i] for i in indices[:r])
-        while n:
-            for i in reversed(range(r)):
-                cycles[i] -= 1
-                if cycles[i] == 0:
-                    indices[i:] = indices[i+1:] + indices[i:i+1]
-                    cycles[i] = n - i
-                else:
-                    j = cycles[i]
-                    indices[i], indices[-j] = indices[-j], indices[i]
-                    yield tuple(pool[i] for i in indices[:r])
-                    break
-            else:
-                return
 
 
 class TestHexToSha(TestCase):
@@ -117,21 +87,21 @@ class BlobReadTests(TestCase):
     def get_blob(self, sha):
         """Return the blob named sha from the test data dir"""
         return self.get_sha_file(Blob, 'blobs', sha)
-  
+
     def get_tree(self, sha):
         return self.get_sha_file(Tree, 'trees', sha)
-  
+
     def get_tag(self, sha):
         return self.get_sha_file(Tag, 'tags', sha)
-  
+
     def commit(self, sha):
         return self.get_sha_file(Commit, 'commits', sha)
-  
+
     def test_decompress_simple_blob(self):
         b = self.get_blob(a_sha)
         self.assertEqual(b.data, 'test 1\n')
         self.assertEqual(b.sha().hexdigest(), a_sha)
-  
+
     def test_hash(self):
         b = self.get_blob(a_sha)
         self.assertEqual(hash(b.id), hash(b))
@@ -142,7 +112,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(b.data, '')
         self.assertEqual(b.id, sha)
         self.assertEqual(b.sha().hexdigest(), sha)
-  
+
     def test_create_blob_from_string(self):
         string = 'test 2\n'
         b = Blob.from_string(string)
@@ -166,23 +136,23 @@ class BlobReadTests(TestCase):
         self.assertEqual('test 5\n', b.data)
         b.chunked = ['te', 'st', ' 6\n']
         self.assertEqual('test 6\n', b.as_raw_string())
-  
+
     def test_parse_legacy_blob(self):
         string = 'test 3\n'
         b = self.get_blob(c_sha)
         self.assertEqual(b.data, string)
         self.assertEqual(b.sha().hexdigest(), c_sha)
-  
+
     def test_eq(self):
         blob1 = self.get_blob(a_sha)
         blob2 = self.get_blob(a_sha)
         self.assertEqual(blob1, blob2)
-  
+
     def test_read_tree_from_file(self):
         t = self.get_tree(tree_sha)
         self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
         self.assertEqual(t.entries()[1], (33188, 'b', b_sha))
-  
+
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)
         self.assertEqual(t.object, (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
@@ -190,7 +160,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
         self.assertEqual(t.tag_time, 1231203091)
         self.assertEqual(t.message, 'This is a signed tag\n-----BEGIN PGP SIGNATURE-----\nVersion: GnuPG v1.4.9 (GNU/Linux)\n\niEYEABECAAYFAkliqx8ACgkQqSMmLy9u/kcx5ACfakZ9NnPl02tOyYP6pkBoEkU1\n5EcAn0UFgokaSvS371Ym/4W9iJj6vh3h\n=ql7y\n-----END PGP SIGNATURE-----\n')
-  
+
     def test_read_commit_from_file(self):
         sha = '60dacdc733de308bb77bb76ce0fb0f9b44c9769e'
         c = self.commit(sha)
@@ -205,7 +175,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
-  
+
     def test_read_commit_no_parents(self):
         sha = '0d89f20333fbb1d2f3a94da77f4981373d8f4310'
         c = self.commit(sha)
@@ -219,7 +189,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
         self.assertEqual(c.message, 'Test commit\n')
-  
+
     def test_read_commit_two_parents(self):
         sha = '5dac377bdded4c9aeb8dff595f0faeebcc8498cc'
         c = self.commit(sha)
@@ -465,18 +435,24 @@ class TreeTests(ShaFileCheckTests):
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
         self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))
+        # test a broken tree that has a leading 0 on the file mode
+        broken_tree = '0100644 foo\0' + hex_to_sha(a_sha)
 
-    def test_parse_tree(self):
-        self._do_test_parse_tree(_parse_tree_py)
+        def eval_parse_tree(*args, **kwargs):
+            return list(parse_tree(*args, **kwargs))
 
-    def test_parse_tree_extension(self):
-        if parse_tree is _parse_tree_py:
-            raise TestSkipped('parse_tree extension not found')
-        self._do_test_parse_tree(parse_tree)
+        self.assertEquals([('foo', 0100644, a_sha)],
+                          eval_parse_tree(broken_tree))
+        self.assertRaises(ObjectFormatException,
+                          eval_parse_tree, broken_tree, strict=True)
+
+    test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
+    test_parse_tree_extension = ext_functest_builder(_do_test_parse_tree,
+                                                     parse_tree)
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
         def do_sort(entries):
-            return list(sorted_tree_items(entries))
+            return list(sorted_tree_items(entries, False))
 
         actual = do_sort(_TREE_ITEMS)
         self.assertEqual(_SORTED_TREE_ITEMS, actual)
@@ -494,13 +470,24 @@ class TreeTests(ShaFileCheckTests):
         self.assertRaises(errors, do_sort, {'foo': ('xxx', myhexsha)})
         self.assertRaises(errors, do_sort, {'foo': (0100755, 12345)})
 
-    def test_sorted_tree_items(self):
-        self._do_test_sorted_tree_items(_sorted_tree_items_py)
+    test_sorted_tree_items = functest_builder(_do_test_sorted_tree_items,
+                                              _sorted_tree_items_py)
+    test_sorted_tree_items_extension = ext_functest_builder(
+      _do_test_sorted_tree_items, sorted_tree_items)
 
-    def test_sorted_tree_items_extension(self):
-        if sorted_tree_items is _sorted_tree_items_py:
-            raise TestSkipped('sorted_tree_items extension not found')
-        self._do_test_sorted_tree_items(sorted_tree_items)
+    def _do_test_sorted_tree_items_name_order(self, sorted_tree_items):
+        self.assertEqual([
+          TreeEntry('a', stat.S_IFDIR,
+                    'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          TreeEntry('a.c', 0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          TreeEntry('a/c', stat.S_IFDIR,
+                    'd80c186a03f423a81b39df39dc87fd269736ca86'),
+          ], list(sorted_tree_items(_TREE_ITEMS, True)))
+
+    test_sorted_tree_items_name_order = functest_builder(
+      _do_test_sorted_tree_items_name_order, _sorted_tree_items_py)
+    test_sorted_tree_items_name_order_extension = ext_functest_builder(
+      _do_test_sorted_tree_items_name_order, sorted_tree_items)
 
     def test_check(self):
         t = Tree
@@ -520,6 +507,8 @@ class TreeTests(ShaFileCheckTests):
         # TODO more whitelisted modes
         self.assertCheckFails(t, '123456 a\0%s' % sha)
         self.assertCheckFails(t, '123abc a\0%s' % sha)
+        # should fail check, but parses ok
+        self.assertCheckFails(t, '0100644 foo\0' + sha)
 
         # shas
         self.assertCheckFails(t, '100644 a\0%s' % ('x' * 5))

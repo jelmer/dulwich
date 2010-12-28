@@ -117,6 +117,7 @@ class GitImportProcessor(processor.ImportProcessor):
         self.repo = repo
         self.last_commit = None
         self.markers = {}
+        self._contents = {}
 
     def import_stream(self, stream):
         p = parser.ImportParser(stream)
@@ -151,10 +152,32 @@ class GitImportProcessor(processor.ImportProcessor):
         commit.commit_time = int(commit_timestamp)
         commit.message = cmd.message
         commit.parents = []
-        contents = {}
+        if cmd.from_:
+            self._reset_base(cmd.from_)
+        for filecmd in cmd.iter_files():
+            if filecmd.name == "filemodify":
+                if filecmd.data is not None:
+                    blob = Blob.from_string(filecmd.data)
+                    self.repo.object_store.add(blob)
+                    blob_id = blob.id
+                else:
+                    assert filecmd.dataref[0] == ":", "non-marker refs not supported yet"
+                    blob_id = self.markers[filecmd.dataref[1:]]
+                self._contents[filecmd.path] = (filecmd.mode, blob_id)
+            elif filecmd.name == "filedelete":
+                del self._contents[filecmd.path]
+            elif filecmd.name == "filecopy":
+                self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
+            elif filecmd.name == "filerename":
+                self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
+                del self._contents[filecmd.old_path]
+            elif filecmd.name == "filedeleteall":
+                self._contents = {}
+            else:
+                raise Exception("Command %s not supported" % filecmd.name)
         commit.tree = commit_tree(self.repo.object_store,
             ((path, hexsha, mode) for (path, (mode, hexsha)) in
-                contents.iteritems()))
+                self._contents.iteritems()))
         if self.last_commit is not None:
             commit.parents.append(self.last_commit)
         commit.parents += cmd.merges
@@ -168,9 +191,19 @@ class GitImportProcessor(processor.ImportProcessor):
         """Process a ProgressCommand."""
         pass
 
+    def _reset_base(self, commit_id):
+        if self.last_commit == commit_id:
+            return
+        self.last_commit = commit_id
+        self._contents = {}
+        tree_id = self.repo[commit_id].tree
+        for (path, mode, hexsha) in (
+                self.repo.object_store.iter_tree_contents(tree_id)):
+            self._contents[path] = (mode, hexsha)
+
     def reset_handler(self, cmd):
         """Process a ResetCommand."""
-        self.last_commit = cmd.from_
+        self._reset_base(cmd.from_)
         self.rep.refs[cmd.from_] = cmd.id
 
     def tag_handler(self, cmd):

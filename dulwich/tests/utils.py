@@ -25,12 +25,16 @@ import os
 import shutil
 import tempfile
 import time
+import types
 
 from dulwich.objects import (
     FixedSha,
     Commit,
     )
 from dulwich.repo import Repo
+from dulwich.tests import (
+    TestSkipped,
+    )
 
 
 def open_repo(name):
@@ -105,3 +109,41 @@ def make_commit(**attrs):
                  'tree': '0' * 40}
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)
+
+
+def functest_builder(method, func):
+    """Generate a test method that tests the given function."""
+
+    def do_test(self):
+        method(self, func)
+
+    return do_test
+
+
+def ext_functest_builder(method, func):
+    """Generate a test method that tests the given extension function.
+
+    This is intended to generate test methods that test both a pure-Python
+    version and an extension version using common test code. The extension test
+    will raise TestSkipped if the extension is not found.
+
+    Sample usage:
+
+    class MyTest(TestCase);
+        def _do_some_test(self, func_impl):
+            self.assertEqual('foo', func_impl())
+
+        test_foo = functest_builder(_do_some_test, foo_py)
+        test_foo_extension = ext_functest_builder(_do_some_test, _foo_c)
+
+    :param method: The method to run. It must must two parameters, self and the
+        function implementation to test.
+    :param func: The function implementation to pass to method.
+    """
+
+    def do_test(self):
+        if not isinstance(func, types.BuiltinFunctionType):
+            raise TestSkipped("%s extension not found", func.func_name)
+        method(self, func)
+
+    return do_test

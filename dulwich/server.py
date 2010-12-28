@@ -48,8 +48,10 @@ from dulwich.pack import (
     write_pack_data,
     )
 from dulwich.protocol import (
+    BufferedPktLineWriter,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
+    Protocol,
     ProtocolFile,
     ReceivableProtocol,
     SINGLE_ACK,
@@ -58,7 +60,6 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
-    BufferedPktLineWriter,
     )
 from dulwich.repo import (
     Repo,
@@ -153,6 +154,14 @@ class DictBackend(Backend):
         logger.debug('Opening repository at %s', path)
         # FIXME: What to do in case there is no repo ?
         return self.repos[path]
+
+
+class FileSystemBackend(Backend):
+    """Simple backend that looks up Git repositories in the local file system."""
+
+    def open_repository(self, path):
+        logger.debug('opening repository at %s', path)
+        return Repo(path)
 
 
 class Handler(object):
@@ -775,3 +784,28 @@ def main(argv=sys.argv):
     backend = DictBackend({'/': Repo(gitdir)})
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
+
+
+def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
+                  outf=sys.stdout):
+    """Serve a single command.
+
+    This is mostly useful for the implementation of commands used by e.g. git+ssh.
+
+    :param handler_cls: `Handler` class to use for the request
+    :param argv: execv-style command-line arguments. Defaults to sys.argv.
+    :param backend: `Backend` to use
+    :param inf: File-like object to read from, defaults to standard input.
+    :param outf: File-like object to write to, defaults to standard output.
+    :return: Exit code for use with sys.exit. 0 on success, 1 on failure.
+    """
+    if backend is None:
+        backend = FileSystemBackend()
+    def send_fn(data):
+        outf.write(data)
+        outf.flush()
+    proto = Protocol(inf.read, send_fn)
+    handler = handler_cls(backend, argv[1:], proto)
+    # FIXME: Catch exceptions and write a single-line summary to outf.
+    handler.handle()
+    return 0

@@ -23,11 +23,14 @@
 import errno
 import itertools
 import os
-import posixpath
 import stat
 import tempfile
 import urllib2
 
+from dulwich.diff_tree import (
+    tree_changes,
+    walk_trees,
+    )
 from dulwich.errors import (
     NotTreeError,
     )
@@ -129,52 +132,14 @@ class BaseObjectStore(object):
         :param object_store: Object store to use for retrieving tree contents
         :param tree: SHA1 of the root tree
         :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :return: Iterator over tuples with
+            (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
-        todo = set([(source, target, "")])
-        while todo:
-            (sid, tid, path) = todo.pop()
-            if sid is not None:
-                stree = self[sid]
-            else:
-                stree = {}
-            if tid is not None:
-                ttree = self[tid]
-            else:
-                ttree = {}
-            for name, oldmode, oldhexsha in stree.iteritems():
-                oldchildpath = posixpath.join(path, name)
-                try:
-                    (newmode, newhexsha) = ttree[name]
-                    newchildpath = oldchildpath
-                except KeyError:
-                    newmode = None
-                    newhexsha = None
-                    newchildpath = None
-                if (want_unchanged or oldmode != newmode or
-                    oldhexsha != newhexsha):
-                    if stat.S_ISDIR(oldmode):
-                        if newmode is None or stat.S_ISDIR(newmode):
-                            todo.add((oldhexsha, newhexsha, oldchildpath))
-                        else:
-                            # entry became a file
-                            todo.add((oldhexsha, None, oldchildpath))
-                            yield ((None, newchildpath), (None, newmode), (None, newhexsha))
-                    else:
-                        if newmode is not None and stat.S_ISDIR(newmode):
-                            # entry became a dir
-                            yield ((oldchildpath, None), (oldmode, None), (oldhexsha, None))
-                            todo.add((None, newhexsha, newchildpath))
-                        else:
-                            yield ((oldchildpath, newchildpath), (oldmode, newmode), (oldhexsha, newhexsha))
-
-            for name, newmode, newhexsha in ttree.iteritems():
-                childpath = posixpath.join(path, name)
-                if not name in stree:
-                    if not stat.S_ISDIR(newmode):
-                        yield ((None, childpath), (None, newmode), (None, newhexsha))
-                    else:
-                        todo.add((None, newhexsha, childpath))
+        for change in tree_changes(self, source, target,
+                                   want_unchanged=want_unchanged):
+            yield ((change.old.path, change.new.path),
+                   (change.old.mode, change.new.mode),
+                   (change.old.sha, change.new.sha))
 
     def iter_tree_contents(self, tree_id, include_trees=False):
         """Iterate the contents of a tree and all subtrees.
@@ -183,19 +148,12 @@ class BaseObjectStore(object):
 
         :param tree_id: SHA1 of the tree.
         :param include_trees: If True, include tree objects in the iteration.
-        :return: Yields tuples of (path, mode, hexhsa) for objects in a tree.
+        :return: Iterator over TreeEntry namedtuples for all the objects in a
+            tree.
         """
-        todo = [('', stat.S_IFDIR, tree_id)]
-        while todo:
-            path, mode, hexsha = todo.pop()
-            is_subtree = stat.S_ISDIR(mode)
-            if not is_subtree or include_trees:
-                yield path, mode, hexsha
-            if is_subtree:
-                entries = reversed(list(self[hexsha].iteritems()))
-                for name, entry_mode, entry_hexsha in entries:
-                    entry_path = posixpath.join(path, name)
-                    todo.append((entry_path, entry_mode, entry_hexsha))
+        for entry, _ in walk_trees(self, tree_id, None):
+            if not stat.S_ISDIR(entry.mode) or include_trees:
+                yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None):
@@ -338,7 +296,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError
+            raise AssertionError("Invalid object name %r" % name)
         for pack in self.packs:
             try:
                 return pack.get_raw(sha)
@@ -443,10 +401,14 @@ class DiskObjectStore(PackBasedObjectStore):
         data.create_index_v2(temppath)
         p = Pack.from_objects(data, load_pack_index(temppath))
 
-        # Write a full pack version
-        temppath = os.path.join(self.pack_dir,
-            sha_to_hex(urllib2.randombytes(20))+".temppack")
-        write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
+        try:
+            # Write a full pack version
+            temppath = os.path.join(self.pack_dir,
+                sha_to_hex(urllib2.randombytes(20))+".temppack")
+            write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
+        finally:
+            p.close()
+
         pack_sha = load_pack_index(temppath+".idx").objects_sha1()
         newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
         os.rename(temppath+".pack", newbasename+".pack")
@@ -578,6 +540,10 @@ class MemoryObjectStore(BaseObjectStore):
 
     def __getitem__(self, name):
         return self._data[name]
+
+    def __delitem__(self, name):
+        """Delete an object from this store, for testing only."""
+        del self._data[name]
 
     def add_object(self, obj):
         """Add a single object to this object store.

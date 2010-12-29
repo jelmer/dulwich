@@ -10,7 +10,7 @@ DEB_PYTHON_BUILD_ARGS += --executable=/usr/bin/python
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 common-build-arch common-build-indep:: debian/stamp-check
 debian/stamp-check: 
-	$(MAKE) check
+	$(MAKE) check TESTRUNNER=testtools.run
 	touch $@
 endif
 

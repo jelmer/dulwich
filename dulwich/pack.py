@@ -33,7 +33,7 @@ a pointer in to the corresponding packfile.
 try:
     from collections import defaultdict
 except ImportError:
-    from _compat import defaultdict
+    from dulwich._compat import defaultdict
 
 from cStringIO import (
     StringIO,

@@ -46,7 +46,7 @@ from dulwich.server import (
     UploadPackHandler,
     )
 from dulwich.tests import TestCase
-from utils import (
+from dulwich.tests.utils import (
     make_commit,
     )
 

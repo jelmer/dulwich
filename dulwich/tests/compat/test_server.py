@@ -30,12 +30,12 @@ from dulwich.server import (
     DictBackend,
     TCPGitServer,
     )
-from server_utils import (
+from dulwich.tests.compat.server_utils import (
     ServerTests,
     ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
     )
-from utils import (
+from dulwich.tests.compat.utils import (
     CompatTestCase,
     )
 

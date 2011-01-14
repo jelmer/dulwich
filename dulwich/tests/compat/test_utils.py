@@ -23,7 +23,7 @@ from dulwich.tests import (
     TestCase,
     TestSkipped,
     )
-import utils
+from dulwich.tests.compat import utils
 
 
 class GitVersionTests(TestCase):

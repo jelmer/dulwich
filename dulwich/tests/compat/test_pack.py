@@ -32,7 +32,7 @@ from dulwich.tests.test_pack import (
     pack1_sha,
     PackTests,
     )
-from utils import (
+from dulwich.tests.compat.utils import (
     require_git_version,
     run_git_or_fail,
     )

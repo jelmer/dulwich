@@ -34,7 +34,7 @@ from dulwich.tests.utils import (
     tear_down_repo,
     )
 
-from utils import (
+from dulwich.tests.compat.utils import (
     run_git_or_fail,
     import_repo,
     CompatTestCase,

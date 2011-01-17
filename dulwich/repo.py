@@ -243,7 +243,6 @@ class RefsContainer(object):
         :return: a tuple of (refname, sha), where refname is the name of the
             last reference in the symbolic reference chain
         """
-        self._check_refname(name)
         contents = SYMREF + name
         depth = 0
         while contents.startswith(SYMREF):
@@ -360,6 +359,7 @@ class DictRefsContainer(RefsContainer):
         if old_ref is not None and self._refs.get(name, None) != old_ref:
             return False
         realname, _ = self._follow(name)
+        self._check_refname(realname)
         self._refs[realname] = new_ref
         return True
 
@@ -574,6 +574,7 @@ class DiskRefsContainer(RefsContainer):
         :param new_ref: The new sha the refname will refer to.
         :return: True if the set was successful, False otherwise.
         """
+        self._check_refname(name)
         try:
             realname, _ = self._follow(name)
         except KeyError:

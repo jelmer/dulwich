@@ -454,6 +454,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if os.path.getsize(path) > 0:
                 return self.move_in_thin_pack(path)
             else:
+                os.remove(path)
                 return None
         return f, commit
 
@@ -471,6 +472,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if os.path.getsize(path) > 0:
                 return self.move_in_pack(path)
             else:
+                os.remove(path)
                 return None
         return f, commit
 

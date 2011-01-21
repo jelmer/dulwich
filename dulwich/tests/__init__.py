@@ -21,27 +21,27 @@
 
 import doctest
 import os
-import unittest
 import shutil
 import subprocess
 import sys
 import tempfile
 
-try:
-    # If Python itself provides an exception, use that
-    from unittest import SkipTest as TestSkipped
-except ImportError:
-    try:
-        from unittest2 import SkipTest as TestSkipped
-    except ImportError:
-        from testtools.testcase import TestSkipped
 
-try:
-    from testtools.testcase import TestCase
-except ImportError:
+if sys.version_info >= (2, 7):
+    # If Python itself provides an exception, use that
+    import unittest
+    from unittest import SkipTest as TestSkipped
     from unittest import TestCase
 else:
-    TestCase.skipException = TestSkipped
+    try:
+        import unittest2 as unittest
+        from unittest2 import SkipTest as TestSkipped
+        from unittest2 import TestCase
+    except ImportError:
+        import unittest
+        from testtools.testcase import TestSkipped
+        from testtools.testcase import TestCase
+        TestCase.skipException = TestSkipped
 
 
 class BlackboxTestCase(TestCase):

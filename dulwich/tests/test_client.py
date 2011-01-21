@@ -64,11 +64,11 @@ class GitClientTests(TestCase):
 
     def test_fetch_pack_none(self):
         self.rin.write(
-            "008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack thin-pack side-band side-band-64k ofs-delta shallow no-progress include-tag\n"
-            "0000")
+            '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack thin-pack side-band side-band-64k ofs-delta shallow no-progress include-tag\n'
+            '0000')
         self.rin.seek(0)
-        self.client.fetch_pack("bla", lambda heads: [], None, None, None)
-        self.assertEquals(self.rout.getvalue(), "0000")
+        self.client.fetch_pack('bla', lambda heads: [], None, None, None)
+        self.assertEquals(self.rout.getvalue(), '0000')
 
     def test_get_transport_and_path_tcp(self):
         client, path = get_transport_and_path('git://foo.com/bar/baz')
@@ -132,12 +132,12 @@ class SSHGitClientTests(TestCase):
 
     def setUp(self):
         super(SSHGitClientTests, self).setUp()
-        self.client = SSHGitClient("git.samba.org")
+        self.client = SSHGitClient('git.samba.org')
 
     def test_default_command(self):
-        self.assertEquals("git-upload-pack", self.client._get_cmd_path("upload-pack"))
+        self.assertEquals('git-upload-pack', self.client._get_cmd_path('upload-pack'))
 
     def test_alternative_command_path(self):
-        self.client.alternative_paths["upload-pack"] = "/usr/lib/git/git-upload-pack"
-        self.assertEquals("/usr/lib/git/git-upload-pack", self.client._get_cmd_path("upload-pack"))
+        self.client.alternative_paths['upload-pack'] = '/usr/lib/git/git-upload-pack'
+        self.assertEquals('/usr/lib/git/git-upload-pack', self.client._get_cmd_path('upload-pack'))
 

@@ -56,7 +56,9 @@ from dulwich.web import (
     HTTPGitApplication,
     )
 
-from utils import make_object
+from dulwich.tests.utils import (
+    make_object,
+    )
 
 
 class TestHTTPGitRequest(HTTPGitRequest):

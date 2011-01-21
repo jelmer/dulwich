@@ -30,7 +30,7 @@ from dulwich.server import (
 from dulwich.tests.utils import (
     tear_down_repo,
     )
-from utils import (
+from dulwich.tests.compat.utils import (
     import_repo,
     run_git_or_fail,
     )

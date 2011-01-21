@@ -1,4 +1,7 @@
-Please follow PEP8 with regard to coding style.
+Where possible, please follow PEP8 with regard to coding style.
+
+Furthermore, triple-quotes should always be """, single quotes are ' unless using "
+would result in less escaping within the string.
 
 All functionality should be available in pure Python. Optional C
 implementations may be written for performance reasons, but should never

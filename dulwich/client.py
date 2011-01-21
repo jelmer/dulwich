@@ -45,8 +45,8 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
-COMMON_CAPABILITIES = ["ofs-delta"]
-FETCH_CAPABILITIES = ["multi_ack", "side-band-64k"] + COMMON_CAPABILITIES
+COMMON_CAPABILITIES = ['ofs-delta']
+FETCH_CAPABILITIES = ['multi_ack', 'side-band-64k'] + COMMON_CAPABILITIES
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
@@ -68,7 +68,7 @@ class GitClient(object):
         self._fetch_capabilities = list(FETCH_CAPABILITIES)
         self._send_capabilities = list(SEND_CAPABILITIES)
         if thin_packs:
-            self._fetch_capabilities.append("thin-pack")
+            self._fetch_capabilities.append('thin-pack')
 
     def _connect(self, cmd, path):
         """Create a connection to the server.
@@ -89,7 +89,7 @@ class GitClient(object):
         refs = {}
         # Receive refs from server
         for pkt in proto.read_pkt_seq():
-            (sha, ref) = pkt.rstrip("\n").split(" ", 1)
+            (sha, ref) = pkt.rstrip('\n').split(' ', 1)
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha
@@ -162,11 +162,11 @@ class GitClient(object):
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if old_sha1 != new_sha1:
                 if sent_capabilities:
-                    proto.write_pkt_line("%s %s %s" % (old_sha1, new_sha1,
+                    proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
                                                             refname))
                 else:
                     proto.write_pkt_line(
-                      "%s %s %s\0%s" % (old_sha1, new_sha1, refname,
+                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
                                         ' '.join(self._send_capabilities)))
                     sent_capabilities = True
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
@@ -221,28 +221,28 @@ class GitClient(object):
             proto.write_pkt_line(None)
             return refs
         assert isinstance(wants, list) and type(wants[0]) == str
-        proto.write_pkt_line("want %s %s\n" % (
+        proto.write_pkt_line('want %s %s\n' % (
             wants[0], ' '.join(self._fetch_capabilities)))
         for want in wants[1:]:
-            proto.write_pkt_line("want %s\n" % want)
+            proto.write_pkt_line('want %s\n' % want)
         proto.write_pkt_line(None)
         have = graph_walker.next()
         while have:
-            proto.write_pkt_line("have %s\n" % have)
+            proto.write_pkt_line('have %s\n' % have)
             if can_read():
                 pkt = proto.read_pkt_line()
-                parts = pkt.rstrip("\n").split(" ")
-                if parts[0] == "ACK":
+                parts = pkt.rstrip('\n').split(' ')
+                if parts[0] == 'ACK':
                     graph_walker.ack(parts[1])
-                    assert parts[2] == "continue"
+                    assert parts[2] == 'continue'
             have = graph_walker.next()
-        proto.write_pkt_line("done\n")
+        proto.write_pkt_line('done\n')
         pkt = proto.read_pkt_line()
         while pkt:
-            parts = pkt.rstrip("\n").split(" ")
-            if parts[0] == "ACK":
-                graph_walker.ack(pkt.split(" ")[1])
-            if len(parts) < 3 or parts[2] != "continue":
+            parts = pkt.rstrip('\n').split(' ')
+            if parts[0] == 'ACK':
+                graph_walker.ack(pkt.split(' ')[1])
+            if len(parts) < 3 or parts[2] != 'continue':
                 break
             pkt = proto.read_pkt_line()
         # TODO(durin42): this is broken if the server didn't support the
@@ -256,7 +256,7 @@ class GitClient(object):
                 if progress is not None:
                     progress(pkt)
             else:
-                raise AssertionError("Invalid sideband channel %d" % channel)
+                raise AssertionError('Invalid sideband channel %d' % channel)
         return refs
 
 
@@ -323,7 +323,7 @@ class SSHVendor(object):
         if port is not None:
             args.extend(['-p', str(port)])
         if username is not None:
-            host = "%s@%s" % (username, host)
+            host = '%s@%s' % (username, host)
         args.append(host)
         proc = subprocess.Popen(args + command,
                                 stdin=subprocess.PIPE,

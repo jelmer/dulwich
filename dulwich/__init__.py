@@ -21,10 +21,6 @@
 
 """Python implementation of the Git file formats and protocols."""
 
-
-import client
-import protocol
-import repo
-import server
+from dulwich import (client, protocol, repo, server)
 
 __version__ = (0, 7, 0)

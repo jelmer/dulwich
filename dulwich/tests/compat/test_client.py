@@ -25,18 +25,20 @@ import signal
 import subprocess
 import tempfile
 
-from dulwich import client
-from dulwich import errors
-from dulwich import file
-from dulwich import index
-from dulwich import protocol
-from dulwich import objects
-from dulwich import repo
+from dulwich import (
+    client,
+    errors,
+    file,
+    index,
+    protocol,
+    objects,
+    repo,
+    )
 from dulwich.tests import (
     TestSkipped,
     )
 
-from utils import (
+from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
     import_repo_to_dir,

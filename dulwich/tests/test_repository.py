@@ -574,6 +574,8 @@ class RefsContainerTests(object):
         self._refs['refs/some/ref'] = '42d06bd4b77fed026b154d16493e5deab78f02ec'
         self.assertEqual('42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs['refs/some/ref'])
+        self.assertRaises(errors.RefFormatError, self._refs.__setitem__,
+                          'notrefs/foo', '42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_set_if_equals(self):
         nines = '9' * 40
@@ -649,6 +651,14 @@ class DictRefsContainerTests(RefsContainerTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self._refs = DictRefsContainer(dict(_TEST_REFS))
+
+    def test_invalid_refname(self):
+        # FIXME: Move this test into RefsContainerTests, but requires
+        # some way of injecting invalid refs.
+        self._refs._refs["refs/stash"] = "00" * 20
+        expected_refs = dict(_TEST_REFS)
+        expected_refs["refs/stash"] = "00" * 20
+        self.assertEquals(expected_refs, self._refs.as_dict())
 
 
 class DiskRefsContainerTests(RefsContainerTests, TestCase):
@@ -748,8 +758,6 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEquals(
           ('refs/heads/master', '42d06bd4b77fed026b154d16493e5deab78f02ec'),
           self._refs._follow('refs/heads/master'))
-        self.assertRaises(errors.RefFormatError, self._refs._follow,
-                          'notrefs/foo')
         self.assertRaises(KeyError, self._refs._follow, 'refs/heads/loop')
 
     def test_delitem(self):

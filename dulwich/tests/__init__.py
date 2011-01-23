@@ -103,12 +103,12 @@ def self_test_suite():
 
 def tutorial_test_suite():
     tutorial = [
-        '0-introduction',
-        '1-repo',
-        '2-object-store',
-        '3-conclusion',
+        'introduction',
+        'repo',
+        'object-store',
+        'conclusion',
         ]
-    tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+    tutorial_files = ["../../docs/tutorial/%s.rst" % name for name in tutorial]
     def setup(test):
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)

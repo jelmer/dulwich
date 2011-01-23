@@ -1,3 +1,5 @@
+.. _tutorial-object-store:
+
 The object store
 ================
 

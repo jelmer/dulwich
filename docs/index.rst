@@ -12,6 +12,7 @@ dulwich - Python implementation of Git
     overview
     performance
     protocol
+    changelog
 
     tutorial/index
     api/index

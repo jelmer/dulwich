@@ -15,7 +15,6 @@ dulwich - Python implementation of Git
     changelog
 
     tutorial/index
-    api/index
 
 
 Indices and tables

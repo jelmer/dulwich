@@ -20,6 +20,10 @@
 #include <Python.h>
 #include <sys/stat.h>
 
+#ifdef _MSC_VER
+typedef unsigned short mode_t;
+#endif
+
 #if (PY_VERSION_HEX < 0x02050000)
 typedef int Py_ssize_t;
 #endif

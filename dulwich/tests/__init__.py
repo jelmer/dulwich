@@ -108,7 +108,7 @@ def tutorial_test_suite():
         'object-store',
         'conclusion',
         ]
-    tutorial_files = ["../../docs/tutorial/%s.rst" % name for name in tutorial]
+    tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
     def setup(test):
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)

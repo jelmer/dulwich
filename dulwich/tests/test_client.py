@@ -125,7 +125,9 @@ class GitClientTests(TestCase):
         self.assertEquals('foo.bar/baz', path)
 
     def test_get_transport_and_path_error(self):
-        self.assertRaises(ValueError, get_transport_and_path, 'foo://bar/baz')
+        # Need to use a known urlparse.uses_netloc URL scheme to get the
+        # expected parsing of the URL on Python versions less than 2.6.5
+        self.assertRaises(ValueError, get_transport_and_path, 'prospero://bar/baz')
 
 
 class SSHGitClientTests(TestCase):

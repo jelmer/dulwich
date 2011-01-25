@@ -4,6 +4,9 @@
 
   * Fix the build on Windows. (Pascal Quantin)
 
+  * Fix get_transport_and_path compatibility with pre-2.6.5 versions of Python.
+    (Max Bowsher, #707438)
+
 0.7.0	2011-01-21
 
  FEATURES

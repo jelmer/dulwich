@@ -41,6 +41,12 @@ from dulwich.pack import (
     )
 
 
+# Python 2.6.6 included these in urlparse.uses_netloc upstream. Do
+# monkeypatching to enable similar behaviour in earlier Pythons:
+for scheme in ('git', 'git+ssh'):
+    if scheme not in urlparse.uses_netloc:
+        urlparse.uses_netloc.append(scheme)
+
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0

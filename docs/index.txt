@@ -4,18 +4,28 @@
 dulwich - Python implementation of Git
 ======================================
 
-**Documentation**:
+Overview
+========
+
+.. include:: ../README
+
+Documentation
+=============
+
 
 .. toctree::
     :maxdepth: 2
 
-    overview
     performance
     protocol
-    changelog
 
     tutorial/index
 
+
+Changelog
+=========
+
+.. include:: ../NEWS
 
 Indices and tables
 ==================

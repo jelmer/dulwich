@@ -391,7 +391,7 @@ note: This list is most likely incomplete for 0.6.0.
 
  FEATURES
 
-  * A new function `commit_tree' has been added that can commit a tree 
+  * A new function 'commit_tree' has been added that can commit a tree 
     based on an index.
 
  BUG FIXES

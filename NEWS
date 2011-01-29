@@ -7,6 +7,10 @@
   * Fix get_transport_and_path compatibility with pre-2.6.5 versions of Python.
     (Max Bowsher, #707438)
 
+ IMPROVEMENTS
+
+  * Sphinxified documentation. (Lukasz Balcerzak)
+
 0.7.0	2011-01-21
 
  FEATURES
@@ -398,7 +402,7 @@ note: This list is most likely incomplete for 0.6.0.
 
  FEATURES
 
-  * A new function `commit_tree' has been added that can commit a tree 
+  * A new function 'commit_tree' has been added that can commit a tree 
     based on an index.
 
  BUG FIXES

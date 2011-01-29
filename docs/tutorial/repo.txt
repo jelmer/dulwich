@@ -1,3 +1,5 @@
+.. _tutorial-repo:
+
 The Repository
 ==============
 

@@ -24,7 +24,6 @@ on.
 
 from difflib import SequenceMatcher
 import rfc822
-import subprocess
 import time
 
 from dulwich.objects import (
@@ -47,9 +46,10 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     f.write("\n")
     f.write("---\n")
     try:
+        import subprocess
         p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
                              stdin=subprocess.PIPE)
-    except OSError, e:
+    except (ImportError, OSError), e:
         pass # diffstat not available?
     else:
         (diffstat, _) = p.communicate(contents)

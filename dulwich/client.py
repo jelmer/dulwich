@@ -23,7 +23,6 @@ __docformat__ = 'restructuredText'
 
 import select
 import socket
-import subprocess
 import urlparse
 
 from dulwich.errors import (
@@ -314,6 +313,7 @@ class SubprocessGitClient(GitClient):
         GitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
+        import subprocess
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
@@ -321,9 +321,11 @@ class SubprocessGitClient(GitClient):
         return Protocol(p.read, p.write,
                         report_activity=self._report_activity), p.can_read
 
+
 class SSHVendor(object):
 
     def connect_ssh(self, host, command, username=None, port=None):
+        import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:

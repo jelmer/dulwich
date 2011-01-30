@@ -47,7 +47,12 @@ from itertools import (
     imap,
     izip,
     )
-import mmap
+try:
+    import mmap
+except ImportError:
+    has_mmap = False
+else:
+    has_mmap = True
 import os
 import struct
 try:
@@ -163,13 +168,14 @@ def _load_file_contents(f, size=None):
         fd = f.fileno()
         if size is None:
             size = os.fstat(fd).st_size
-        try:
-            contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
-        except mmap.error:
-            # Perhaps a socket?
-            pass
-        else:
-            return contents, size
+        if has_mmap:
+            try:
+                contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
+            except mmap.error:
+                # Perhaps a socket?
+                pass
+            else:
+                return contents, size
     contents = f.read()
     size = len(contents)
     return contents, size

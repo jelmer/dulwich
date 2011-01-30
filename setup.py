@@ -34,7 +34,7 @@ class DulwichDistribution(Distribution):
 
         
 setup(name='dulwich',
-      description='Pure-Python Git Library',
+      description='Python Git Library',
       keywords='git',
       version=dulwich_version_string,
       url='http://samba.org/~jelmer/dulwich',
@@ -43,9 +43,12 @@ setup(name='dulwich',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',
       long_description="""
-      Simple Pure-Python implementation of the Git file formats and
+      Simple Python implementation of the Git file formats and
       protocols. Dulwich is the place where Mr. and Mrs. Git live
       in one of the Monty Python sketches.
+
+      All functionality is available in pure Python, but (optional)
+      C extensions are also available for better performance.
       """,
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],

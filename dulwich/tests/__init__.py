@@ -83,6 +83,7 @@ def self_test_suite():
     names = [
         'blackbox',
         'client',
+        'diff_tree',
         'fastexport',
         'file',
         'index',

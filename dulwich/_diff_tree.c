@@ -438,7 +438,6 @@ init_diff_tree(void)
 		goto error;
 	}
 
-	Py_DECREF(objects_mod);
 	Py_DECREF(diff_tree_mod);
 	return;
 

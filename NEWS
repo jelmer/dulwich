@@ -9,6 +9,9 @@
   * Fix get_transport_and_path compatibility with pre-2.6.5 versions of Python.
     (Max Bowsher, #707438)
 
+  * BaseObjectStore.determine_wants_all no longer breaks on zero SHAs.
+    (Jelmer Vernooij)
+
  IMPROVEMENTS
 
   * Sphinxified documentation. (Lukasz Balcerzak)

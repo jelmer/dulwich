@@ -43,6 +43,7 @@ from dulwich._compat import (
     TreeEntryTuple,
     )
 
+ZERO_SHA = "0" * 40
 
 # Header fields for commits
 _TREE_HEADER = "tree"

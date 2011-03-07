@@ -1,4 +1,4 @@
-dulwich (0.7.0-2) UNRELEASED; urgency=low
+dulwich (0.7.0-2) unstable; urgency=low
 
   * Switch to dh_python2.
 

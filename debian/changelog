@@ -1,3 +1,9 @@
+dulwich (0.7.0-2) UNRELEASED; urgency=low
+
+  * Switch to dh_python2.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 07 Mar 2011 03:19:45 +0100
+
 dulwich (0.7.0-1) unstable; urgency=low
 
   * New upstream release.

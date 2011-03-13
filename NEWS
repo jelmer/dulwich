@@ -16,6 +16,12 @@
 
   * Sphinxified documentation. (Lukasz Balcerzak)
 
+ API CHANGES
+
+  * The order of the parameters to Tree.add(name, mode, sha) has changed, and
+    is now consistent with the rest of Dulwich. Existing code will still
+    work but print a DeprecationWarning. (Jelmer Vernooij, #663550)
+
 0.7.0	2011-01-21
 
  FEATURES

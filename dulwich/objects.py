@@ -27,6 +27,7 @@ from cStringIO import (
 import os
 import posixpath
 import stat
+import warnings
 import zlib
 
 from dulwich.errors import (
@@ -819,14 +820,18 @@ class Tree(ShaFile):
         self._ensure_parsed()
         return iter(self._entries)
 
-    def add(self, mode, name, hexsha):
+    def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all possible
-            modes are supported by git; see check() for details.
+        :param mode: The mode of the entry as an integral type. Not all 
+            possible modes are supported by git; see check() for details.
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
         """
+        if type(name) is int and type(mode) is str:
+            (name, mode) = (mode, name)
+            warnings.warn("Please use Tree.add(name, mode, hexsha)",
+                category=DeprecationWarning, stacklevel=2)
         self._ensure_parsed()
         self._entries[name] = mode, hexsha
         self._needs_serialization = True

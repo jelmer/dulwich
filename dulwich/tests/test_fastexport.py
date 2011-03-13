@@ -61,7 +61,7 @@ class GitFastExporterTests(TestCase):
         b = Blob()
         b.data = "FOO"
         t = Tree()
-        t.add(stat.S_IFREG | 0644, "foo", b.id)
+        t.add("foo", stat.S_IFREG | 0644, b.id)
         c = Commit()
         c.committer = c.author = "Jelmer <jelmer@host>"
         c.author_time = c.commit_time = 1271345553

@@ -150,8 +150,8 @@ class BlobReadTests(TestCase):
 
     def test_read_tree_from_file(self):
         t = self.get_tree(tree_sha)
-        self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
-        self.assertEqual(t.entries()[1], (33188, 'b', b_sha))
+        self.assertEqual(t.items()[0], ('a', 33188, a_sha))
+        self.assertEqual(t.items()[1], ('b', 33188, b_sha))
 
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)

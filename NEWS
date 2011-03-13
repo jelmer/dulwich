@@ -16,6 +16,11 @@
 
   * Sphinxified documentation. (Lukasz Balcerzak)
 
+ API CHANGES
+
+  * Tree.entries() is now deprecated in favour of Tree.items() and
+    Tree.iteritems(). (Jelmer Vernooij)
+
 0.7.0	2011-01-21
 
  FEATURES

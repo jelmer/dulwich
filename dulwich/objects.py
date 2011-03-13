@@ -838,6 +838,9 @@ class Tree(ShaFile):
             returned by the items and iteritems methods. This function will be
             deprecated in the future.
         """
+        warnings.warn("Tree.entries() is deprecated. Use Tree.items() or"
+            " Tree.iteritems() instead.", category=DeprecationWarning,
+            stacklevel=2)
         self._ensure_parsed()
         # The order of this is different from iteritems() for historical
         # reasons

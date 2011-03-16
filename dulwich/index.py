@@ -330,7 +330,7 @@ def commit_tree(object_store, blobs):
                 sha = build_tree(pathjoin(path, basename))
             else:
                 (mode, sha) = entry
-            tree.add(mode, basename, sha)
+            tree.add(basename, mode, sha)
         object_store.add_object(tree)
         return tree.id
     return build_tree("")

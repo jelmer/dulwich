@@ -698,7 +698,7 @@ class MissingObjectFinder(object):
 
     def parse_tree(self, tree):
         self.add_todo([(sha, name, not stat.S_ISDIR(mode))
-                       for mode, name, sha in tree.entries()
+                       for name, mode, sha in tree.iteritems()
                        if not S_ISGITLINK(mode)])
 
     def parse_commit(self, commit):

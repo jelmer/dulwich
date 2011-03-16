@@ -22,6 +22,9 @@
     is now consistent with the rest of Dulwich. Existing code will still
     work but print a DeprecationWarning. (Jelmer Vernooij, #663550)
 
+  * Tree.entries() is now deprecated in favour of Tree.items() and
+    Tree.iteritems(). (Jelmer Vernooij)
+
 0.7.0	2011-01-21
 
  FEATURES

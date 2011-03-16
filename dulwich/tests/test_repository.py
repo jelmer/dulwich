@@ -239,7 +239,7 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('a.git')
         commit = r[r.head()]
         tree = r[commit.tree]
-        blob_sha = tree.entries()[0][2]
+        blob_sha = tree.items()[0][2]
         warnings.simplefilter("ignore", DeprecationWarning)
         try:
             blob = r.get_blob(blob_sha)

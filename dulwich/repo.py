@@ -819,8 +819,15 @@ class BaseRepo(object):
         return self.get_refs()
 
     def fetch_and_keep(self, target, determine_wants=None, progress=None, msg=None):
-        """Like fetch(), but adds a .keep file (see Pack.keep()) and returns
-           a tuple of refs, keepfile"""
+        """Like fetch(), but adds a .keep file (see Pack.keep()).
+
+        :param target: The target repository
+        :param determine_wants: Optional function to determine what refs to
+            fetch.
+        :param progress: Optional progress function
+        :param msg: A message passed to Pack.keep().
+        :return: A tuple of (refs, filename of the .keep file)
+        """
         if determine_wants is None:
             determine_wants = lambda heads: heads.values()
         pack = target.object_store.add_objects(

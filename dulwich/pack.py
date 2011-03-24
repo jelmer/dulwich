@@ -1500,7 +1500,9 @@ class Pack(object):
 
     def keep(self, msg=None):
         """Add a .keep file for the pack, preventing git from garbage collecting it.
-           Returns the path of the .keep file."""
+           :param msg: A message written inside the .keep file; can be used later to
+                       determine whether or not a .keep file is obsolete.
+           :return: The path of the .keep file, as a string."""
         keepfile_name = '%s.keep' % self._basename
         keepfile = file(keepfile_name, 'w')
         if msg:

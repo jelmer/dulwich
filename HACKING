@@ -10,6 +10,10 @@ implementations may be written for performance reasons, but should never
 replace the Python implementation. The C implementations should follow the
 kernel/git coding style.
 
+Public methods, functions and classes should all have doc strings. Please use
+epydoc style docstrings to document parameters and return values.
+You can generate the documentation by running "make doc".
+
 Where possible please include updates to NEWS along with your improvements.
 
 Running the tests

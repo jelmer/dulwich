@@ -304,6 +304,19 @@ class TestPack(PackTests):
                           commit.author)
         self.assertEquals([], commit.parents)
 
+    def test_keep(self):
+        p = self.get_pack(pack1_sha)
+        msg = 'some message'
+        keepfile_name = p.keep(msg)
+
+        # file should exist
+        self.assertTrue(os.path.exists(keepfile_name))
+
+        # and contain the right message, with a linefeed
+        buf = file(keepfile_name).read()
+
+        self.assertEqual(msg + '\n', buf)
+
     def test_name(self):
         p = self.get_pack(pack1_sha)
         self.assertEquals(pack1_sha, p.name())

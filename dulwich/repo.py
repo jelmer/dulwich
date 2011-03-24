@@ -818,6 +818,16 @@ class BaseRepo(object):
                              progress))
         return self.get_refs()
 
+    def fetch_and_keep(self, target, determine_wants=None, progress=None, msg=None):
+        """Like fetch(), but adds a .keep file (see Pack.keep()) and returns
+           a tuple of refs, keepfile"""
+        if determine_wants is None:
+            determine_wants = lambda heads: heads.values()
+        pack = target.object_store.add_objects(
+          self.fetch_objects(determine_wants, target.get_graph_walker(),
+                             progress))
+        return self.get_refs(), pack.keep(msg)
+
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):
         """Fetch the missing objects required for a set of revisions.

@@ -1504,7 +1504,7 @@ class Pack(object):
                        determine whether or not a .keep file is obsolete.
            :return: The path of the .keep file, as a string."""
         keepfile_name = '%s.keep' % self._basename
-        keepfile = file(keepfile_name, 'w')
+        keepfile = file(keepfile_name, 'wb')
         if msg:
             keepfile.write(msg)
             keepfile.write('\n')

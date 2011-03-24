@@ -1394,7 +1394,7 @@ class Pack(object):
 
     @classmethod
     def from_lazy_objects(self, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and 
+        """Create a new pack object from callables to load pack data and
         index objects."""
         ret = Pack("")
         ret._data_load = data_fn

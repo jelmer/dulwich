@@ -1498,6 +1498,17 @@ class Pack(object):
             yield ShaFile.from_raw_chunks(
               *self.data.resolve_object(offset, type, obj))
 
+    def keep(self, msg = None):
+        """Add a .keep file for the pack, preventing git from garbage collecting it.
+           Returns the path of the .keep file."""
+        keepfile_name = '%s.keep' % self._basename
+        keepfile = file(keepfile_name, 'w')
+        if msg:
+            keepfile.write(msg)
+            keepfile.write('\n')
+        keepfile.close()
+        return keepfile_name
+
 
 try:
     from dulwich._pack import apply_delta, bisect_find_sha

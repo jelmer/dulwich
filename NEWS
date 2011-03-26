@@ -16,6 +16,8 @@
 
   * Sphinxified documentation. (Lukasz Balcerzak)
 
+  * Add Pack.keep.(Marc Brinkmann)
+
  API CHANGES
 
   * The order of the parameters to Tree.add(name, mode, sha) has changed, and

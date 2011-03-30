@@ -27,8 +27,8 @@ import rfc822
 import time
 
 from dulwich.objects import (
-    Blob,
     Commit,
+    S_ISGITLINK,
     )
 
 def write_commit_patch(f, commit, contents, progress, version=None):
@@ -103,6 +103,49 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
                     yield '+' + line
 
 
+def write_object_diff(f, store, (old_path, old_mode, old_id),
+                                (new_path, new_mode, new_id)):
+    """Write file contents diff.
+
+    """
+    def shortid(hexsha):
+        if hexsha is None:
+            return "0" * 7
+        else:
+            return hexsha[:7]
+    def lines(mode, hexsha):
+        if hexsha is None:
+            return []
+        elif S_ISGITLINK(mode):
+            return ["Submodule commit " + hexsha + "\n"]
+        else:
+            return store[hexsha].data.splitlines(True)
+    if old_path is None:
+        old_path = "/dev/null"
+    else:
+        old_path = "a/%s" % old_path
+    if new_path is None:
+        new_path = "/dev/null"
+    else:
+        new_path = "b/%s" % new_path
+    f.write("diff --git %s %s\n" % (old_path, new_path))
+    if old_mode != new_mode:
+        if new_mode is not None:
+            if old_mode is not None:
+                f.write("old mode %o\n" % old_mode)
+            f.write("new mode %o\n" % new_mode)
+        else:
+            f.write("deleted mode %o\n" % old_mode)
+    f.write("index %s..%s" % (shortid(old_id), shortid(new_id)))
+    if new_mode is not None:
+        f.write(" %o" % new_mode)
+    f.write("\n")
+    old_contents = lines(old_mode, old_id)
+    new_contents = lines(new_mode, new_id)
+    f.writelines(unified_diff(old_contents, new_contents,
+        old_path, new_path))
+
+
 def write_blob_diff(f, (old_path, old_mode, old_blob),
                        (new_path, new_mode, new_blob)):
     """Write diff file header.
@@ -156,16 +199,8 @@ def write_tree_diff(f, store, old_tree, new_tree):
     """
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
-        if oldsha is None:
-            old_blob = Blob.from_string("")
-        else:
-            old_blob = store[oldsha]
-        if newsha is None:
-            new_blob = Blob.from_string("")
-        else:
-            new_blob = store[newsha]
-        write_blob_diff(f, (oldpath, oldmode, old_blob),
-                           (newpath, newmode, new_blob))
+        write_object_diff(f, store, (oldpath, oldmode, oldsha),
+                                    (newpath, newmode, newsha))
 
 
 def git_am_patch_split(f):

@@ -23,6 +23,7 @@ from cStringIO import StringIO
 from dulwich.objects import (
     Blob,
     Commit,
+    S_IFGITLINK,
     Tree,
     )
 from dulwich.object_store import (
@@ -289,4 +290,25 @@ class DiffTests(TestCase):
             '+++ /dev/null',
             '@@ -1,1 +1,0 @@',
             '-removed',
+            ], f.getvalue().splitlines())
+
+    def test_tree_diff_submodule(self):
+        f = StringIO()
+        store = MemoryObjectStore()
+        tree1 = Tree()
+        tree1.add("asubmodule", S_IFGITLINK,
+            "06d0bdd9e2e20377b3180e4986b14c8549b393e4")
+        tree2 = Tree()
+        tree2.add("asubmodule", S_IFGITLINK,
+            "cc975646af69f279396d4d5e1379ac6af80ee637")
+        store.add_objects([(o, None) for o in [tree1, tree2]])
+        write_tree_diff(f, store, tree1.id, tree2.id)
+        self.assertEquals([
+            'diff --git a/asubmodule b/asubmodule',
+            'index e69de29..76d4bb8 160000 (submodule)',
+            '--- a/asubmodule',
+            '+++ b/asubmodule',
+            '@@ -1,1 +1,1 @@',
+            '-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            '+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
             ], f.getvalue().splitlines())

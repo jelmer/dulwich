@@ -105,8 +105,14 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
 
 def write_object_diff(f, store, (old_path, old_mode, old_id),
                                 (new_path, new_mode, new_id)):
-    """Write file contents diff.
+    """Write the diff for an object.
 
+    :param f: File-like object to write to
+    :param store: Store to retrieve objects from, if necessary
+    :param (old_path, old_mode, old_hexsha): Old file
+    :param (new_path, new_mode, new_hexsha): New file
+
+    :note: the tuple elements should be None for nonexistant files
     """
     def shortid(hexsha):
         if hexsha is None:
@@ -153,6 +159,8 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
     :param f: File-like object to write to
     :param (old_path, old_mode, old_blob): Previous file (None if nonexisting)
     :param (new_path, new_mode, new_blob): New file (None if nonexisting)
+
+    :note: The use of write_object_diff is recommended over this function.
     """
     def blob_id(blob):
         if blob is None:

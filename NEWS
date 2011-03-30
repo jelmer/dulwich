@@ -12,6 +12,9 @@
   * BaseObjectStore.determine_wants_all no longer breaks on zero SHAs.
     (Jelmer Vernooij)
 
+  * write_tree_diff() now supports submodules.
+    (Jelmer Vernooij)
+
  IMPROVEMENTS
 
   * Sphinxified documentation. (Lukasz Balcerzak)

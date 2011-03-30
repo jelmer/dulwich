@@ -23,6 +23,7 @@ from cStringIO import StringIO
 from dulwich.objects import (
     Blob,
     Commit,
+    S_IFGITLINK,
     Tree,
     )
 from dulwich.object_store import (
@@ -32,6 +33,7 @@ from dulwich.patch import (
     git_am_patch_split,
     write_blob_diff,
     write_commit_patch,
+    write_object_diff,
     write_tree_diff,
     )
 from dulwich.tests import (
@@ -269,7 +271,7 @@ class DiffTests(TestCase):
         self.assertEquals([
             'diff --git /dev/null b/added.txt',
             'new mode 644',
-            'index e69de29..76d4bb8 644',
+            'index 0000000..76d4bb8 644',
             '--- /dev/null',
             '+++ b/added.txt',
             '@@ -1,0 +1,1 @@',
@@ -284,9 +286,105 @@ class DiffTests(TestCase):
             '+added',
             'diff --git a/removed.txt /dev/null',
             'deleted mode 644',
-            'index 2c3f0b3..e69de29',
+            'index 2c3f0b3..0000000',
             '--- a/removed.txt',
             '+++ /dev/null',
             '@@ -1,1 +1,0 @@',
             '-removed',
+            ], f.getvalue().splitlines())
+
+    def test_tree_diff_submodule(self):
+        f = StringIO()
+        store = MemoryObjectStore()
+        tree1 = Tree()
+        tree1.add("asubmodule", S_IFGITLINK,
+            "06d0bdd9e2e20377b3180e4986b14c8549b393e4")
+        tree2 = Tree()
+        tree2.add("asubmodule", S_IFGITLINK,
+            "cc975646af69f279396d4d5e1379ac6af80ee637")
+        store.add_objects([(o, None) for o in [tree1, tree2]])
+        write_tree_diff(f, store, tree1.id, tree2.id)
+        self.assertEquals([
+            'diff --git a/asubmodule b/asubmodule',
+            'index 06d0bdd..cc97564 160000',
+            '--- a/asubmodule',
+            '+++ b/asubmodule',
+            '@@ -1,1 +1,1 @@',
+            '-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            '+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
+            ], f.getvalue().splitlines())
+
+    def test_object_diff_blob(self):
+        f = StringIO()
+        b1 = Blob.from_string("old\nsame\n")
+        b2 = Blob.from_string("new\nsame\n")
+        store = MemoryObjectStore()
+        store.add_objects([(b1, None), (b2, None)])
+        write_object_diff(f, store, ("foo.txt", 0644, b1.id),
+                                    ("bar.txt", 0644, b2.id))
+        self.assertEquals([
+            "diff --git a/foo.txt b/bar.txt",
+            "index 3b0f961..a116b51 644",
+            "--- a/foo.txt",
+            "+++ b/bar.txt",
+            "@@ -1,2 +1,2 @@",
+            "-old",
+            "+new",
+            " same"
+            ], f.getvalue().splitlines())
+
+    def test_object_diff_add_blob(self):
+        f = StringIO()
+        store = MemoryObjectStore()
+        b2 = Blob.from_string("new\nsame\n")
+        store.add_object(b2)
+        write_object_diff(f, store, (None, None, None),
+                                    ("bar.txt", 0644, b2.id))
+        self.assertEquals([
+            'diff --git /dev/null b/bar.txt',
+             'new mode 644',
+             'index 0000000..a116b51 644',
+             '--- /dev/null',
+             '+++ b/bar.txt',
+             '@@ -1,0 +1,2 @@',
+             '+new',
+             '+same'
+            ], f.getvalue().splitlines())
+
+    def test_object_diff_remove_blob(self):
+        f = StringIO()
+        b1 = Blob.from_string("new\nsame\n")
+        store = MemoryObjectStore()
+        store.add_object(b1)
+        write_object_diff(f, store, ("bar.txt", 0644, b1.id),
+                                    (None, None, None))
+        self.assertEquals([
+            'diff --git a/bar.txt /dev/null',
+            'deleted mode 644',
+            'index a116b51..0000000',
+            '--- a/bar.txt',
+            '+++ /dev/null',
+            '@@ -1,2 +1,0 @@',
+            '-new',
+            '-same'
+            ], f.getvalue().splitlines())
+
+    def test_object_diff_kind_change(self):
+        f = StringIO()
+        b1 = Blob.from_string("new\nsame\n")
+        store = MemoryObjectStore()
+        store.add_object(b1)
+        write_object_diff(f, store, ("bar.txt", 0644, b1.id),
+            ("bar.txt", 0160000, "06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
+        self.assertEquals([
+            'diff --git a/bar.txt b/bar.txt',
+            'old mode 644',
+            'new mode 160000',
+            'index a116b51..06d0bdd 160000',
+            '--- a/bar.txt',
+            '+++ b/bar.txt',
+            '@@ -1,2 +1,1 @@',
+            '-new',
+            '-same',
+            '+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
             ], f.getvalue().splitlines())

@@ -270,7 +270,7 @@ class DiffTests(TestCase):
         self.assertEquals([
             'diff --git /dev/null b/added.txt',
             'new mode 644',
-            'index e69de29..76d4bb8 644',
+            'index 0000000..76d4bb8 644',
             '--- /dev/null',
             '+++ b/added.txt',
             '@@ -1,0 +1,1 @@',
@@ -285,7 +285,7 @@ class DiffTests(TestCase):
             '+added',
             'diff --git a/removed.txt /dev/null',
             'deleted mode 644',
-            'index 2c3f0b3..e69de29',
+            'index 2c3f0b3..0000000',
             '--- a/removed.txt',
             '+++ /dev/null',
             '@@ -1,1 +1,0 @@',
@@ -305,7 +305,7 @@ class DiffTests(TestCase):
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEquals([
             'diff --git a/asubmodule b/asubmodule',
-            'index e69de29..76d4bb8 160000 (submodule)',
+            'index 06d0bdd..cc97564 160000',
             '--- a/asubmodule',
             '+++ b/asubmodule',
             '@@ -1,1 +1,1 @@',

@@ -1,6 +1,7 @@
 dulwich (0.7.0-3) UNRELEASED; urgency=low
 
   * Add missing Breaks: field to python-dulwich.
+  * Switch to debhelper 7, drop cdbs.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Mon, 07 Mar 2011 04:26:27 +0100
 

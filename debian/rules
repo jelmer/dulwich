@@ -1,18 +1,9 @@
 #!/usr/bin/make -f
 
-include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/class/python-distutils.mk
+%:
+	dh --buildsystem=python_distutils $*
 
-DEB_PYTHON_BUILD_ARGS += --executable=/usr/bin/python
-
+override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
-common-build-arch common-build-indep:: debian/stamp-check
-debian/stamp-check: 
 	$(MAKE) check TESTRUNNER=testtools.run
-	touch $@
 endif
-
-clean::
-	rm -f debian/stamp-check
-	rm -f dulwich/*.so
-	rm -rf *.egg-info

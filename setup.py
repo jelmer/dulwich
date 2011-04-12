@@ -12,6 +12,7 @@ dulwich_version_string = '0.7.1'
 
 include_dirs = []
 # Windows MSVC support
+import os
 import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
@@ -32,7 +33,28 @@ class DulwichDistribution(Distribution):
 
     pure = False
 
-        
+def runcmd(cmd, env):
+    import subprocess
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    out, err = p.communicate()
+    err = [e for e in err.splitlines()
+           if not e.startswith('Not trusting file') \
+              and not e.startswith('warning: Not importing')]
+    if err:
+        return ''
+    return out
+
+
+if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
+    # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
+    # distutils.sysconfig
+    version = runcmd(['/usr/bin/xcodebuild', '-version'], {}).splitlines()[0]
+    # Also parse only first digit, because 3.2.1 can't be parsed nicely
+    if (version.startswith('Xcode') and
+        int(version.split()[1].split('.')[0]) >= 4):
+        os.environ['ARCHFLAGS'] = '-arch i386 -arch x86_64'
+
 setup(name='dulwich',
       description='Python Git Library',
       keywords='git',

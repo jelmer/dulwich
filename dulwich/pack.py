@@ -47,7 +47,12 @@ from itertools import (
     imap,
     izip,
     )
-import mmap
+try:
+    import mmap
+except ImportError:
+    has_mmap = False
+else:
+    has_mmap = True
 import os
 import struct
 try:
@@ -163,13 +168,14 @@ def _load_file_contents(f, size=None):
         fd = f.fileno()
         if size is None:
             size = os.fstat(fd).st_size
-        try:
-            contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
-        except mmap.error:
-            # Perhaps a socket?
-            pass
-        else:
-            return contents, size
+        if has_mmap:
+            try:
+                contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
+            except mmap.error:
+                # Perhaps a socket?
+                pass
+            else:
+                return contents, size
     contents = f.read()
     size = len(contents)
     return contents, size
@@ -1388,7 +1394,7 @@ class Pack(object):
 
     @classmethod
     def from_lazy_objects(self, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and 
+        """Create a new pack object from callables to load pack data and
         index objects."""
         ret = Pack("")
         ret._data_load = data_fn
@@ -1491,6 +1497,23 @@ class Pack(object):
             assert isinstance(offset, int)
             yield ShaFile.from_raw_chunks(
               *self.data.resolve_object(offset, type, obj))
+
+    def keep(self, msg=None):
+        """Add a .keep file for the pack, preventing git from garbage collecting it.
+
+        :param msg: A message written inside the .keep file; can be used later to
+                    determine whether or not a .keep file is obsolete.
+        :return: The path of the .keep file, as a string.
+        """
+        keepfile_name = '%s.keep' % self._basename
+        keepfile = GitFile(keepfile_name, 'wb')
+        try:
+            if msg:
+                keepfile.write(msg)
+                keepfile.write('\n')
+        finally:
+            keepfile.close()
+        return keepfile_name
 
 
 try:

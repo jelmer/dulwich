@@ -1,10 +1,14 @@
-================
-Dulwich Tutorial
-================
+.. _tutorial:
 
-.. contents::
+========
+Tutorial
+========
 
-.. include:: 0-introduction.txt
-.. include:: 1-repo.txt
-.. include:: 2-object-store.txt
-.. include:: 3-conclusion.txt
+.. toctree::
+   :maxdepth: 2
+
+   introduction
+   repo
+   object-store
+   conclusion
+

@@ -28,6 +28,7 @@ def test_suite():
         'repository',
         'server',
         'utils',
+        'web',
         ]
     module_names = ['dulwich.tests.compat.test_' + name for name in names]
     result = unittest.TestSuite()

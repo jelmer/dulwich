@@ -1,3 +1,38 @@
+0.7.1	2011-04-12
+
+ BUG FIXES
+
+  * Fix double decref in _diff_tree.c. (Ted Horst, #715528)
+
+  * Fix the build on Windows. (Pascal Quantin)
+
+  * Fix get_transport_and_path compatibility with pre-2.6.5 versions of Python.
+    (Max Bowsher, #707438)
+
+  * BaseObjectStore.determine_wants_all no longer breaks on zero SHAs.
+    (Jelmer Vernooij)
+
+  * write_tree_diff() now supports submodules.
+    (Jelmer Vernooij)
+
+  * Fix compilation for XCode 4 and older versions of distutils.sysconfig.
+    (Daniele Sluijters)
+
+ IMPROVEMENTS
+
+  * Sphinxified documentation. (Lukasz Balcerzak)
+
+  * Add Pack.keep.(Marc Brinkmann)
+
+ API CHANGES
+
+  * The order of the parameters to Tree.add(name, mode, sha) has changed, and
+    is now consistent with the rest of Dulwich. Existing code will still
+    work but print a DeprecationWarning. (Jelmer Vernooij, #663550)
+
+  * Tree.entries() is now deprecated in favour of Tree.items() and
+    Tree.iteritems(). (Jelmer Vernooij)
+
 0.7.0	2011-01-21
 
  FEATURES
@@ -389,7 +424,7 @@ note: This list is most likely incomplete for 0.6.0.
 
  FEATURES
 
-  * A new function `commit_tree' has been added that can commit a tree 
+  * A new function 'commit_tree' has been added that can commit a tree 
     based on an index.
 
  BUG FIXES

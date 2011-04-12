@@ -1,11 +1,30 @@
+Coding style
+------------
 Where possible, please follow PEP8 with regard to coding style.
 
-Furthermore, triple-quotes should always be """, single quotes are ' unless using "
-would result in less escaping within the string.
+Furthermore, triple-quotes should always be """, single quotes are ' unless
+using " would result in less escaping within the string.
 
 All functionality should be available in pure Python. Optional C
 implementations may be written for performance reasons, but should never
 replace the Python implementation. The C implementations should follow the
 kernel/git coding style.
 
+Public methods, functions and classes should all have doc strings. Please use
+epydoc style docstrings to document parameters and return values.
+You can generate the documentation by running "make doc".
+
 Where possible please include updates to NEWS along with your improvements.
+
+Running the tests
+-----------------
+To run the testsuite, you should be able to simply run "make check". This
+will run the tests using unittest on Python 2.7 and higher, and using
+unittest2 (which you will need to have installed) on older versions of Python.
+
+ $ make check
+
+Alternatively, if you have testtools installed you can run the testsuite by
+overriding the test runner:
+
+ $ make check TESTRUNNER=testtools.run

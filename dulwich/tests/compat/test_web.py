@@ -43,7 +43,7 @@ from dulwich.tests.compat.server_utils import (
     ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
     )
-from dulwich.utils import (
+from dulwich.tests.compat.utils import (
     CompatTestCase,
     )
 

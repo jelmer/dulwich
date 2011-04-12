@@ -26,6 +26,7 @@ from cStringIO import StringIO
 import datetime
 import os
 import stat
+import warnings
 
 from dulwich.errors import (
     ObjectFormatException,
@@ -150,8 +151,8 @@ class BlobReadTests(TestCase):
 
     def test_read_tree_from_file(self):
         t = self.get_tree(tree_sha)
-        self.assertEqual(t.entries()[0], (33188, 'a', a_sha))
-        self.assertEqual(t.entries()[1], (33188, 'b', b_sha))
+        self.assertEqual(t.items()[0], ('a', 33188, a_sha))
+        self.assertEqual(t.items()[1], ('b', 33188, b_sha))
 
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)
@@ -403,6 +404,26 @@ _SORTED_TREE_ITEMS = [
 
 
 class TreeTests(ShaFileCheckTests):
+
+    def test_add(self):
+        myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
+        x = Tree()
+        x.add("myname", 0100755, myhexsha)
+        self.assertEquals(x["myname"], (0100755, myhexsha))
+        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+                x.as_raw_string())
+
+    def test_add_old_order(self):
+        myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
+        x = Tree()
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            x.add(0100755, "myname", myhexsha)
+        finally:
+            warnings.resetwarnings()
+        self.assertEquals(x["myname"], (0100755, myhexsha))
+        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+                x.as_raw_string())
 
     def test_simple(self):
         myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"

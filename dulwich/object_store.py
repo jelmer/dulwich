@@ -40,6 +40,7 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    ZERO_SHA,
     hex_to_sha,
     sha_to_hex,
     hex_to_filename,
@@ -66,7 +67,8 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
-                if not sha in self and not ref.endswith("^{}")]
+                if not sha in self and not ref.endswith("^{}") and
+                   not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.
@@ -696,7 +698,7 @@ class MissingObjectFinder(object):
 
     def parse_tree(self, tree):
         self.add_todo([(sha, name, not stat.S_ISDIR(mode))
-                       for mode, name, sha in tree.entries()
+                       for name, mode, sha in tree.iteritems()
                        if not S_ISGITLINK(mode)])
 
     def parse_commit(self, commit):

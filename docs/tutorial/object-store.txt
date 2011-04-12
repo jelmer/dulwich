@@ -1,3 +1,5 @@
+.. _tutorial-object-store:
+
 The object store
 ================
 
@@ -25,7 +27,7 @@ give this content a name::
 
   >>> from dulwich.objects import Tree
   >>> tree = Tree()
-  >>> tree.add(0100644, "spam", blob.id)
+  >>> tree.add("spam", 0100644, blob.id)
 
 Note that "0100644" is the octal form for a regular file with common
 permissions. You can hardcode them or you can use the ``stat`` module.

@@ -955,7 +955,7 @@ class BaseRepo(object):
         """Returns a list of the commits reachable from head.
 
         Returns a list of commit objects. the first of which will be the commit
-        of head, then following theat will be the parents.
+        of head, then following that will be the parents.
 
         Raises NotCommitError if any no commits are referenced, including if the
         head parameter isn't the sha of a commit.

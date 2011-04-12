@@ -15,6 +15,9 @@
   * write_tree_diff() now supports submodules.
     (Jelmer Vernooij)
 
+  * Fix compilation for XCode 4 and older versions of distutils.sysconfig.
+    (Daniele Sluijters)
+
  IMPROVEMENTS
 
   * Sphinxified documentation. (Lukasz Balcerzak)

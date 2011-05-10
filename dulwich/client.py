@@ -89,7 +89,7 @@ class GitClient(object):
         """
         raise NotImplementedError()
 
-    def read_refs(self, proto):
+    def _read_refs(self, proto):
         server_capabilities = None
         refs = {}
         # Receive refs from server
@@ -152,7 +152,7 @@ class GitClient(object):
                                  and rejects ref updates
         """
         proto, unused_can_read = self._connect('receive-pack', path)
-        old_refs, server_capabilities = self.read_refs(proto)
+        old_refs, server_capabilities = self._read_refs(proto)
         if 'report-status' not in server_capabilities:
             self._send_capabilities.remove('report-status')
         new_refs = determine_wants(old_refs)
@@ -220,7 +220,7 @@ class GitClient(object):
         :param progress: Callback for progress reports (strings)
         """
         proto, can_read = self._connect('upload-pack', path)
-        (refs, server_capabilities) = self.read_refs(proto)
+        (refs, server_capabilities) = self._read_refs(proto)
         wants = determine_wants(refs)
         if not wants:
             proto.write_pkt_line(None)

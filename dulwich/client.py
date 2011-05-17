@@ -26,6 +26,7 @@ import socket
 import urlparse
 
 from dulwich.errors import (
+    GitProtocolError,
     SendPackError,
     UpdateRefsError,
     )
@@ -95,6 +96,8 @@ class GitClient(object):
         # Receive refs from server
         for pkt in proto.read_pkt_seq():
             (sha, ref) = pkt.rstrip('\n').split(' ', 1)
+            if sha == 'ERR':
+                raise GitProtocolError(ref)
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha

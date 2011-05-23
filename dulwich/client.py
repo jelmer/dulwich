@@ -361,7 +361,8 @@ class SSHGitClient(GitClient):
         con = get_ssh_vendor().connect_ssh(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
-        return Protocol(con.read, con.write), con.can_read
+        return (Protocol(con.read, con.write, report_activity=self._report_activity),
+                con.can_read)
 
 
 def get_transport_and_path(uri):

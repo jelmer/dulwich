@@ -823,7 +823,7 @@ class Tree(ShaFile):
     def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all 
+        :param mode: The mode of the entry as an integral type. Not all
             possible modes are supported by git; see check() for details.
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
@@ -996,12 +996,12 @@ class Commit(ShaFile):
                 self._parents.append(value)
             elif field == _AUTHOR_HEADER:
                 self._author, timetext, timezonetext = value.rsplit(" ", 2)
-                self._author_time = int(timetext)
+                self._author_time = int(float(timetext))
                 self._author_timezone, self._author_timezone_neg_utc =\
                     parse_timezone(timezonetext)
             elif field == _COMMITTER_HEADER:
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
-                self._commit_time = int(timetext)
+                self._commit_time = int(float(timetext))
                 self._commit_timezone, self._commit_timezone_neg_utc =\
                     parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:

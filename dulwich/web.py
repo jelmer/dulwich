@@ -226,6 +226,56 @@ class _LengthLimitedFile(object):
 
     # TODO: support more methods as necessary
 
+class _ChunkedFile(object):
+    """Wrapper class to handle HTTP chunked encoding.
+    """
+
+    def __init__(self, input):
+        self._input = input
+        self._buffer = ''
+
+    def _fetch(self):
+        """Fetch next chunk.
+
+           Return True if fetch succeeded,
+           False if there's nothing more to fetch (EOF).
+        """
+        line = self._input.readline()
+        try:
+            chunk_size = line.strip().split(';', 1).pop(0)
+            chunk_size = int(chunk_size, 16)
+        except:
+            raise ValueError('Failed to parse chunk size: ' + repr(line))
+
+        if chunk_size < 0:
+            raise ValueError('Invalid chunk size: ' + str(chunk_size))
+
+        if chunk_size == 0:
+            return False
+
+        chunk = self._input.read(chunk_size)
+        if self._input.read(2) != '\r\n':
+            raise ValueError('Invalid chunk')
+        self._buffer += chunk
+        return True
+
+    def read(self, size = -1):
+        result = ''
+        while True:
+            if len(result) == size:
+                return result
+
+            if not self._buffer:
+                if not self._fetch():
+                    return result
+
+            if size == -1:
+                result += self._buffer
+            else:
+                left = size - len(result)
+                result += self._buffer[:left]
+                self._buffer = self._buffer[left:]
+        return result
 
 def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
@@ -240,11 +290,12 @@ def handle_service_request(req, backend, mat):
     input = req.environ['wsgi.input']
     # This is not necessary if this app is run from a conforming WSGI server.
     # Unfortunately, there's no way to tell that at this point.
-    # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
-    # content-length
     content_length = req.environ.get('CONTENT_LENGTH', '')
     if content_length:
         input = _LengthLimitedFile(input, int(content_length))
+    transfer_encoding = req.environ.get('HTTP_TRANSFER_ENCODING', '')
+    if transfer_encoding == 'chunked':
+        input = _ChunkedFile(input)
     proto = ReceivableProtocol(input.read, write)
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()

@@ -851,7 +851,7 @@ class PackData(object):
             assert isinstance(basename, str) and len(basename) == 20
             base_offset, type, base_obj = get_ref(basename)
             assert isinstance(type, int)
-        type, base_chunks = self.resolve_object(base_offset, type, base_obj)
+        type, base_chunks = self.resolve_object(base_offset, type, base_obj, get_ref)
         chunks = apply_delta(base_chunks, delta)
         # TODO(dborowitz): This can result in poor performance if large base
         # objects are separated from deltas in the pack. We should reorganize

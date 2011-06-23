@@ -233,13 +233,14 @@ class _ChunkedFile(object):
     def __init__(self, input):
         self._input = input
         self._buffer = ''
+        self._finished = False
 
     def _fetch(self):
         """Fetch next chunk.
-
-           Return True if fetch succeeded,
-           False if there's nothing more to fetch (EOF).
         """
+        if self._finished:
+            return
+
         line = self._input.readline()
         try:
             chunk_size = line.strip().split(';', 1).pop(0)
@@ -251,13 +252,13 @@ class _ChunkedFile(object):
             raise ValueError('Invalid chunk size: ' + str(chunk_size))
 
         if chunk_size == 0:
-            return False
+            self._finished = True
+            return
 
         chunk = self._input.read(chunk_size)
         if self._input.read(2) != '\r\n':
             raise ValueError('Invalid chunk')
         self._buffer += chunk
-        return True
 
     def read(self, size = -1):
         result = ''
@@ -266,7 +267,8 @@ class _ChunkedFile(object):
                 return result
 
             if not self._buffer:
-                if not self._fetch():
+                self._fetch()
+                if self._finished:
                     return result
 
             if size == -1:

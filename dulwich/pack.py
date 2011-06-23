@@ -686,7 +686,7 @@ class PackStreamReader(object):
             buf.seek(0)
             self._rbuf = buf
 
-        pack_sha = sha_to_hex(''.join([c for c in self._trailer]))
+        pack_sha = sha_to_hex(self.read(20))
         calculated_sha = self.sha.hexdigest()
         if pack_sha != calculated_sha:
             raise ChecksumMismatch(pack_sha, calculated_sha)

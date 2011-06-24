@@ -279,8 +279,22 @@ class TCPGitClient(GitClient):
         GitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
-        s = socket.socket(type=socket.SOCK_STREAM)
-        s.connect((self._host, self._port))
+        sockaddrs = socket.getaddrinfo(self._host, self._port,
+            socket.AF_UNSPEC, socket.SOCK_STREAM, 0, 0)
+        s = None
+        err = socket.error("no address found for %s" % self._host)
+        for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
+            try:
+                s = socket.socket(family, socktype, proto)
+                s.setsockopt(socket.IPPROTO_TCP,
+                                        socket.TCP_NODELAY, 1)
+                s.connect(sockaddr)
+            except socket.error, err:
+                if s is not None:
+                    s.close()
+                s = None
+        if s is None:
+            raise err
         # -1 means system default buffering
         rfile = s.makefile('rb', -1)
         # 0 means unbuffered

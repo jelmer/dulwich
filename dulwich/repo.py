@@ -964,9 +964,14 @@ class BaseRepo(object):
         """
         
         try:
-            pending_commits = [self.commit(head)]
+            commit = self[head]
         except KeyError:
             raise MissingCommitError(head)
+
+        if type(commit) != Commit:
+            raise NotCommitError(commit)
+        pending_commits = [commit]
+
         history = set()
         
         while pending_commits != []:
@@ -979,9 +984,14 @@ class BaseRepo(object):
             
             for parent in commit.parents:
                 try:
-                    pending_commits.append(self.commit(parent))
+                    commit = self[parent]
                 except KeyError:
-                    raise MissingCommitError(parent)
+                    raise MissingCommitError(head)
+
+                if type(commit) != Commit:
+                    raise NotCommitError(commit)
+                
+                pending_commits.append(commit)
         
         history = list(history)
         history.sort(key=lambda c:c.commit_time, reverse=True)

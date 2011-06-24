@@ -133,7 +133,8 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     popen_kwargs['stderr'] = subprocess.STDOUT
     returncode, stdout = run_git(args, git_path=git_path, input=input,
                                  capture_stdout=True, **popen_kwargs)
-    assert returncode == 0
+    assert returncode == 0, "git with args %r failed with %d" % (
+        args, returncode)
     return stdout
 
 

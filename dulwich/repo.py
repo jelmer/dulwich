@@ -962,7 +962,7 @@ class BaseRepo(object):
 
         XXX: work out how to handle merges.
         """
-        
+
         try:
             commit = self[head]
         except KeyError:
@@ -973,7 +973,7 @@ class BaseRepo(object):
         pending_commits = [commit]
 
         history = set()
-        
+
         while pending_commits != []:
             commit = pending_commits.pop(0)
 
@@ -981,7 +981,7 @@ class BaseRepo(object):
                 continue
 
             history.add(commit)
-            
+
             for parent in commit.parents:
                 try:
                     commit = self[parent]
@@ -990,9 +990,9 @@ class BaseRepo(object):
 
                 if type(commit) != Commit:
                     raise NotCommitError(commit)
-                
+
                 pending_commits.append(commit)
-        
+
         history = list(history)
         history.sort(key=lambda c:c.commit_time, reverse=True)
         return history

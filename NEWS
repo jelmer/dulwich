@@ -4,6 +4,8 @@
 
   * Support IPv6 for git:// connections. (Jelmer Vernooij, #801543)
 
+  * Improve performance of Repo.revision_history(). (Timo Schmid, #535118)
+
 0.7.1	2011-04-12
 
  BUG FIXES

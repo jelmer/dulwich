@@ -962,28 +962,39 @@ class BaseRepo(object):
 
         XXX: work out how to handle merges.
         """
-        # We build the list backwards, as parents are more likely to be older
-        # than children
-        pending_commits = [head]
-        history = []
+        
+        try:
+            commit = self[head]
+        except KeyError:
+            raise MissingCommitError(head)
+
+        if type(commit) != Commit:
+            raise NotCommitError(commit)
+        pending_commits = [commit]
+
+        history = set()
+        
         while pending_commits != []:
-            head = pending_commits.pop(0)
-            try:
-                commit = self[head]
-            except KeyError:
-                raise MissingCommitError(head)
-            if type(commit) != Commit:
-                raise NotCommitError(commit)
+            commit = pending_commits.pop(0)
+
             if commit in history:
                 continue
-            i = 0
-            for known_commit in history:
-                if known_commit.commit_time > commit.commit_time:
-                    break
-                i += 1
-            history.insert(i, commit)
-            pending_commits += commit.parents
-        history.reverse()
+
+            history.add(commit)
+            
+            for parent in commit.parents:
+                try:
+                    commit = self[parent]
+                except KeyError:
+                    raise MissingCommitError(head)
+
+                if type(commit) != Commit:
+                    raise NotCommitError(commit)
+                
+                pending_commits.append(commit)
+        
+        history = list(history)
+        history.sort(key=lambda c:c.commit_time, reverse=True)
         return history
 
     def __getitem__(self, name):

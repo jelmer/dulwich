@@ -6,6 +6,8 @@
 
   * Improve performance of Repo.revision_history(). (Timo Schmid, #535118)
 
+  * Fix use of SubprocessWrapper on Windows. (Paulo Madeira, #670035)
+
 0.7.1	2011-04-12
 
  BUG FIXES

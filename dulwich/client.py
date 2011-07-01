@@ -23,6 +23,7 @@ __docformat__ = 'restructuredText'
 
 import select
 import socket
+import subprocess
 import urlparse
 
 from dulwich.errors import (
@@ -314,7 +315,13 @@ class SubprocessWrapper(object):
         self.write = proc.stdin.write
 
     def can_read(self):
-        return _fileno_can_read(self.proc.stdout.fileno())
+        if subprocess.mswindows:
+            from msvcrt import get_osfhandle
+            from win32pipe import PeekNamedPipe
+            handle = get_osfhandle(self.proc.stdout.fileno())
+            return PeekNamedPipe(handle, 0)[2] != 0
+        else:
+            return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self):
         self.proc.stdin.close()

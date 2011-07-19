@@ -8,6 +8,8 @@
 
   * Fix use of SubprocessWrapper on Windows. (Paulo Madeira, #670035)
 
+  * Fix compilation on newer versions of Mac OS X (Lion and up). (Ryan McKern, #794543)
+
 0.7.1	2011-04-12
 
  BUG FIXES

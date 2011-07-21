@@ -1094,7 +1094,6 @@ def write_pack_object(f, type, object):
     :param object: Object to write
     :return: Tuple with offset at which the object was written, and crc32
     """
-    offset = f.tell()
     packed_data_hdr = ""
     if type == OFS_DELTA:
         (delta_base_offset, object) = object
@@ -1121,7 +1120,7 @@ def write_pack_object(f, type, object):
         packed_data_hdr += basename
     packed_data = packed_data_hdr + zlib.compress(object)
     f.write(packed_data)
-    return (offset, (zlib.crc32(packed_data) & 0xffffffff))
+    return (zlib.crc32(packed_data) & 0xffffffff)
 
 
 def write_pack(filename, objects, num_objects=None):
@@ -1173,40 +1172,39 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     else:
         num_objects = len(objects)
 
-    # FIXME: Somehow limit delta depth
     # FIXME: Make thin-pack optional (its not used when cloning a pack)
-    # # Build a list of objects ordered by the magic Linus heuristic
-    # # This helps us find good objects to diff against us
-    # magic = []
-    # for obj, path in objects:
-    #     magic.append( (obj.type_num, path, 1, -obj.raw_length(), obj) )
-    # magic.sort()
-    # # Build a map of objects and their index in magic - so we can find
-    # # preceeding objects to diff against
-    # offs = {}
-    # for i in range(len(magic)):
-    #     offs[magic[i][4]] = i
+    # Build a list of objects ordered by the magic Linus heuristic
+    # This helps us find good objects to diff against us
+    magic = []
+    for obj, path in objects:
+        magic.append((obj.type_num, path, -obj.raw_length(), obj))
+    magic.sort()
+
+    possible_bases = deque()
 
     # Write the pack
     entries = []
     f = SHA1Writer(f)
     write_pack_header(f, num_objects)
-    for o, path in objects:
+    for type_num, path, neg_length, o in magic:
         sha1 = o.sha().digest()
-        orig_t = o.type_num
         raw = o.as_raw_string()
-        winner = raw
-        t = orig_t
-        #for i in range(offs[o]-window, window):
-        #    if i < 0 or i >= len(offs): continue
-        #    b = magic[i][4]
-        #    if b.type_num != orig_t: continue
-        #    base = b.as_raw_string()
-        #    delta = create_delta(base, raw)
-        #    if len(delta) < len(winner):
-        #        winner = delta
-        #        t = 6 if magic[i][2] == 1 else 7
-        offset, crc32 = write_pack_object(f, t, winner)
+        winner = (type_num, raw)
+        for base, base_offset in possible_bases:
+            if base.type_num != type_num:
+                continue
+            delta = create_delta(base.as_raw_string(), raw)
+            if len(delta) < len(winner):
+                base_id = base.sha().digest()
+                assert base_offset is not None
+                winner = (OFS_DELTA, (base_offset, delta))
+                #    t = REF_DELTA
+                #    winner = (base_id, delta)
+        offset = f.tell()
+        possible_bases.appendleft((o, offset))
+        if len(possible_bases) > window:
+            possible_bases.pop()
+        crc32 = write_pack_object(f, winner[0], winner[1])
         entries.append((sha1, offset, crc32))
     return entries, f.write_sha()
 

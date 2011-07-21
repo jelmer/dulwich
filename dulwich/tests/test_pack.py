@@ -276,8 +276,7 @@ class TestPack(PackTests):
         try:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, 'Elch')
-            write_pack(basename, [(x, '') for x in origpack.iterobjects()],
-                       len(origpack))
+            write_pack(basename, [(x, '') for x in origpack.iterobjects()])
             newpack = Pack(basename)
 
             try:
@@ -306,8 +305,7 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, 'somepack')
-        write_pack(basename, [(x, '') for x in origpack.iterobjects()],
-                   len(origpack))
+        write_pack(basename, [(x, '') for x in origpack.iterobjects()])
         return Pack(basename)
 
     def test_keep_no_message(self):

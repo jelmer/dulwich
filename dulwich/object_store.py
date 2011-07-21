@@ -271,7 +271,7 @@ class PackBasedObjectStore(BaseObjectStore):
         objects = set()
         for sha in self._iter_loose_objects():
             objects.add((self._get_loose_object(sha), None))
-        self.add_objects(objects)
+        self.add_objects(list(objects))
         for obj, path in objects:
             self._remove_loose_object(obj.id)
         return len(objects)

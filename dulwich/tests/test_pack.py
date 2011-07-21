@@ -257,6 +257,19 @@ class TestPack(PackTests):
         p = self.get_pack(pack1_sha)
         self.assertEquals(set([tree_sha, commit_sha, a_sha]), set(p))
 
+    def test_iterobjects(self):
+        p = self.get_pack(pack1_sha)
+        expected = set([p[s] for s in [commit_sha, tree_sha, a_sha]])
+        self.assertEquals(expected, set(list(p.iterobjects())))
+
+    def test_pack_tuples(self):
+        p = self.get_pack(pack1_sha)
+        tuples = p.pack_tuples()
+        expected = set([(p[s], None) for s in [commit_sha, tree_sha, a_sha]])
+        self.assertEquals(expected, set(list(tuples)))
+        self.assertEquals(expected, set(list(tuples)))
+        self.assertEquals(3, len(tuples))
+
     def test_get_object_at(self):
         """Tests random access for non-delta objects"""
         p = self.get_pack(pack1_sha)
@@ -276,7 +289,7 @@ class TestPack(PackTests):
         try:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, 'Elch')
-            write_pack(basename, [(x, '') for x in origpack.iterobjects()])
+            write_pack(basename, origpack.pack_tuples())
             newpack = Pack(basename)
 
             try:
@@ -305,7 +318,7 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, 'somepack')
-        write_pack(basename, [(x, '') for x in origpack.iterobjects()])
+        write_pack(basename, origpack.pack_tuples())
         return Pack(basename)
 
     def test_keep_no_message(self):

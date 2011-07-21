@@ -1510,6 +1510,25 @@ class Pack(object):
             yield ShaFile.from_raw_chunks(
               *self.data.resolve_object(offset, type, obj))
 
+    def pack_tuples(self):
+        """Provide an iterable for use with write_pack_data.
+
+        :return: Object that can iterate over (object, path) tuples
+            and provides __len__
+        """
+        class PackTupleIterable(object):
+
+            def __init__(self, pack):
+                self.pack = pack
+
+            def __len__(self):
+                return len(self.pack)
+
+            def __iter__(self):
+                return ((o, None) for o in self.pack.iterobjects())
+
+        return PackTupleIterable(self)
+
     def keep(self, msg=None):
         """Add a .keep file for the pack, preventing git from garbage collecting it.
 

@@ -407,7 +407,7 @@ class DiskObjectStore(PackBasedObjectStore):
             # Write a full pack version
             temppath = os.path.join(self.pack_dir,
                 sha_to_hex(urllib2.randombytes(20))+".temppack")
-            write_pack(temppath, [(o, None) for o in p.iterobjects()])
+            write_pack(temppath, p.pack_tuples())
         finally:
             p.close()
 

@@ -1,5 +1,10 @@
 0.8.0	UNRELEASED
 
+ BUG FIXES
+
+  * Avoid storing all objects in memory when writing pack.
+    (Jelmer Vernooij, #813268)
+
  API CHANGES
 
   * write_pack_data and write_pack no longer take a num_objects argument.

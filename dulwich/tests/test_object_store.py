@@ -226,14 +226,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         o = DiskObjectStore(self.store_dir)
         f, commit = o.add_pack()
         b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)], 1)
+        write_pack_data(f, [(b, None)])
         commit()
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)
         f, commit = o.add_thin_pack()
         b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)], 1)
+        write_pack_data(f, [(b, None)])
         commit()
 
 

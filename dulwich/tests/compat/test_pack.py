@@ -54,8 +54,7 @@ class TestPack(PackTests):
         origpack = self.get_pack(pack1_sha)
         self.assertSucceeds(origpack.index.check)
         pack_path = os.path.join(self._tempdir, "Elch")
-        write_pack(pack_path, [(x, "") for x in origpack.iterobjects()],
-                   len(origpack))
+        write_pack(pack_path, [(x, "") for x in origpack.iterobjects()])
         output = run_git_or_fail(['verify-pack', '-v', pack_path])
 
         pack_shas = set()

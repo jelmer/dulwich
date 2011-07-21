@@ -1187,7 +1187,6 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     f = SHA1Writer(f)
     write_pack_header(f, num_objects)
     for type_num, path, neg_length, o in magic:
-        sha1 = o.sha().digest()
         raw = o.as_raw_string()
         winner = (type_num, raw)
         for base, base_offset in possible_bases:
@@ -1195,17 +1194,15 @@ def write_pack_data(f, objects, num_objects=None, window=10):
                 continue
             delta = create_delta(base.as_raw_string(), raw)
             if len(delta) < len(winner):
-                base_id = base.sha().digest()
-                assert base_offset is not None
                 winner = (OFS_DELTA, (base_offset, delta))
                 #    t = REF_DELTA
-                #    winner = (base_id, delta)
+                #    winner = (base.sha().digest(), delta)
         offset = f.tell()
         possible_bases.appendleft((o, offset))
-        if len(possible_bases) > window:
+        while len(possible_bases) > window:
             possible_bases.pop()
         crc32 = write_pack_object(f, winner[0], winner[1])
-        entries.append((sha1, offset, crc32))
+        entries.append((o.sha().digest(), offset, crc32))
     return entries, f.write_sha()
 
 

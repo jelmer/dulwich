@@ -13,6 +13,8 @@
 
   * Fix compilation on newer versions of Mac OS X (Lion and up). (Ryan McKern, #794543)
 
+  * Actually create deltas when creating packs. (Jelmer Vernooij, #562673)
+
  API CHANGES
 
   * write_pack_data and write_pack no longer take a num_objects argument and

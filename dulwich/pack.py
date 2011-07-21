@@ -1168,21 +1168,25 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     if num_objects is not None:
         warnings.warn("num_objects argument to write_pack_data is deprecated",
                       DeprecationWarning)
+        # Previously it was possible to pass in an iterable
+        objects = list(objects)
     else:
         num_objects = len(objects)
+
     # FIXME: Somehow limit delta depth
     # FIXME: Make thin-pack optional (its not used when cloning a pack)
-    # Build a list of objects ordered by the magic Linus heuristic
-    # This helps us find good objects to diff against us
-    magic = []
-    for obj, path in objects:
-        magic.append( (obj.type_num, path, 1, -obj.raw_length(), obj) )
-    magic.sort()
-    # Build a map of objects and their index in magic - so we can find
-    # preceeding objects to diff against
-    offs = {}
-    for i in range(len(magic)):
-        offs[magic[i][4]] = i
+    # # Build a list of objects ordered by the magic Linus heuristic
+    # # This helps us find good objects to diff against us
+    # magic = []
+    # for obj, path in objects:
+    #     magic.append( (obj.type_num, path, 1, -obj.raw_length(), obj) )
+    # magic.sort()
+    # # Build a map of objects and their index in magic - so we can find
+    # # preceeding objects to diff against
+    # offs = {}
+    # for i in range(len(magic)):
+    #     offs[magic[i][4]] = i
+
     # Write the pack
     entries = []
     f = SHA1Writer(f)

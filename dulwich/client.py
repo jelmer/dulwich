@@ -148,8 +148,8 @@ class GitClient(object):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return the shas of the
-            objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -184,8 +184,7 @@ class GitClient(object):
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_data(proto.write_file(), objects,
-                                       len(objects))
+        entries, sha = write_pack_data(proto.write_file(), objects)
 
         if 'report-status' in self._send_capabilities:
             self._parse_status_report(proto)

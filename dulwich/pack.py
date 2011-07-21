@@ -60,6 +60,7 @@ try:
 except ImportError:
     from dulwich._compat import unpack_from
 import sys
+import warnings
 import zlib
 
 from dulwich.errors import (
@@ -1123,17 +1124,20 @@ def write_pack_object(f, type, object):
     return (offset, (zlib.crc32(packed_data) & 0xffffffff))
 
 
-def write_pack(filename, objects, num_objects):
+def write_pack(filename, objects, num_objects=None):
     """Write a new pack data file.
 
     :param filename: Path to the new pack file (without .pack extension)
-    :param objects: Iterable over (object, path) tuples to write
-    :param num_objects: Number of objects to write
+    :param objects: Iterable of (object, path) tuples to write.
+        Should provide __len__
     :return: Tuple with checksum of pack file and index file
     """
+    if num_objects is not None:
+        warnings.warn("num_objects argument to write_pack is deprecated",
+                      DeprecationWarning)
     f = GitFile(filename + ".pack", 'wb')
     try:
-        entries, data_sum = write_pack_data(f, objects, num_objects)
+        entries, data_sum = write_pack_data(f, objects, num_objects=num_objects)
     finally:
         f.close()
     entries.sort()
@@ -1151,23 +1155,27 @@ def write_pack_header(f, num_objects):
     f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
 
-def write_pack_data(f, objects, num_objects, window=10):
+def write_pack_data(f, objects, num_objects=None, window=10):
     """Write a new pack data file.
 
     :param f: File to write to
-    :param objects: Iterable over (object, path) tuples to write
-    :param num_objects: Number of objects to write
+    :param objects: Iterable of (object, path) tuples to write.
+        Should provide __len__
     :param window: Sliding window size for searching for deltas; currently
                    unimplemented
     :return: List with (name, offset, crc32 checksum) entries, pack checksum
     """
-    recency = list(objects)
+    if num_objects is not None:
+        warnings.warn("num_objects argument to write_pack_data is deprecated",
+                      DeprecationWarning)
+    else:
+        num_objects = len(objects)
     # FIXME: Somehow limit delta depth
     # FIXME: Make thin-pack optional (its not used when cloning a pack)
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
-    for obj, path in recency:
+    for obj, path in objects:
         magic.append( (obj.type_num, path, 1, -obj.raw_length(), obj) )
     magic.sort()
     # Build a map of objects and their index in magic - so we can find
@@ -1179,7 +1187,7 @@ def write_pack_data(f, objects, num_objects, window=10):
     entries = []
     f = SHA1Writer(f)
     write_pack_header(f, num_objects)
-    for o, path in recency:
+    for o, path in objects:
         sha1 = o.sha().digest()
         orig_t = o.type_num
         raw = o.as_raw_string()

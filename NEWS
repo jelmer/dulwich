@@ -1,3 +1,10 @@
+0.8.0	UNRELEASED
+
+ API CHANGES
+
+  * write_pack_data and write_pack no longer take a num_objects argument.
+    (Jelmer Vernooij)
+
 0.7.2	UNRELEASED
 
  BUG FIXES

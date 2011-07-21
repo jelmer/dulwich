@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.7.2'
+dulwich_version_string = '0.8.0'
 
 include_dirs = []
 # Windows MSVC support

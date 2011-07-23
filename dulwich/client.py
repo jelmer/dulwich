@@ -38,7 +38,7 @@ from dulwich.protocol import (
     extract_capabilities,
     )
 from dulwich.pack import (
-    write_pack_data,
+    write_pack_objects,
     )
 
 
@@ -184,7 +184,7 @@ class GitClient(object):
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_data(proto.write_file(), objects)
+        entries, sha = write_pack_objects(proto.write_file(), objects)
 
         if 'report-status' in self._send_capabilities:
             self._parse_status_report(proto)

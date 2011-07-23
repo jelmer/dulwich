@@ -1167,6 +1167,8 @@ def deltify_pack_objects(objects, window=10):
 
     :param objects: Objects to deltify
     :param window: Window size
+    :return: Iterator over type_num, object id, delta_base, content
+        delta_base is None for full text entries
     """
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us

@@ -256,7 +256,7 @@ class ShaFile(object):
             self._needs_parsing = False
 
     def set_raw_string(self, text):
-        if type(text) != str:
+        if type(text) != str and type(text) != unicode:
             raise TypeError(text)
         self.set_raw_chunks([text])
 

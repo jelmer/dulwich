@@ -1163,7 +1163,7 @@ def write_pack_data(f, objects, num_objects=None, window=10):
         Should provide __len__
     :param window: Sliding window size for searching for deltas; currently
                    unimplemented
-    :return: Dictionary mapping id -> (offset, crc32 checksum) entries, pack checksum
+    :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     if num_objects is not None:
         warnings.warn("num_objects argument to write_pack_data is deprecated",
@@ -1190,16 +1190,18 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     for type_num, path, neg_length, o in magic:
         raw = o.as_raw_string()
         winner = (type_num, raw)
-        for base, base_offset in possible_bases:
+        for base in possible_bases:
             if base.type_num != type_num:
                 continue
             delta = create_delta(base.as_raw_string(), raw)
             if len(delta) < len(winner):
+                base_id = base.sha().digest()
+                base_offset = entries[base_id][0]
                 winner = (OFS_DELTA, (base_offset, delta))
                 #    t = REF_DELTA
                 #    winner = (base.sha().digest(), delta)
         offset = f.tell()
-        possible_bases.appendleft((o, offset))
+        possible_bases.appendleft(o)
         while len(possible_bases) > window:
             possible_bases.pop()
         crc32 = write_pack_object(f, winner[0], winner[1])

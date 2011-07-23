@@ -1139,6 +1139,7 @@ def write_pack(filename, objects, num_objects=None):
         entries, data_sum = write_pack_data(f, objects, num_objects=num_objects)
     finally:
         f.close()
+    entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
     entries.sort()
     f = GitFile(filename + ".idx", 'wb')
     try:
@@ -1162,7 +1163,7 @@ def write_pack_data(f, objects, num_objects=None, window=10):
         Should provide __len__
     :param window: Sliding window size for searching for deltas; currently
                    unimplemented
-    :return: List with (name, offset, crc32 checksum) entries, pack checksum
+    :return: Dictionary mapping id -> (offset, crc32 checksum) entries, pack checksum
     """
     if num_objects is not None:
         warnings.warn("num_objects argument to write_pack_data is deprecated",
@@ -1183,7 +1184,7 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     possible_bases = deque()
 
     # Write the pack
-    entries = []
+    entries = {}
     f = SHA1Writer(f)
     write_pack_header(f, num_objects)
     for type_num, path, neg_length, o in magic:
@@ -1202,7 +1203,7 @@ def write_pack_data(f, objects, num_objects=None, window=10):
         while len(possible_bases) > window:
             possible_bases.pop()
         crc32 = write_pack_object(f, winner[0], winner[1])
-        entries.append((o.sha().digest(), offset, crc32))
+        entries[o.sha().digest()] = (offset, crc32)
     return entries, f.write_sha()
 
 

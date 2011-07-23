@@ -42,7 +42,7 @@ from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich.pack import (
-    write_pack_data,
+    write_pack_objects,
     )
 from dulwich.tests import (
     TestCase,
@@ -226,14 +226,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         o = DiskObjectStore(self.store_dir)
         f, commit = o.add_pack()
         b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)])
+        write_pack_objects(f, [(b, None)])
         commit()
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)
         f, commit = o.add_thin_pack()
         b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)])
+        write_pack_objects(f, [(b, None)])
         commit()
 
 

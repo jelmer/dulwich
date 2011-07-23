@@ -54,8 +54,8 @@ from dulwich.pack import (
     iter_sha1,
     load_pack_index,
     write_pack,
-    write_pack_data,
     write_pack_index_v2,
+    write_pack_objects,
     )
 
 INFODIR = 'info'
@@ -321,7 +321,7 @@ class PackBasedObjectStore(BaseObjectStore):
             # Don't bother writing an empty pack file
             return
         f, commit = self.add_pack()
-        write_pack_data(f, objects)
+        write_pack_objects(f, objects)
         return commit()
 
 

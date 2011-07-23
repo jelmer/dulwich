@@ -1065,22 +1065,28 @@ class SHA1Writer(object):
 
     def __init__(self, f):
         self.f = f
+        self.length = 0
         self.sha1 = make_sha("")
 
     def write(self, data):
         self.sha1.update(data)
         self.f.write(data)
+        self.length += len(data)
 
     def write_sha(self):
         sha = self.sha1.digest()
         assert len(sha) == 20
         self.f.write(sha)
+        self.length += len(sha)
         return sha
 
     def close(self):
         sha = self.write_sha()
         self.f.close()
         return sha
+
+    def offset(self):
+        return self.length
 
     def tell(self):
         return self.f.tell()
@@ -1094,7 +1100,6 @@ def write_pack_object(f, type, object):
     :param object: Object to write
     :return: Tuple with offset at which the object was written, and crc32
     """
-    offset = f.tell()
     packed_data_hdr = ""
     if type == OFS_DELTA:
         (delta_base_offset, object) = object
@@ -1121,7 +1126,7 @@ def write_pack_object(f, type, object):
         packed_data_hdr += basename
     packed_data = packed_data_hdr + zlib.compress(object)
     f.write(packed_data)
-    return (offset, (zlib.crc32(packed_data) & 0xffffffff))
+    return (zlib.crc32(packed_data) & 0xffffffff)
 
 
 def write_pack(filename, objects, num_objects=None):
@@ -1137,9 +1142,11 @@ def write_pack(filename, objects, num_objects=None):
                       DeprecationWarning)
     f = GitFile(filename + ".pack", 'wb')
     try:
-        entries, data_sum = write_pack_data(f, objects, num_objects=num_objects)
+        entries, data_sum = write_pack_objects(f, objects,
+            num_objects=num_objects)
     finally:
         f.close()
+    entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
     entries.sort()
     f = GitFile(filename + ".idx", 'wb')
     try:
@@ -1155,7 +1162,41 @@ def write_pack_header(f, num_objects):
     f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
 
-def write_pack_data(f, objects, num_objects=None, window=10):
+def deltify_pack_objects(objects, window=10):
+    """Generate deltas for pack objects.
+
+    :param objects: Objects to deltify
+    :param window: Window size
+    :return: Iterator over type_num, object id, delta_base, content
+        delta_base is None for full text entries
+    """
+    # Build a list of objects ordered by the magic Linus heuristic
+    # This helps us find good objects to diff against us
+    magic = []
+    for obj, path in objects:
+        magic.append((obj.type_num, path, -obj.raw_length(), obj))
+    magic.sort()
+
+    possible_bases = deque()
+
+    for type_num, path, neg_length, o in magic:
+        raw = o.as_raw_string()
+        winner = raw
+        winner_base = None
+        for base in possible_bases:
+            if base.type_num != type_num:
+                continue
+            delta = create_delta(base.as_raw_string(), raw)
+            if len(delta) < len(winner):
+                winner_base = base.sha().digest()
+                winner = delta
+        yield type_num, o.sha().digest(), winner_base, winner
+        possible_bases.appendleft(o)
+        while len(possible_bases) > window:
+            possible_bases.pop()
+
+
+def write_pack_objects(f, objects, window=10, num_objects=None):
     """Write a new pack data file.
 
     :param f: File to write to
@@ -1163,51 +1204,43 @@ def write_pack_data(f, objects, num_objects=None, window=10):
         Should provide __len__
     :param window: Sliding window size for searching for deltas; currently
                    unimplemented
-    :return: List with (name, offset, crc32 checksum) entries, pack checksum
+    :param num_objects: Number of objects (do not use, deprecated)
+    :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
-    if num_objects is not None:
-        warnings.warn("num_objects argument to write_pack_data is deprecated",
-                      DeprecationWarning)
-        # Previously it was possible to pass in an iterable
-        objects = list(objects)
-    else:
+    if num_objects is None:
         num_objects = len(objects)
+    # FIXME: pack_contents = deltify_pack_objects(objects, window)
+    pack_contents = (
+        (o.type_num, o.sha().digest(), None, o.as_raw_string())
+        for (o, path) in objects)
+    return write_pack_data(f, num_objects, pack_contents)
 
-    # FIXME: Somehow limit delta depth
-    # FIXME: Make thin-pack optional (its not used when cloning a pack)
-    # # Build a list of objects ordered by the magic Linus heuristic
-    # # This helps us find good objects to diff against us
-    # magic = []
-    # for obj, path in objects:
-    #     magic.append( (obj.type_num, path, 1, -obj.raw_length(), obj) )
-    # magic.sort()
-    # # Build a map of objects and their index in magic - so we can find
-    # # preceeding objects to diff against
-    # offs = {}
-    # for i in range(len(magic)):
-    #     offs[magic[i][4]] = i
 
+def write_pack_data(f, num_records, records):
+    """Write a new pack data file.
+
+    :param f: File to write to
+    :param num_records: Number of records
+    :param records: Iterator over type_num, object_id, delta_base, raw
+    :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
+    """
     # Write the pack
-    entries = []
+    entries = {}
     f = SHA1Writer(f)
-    write_pack_header(f, num_objects)
-    for o, path in objects:
-        sha1 = o.sha().digest()
-        orig_t = o.type_num
-        raw = o.as_raw_string()
-        winner = raw
-        t = orig_t
-        #for i in range(offs[o]-window, window):
-        #    if i < 0 or i >= len(offs): continue
-        #    b = magic[i][4]
-        #    if b.type_num != orig_t: continue
-        #    base = b.as_raw_string()
-        #    delta = create_delta(base, raw)
-        #    if len(delta) < len(winner):
-        #        winner = delta
-        #        t = 6 if magic[i][2] == 1 else 7
-        offset, crc32 = write_pack_object(f, t, winner)
-        entries.append((sha1, offset, crc32))
+    write_pack_header(f, num_records)
+    for type_num, object_id, delta_base, raw in records:
+        if delta_base is not None:
+            try:
+                base_offset, base_crc32 = entries[delta_base]
+            except KeyError:
+                type_num = REF_DELTA
+                raw = (delta_base, raw)
+            else:
+                type_num = OFS_DELTA
+                raw = (base_offset, raw)
+        offset = f.offset()
+        crc32 = write_pack_object(f, type_num, raw)
+        entries[object_id] = (offset, crc32)
     return entries, f.write_sha()
 
 
@@ -1511,7 +1544,7 @@ class Pack(object):
               *self.data.resolve_object(offset, type, obj))
 
     def pack_tuples(self):
-        """Provide an iterable for use with write_pack_data.
+        """Provide an iterable for use with write_pack_objects.
 
         :return: Object that can iterate over (object, path) tuples
             and provides __len__

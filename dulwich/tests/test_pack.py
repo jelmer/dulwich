@@ -33,6 +33,7 @@ from dulwich.file import (
     GitFile,
     )
 from dulwich.objects import (
+    Blob,
     hex_to_sha,
     sha_to_hex,
     Tree,
@@ -44,6 +45,7 @@ from dulwich.pack import (
     ThinPackData,
     apply_delta,
     create_delta,
+    deltify_pack_objects,
     load_pack_index,
     read_zlib_chunks,
     write_pack_header,
@@ -536,3 +538,25 @@ class ReadZlibTests(TestCase):
 
     def test_decompress_buffer_size_4(self):
         self._do_decompress_test(4)
+
+
+class DeltifyTests(TestCase):
+
+    def test_empty(self):
+        self.assertEquals([], list(deltify_pack_objects([])))
+
+    def test_single(self):
+        b = Blob.from_string("foo")
+        self.assertEquals(
+            [(b.type_num, b.sha().digest(), None, b.as_raw_string())],
+            list(deltify_pack_objects([(b, "")])))
+
+    def test_simple_delta(self):
+        b1 = Blob.from_string("a" * 101)
+        b2 = Blob.from_string("a" * 100)
+        delta = create_delta(b1.as_raw_string(), b2.as_raw_string())
+        self.assertEquals([
+            (b1.type_num, b1.sha().digest(), None, b1.as_raw_string()),
+            (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta)
+            ],
+            list(deltify_pack_objects([(b1, ""), (b2, "")])))

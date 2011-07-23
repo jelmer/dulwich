@@ -1173,7 +1173,6 @@ def write_pack_data(f, objects, num_objects=None, window=10):
     else:
         num_objects = len(objects)
 
-    # FIXME: Make thin-pack optional (its not used when cloning a pack)
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
@@ -1196,10 +1195,12 @@ def write_pack_data(f, objects, num_objects=None, window=10):
             delta = create_delta(base.as_raw_string(), raw)
             if len(delta) < len(winner):
                 base_id = base.sha().digest()
-                base_offset = entries[base_id][0]
-                winner = (OFS_DELTA, (base_offset, delta))
-                #    t = REF_DELTA
-                #    winner = (base.sha().digest(), delta)
+                try:
+                    base_offset, base_crc32 = entries[base_id]
+                except KeyError:
+                    winner = (OFS_DELTA, (base_offset, delta))
+                else:
+                    winner = (REF_DELTA, (base_id, delta))
         offset = f.tell()
         possible_bases.appendleft(o)
         while len(possible_bases) > window:

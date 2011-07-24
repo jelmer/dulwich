@@ -280,15 +280,15 @@ class TCPGitClient(GitClient):
 
     def _connect(self, cmd, path):
         sockaddrs = socket.getaddrinfo(self._host, self._port,
-            socket.AF_UNSPEC, socket.SOCK_STREAM, 0, 0)
+            socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
         err = socket.error("no address found for %s" % self._host)
         for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
+            s = socket.socket(family, socktype, proto)
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
-                s = socket.socket(family, socktype, proto)
-                s.setsockopt(socket.IPPROTO_TCP,
-                                        socket.TCP_NODELAY, 1)
                 s.connect(sockaddr)
+                break
             except socket.error, err:
                 if s is not None:
                     s.close()

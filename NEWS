@@ -22,6 +22,11 @@
   * write_pack_data has been renamed to write_pack_objects and no longer takes a
     num_objects argument. (Jelmer Vernooij)
 
+ TEST CHANGES
+
+  * If setuptools is installed, "python setup.py test" will now run the testsuite.
+    (Jelmer Vernooij)
+
 0.7.1	2011-04-12
 
  BUG FIXES

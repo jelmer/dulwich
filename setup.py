@@ -4,8 +4,10 @@
 
 try:
     from setuptools import setup, Extension
+    has_setuptools = True
 except ImportError:
     from distutils.core import setup, Extension
+    has_setuptools = False
 from distutils.core import Distribution
 
 dulwich_version_string = '0.8.0'
@@ -55,6 +57,11 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         int(version.split()[1].split('.')[0]) >= 4):
         os.environ['ARCHFLAGS'] = ''
 
+setup_kwargs = {}
+
+if has_setuptools:
+    setup_kwargs['test_suite'] = 'dulwich.tests'
+
 setup(name='dulwich',
       description='Python Git Library',
       keywords='git',
@@ -83,4 +90,5 @@ setup(name='dulwich',
               include_dirs=include_dirs),
           ],
       distclass=DulwichDistribution,
+      **setup_kwargs
       )

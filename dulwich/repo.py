@@ -1028,7 +1028,8 @@ class BaseRepo(object):
     def __delitem__(self, name):
         if name.startswith("refs") or name == "HEAD":
             del self.refs[name]
-        raise ValueError(name)
+        else:
+            raise ValueError(name)
 
     def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,

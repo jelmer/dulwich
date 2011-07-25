@@ -123,6 +123,17 @@ class RepositoryTests(TestCase):
         self.assertEquals('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                           r["refs/tags/foo"].id)
 
+    def test_delitem(self):
+        r = self._repo = open_repo('a.git')
+
+        del r['refs/heads/master']
+        self.assertRaises(KeyError, lambda: r['refs/heads/master'])
+
+        del r['HEAD']
+        self.assertRaises(KeyError, lambda: r['HEAD'])
+
+        self.assertRaises(ValueError, r.__delitem__, 'notrefs/foo')
+
     def test_get_refs(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual({

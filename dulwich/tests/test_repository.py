@@ -123,6 +123,24 @@ class RepositoryTests(TestCase):
         self.assertEquals('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                           r["refs/tags/foo"].id)
 
+    def test_delitem(self):
+        r = self._repo = open_repo('a.git')
+
+        try:
+            del r['refs/heads/master']
+            self.assertRaises(KeyError, lambda: r['refs/heads/master'])
+        except:
+            self.fail('Unexpected exception on deleting master branch')
+
+        try:
+            del r['HEAD']
+            self.assertRaises(KeyError, lambda: r['HEAD'])
+        except:
+            self.fail('Unexpected exception on deleting HEAD')
+
+        with self.assertRaises(ValueError):
+            del r['notrefs/foo']
+
     def test_get_refs(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual({

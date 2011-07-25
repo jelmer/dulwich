@@ -13,6 +13,8 @@
 
   * Fix compilation on newer versions of Mac OS X (Lion and up). (Ryan McKern, #794543)
 
+  * Prevent raising ValueError for correct refs in RefContainer.__delitem__.
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

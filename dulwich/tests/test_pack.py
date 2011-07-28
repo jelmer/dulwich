@@ -612,9 +612,9 @@ class ReadZlibTests(TestCase):
         read_zlib_chunks(self.read, self.unpacked)
         self.assertEquals(None, self.unpacked.crc32)
 
-    def _do_decompress_test(self, buffer_size):
+    def _do_decompress_test(self, buffer_size, **kwargs):
         unused = read_zlib_chunks(self.read, self.unpacked,
-                                  buffer_size=buffer_size)
+                                  buffer_size=buffer_size, **kwargs)
         self.assertEquals(self.decomp, ''.join(self.unpacked.decomp_chunks))
         self.assertEquals(len(self.comp), self.unpacked.comp_len)
         self.assertEquals(zlib.crc32(self.comp), self.unpacked.crc32)
@@ -623,6 +623,7 @@ class ReadZlibTests(TestCase):
 
     def test_simple_decompress(self):
         self._do_decompress_test(4096)
+        self.assertEqual(None, self.unpacked.comp_chunks)
 
     # These buffer sizes are not intended to be realistic, but rather simulate
     # larger buffer sizes that may end at various places.
@@ -637,6 +638,10 @@ class ReadZlibTests(TestCase):
 
     def test_decompress_buffer_size_4(self):
         self._do_decompress_test(4)
+
+    def test_decompress_include_comp(self):
+        self._do_decompress_test(4096, include_comp=True)
+        self.assertEqual(self.comp, ''.join(self.unpacked.comp_chunks))
 
 
 class DeltifyTests(TestCase):

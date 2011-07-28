@@ -50,6 +50,9 @@
 
   * Extract a compute_file_sha function. (Dave Borowitz)
 
+  * Remove move_in_thin_pack as a separate method; add_thin_pack now completes
+    the thin pack and moves it in in one step. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

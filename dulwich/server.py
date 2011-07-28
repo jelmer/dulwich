@@ -44,7 +44,6 @@ from dulwich.objects import (
     hex_to_sha,
     )
 from dulwich.pack import (
-    PackStreamCopier,
     write_pack_objects,
     )
 from dulwich.protocol import (
@@ -588,18 +587,14 @@ class ReceivePackHandler(Handler):
         return ("report-status", "delete-refs", "side-band-64k")
 
     def _apply_pack(self, refs):
-        f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
         # TODO: more informative error messages than just the exception string
         try:
-            PackStreamCopier(self.proto.read, self.proto.recv, f).verify()
-            p = commit()
-            if not p:
-                raise IOError('Failed to write pack')
-            p.check()
+            p = self.repo.object_store.add_thin_pack(self.proto.read,
+                                                     self.proto.recv)
             status.append(('unpack', 'ok'))
         except all_exceptions, e:
             status.append(('unpack', str(e).replace('\n', '')))

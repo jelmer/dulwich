@@ -1260,6 +1260,16 @@ class PackIndexer(DeltaChainIterator):
         return sha, offset, crc32
 
 
+class PackInflater(DeltaChainIterator):
+    """Delta chain iterator that yields ShaFile objects."""
+
+    def _result(self, unused_offset, type_num, chunks, unused_sha,
+                unused_crc32):
+        # TODO: If from_raw_chunks supported it, we could pass in the SHA to
+        # avoid another pass over the file.
+        return ShaFile.from_raw_chunks(type_num, chunks)
+
+
 class SHA1Reader(object):
     """Wrapper around a file-like object that remembers the SHA1 of its data."""
 
@@ -1768,10 +1778,7 @@ class Pack(object):
 
     def iterobjects(self):
         """Iterate over the objects in this pack."""
-        for offset, type, obj, crc32 in self.data.iterobjects():
-            assert isinstance(offset, int)
-            yield ShaFile.from_raw_chunks(
-              *self.data.resolve_object(offset, type, obj))
+        return iter(PackInflater.for_pack_data(self.data))
 
     def pack_tuples(self):
         """Provide an iterable for use with write_pack_objects.

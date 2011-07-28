@@ -508,17 +508,24 @@ class ReadZlibTests(TestCase):
     def test_decompress_empty(self):
         comp = zlib.compress('')
         read = StringIO(comp + self.extra).read
-        decomp, comp_len, unused_data = read_zlib_chunks(read, 0)
+        decomp, comp_len, crc32, unused_data = read_zlib_chunks(read, 0,
+                                                                crc32=0)
         self.assertEqual('', ''.join(decomp))
         self.assertEqual(len(comp), comp_len)
         self.assertNotEquals('', unused_data)
         self.assertEquals(self.extra, unused_data + read())
 
+    def test_decompress_no_crc32(self):
+        _, _, crc32, _ = read_zlib_chunks(
+          self.read, len(self.decomp), buffer_size=4096)
+        self.assertEquals(None, crc32)
+
     def _do_decompress_test(self, buffer_size):
-        decomp, comp_len, unused_data = read_zlib_chunks(
-          self.read, len(self.decomp), buffer_size=buffer_size)
+        decomp, comp_len, crc32, unused_data = read_zlib_chunks(
+          self.read, len(self.decomp), buffer_size=buffer_size, crc32=0)
         self.assertEquals(self.decomp, ''.join(decomp))
         self.assertEquals(len(self.comp), comp_len)
+        self.assertEquals(crc32, zlib.crc32(self.comp))
         self.assertNotEquals('', unused_data)
         self.assertEquals(self.extra, unused_data + self.read())
 

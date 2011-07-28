@@ -56,7 +56,6 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
-    ThinPackData,
     obj_sha,
     iter_sha1,
     load_pack_index,

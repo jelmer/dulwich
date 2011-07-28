@@ -1061,81 +1061,6 @@ class PackData(object):
         return unpack_object(self._file.read)[:2]
 
 
-class ThinPackData(PackData):
-    """PackData for thin packs, which require an ObjectStore for resolving."""
-
-    def __init__(self, resolve_ext_ref, *args, **kwargs):
-        super(ThinPackData, self).__init__(*args, **kwargs)
-        self.resolve_ext_ref = resolve_ext_ref
-
-    @classmethod
-    def from_file(cls, resolve_ext_ref, file, size):
-        return cls(resolve_ext_ref, str(file), file=file, size=size)
-
-    def get_ref(self, sha):
-        """Resolve a reference looking in both this pack and the store."""
-        try:
-            # As part of completing a pack we create a Pack object with a
-            # ThinPackData and a full PackIndex, so check in the index first if
-            # possible.
-            # TODO(dborowitz): reevaluate this when the pack completion code is
-            # rewritten.
-            return super(ThinPackData, self).get_ref(sha)
-        except KeyError:
-            type, obj = self.resolve_ext_ref(sha)
-            return None, type, obj
-
-    def iterentries(self, progress=None):
-        """Yield entries summarizing the contents of this pack.
-
-        :param progress: Progress function, called with current and
-            total object count.
-
-        This will yield tuples with (sha, offset, crc32)
-        """
-        found = {}
-        postponed = defaultdict(list)
-
-        class Postpone(Exception):
-            """Raised to postpone delta resolving."""
-
-            def __init__(self, sha):
-                self.sha = sha
-
-        def get_ref_text(sha):
-            assert len(sha) == 20
-            if sha in found:
-                offset = found[sha]
-                type, obj = self.get_object_at(offset)
-                return offset, type, obj
-            try:
-                return self.get_ref(sha)
-            except KeyError:
-                raise Postpone(sha)
-
-        extra = []
-        todo = chain(self.iterobjects(progress=progress), extra)
-        for (offset, type, obj, crc32) in todo:
-            assert isinstance(offset, int)
-            if obj is None:
-                # Inflate postponed delta
-                obj, type = self.get_object_at(offset)
-            assert isinstance(type, int)
-            assert isinstance(obj, list) or isinstance(obj, tuple)
-            try:
-                type, obj = self.resolve_object(offset, type, obj, get_ref_text)
-            except Postpone, e:
-                # Save memory by not storing the inflated obj in postponed
-                postponed[e.sha].append((offset, type, None, crc32))
-            else:
-                sha = obj_sha(type, obj)
-                found[sha] = offset
-                yield sha, offset, crc32
-                extra.extend(postponed.pop(sha, []))
-        if postponed:
-            raise KeyError([sha_to_hex(h) for h in postponed.keys()])
-
-
 class DeltaChainIterator(object):
     """Abstract iterator over pack data based on delta chains.
 
@@ -1158,8 +1083,8 @@ class DeltaChainIterator(object):
         self._ext_refs = []
 
     @classmethod
-    def for_pack_data(cls, pack_data):
-        walker = cls(None)
+    def for_pack_data(cls, pack_data, resolve_ext_ref=None):
+        walker = cls(None, resolve_ext_ref=resolve_ext_ref)
         walker.set_pack_data(pack_data)
         for offset, type_num, obj, _ in pack_data.iterobjects():
             walker.record(offset, type_num, obj)
@@ -1178,8 +1103,6 @@ class DeltaChainIterator(object):
 
     def set_pack_data(self, pack_data):
         self._file = pack_data._file
-        if isinstance(pack_data, ThinPackData):
-            self._resolve_ext_ref = pack_data.resolve_ext_ref
 
     def _walk_all_chains(self):
         for offset, type_num in self._full_ofs:

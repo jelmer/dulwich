@@ -424,6 +424,15 @@ class TestPack(PackTests):
         self.assertRaises(ChecksumMismatch, lambda:
                           bad_pack.check_length_and_checksum())
 
+    def test_iterobjects(self):
+        p = self.get_pack(pack1_sha)
+        objs = dict((o.id, o) for o in p.iterobjects())
+        self.assertEquals(3, len(objs))
+        self.assertEquals(sorted(objs), sorted(p.index))
+        self.assertTrue(isinstance(objs[a_sha], Blob))
+        self.assertTrue(isinstance(objs[tree_sha], Tree))
+        self.assertTrue(isinstance(objs[commit_sha], Commit))
+
 
 class WritePackTests(TestCase):
 

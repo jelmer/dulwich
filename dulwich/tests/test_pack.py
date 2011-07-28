@@ -378,6 +378,31 @@ class TestPack(PackTests):
         p = self.get_pack(pack1_sha)
         self.assertEquals(pack1_sha, p.name())
 
+    def test_length_mismatch(self):
+        data = self.get_pack_data(pack1_sha)
+        index = self.get_pack_index(pack1_sha)
+        self.assertTrue(Pack.from_objects(data, index).data)
+
+        data._file.seek(12)
+        bad_file = StringIO()
+        write_pack_header(bad_file, 9999)
+        bad_file.write(data._file.read())
+        bad_file = StringIO(bad_file.getvalue())
+        bad_data = PackData('', file=bad_file)
+        bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+        self.assertRaises(AssertionError, lambda: bad_pack.data)
+
+    def test_checksum_mismatch(self):
+        data = self.get_pack_data(pack1_sha)
+        index = self.get_pack_index(pack1_sha)
+        self.assertTrue(Pack.from_objects(data, index).data)
+
+        data._file.seek(0)
+        bad_file = StringIO(data._file.read()[:-20] + ('\xff' * 20))
+        bad_data = PackData('', file=bad_file)
+        bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+        self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
+
 
 class WritePackTests(TestCase):
 

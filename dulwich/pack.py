@@ -1081,6 +1081,7 @@ class DeltaChainIterator(object):
         self._pending_ref = defaultdict(list)
         self._full_ofs = []
         self._shas = {}
+        self._ext_refs = []
 
     @classmethod
     def for_pack_data(cls, pack_data):
@@ -1131,6 +1132,7 @@ class DeltaChainIterator(object):
                 # popped via a _follow_chain call, or we will raise an error
                 # below.
                 continue
+            self._ext_refs.append(base_sha)
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
                 for result in self._follow_chain(new_offset, type_num, chunks):
@@ -1170,6 +1172,9 @@ class DeltaChainIterator(object):
 
     def __iter__(self):
         return self._walk_all_chains()
+
+    def ext_refs(self):
+        return self._ext_refs
 
 
 class PackIndexer(DeltaChainIterator):

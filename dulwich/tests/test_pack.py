@@ -788,7 +788,9 @@ class DeltaChainIteratorTests(TestCase):
     def test_ext_ref(self):
         blob, = self.store_blobs(['blob'])
         f, entries = self.write_pack_data([(REF_DELTA, (blob.id, 'blob1'))])
-        self.assertEntriesMatch([0], entries, self.make_pack_iter(f))
+        pack_iter = self.make_pack_iter(f)
+        self.assertEntriesMatch([0], entries, pack_iter)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_chain(self):
         blob, = self.store_blobs(['blob'])
@@ -796,7 +798,9 @@ class DeltaChainIteratorTests(TestCase):
           (REF_DELTA, (1, 'blob2')),
           (REF_DELTA, (blob.id, 'blob1')),
           ])
-        self.assertEntriesMatch([1, 0], entries, self.make_pack_iter(f))
+        pack_iter = self.make_pack_iter(f)
+        self.assertEntriesMatch([1, 0], entries, pack_iter)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_multiple_times(self):
         blob, = self.store_blobs(['blob'])
@@ -804,7 +808,9 @@ class DeltaChainIteratorTests(TestCase):
           (REF_DELTA, (blob.id, 'blob1')),
           (REF_DELTA, (blob.id, 'blob2')),
           ])
-        self.assertEntriesMatch([0, 1], entries, self.make_pack_iter(f))
+        pack_iter = self.make_pack_iter(f)
+        self.assertEntriesMatch([0, 1], entries, pack_iter)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_multiple_ext_refs(self):
         b1, b2 = self.store_blobs(['foo', 'bar'])
@@ -812,7 +818,10 @@ class DeltaChainIteratorTests(TestCase):
           (REF_DELTA, (b1.id, 'foo1')),
           (REF_DELTA, (b2.id, 'bar2')),
           ])
-        self.assertEntriesMatch([0, 1], entries, self.make_pack_iter(f))
+        pack_iter = self.make_pack_iter(f)
+        self.assertEntriesMatch([0, 1], entries, pack_iter)
+        self.assertEqual([hex_to_sha(b1.id), hex_to_sha(b2.id)],
+                         pack_iter.ext_refs())
 
     def test_bad_ext_ref_non_thin_pack(self):
         blob, = self.store_blobs(['blob'])

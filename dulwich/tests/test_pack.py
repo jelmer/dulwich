@@ -57,6 +57,7 @@ from dulwich.pack import (
     create_delta,
     deltify_pack_objects,
     load_pack_index,
+    UnpackedObject,
     read_zlib_chunks,
     write_pack_header,
     write_pack_index_v1,
@@ -436,8 +437,13 @@ class WritePackTests(TestCase):
         f.write('x')  # unpack_object needs extra trailing data.
         f.seek(offset)
         comp_len = len(f.getvalue()) - offset - 1
-        self.assertEqual((Blob.type_num, ['blob'], comp_len, crc32, 'x'),
-                         unpack_object(f.read, compute_crc32=True))
+        unpacked, unused = unpack_object(f.read, compute_crc32=True)
+        self.assertEqual(Blob.type_num, unpacked.pack_type_num)
+        self.assertEqual(Blob.type_num, unpacked.obj_type_num)
+        self.assertEqual(['blob'], unpacked.decomp_chunks)
+        self.assertEqual(comp_len, unpacked.comp_len)
+        self.assertEqual(crc32, unpacked.crc32)
+        self.assertEqual('x', unused)
 
     def test_write_pack_object_sha(self):
         f = StringIO()
@@ -570,45 +576,50 @@ class ReadZlibTests(TestCase):
     def setUp(self):
         super(ReadZlibTests, self).setUp()
         self.read = StringIO(self.comp + self.extra).read
+        self.unpacked = UnpackedObject(Tree.type_num, None, len(self.decomp), 0)
 
     def test_decompress_size(self):
         good_decomp_len = len(self.decomp)
-        self.assertRaises(ValueError, read_zlib_chunks, self.read, -1)
+        self.unpacked.decomp_len = -1
+        self.assertRaises(ValueError, read_zlib_chunks, self.read,
+                          self.unpacked)
+        self.unpacked.decomp_len = good_decomp_len - 1
         self.assertRaises(zlib.error, read_zlib_chunks, self.read,
-                          good_decomp_len - 1)
+                          self.unpacked)
+        self.unpacked.decomp_len = good_decomp_len + 1
         self.assertRaises(zlib.error, read_zlib_chunks, self.read,
-                          good_decomp_len + 1)
+                          self.unpacked)
 
     def test_decompress_truncated(self):
         read = StringIO(self.comp[:10]).read
-        self.assertRaises(zlib.error, read_zlib_chunks, read, len(self.decomp))
+        self.assertRaises(zlib.error, read_zlib_chunks, read, self.unpacked)
 
         read = StringIO(self.comp).read
-        self.assertRaises(zlib.error, read_zlib_chunks, read, len(self.decomp))
+        self.assertRaises(zlib.error, read_zlib_chunks, read, self.unpacked)
 
     def test_decompress_empty(self):
+        unpacked = UnpackedObject(Tree.type_num, None, 0, None)
         comp = zlib.compress('')
         read = StringIO(comp + self.extra).read
-        decomp, comp_len, crc32, unused_data = read_zlib_chunks(read, 0,
-                                                                crc32=0)
-        self.assertEqual('', ''.join(decomp))
-        self.assertEqual(len(comp), comp_len)
-        self.assertNotEquals('', unused_data)
-        self.assertEquals(self.extra, unused_data + read())
+        unused = read_zlib_chunks(read, unpacked)
+        self.assertEqual('', ''.join(unpacked.decomp_chunks))
+        self.assertEqual(len(comp), unpacked.comp_len)
+        self.assertNotEquals('', unused)
+        self.assertEquals(self.extra, unused + read())
 
     def test_decompress_no_crc32(self):
-        _, _, crc32, _ = read_zlib_chunks(
-          self.read, len(self.decomp), buffer_size=4096)
-        self.assertEquals(None, crc32)
+        self.unpacked.crc32 = None
+        read_zlib_chunks(self.read, self.unpacked)
+        self.assertEquals(None, self.unpacked.crc32)
 
     def _do_decompress_test(self, buffer_size):
-        decomp, comp_len, crc32, unused_data = read_zlib_chunks(
-          self.read, len(self.decomp), buffer_size=buffer_size, crc32=0)
-        self.assertEquals(self.decomp, ''.join(decomp))
-        self.assertEquals(len(self.comp), comp_len)
-        self.assertEquals(crc32, zlib.crc32(self.comp))
-        self.assertNotEquals('', unused_data)
-        self.assertEquals(self.extra, unused_data + self.read())
+        unused = read_zlib_chunks(self.read, self.unpacked,
+                                  buffer_size=buffer_size)
+        self.assertEquals(self.decomp, ''.join(self.unpacked.decomp_chunks))
+        self.assertEquals(len(self.comp), self.unpacked.comp_len)
+        self.assertEquals(zlib.crc32(self.comp), self.unpacked.crc32)
+        self.assertNotEquals('', unused)
+        self.assertEquals(self.extra, unused + self.read())
 
     def test_simple_decompress(self):
         self._do_decompress_test(4096)
@@ -668,23 +679,27 @@ class TestPackStreamReader(TestCase):
         objects = list(reader.read_objects(compute_crc32=True))
         self.assertEqual(2, len(objects))
 
-        blob, delta = objects
-        bofs, btype, buncomp, blen, bcrc = blob
-        dofs, dtype, duncomp, dlen, dcrc = delta
+        unpacked_blob, unpacked_delta = objects
 
-        self.assertEqual(entries[0][0], bofs)
-        self.assertEqual(Blob.type_num, btype)
-        self.assertEqual('blob', ''.join(buncomp))
-        self.assertEqual(dofs - bofs, blen)
-        self.assertEqual(entries[0][4], bcrc)
+        self.assertEqual(entries[0][0], unpacked_blob.offset)
+        self.assertEqual(Blob.type_num, unpacked_blob.pack_type_num)
+        self.assertEqual(Blob.type_num, unpacked_blob.obj_type_num)
+        self.assertEqual(None, unpacked_blob.delta_base)
+        self.assertEqual('blob', ''.join(unpacked_blob.decomp_chunks))
+        self.assertEqual(unpacked_delta.offset - unpacked_blob.offset,
+                         unpacked_blob.comp_len)
+        self.assertEqual(entries[0][4], unpacked_blob.crc32)
 
-        self.assertEqual(entries[1][0], dofs)
-        self.assertEqual(OFS_DELTA, dtype)
-        delta_ofs, delta_chunks = duncomp
-        self.assertEqual(dofs - bofs, delta_ofs)
-        self.assertEqual(create_delta('blob', 'blob1'), ''.join(delta_chunks))
-        self.assertEqual(len(f.getvalue()) - 20 - dofs, dlen)
-        self.assertEqual(entries[1][4], dcrc)
+        self.assertEqual(entries[1][0], unpacked_delta.offset)
+        self.assertEqual(OFS_DELTA, unpacked_delta.pack_type_num)
+        self.assertEqual(None, unpacked_delta.obj_type_num)
+        self.assertEqual(unpacked_delta.offset - unpacked_blob.offset,
+                         unpacked_delta.delta_base)
+        self.assertEqual(create_delta('blob', 'blob1'),
+                         ''.join(unpacked_delta.decomp_chunks))
+        self.assertEqual(len(f.getvalue()) - 20 - unpacked_delta.offset,
+                         unpacked_delta.comp_len)
+        self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):
         f = StringIO()
@@ -702,19 +717,19 @@ class TestPackIterator(DeltaChainIterator):
 
     def __init__(self, *args, **kwargs):
         super(TestPackIterator, self).__init__(*args, **kwargs)
-        self._unpacked = set()
+        self._unpacked_offsets = set()
 
-    def _result(self, offset, type_num, chunks, sha, crc32):
+    def _result(self, unpacked):
         """Return entries in the same format as build_pack."""
-        return offset, type_num, ''.join(chunks), sha, crc32
+        return (unpacked.offset, unpacked.obj_type_num,
+                ''.join(unpacked.obj_chunks), unpacked.sha(), unpacked.crc32)
 
-    def _resolve_object(self, offset, base_type_num, base_chunks):
-        assert offset not in self._unpacked, ('Attempted to re-inflate offset '
-                                              '%i' % offset)
-        self._unpacked.add(offset)
+    def _resolve_object(self, offset, pack_type_num, base_chunks):
+        assert offset not in self._unpacked_offsets, (
+                'Attempted to re-inflate offset %i' % offset)
+        self._unpacked_offsets.add(offset)
         return super(TestPackIterator, self)._resolve_object(
-          offset, base_type_num, base_chunks)
-
+          offset, pack_type_num, base_chunks)
 
 
 class DeltaChainIteratorTests(TestCase):

@@ -712,6 +712,7 @@ class PackStreamReader(object):
         :param compute_crc32: If True, compute the CRC32 of the compressed
             data. If False, the returned CRC32 will be None.
         :return: Iterator over tuples of (
+            offset,
             type number,
             list of uncompressed chunks,
             length of compressed data,
@@ -725,9 +726,10 @@ class PackStreamReader(object):
         """
         pack_version, self._num_objects = read_pack_header(self.read)
         for i in xrange(self._num_objects):
+            offset = self.offset
             type_num, uncomp, comp_len, crc32, unused = unpack_object(
               self.read, read_some=self.recv, compute_crc32=compute_crc32)
-            yield type_num, uncomp, comp_len, crc32
+            yield offset, type_num, uncomp, comp_len, crc32
 
             # prepend any unused data to current read buffer
             buf = StringIO()

@@ -1661,12 +1661,7 @@ class Pack(object):
         if self._data is None:
             self._data = self._data_load()
             self._data.pack = self
-            assert len(self.index) == len(self._data)
-            idx_stored_checksum = self.index.get_pack_checksum()
-            data_stored_checksum = self._data.get_stored_checksum()
-            if idx_stored_checksum != data_stored_checksum:
-                raise ChecksumMismatch(sha_to_hex(idx_stored_checksum),
-                                       sha_to_hex(data_stored_checksum))
+            self.check_length_and_checksum()
         return self._data
 
     @property
@@ -1697,6 +1692,15 @@ class Pack(object):
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""
         return iter(self.index)
+
+    def check_length_and_checksum(self):
+        """Sanity check the length and checksum of the pack index and data."""
+        assert len(self.index) == len(self.data)
+        idx_stored_checksum = self.index.get_pack_checksum()
+        data_stored_checksum = self.data.get_stored_checksum()
+        if idx_stored_checksum != data_stored_checksum:
+            raise ChecksumMismatch(sha_to_hex(idx_stored_checksum),
+                                   sha_to_hex(data_stored_checksum))
 
     def check(self):
         """Check the integrity of this pack.

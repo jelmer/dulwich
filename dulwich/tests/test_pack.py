@@ -49,6 +49,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
+    DELTA_TYPES,
     MemoryPackIndex,
     Pack,
     PackData,
@@ -66,6 +67,7 @@ from dulwich.pack import (
     write_pack,
     unpack_object,
     compute_file_sha,
+    PackStreamReader,
     DeltaChainIterator,
     )
 from dulwich.tests import (
@@ -653,6 +655,52 @@ class DeltifyTests(TestCase):
             (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta)
             ],
             list(deltify_pack_objects([(b1, ""), (b2, "")])))
+
+
+class TestPackStreamReader(TestCase):
+
+    def test_read_objects_emtpy(self):
+        f = StringIO()
+        build_pack(f, [])
+        reader = PackStreamReader(f.read)
+        self.assertEqual(0, len(list(reader.read_objects())))
+
+    def test_read_objects(self):
+        f = StringIO()
+        entries = build_pack(f, [
+          (Blob.type_num, 'blob'),
+          (OFS_DELTA, (0, 'blob1')),
+          ])
+        reader = PackStreamReader(f.read)
+        objects = list(reader.read_objects(compute_crc32=True))
+        self.assertEqual(2, len(objects))
+
+        blob, delta = objects
+        bofs, btype, buncomp, blen, bcrc = blob
+        dofs, dtype, duncomp, dlen, dcrc = delta
+
+        self.assertEqual(entries[0][0], bofs)
+        self.assertEqual(Blob.type_num, btype)
+        self.assertEqual('blob', ''.join(buncomp))
+        self.assertEqual(dofs - bofs, blen)
+        self.assertEqual(entries[0][4], bcrc)
+
+        self.assertEqual(entries[1][0], dofs)
+        self.assertEqual(OFS_DELTA, dtype)
+        delta_ofs, delta_chunks = duncomp
+        self.assertEqual(dofs - bofs, delta_ofs)
+        self.assertEqual(create_delta('blob', 'blob1'), ''.join(delta_chunks))
+        self.assertEqual(len(f.getvalue()) - 20 - dofs, dlen)
+        self.assertEqual(entries[1][4], dcrc)
+
+    def test_read_objects_buffered(self):
+        f = StringIO()
+        build_pack(f, [
+          (Blob.type_num, 'blob'),
+          (OFS_DELTA, (0, 'blob1')),
+          ])
+        reader = PackStreamReader(f.read, zlib_bufsize=4)
+        self.assertEqual(2, len(list(reader.read_objects())))
 
 
 class TestPackIterator(DeltaChainIterator):

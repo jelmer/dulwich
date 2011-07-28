@@ -2,8 +2,8 @@
 
  FEATURES
 
-  * New DeltaChainIterator abstract class for quickly inflating/iterating all
-    objects in a pack. (Dave Borowitz)
+  * New DeltaChainIterator abstract class for quickly iterating all objects in
+    a pack, with an implementation for pack indexing. (Dave Borowitz)
 
  BUG FIXES
 

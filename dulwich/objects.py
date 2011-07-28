@@ -41,7 +41,7 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich._compat import (
     make_sha,
-    TreeEntryTuple,
+    namedtuple,
     )
 
 ZERO_SHA = "0" * 40
@@ -688,8 +688,8 @@ class Tag(ShaFile):
     message = serializable_property("message", "The message attached to this tag")
 
 
-class TreeEntry(TreeEntryTuple):
-    """Namedtuple encapsulating a single tree entry."""
+class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
+    """Named tuple encapsulating a single tree entry."""
 
     def in_path(self, path):
         """Return a copy of this entry with the given path prepended."""

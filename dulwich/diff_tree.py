@@ -24,7 +24,7 @@ import stat
 
 from dulwich._compat import (
     defaultdict,
-    TreeChangeTuple,
+    namedtuple,
     )
 from dulwich.objects import (
     S_ISGITLINK,
@@ -47,8 +47,8 @@ _MAX_FILES = 200
 _REWRITE_THRESHOLD = None
 
 
-class TreeChange(TreeChangeTuple):
-    """Class encapsulating a single change between two trees."""
+class TreeChange(namedtuple('TreeChange', ['type', 'old', 'new'])):
+    """Named tuple a single change between two trees."""
 
     @classmethod
     def add(cls, new):

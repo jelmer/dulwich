@@ -29,6 +29,9 @@
     crc32 to compute, and each return an additional crc32 element in their
     return values. (Dave Borowitz)
 
+  * PackObjectIterator was removed; its functionality is still exposed by
+    PackData.iterobjects. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

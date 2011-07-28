@@ -44,7 +44,7 @@ from dulwich.objects import (
     hex_to_sha,
     )
 from dulwich.pack import (
-    PackStreamReader,
+    PackStreamCopier,
     write_pack_objects,
     )
 from dulwich.protocol import (
@@ -116,48 +116,6 @@ class BackendRepo(object):
             sha for including tags.
         """
         raise NotImplementedError
-
-
-class PackStreamCopier(PackStreamReader):
-    """Class to verify a pack stream as it is being read.
-
-    The pack is read from a ReceivableProtocol using read() or recv() as
-    appropriate and written out to the given file-like object.
-    """
-
-    def __init__(self, read_all, read_some, outfile, delta_iter=None):
-        """Initialize the copier.
-
-        :param read_all: Read function that blocks until the number of requested
-            bytes are read.
-        :param read_some: Read function that returns at least one byte, but may
-            not return the number of bytes requested.
-        :param outfile: File-like object to write output through.
-        :param delta_iter: Optional DeltaChainIterator to record deltas as we
-            read them.
-        """
-        super(PackStreamCopier, self).__init__(read_all, read_some=read_some)
-        self.outfile = outfile
-        self._delta_iter = delta_iter
-
-    def _read(self, read, size):
-        """Read data from the read callback and write it to the file."""
-        data = super(PackStreamCopier, self)._read(read, size)
-        self.outfile.write(data)
-        return data
-
-    def verify(self):
-        """Verify a pack stream and write it to the output file.
-
-        See PackStreamReader.iterobjects for a list of exceptions this may
-        throw.
-        """
-        if self._delta_iter:
-            for offset, type_num, uncomp, _, _ in self.read_objects():
-                self._delta_iter.record(offset, type_num, uncomp)
-        else:
-            for _ in self.read_objects():
-                pass
 
 
 class DictBackend(Backend):

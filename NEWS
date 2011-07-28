@@ -53,6 +53,8 @@
   * Remove move_in_thin_pack as a separate method; add_thin_pack now completes
     the thin pack and moves it in in one step. (Dave Borowitz)
 
+  * Custom buffer size in read_zlib_chunks. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

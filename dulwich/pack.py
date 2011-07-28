@@ -108,7 +108,11 @@ def take_msb_bytes(read, crc32=None):
     return ret, crc32
 
 
-def read_zlib_chunks(read_some, dec_size, buffer_size=4096, crc32=None):
+_ZLIB_BUFSIZE = 4096
+
+
+def read_zlib_chunks(read_some, dec_size, buffer_size=_ZLIB_BUFSIZE,
+                     crc32=None):
     """Read zlib data from a buffer.
 
     This function requires that the buffer have additional data following the
@@ -556,7 +560,8 @@ def chunks_length(chunks):
     return sum(imap(len, chunks))
 
 
-def unpack_object(read_all, read_some=None, compute_crc32=False):
+def unpack_object(read_all, read_some=None, compute_crc32=False,
+                  zlib_bufsize=_ZLIB_BUFSIZE):
     """Unpack a Git object.
 
     :param read_all: Read function that blocks until the number of requested
@@ -565,6 +570,7 @@ def unpack_object(read_all, read_some=None, compute_crc32=False):
         return the number of bytes requested.
     :param compute_crc32: If True, compute the CRC32 of the compressed data. If
         False, the returned CRC32 will be None.
+    :param zlib_bufsize: An optional buffer size for zlib operations.
     :return: A tuple of (
         type number,
         uncompressed data,
@@ -606,8 +612,8 @@ def unpack_object(read_all, read_some=None, compute_crc32=False):
     else:
         base = None
 
-    uncomp, comp_len, crc32, unused = read_zlib_chunks(read_some, size,
-                                                       crc32=crc32)
+    uncomp, comp_len, crc32, unused = read_zlib_chunks(
+      read_some, size, crc32=crc32, buffer_size=zlib_bufsize)
     if compute_crc32:
         crc32 &= 0xffffffff
     comp_len += raw_base
@@ -631,7 +637,7 @@ class PackStreamReader(object):
     appropriate.
     """
 
-    def __init__(self, read_all, read_some=None):
+    def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE):
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -642,6 +648,7 @@ class PackStreamReader(object):
         self._rbuf = StringIO()
         # trailer is a deque to avoid memory allocation on small reads
         self._trailer = deque()
+        self._zlib_bufsize = zlib_bufsize
 
     def _read(self, read, size):
         """Read up to size bytes using the given callback.
@@ -729,7 +736,8 @@ class PackStreamReader(object):
         for i in xrange(self._num_objects):
             offset = self.offset
             type_num, uncomp, comp_len, crc32, unused = unpack_object(
-              self.read, read_some=self.recv, compute_crc32=compute_crc32)
+              self.read, read_some=self.recv, compute_crc32=compute_crc32,
+              zlib_bufsize=self._zlib_bufsize)
             yield offset, type_num, uncomp, comp_len, crc32
 
             # prepend any unused data to current read buffer

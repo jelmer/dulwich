@@ -127,7 +127,6 @@ class UnpackedObject(object):
       'pack_type_num',  # Type of this object in the pack (may be a delta).
       'delta_base',     # Delta base offset or SHA.
       'comp_chunks',    # Compressed object chunks.
-      'comp_len',       # Compressed length of this object.
       'decomp_chunks',  # Decompressed object chunks.
       'decomp_len',     # Decompressed length of this object.
       'crc32',          # CRC32.
@@ -140,7 +139,6 @@ class UnpackedObject(object):
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
         self.comp_chunks = None
-        self.comp_len = None
         self.decomp_chunks = []
         self.decomp_len = decomp_len
         self.crc32 = crc32
@@ -203,7 +201,6 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
         using this starting CRC32.
         After this function, will have the following attrs set:
             comp_chunks    (if include_comp is True)
-            comp_len
             decomp_chunks
             decomp_len
             crc32
@@ -219,7 +216,6 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
     comp_chunks = []
     decomp_chunks = unpacked.decomp_chunks
     decomp_len = 0
-    comp_len = 0
     crc32 = unpacked.crc32
 
     while True:
@@ -227,14 +223,12 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
         if not add:
             raise zlib.error('EOF before end of zlib stream')
         comp_chunks.append(add)
-        comp_len += len(add)
         decomp = decomp_obj.decompress(add)
         decomp_len += len(decomp)
         decomp_chunks.append(decomp)
         unused = decomp_obj.unused_data
         if unused:
             left = len(unused)
-            comp_len -= left
             if crc32 is not None:
                 crc32 = binascii.crc32(add[:-left], crc32)
             if include_comp:
@@ -248,7 +242,6 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
     if decomp_len != unpacked.decomp_len:
         raise zlib.error('decompressed data does not match expected size')
 
-    unpacked.comp_len = comp_len
     unpacked.crc32 = crc32
     if include_comp:
         unpacked.comp_chunks = comp_chunks
@@ -672,7 +665,6 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
             pack_type_num
             delta_base     (for delta types)
             comp_chunks    (if include_comp is True)
-            comp_len
             decomp_chunks
             decomp_len
             crc32          (if compute_crc32 is True)
@@ -712,7 +704,6 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
     unpacked = UnpackedObject(type_num, delta_base, size, crc32)
     unused = read_zlib_chunks(read_some, unpacked, buffer_size=zlib_bufsize,
                               include_comp=include_comp)
-    unpacked.comp_len += raw_base
     return unpacked, unused
 
 
@@ -817,7 +808,6 @@ class PackStreamReader(object):
             obj_type_num
             obj_chunks (for non-delta types)
             delta_base (for delta types)
-            comp_len
             decomp_chunks
             decomp_len
             crc32 (if compute_crc32 is True)
@@ -1052,27 +1042,28 @@ class PackData(object):
         return type, chunks
 
     def iterobjects(self, progress=None, compute_crc32=True):
-        offset = self._header_size
+        self._file.seek(self._header_size)
         for i in xrange(1, self._num_objects + 1):
-            self._file.seek(offset)  # Back up over unused data.
-            unpacked, _ = unpack_object(
+            offset = self._file.tell()
+            unpacked, unused = unpack_object(
               self._file.read, compute_crc32=compute_crc32)
             if progress is not None:
                 progress(i, self._num_objects)
             yield (offset, unpacked.pack_type_num, unpacked._obj(),
                    unpacked.crc32)
-            offset += unpacked.comp_len
+            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
 
     def _iter_unpacked(self):
         # TODO(dborowitz): Merge this with iterobjects, if we can change its
         # return type.
-        offset = self._header_size
+        self._file.seek(self._header_size)
         for _ in xrange(self._num_objects):
-            self._file.seek(offset)  # Back up over unused data.
-            unpacked, _ = unpack_object(self._file.read, compute_crc32=False)
+            offset = self._file.tell()
+            unpacked, unused = unpack_object(
+              self._file.read, compute_crc32=False)
             unpacked.offset = offset
             yield unpacked
-            offset += unpacked.comp_len
+            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
 
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
@@ -1185,7 +1176,6 @@ class DeltaChainIterator(object):
         pack_type_num
         delta_base     (for delta types)
         comp_chunks    (if _include_comp is True)
-        comp_len
         decomp_chunks
         decomp_len
         crc32          (if _compute_crc32 is True)

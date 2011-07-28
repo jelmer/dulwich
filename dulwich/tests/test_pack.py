@@ -441,7 +441,6 @@ class WritePackTests(TestCase):
         self.assertEqual(Blob.type_num, unpacked.pack_type_num)
         self.assertEqual(Blob.type_num, unpacked.obj_type_num)
         self.assertEqual(['blob'], unpacked.decomp_chunks)
-        self.assertEqual(comp_len, unpacked.comp_len)
         self.assertEqual(crc32, unpacked.crc32)
         self.assertEqual('x', unused)
 
@@ -603,7 +602,6 @@ class ReadZlibTests(TestCase):
         read = StringIO(comp + self.extra).read
         unused = read_zlib_chunks(read, unpacked)
         self.assertEqual('', ''.join(unpacked.decomp_chunks))
-        self.assertEqual(len(comp), unpacked.comp_len)
         self.assertNotEquals('', unused)
         self.assertEquals(self.extra, unused + read())
 
@@ -616,7 +614,6 @@ class ReadZlibTests(TestCase):
         unused = read_zlib_chunks(self.read, self.unpacked,
                                   buffer_size=buffer_size, **kwargs)
         self.assertEquals(self.decomp, ''.join(self.unpacked.decomp_chunks))
-        self.assertEquals(len(self.comp), self.unpacked.comp_len)
         self.assertEquals(zlib.crc32(self.comp), self.unpacked.crc32)
         self.assertNotEquals('', unused)
         self.assertEquals(self.extra, unused + self.read())
@@ -691,8 +688,6 @@ class TestPackStreamReader(TestCase):
         self.assertEqual(Blob.type_num, unpacked_blob.obj_type_num)
         self.assertEqual(None, unpacked_blob.delta_base)
         self.assertEqual('blob', ''.join(unpacked_blob.decomp_chunks))
-        self.assertEqual(unpacked_delta.offset - unpacked_blob.offset,
-                         unpacked_blob.comp_len)
         self.assertEqual(entries[0][4], unpacked_blob.crc32)
 
         self.assertEqual(entries[1][0], unpacked_delta.offset)
@@ -700,10 +695,8 @@ class TestPackStreamReader(TestCase):
         self.assertEqual(None, unpacked_delta.obj_type_num)
         self.assertEqual(unpacked_delta.offset - unpacked_blob.offset,
                          unpacked_delta.delta_base)
-        self.assertEqual(create_delta('blob', 'blob1'),
-                         ''.join(unpacked_delta.decomp_chunks))
-        self.assertEqual(len(f.getvalue()) - 20 - unpacked_delta.offset,
-                         unpacked_delta.comp_len)
+        delta = create_delta('blob', 'blob1')
+        self.assertEqual(delta, ''.join(unpacked_delta.decomp_chunks))
         self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):

@@ -254,7 +254,3 @@ except ImportError:
             pass
 
         return result
-
-
-TreeEntryTuple = namedtuple('TreeEntryTuple', ['path', 'mode', 'sha'])
-TreeChangeTuple = namedtuple('TreeChangeTuple', ['type', 'old', 'new'])

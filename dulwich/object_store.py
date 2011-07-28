@@ -540,7 +540,8 @@ class MemoryObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
-        return self[name].as_raw_string()
+        obj = self[name]
+        return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
         return self._data[name]

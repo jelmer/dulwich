@@ -178,6 +178,11 @@ class ObjectStoreTests(object):
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual(testobject, self.store.peel_sha(obj.id))
 
+    def test_get_raw(self):
+        self.store.add_object(testobject)
+        self.assertEqual((Blob.type_num, 'yummy data'),
+                         self.store.get_raw(testobject.id))
+
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 

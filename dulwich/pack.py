@@ -35,6 +35,7 @@ try:
 except ImportError:
     from dulwich._compat import defaultdict
 
+import binascii
 from cStringIO import (
     StringIO,
     )
@@ -92,18 +93,21 @@ REF_DELTA = 7
 DELTA_TYPES = (OFS_DELTA, REF_DELTA)
 
 
-def take_msb_bytes(read):
+def take_msb_bytes(read, crc32=None):
     """Read bytes marked with most significant bit.
 
     :param read: Read function
     """
     ret = []
     while len(ret) == 0 or ret[-1] & 0x80:
-        ret.append(ord(read(1)))
-    return ret
+        b = read(1)
+        if crc32 is not None:
+            crc32 = binascii.crc32(b, crc32)
+        ret.append(ord(b))
+    return ret, crc32
 
 
-def read_zlib_chunks(read_some, dec_size, buffer_size=4096):
+def read_zlib_chunks(read_some, dec_size, buffer_size=4096, crc32=None):
     """Read zlib data from a buffer.
 
     This function requires that the buffer have additional data following the
@@ -113,28 +117,44 @@ def read_zlib_chunks(read_some, dec_size, buffer_size=4096):
         return less than the requested size
     :param dec_size: Expected size of the decompressed buffer
     :param buffer_size: Size of the read buffer
-    :return: Tuple with list of chunks, length of compressed data length and
-        and unused read data.
+    :param crc32: If not None, the CRC32 of the compressed bytes will be
+        computed using this starting CRC32. If False, CRC32 computations will
+        not be done, and the returned CRC32 will be None.
+    :return: Tuple of (
+        list of uncompressed chunks,
+        length of compressed data,
+        crc32 of compressed data,
+        unused read data,
+        ).
     :raise zlib.error: if a decompression error occurred.
     """
     if dec_size <= -1:
         raise ValueError('non-negative zlib data stream size expected')
     obj = zlib.decompressobj()
     ret = []
-    fed = 0
     size = 0
-    while obj.unused_data == '':
+    comp_size = 0
+    while True:
         add = read_some(buffer_size)
         if not add:
             raise zlib.error('EOF before end of zlib stream')
-        fed += len(add)
+        comp_size += len(add)
         decomp = obj.decompress(add)
         size += len(decomp)
         ret.append(decomp)
+        unused = obj.unused_data
+        if unused:
+            left = len(unused)
+            comp_size -= left
+            if crc32 is not None:
+                crc32 = binascii.crc32(add[:-left], crc32)
+            break
+        elif crc32 is not None:
+            crc32 = binascii.crc32(add, crc32)
+
     if size != dec_size:
         raise zlib.error('decompressed data does not match expected size')
-    comp_len = fed - len(obj.unused_data)
-    return ret, comp_len, obj.unused_data
+    return ret, comp_size, crc32, unused
 
 
 def iter_sha1(iter):
@@ -535,26 +555,40 @@ def chunks_length(chunks):
     return sum(imap(len, chunks))
 
 
-def unpack_object(read_all, read_some=None):
+def unpack_object(read_all, read_some=None, compute_crc32=False):
     """Unpack a Git object.
 
     :param read_all: Read function that blocks until the number of requested
         bytes are read.
     :param read_some: Read function that returns at least one byte, but may not
         return the number of bytes requested.
-    :return: A tuple of (type number, uncompressed data,
-        length of compressed data, compressed data, unused read data).
+    :param compute_crc32: If True, compute the CRC32 of the compressed data. If
+        False, the returned CRC32 will be None.
+    :return: A tuple of (
+        type number,
+        uncompressed data,
+        length of compressed data,
+        CRC32 of compressed data,
+        unused read data,
+        ).
+        For delta types, the uncompressed data is a tuple of
+        (base, uncompressed chunks).
     """
     if read_some is None:
         read_some = read_all
-    bytes = take_msb_bytes(read_all)
+    if compute_crc32:
+        crc32 = 0
+    else:
+        crc32 = None
+
+    bytes, crc32 = take_msb_bytes(read_all, crc32=crc32)
     type_num = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
     if type_num == OFS_DELTA:
-        bytes = take_msb_bytes(read_all)
+        bytes, crc32 = take_msb_bytes(read_all, crc32=crc32)
         raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
         delta_base_offset = bytes[0] & 0x7f
@@ -565,16 +599,21 @@ def unpack_object(read_all, read_some=None):
         base = delta_base_offset
     elif type_num == REF_DELTA:
         base = read_all(20)
+        if compute_crc32:
+            crc32 = binascii.crc32(base, crc32)
         raw_base += 20
     else:
         base = None
 
-    uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
+    uncomp, comp_len, crc32, unused = read_zlib_chunks(read_some, size,
+                                                       crc32=crc32)
+    if compute_crc32:
+        crc32 &= 0xffffffff
     comp_len += raw_base
     if base is None:
-        return type_num, uncomp, comp_len, unused
+        return type_num, uncomp, comp_len, crc32, unused
     else:
-        return type_num, (base, uncomp), comp_len, unused
+        return type_num, (base, uncomp), comp_len, crc32, unused
 
 
 def _compute_object_size((num, obj)):
@@ -667,9 +706,17 @@ class PackStreamReader(object):
     def __len__(self):
         return self._num_objects
 
-    def read_objects(self):
+    def read_objects(self, compute_crc32=False):
         """Read the objects in this pack file.
 
+        :param compute_crc32: If True, compute the CRC32 of the compressed
+            data. If False, the returned CRC32 will be None.
+        :yield: Tuples of (
+            type number,
+            list of uncompressed chunks,
+            length of compressed data,
+            crc32 of compressed data,
+            ).
         :raise AssertionError: if there is an error in the pack format.
         :raise ChecksumMismatch: if the checksum of the pack contents does not
             match the checksum in the pack trailer.
@@ -678,8 +725,9 @@ class PackStreamReader(object):
         """
         pack_version, self._num_objects = read_pack_header(self.read)
         for i in xrange(self._num_objects):
-            type, uncomp, comp_len, unused = unpack_object(self.read, self.recv)
-            yield type, uncomp, comp_len
+            type_num, uncomp, comp_len, crc32, unused = unpack_object(
+              self.read, read_some=self.recv, compute_crc32=compute_crc32)
+            yield type_num, uncomp, comp_len, crc32
 
             # prepend any unused data to current read buffer
             buf = StringIO()
@@ -712,11 +760,10 @@ class PackObjectIterator(object):
     def next(self):
         if self.i == self.num:
             raise StopIteration
-        self.map.seek(self.offset)
-        (type, obj, total_size, unused) = unpack_object(self.map.read)
-        self.map.seek(self.offset)
-        crc32 = zlib.crc32(self.map.read(total_size)) & 0xffffffff
-        ret = (self.offset, type, obj, crc32)
+        self.map.seek(self.offset)  # Back up over unused data.
+        type_num, obj, total_size, crc32, unused = unpack_object(
+          self.map.read, compute_crc32=True)
+        ret = (self.offset, type_num, obj, crc32)
         self.offset += total_size
         if self._progress is not None:
             self._progress(self.i, self.num)

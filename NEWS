@@ -24,6 +24,11 @@
   * write_pack_data has been renamed to write_pack_objects and no longer takes a
     num_objects argument. (Jelmer Vernooij)
 
+  * take_msb_bytes, read_zlib_chunks, unpack_objects, and
+    PackStreamReader.read_objects now take an additional argument indicating a
+    crc32 to compute, and each return an additional crc32 element in their
+    return values. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

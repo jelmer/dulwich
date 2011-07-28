@@ -621,18 +621,15 @@ class DeltaChainIteratorTests(TestCase):
     def write_pack_data(self, objects_spec):
         """Write test pack data from a concise spec.
 
-        :param objects_spec: A list of (type_num, obj). For non-delta types, obj
-            is the string of that object's data.
-
+        :param objects_spec: A list of (type_num, obj). For non-delta types,
+            obj is the string of that object's data.
             For delta types, obj is a tuple of (base_index, data), where
             base_index is the index in objects_spec of the base for that delta,
             and data is the full, non-deltified data for that object.
             (Offsets/refs and deltas are computed within this function.)
-
-        :return: A tuple of (f, entries), where f is a file-like object pointed
-            at the beginning of a pack with the requested data, and entries is a
-            list of tuples of:
-              (offset, type num, data, sha, CRC32)
+        :return: A tuple of (f, entries), where f is a file-like object
+            pointed at the beginning of a pack with the requested data, and
+            entries is a list of tuples of (offset, type num, data, sha, CRC32)
             These tuples match the result format from TestPackIterator, and are
             returned in the order specified by objects_spec.
         """

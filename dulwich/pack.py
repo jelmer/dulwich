@@ -1064,6 +1064,113 @@ class ThinPackData(PackData):
             raise KeyError([sha_to_hex(h) for h in postponed.keys()])
 
 
+class DeltaChainIterator(object):
+    """Abstract iterator over pack data based on delta chains.
+
+    Each object in the pack is guaranteed to be inflated exactly once,
+    regardless of how many objects reference it as a delta base. As a result,
+    memory usage is proportional to the length of the longest delta chain.
+
+    Subclasses override _result to define the result type of the iterator.
+    """
+
+    _compute_crc32 = False
+
+    def __init__(self, file_obj, resolve_ext_ref=None):
+        self._file = file_obj
+        self._resolve_ext_ref = resolve_ext_ref
+        self._pending_ofs = defaultdict(list)
+        self._pending_ref = defaultdict(list)
+        self._full_ofs = []
+        self._shas = {}
+
+    @classmethod
+    def for_pack_data(cls, pack_data):
+        walker = cls(None)
+        walker.set_pack_data(pack_data)
+        for offset, type_num, obj, _ in pack_data.iterobjects():
+            walker.record(offset, type_num, obj)
+        return walker
+
+    def record(self, offset, type_num, uncomp):
+        if type_num == OFS_DELTA:
+            delta_offset, _ = uncomp
+            base_offset = offset - delta_offset
+            self._pending_ofs[base_offset].append(offset)
+        elif type_num == REF_DELTA:
+            base_sha, _ = uncomp
+            self._pending_ref[base_sha].append(offset)
+        else:
+            self._full_ofs.append((offset, type_num))
+
+    def set_pack_data(self, pack_data):
+        self._file = pack_data._file
+        if isinstance(pack_data, ThinPackData):
+            self._resolve_ext_ref = pack_data.resolve_ext_ref
+
+    def _walk_all_chains(self):
+        for offset, type_num in self._full_ofs:
+            for result in self._follow_chain(offset, type_num, None):
+                yield result
+        for result in self._walk_ref_chains():
+            yield result
+        assert not self._pending_ofs
+
+    def _ensure_no_pending(self):
+        if self._pending_ref:
+            raise KeyError([sha_to_hex(s) for s in self._pending_ref])
+
+    def _walk_ref_chains(self):
+        if not self._resolve_ext_ref:
+            self._ensure_no_pending()
+            return
+
+        for base_sha, pending in sorted(self._pending_ref.iteritems()):
+            try:
+                type_num, chunks = self._resolve_ext_ref(base_sha)
+            except KeyError:
+                # Not an external ref, but may depend on one. Either it will get
+                # popped via a _follow_chain call, or we will raise an error
+                # below.
+                continue
+            self._pending_ref.pop(base_sha)
+            for new_offset in pending:
+                for result in self._follow_chain(new_offset, type_num, chunks):
+                    yield result
+
+        self._ensure_no_pending()
+
+    def _result(self, offset, type_num, chunks, sha, crc32):
+        raise NotImplementedError
+
+    def _resolve_object(self, offset, base_type_num, base_chunks):
+        self._file.seek(offset)
+        type_num, obj, _, crc32, _ = unpack_object(
+          self._file.read, compute_crc32=self._compute_crc32)
+        if base_chunks is None:
+            assert type_num == base_type_num
+            chunks = obj
+        else:
+            assert type_num in DELTA_TYPES
+            _, delta_chunks = obj
+            chunks = apply_delta(base_chunks, delta_chunks)
+        sha = obj_sha(base_type_num, chunks)
+        return chunks, sha, crc32
+
+    def _follow_chain(self, offset, base_type_num, base_chunks):
+        # Unlike PackData.get_object_at, there is no need to cache offsets as
+        # this approach by design inflates each object exactly once.
+        chunks, sha, crc32 = self._resolve_object(offset, base_type_num,
+                                                  base_chunks)
+        yield self._result(offset, base_type_num, chunks, sha, crc32)
+
+        pending = chain(self._pending_ofs.pop(offset, []),
+                        self._pending_ref.pop(sha, []))
+        for new_offset in pending:
+            for result in self._follow_chain(new_offset, base_type_num, chunks):
+                yield result
+
+
 class SHA1Reader(object):
     """Wrapper around a file-like object that remembers the SHA1 of its data."""
 

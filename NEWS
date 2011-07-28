@@ -1,5 +1,10 @@
 0.8.0	UNRELEASED
 
+ FEATURES
+
+  * New DeltaChainIterator abstract class for quickly inflating/iterating all
+    objects in a pack. (Dave Borowitz)
+
  BUG FIXES
 
   * Avoid storing all objects in memory when writing pack.

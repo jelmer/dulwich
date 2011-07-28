@@ -1242,7 +1242,7 @@ class SHA1Writer(object):
         return self.f.tell()
 
 
-def write_pack_object(f, type, object):
+def write_pack_object(f, type, object, sha=None):
     """Write pack object to a file.
 
     :param f: File to write to
@@ -1276,6 +1276,8 @@ def write_pack_object(f, type, object):
         packed_data_hdr += basename
     packed_data = packed_data_hdr + zlib.compress(object)
     f.write(packed_data)
+    if sha is not None:
+        sha.update(packed_data)
     return (zlib.crc32(packed_data) & 0xffffffff)
 
 

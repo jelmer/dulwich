@@ -74,6 +74,7 @@ from dulwich.lru_cache import (
     )
 from dulwich._compat import (
     make_sha,
+    SEEK_CUR,
     SEEK_END,
     )
 from dulwich.objects import (
@@ -1005,7 +1006,7 @@ class PackData(object):
 
     def get_stored_checksum(self):
         """Return the expected checksum stored in this pack."""
-        self._file.seek(self._get_size()-20)
+        self._file.seek(-20, SEEK_END)
         return self._file.read(20)
 
     def check(self):

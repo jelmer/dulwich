@@ -1358,6 +1358,36 @@ class SHA1Writer(object):
         return self.f.tell()
 
 
+def pack_object_header(type_num, delta_base, size):
+    """Create a pack object header for the given object info.
+
+    :param type_num: Numeric type of the object.
+    :param delta_base: Delta base offset or ref, or None for whole objects.
+    :param size: Uncompressed object size.
+    :return A header for a packed object.
+    """
+    header = ''
+    c = (type_num << 4) | (size & 15)
+    size >>= 4
+    while size:
+        header += (chr(c | 0x80))
+        c = size & 0x7f
+        size >>= 7
+    header += chr(c)
+    if type_num == OFS_DELTA:
+        ret = [delta_base & 0x7f]
+        delta_base >>= 7
+        while delta_base:
+            delta_base -= 1
+            ret.insert(0, 0x80 | (delta_base & 0x7f))
+            delta_base >>= 7
+        header += ''.join([chr(x) for x in ret])
+    elif type_num == REF_DELTA:
+        assert len(delta_base) == 20
+        header += delta_base
+    return header
+
+
 def write_pack_object(f, type, object, sha=None):
     """Write pack object to a file.
 
@@ -1366,35 +1396,19 @@ def write_pack_object(f, type, object, sha=None):
     :param object: Object to write
     :return: Tuple with offset at which the object was written, and crc32
     """
-    packed_data_hdr = ''
-    if type == OFS_DELTA:
-        (delta_base_offset, object) = object
-    elif type == REF_DELTA:
-        (basename, object) = object
-    size = len(object)
-    c = (type << 4) | (size & 15)
-    size >>= 4
-    while size:
-        packed_data_hdr += (chr(c | 0x80))
-        c = size & 0x7f
-        size >>= 7
-    packed_data_hdr += chr(c)
-    if type == OFS_DELTA:
-        ret = [delta_base_offset & 0x7f]
-        delta_base_offset >>= 7
-        while delta_base_offset:
-            delta_base_offset -= 1
-            ret.insert(0, 0x80 | (delta_base_offset & 0x7f))
-            delta_base_offset >>= 7
-        packed_data_hdr += ''.join([chr(x) for x in ret])
-    elif type == REF_DELTA:
-        assert len(basename) == 20
-        packed_data_hdr += basename
-    packed_data = packed_data_hdr + zlib.compress(object)
-    f.write(packed_data)
-    if sha is not None:
-        sha.update(packed_data)
-    return (zlib.crc32(packed_data) & 0xffffffff)
+    if type in DELTA_TYPES:
+        delta_base, object = object
+    else:
+        delta_base = None
+    header = pack_object_header(type, delta_base, len(object))
+    comp_data = zlib.compress(object)
+    crc32 = 0
+    for data in (header, comp_data):
+        f.write(data)
+        if sha is not None:
+            sha.update(data)
+        crc32 = binascii.crc32(data, crc32)
+    return crc32 & 0xffffffff
 
 
 def write_pack(filename, objects, num_objects=None):

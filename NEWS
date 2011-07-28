@@ -49,7 +49,8 @@
 
   * Move PackStreamReader from server to pack. (Dave Borowitz)
 
-  * Extract a check_length_and_checksum function. (Dave Borowitz)
+  * Extract a check_length_and_checksum, compute_file_sha, and
+    pack_object_header pack helper functions. (Dave Borowitz)
 
   * Extract a compute_file_sha function. (Dave Borowitz)
 

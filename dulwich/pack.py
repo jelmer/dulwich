@@ -711,7 +711,7 @@ class PackStreamReader(object):
 
         :param compute_crc32: If True, compute the CRC32 of the compressed
             data. If False, the returned CRC32 will be None.
-        :yield: Tuples of (
+        :return: Iterator over tuples of (
             type number,
             list of uncompressed chunks,
             length of compressed data,

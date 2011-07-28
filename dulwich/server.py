@@ -140,7 +140,7 @@ class PackStreamCopier(PackStreamReader):
         See PackStreamReader.iterobjects for a list of exceptions this may
         throw.
         """
-        for _, _, _ in self.read_objects():
+        for _ in self.read_objects():
             pass
 
 

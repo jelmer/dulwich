@@ -742,34 +742,6 @@ class PackStreamReader(object):
             raise ChecksumMismatch(pack_sha, calculated_sha)
 
 
-class PackObjectIterator(object):
-
-    def __init__(self, pack, progress=None):
-        self.i = 0
-        self.offset = pack._header_size
-        self.num = len(pack)
-        self.map = pack._file
-        self._progress = progress
-
-    def __iter__(self):
-        return self
-
-    def __len__(self):
-        return self.num
-
-    def next(self):
-        if self.i == self.num:
-            raise StopIteration
-        self.map.seek(self.offset)  # Back up over unused data.
-        type_num, obj, total_size, crc32, unused = unpack_object(
-          self.map.read, compute_crc32=True)
-        ret = (self.offset, type_num, obj, crc32)
-        self.offset += total_size
-        if self._progress is not None:
-            self._progress(self.i, self.num)
-        self.i+=1
-        return ret
-
 def obj_sha(type, chunks):
     """Compute the SHA for a numeric type and object chunks."""
     sha = make_sha()
@@ -910,8 +882,16 @@ class PackData(object):
             self._offset_cache[offset] = type, chunks
         return type, chunks
 
-    def iterobjects(self, progress=None):
-        return PackObjectIterator(self, progress)
+    def iterobjects(self, progress=None, compute_crc32=True):
+        offset = self._header_size
+        for i in xrange(1, self._num_objects + 1):
+            self._file.seek(offset)  # Back up over unused data.
+            type_num, obj, total_size, crc32, unused = unpack_object(
+              self._file.read, compute_crc32=compute_crc32)
+            if progress is not None:
+                progress(i, self._num_objects)
+            yield offset, type_num, obj, crc32
+            offset += total_size
 
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.

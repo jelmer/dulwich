@@ -126,6 +126,7 @@ class UnpackedObject(object):
       'obj_chunks',     # Decompressed and delta-resolved chunks.
       'pack_type_num',  # Type of this object in the pack (may be a delta).
       'delta_base',     # Delta base offset or SHA.
+      'comp_chunks',    # Compressed object chunks.
       'comp_len',       # Compressed length of this object.
       'decomp_chunks',  # Decompressed object chunks.
       'decomp_len',     # Decompressed length of this object.
@@ -138,6 +139,7 @@ class UnpackedObject(object):
         self.offset = None
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
+        self.comp_chunks = None
         self.comp_len = None
         self.decomp_chunks = []
         self.decomp_len = decomp_len
@@ -187,7 +189,8 @@ class UnpackedObject(object):
 _ZLIB_BUFSIZE = 4096
 
 
-def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
+def read_zlib_chunks(read_some, unpacked, include_comp=False,
+                     buffer_size=_ZLIB_BUFSIZE):
     """Read zlib data from a buffer.
 
     This function requires that the buffer have additional data following the
@@ -199,10 +202,12 @@ def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
         attr is not None, the CRC32 of the compressed bytes will be computed
         using this starting CRC32.
         After this function, will have the following attrs set:
+            comp_chunks    (if include_comp is True)
             comp_len
             decomp_chunks
             decomp_len
             crc32
+    :param include_comp: If True, include compressed data in the result.
     :param buffer_size: Size of the read buffer.
     :return: Leftover unused data from the decompression.
     :raise zlib.error: if a decompression error occurred.
@@ -211,6 +216,7 @@ def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
         raise ValueError('non-negative zlib data stream size expected')
     decomp_obj = zlib.decompressobj()
 
+    comp_chunks = []
     decomp_chunks = unpacked.decomp_chunks
     decomp_len = 0
     comp_len = 0
@@ -220,6 +226,7 @@ def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
         add = read_some(buffer_size)
         if not add:
             raise zlib.error('EOF before end of zlib stream')
+        comp_chunks.append(add)
         comp_len += len(add)
         decomp = decomp_obj.decompress(add)
         decomp_len += len(decomp)
@@ -230,6 +237,8 @@ def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
             comp_len -= left
             if crc32 is not None:
                 crc32 = binascii.crc32(add[:-left], crc32)
+            if include_comp:
+                comp_chunks[-1] = add[:-left]
             break
         elif crc32 is not None:
             crc32 = binascii.crc32(add, crc32)
@@ -241,6 +250,8 @@ def read_zlib_chunks(read_some, unpacked, buffer_size=_ZLIB_BUFSIZE):
 
     unpacked.comp_len = comp_len
     unpacked.crc32 = crc32
+    if include_comp:
+        unpacked.comp_chunks = comp_chunks
     return unused
 
 
@@ -643,7 +654,7 @@ def chunks_length(chunks):
 
 
 def unpack_object(read_all, read_some=None, compute_crc32=False,
-                  zlib_bufsize=_ZLIB_BUFSIZE):
+                  include_comp=False, zlib_bufsize=_ZLIB_BUFSIZE):
     """Unpack a Git object.
 
     :param read_all: Read function that blocks until the number of requested
@@ -652,6 +663,7 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
         return the number of bytes requested.
     :param compute_crc32: If True, compute the CRC32 of the compressed data. If
         False, the returned CRC32 will be None.
+    :param include_comp: If True, include compressed data in the result.
     :param zlib_bufsize: An optional buffer size for zlib operations.
     :return: A tuple of (unpacked, unused), where unused is the unused data
         leftover from decompression, and unpacked i an UnpackedObject with the
@@ -659,6 +671,7 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
             obj_chunks     (for non-delta types)
             pack_type_num
             delta_base     (for delta types)
+            comp_chunks    (if include_comp is True)
             comp_len
             decomp_chunks
             decomp_len
@@ -697,7 +710,8 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
         delta_base = None
 
     unpacked = UnpackedObject(type_num, delta_base, size, crc32)
-    unused = read_zlib_chunks(read_some, unpacked, buffer_size=zlib_bufsize)
+    unused = read_zlib_chunks(read_some, unpacked, buffer_size=zlib_bufsize,
+                              include_comp=include_comp)
     unpacked.comp_len += raw_base
     return unpacked, unused
 
@@ -1170,6 +1184,7 @@ class DeltaChainIterator(object):
         obj_chunks
         pack_type_num
         delta_base     (for delta types)
+        comp_chunks    (if _include_comp is True)
         comp_len
         decomp_chunks
         decomp_len
@@ -1177,6 +1192,7 @@ class DeltaChainIterator(object):
     """
 
     _compute_crc32 = False
+    _include_comp = False
 
     def __init__(self, file_obj, resolve_ext_ref=None):
         self._file = file_obj
@@ -1248,7 +1264,8 @@ class DeltaChainIterator(object):
     def _resolve_object(self, offset, obj_type_num, base_chunks):
         self._file.seek(offset)
         unpacked, _ = unpack_object(
-          self._file.read, compute_crc32=self._compute_crc32)
+          self._file.read, include_comp=self._include_comp,
+          compute_crc32=self._compute_crc32)
         unpacked.offset = offset
         if base_chunks is None:
             assert unpacked.pack_type_num == obj_type_num

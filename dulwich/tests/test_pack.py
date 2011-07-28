@@ -668,7 +668,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEqual(expected, list(pack_iter._walk_all_chains()))
 
     def test_no_deltas(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (Commit.type_num, 'commit'),
           (Blob.type_num, 'blob'),
           (Tree.type_num, 'tree'),
@@ -676,7 +677,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
 
     def test_ofs_deltas(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (Blob.type_num, 'blob'),
           (OFS_DELTA, (0, 'blob1')),
           (OFS_DELTA, (0, 'blob2')),
@@ -684,7 +686,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
 
     def test_ofs_deltas_chain(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (Blob.type_num, 'blob'),
           (OFS_DELTA, (0, 'blob1')),
           (OFS_DELTA, (1, 'blob2')),
@@ -692,7 +695,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
 
     def test_ref_deltas(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (1, 'blob1')),
           (Blob.type_num, ('blob')),
           (REF_DELTA, (1, 'blob2')),
@@ -700,7 +704,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
 
     def test_ref_deltas_chain(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (2, 'blob1')),
           (Blob.type_num, ('blob')),
           (REF_DELTA, (1, 'blob2')),
@@ -710,7 +715,8 @@ class DeltaChainIteratorTests(TestCase):
     def test_ofs_and_ref_deltas(self):
         # Deltas pending on this offset are popped before deltas depending on
         # this ref.
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (1, 'blob1')),
           (Blob.type_num, ('blob')),
           (OFS_DELTA, (1, 'blob2')),
@@ -718,7 +724,8 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
 
     def test_mixed_chain(self):
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (Blob.type_num, 'blob'),
           (REF_DELTA, (2, 'blob2')),
           (OFS_DELTA, (0, 'blob1')),
@@ -733,7 +740,8 @@ class DeltaChainIteratorTests(TestCase):
         objects_spec = [(Blob.type_num, 'blob')]
         for i in xrange(n):
             objects_spec.append((OFS_DELTA, (i, 'blob%i' % i)))
-        f, entries = build_pack(objects_spec)
+        f = StringIO()
+        entries = build_pack(f, objects_spec)
         self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
 
     def test_branchy_chain(self):
@@ -741,20 +749,23 @@ class DeltaChainIteratorTests(TestCase):
         objects_spec = [(Blob.type_num, 'blob')]
         for i in xrange(n):
             objects_spec.append((OFS_DELTA, (0, 'blob%i' % i)))
-        f, entries = build_pack(objects_spec)
+        f = StringIO()
+        entries = build_pack(f, objects_spec)
         self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
 
     def test_ext_ref(self):
         blob, = self.store_blobs(['blob'])
-        f, entries = build_pack([(REF_DELTA, (blob.id, 'blob1'))],
-                                store=self.store)
+        f = StringIO()
+        entries = build_pack(f, [(REF_DELTA, (blob.id, 'blob1'))],
+                             store=self.store)
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([0], entries, pack_iter)
         self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_chain(self):
         blob, = self.store_blobs(['blob'])
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (1, 'blob2')),
           (REF_DELTA, (blob.id, 'blob1')),
           ], store=self.store)
@@ -764,7 +775,8 @@ class DeltaChainIteratorTests(TestCase):
 
     def test_ext_ref_multiple_times(self):
         blob, = self.store_blobs(['blob'])
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'blob1')),
           (REF_DELTA, (blob.id, 'blob2')),
           ], store=self.store)
@@ -774,7 +786,8 @@ class DeltaChainIteratorTests(TestCase):
 
     def test_multiple_ext_refs(self):
         b1, b2 = self.store_blobs(['foo', 'bar'])
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (b1.id, 'foo1')),
           (REF_DELTA, (b2.id, 'bar2')),
           ], store=self.store)
@@ -785,8 +798,9 @@ class DeltaChainIteratorTests(TestCase):
 
     def test_bad_ext_ref_non_thin_pack(self):
         blob, = self.store_blobs(['blob'])
-        f, entries = build_pack([(REF_DELTA, (blob.id, 'blob1'))],
-                                store=self.store)
+        f = StringIO()
+        entries = build_pack(f, [(REF_DELTA, (blob.id, 'blob1'))],
+                             store=self.store)
         pack_iter = self.make_pack_iter(f, thin=False)
         try:
             list(pack_iter._walk_all_chains())
@@ -796,7 +810,8 @@ class DeltaChainIteratorTests(TestCase):
 
     def test_bad_ext_ref_thin_pack(self):
         b1, b2, b3 = self.store_blobs(['foo', 'bar', 'baz'])
-        f, entries = build_pack([
+        f = StringIO()
+        entries = build_pack(f, [
           (REF_DELTA, (1, 'foo99')),
           (REF_DELTA, (b1.id, 'foo1')),
           (REF_DELTA, (b2.id, 'bar2')),

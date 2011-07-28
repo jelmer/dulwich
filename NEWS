@@ -15,6 +15,8 @@
 
   * Prevent raising ValueError for correct refs in RefContainer.__delitem__.
 
+  * Correctly return a tuple from MemoryObjectStore.get_raw. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

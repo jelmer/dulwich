@@ -542,17 +542,18 @@ def unpack_object(read_all, read_some=None):
         bytes are read.
     :param read_some: Read function that returns at least one byte, but may not
         return the number of bytes requested.
-    :return: tuple with type, uncompressed data, compressed size and tail data.
+    :return: A tuple of (type number, uncompressed data,
+        length of compressed data, compressed data, unused read data).
     """
     if read_some is None:
         read_some = read_all
     bytes = take_msb_bytes(read_all)
-    type = (bytes[0] >> 4) & 0x07
+    type_num = (bytes[0] >> 4) & 0x07
     size = bytes[0] & 0x0f
     for i, byte in enumerate(bytes[1:]):
         size += (byte & 0x7f) << ((i * 7) + 4)
     raw_base = len(bytes)
-    if type == OFS_DELTA:
+    if type_num == OFS_DELTA:
         bytes = take_msb_bytes(read_all)
         raw_base += len(bytes)
         assert not (bytes[-1] & 0x80)
@@ -561,19 +562,19 @@ def unpack_object(read_all, read_some=None):
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += (byte & 0x7f)
-        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
-        assert size == chunks_length(uncomp)
-        return type, (delta_base_offset, uncomp), comp_len+raw_base, unused
-    elif type == REF_DELTA:
-        basename = read_all(20)
+        base = delta_base_offset
+    elif type_num == REF_DELTA:
+        base = read_all(20)
         raw_base += 20
-        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
-        assert size == chunks_length(uncomp)
-        return type, (basename, uncomp), comp_len+raw_base, unused
     else:
-        uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
-        assert chunks_length(uncomp) == size
-        return type, uncomp, comp_len+raw_base, unused
+        base = None
+
+    uncomp, comp_len, unused = read_zlib_chunks(read_some, size)
+    comp_len += raw_base
+    if base is None:
+        return type_num, uncomp, comp_len, unused
+    else:
+        return type_num, (base, uncomp), comp_len, unused
 
 
 def _compute_object_size((num, obj)):

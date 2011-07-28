@@ -32,15 +32,24 @@ from dulwich.errors import (
 from dulwich.file import (
     GitFile,
     )
+from dulwich.object_store import (
+    MemoryObjectStore,
+    )
 from dulwich.objects import (
     Blob,
     hex_to_sha,
     sha_to_hex,
+    Commit,
     Tree,
+    Blob,
     )
 from dulwich.pack import (
+    OFS_DELTA,
+    REF_DELTA,
+    DELTA_TYPES,
     MemoryPackIndex,
     Pack,
+    obj_sha,
     PackData,
     ThinPackData,
     apply_delta,
@@ -51,10 +60,16 @@ from dulwich.pack import (
     write_pack_header,
     write_pack_index_v1,
     write_pack_index_v2,
+    SHA1Writer,
+    write_pack_object,
     write_pack,
+    DeltaChainIterator,
     )
 from dulwich.tests import (
     TestCase,
+    )
+from utils import (
+    make_object,
     )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -567,3 +582,264 @@ class DeltifyTests(TestCase):
             (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta)
             ],
             list(deltify_pack_objects([(b1, ""), (b2, "")])))
+
+
+class TestPackIterator(DeltaChainIterator):
+
+    _compute_crc32 = True
+
+    def __init__(self, pack_data):
+        super(TestPackIterator, self).__init__(pack_data)
+        self._unpacked = set()
+
+    def _result(self, offset, type_num, chunks, sha, crc32):
+        return offset, type_num, ''.join(chunks), sha, crc32
+
+    def _resolve_object(self, offset, base_type_num, base_chunks):
+        assert offset not in self._unpacked, ('Attempted to re-inflate offset '
+                                              '%i' % offset)
+        self._unpacked.add(offset)
+        return super(TestPackIterator, self)._resolve_object(
+          offset, base_type_num, base_chunks)
+
+
+
+class DeltaChainIteratorTests(TestCase):
+
+    def setUp(self):
+        self.store = MemoryObjectStore()
+        self.fetched = set()
+
+    def store_blobs(self, blobs_data):
+        blobs = []
+        for data in blobs_data:
+            blob = make_object(Blob, data=data)
+            blobs.append(blob)
+            self.store.add_object(blob)
+        return blobs
+
+    def write_pack_data(self, objects_spec):
+        """Write test pack data from a concise spec.
+
+        :param objects_spec: A list of (type_num, obj). For non-delta types, obj
+            is the string of that object's data.
+
+            For delta types, obj is a tuple of (base_index, data), where
+            base_index is the index in objects_spec of the base for that delta,
+            and data is the full, non-deltified data for that object.
+            (Offsets/refs and deltas are computed within this function.)
+
+        :return: A tuple of (f, entries), where f is a file-like object pointed
+            at the beginning of a pack with the requested data, and entries is a
+            list of tuples of:
+              (offset, type num, data, sha, CRC32)
+            These tuples match the result format from TestPackIterator, and are
+            returned in the order specified by objects_spec.
+        """
+        f = StringIO()
+        sf = SHA1Writer(f)
+        num_objects = len(objects_spec)
+        write_pack_header(sf, num_objects)
+
+        full_objects = {}
+        offsets = {}
+        crc32s = {}
+
+        while len(full_objects) < num_objects:
+            for i, (type_num, data) in enumerate(objects_spec):
+                if type_num not in DELTA_TYPES:
+                    full_objects[i] = (type_num, data,
+                                       obj_sha(type_num, [data]))
+                    continue
+                base, data = data
+                if isinstance(base, int):
+                    if base not in full_objects:
+                        continue
+                    base_type_num, _, _ = full_objects[base]
+                else:
+                    base_type_num, _ = self.store.get_raw(base)
+                full_objects[i] = (base_type_num, data,
+                                   obj_sha(base_type_num, [data]))
+
+        for i, (type_num, obj) in enumerate(objects_spec):
+            offset = f.tell()
+            if type_num == OFS_DELTA:
+                base_index, data = obj
+                base = offset - offsets[base_index]
+                _, base_data, _ = full_objects[base_index]
+                obj = (base, create_delta(base_data, data))
+            elif type_num == REF_DELTA:
+                base_ref, data = obj
+                if isinstance(base_ref, int):
+                    _, base_data, base = full_objects[base_ref]
+                else:
+                    base_type_num, base_data = self.store.get_raw(base_ref)
+                    base = obj_sha(base_type_num, base_data)
+                obj = (base, create_delta(base_data, data))
+
+            crc32 = write_pack_object(sf, type_num, obj)
+            offsets[i] = offset
+            crc32s[i] = crc32
+
+        expected = []
+        for i in xrange(num_objects):
+            type_num, data, sha = full_objects[i]
+            expected.append((offsets[i], type_num, data, sha, crc32s[i]))
+
+        sf.write_sha()
+        f.seek(0)
+        return f, expected
+
+    def get_raw_no_repeat(self, bin_sha):
+        """Wrapper around store.get_raw that doesn't allow repeat lookups."""
+        hex_sha = sha_to_hex(bin_sha)
+        self.assertFalse(hex_sha in self.fetched,
+                         'Attempted to re-fetch object %s' % hex_sha)
+        self.fetched.add(hex_sha)
+        return self.store.get_raw(hex_sha)
+
+    def make_pack_iter(self, f, thin=None):
+        if thin is None:
+            thin = bool(list(self.store))
+        if thin:
+            data = ThinPackData(self.get_raw_no_repeat, 'test.pack', file=f)
+        else:
+            data = PackData('test.pack', file=f)
+        return TestPackIterator.for_pack_data(data)
+
+    def assertEntriesMatch(self, expected_indexes, entries, pack_iter):
+        expected = [entries[i] for i in expected_indexes]
+        self.assertEqual(expected, list(pack_iter._walk_all_chains()))
+
+    def test_no_deltas(self):
+        f, entries = self.write_pack_data([
+          (Commit.type_num, 'commit'),
+          (Blob.type_num, 'blob'),
+          (Tree.type_num, 'tree'),
+          ])
+        self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+
+    def test_ofs_deltas(self):
+        f, entries = self.write_pack_data([
+          (Blob.type_num, 'blob'),
+          (OFS_DELTA, (0, 'blob1')),
+          (OFS_DELTA, (0, 'blob2')),
+          ])
+        self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+
+    def test_ofs_deltas_chain(self):
+        f, entries = self.write_pack_data([
+          (Blob.type_num, 'blob'),
+          (OFS_DELTA, (0, 'blob1')),
+          (OFS_DELTA, (1, 'blob2')),
+          ])
+        self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+
+    def test_ref_deltas(self):
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (1, 'blob1')),
+          (Blob.type_num, ('blob')),
+          (REF_DELTA, (1, 'blob2')),
+          ])
+        self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
+
+    def test_ref_deltas_chain(self):
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (2, 'blob1')),
+          (Blob.type_num, ('blob')),
+          (REF_DELTA, (1, 'blob2')),
+          ])
+        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
+
+    def test_ofs_and_ref_deltas(self):
+        # Deltas pending on this offset are popped before deltas depending on
+        # this ref.
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (1, 'blob1')),
+          (Blob.type_num, ('blob')),
+          (OFS_DELTA, (1, 'blob2')),
+          ])
+        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
+
+    def test_mixed_chain(self):
+        f, entries = self.write_pack_data([
+          (Blob.type_num, 'blob'),
+          (REF_DELTA, (2, 'blob2')),
+          (OFS_DELTA, (0, 'blob1')),
+          (OFS_DELTA, (1, 'blob3')),
+          (OFS_DELTA, (0, 'bob')),
+          ])
+        self.assertEntriesMatch([0, 2, 1, 3, 4], entries,
+                                self.make_pack_iter(f))
+
+    def test_long_chain(self):
+        n = 100
+        objects_spec = [(Blob.type_num, 'blob')]
+        for i in xrange(n):
+            objects_spec.append((OFS_DELTA, (i, 'blob%i' % i)))
+        f, entries = self.write_pack_data(objects_spec)
+        self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
+
+    def test_branchy_chain(self):
+        n = 100
+        objects_spec = [(Blob.type_num, 'blob')]
+        for i in xrange(n):
+            objects_spec.append((OFS_DELTA, (0, 'blob%i' % i)))
+        f, entries = self.write_pack_data(objects_spec)
+        self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
+
+    def test_ext_ref(self):
+        blob, = self.store_blobs(['blob'])
+        f, entries = self.write_pack_data([(REF_DELTA, (blob.id, 'blob1'))])
+        self.assertEntriesMatch([0], entries, self.make_pack_iter(f))
+
+    def test_ext_ref_chain(self):
+        blob, = self.store_blobs(['blob'])
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (1, 'blob2')),
+          (REF_DELTA, (blob.id, 'blob1')),
+          ])
+        self.assertEntriesMatch([1, 0], entries, self.make_pack_iter(f))
+
+    def test_ext_ref_multiple_times(self):
+        blob, = self.store_blobs(['blob'])
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (blob.id, 'blob1')),
+          (REF_DELTA, (blob.id, 'blob2')),
+          ])
+        self.assertEntriesMatch([0, 1], entries, self.make_pack_iter(f))
+
+    def test_multiple_ext_refs(self):
+        b1, b2 = self.store_blobs(['foo', 'bar'])
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (b1.id, 'foo1')),
+          (REF_DELTA, (b2.id, 'bar2')),
+          ])
+        self.assertEntriesMatch([0, 1], entries, self.make_pack_iter(f))
+
+    def test_bad_ext_ref_non_thin_pack(self):
+        blob, = self.store_blobs(['blob'])
+        f, entries = self.write_pack_data([(REF_DELTA, (blob.id, 'blob1'))])
+        pack_iter = self.make_pack_iter(f, thin=False)
+        try:
+            list(pack_iter._walk_all_chains())
+            self.fail()
+        except KeyError, e:
+            self.assertEqual(([blob.id],), e.args)
+
+    def test_bad_ext_ref_thin_pack(self):
+        b1, b2, b3 = self.store_blobs(['foo', 'bar', 'baz'])
+        f, entries = self.write_pack_data([
+          (REF_DELTA, (1, 'foo99')),
+          (REF_DELTA, (b1.id, 'foo1')),
+          (REF_DELTA, (b2.id, 'bar2')),
+          (REF_DELTA, (b3.id, 'baz3')),
+          ])
+        del self.store[b2.id]
+        del self.store[b3.id]
+        pack_iter = self.make_pack_iter(f)
+        try:
+            list(pack_iter._walk_all_chains())
+            self.fail()
+        except KeyError, e:
+            self.assertEqual((sorted([b2.id, b3.id]),), e.args)

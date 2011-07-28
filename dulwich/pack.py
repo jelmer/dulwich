@@ -900,12 +900,11 @@ class PackData(object):
             object count.
         :return: iterator of tuples with (sha, offset, crc32)
         """
-        for offset, type, obj, crc32 in self.iterobjects(progress=progress):
-            assert isinstance(offset, int)
-            assert isinstance(type, int)
-            assert isinstance(obj, list) or isinstance(obj, tuple)
-            type, obj = self.resolve_object(offset, type, obj)
-            yield obj_sha(type, obj), offset, crc32
+        num_objects = self._num_objects
+        for i, result in enumerate(PackIndexer.for_pack_data(self)):
+            if progress is not None:
+                progress(i, num_objects)
+            yield result
 
     def sorted_entries(self, progress=None):
         """Return entries in this pack, sorted by SHA.
@@ -1169,6 +1168,18 @@ class DeltaChainIterator(object):
         for new_offset in pending:
             for result in self._follow_chain(new_offset, base_type_num, chunks):
                 yield result
+
+    def __iter__(self):
+        return self._walk_all_chains()
+
+
+class PackIndexer(DeltaChainIterator):
+    """Delta chain iterator that yields index entries."""
+
+    _compute_crc32 = True
+
+    def _result(self, offset, unused_type_num, unused_chunks, sha, crc32):
+        return sha, offset, crc32
 
 
 class SHA1Reader(object):

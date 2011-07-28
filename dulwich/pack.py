@@ -646,7 +646,7 @@ class PackStreamReader(object):
         """Read up to size bytes using the given callback.
 
         As a side effect, update the verifier's hash (excluding the last 20
-        bytes read) and write through to the output file.
+        bytes read).
 
         :param read: The read callback to read from.
         :param size: The maximum number of bytes to read; the particular
@@ -736,10 +736,9 @@ class PackStreamReader(object):
             buf.seek(0)
             self._rbuf = buf
 
-        pack_sha = sha_to_hex(''.join([c for c in self._trailer]))
-        calculated_sha = self.sha.hexdigest()
-        if pack_sha != calculated_sha:
-            raise ChecksumMismatch(pack_sha, calculated_sha)
+        pack_sha = ''.join(self._trailer)
+        if pack_sha != self.sha.digest():
+            raise ChecksumMismatch(sha_to_hex(pack_sha), self.sha.hexdigest())
 
 
 def obj_sha(type, chunks):

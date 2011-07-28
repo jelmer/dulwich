@@ -48,6 +48,8 @@
 
   * Extract a check_length_and_checksum function. (Dave Borowitz)
 
+  * Extract a compute_file_sha function. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

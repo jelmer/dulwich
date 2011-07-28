@@ -65,6 +65,7 @@ from dulwich.pack import (
     write_pack_object,
     write_pack,
     unpack_object,
+    compute_file_sha,
     DeltaChainIterator,
     )
 from dulwich.tests import (
@@ -257,6 +258,20 @@ class TestPackData(PackTests):
         idx1 = load_pack_index(filename)
         idx2 = self.get_pack_index(pack1_sha)
         self.assertEquals(idx1, idx2)
+
+    def test_compute_file_sha(self):
+        f = StringIO('abcd1234wxyz')
+        self.assertEqual(make_sha('abcd1234wxyz').hexdigest(),
+                         compute_file_sha(f).hexdigest())
+        self.assertEqual(make_sha('abcd1234wxyz').hexdigest(),
+                         compute_file_sha(f, buffer_size=5).hexdigest())
+        self.assertEqual(make_sha('abcd1234').hexdigest(),
+                         compute_file_sha(f, end_ofs=-4).hexdigest())
+        self.assertEqual(make_sha('1234wxyz').hexdigest(),
+                         compute_file_sha(f, start_ofs=4).hexdigest())
+        self.assertEqual(
+          make_sha('1234').hexdigest(),
+          compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest())
 
 
 class TestPack(PackTests):

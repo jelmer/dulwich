@@ -153,8 +153,8 @@ class PackStreamCopier(PackStreamReader):
         throw.
         """
         if self._delta_iter:
-            for type_num, uncomp, _, _ in self.read_objects():
-                self._delta_iter.record(self.offset, type_num, uncomp)
+            for offset, type_num, uncomp, _, _ in self.read_objects():
+                self._delta_iter.record(offset, type_num, uncomp)
         else:
             for _ in self.read_objects():
                 pass

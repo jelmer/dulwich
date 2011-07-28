@@ -118,21 +118,21 @@ def read_zlib_chunks(read_some, dec_size, buffer_size=4096):
     :raise zlib.error: if a decompression error occurred.
     """
     if dec_size <= -1:
-        raise ValueError("non-negative zlib data stream size expected")
+        raise ValueError('non-negative zlib data stream size expected')
     obj = zlib.decompressobj()
     ret = []
     fed = 0
     size = 0
-    while obj.unused_data == "":
+    while obj.unused_data == '':
         add = read_some(buffer_size)
         if not add:
-            raise zlib.error("EOF before end of zlib stream")
+            raise zlib.error('EOF before end of zlib stream')
         fed += len(add)
         decomp = obj.decompress(add)
         size += len(decomp)
         ret.append(decomp)
     if size != dec_size:
-        raise zlib.error("decompressed data does not match expected size")
+        raise zlib.error('decompressed data does not match expected size')
     comp_len = fed - len(obj.unused_data)
     return ret, comp_len, obj.unused_data
 
@@ -191,12 +191,12 @@ def load_pack_index_file(path, f):
     """
     contents, size = _load_file_contents(f)
     if contents[:4] == '\377tOc':
-        version = struct.unpack(">L", contents[4:8])[0]
+        version = struct.unpack('>L', contents[4:8])[0]
         if version == 2:
             return PackIndex2(path, file=f, contents=contents,
                 size=size)
         else:
-            raise KeyError("Unknown pack index format %d" % version)
+            raise KeyError('Unknown pack index format %d' % version)
     else:
         return PackIndex1(path, file=f, contents=contents, size=size)
 
@@ -411,7 +411,7 @@ class FilePackIndex(PackIndex):
         ret = []
         for i in range(0x100):
             fanout_entry = self._contents[start_offset+i*4:start_offset+(i+1)*4]
-            ret.append(struct.unpack(">L", fanout_entry)[0])
+            ret.append(struct.unpack('>L', fanout_entry)[0])
         return ret
 
     def check(self):
@@ -469,7 +469,7 @@ class PackIndex1(FilePackIndex):
         self._fan_out_table = self._read_fan_out_table(0)
 
     def _unpack_entry(self, i):
-        (offset, name) = unpack_from(">L20s", self._contents,
+        (offset, name) = unpack_from('>L20s', self._contents,
                                      (0x100 * 4) + (i * 24))
         return (name, offset, None)
 
@@ -479,7 +479,7 @@ class PackIndex1(FilePackIndex):
 
     def _unpack_offset(self, i):
         offset = (0x100 * 4) + (i * 24)
-        return unpack_from(">L", self._contents, offset)[0]
+        return unpack_from('>L', self._contents, offset)[0]
 
     def _unpack_crc32_checksum(self, i):
         # Not stored in v1 index files
@@ -491,9 +491,9 @@ class PackIndex2(FilePackIndex):
 
     def __init__(self, filename, file=None, contents=None, size=None):
         super(PackIndex2, self).__init__(filename, file, contents, size)
-        assert self._contents[:4] == '\377tOc', "Not a v2 pack index file"
-        (self.version, ) = unpack_from(">L", self._contents, 4)
-        assert self.version == 2, "Version was %d" % self.version
+        assert self._contents[:4] == '\377tOc', 'Not a v2 pack index file'
+        (self.version, ) = unpack_from('>L', self._contents, 4)
+        assert self.version == 2, 'Version was %d' % self.version
         self._fan_out_table = self._read_fan_out_table(8)
         self._name_table_offset = 8 + 0x100 * 4
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
@@ -510,10 +510,10 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
-        return unpack_from(">L", self._contents, offset)[0]
+        return unpack_from('>L', self._contents, offset)[0]
 
     def _unpack_crc32_checksum(self, i):
-        return unpack_from(">L", self._contents,
+        return unpack_from('>L', self._contents,
                           self._crc32_table_offset + i * 4)[0]
 
 
@@ -524,10 +524,10 @@ def read_pack_header(read):
     :return: Tuple with pack version and number of objects
     """
     header = read(12)
-    assert header[:4] == "PACK"
-    (version,) = unpack_from(">L", header, 4)
-    assert version in (2, 3), "Version was %d" % version
-    (num_objects,) = unpack_from(">L", header, 8)
+    assert header[:4] == 'PACK'
+    (version,) = unpack_from('>L', header, 4)
+    assert version in (2, 3), 'Version was %d' % version
+    (num_objects,) = unpack_from('>L', header, 8)
     return (version, num_objects)
 
 
@@ -795,7 +795,7 @@ class PackData(object):
             return self._size
         self._size = os.path.getsize(self._filename)
         if self._size < self._header_size:
-            errmsg = ("%s is too small for a packfile (%d < %d)" %
+            errmsg = ('%s is too small for a packfile (%d < %d)' %
                       (self._filename, self._size, self._header_size))
             raise AssertionError(errmsg)
         return self._size
@@ -931,7 +931,7 @@ class PackData(object):
         elif version == 2:
             return self.create_index_v2(filename, progress)
         else:
-            raise ValueError("unknown index format %d" % version)
+            raise ValueError('unknown index format %d' % version)
 
     def get_stored_checksum(self):
         """Return the expected checksum stored in this pack."""
@@ -955,7 +955,7 @@ class PackData(object):
         if offset in self._offset_cache:
             return self._offset_cache[offset]
         assert isinstance(offset, long) or isinstance(offset, int),\
-                "offset was %r" % offset
+                'offset was %r' % offset
         assert offset >= self._header_size
         self._file.seek(offset)
         return unpack_object(self._file.read)[:2]
@@ -1041,7 +1041,7 @@ class SHA1Reader(object):
 
     def __init__(self, f):
         self.f = f
-        self.sha1 = make_sha("")
+        self.sha1 = make_sha('')
 
     def read(self, num=None):
         data = self.f.read(num)
@@ -1066,7 +1066,7 @@ class SHA1Writer(object):
     def __init__(self, f):
         self.f = f
         self.length = 0
-        self.sha1 = make_sha("")
+        self.sha1 = make_sha('')
 
     def write(self, data):
         self.sha1.update(data)
@@ -1100,7 +1100,7 @@ def write_pack_object(f, type, object):
     :param object: Object to write
     :return: Tuple with offset at which the object was written, and crc32
     """
-    packed_data_hdr = ""
+    packed_data_hdr = ''
     if type == OFS_DELTA:
         (delta_base_offset, object) = object
     elif type == REF_DELTA:
@@ -1120,7 +1120,7 @@ def write_pack_object(f, type, object):
             delta_base_offset -= 1
             ret.insert(0, 0x80 | (delta_base_offset & 0x7f))
             delta_base_offset >>= 7
-        packed_data_hdr += "".join([chr(x) for x in ret])
+        packed_data_hdr += ''.join([chr(x) for x in ret])
     elif type == REF_DELTA:
         assert len(basename) == 20
         packed_data_hdr += basename
@@ -1138,9 +1138,9 @@ def write_pack(filename, objects, num_objects=None):
     :return: Tuple with checksum of pack file and index file
     """
     if num_objects is not None:
-        warnings.warn("num_objects argument to write_pack is deprecated",
+        warnings.warn('num_objects argument to write_pack is deprecated',
                       DeprecationWarning)
-    f = GitFile(filename + ".pack", 'wb')
+    f = GitFile(filename + '.pack', 'wb')
     try:
         entries, data_sum = write_pack_objects(f, objects,
             num_objects=num_objects)
@@ -1148,7 +1148,7 @@ def write_pack(filename, objects, num_objects=None):
         f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
     entries.sort()
-    f = GitFile(filename + ".idx", 'wb')
+    f = GitFile(filename + '.idx', 'wb')
     try:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
     finally:
@@ -1259,10 +1259,10 @@ def write_pack_index_v1(f, entries, pack_checksum):
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
-        f.write(struct.pack(">L", fan_out_table[i]))
+        f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">L20s", offset, name))
+        f.write(struct.pack('>L20s', offset, name))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
     return f.write_sha()
@@ -1276,10 +1276,10 @@ def create_delta(base_buf, target_buf):
     """
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
-    out_buf = ""
+    out_buf = ''
     # write delta header
     def encode_size(size):
-        ret = ""
+        ret = ''
         c = size & 0x7f
         size >>= 7
         while size:
@@ -1294,12 +1294,12 @@ def create_delta(base_buf, target_buf):
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
-        #if opcode == "replace" or opcode == "delete":
+        #if opcode == 'replace' or opcode == 'delete':
         #    pass
-        if opcode == "equal":
+        if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            scratch = ""
+            scratch = ''
             op = 0x80
             o = i1
             for i in range(4):
@@ -1313,7 +1313,7 @@ def create_delta(base_buf, target_buf):
                     op |= 1 << (4+i)
             out_buf += chr(op)
             out_buf += scratch
-        if opcode == "replace" or opcode == "insert":
+        if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
             s = j2 - j1
@@ -1335,9 +1335,9 @@ def apply_delta(src_buf, delta):
     :param delta: Delta instructions
     """
     if type(src_buf) != str:
-        src_buf = "".join(src_buf)
+        src_buf = ''.join(src_buf)
     if type(delta) != str:
-        delta = "".join(delta)
+        delta = ''.join(delta)
     out = []
     index = 0
     delta_length = len(delta)
@@ -1354,7 +1354,7 @@ def apply_delta(src_buf, delta):
         return size, index
     src_size, index = get_delta_header_size(delta, index)
     dest_size, index = get_delta_header_size(delta, index)
-    assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
+    assert src_size == len(src_buf), '%d vs %d' % (src_size, len(src_buf))
     while index < delta_length:
         cmd = ord(delta[index])
         index += 1
@@ -1382,13 +1382,13 @@ def apply_delta(src_buf, delta):
             out.append(delta[index:index+cmd])
             index += cmd
         else:
-            raise ApplyDeltaError("Invalid opcode 0")
+            raise ApplyDeltaError('Invalid opcode 0')
 
     if index != delta_length:
-        raise ApplyDeltaError("delta not empty: %r" % delta[index:])
+        raise ApplyDeltaError('delta not empty: %r' % delta[index:])
 
     if dest_size != chunks_length(out):
-        raise ApplyDeltaError("dest size incorrect")
+        raise ApplyDeltaError('dest size incorrect')
 
     return out
 
@@ -1404,21 +1404,21 @@ def write_pack_index_v2(f, entries, pack_checksum):
     """
     f = SHA1Writer(f)
     f.write('\377tOc') # Magic!
-    f.write(struct.pack(">L", 2))
+    f.write(struct.pack('>L', 2))
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
-        f.write(struct.pack(">L", fan_out_table[i]))
+        f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
         f.write(name)
     for (name, offset, entry_checksum) in entries:
-        f.write(struct.pack(">L", entry_checksum))
+        f.write(struct.pack('>L', entry_checksum))
     for (name, offset, entry_checksum) in entries:
         # FIXME: handle if MSBit is set in offset
-        f.write(struct.pack(">L", offset))
+        f.write(struct.pack('>L', offset))
     # FIXME: handle table for pack files > 8 Gb
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
@@ -1432,8 +1432,8 @@ class Pack(object):
         self._basename = basename
         self._data = None
         self._idx = None
-        self._idx_path = self._basename + ".idx"
-        self._data_path = self._basename + ".pack"
+        self._idx_path = self._basename + '.idx'
+        self._data_path = self._basename + '.pack'
         self._data_load = lambda: PackData(self._data_path)
         self._idx_load = lambda: load_pack_index(self._idx_path)
 
@@ -1441,7 +1441,7 @@ class Pack(object):
     def from_lazy_objects(self, data_fn, idx_fn):
         """Create a new pack object from callables to load pack data and
         index objects."""
-        ret = Pack("")
+        ret = Pack('')
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
@@ -1449,7 +1449,7 @@ class Pack(object):
     @classmethod
     def from_objects(self, data, idx):
         """Create a new pack object from pack data and index objects."""
-        ret = Pack("")
+        ret = Pack('')
         ret._data_load = lambda: data
         ret._idx_load = lambda: idx
         return ret
@@ -1495,7 +1495,7 @@ class Pack(object):
         return len(self.index)
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._basename)
+        return '%s(%r)' % (self.__class__.__name__, self._basename)
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""
@@ -1529,7 +1529,7 @@ class Pack(object):
         if type(offset) is long:
           offset = int(offset)
         type_num, chunks = self.data.resolve_object(offset, obj_type, obj)
-        return type_num, "".join(chunks)
+        return type_num, ''.join(chunks)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

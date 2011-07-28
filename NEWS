@@ -46,6 +46,8 @@
 
   * Move PackStreamReader from server to pack. (Dave Borowitz)
 
+  * Extract a check_length_and_checksum function. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

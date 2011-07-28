@@ -32,8 +32,9 @@ except ImportError:
     from cgi import parse_qs
 
 try:
-    from os import SEEK_END
+    from os import SEEK_CUR, SEEK_END
 except ImportError:
+    SEEK_CUR = 1
     SEEK_END = 2
 
 import struct

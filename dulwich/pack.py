@@ -747,6 +747,13 @@ class PackStreamReader(object):
             buf.seek(0)
             self._rbuf = buf
 
+        if self._buf_len() < 20:
+            # If the read buffer is full, then the last read() got the whole
+            # trailer off the wire. If not, it means there is still some of the
+            # trailer to read. We need to read() all 20 bytes; N come from the
+            # read buffer and (20 - N) come from the wire.
+            self.read(20)
+
         pack_sha = ''.join(self._trailer)
         if pack_sha != self.sha.digest():
             raise ChecksumMismatch(sha_to_hex(pack_sha), self.sha.hexdigest())

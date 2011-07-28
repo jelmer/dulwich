@@ -22,6 +22,9 @@
 
   * Correctly return a tuple from MemoryObjectStore.get_raw. (Dave Borowitz)
 
+  * Fix a bug in reading the pack checksum when there are fewer than 20 bytes
+    left in the buffer. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

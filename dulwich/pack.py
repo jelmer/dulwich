@@ -795,6 +795,27 @@ def obj_sha(type, chunks):
     return sha.digest()
 
 
+def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
+    """Hash a portion of a file into a new SHA.
+
+    :param f: A file-like object to read from that supports seek().
+    :param start_ofs: The offset in the file to start reading at.
+    :param end_ofs: The offset in the file to end reading at, relative to the
+        end of the file.
+    :param buffer_size: A buffer size for reading.
+    :return: A new SHA object updated with data read from the file.
+    """
+    sha = make_sha()
+    f.seek(0, SEEK_END)
+    todo = f.tell() + end_ofs - start_ofs
+    f.seek(start_ofs)
+    while todo:
+        data = f.read(min(todo, buffer_size))
+        sha.update(data)
+        todo -= len(data)
+    return sha
+
+
 class PackData(object):
     """The data contained in a packfile.
 
@@ -873,14 +894,7 @@ class PackData(object):
 
         :return: 20-byte binary SHA1 digest
         """
-        s = make_sha()
-        self._file.seek(0)
-        todo = self._get_size() - 20
-        while todo > 0:
-            x = self._file.read(min(todo, 1<<16))
-            s.update(x)
-            todo -= len(x)
-        return s.digest()
+        return compute_file_sha(self._file, end_ofs=-20).digest()
 
     def get_ref(self, sha):
         """Get the object for a ref SHA, only looking in this pack."""

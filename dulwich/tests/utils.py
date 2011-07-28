@@ -160,9 +160,10 @@ def ext_functest_builder(method, func):
     return do_test
 
 
-def build_pack(objects_spec, store=None):
+def build_pack(f, objects_spec, store=None):
     """Write test pack data from a concise spec.
 
+    :param f: A file-like object to write the pack to.
     :param objects_spec: A list of (type_num, obj). For non-delta types, obj
         is the string of that object's data.
 
@@ -174,12 +175,9 @@ def build_pack(objects_spec, store=None):
         Note that offsets/refs and deltas are computed within this function.
     :param store: An optional ObjectStore for looking up external refs.
 
-    :return: A tuple of (f, entries), where f is a file-like object pointed
-        at the beginning of a pack with the requested data, and entries is a
-        list of tuples in the order specified by objects_spec:
-          (offset, type num, data, sha, CRC32)
+    :return: A list of tuples in the order specified by objects_spec:
+        (offset, type num, data, sha, CRC32)
     """
-    f = StringIO()
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
     write_pack_header(sf, num_objects)
@@ -231,4 +229,4 @@ def build_pack(objects_spec, store=None):
 
     sf.write_sha()
     f.seek(0)
-    return f, expected
+    return expected

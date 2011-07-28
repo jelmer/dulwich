@@ -39,6 +39,9 @@
   * PackObjectIterator was removed; its functionality is still exposed by
     PackData.iterobjects. (Dave Borowitz)
 
+  * Add a sha arg to write_pack_object to incrementally compute a SHA.
+    (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

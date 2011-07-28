@@ -26,6 +26,9 @@ import shutil
 import tempfile
 import zlib
 
+from dulwich._compat import (
+    make_sha,
+    )
 from dulwich.errors import (
     ChecksumMismatch,
     )
@@ -63,6 +66,7 @@ from dulwich.pack import (
     SHA1Writer,
     write_pack_object,
     write_pack,
+    unpack_object,
     DeltaChainIterator,
     )
 from dulwich.tests import (
@@ -376,13 +380,37 @@ class TestPack(PackTests):
         self.assertEquals(pack1_sha, p.name())
 
 
-class WritePackHeaderTests(TestCase):
+class WritePackTests(TestCase):
 
-    def test_simple(self):
+    def test_write_pack_header(self):
         f = StringIO()
         write_pack_header(f, 42)
         self.assertEquals('PACK\x00\x00\x00\x02\x00\x00\x00*',
                 f.getvalue())
+
+    def test_write_pack_object(self):
+        f = StringIO()
+        f.write('header')
+        offset = f.tell()
+        crc32 = write_pack_object(f, Blob.type_num, 'blob')
+        self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xffffffff)
+
+        f.write('x')  # unpack_object needs extra trailing data.
+        f.seek(offset)
+        comp_len = len(f.getvalue()) - offset - 1
+        self.assertEqual((Blob.type_num, ['blob'], comp_len, crc32, 'x'),
+                         unpack_object(f.read, compute_crc32=True))
+
+    def test_write_pack_object_sha(self):
+        f = StringIO()
+        f.write('header')
+        offset = f.tell()
+        sha_a = make_sha('foo')
+        sha_b = sha_a.copy()
+        write_pack_object(f, Blob.type_num, 'blob', sha=sha_a)
+        self.assertNotEqual(sha_a.digest(), sha_b.digest())
+        sha_b.update(f.getvalue()[offset:])
+        self.assertEqual(sha_a.digest(), sha_b.digest())
 
 
 pack_checksum = hex_to_sha('721980e866af9a5f93ad674144e1459b8ba3e7b7')

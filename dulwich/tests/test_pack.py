@@ -53,7 +53,6 @@ from dulwich.pack import (
     MemoryPackIndex,
     Pack,
     PackData,
-    ThinPackData,
     apply_delta,
     create_delta,
     deltify_pack_objects,
@@ -192,21 +191,6 @@ class TestPackData(PackTests):
     def test_from_file(self):
         path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
         PackData.from_file(open(path), os.path.getsize(path))
-
-    # TODO: more ThinPackData tests.
-    def test_thin_from_file(self):
-        test_sha = '1' * 40
-
-        def resolve(sha):
-            self.assertEqual(test_sha, sha)
-            return 3, 'data'
-
-        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
-        data = ThinPackData.from_file(resolve, open(path),
-                                      os.path.getsize(path))
-        idx = self.get_pack_index(pack1_sha)
-        Pack.from_objects(data, idx)
-        self.assertEqual((None, 3, 'data'), data.get_ref(test_sha))
 
     def test_pack_len(self):
         p = self.get_pack_data(pack1_sha)
@@ -716,8 +700,8 @@ class TestPackIterator(DeltaChainIterator):
 
     _compute_crc32 = True
 
-    def __init__(self, pack_data):
-        super(TestPackIterator, self).__init__(pack_data)
+    def __init__(self, *args, **kwargs):
+        super(TestPackIterator, self).__init__(*args, **kwargs)
         self._unpacked = set()
 
     def _result(self, offset, type_num, chunks, sha, crc32):
@@ -758,11 +742,10 @@ class DeltaChainIteratorTests(TestCase):
     def make_pack_iter(self, f, thin=None):
         if thin is None:
             thin = bool(list(self.store))
-        if thin:
-            data = ThinPackData(self.get_raw_no_repeat, 'test.pack', file=f)
-        else:
-            data = PackData('test.pack', file=f)
-        return TestPackIterator.for_pack_data(data)
+        resolve_ext_ref = thin and self.get_raw_no_repeat or None
+        data = PackData('test.pack', file=f)
+        return TestPackIterator.for_pack_data(
+          data, resolve_ext_ref=resolve_ext_ref)
 
     def assertEntriesMatch(self, expected_indexes, entries, pack_iter):
         expected = [entries[i] for i in expected_indexes]

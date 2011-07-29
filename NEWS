@@ -80,6 +80,8 @@
 
   * Optionally include unchanged entries in RenameDetectors. (Dave Borowitz)
 
+  * Optionally pass a RenameDetector to tree_changes. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

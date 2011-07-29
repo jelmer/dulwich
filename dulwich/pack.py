@@ -76,7 +76,6 @@ from dulwich._compat import (
     make_sha,
     SEEK_CUR,
     SEEK_END,
-    namedtuple,
     )
 from dulwich.objects import (
     ShaFile,

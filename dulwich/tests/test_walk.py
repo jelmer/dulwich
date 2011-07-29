@@ -395,3 +395,17 @@ class WalkerTest(TestCase):
           times=[2, 1, 3, 4, 5])
         self.assertWalkYields([c5, c4, c3, c1, c2], [c5.id])
         self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id], order=ORDER_TOPO)
+
+    def test_out_of_order_with_exclude(self):
+        # Create the following graph:
+        # c1-------x2---m6
+        #   \          /
+        #    \-y3--y4-/--y5
+        # Due to skew, y5 is the oldest commit.
+        c1, x2, y3, y4, y5, m6 = cs = self.make_commits(
+          [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]],
+          times=[2, 3, 4, 5, 1, 6])
+        self.assertWalkYields([m6, y4, y3, x2, c1], [m6.id])
+        # Ensure that c1..y4 get excluded even though they're popped from the
+        # priority queue long before y5.
+        self.assertWalkYields([m6, x2], [m6.id], exclude=[y5.id])

@@ -95,6 +95,7 @@ class _CommitTimeQueue(object):
         self._excluded = walker.excluded
         self._pq = []
         self._pq_set = set()
+        self._seen = set()
         self._done = set()
         self._min_time = walker.since
         self._extra_commits_left = _MAX_EXTRA_COMMITS
@@ -111,6 +112,22 @@ class _CommitTimeQueue(object):
         if commit_id not in self._pq_set and commit_id not in self._done:
             heapq.heappush(self._pq, (-commit.commit_time, commit))
             self._pq_set.add(commit_id)
+            self._seen.add(commit_id)
+
+    def _exclude_parents(self, commit):
+        excluded = self._excluded
+        seen = self._seen
+        todo = [commit]
+        while todo:
+            commit = todo.pop()
+            for parent in commit.parents:
+                if parent not in excluded and parent in seen:
+                    # TODO: This is inefficient unless the object store does
+                    # some caching (which DiskObjectStore currently does not).
+                    # We could either add caching in this class or pass around
+                    # parsed queue entry objects instead of commits.
+                    todo.append(self._store[parent])
+                excluded.add(parent)
 
     def next(self):
         if self._is_finished:
@@ -121,12 +138,15 @@ class _CommitTimeQueue(object):
             self._pq_set.remove(sha)
             if sha in self._done:
                 continue
+            self._done.add(commit.id)
+
+            for parent_id in commit.parents:
+                self._push(parent_id)
 
             is_excluded = sha in self._excluded
             if is_excluded:
-                self._excluded.update(commit.parents)
+                self._exclude_parents(commit)
 
-            self._done.add(commit.id)
             if self._min_time is not None:
                 if commit.commit_time < self._min_time:
                     # We want to stop walking at min_time, but commits at the
@@ -139,9 +159,6 @@ class _CommitTimeQueue(object):
                 else:
                     # We're not at a boundary, so reset the counter.
                     self._extra_commits_left = _MAX_EXTRA_COMMITS
-
-            for parent_id in commit.parents:
-                self._push(parent_id)
 
             if not is_excluded:
                 return WalkEntry(self._walker, commit)

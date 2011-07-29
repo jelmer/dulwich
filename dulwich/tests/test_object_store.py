@@ -19,6 +19,7 @@
 """Tests for the object store interface."""
 
 
+from cStringIO import StringIO
 import os
 import shutil
 import tempfile
@@ -30,6 +31,7 @@ from dulwich.errors import (
     NotTreeError,
     )
 from dulwich.objects import (
+    sha_to_hex,
     object_class,
     Blob,
     Tag,
@@ -42,13 +44,15 @@ from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich.pack import (
-    write_pack_data,
+    REF_DELTA,
+    write_pack_objects,
     )
 from dulwich.tests import (
     TestCase,
     )
 from dulwich.tests.utils import (
     make_object,
+    build_pack,
     )
 
 
@@ -178,6 +182,11 @@ class ObjectStoreTests(object):
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual(testobject, self.store.peel_sha(obj.id))
 
+    def test_get_raw(self):
+        self.store.add_object(testobject)
+        self.assertEqual((Blob.type_num, 'yummy data'),
+                         self.store.get_raw(testobject.id))
+
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
@@ -226,15 +235,27 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         o = DiskObjectStore(self.store_dir)
         f, commit = o.add_pack()
         b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)], 1)
+        write_pack_objects(f, [(b, None)])
         commit()
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)
-        f, commit = o.add_thin_pack()
-        b = make_object(Blob, data="more yummy data")
-        write_pack_data(f, [(b, None)], 1)
-        commit()
+        blob = make_object(Blob, data='yummy data')
+        o.add_object(blob)
+
+        f = StringIO()
+        entries = build_pack(f, [
+          (REF_DELTA, (blob.id, 'more yummy data')),
+          ], store=o)
+        pack = o.add_thin_pack(f.read, None)
+
+        packed_blob_sha = sha_to_hex(entries[0][3])
+        pack.check_length_and_checksum()
+        self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
+        self.assertTrue(o.contains_packed(packed_blob_sha))
+        self.assertTrue(o.contains_packed(blob.id))
+        self.assertEqual((Blob.type_num, 'more yummy data'),
+                         o.get_raw(packed_blob_sha))
 
 
 class TreeLookupPathTests(TestCase):

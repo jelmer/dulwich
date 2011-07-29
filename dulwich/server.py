@@ -44,8 +44,7 @@ from dulwich.objects import (
     hex_to_sha,
     )
 from dulwich.pack import (
-    PackStreamReader,
-    write_pack_data,
+    write_pack_objects,
     )
 from dulwich.protocol import (
     BufferedPktLineWriter,
@@ -116,32 +115,6 @@ class BackendRepo(object):
             sha for including tags.
         """
         raise NotImplementedError
-
-
-class PackStreamCopier(PackStreamReader):
-    """Class to verify a pack stream as it is being read.
-
-    The pack is read from a ReceivableProtocol using read() or recv() as
-    appropriate and written out to the given file-like object.
-    """
-
-    def __init__(self, read_all, read_some, outfile):
-        super(PackStreamCopier, self).__init__(read_all, read_some)
-        self.outfile = outfile
-
-    def _read(self, read, size):
-        data = super(PackStreamCopier, self)._read(read, size)
-        self.outfile.write(data)
-        return data
-
-    def verify(self):
-        """Verify a pack stream and write it to the output file.
-
-        See PackStreamReader.iterobjects for a list of exceptions this may
-        throw.
-        """
-        for _, _, _ in self.read_objects():
-            pass
 
 
 class DictBackend(Backend):
@@ -280,8 +253,7 @@ class UploadPackHandler(Handler):
 
         self.progress("dul-daemon says what\n")
         self.progress("counting objects: %d, done.\n" % len(objects_iter))
-        write_pack_data(ProtocolFile(None, write), objects_iter, 
-                        len(objects_iter))
+        write_pack_objects(ProtocolFile(None, write), objects_iter)
         self.progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
@@ -615,18 +587,14 @@ class ReceivePackHandler(Handler):
         return ("report-status", "delete-refs", "side-band-64k")
 
     def _apply_pack(self, refs):
-        f, commit = self.repo.object_store.add_thin_pack()
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
         # TODO: more informative error messages than just the exception string
         try:
-            PackStreamCopier(self.proto.read, self.proto.recv, f).verify()
-            p = commit()
-            if not p:
-                raise IOError('Failed to write pack')
-            p.check()
+            p = self.repo.object_store.add_thin_pack(self.proto.read,
+                                                     self.proto.recv)
             status.append(('unpack', 'ok'))
         except all_exceptions, e:
             status.append(('unpack', str(e).replace('\n', '')))

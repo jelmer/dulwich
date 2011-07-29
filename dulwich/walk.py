@@ -254,8 +254,17 @@ class Walker(object):
                 self._num_entries += 1
                 return entry
 
-    def __iter__(self):
-        results = iter(self._next, None)
+    def _reorder(self, results):
+        """Possibly reorder a results iterator.
+
+        :param results: An iterator of results, in the order returned from the
+            queue_cls.
+        :return: An iterator or list of results, in the order required by the
+            Walker.
+        """
         if self.reverse:
             results = reversed(list(results))
-        return iter(results)
+        return results
+
+    def __iter__(self):
+        return iter(self._reorder(iter(self._next, None)))

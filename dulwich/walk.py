@@ -34,6 +34,9 @@ from dulwich.errors import (
 
 ORDER_DATE = 'date'
 
+# Maximum number of commits to walk past a commit time boundary.
+_MAX_EXTRA_COMMITS = 5
+
 
 class WalkEntry(object):
     """Object encapsulating a single result from a walk."""
@@ -126,6 +129,7 @@ class Walker(object):
 
         self._since = since
         self._until = until
+        self._extra_commits_left = _MAX_EXTRA_COMMITS
 
         for commit_id in itertools.chain(include, exclude):
             self._push(commit_id)
@@ -152,9 +156,21 @@ class Walker(object):
                 self._excluded.update(commit.parents)
 
             self._done.add(commit.id)
-            if self._since is None or commit.commit_time >= self._since:
-                for parent_id in commit.parents:
-                    self._push(parent_id)
+            if self._since is not None:
+                if commit.commit_time < self._since:
+                    # We want to stop walking at since, but commits at the
+                    # boundary may be out of order with respect to their
+                    # parents. So we walk _MAX_EXTRA_COMMITS more commits once
+                    # we hit this boundary.
+                    self._extra_commits_left -= 1
+                    if not self._extra_commits_left:
+                        break
+                else:
+                    # We're not at a boundary, so reset the counter.
+                    self._extra_commits_left = _MAX_EXTRA_COMMITS
+
+            for parent_id in commit.parents:
+                self._push(parent_id)
 
             if not is_excluded:
                 return commit

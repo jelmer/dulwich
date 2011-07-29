@@ -199,10 +199,10 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
         attr is not None, the CRC32 of the compressed bytes will be computed
         using this starting CRC32.
         After this function, will have the following attrs set:
-            comp_chunks    (if include_comp is True)
-            decomp_chunks
-            decomp_len
-            crc32
+        * comp_chunks    (if include_comp is True)
+        * decomp_chunks
+        * decomp_len
+        * crc32
     :param include_comp: If True, include compressed data in the result.
     :param buffer_size: Size of the read buffer.
     :return: Leftover unused data from the decompression.
@@ -658,15 +658,16 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
     :param include_comp: If True, include compressed data in the result.
     :param zlib_bufsize: An optional buffer size for zlib operations.
     :return: A tuple of (unpacked, unused), where unused is the unused data
-        leftover from decompression, and unpacked i an UnpackedObject with the
-        following attrs set:
-            obj_chunks     (for non-delta types)
-            pack_type_num
-            delta_base     (for delta types)
-            comp_chunks    (if include_comp is True)
-            decomp_chunks
-            decomp_len
-            crc32          (if compute_crc32 is True)
+        leftover from decompression, and unpacked in an UnpackedObject with
+        the following attrs set:
+
+        * obj_chunks     (for non-delta types)
+        * pack_type_num
+        * delta_base     (for delta types)
+        * comp_chunks    (if include_comp is True)
+        * decomp_chunks
+        * decomp_len
+        * crc32          (if compute_crc32 is True)
     """
     if read_some is None:
         read_some = read_all
@@ -1169,15 +1170,16 @@ class DeltaChainIterator(object):
 
     Subclasses can override _result to define the result type of the iterator.
     By default, results are UnpackedObjects with the following members set:
-        offset
-        obj_type_num
-        obj_chunks
-        pack_type_num
-        delta_base     (for delta types)
-        comp_chunks    (if _include_comp is True)
-        decomp_chunks
-        decomp_len
-        crc32          (if _compute_crc32 is True)
+
+    * offset
+    * obj_type_num
+    * obj_chunks
+    * pack_type_num
+    * delta_base     (for delta types)
+    * comp_chunks    (if _include_comp is True)
+    * decomp_chunks
+    * decomp_len
+    * crc32          (if _compute_crc32 is True)
     """
 
     _compute_crc32 = False
@@ -1363,7 +1365,7 @@ def pack_object_header(type_num, delta_base, size):
     :param type_num: Numeric type of the object.
     :param delta_base: Delta base offset or ref, or None for whole objects.
     :param size: Uncompressed object size.
-    :return A header for a packed object.
+    :return: A header for a packed object.
     """
     header = ''
     c = (type_num << 4) | (size & 15)

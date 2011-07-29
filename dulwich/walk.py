@@ -20,6 +20,7 @@
 
 import heapq
 import itertools
+import os
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -72,7 +73,7 @@ class Walker(object):
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
-                 reverse=False, max_entries=None):
+                 reverse=False, max_entries=None, paths=None):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -86,6 +87,7 @@ class Walker(object):
             memory.
         :param max_entries: The maximum number of entries to yield, or None for
             no limit.
+        :param paths: Iterable of file or subtree paths to show entries for.
         """
         self._store = store
 
@@ -94,12 +96,14 @@ class Walker(object):
         self._order = order
         self._reverse = reverse
         self._max_entries = max_entries
+        self._num_entries = 0
 
         exclude = exclude or []
         self._excluded = set(exclude)
         self._pq = []
         self._pq_set = set()
         self._done = set()
+        self._paths = paths and list(paths) or None
 
         for commit_id in itertools.chain(include, exclude):
             self._push(store[commit_id])
@@ -130,16 +134,58 @@ class Walker(object):
                 return commit
         return None
 
+    def _path_matches(self, changed_path):
+        if changed_path is None:
+            return False
+        for followed_path in self._paths:
+            if changed_path == followed_path:
+                return True
+            if (changed_path.startswith(followed_path) and
+                changed_path[len(followed_path)] == '/'):
+                return True
+        return False
+
+    def _change_matches(self, change):
+        return (self._path_matches(change.old.path) or
+                self._path_matches(change.new.path))
+
     def _make_entry(self, commit):
-        if commit is None:
-            return None
-        return WalkEntry(self._store, commit)
+        """Make a WalkEntry from a commit.
+
+        :param commit: The commit for the WalkEntry.
+        :return: A WalkEntry object, or None if no entry should be returned for
+            this commit (e.g. if it doesn't match any requested  paths).
+        """
+        entry = WalkEntry(self._store, commit)
+        if self._paths is None:
+            return entry
+
+        if len(commit.parents) > 1:
+            for path_changes in entry.changes():
+                # For merge commits, only include changes with conflicts for
+                # this path. Since a rename conflict may include different
+                # old.paths, we have to check all of them.
+                for change in path_changes:
+                    if self._change_matches(change):
+                        return entry
+        else:
+            for change in entry.changes():
+                if self._change_matches(change):
+                    return entry
+        return None
 
     def _next(self):
-        limit = self._max_entries
-        if limit is not None and len(self._done) >= limit:
-            return None
-        return self._make_entry(self._pop())
+        max_entries = self._max_entries
+        while True:
+            if max_entries is not None and self._num_entries >= max_entries:
+                return None
+            commit = self._pop()
+            if commit is None:
+                return None
+            entry = self._make_entry(commit)
+            if entry:
+                self._num_entries += 1
+                return entry
 
     def __iter__(self):
         results = iter(self._next, None)

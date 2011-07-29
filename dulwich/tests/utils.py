@@ -238,7 +238,7 @@ def build_pack(f, objects_spec, store=None):
     return expected
 
 
-def build_commit_graph(object_store, commit_spec, trees=None):
+def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
     """Build a commit graph from a concise specification.
 
     Sample usage:
@@ -262,11 +262,15 @@ def build_commit_graph(object_store, commit_spec, trees=None):
         trees for commits. The tree spec is an iterable of (path, blob, mode) or
         (path, blob) entries; if mode is omitted, it defaults to the normal file
         mode (0100644).
+    :param attrs: A dict of commit number -> (dict of attribute -> value) for
+        assigning additional values to the commits.
     :return: The list of commit objects created.
     :raise ValueError: If an undefined commit identifier is listed as a parent.
     """
     if trees is None:
         trees = {}
+    if attrs is None:
+        attrs = {}
     commit_time = 0
     nums = {}
     commits = []
@@ -289,13 +293,18 @@ def build_commit_graph(object_store, commit_spec, trees=None):
             object_store.add_object(blob)
         tree_id = commit_tree(object_store, blobs)
 
-        commit_obj = make_commit(
-          message=('Commit %i' % commit_num),
-          parents=parent_ids,
-          tree=tree_id,
-          commit_time=commit_time)
+        commit_attrs = {
+            'message': 'Commit %i' % commit_num,
+            'parents': parent_ids,
+            'tree': tree_id,
+            'commit_time': commit_time,
+            }
+        commit_attrs.update(attrs.get(commit_num, {}))
+        commit_obj = make_commit(**commit_attrs)
 
-        commit_time += 1
+        # By default, increment the time by a lot. Out-of-order commits should
+        # be closer together than this because their main cause is clock skew.
+        commit_time = commit_attrs['commit_time'] + 100
         nums[commit_num] = commit_obj.id
         object_store.add_object(commit_obj)
         commits.append(commit_obj)

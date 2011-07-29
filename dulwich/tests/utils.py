@@ -166,15 +166,15 @@ def build_pack(f, objects_spec, store=None):
     :param f: A file-like object to write the pack to.
     :param objects_spec: A list of (type_num, obj). For non-delta types, obj
         is the string of that object's data.
-
         For delta types, obj is a tuple of (base, data), where:
-          base can be either an index in objects_spec of the base for that
-          delta; or for a ref delta, a SHA, in which case the resulting pack
-          will be thin and the base will be an external ref.
-          data is a string of the full, non-deltified data for that object.
+
+        * base can be either an index in objects_spec of the base for that
+        * delta; or for a ref delta, a SHA, in which case the resulting pack
+        * will be thin and the base will be an external ref.
+        * data is a string of the full, non-deltified data for that object.
+
         Note that offsets/refs and deltas are computed within this function.
     :param store: An optional ObjectStore for looking up external refs.
-
     :return: A list of tuples in the order specified by objects_spec:
         (offset, type num, data, sha, CRC32)
     """

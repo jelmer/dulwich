@@ -150,3 +150,74 @@ class WalkerTest(TestCase):
           ]]
         self.assertWalkYields([TestWalkEntry(c3, changes)], [c3.id],
                               exclude=[c1.id, c2.id])
+
+    def test_path_matches(self):
+        walker = Walker(None, [], paths=['foo', 'bar', 'baz/quux'])
+        self.assertTrue(walker._path_matches('foo'))
+        self.assertTrue(walker._path_matches('foo/a'))
+        self.assertTrue(walker._path_matches('foo/a/b'))
+        self.assertTrue(walker._path_matches('bar'))
+        self.assertTrue(walker._path_matches('baz/quux'))
+        self.assertTrue(walker._path_matches('baz/quux/a'))
+
+        self.assertFalse(walker._path_matches(None))
+        self.assertFalse(walker._path_matches('oops'))
+        self.assertFalse(walker._path_matches('fool'))
+        self.assertFalse(walker._path_matches('baz'))
+        self.assertFalse(walker._path_matches('baz/quu'))
+
+    def test_paths(self):
+        blob_a1 = make_object(Blob, data='a1')
+        blob_b2 = make_object(Blob, data='b2')
+        blob_a3 = make_object(Blob, data='a3')
+        blob_b3 = make_object(Blob, data='b3')
+        c1, c2, c3 = self.make_linear_commits(
+          3, trees={1: [('a', blob_a1)],
+                    2: [('a', blob_a1), ('x/b', blob_b2)],
+                    3: [('a', blob_a3), ('x/b', blob_b3)]})
+
+        self.assertWalkYields([c3, c2, c1], [c3.id])
+        self.assertWalkYields([c3, c1], [c3.id], paths=['a'])
+        self.assertWalkYields([c3, c2], [c3.id], paths=['x/b'])
+
+        # All changes are included, not just for requested paths.
+        changes = [
+          TreeChange(CHANGE_MODIFY, ('a', F, blob_a1.id),
+                     ('a', F, blob_a3.id)),
+          TreeChange(CHANGE_MODIFY, ('x/b', F, blob_b2.id),
+                     ('x/b', F, blob_b3.id)),
+          ]
+        self.assertWalkYields([TestWalkEntry(c3, changes)], [c3.id],
+                              max_entries=1, paths=['a'])
+
+    def test_paths_subtree(self):
+        blob_a = make_object(Blob, data='a')
+        blob_b = make_object(Blob, data='b')
+        c1, c2, c3 = self.make_linear_commits(
+          3, trees={1: [('x/a', blob_a)],
+                    2: [('b', blob_b), ('x/a', blob_a)],
+                    3: [('b', blob_b), ('x/a', blob_a), ('x/b', blob_b)]})
+        self.assertWalkYields([c2], [c3.id], paths=['b'])
+        self.assertWalkYields([c3, c1], [c3.id], paths=['x'])
+
+    def test_paths_max_entries(self):
+        blob_a = make_object(Blob, data='a')
+        blob_b = make_object(Blob, data='b')
+        c1, c2 = self.make_linear_commits(
+          2, trees={1: [('a', blob_a)],
+                    2: [('a', blob_a), ('b', blob_b)]})
+        self.assertWalkYields([c2], [c2.id], paths=['b'], max_entries=1)
+        self.assertWalkYields([c1], [c1.id], paths=['a'], max_entries=1)
+
+    def test_paths_merge(self):
+        blob_a1 = make_object(Blob, data='a1')
+        blob_a2 = make_object(Blob, data='a2')
+        blob_a3 = make_object(Blob, data='a3')
+        x1, y2, m3, m4 = self.make_commits(
+          [[1], [2], [3, 1, 2], [4, 1, 2]],
+          trees={1: [('a', blob_a1)],
+                 2: [('a', blob_a2)],
+                 3: [('a', blob_a3)],
+                 4: [('a', blob_a1)]})  # Non-conflicting
+        self.assertWalkYields([m3, y2, x1], [m3.id], paths=['a'])
+        self.assertWalkYields([y2, x1], [m4.id], paths=['a'])

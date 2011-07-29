@@ -75,3 +75,16 @@ class WalkerTest(TestCase):
     def test_reverse(self):
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c1, c2, c3], [c3.id], reverse=True)
+
+    def test_max_commits(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([c3, c2, c1], [c3.id], max_commits=3)
+        self.assertWalkYields([c3, c2], [c3.id], max_commits=2)
+        self.assertWalkYields([c3], [c3.id], max_commits=1)
+
+    def test_reverse_after_max_commits(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([c1, c2, c3], [c3.id], max_commits=3,
+                              reverse=True)
+        self.assertWalkYields([c2, c3], [c3.id], max_commits=2, reverse=True)
+        self.assertWalkYields([c3], [c3.id], max_commits=1, reverse=True)

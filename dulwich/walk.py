@@ -32,7 +32,7 @@ class Walker(object):
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
-                 reverse=False):
+                 reverse=False, max_commits=None):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -44,6 +44,8 @@ class Walker(object):
             other than ORDER_DATE may result in O(n) memory usage.
         :param reverse: If True, reverse the order of output, requiring O(n)
             memory.
+        :param max_commits: The maximum number of commits to yield, or None for
+            no limit.
         """
         self._store = store
 
@@ -51,6 +53,7 @@ class Walker(object):
             raise ValueError('Unknown walk order %s' % order)
         self._order = order
         self._reverse = reverse
+        self._max_commits = max_commits
 
         exclude = exclude or []
         self._excluded = set(exclude)
@@ -88,6 +91,9 @@ class Walker(object):
         return None
 
     def _next(self):
+        limit = self._max_commits
+        if limit is not None and len(self._done) >= limit:
+            return None
         return self._pop()
 
     def __iter__(self):

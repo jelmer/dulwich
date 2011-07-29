@@ -31,6 +31,7 @@ import types
 from dulwich.objects import (
     FixedSha,
     Commit,
+    Tree,
     )
 from dulwich.pack import (
     OFS_DELTA,
@@ -46,6 +47,9 @@ from dulwich.repo import Repo
 from dulwich.tests import (
     TestSkipped,
     )
+
+# Plain files are very frequently used in tests, so let the mode be very short.
+F = 0100644  # Shorthand mode for Files.
 
 
 def open_repo(name):
@@ -230,3 +234,54 @@ def build_pack(f, objects_spec, store=None):
     sf.write_sha()
     f.seek(0)
     return expected
+
+
+def build_commit_graph(object_store, commit_spec):
+    """Build a commit graph from a concise specification.
+
+    Sample usage:
+    >>> c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
+    >>> store[store[c3].parents[0]] == c1
+    True
+    >>> store[store[c3].parents[1]] == c2
+    True
+
+    If not otherwise specified, commits will refer to the empty tree and have
+    commit times increasing in the same order as the commit spec.
+
+    :param object_store: An ObjectStore to commit objects to.
+    :param commit_spec: An iterable of iterables of ints defining the commit
+        graph. Each entry defines one commit, and entries must be in topological
+        order. The first element of each entry is a commit number, and the
+        remaining elements are its parents. The commit numbers are only
+        meaningful for the call to make_commits; since real commit objects are
+        created, they will get created with real, opaque SHAs.
+    :return: The list of commit objects created.
+    :raise ValueError: If an undefined commit identifier is listed as a parent.
+    """
+    commit_time = 0
+    nums = {}
+    commits = []
+
+    for commit in commit_spec:
+        commit_num = commit[0]
+        try:
+            parent_ids = [nums[pn] for pn in commit[1:]]
+        except KeyError, e:
+            missing_parent, = e.args
+            raise ValueError('Unknown parent %i' % missing_parent)
+
+        tree = Tree()
+        commit_obj = make_commit(
+          message=('Commit %i' % commit_num),
+          parents=parent_ids,
+          tree=tree.id,
+          commit_time=commit_time)
+
+        commit_time += 1
+        nums[commit_num] = commit_obj.id
+        object_store.add_object(commit_obj)
+        object_store.add_object(tree)
+        commits.append(commit_obj)
+
+    return commits

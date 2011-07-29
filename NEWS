@@ -74,6 +74,9 @@
   * Add a new build_pack test utility for building packs from a simple spec.
     (Dave Borowitz)
 
+  * Add a new build_commit_graph test utility for building commits from a
+    simple spec. (Dave Borowitz)
+
 0.7.1	2011-04-12
 
  BUG FIXES

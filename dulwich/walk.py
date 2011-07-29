@@ -98,6 +98,7 @@ class _CommitTimeQueue(object):
         self._done = set()
         self._min_time = walker.since
         self._extra_commits_left = _MAX_EXTRA_COMMITS
+        self._is_finished = False
 
         for commit_id in itertools.chain(walker.include, walker.excluded):
             self._push(commit_id)
@@ -112,6 +113,8 @@ class _CommitTimeQueue(object):
             self._pq_set.add(commit_id)
 
     def next(self):
+        if self._is_finished:
+            return None
         while self._pq:
             _, commit = heapq.heappop(self._pq)
             sha = commit.id
@@ -142,6 +145,7 @@ class _CommitTimeQueue(object):
 
             if not is_excluded:
                 return WalkEntry(self._walker, commit)
+        self._is_finished = True
         return None
 
 
@@ -198,6 +202,7 @@ class Walker(object):
 
         self._num_entries = 0
         self._queue = queue_cls(self)
+        self._out_queue = collections.deque()
 
     def _path_matches(self, changed_path):
         if changed_path is None:
@@ -254,15 +259,18 @@ class Walker(object):
 
     def _next(self):
         max_entries = self.max_entries
-        while True:
-            if max_entries is not None and self._num_entries >= max_entries:
-                return None
+        while max_entries is None or self._num_entries < max_entries:
             entry = self._queue.next()
-            if entry is None:
-                return None
-            if self._should_return(entry):
-                self._num_entries += 1
-                return entry
+            if entry is not None:
+                self._out_queue.append(entry)
+            if entry is None or len(self._out_queue) > _MAX_EXTRA_COMMITS:
+                if not self._out_queue:
+                    return None
+                entry = self._out_queue.popleft()
+                if self._should_return(entry):
+                    self._num_entries += 1
+                    return entry
+        return None
 
     def _reorder(self, results):
         """Possibly reorder a results iterator.

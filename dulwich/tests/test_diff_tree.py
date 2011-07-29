@@ -289,6 +289,35 @@ class TreeChangesTest(DiffTestCase):
                       ('a', F, blob_a2.id))],
           tree1, tree2)
 
+    def test_tree_changes_rename_detector(self):
+        blob_a1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob_a2 = make_object(Blob, data='a\nb\nc\ne\n')
+        blob_b = make_object(Blob, data='b')
+        tree1 = self.commit_tree([('a', blob_a1), ('b', blob_b)])
+        tree2 = self.commit_tree([('c', blob_a2), ('b', blob_b)])
+        detector = RenameDetector(self.store)
+
+        self.assertChangesEqual(
+          [TreeChange.delete(('a', F, blob_a1.id)),
+           TreeChange.add(('c', F, blob_a2.id))],
+          tree1, tree2)
+        self.assertChangesEqual(
+          [TreeChange.delete(('a', F, blob_a1.id)),
+           TreeChange(CHANGE_UNCHANGED, ('b', F, blob_b.id),
+                      ('b', F, blob_b.id)),
+           TreeChange.add(('c', F, blob_a2.id))],
+          tree1, tree2, want_unchanged=True)
+        self.assertChangesEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob_a1.id),
+                      ('c', F, blob_a2.id))],
+          tree1, tree2, rename_detector=detector)
+        self.assertChangesEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob_a1.id),
+                      ('c', F, blob_a2.id)),
+           TreeChange(CHANGE_UNCHANGED, ('b', F, blob_b.id),
+                      ('b', F, blob_b.id))],
+          tree1, tree2, rename_detector=detector, want_unchanged=True)
+
     def assertChangesForMergeEqual(self, expected, parent_trees, merge_tree,
                                    **kwargs):
         parent_tree_ids = [t.id for t in parent_trees]

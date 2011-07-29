@@ -21,7 +21,9 @@
 from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_MODIFY,
+    CHANGE_RENAME,
     TreeChange,
+    RenameDetector,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -221,3 +223,19 @@ class WalkerTest(TestCase):
                  4: [('a', blob_a1)]})  # Non-conflicting
         self.assertWalkYields([m3, y2, x1], [m3.id], paths=['a'])
         self.assertWalkYields([y2, x1], [m4.id], paths=['a'])
+
+    def test_changes_with_renames(self):
+        blob = make_object(Blob, data='blob')
+        c1, c2 = self.make_linear_commits(
+          2, trees={1: [('a', blob)], 2: [('b', blob)]})
+        entry_a = ('a', F, blob.id)
+        entry_b = ('b', F, blob.id)
+        changes_without_renames = [TreeChange.delete(entry_a),
+                                   TreeChange.add(entry_b)]
+        changes_with_renames = [TreeChange(CHANGE_RENAME, entry_a, entry_b)]
+        self.assertWalkYields(
+          [TestWalkEntry(c2, changes_without_renames)], [c2.id], max_entries=1)
+        detector = RenameDetector(self.store)
+        self.assertWalkYields(
+          [TestWalkEntry(c2, changes_with_renames)], [c2.id], max_entries=1,
+          rename_detector=detector)

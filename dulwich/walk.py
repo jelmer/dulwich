@@ -33,10 +33,11 @@ ORDER_DATE = 'date'
 class WalkEntry(object):
     """Object encapsulating a single result from a walk."""
 
-    def __init__(self, store, commit):
+    def __init__(self, store, commit, rename_detector):
         self.commit = commit
         self._store = store
         self._changes = None
+        self._rename_detector = rename_detector
 
     def changes(self):
         """Get the tree changes for this entry.
@@ -49,15 +50,17 @@ class WalkEntry(object):
         if self._changes is None:
             commit = self.commit
             if not commit.parents:
-                changes = list(tree_changes(self._store, None, commit.tree))
+                changes_func = tree_changes
+                parent = None
             elif len(commit.parents) == 1:
-                ptree = self._store[commit.parents[0]].tree
-                changes = list(tree_changes(self._store, ptree, commit.tree))
+                changes_func = tree_changes
+                parent = self._store[commit.parents[0]].tree
             else:
-                ptrees = [self._store[p].tree for p in commit.parents]
-                changes = list(tree_changes_for_merge(self._store, ptrees,
-                                                      commit.tree))
-            self._changes = changes
+                changes_func = tree_changes_for_merge
+                parent = [self._store[p].tree for p in commit.parents]
+            self._changes = list(changes_func(
+              self._store, parent, commit.tree,
+              rename_detector=self._rename_detector))
         return self._changes
 
     def __repr__(self):
@@ -73,7 +76,8 @@ class Walker(object):
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
-                 reverse=False, max_entries=None, paths=None):
+                 reverse=False, max_entries=None, paths=None,
+                 rename_detector=None):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -88,6 +92,8 @@ class Walker(object):
         :param max_entries: The maximum number of entries to yield, or None for
             no limit.
         :param paths: Iterable of file or subtree paths to show entries for.
+        :param rename_detector: diff.RenameDetector object for detecting
+            renames.
         """
         self._store = store
 
@@ -97,6 +103,7 @@ class Walker(object):
         self._reverse = reverse
         self._max_entries = max_entries
         self._num_entries = 0
+        self._rename_detector = rename_detector
 
         exclude = exclude or []
         self._excluded = set(exclude)
@@ -156,7 +163,7 @@ class Walker(object):
         :return: A WalkEntry object, or None if no entry should be returned for
             this commit (e.g. if it doesn't match any requested  paths).
         """
-        entry = WalkEntry(self._store, commit)
+        entry = WalkEntry(self._store, commit, self._rename_detector)
         if self._paths is None:
             return entry
 

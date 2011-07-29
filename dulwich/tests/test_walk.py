@@ -95,6 +95,7 @@ class WalkerTest(TestCase):
 
     def assertWalkYields(self, expected, *args, **kwargs):
         walker = Walker(self.store, *args, **kwargs)
+        expected = list(expected)
         for i, entry in enumerate(expected):
             if isinstance(entry, Commit):
                 expected[i] = TestWalkEntry(entry, None)
@@ -111,24 +112,17 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c3, c2], [c3.id, c1.id], exclude=[c1.id])
         self.assertWalkYields([c3], [c3.id, c1.id], exclude=[c2.id])
 
-    def assertNextFails(self, walk_iter, missing_sha):
-        try:
-            next(walk_iter)
-            self.fail('Failed to error on missing sha %s' % missing_sha)
-        except MissingCommitError, e:
-            self.assertEqual(missing_sha, e.sha)
-
     def test_missing(self):
-        c1, c2, c3 = self.make_linear_commits(3)
-        self.assertWalkYields([c3, c2, c1], [c3.id])
+        cs = list(reversed(self.make_linear_commits(20)))
+        self.assertWalkYields(cs, [cs[0].id])
 
-        del self.store[c1.id]
-        self.assertWalkYields([c3], [c3.id], max_entries=1)
-        walk_iter = iter(Walker(self.store, [c3.id]))
-        self.assertEqual(TestWalkEntry(c3, None), next(walk_iter))
-        self.assertNextFails(walk_iter, c1.id)
-        self.assertNextFails(iter(Walker(self.store, [c2.id])), c1.id)
-        self.assertRaises(MissingCommitError, Walker, self.store, c1.id)
+        # Exactly how close we can get to a missing commit depends on our
+        # implementation (in particular the choice of _MAX_EXTRA_COMMITS), but
+        # we should at least be able to walk some history in a broken repo.
+        del self.store[cs[-1].id]
+        for i in xrange(1, 11):
+            self.assertWalkYields(cs[:i], [cs[0].id], max_entries=i)
+        self.assertRaises(MissingCommitError, Walker, self.store, cs[0].id)
 
     def test_branch(self):
         c1, x2, x3, y4 = self.make_commits([[1], [2, 1], [3, 2], [4, 1]])

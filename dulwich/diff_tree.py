@@ -193,6 +193,91 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
         yield TreeChange(change_type, entry1, entry2)
 
 
+def _all_eq(seq, key, value):
+    for e in seq:
+        if key(e) != value:
+            return False
+    return True
+
+
+def _all_same(seq, key):
+    return _all_eq(seq[1:], key, key(seq[0]))
+
+
+def _matches_any_parent(store, parent_tree_ids, changes):
+    have = [c for c in changes if c is not None]
+    assert have
+    new = have[0].new
+
+    # Look in changes for parents we already have first.
+    for change in have:
+        if new.sha == change.old.sha:
+            return True
+
+    # A change may be None if that path was unchanged, so we need to actually
+    # look up the SHA for that path in any parent trees.
+    # TODO: We could precompute these old_shas (e.g. by passing want_unchanged
+    # to tree_changes), but the assumption is that the cost of tree lookups due
+    # to conflicts is less than the savings we're getting by pruning identical
+    # subtrees.
+    missing = [p for p, c in zip(parent_tree_ids, changes) if c is None]
+    get = store.__getitem__
+    for parent_tree_id in missing:
+        tree = get(parent_tree_id)
+        try:
+            _, old_sha = tree.lookup_path(get, new.path)
+        except KeyError:
+            continue
+        if new.sha == old_sha:
+            return True
+    return False
+
+
+def tree_changes_for_merge(store, parent_tree_ids, tree_id):
+    """Get the tree changes for a merge tree relative to all its parents.
+
+    :param store: An ObjectStore for looking up objects.
+    :param parent_tree_ids: An iterable of the SHAs of the parent trees.
+    :param tree_id: The SHA of the merge tree.
+
+    :yield: Lists of TreeChange objects, one per conflicted path in the merge.
+
+        Each list contains one element per parent, with the TreeChange for that
+        path relative to that parent. An element may be None if it never existed
+        in one parent and was deleted in two others.
+
+        A path is only included in the output if it is a conflict, i.e. its SHA
+        in the merge tree is not found in any of the parents, or in the case of
+        deletes, if not all of the old SHAs match.
+    """
+    all_parent_changes = [tree_changes(store, t, tree_id)
+                          for t in parent_tree_ids]
+    num_parents = len(parent_tree_ids)
+    changes_by_path = defaultdict(lambda: [None] * num_parents)
+
+    # Organize by path.
+    for i, parent_changes in enumerate(all_parent_changes):
+        for change in parent_changes:
+            if change.type == CHANGE_DELETE:
+                path = change.old.path
+            else:
+                path = change.new.path
+            changes_by_path[path][i] = change
+
+    old_sha = lambda c: c.old.sha
+    change_type = lambda c: c.type
+
+    # Yield only conflicting changes.
+    for _, changes in sorted(changes_by_path.iteritems()):
+        assert len(changes) == num_parents
+        have = [c for c in changes if c is not None]
+        if _all_eq(have, change_type, CHANGE_DELETE):
+            if not _all_same(have, old_sha):
+                yield changes
+        elif not _matches_any_parent(store, parent_tree_ids, changes):
+            yield changes
+
+
 _BLOCK_SIZE = 64
 
 

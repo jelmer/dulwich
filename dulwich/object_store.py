@@ -685,23 +685,17 @@ class ObjectStoreIterator(ObjectIterator):
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):
-    """Lookup an object in a Git tree.
+    """Look up an object in a Git tree.
 
     :param lookup_obj: Callback for retrieving object by SHA1
     :param root_sha: SHA1 of the root tree
     :param path: Path to lookup
+    :return: A tuple of (mode, SHA) of the resulting path.
     """
-    parts = path.split("/")
-    sha = root_sha
-    mode = None
-    for p in parts:
-        obj = lookup_obj(sha)
-        if not isinstance(obj, Tree):
-            raise NotTreeError(sha)
-        if p == '':
-            continue
-        mode, sha = obj[p]
-    return mode, sha
+    tree = lookup_obj(root_sha)
+    if not isinstance(tree, Tree):
+        raise NotTreeError(root_sha)
+    return tree.lookup_path(lookup_obj, path)
 
 
 class MissingObjectFinder(object):

@@ -919,6 +919,25 @@ class Tree(ShaFile):
             text.append("%04o %s %s\t%s\n" % (mode, kind, hexsha, name))
         return "".join(text)
 
+    def lookup_path(self, lookup_obj, path):
+        """Look up an object in a Git tree.
+
+        :param lookup_obj: Callback for retrieving object by SHA1
+        :param path: Path to lookup
+        :return: A tuple of (mode, SHA) of the resulting path.
+        """
+        parts = path.split('/')
+        sha = self.id
+        mode = None
+        for p in parts:
+            if not p:
+                continue
+            obj = lookup_obj(sha)
+            if not isinstance(obj, Tree):
+                raise NotTreeError(sha)
+            mode, sha = obj[p]
+        return mode, sha
+
 
 def parse_timezone(text):
     """Parse a timezone text fragment (e.g. '+0100').

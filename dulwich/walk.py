@@ -41,11 +41,11 @@ _MAX_EXTRA_COMMITS = 5
 class WalkEntry(object):
     """Object encapsulating a single result from a walk."""
 
-    def __init__(self, store, commit, rename_detector):
+    def __init__(self, walker, commit):
         self.commit = commit
-        self._store = store
+        self._store = walker.store
         self._changes = None
-        self._rename_detector = rename_detector
+        self._rename_detector = walker.rename_detector
 
     def changes(self):
         """Get the tree changes for this entry.
@@ -107,7 +107,7 @@ class Walker(object):
         :param since: Timestamp to list commits after.
         :param until: Timestamp to list commits before.
         """
-        self._store = store
+        self.store = store
 
         if order not in (ORDER_DATE,):
             raise ValueError('Unknown walk order %s' % order)
@@ -117,7 +117,7 @@ class Walker(object):
         self._num_entries = 0
         if follow and not rename_detector:
             rename_detector = RenameDetector(store)
-        self._rename_detector = rename_detector
+        self.rename_detector = rename_detector
 
         exclude = exclude or []
         self._excluded = set(exclude)
@@ -136,7 +136,7 @@ class Walker(object):
 
     def _push(self, commit_id):
         try:
-            commit = self._store[commit_id]
+            commit = self.store[commit_id]
         except KeyError:
             raise MissingCommitError(commit_id)
         if commit_id not in self._pq_set and commit_id not in self._done:
@@ -211,7 +211,7 @@ class Walker(object):
         if self._until is not None and commit.commit_time > self._until:
             return None
 
-        entry = WalkEntry(self._store, commit, self._rename_detector)
+        entry = WalkEntry(self, commit)
         if self._paths is None:
             return entry
 

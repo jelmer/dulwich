@@ -39,6 +39,8 @@ CHANGE_RENAME = 'rename'
 CHANGE_COPY = 'copy'
 CHANGE_UNCHANGED = 'unchanged'
 
+RENAME_CHANGE_TYPES = (CHANGE_RENAME, CHANGE_COPY)
+
 _NULL_ENTRY = TreeEntry(None, None, None)
 
 _MAX_SCORE = 100

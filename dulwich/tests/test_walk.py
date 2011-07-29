@@ -22,6 +22,7 @@ from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_MODIFY,
     CHANGE_RENAME,
+    CHANGE_COPY,
     TreeChange,
     RenameDetector,
     )
@@ -239,3 +240,36 @@ class WalkerTest(TestCase):
         self.assertWalkYields(
           [TestWalkEntry(c2, changes_with_renames)], [c2.id], max_entries=1,
           rename_detector=detector)
+
+    def test_follow_rename(self):
+        blob = make_object(Blob, data='blob')
+        names = ['a', 'a', 'b', 'b', 'c', 'c']
+
+        trees = dict((i + 1, [(n, blob, F)]) for i, n in enumerate(names))
+        c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
+        self.assertWalkYields([c5], [c6.id], paths=['c'])
+
+        e = lambda n: (n, F, blob.id)
+        self.assertWalkYields(
+          [TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e('b'), e('c'))]),
+           TestWalkEntry(c3, [TreeChange(CHANGE_RENAME, e('a'), e('b'))]),
+           TestWalkEntry(c1, [TreeChange.add(e('a'))])],
+          [c6.id], paths=['c'], follow=True)
+
+    def test_follow_rename_remove_path(self):
+        blob = make_object(Blob, data='blob')
+        _, _, _, c4, c5, c6 = self.make_linear_commits(
+          6, trees={1: [('a', blob), ('c', blob)],
+                    2: [],
+                    3: [],
+                    4: [('b', blob)],
+                    5: [('a', blob)],
+                    6: [('c', blob)]})
+
+        e = lambda n: (n, F, blob.id)
+        # Once the path changes to b, we aren't interested in a or c anymore.
+        self.assertWalkYields(
+          [TestWalkEntry(c6, [TreeChange(CHANGE_RENAME, e('a'), e('c'))]),
+           TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e('b'), e('a'))]),
+           TestWalkEntry(c4, [TreeChange.add(e('b'))])],
+          [c6.id], paths=['c'], follow=True)

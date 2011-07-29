@@ -54,13 +54,11 @@ from dulwich.tests import (
     TestCase,
     )
 from dulwich.tests.utils import (
+    F,
     make_object,
     functest_builder,
     ext_functest_builder,
     )
-
-# Shorthand mode for Files.
-F = 0100644
 
 
 class DiffTestCase(TestCase):

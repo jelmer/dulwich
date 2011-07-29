@@ -32,8 +32,9 @@ except ImportError:
     from cgi import parse_qs
 
 try:
-    from os import SEEK_END
+    from os import SEEK_CUR, SEEK_END
 except ImportError:
+    SEEK_CUR = 1
     SEEK_END = 2
 
 import struct
@@ -137,94 +138,119 @@ except ImportError:
 
 try:
     from collections import namedtuple
-
-    TreeEntryTuple = namedtuple('TreeEntryTuple', ['path', 'mode', 'sha'])
-    TreeChangeTuple = namedtuple('TreeChangeTuple', ['type', 'old', 'new'])
 except ImportError:
-    # Provide manual implementations of namedtuples for Python <2.5.
-    # If the class definitions change, be sure to keep these in sync by running
-    # namedtuple(..., verbose=True) in a recent Python and pasting the output.
-
-    # Necessary globals go here.
-    _tuple = tuple
-    _property = property
+    # Recipe for namedtuple from http://code.activestate.com/recipes/500261/
+    # Copyright (c) 2007 Python Software Foundation; All Rights Reserved
+    # Licensed under the Python Software Foundation License.
     from operator import itemgetter as _itemgetter
+    from keyword import iskeyword as _iskeyword
+    import sys as _sys
 
-    class TreeEntryTuple(tuple):
-            'TreeEntryTuple(path, mode, sha)'
+    def namedtuple(typename, field_names, verbose=False, rename=False):
+        """Returns a new subclass of tuple with named fields.
 
-            __slots__ = ()
+        >>> Point = namedtuple('Point', 'x y')
+        >>> Point.__doc__                   # docstring for the new class
+        'Point(x, y)'
+        >>> p = Point(11, y=22)             # instantiate with positional args or keywords
+        >>> p[0] + p[1]                     # indexable like a plain tuple
+        33
+        >>> x, y = p                        # unpack like a regular tuple
+        >>> x, y
+        (11, 22)
+        >>> p.x + p.y                       # fields also accessable by name
+        33
+        >>> d = p._asdict()                 # convert to a dictionary
+        >>> d['x']
+        11
+        >>> Point(**d)                      # convert from a dictionary
+        Point(x=11, y=22)
+        >>> p._replace(x=100)               # _replace() is like str.replace() but targets named fields
+        Point(x=100, y=22)
 
-            _fields = ('path', 'mode', 'sha')
+        """
 
-            def __new__(_cls, path, mode, sha):
-                return _tuple.__new__(_cls, (path, mode, sha))
+        # Parse and validate the field names.  Validation serves two purposes,
+        # generating informative error messages and preventing template injection attacks.
+        if isinstance(field_names, basestring):
+            field_names = field_names.replace(',', ' ').split() # names separated by whitespace and/or commas
+        field_names = tuple(map(str, field_names))
+        if rename:
+            names = list(field_names)
+            seen = set()
+            for i, name in enumerate(names):
+                if (not min(c.isalnum() or c=='_' for c in name) or _iskeyword(name)
+                    or not name or name[0].isdigit() or name.startswith('_')
+                    or name in seen):
+                        names[i] = '_%d' % i
+                seen.add(name)
+            field_names = tuple(names)
+        for name in (typename,) + field_names:
+            if not min(c.isalnum() or c=='_' for c in name):
+                raise ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
+            if _iskeyword(name):
+                raise ValueError('Type names and field names cannot be a keyword: %r' % name)
+            if name[0].isdigit():
+                raise ValueError('Type names and field names cannot start with a number: %r' % name)
+        seen_names = set()
+        for name in field_names:
+            if name.startswith('_') and not rename:
+                raise ValueError('Field names cannot start with an underscore: %r' % name)
+            if name in seen_names:
+                raise ValueError('Encountered duplicate field name: %r' % name)
+            seen_names.add(name)
 
-            @classmethod
-            def _make(cls, iterable, new=tuple.__new__, len=len):
-                'Make a new TreeEntryTuple object from a sequence or iterable'
-                result = new(cls, iterable)
-                if len(result) != 3:
-                    raise TypeError('Expected 3 arguments, got %d' % len(result))
-                return result
+        # Create and fill-in the class template
+        numfields = len(field_names)
+        argtxt = repr(field_names).replace("'", "")[1:-1]   # tuple repr without parens or quotes
+        reprtxt = ', '.join('%s=%%r' % name for name in field_names)
+        template = '''class %(typename)s(tuple):
+        '%(typename)s(%(argtxt)s)' \n
+        __slots__ = () \n
+        _fields = %(field_names)r \n
+        def __new__(_cls, %(argtxt)s):
+            return _tuple.__new__(_cls, (%(argtxt)s)) \n
+        @classmethod
+        def _make(cls, iterable, new=tuple.__new__, len=len):
+            'Make a new %(typename)s object from a sequence or iterable'
+            result = new(cls, iterable)
+            if len(result) != %(numfields)d:
+                raise TypeError('Expected %(numfields)d arguments, got %%d' %% len(result))
+            return result \n
+        def __repr__(self):
+            return '%(typename)s(%(reprtxt)s)' %% self \n
+        def _asdict(self):
+            'Return a new dict which maps field names to their values'
+            return dict(zip(self._fields, self)) \n
+        def _replace(_self, **kwds):
+            'Return a new %(typename)s object replacing specified fields with new values'
+            result = _self._make(map(kwds.pop, %(field_names)r, _self))
+            if kwds:
+                raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
+            return result \n
+        def __getnewargs__(self):
+            return tuple(self) \n\n''' % locals()
+        for i, name in enumerate(field_names):
+            template += '        %s = _property(_itemgetter(%d))\n' % (name, i)
+        if verbose:
+            print template
 
-            def __repr__(self):
-                return 'TreeEntryTuple(path=%r, mode=%r, sha=%r)' % self
+        # Execute the template string in a temporary namespace
+        namespace = dict(_itemgetter=_itemgetter, __name__='namedtuple_%s' % typename,
+                         _property=property, _tuple=tuple)
+        try:
+            exec template in namespace
+        except SyntaxError, e:
+            raise SyntaxError(e.message + ':\n' + template)
+        result = namespace[typename]
 
-            def _asdict(t):
-                'Return a new dict which maps field names to their values'
-                return {'path': t[0], 'mode': t[1], 'sha': t[2]}
+        # For pickling to work, the __module__ variable needs to be set to the frame
+        # where the named tuple is created.  Bypass this step in enviroments where
+        # sys._getframe is not defined (Jython for example) or sys._getframe is not
+        # defined for arguments greater than 0 (IronPython).
+        try:
+            result.__module__ = _sys._getframe(1).f_globals.get('__name__', '__main__')
+        except (AttributeError, ValueError):
+            pass
 
-            def _replace(_self, **kwds):
-                'Return a new TreeEntryTuple object replacing specified fields with new values'
-                result = _self._make(map(kwds.pop, ('path', 'mode', 'sha'), _self))
-                if kwds:
-                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
-                return result
-
-            def __getnewargs__(self):
-                return tuple(self)
-
-            path = _property(_itemgetter(0))
-            mode = _property(_itemgetter(1))
-            sha = _property(_itemgetter(2))
-
-
-    class TreeChangeTuple(tuple):
-            'TreeChangeTuple(type, old, new)'
-
-            __slots__ = ()
-
-            _fields = ('type', 'old', 'new')
-
-            def __new__(_cls, type, old, new):
-                return _tuple.__new__(_cls, (type, old, new))
-
-            @classmethod
-            def _make(cls, iterable, new=tuple.__new__, len=len):
-                'Make a new TreeChangeTuple object from a sequence or iterable'
-                result = new(cls, iterable)
-                if len(result) != 3:
-                    raise TypeError('Expected 3 arguments, got %d' % len(result))
-                return result
-
-            def __repr__(self):
-                return 'TreeChangeTuple(type=%r, old=%r, new=%r)' % self
-
-            def _asdict(t):
-                'Return a new dict which maps field names to their values'
-                return {'type': t[0], 'old': t[1], 'new': t[2]}
-
-            def _replace(_self, **kwds):
-                'Return a new TreeChangeTuple object replacing specified fields with new values'
-                result = _self._make(map(kwds.pop, ('type', 'old', 'new'), _self))
-                if kwds:
-                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
-                return result
-
-            def __getnewargs__(self):
-                return tuple(self)
-
-            type = _property(_itemgetter(0))
-            old = _property(_itemgetter(1))
-            new = _property(_itemgetter(2))
+        return result

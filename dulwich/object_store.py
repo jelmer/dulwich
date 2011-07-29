@@ -20,6 +20,7 @@
 """Git object store interfaces and implementation."""
 
 
+from cStringIO import StringIO
 import errno
 import itertools
 import os
@@ -27,6 +28,11 @@ import stat
 import tempfile
 import urllib2
 
+from dulwich._compat import (
+    make_sha,
+    SEEK_END,
+    SEEK_CUR,
+    )
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
@@ -50,12 +56,17 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
-    ThinPackData,
+    obj_sha,
     iter_sha1,
     load_pack_index,
     write_pack,
-    write_pack_data,
+    write_pack_header,
     write_pack_index_v2,
+    write_pack_object,
+    write_pack_objects,
+    compute_file_sha,
+    PackIndexer,
+    PackStreamCopier,
     )
 
 INFODIR = 'info'
@@ -271,7 +282,7 @@ class PackBasedObjectStore(BaseObjectStore):
         objects = set()
         for sha in self._iter_loose_objects():
             objects.add((self._get_loose_object(sha), None))
-        self.add_objects(objects)
+        self.add_objects(list(objects))
         for obj, path in objects:
             self._remove_loose_object(obj.id)
         return len(objects)
@@ -321,7 +332,7 @@ class PackBasedObjectStore(BaseObjectStore):
             # Don't bother writing an empty pack file
             return
         f, commit = self.add_pack()
-        write_pack_data(f, objects, len(objects))
+        write_pack_objects(f, objects)
         return commit()
 
 
@@ -387,37 +398,81 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
 
-    def move_in_thin_pack(self, path):
+    def _complete_thin_pack(self, f, path, copier, indexer):
         """Move a specific file containing a pack into the pack directory.
 
         :note: The file should be on the same file system as the
             packs directory.
 
+        :param f: Open file object for the pack.
         :param path: Path to the pack file.
+        :param copier: A PackStreamCopier to use for writing pack data.
+        :param indexer: A PackIndexer for indexing the pack.
         """
-        data = ThinPackData(self.get_raw, path)
+        entries = list(indexer)
 
-        # Write index for the thin pack (do we really need this?)
-        temppath = os.path.join(self.pack_dir,
-            sha_to_hex(urllib2.randombytes(20))+".tempidx")
-        data.create_index_v2(temppath)
-        p = Pack.from_objects(data, load_pack_index(temppath))
+        # Update the header with the new number of objects.
+        f.seek(0)
+        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
 
+        # Rescan the rest of the pack, computing the SHA with the new header.
+        new_sha = compute_file_sha(f, end_ofs=-20)
+
+        # Complete the pack.
+        for ext_sha in indexer.ext_refs():
+            type_num, data = self.get_raw(ext_sha)
+            offset = f.tell()
+            crc32 = write_pack_object(f, type_num, data, sha=new_sha)
+            entries.append((ext_sha, offset, crc32))
+        pack_sha = new_sha.digest()
+        f.write(pack_sha)
+        f.close()
+
+        # Move the pack in.
+        entries.sort()
+        pack_base_name = os.path.join(
+          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+        os.rename(path, pack_base_name + '.pack')
+
+        # Write the index.
+        index_file = GitFile(pack_base_name + '.idx', 'wb')
         try:
-            # Write a full pack version
-            temppath = os.path.join(self.pack_dir,
-                sha_to_hex(urllib2.randombytes(20))+".temppack")
-            write_pack(temppath, ((o, None) for o in p.iterobjects()), len(p))
+            write_pack_index_v2(index_file, entries, pack_sha)
+            index_file.close()
         finally:
-            p.close()
+            index_file.abort()
 
-        pack_sha = load_pack_index(temppath+".idx").objects_sha1()
-        newbasename = os.path.join(self.pack_dir, "pack-%s" % pack_sha)
-        os.rename(temppath+".pack", newbasename+".pack")
-        os.rename(temppath+".idx", newbasename+".idx")
-        final_pack = Pack(newbasename)
+        # Add the pack to the store and return it.
+        final_pack = Pack(pack_base_name)
+        final_pack.check_length_and_checksum()
         self._add_known_pack(final_pack)
         return final_pack
+
+    def add_thin_pack(self, read_all, read_some):
+        """Add a new thin pack to this object store.
+
+        Thin packs are packs that contain deltas with parents that exist outside
+        the pack. They should never be placed in the object store directly, and
+        always indexed and completed as they are copied.
+
+        :param read_all: Read function that blocks until the number of requested
+            bytes are read.
+        :param read_some: Read function that returns at least one byte, but may
+            not return the number of bytes requested.
+        :return: A Pack object pointing at the now-completed thin pack in the
+            objects/pack directory.
+        """
+        fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
+        f = os.fdopen(fd, 'w+b')
+
+        try:
+            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
+            copier = PackStreamCopier(read_all, read_some, f,
+                                      delta_iter=indexer)
+            copier.verify()
+            return self._complete_thin_pack(f, path, copier, indexer)
+        finally:
+            f.close()
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -441,24 +496,6 @@ class DiskObjectStore(PackBasedObjectStore):
         final_pack = Pack(basename)
         self._add_known_pack(final_pack)
         return final_pack
-
-    def add_thin_pack(self):
-        """Add a new thin pack to this object store.
-
-        Thin packs are packs that contain deltas with parents that exist
-        in a different pack.
-        """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
-        f = os.fdopen(fd, 'wb')
-        def commit():
-            os.fsync(fd)
-            f.close()
-            if os.path.getsize(path) > 0:
-                return self.move_in_thin_pack(path)
-            else:
-                os.remove(path)
-                return None
-        return f, commit
 
     def add_pack(self):
         """Add a new pack to this object store.
@@ -540,7 +577,8 @@ class MemoryObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
-        return self[name].as_raw_string()
+        obj = self[name]
+        return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
         return self._data[name]

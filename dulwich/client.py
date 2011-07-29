@@ -23,9 +23,11 @@ __docformat__ = 'restructuredText'
 
 import select
 import socket
+import subprocess
 import urlparse
 
 from dulwich.errors import (
+    GitProtocolError,
     SendPackError,
     UpdateRefsError,
     )
@@ -36,7 +38,7 @@ from dulwich.protocol import (
     extract_capabilities,
     )
 from dulwich.pack import (
-    write_pack_data,
+    write_pack_objects,
     )
 
 
@@ -89,12 +91,14 @@ class GitClient(object):
         """
         raise NotImplementedError()
 
-    def read_refs(self, proto):
+    def _read_refs(self, proto):
         server_capabilities = None
         refs = {}
         # Receive refs from server
         for pkt in proto.read_pkt_seq():
             (sha, ref) = pkt.rstrip('\n').split(' ', 1)
+            if sha == 'ERR':
+                raise GitProtocolError(ref)
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha
@@ -144,15 +148,15 @@ class GitClient(object):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return the shas of the
-            objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
         proto, unused_can_read = self._connect('receive-pack', path)
-        old_refs, server_capabilities = self.read_refs(proto)
+        old_refs, server_capabilities = self._read_refs(proto)
         if 'report-status' not in server_capabilities:
             self._send_capabilities.remove('report-status')
         new_refs = determine_wants(old_refs)
@@ -180,8 +184,7 @@ class GitClient(object):
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_data(proto.write_file(), objects,
-                                       len(objects))
+        entries, sha = write_pack_objects(proto.write_file(), objects)
 
         if 'report-status' in self._send_capabilities:
             self._parse_status_report(proto)
@@ -220,7 +223,7 @@ class GitClient(object):
         :param progress: Callback for progress reports (strings)
         """
         proto, can_read = self._connect('upload-pack', path)
-        (refs, server_capabilities) = self.read_refs(proto)
+        (refs, server_capabilities) = self._read_refs(proto)
         wants = determine_wants(refs)
         if not wants:
             proto.write_pkt_line(None)
@@ -276,14 +279,30 @@ class TCPGitClient(GitClient):
         GitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
-        s = socket.socket(type=socket.SOCK_STREAM)
-        s.connect((self._host, self._port))
+        sockaddrs = socket.getaddrinfo(self._host, self._port,
+            socket.AF_UNSPEC, socket.SOCK_STREAM)
+        s = None
+        err = socket.error("no address found for %s" % self._host)
+        for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
+            s = socket.socket(family, socktype, proto)
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            try:
+                s.connect(sockaddr)
+                break
+            except socket.error, err:
+                if s is not None:
+                    s.close()
+                s = None
+        if s is None:
+            raise err
         # -1 means system default buffering
         rfile = s.makefile('rb', -1)
         # 0 means unbuffered
         wfile = s.makefile('wb', 0)
         proto = Protocol(rfile.read, wfile.write,
                          report_activity=self._report_activity)
+        if path.startswith("/~"):
+            path = path[1:]
         proto.send_cmd('git-%s' % cmd, path, 'host=%s' % self._host)
         return proto, lambda: _fileno_can_read(s)
 
@@ -297,7 +316,13 @@ class SubprocessWrapper(object):
         self.write = proc.stdin.write
 
     def can_read(self):
-        return _fileno_can_read(self.proc.stdout.fileno())
+        if subprocess.mswindows:
+            from msvcrt import get_osfhandle
+            from win32pipe import PeekNamedPipe
+            handle = get_osfhandle(self.proc.stdout.fileno())
+            return PeekNamedPipe(handle, 0)[2] != 0
+        else:
+            return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self):
         self.proc.stdin.close()
@@ -358,7 +383,8 @@ class SSHGitClient(GitClient):
         con = get_ssh_vendor().connect_ssh(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
-        return Protocol(con.read, con.write), con.can_read
+        return (Protocol(con.read, con.write, report_activity=self._report_activity),
+                con.can_read)
 
 
 def get_transport_and_path(uri):

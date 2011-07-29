@@ -1,3 +1,79 @@
+0.8.0	UNRELEASED
+
+ FEATURES
+
+  * New DeltaChainIterator abstract class for quickly iterating all objects in
+    a pack, with implementations for pack indexing and inflation.
+    (Dave Borowitz)
+
+ BUG FIXES
+
+  * Avoid storing all objects in memory when writing pack.
+    (Jelmer Vernooij, #813268)
+
+  * Support IPv6 for git:// connections. (Jelmer Vernooij, #801543)
+
+  * Improve performance of Repo.revision_history(). (Timo Schmid, #535118)
+
+  * Fix use of SubprocessWrapper on Windows. (Paulo Madeira, #670035)
+
+  * Fix compilation on newer versions of Mac OS X (Lion and up). (Ryan McKern, #794543)
+
+  * Prevent raising ValueError for correct refs in RefContainer.__delitem__.
+
+  * Correctly return a tuple from MemoryObjectStore.get_raw. (Dave Borowitz)
+
+  * Fix a bug in reading the pack checksum when there are fewer than 20 bytes
+    left in the buffer. (Dave Borowitz)
+
+  * Support ~ in git:// URL paths. (Jelmer Vernooij, #813555)
+
+ API CHANGES
+
+  * write_pack no longer takes the num_objects argument and requires an object
+    to be passed in that is iterable (rather than an iterator) and that
+    provides __len__.  (Jelmer Vernooij)
+
+  * write_pack_data has been renamed to write_pack_objects and no longer takes a
+    num_objects argument. (Jelmer Vernooij)
+
+  * take_msb_bytes, read_zlib_chunks, unpack_objects, and
+    PackStreamReader.read_objects now take an additional argument indicating a
+    crc32 to compute. (Dave Borowitz)
+
+  * PackObjectIterator was removed; its functionality is still exposed by
+    PackData.iterobjects. (Dave Borowitz)
+
+  * Add a sha arg to write_pack_object to incrementally compute a SHA.
+    (Dave Borowitz)
+
+  * Include offset in PackStreamReader results. (Dave Borowitz)
+
+  * Move PackStreamReader from server to pack. (Dave Borowitz)
+
+  * Extract a check_length_and_checksum, compute_file_sha, and
+    pack_object_header pack helper functions. (Dave Borowitz)
+
+  * Extract a compute_file_sha function. (Dave Borowitz)
+
+  * Remove move_in_thin_pack as a separate method; add_thin_pack now completes
+    the thin pack and moves it in in one step. Remove ThinPackData as well.
+    (Dave Borowitz)
+
+  * Custom buffer size in read_zlib_chunks. (Dave Borowitz)
+
+  * New UnpackedObject data class that replaces ad-hoc tuples in the return
+    value of unpack_object and various DeltaChainIterator methods.
+    (Dave Borowitz)
+
+ TEST CHANGES
+
+  * If setuptools is installed, "python setup.py test" will now run the testsuite.
+    (Jelmer Vernooij)
+
+  * Add a new build_pack test utility for building packs from a simple spec.
+    (Dave Borowitz)
+
 0.7.1	2011-04-12
 
  BUG FIXES

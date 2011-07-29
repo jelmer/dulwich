@@ -28,6 +28,9 @@ from dulwich.diff_tree import (
     tree_changes_for_merge,
     RenameDetector,
     )
+from dulwich.errors import (
+    MissingCommitError,
+    )
 
 ORDER_DATE = 'date'
 
@@ -120,13 +123,16 @@ class Walker(object):
         self._follow = follow
 
         for commit_id in itertools.chain(include, exclude):
-            self._push(store[commit_id])
+            self._push(commit_id)
 
-    def _push(self, commit):
-        sha = commit.id
-        if sha not in self._pq_set and sha not in self._done:
+    def _push(self, commit_id):
+        try:
+            commit = self._store[commit_id]
+        except KeyError:
+            raise MissingCommitError(commit_id)
+        if commit_id not in self._pq_set and commit_id not in self._done:
             heapq.heappush(self._pq, (-commit.commit_time, commit))
-            self._pq_set.add(sha)
+            self._pq_set.add(commit_id)
 
     def _pop(self):
         while self._pq:
@@ -142,7 +148,7 @@ class Walker(object):
 
             self._done.add(commit.id)
             for parent_id in commit.parents:
-                self._push(self._store[parent_id])
+                self._push(parent_id)
 
             if not is_excluded:
                 return commit

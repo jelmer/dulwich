@@ -24,6 +24,16 @@ import itertools
 ORDER_DATE = 'date'
 
 
+class WalkEntry(object):
+    """Object encapsulating a single result from a walk."""
+
+    def __init__(self, commit):
+        self.commit = commit
+
+    def __eq__(self, other):
+        return isinstance(other, WalkEntry) and self.commit == other.commit
+
+
 class Walker(object):
     """Object for performing a walk of commits in a store.
 
@@ -32,7 +42,7 @@ class Walker(object):
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
-                 reverse=False, max_commits=None):
+                 reverse=False, max_entries=None):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -44,7 +54,7 @@ class Walker(object):
             other than ORDER_DATE may result in O(n) memory usage.
         :param reverse: If True, reverse the order of output, requiring O(n)
             memory.
-        :param max_commits: The maximum number of commits to yield, or None for
+        :param max_entries: The maximum number of entries to yield, or None for
             no limit.
         """
         self._store = store
@@ -53,7 +63,7 @@ class Walker(object):
             raise ValueError('Unknown walk order %s' % order)
         self._order = order
         self._reverse = reverse
-        self._max_commits = max_commits
+        self._max_entries = max_entries
 
         exclude = exclude or []
         self._excluded = set(exclude)
@@ -91,10 +101,13 @@ class Walker(object):
         return None
 
     def _next(self):
-        limit = self._max_commits
+        limit = self._max_entries
         if limit is not None and len(self._done) >= limit:
             return None
-        return self._pop()
+        commit = self._pop()
+        if commit is None:
+            return None
+        return WalkEntry(commit)
 
     def __iter__(self):
         results = iter(self._next, None)

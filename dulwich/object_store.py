@@ -779,8 +779,10 @@ class ObjectStoreGraphWalker(object):
             # collect all ancestors
             new_ancestors = set()
             for a in ancestors:
-                if a in self.parents:
-                    new_ancestors.update(self.parents[a])
+                ps = self.parents.get(a)
+                if ps is not None:
+                    new_ancestors.update(ps)
+                self.parents[a] = None
 
             # no more ancestors; stop
             if not new_ancestors:
@@ -794,6 +796,6 @@ class ObjectStoreGraphWalker(object):
             ret = self.heads.pop()
             ps = self.get_parents(ret)
             self.parents[ret] = ps
-            self.heads.update(ps)
+            self.heads.update([p for p in ps if not p in self.parents])
             return ret
         return None

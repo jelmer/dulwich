@@ -295,3 +295,42 @@ class WalkerTest(TestCase):
            TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e('b'), e('a'))]),
            TestWalkEntry(c4, [TreeChange.add(e('b'))])],
           [c6.id], paths=['c'], follow=True)
+
+    def test_since(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([c3, c2, c1], [c3.id], since=-1)
+        self.assertWalkYields([c3, c2, c1], [c3.id], since=0)
+        self.assertWalkYields([c3, c2], [c3.id], since=1)
+        self.assertWalkYields([c3, c2], [c3.id], since=99)
+        self.assertWalkYields([c3, c2], [c3.id], since=100)
+        self.assertWalkYields([c3], [c3.id], since=101)
+        self.assertWalkYields([c3], [c3.id], since=199)
+        self.assertWalkYields([c3], [c3.id], since=200)
+        self.assertWalkYields([], [c3.id], since=201)
+        self.assertWalkYields([], [c3.id], since=300)
+
+    def test_until(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([], [c3.id], until=-1)
+        self.assertWalkYields([c1], [c3.id], until=0)
+        self.assertWalkYields([c1], [c3.id], until=1)
+        self.assertWalkYields([c1], [c3.id], until=99)
+        self.assertWalkYields([c2, c1], [c3.id], until=100)
+        self.assertWalkYields([c2, c1], [c3.id], until=101)
+        self.assertWalkYields([c2, c1], [c3.id], until=199)
+        self.assertWalkYields([c3, c2, c1], [c3.id], until=200)
+        self.assertWalkYields([c3, c2, c1], [c3.id], until=201)
+        self.assertWalkYields([c3, c2, c1], [c3.id], until=300)
+
+    def test_since_until(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([], [c3.id], since=100, until=99)
+        self.assertWalkYields([c3, c2, c1], [c3.id], since=-1, until=201)
+        self.assertWalkYields([c2], [c3.id], since=100, until=100)
+        self.assertWalkYields([c2], [c3.id], since=50, until=150)
+
+    def test_since_prune(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        del self.store[c1.id]
+        self.assertRaises(MissingCommitError, list, Walker(self.store, [c3.id]))
+        self.assertWalkYields([c3], [c3.id], since=101)

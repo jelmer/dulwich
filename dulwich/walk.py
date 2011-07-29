@@ -98,6 +98,7 @@ class _CommitTimeQueue(object):
         self._seen = set()
         self._done = set()
         self._min_time = walker.since
+        self._last = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
         self._is_finished = False
 
@@ -165,6 +166,7 @@ class _CommitTimeQueue(object):
                     break
 
             if not is_excluded:
+                self._last = commit
                 return WalkEntry(self._walker, commit)
         self._is_finished = True
         return None

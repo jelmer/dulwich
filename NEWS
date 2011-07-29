@@ -78,6 +78,8 @@
   * Optionally create RenameDetectors without passing in tree SHAs.
     (Dave Borowitz)
 
+  * Optionally include unchanged entries in RenameDetectors. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

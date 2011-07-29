@@ -76,6 +76,65 @@ class WalkEntry(object):
           self.commit.id, self.changes())
 
 
+class _CommitTimeQueue(object):
+    """Priority queue of WalkEntry objects by commit time."""
+
+    def __init__(self, walker):
+        self._walker = walker
+        self._store = walker.store
+        self._excluded = walker.excluded
+        self._pq = []
+        self._pq_set = set()
+        self._done = set()
+        self._min_time = walker.since
+        self._extra_commits_left = _MAX_EXTRA_COMMITS
+
+        for commit_id in itertools.chain(walker.include, walker.excluded):
+            self._push(commit_id)
+
+    def _push(self, commit_id):
+        try:
+            commit = self._store[commit_id]
+        except KeyError:
+            raise MissingCommitError(commit_id)
+        if commit_id not in self._pq_set and commit_id not in self._done:
+            heapq.heappush(self._pq, (-commit.commit_time, commit))
+            self._pq_set.add(commit_id)
+
+    def next(self):
+        while self._pq:
+            _, commit = heapq.heappop(self._pq)
+            sha = commit.id
+            self._pq_set.remove(sha)
+            if sha in self._done:
+                continue
+
+            is_excluded = sha in self._excluded
+            if is_excluded:
+                self._excluded.update(commit.parents)
+
+            self._done.add(commit.id)
+            if self._min_time is not None:
+                if commit.commit_time < self._min_time:
+                    # We want to stop walking at min_time, but commits at the
+                    # boundary may be out of order with respect to their
+                    # parents. So we walk _MAX_EXTRA_COMMITS more commits once
+                    # we hit this boundary.
+                    self._extra_commits_left -= 1
+                    if not self._extra_commits_left:
+                        break
+                else:
+                    # We're not at a boundary, so reset the counter.
+                    self._extra_commits_left = _MAX_EXTRA_COMMITS
+
+            for parent_id in commit.parents:
+                self._push(parent_id)
+
+            if not is_excluded:
+                return WalkEntry(self._walker, commit)
+        return None
+
+
 class Walker(object):
     """Object for performing a walk of commits in a store.
 
@@ -85,7 +144,8 @@ class Walker(object):
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
                  reverse=False, max_entries=None, paths=None,
-                 rename_detector=None, follow=False, since=None, until=None):
+                 rename_detector=None, follow=False, since=None, until=None,
+                 queue_cls=_CommitTimeQueue):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -106,80 +166,33 @@ class Walker(object):
             default rename_detector.
         :param since: Timestamp to list commits after.
         :param until: Timestamp to list commits before.
+        :param queue_cls: A class to use for a queue of commits, supporting the
+            iterator protocol. The constructor takes a single argument, the
+            Walker.
         """
-        self.store = store
-
         if order not in (ORDER_DATE,):
             raise ValueError('Unknown walk order %s' % order)
-        self._order = order
-        self._reverse = reverse
-        self._max_entries = max_entries
-        self._num_entries = 0
+        self.store = store
+        self.include = include
+        self.excluded = set(exclude or [])
+        self.order = order
+        self.reverse = reverse
+        self.max_entries = max_entries
+        self.paths = paths and set(paths) or None
         if follow and not rename_detector:
             rename_detector = RenameDetector(store)
         self.rename_detector = rename_detector
+        self.follow = follow
+        self.since = since
+        self.until = until
 
-        exclude = exclude or []
-        self._excluded = set(exclude)
-        self._pq = []
-        self._pq_set = set()
-        self._done = set()
-        self._paths = paths and set(paths) or None
-        self._follow = follow
-
-        self._since = since
-        self._until = until
-        self._extra_commits_left = _MAX_EXTRA_COMMITS
-
-        for commit_id in itertools.chain(include, exclude):
-            self._push(commit_id)
-
-    def _push(self, commit_id):
-        try:
-            commit = self.store[commit_id]
-        except KeyError:
-            raise MissingCommitError(commit_id)
-        if commit_id not in self._pq_set and commit_id not in self._done:
-            heapq.heappush(self._pq, (-commit.commit_time, commit))
-            self._pq_set.add(commit_id)
-
-    def _pop(self):
-        while self._pq:
-            _, commit = heapq.heappop(self._pq)
-            sha = commit.id
-            self._pq_set.remove(sha)
-            if sha in self._done:
-                continue
-
-            is_excluded = sha in self._excluded
-            if is_excluded:
-                self._excluded.update(commit.parents)
-
-            self._done.add(commit.id)
-            if self._since is not None:
-                if commit.commit_time < self._since:
-                    # We want to stop walking at since, but commits at the
-                    # boundary may be out of order with respect to their
-                    # parents. So we walk _MAX_EXTRA_COMMITS more commits once
-                    # we hit this boundary.
-                    self._extra_commits_left -= 1
-                    if not self._extra_commits_left:
-                        break
-                else:
-                    # We're not at a boundary, so reset the counter.
-                    self._extra_commits_left = _MAX_EXTRA_COMMITS
-
-            for parent_id in commit.parents:
-                self._push(parent_id)
-
-            if not is_excluded:
-                return commit
-        return None
+        self._num_entries = 0
+        self._queue = queue_cls(self)
 
     def _path_matches(self, changed_path):
         if changed_path is None:
             return False
-        for followed_path in self._paths:
+        for followed_path in self.paths:
             if changed_path == followed_path:
                 return True
             if (changed_path.startswith(followed_path) and
@@ -191,29 +204,29 @@ class Walker(object):
         old_path = change.old.path
         new_path = change.new.path
         if self._path_matches(new_path):
-            if self._follow and change.type in RENAME_CHANGE_TYPES:
-                self._paths.add(old_path)
-                self._paths.remove(new_path)
+            if self.follow and change.type in RENAME_CHANGE_TYPES:
+                self.paths.add(old_path)
+                self.paths.remove(new_path)
             return True
         elif self._path_matches(old_path):
             return True
         return False
 
-    def _make_entry(self, commit):
-        """Make a WalkEntry from a commit.
+    def _should_return(self, entry):
+        """Determine if a walk entry should be returned..
 
-        :param commit: The commit for the WalkEntry.
-        :return: A WalkEntry object, or None if no entry should be returned for
-            this commit (e.g. if it doesn't match any requested paths).
+        :param entry: The WalkEntry to consider.
+        :return: True if the WalkEntry should be returned by this walk, or False
+            otherwise (e.g. if it doesn't match any requested paths).
         """
-        if self._since is not None and commit.commit_time < self._since:
-            return None
-        if self._until is not None and commit.commit_time > self._until:
-            return None
+        commit = entry.commit
+        if self.since is not None and commit.commit_time < self.since:
+            return False
+        if self.until is not None and commit.commit_time > self.until:
+            return False
 
-        entry = WalkEntry(self, commit)
-        if self._paths is None:
-            return entry
+        if self.paths is None:
+            return True
 
         if len(commit.parents) > 1:
             for path_changes in entry.changes():
@@ -222,28 +235,27 @@ class Walker(object):
                 # old.paths, we have to check all of them.
                 for change in path_changes:
                     if self._change_matches(change):
-                        return entry
+                        return True
         else:
             for change in entry.changes():
                 if self._change_matches(change):
-                    return entry
+                    return True
         return None
 
     def _next(self):
-        max_entries = self._max_entries
+        max_entries = self.max_entries
         while True:
             if max_entries is not None and self._num_entries >= max_entries:
                 return None
-            commit = self._pop()
-            if commit is None:
+            entry = self._queue.next()
+            if entry is None:
                 return None
-            entry = self._make_entry(commit)
-            if entry:
+            if self._should_return(entry):
                 self._num_entries += 1
                 return entry
 
     def __iter__(self):
         results = iter(self._next, None)
-        if self._reverse:
+        if self.reverse:
             results = reversed(list(results))
         return iter(results)

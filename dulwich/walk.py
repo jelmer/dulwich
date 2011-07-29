@@ -82,7 +82,7 @@ class Walker(object):
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
                  reverse=False, max_entries=None, paths=None,
-                 rename_detector=None, follow=False):
+                 rename_detector=None, follow=False, since=None, until=None):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -101,6 +101,8 @@ class Walker(object):
             renames.
         :param follow: If True, follow path across renames/copies. Forces a
             default rename_detector.
+        :param since: Timestamp to list commits after.
+        :param until: Timestamp to list commits before.
         """
         self._store = store
 
@@ -121,6 +123,9 @@ class Walker(object):
         self._done = set()
         self._paths = paths and set(paths) or None
         self._follow = follow
+
+        self._since = since
+        self._until = until
 
         for commit_id in itertools.chain(include, exclude):
             self._push(commit_id)
@@ -147,8 +152,9 @@ class Walker(object):
                 self._excluded.update(commit.parents)
 
             self._done.add(commit.id)
-            for parent_id in commit.parents:
-                self._push(parent_id)
+            if self._since is None or commit.commit_time >= self._since:
+                for parent_id in commit.parents:
+                    self._push(parent_id)
 
             if not is_excluded:
                 return commit
@@ -184,6 +190,11 @@ class Walker(object):
         :return: A WalkEntry object, or None if no entry should be returned for
             this commit (e.g. if it doesn't match any requested paths).
         """
+        if self._since is not None and commit.commit_time < self._since:
+            return None
+        if self._until is not None and commit.commit_time > self._until:
+            return None
+
         entry = WalkEntry(self._store, commit, self._rename_detector)
         if self._paths is None:
             return entry

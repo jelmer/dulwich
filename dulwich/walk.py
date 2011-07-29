@@ -21,17 +21,47 @@
 import heapq
 import itertools
 
+from dulwich.diff_tree import (
+    tree_changes,
+    tree_changes_for_merge,
+    )
+
 ORDER_DATE = 'date'
 
 
 class WalkEntry(object):
     """Object encapsulating a single result from a walk."""
 
-    def __init__(self, commit):
+    def __init__(self, store, commit):
         self.commit = commit
+        self._store = store
+        self._changes = None
 
-    def __eq__(self, other):
-        return isinstance(other, WalkEntry) and self.commit == other.commit
+    def changes(self):
+        """Get the tree changes for this entry.
+
+        :return: For commits with up to one parent, a list of TreeChange
+            objects; if the commit has no parents, these will be relative to the
+            empty tree. For merge commits, a list of lists of TreeChange
+            objects; see dulwich.diff.tree_changes_for_merge.
+        """
+        if self._changes is None:
+            commit = self.commit
+            if not commit.parents:
+                changes = list(tree_changes(self._store, None, commit.tree))
+            elif len(commit.parents) == 1:
+                ptree = self._store[commit.parents[0]].tree
+                changes = list(tree_changes(self._store, ptree, commit.tree))
+            else:
+                ptrees = [self._store[p].tree for p in commit.parents]
+                changes = list(tree_changes_for_merge(self._store, ptrees,
+                                                      commit.tree))
+            self._changes = changes
+        return self._changes
+
+    def __repr__(self):
+        return '<WalkEntry commit=%s, changes=%r>' % (
+          self.commit.id, self.changes())
 
 
 class Walker(object):
@@ -100,14 +130,16 @@ class Walker(object):
                 return commit
         return None
 
+    def _make_entry(self, commit):
+        if commit is None:
+            return None
+        return WalkEntry(self._store, commit)
+
     def _next(self):
         limit = self._max_entries
         if limit is not None and len(self._done) >= limit:
             return None
-        commit = self._pop()
-        if commit is None:
-            return None
-        return WalkEntry(commit)
+        return self._make_entry(self._pop())
 
     def __iter__(self):
         results = iter(self._next, None)

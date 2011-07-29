@@ -397,6 +397,7 @@ class RenameDetector(object):
         self._rewrite_threshold = rewrite_threshold
         self._max_files = max_files
         self._find_copies_harder = find_copies_harder
+        self._want_unchanged = False
 
     def _reset(self):
         self._adds = []
@@ -412,8 +413,9 @@ class RenameDetector(object):
         return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
 
     def _collect_changes(self, tree1_id, tree2_id):
+        want_unchanged = self._find_copies_harder or self._want_unchanged
         for change in tree_changes(self._store, tree1_id, tree2_id,
-                                   want_unchanged=self._find_copies_harder):
+                                   want_unchanged=want_unchanged):
             if change.type == CHANGE_ADD:
                 self._adds.append(change)
             elif change.type == CHANGE_DELETE:
@@ -554,11 +556,14 @@ class RenameDetector(object):
         return result
 
     def _prune_unchanged(self):
+        if self._want_unchanged:
+            return
         self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
-    def changes_with_renames(self, tree1_id, tree2_id):
+    def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False):
         """Iterate TreeChanges between two tree SHAs, with rename detection."""
         self._reset()
+        self._want_unchanged = want_unchanged
         self._collect_changes(tree1_id, tree2_id)
         self._find_exact_renames()
         self._find_content_renames()

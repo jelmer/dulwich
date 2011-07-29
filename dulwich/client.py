@@ -301,6 +301,8 @@ class TCPGitClient(GitClient):
         wfile = s.makefile('wb', 0)
         proto = Protocol(rfile.read, wfile.write,
                          report_activity=self._report_activity)
+        if path.startswith("/~"):
+            path = path[1:]
         proto.send_cmd('git-%s' % cmd, path, 'host=%s' % self._host)
         return proto, lambda: _fileno_can_read(s)
 

@@ -143,22 +143,26 @@ class _CommitTimeQueue(object):
             for parent_id in commit.parents:
                 self._push(parent_id)
 
+            reset_extra_commits = True
             is_excluded = sha in self._excluded
             if is_excluded:
                 self._exclude_parents(commit)
 
-            if self._min_time is not None:
-                if commit.commit_time < self._min_time:
-                    # We want to stop walking at min_time, but commits at the
-                    # boundary may be out of order with respect to their
-                    # parents. So we walk _MAX_EXTRA_COMMITS more commits once
-                    # we hit this boundary.
-                    self._extra_commits_left -= 1
-                    if not self._extra_commits_left:
-                        break
-                else:
-                    # We're not at a boundary, so reset the counter.
-                    self._extra_commits_left = _MAX_EXTRA_COMMITS
+            if (self._min_time is not None and
+                commit.commit_time < self._min_time):
+                # We want to stop walking at min_time, but commits at the
+                # boundary may be out of order with respect to their parents. So
+                # we walk _MAX_EXTRA_COMMITS more commits once we hit this
+                # boundary.
+                reset_extra_commits = False
+
+            if reset_extra_commits:
+                # We're not at a boundary, so reset the counter.
+                self._extra_commits_left = _MAX_EXTRA_COMMITS
+            else:
+                self._extra_commits_left -= 1
+                if not self._extra_commits_left:
+                    break
 
             if not is_excluded:
                 return WalkEntry(self._walker, commit)

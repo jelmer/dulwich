@@ -152,7 +152,8 @@ def _skip_tree(entry):
     return entry
 
 
-def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
+def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
+                 rename_detector=None):
     """Find the differences between the contents of two trees.
 
     :param store: An ObjectStore for looking up objects.
@@ -160,9 +161,17 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False):
     :param tree2_id: The SHA of the target tree.
     :param want_unchanged: If True, include TreeChanges for unmodified entries
         as well.
+    :param rename_detector: RenameDetector object for detecting renames.
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
     """
+    if (rename_detector is not None and tree1_id is not None and
+        tree2_id is not None):
+        for change in rename_detector.changes_with_renames(
+          tree1_id, tree2_id, want_unchanged=want_unchanged):
+            yield change
+        return
+
     entries = walk_trees(store, tree1_id, tree2_id,
                          prune_identical=(not want_unchanged))
     for entry1, entry2 in entries:

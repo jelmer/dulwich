@@ -68,3 +68,17 @@ class BuildCommitGraphTest(TestCase):
                                            2: [('a', a2, 0100644)]})
         self.assertEqual((0100644, a1.id), self.store[c1.tree]['a'])
         self.assertEqual((0100644, a2.id), self.store[c2.tree]['a'])
+
+    def test_attrs(self):
+        c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],
+                                    attrs={1: {'message': 'Hooray!'}})
+        self.assertEqual('Hooray!', c1.message)
+        self.assertEqual('Commit 2', c2.message)
+
+    def test_commit_time(self):
+        c1, c2, c3 = build_commit_graph(self.store, [[1], [2, 1], [3, 2]],
+                                        attrs={1: {'commit_time': 124},
+                                               2: {'commit_time': 123}})
+        self.assertEqual(124, c1.commit_time)
+        self.assertEqual(123, c2.commit_time)
+        self.assertTrue(c2.commit_time < c1.commit_time < c3.commit_time)

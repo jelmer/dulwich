@@ -23,8 +23,10 @@ import itertools
 import os
 
 from dulwich.diff_tree import (
+    RENAME_CHANGE_TYPES,
     tree_changes,
     tree_changes_for_merge,
+    RenameDetector,
     )
 
 ORDER_DATE = 'date'
@@ -77,7 +79,7 @@ class Walker(object):
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
                  reverse=False, max_entries=None, paths=None,
-                 rename_detector=None):
+                 rename_detector=None, follow=False):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
@@ -94,6 +96,8 @@ class Walker(object):
         :param paths: Iterable of file or subtree paths to show entries for.
         :param rename_detector: diff.RenameDetector object for detecting
             renames.
+        :param follow: If True, follow path across renames/copies. Forces a
+            default rename_detector.
         """
         self._store = store
 
@@ -103,6 +107,8 @@ class Walker(object):
         self._reverse = reverse
         self._max_entries = max_entries
         self._num_entries = 0
+        if follow and not rename_detector:
+            rename_detector = RenameDetector(store)
         self._rename_detector = rename_detector
 
         exclude = exclude or []
@@ -110,7 +116,8 @@ class Walker(object):
         self._pq = []
         self._pq_set = set()
         self._done = set()
-        self._paths = paths and list(paths) or None
+        self._paths = paths and set(paths) or None
+        self._follow = follow
 
         for commit_id in itertools.chain(include, exclude):
             self._push(store[commit_id])
@@ -153,15 +160,23 @@ class Walker(object):
         return False
 
     def _change_matches(self, change):
-        return (self._path_matches(change.old.path) or
-                self._path_matches(change.new.path))
+        old_path = change.old.path
+        new_path = change.new.path
+        if self._path_matches(new_path):
+            if self._follow and change.type in RENAME_CHANGE_TYPES:
+                self._paths.add(old_path)
+                self._paths.remove(new_path)
+            return True
+        elif self._path_matches(old_path):
+            return True
+        return False
 
     def _make_entry(self, commit):
         """Make a WalkEntry from a commit.
 
         :param commit: The commit for the WalkEntry.
         :return: A WalkEntry object, or None if no entry should be returned for
-            this commit (e.g. if it doesn't match any requested  paths).
+            this commit (e.g. if it doesn't match any requested paths).
         """
         entry = WalkEntry(self._store, commit, self._rename_detector)
         if self._paths is None:

@@ -21,7 +21,11 @@
 from dulwich.object_store import (
     MemoryObjectStore,
     )
+from dulwich.objects import (
+    Commit,
+    )
 from dulwich.walk import (
+    WalkEntry,
     Walker,
     )
 from dulwich.tests import TestCase
@@ -49,6 +53,9 @@ class WalkerTest(TestCase):
 
     def assertWalkYields(self, expected, *args, **kwargs):
         walker = Walker(self.store, *args, **kwargs)
+        for i, entry in enumerate(expected):
+            if isinstance(entry, Commit):
+                expected[i] = WalkEntry(entry)
         actual = list(walker)
         self.assertEqual(expected, actual)
 
@@ -76,15 +83,15 @@ class WalkerTest(TestCase):
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c1, c2, c3], [c3.id], reverse=True)
 
-    def test_max_commits(self):
+    def test_max_entries(self):
         c1, c2, c3 = self.make_linear_commits(3)
-        self.assertWalkYields([c3, c2, c1], [c3.id], max_commits=3)
-        self.assertWalkYields([c3, c2], [c3.id], max_commits=2)
-        self.assertWalkYields([c3], [c3.id], max_commits=1)
+        self.assertWalkYields([c3, c2, c1], [c3.id], max_entries=3)
+        self.assertWalkYields([c3, c2], [c3.id], max_entries=2)
+        self.assertWalkYields([c3], [c3.id], max_entries=1)
 
-    def test_reverse_after_max_commits(self):
+    def test_reverse_after_max_entries(self):
         c1, c2, c3 = self.make_linear_commits(3)
-        self.assertWalkYields([c1, c2, c3], [c3.id], max_commits=3,
+        self.assertWalkYields([c1, c2, c3], [c3.id], max_entries=3,
                               reverse=True)
-        self.assertWalkYields([c2, c3], [c3.id], max_commits=2, reverse=True)
-        self.assertWalkYields([c3], [c3.id], max_commits=1, reverse=True)
+        self.assertWalkYields([c2, c3], [c3.id], max_entries=2, reverse=True)
+        self.assertWalkYields([c3], [c3.id], max_entries=1, reverse=True)

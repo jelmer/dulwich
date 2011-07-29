@@ -71,6 +71,8 @@
     value of unpack_object and various DeltaChainIterator methods.
     (Dave Borowitz)
 
+  * Add a lookup_path convenience method to Tree. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

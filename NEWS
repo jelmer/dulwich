@@ -28,6 +28,8 @@
 
   * Support ~ in git:// URL paths. (Jelmer Vernooij, #813555)
 
+  * Make ShaFile.__eq__ work when other is not a ShaFile. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

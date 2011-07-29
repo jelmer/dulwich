@@ -20,19 +20,12 @@
 """Git object store interfaces and implementation."""
 
 
-from cStringIO import StringIO
 import errno
 import itertools
 import os
 import stat
 import tempfile
-import urllib2
 
-from dulwich._compat import (
-    make_sha,
-    SEEK_END,
-    SEEK_CUR,
-    )
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
@@ -56,10 +49,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
-    obj_sha,
     iter_sha1,
-    load_pack_index,
-    write_pack,
     write_pack_header,
     write_pack_index_v2,
     write_pack_object,

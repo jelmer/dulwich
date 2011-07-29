@@ -53,6 +53,9 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     )
+from dulwich.walk import (
+    Walker,
+    )
 import warnings
 
 
@@ -954,48 +957,15 @@ class BaseRepo(object):
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.
 
-        Returns a list of commit objects. the first of which will be the commit
-        of head, then following that will be the parents.
-
-        Raises NotCommitError if any no commits are referenced, including if the
-        head parameter isn't the sha of a commit.
-
-        XXX: work out how to handle merges.
+        :param head: The SHA of the head to list revision history for.
+        :return: A list of commit objects reachable from head, starting with
+            head itself, in descending commit time order.
+        :raise MissingCommitError: if any missing commits are referenced,
+            including if the head parameter isn't the SHA of a commit.
         """
-
-        try:
-            commit = self[head]
-        except KeyError:
-            raise MissingCommitError(head)
-
-        if type(commit) != Commit:
-            raise NotCommitError(commit)
-        pending_commits = [commit]
-
-        history = set()
-
-        while pending_commits != []:
-            commit = pending_commits.pop(0)
-
-            if commit in history:
-                continue
-
-            history.add(commit)
-
-            for parent in commit.parents:
-                try:
-                    commit = self[parent]
-                except KeyError:
-                    raise MissingCommitError(head)
-
-                if type(commit) != Commit:
-                    raise NotCommitError(commit)
-
-                pending_commits.append(commit)
-
-        history = list(history)
-        history.sort(key=lambda c:c.commit_time, reverse=True)
-        return history
+        # TODO(dborowitz): Expose more of the Walker functionality here or in a
+        # separate Repo/BaseObjectStore method.
+        return [e.commit for e in Walker(self.object_store, [head])]
 
     def __getitem__(self, name):
         if len(name) in (20, 40):

@@ -42,9 +42,9 @@ CHANGE_UNCHANGED = 'unchanged'
 _NULL_ENTRY = TreeEntry(None, None, None)
 
 _MAX_SCORE = 100
-_RENAME_THRESHOLD = 60
-_MAX_FILES = 200
-_REWRITE_THRESHOLD = None
+RENAME_THRESHOLD = 60
+MAX_FILES = 200
+REWRITE_THRESHOLD = None
 
 
 class TreeChange(namedtuple('TreeChange', ['type', 'old', 'new'])):
@@ -288,8 +288,8 @@ class RenameDetector(object):
     """Object for handling rename detection between two trees."""
 
     def __init__(self, store, tree1_id, tree2_id,
-                 rename_threshold=_RENAME_THRESHOLD, max_files=_MAX_FILES,
-                 rewrite_threshold=_REWRITE_THRESHOLD,
+                 rename_threshold=RENAME_THRESHOLD, max_files=MAX_FILES,
+                 rewrite_threshold=REWRITE_THRESHOLD,
                  find_copies_harder=False):
         """Initialize the rename detector.
 

@@ -469,15 +469,15 @@ class ShaFile(object):
         return "<%s %s>" % (self.__class__.__name__, self.id)
 
     def __ne__(self, other):
-        return self.id != other.id
+        return not isinstance(other, ShaFile) or self.id != other.id
 
     def __eq__(self, other):
-        """Return true if the sha of the two objects match.
+        """Return True if the SHAs of the two objects match.
 
-        The __le__ etc methods aren't overriden as they make no sense,
-        certainly at this level.
+        It doesn't make sense to talk about an order on ShaFiles, so we don't
+        override the rich comparison methods (__le__, etc.).
         """
-        return self.id == other.id
+        return isinstance(other, ShaFile) and self.id == other.id
 
 
 class Blob(ShaFile):

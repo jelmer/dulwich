@@ -18,6 +18,9 @@
 
 """Tests for commit walking functionality."""
 
+from dulwich._compat import (
+    permutations,
+    )
 from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_MODIFY,
@@ -37,8 +40,10 @@ from dulwich.objects import (
     Blob,
     )
 from dulwich.walk import (
+    ORDER_TOPO,
     WalkEntry,
     Walker,
+    _topo_reorder
     )
 from dulwich.tests import TestCase
 from utils import (
@@ -134,6 +139,14 @@ class WalkerTest(TestCase):
         self.assertWalkYields([y4, x3], [y4.id, x3.id], exclude=[x2.id])
         self.assertWalkYields([y4], [y4.id], exclude=[x3.id])
         self.assertWalkYields([x3, x2], [x3.id], exclude=[y4.id])
+
+    def test_merge(self):
+        c1, c2, c3, c4 = self.make_commits([[1], [2, 1], [3, 1], [4, 2, 3]])
+        self.assertWalkYields([c4, c3, c2, c1], [c4.id])
+        self.assertWalkYields([c3, c1], [c3.id])
+        self.assertWalkYields([c2, c1], [c2.id])
+        self.assertWalkYields([c4, c3], [c4.id], exclude=[c2.id])
+        self.assertWalkYields([c4, c2], [c4.id], exclude=[c3.id])
 
     def test_reverse(self):
         c1, c2, c3 = self.make_linear_commits(3)
@@ -344,3 +357,47 @@ class WalkerTest(TestCase):
         # c1 would also match, but we've deleted it, and it should get pruned
         # even with over-scanning.
         self.assertWalkYields([c11, c10, c8], [c11.id], since=7)
+
+    def assertTopoOrderEqual(self, expected_commits, commits):
+        entries = [TestWalkEntry(c, None) for c in commits]
+        actual_ids = [e.commit.id for e in list(_topo_reorder(entries))]
+        self.assertEqual([c.id for c in expected_commits], actual_ids)
+
+    def test_topo_reorder_linear(self):
+        commits = self.make_linear_commits(5)
+        commits.reverse()
+        for perm in permutations(commits):
+            self.assertTopoOrderEqual(commits, perm)
+
+    def test_topo_reorder_multiple_parents(self):
+        c1, c2, c3 = self.make_commits([[1], [2], [3, 1, 2]])
+        # Already sorted, so totally FIFO.
+        self.assertTopoOrderEqual([c3, c2, c1], [c3, c2, c1])
+        self.assertTopoOrderEqual([c3, c1, c2], [c3, c1, c2])
+
+        # c3 causes one parent to be yielded.
+        self.assertTopoOrderEqual([c3, c2, c1], [c2, c3, c1])
+        self.assertTopoOrderEqual([c3, c1, c2], [c1, c3, c2])
+
+        # c3 causes both parents to be yielded.
+        self.assertTopoOrderEqual([c3, c2, c1], [c1, c2, c3])
+        self.assertTopoOrderEqual([c3, c2, c1], [c2, c1, c3])
+
+    def test_topo_reorder_multiple_children(self):
+        c1, c2, c3 = self.make_commits([[1], [2, 1], [3, 1]])
+
+        # c2 and c3 are FIFO but c1 moves to the end.
+        self.assertTopoOrderEqual([c3, c2, c1], [c3, c2, c1])
+        self.assertTopoOrderEqual([c3, c2, c1], [c3, c1, c2])
+        self.assertTopoOrderEqual([c3, c2, c1], [c1, c3, c2])
+
+        self.assertTopoOrderEqual([c2, c3, c1], [c2, c3, c1])
+        self.assertTopoOrderEqual([c2, c3, c1], [c2, c1, c3])
+        self.assertTopoOrderEqual([c2, c3, c1], [c1, c2, c3])
+
+    def test_out_of_order_children(self):
+        c1, c2, c3, c4, c5 = self.make_commits(
+          [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]],
+          times=[2, 1, 3, 4, 5])
+        self.assertWalkYields([c5, c4, c3, c1, c2], [c5.id])
+        self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id], order=ORDER_TOPO)

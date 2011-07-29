@@ -18,6 +18,13 @@
 
 """General implementation of walking commits and their contents."""
 
+
+try:
+    from collections import defaultdict
+except ImportError:
+    from _compat import defaultdict
+
+import collections
 import heapq
 import itertools
 import os
@@ -33,6 +40,9 @@ from dulwich.errors import (
     )
 
 ORDER_DATE = 'date'
+ORDER_TOPO = 'topo'
+
+ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 
 # Maximum number of commits to walk past a commit time boundary.
 _MAX_EXTRA_COMMITS = 5
@@ -170,7 +180,7 @@ class Walker(object):
             iterator protocol. The constructor takes a single argument, the
             Walker.
         """
-        if order not in (ORDER_DATE,):
+        if order not in ALL_ORDERS:
             raise ValueError('Unknown walk order %s' % order)
         self.store = store
         self.include = include
@@ -257,14 +267,50 @@ class Walker(object):
     def _reorder(self, results):
         """Possibly reorder a results iterator.
 
-        :param results: An iterator of results, in the order returned from the
-            queue_cls.
-        :return: An iterator or list of results, in the order required by the
-            Walker.
+        :param results: An iterator of WalkEntry objects, in the order returned
+            from the queue_cls.
+        :return: An iterator or list of WalkEntry objects, in the order required
+            by the Walker.
         """
+        if self.order == ORDER_TOPO:
+            results = _topo_reorder(results)
         if self.reverse:
             results = reversed(list(results))
         return results
 
     def __iter__(self):
         return iter(self._reorder(iter(self._next, None)))
+
+
+def _topo_reorder(entries):
+    """Reorder an iterable of entries topologically.
+
+    This works best assuming the entries are already in almost-topological
+    order, e.g. in commit time order.
+
+    :param entries: An iterable of WalkEntry objects.
+    :yield: WalkEntry objects from entries in FIFO order, except where a parent
+        would be yielded before any of its children.
+    """
+    todo = collections.deque()
+    pending = {}
+    num_children = defaultdict(int)
+    for entry in entries:
+        todo.append(entry)
+        for p in entry.commit.parents:
+            num_children[p] += 1
+
+    while todo:
+        entry = todo.popleft()
+        commit = entry.commit
+        commit_id = commit.id
+        if num_children[commit_id]:
+            pending[commit_id] = entry
+            continue
+        for parent_id in commit.parents:
+            num_children[parent_id] -= 1
+            if not num_children[parent_id]:
+                parent_entry = pending.pop(parent_id, None)
+                if parent_entry:
+                    todo.appendleft(parent_entry)
+        yield entry

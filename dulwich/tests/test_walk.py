@@ -329,8 +329,14 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c3.id], since=100, until=100)
         self.assertWalkYields([c2], [c3.id], since=50, until=150)
 
-    def test_since_prune(self):
-        c1, c2, c3 = self.make_linear_commits(3)
-        del self.store[c1.id]
-        self.assertRaises(MissingCommitError, list, Walker(self.store, [c3.id]))
-        self.assertWalkYields([c3], [c3.id], since=101)
+    def test_since_over_scan(self):
+        times = [9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9]
+        attrs = dict((i + 1, {'commit_time': t}) for i, t in enumerate(times))
+        commits = self.make_linear_commits(11, attrs=attrs)
+        c8, _, c10, c11 = commits[-4:]
+        del self.store[commits[0].id]
+        # c9 is older than we want to walk, but is out of order with its parent,
+        # so we need to walk past it to get to c8.
+        # c1 would also match, but we've deleted it, and it should get pruned
+        # even with over-scanning.
+        self.assertWalkYields([c11, c10, c8], [c11.id], since=7)

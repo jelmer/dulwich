@@ -27,7 +27,6 @@ except ImportError:
 import collections
 import heapq
 import itertools
-import os
 
 from dulwich._compat import (
     all,

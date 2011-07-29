@@ -27,6 +27,7 @@ from dulwich.diff_tree import (
     _merge_entries,
     _merge_entries_py,
     tree_changes,
+    tree_changes_for_merge,
     _count_blocks,
     _count_blocks_py,
     _similarity_score,
@@ -287,6 +288,110 @@ class TreeChangesTest(DiffTestCase):
           [TreeChange(CHANGE_MODIFY, ('a', F, blob_a1.id),
                       ('a', F, blob_a2.id))],
           tree1, tree2)
+
+    def assertChangesForMergeEqual(self, expected, parent_trees, merge_tree,
+                                   **kwargs):
+        parent_tree_ids = [t.id for t in parent_trees]
+        actual = list(tree_changes_for_merge(
+          self.store, parent_tree_ids, merge_tree.id, **kwargs))
+        self.assertEqual(expected, actual)
+
+        parent_tree_ids.reverse()
+        expected = [list(reversed(cs)) for cs in expected]
+        actual = list(tree_changes_for_merge(
+          self.store, parent_tree_ids, merge_tree.id, **kwargs))
+        self.assertEqual(expected, actual)
+
+    def test_tree_changes_for_merge_add_no_conflict(self):
+        blob = make_object(Blob, data='blob')
+        parent1 = self.commit_tree([])
+        parent2 = merge = self.commit_tree([('a', blob)])
+        self.assertChangesForMergeEqual([], [parent1, parent2], merge)
+        self.assertChangesForMergeEqual([], [parent2, parent2], merge)
+
+    def test_tree_changes_for_merge_add_modify_conflict(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        parent1 = self.commit_tree([])
+        parent2 = self.commit_tree([('a', blob1)])
+        merge = self.commit_tree([('a', blob2)])
+        self.assertChangesForMergeEqual(
+          [[TreeChange.add(('a', F, blob2.id)),
+            TreeChange(CHANGE_MODIFY, ('a', F, blob1.id), ('a', F, blob2.id))]],
+          [parent1, parent2], merge)
+
+    def test_tree_changes_for_merge_modify_modify_conflict(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        blob3 = make_object(Blob, data='3')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = self.commit_tree([('a', blob2)])
+        merge = self.commit_tree([('a', blob3)])
+        self.assertChangesForMergeEqual(
+          [[TreeChange(CHANGE_MODIFY, ('a', F, blob1.id), ('a', F, blob3.id)),
+            TreeChange(CHANGE_MODIFY, ('a', F, blob2.id), ('a', F, blob3.id))]],
+          [parent1, parent2], merge)
+
+    def test_tree_changes_for_merge_modify_no_conflict(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = merge = self.commit_tree([('a', blob2)])
+        self.assertChangesForMergeEqual([], [parent1, parent2], merge)
+
+    def test_tree_changes_for_merge_delete_delete_conflict(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='2')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = self.commit_tree([('a', blob2)])
+        merge = self.commit_tree([])
+        self.assertChangesForMergeEqual(
+          [[TreeChange.delete(('a', F, blob1.id)),
+            TreeChange.delete(('a', F, blob2.id))]],
+          [parent1, parent2], merge)
+
+    def test_tree_changes_for_merge_delete_no_conflict(self):
+        blob = make_object(Blob, data='blob')
+        has = self.commit_tree([('a', blob)])
+        doesnt_have = self.commit_tree([])
+        self.assertChangesForMergeEqual([], [has, has], doesnt_have)
+        self.assertChangesForMergeEqual([], [has, doesnt_have], doesnt_have)
+
+    def test_tree_changes_for_merge_octopus_no_conflict(self):
+        r = range(5)
+        blobs = [make_object(Blob, data=str(i)) for i in r]
+        parents = [self.commit_tree([('a', blobs[i])]) for i in r]
+        for i in r:
+            # Take the SHA from each of the parents.
+            self.assertChangesForMergeEqual([], parents, parents[i])
+
+    def test_tree_changes_for_merge_octopus_modify_conflict(self):
+        # Because the octopus merge strategy is limited, I doubt it's possible
+        # to create this with the git command line. But the output is well-
+        # defined, so test it anyway.
+        r = range(5)
+        parent_blobs = [make_object(Blob, data=str(i)) for i in r]
+        merge_blob = make_object(Blob, data='merge')
+        parents = [self.commit_tree([('a', parent_blobs[i])]) for i in r]
+        merge = self.commit_tree([('a', merge_blob)])
+        expected = [[TreeChange(CHANGE_MODIFY, ('a', F, parent_blobs[i].id),
+                                ('a', F, merge_blob.id)) for i in r]]
+        self.assertChangesForMergeEqual(expected, parents, merge)
+
+    def test_tree_changes_for_merge_octopus_delete(self):
+        blob1 = make_object(Blob, data='1')
+        blob2 = make_object(Blob, data='3')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = self.commit_tree([('a', blob2)])
+        parent3 = merge = self.commit_tree([])
+        self.assertChangesForMergeEqual([], [parent1, parent1, parent1], merge)
+        self.assertChangesForMergeEqual([], [parent1, parent1, parent3], merge)
+        self.assertChangesForMergeEqual([], [parent1, parent3, parent3], merge)
+        self.assertChangesForMergeEqual(
+          [[TreeChange.delete(('a', F, blob1.id)),
+            TreeChange.delete(('a', F, blob2.id)),
+            None]],
+          [parent1, parent2, parent3], merge)
 
 
 class RenameDetectionTest(DiffTestCase):

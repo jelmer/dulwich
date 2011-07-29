@@ -35,6 +35,11 @@
 
   * Make ShaFile.__eq__ work when other is not a ShaFile. (Dave Borowitz)
 
+  * ObjectStore.get_graph_walker() now no longer yields the same
+    revision more than once. This has a significant improvement for
+    performance when wide revision graphs are involved.
+    (Jelmer Vernooij, #818168)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

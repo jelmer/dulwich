@@ -242,12 +242,14 @@ def _matches_any_parent(store, parent_tree_ids, changes):
     return False
 
 
-def tree_changes_for_merge(store, parent_tree_ids, tree_id):
+def tree_changes_for_merge(store, parent_tree_ids, tree_id,
+                           rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
 
     :param store: An ObjectStore for looking up objects.
     :param parent_tree_ids: An iterable of the SHAs of the parent trees.
     :param tree_id: The SHA of the merge tree.
+    :param rename_detector: RenameDetector object for detecting renames.
 
     :yield: Lists of TreeChange objects, one per conflicted path in the merge.
 
@@ -259,7 +261,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id):
         in the merge tree is not found in any of the parents, or in the case of
         deletes, if not all of the old SHAs match.
     """
-    all_parent_changes = [tree_changes(store, t, tree_id)
+    all_parent_changes = [tree_changes(store, t, tree_id,
+                                       rename_detector=rename_detector)
                           for t in parent_tree_ids]
     num_parents = len(parent_tree_ids)
     changes_by_path = defaultdict(lambda: [None] * num_parents)

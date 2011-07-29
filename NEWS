@@ -6,6 +6,9 @@
     a pack, with implementations for pack indexing and inflation.
     (Dave Borowitz)
 
+  * New walk module with a Walker class for customizable commit walking.
+    (Dave Borowitz)
+
  BUG FIXES
 
   * Avoid storing all objects in memory when writing pack.

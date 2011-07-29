@@ -59,3 +59,12 @@ class BuildCommitGraphTest(TestCase):
     def test_missing_parent(self):
         self.assertRaises(ValueError, build_commit_graph, self.store,
                           [[1], [3, 2], [2, 1]])
+
+    def test_trees(self):
+        a1 = make_object(Blob, data='aaa1')
+        a2 = make_object(Blob, data='aaa2')
+        c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],
+                                    trees={1: [('a', a1)],
+                                           2: [('a', a2, 0100644)]})
+        self.assertEqual((0100644, a1.id), self.store[c1.tree]['a'])
+        self.assertEqual((0100644, a2.id), self.store[c2.tree]['a'])

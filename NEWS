@@ -75,6 +75,9 @@
 
   * Add a lookup_path convenience method to Tree. (Dave Borowitz)
 
+  * Optionally create RenameDetectors without passing in tree SHAs.
+    (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

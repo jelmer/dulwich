@@ -29,6 +29,9 @@ import heapq
 import itertools
 import os
 
+from dulwich._compat import (
+    all,
+    )
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
     tree_changes,
@@ -148,6 +151,18 @@ class _CommitTimeQueue(object):
             is_excluded = sha in self._excluded
             if is_excluded:
                 self._exclude_parents(commit)
+                if self._pq and all(c.id in self._excluded
+                                    for _, c in self._pq):
+                    _, n = self._pq[0]
+                    if n.commit_time >= self._last.commit_time:
+                        # If the next commit is newer than the last one, we need
+                        # to keep walking in case its parents (which we may not
+                        # have seen yet) are excluded. This gives the excluded
+                        # set a chance to "catch up" while the commit is still
+                        # in the Walker's output queue.
+                        reset_extra_commits = True
+                    else:
+                        reset_extra_commits = False
 
             if (self._min_time is not None and
                 commit.commit_time < self._min_time):
@@ -261,6 +276,8 @@ class Walker(object):
         if self.since is not None and commit.commit_time < self.since:
             return False
         if self.until is not None and commit.commit_time > self.until:
+            return False
+        if commit.id in self.excluded:
             return False
 
         if self.paths is None:

@@ -88,6 +88,10 @@ class DiffTestCase(TestCase):
 
 class TreeChangesTest(DiffTestCase):
 
+    def setUp(self):
+        super(TreeChangesTest, self).setUp()
+        self.detector = RenameDetector(self.store)
+
     def assertMergeFails(self, merge_entries, name, mode, sha):
         t = Tree()
         t[name] = (mode, sha)
@@ -421,6 +425,28 @@ class TreeChangesTest(DiffTestCase):
             TreeChange.delete(('a', F, blob2.id)),
             None]],
           [parent1, parent2, parent3], merge)
+
+    def test_tree_changes_for_merge_octopus_add_rename_conflict(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = self.commit_tree([])
+        merge = self.commit_tree([('b', blob2)])
+        self.assertChangesForMergeEqual(
+          [[TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('b', F, blob2.id)),
+            TreeChange.add(('b', F, blob2.id))]],
+          [parent1, parent2], merge, rename_detector=self.detector)
+
+    def test_tree_changes_for_merge_octopus_modify_rename_conflict(self):
+        blob1 = make_object(Blob, data='a\nb\nc\nd\n')
+        blob2 = make_object(Blob, data='a\nb\nc\ne\n')
+        parent1 = self.commit_tree([('a', blob1)])
+        parent2 = self.commit_tree([('b', blob1)])
+        merge = self.commit_tree([('b', blob2)])
+        self.assertChangesForMergeEqual(
+          [[TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('b', F, blob2.id)),
+            TreeChange(CHANGE_MODIFY, ('b', F, blob1.id), ('b', F, blob2.id))]],
+          [parent1, parent2], merge, rename_detector=self.detector)
 
 
 class RenameDetectionTest(DiffTestCase):

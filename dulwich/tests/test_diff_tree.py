@@ -491,8 +491,8 @@ class RenameDetectionTest(DiffTestCase):
                              sorted(perm, key=_tree_change_key))
 
     def detect_renames(self, tree1, tree2, **kwargs):
-        detector = RenameDetector(self.store, tree1.id, tree2.id, **kwargs)
-        return detector.changes_with_renames()
+        detector = RenameDetector(self.store, **kwargs)
+        return detector.changes_with_renames(tree1.id, tree2.id)
 
     def test_no_renames(self):
         blob1 = make_object(Blob, data='a\nb\nc\nd\n')
@@ -772,3 +772,15 @@ class RenameDetectionTest(DiffTestCase):
                       ('b', F, blob_b2.id))],
           self.detect_renames(tree1, tree2, rewrite_threshold=50,
                               find_copies_harder=True))
+
+    def test_reuse_detector(self):
+        blob = make_object(Blob, data='blob')
+        tree1 = self.commit_tree([('a', blob)])
+        tree2 = self.commit_tree([('b', blob)])
+        detector = RenameDetector(self.store)
+        changes = [TreeChange(CHANGE_RENAME, ('a', F, blob.id),
+                              ('b', F, blob.id))]
+        self.assertEqual(changes,
+                         detector.changes_with_renames(tree1.id, tree2.id))
+        self.assertEqual(changes,
+                         detector.changes_with_renames(tree1.id, tree2.id))

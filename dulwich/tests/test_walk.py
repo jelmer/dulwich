@@ -72,7 +72,12 @@ class WalkerTest(TestCase):
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):
-        return build_commit_graph(self.store, commit_spec, **kwargs)
+        times = kwargs.pop('times', [])
+        attrs = kwargs.pop('attrs', {})
+        for i, t in enumerate(times):
+            attrs.setdefault(i + 1, {})['commit_time'] = t
+        return build_commit_graph(self.store, commit_spec, attrs=attrs,
+                                  **kwargs)
 
     def make_linear_commits(self, num_commits, **kwargs):
         commit_spec = []
@@ -330,9 +335,8 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c3.id], since=50, until=150)
 
     def test_since_over_scan(self):
-        times = [9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9]
-        attrs = dict((i + 1, {'commit_time': t}) for i, t in enumerate(times))
-        commits = self.make_linear_commits(11, attrs=attrs)
+        commits = self.make_linear_commits(
+          11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
         c8, _, c10, c11 = commits[-4:]
         del self.store[commits[0].id]
         # c9 is older than we want to walk, but is out of order with its parent,

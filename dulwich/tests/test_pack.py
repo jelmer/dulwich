@@ -708,6 +708,10 @@ class TestPackStreamReader(TestCase):
         reader = PackStreamReader(f.read, zlib_bufsize=4)
         self.assertEqual(2, len(list(reader.read_objects())))
 
+    def test_read_objects_empty(self):
+        reader = PackStreamReader(StringIO().read)
+        self.assertEqual([], list(reader.read_objects()))
+
 
 class TestPackIterator(DeltaChainIterator):
 

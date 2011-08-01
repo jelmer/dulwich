@@ -631,9 +631,12 @@ def read_pack_header(read):
     """Read the header of a pack file.
 
     :param read: Read function
-    :return: Tuple with pack version and number of objects
+    :return: Tuple of (pack version, number of objects). If no data is available
+        to read, returns (None, None).
     """
     header = read(12)
+    if not header:
+        return None, None
     assert header[:4] == 'PACK'
     (version,) = unpack_from('>L', header, 4)
     assert version in (2, 3), 'Version was %d' % version
@@ -817,6 +820,9 @@ class PackStreamReader(object):
         :raise IOError: if an error occurred writing to the output file.
         """
         pack_version, self._num_objects = read_pack_header(self.read)
+        if pack_version is None:
+            return
+
         for i in xrange(self._num_objects):
             offset = self.offset
             unpacked, unused = unpack_object(

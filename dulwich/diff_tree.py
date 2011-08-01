@@ -437,10 +437,12 @@ class RenameDetector(object):
             elif self._should_split(change):
                 self._deletes.append(TreeChange.delete(change.old))
                 self._adds.append(TreeChange.add(change.new))
-            elif (self._find_copies_harder and (
-              change.type == CHANGE_MODIFY or change.type == CHANGE_UNCHANGED)):
-                # Treat modified/unchanged as deleted rather than splitting it,
-                # to avoid spurious renames.
+            elif ((self._find_copies_harder and change.type == CHANGE_UNCHANGED)
+                  or change.type == CHANGE_MODIFY):
+                # Treat all modifies as potential deletes for rename detection,
+                # but don't split them (to avoid spurious renames). Setting
+                # find_copies_harder means we treat unchanged the same as
+                # modified.
                 self._deletes.append(change)
             else:
                 self._changes.append(change)
@@ -457,8 +459,7 @@ class RenameDetector(object):
         delete_map = defaultdict(list)
         for delete in self._deletes:
             # Keep track of whether the delete was actually marked as a delete.
-            # If not, it must have been added due to find_copies_harder, and
-            # needs to be marked as a copy.
+            # If not, it needs to be marked as a copy.
             is_delete = delete.type == CHANGE_DELETE
             delete_map[delete.old.sha].append((delete.old, is_delete))
 
@@ -469,7 +470,8 @@ class RenameDetector(object):
             for (old, is_delete), new in itertools.izip(sha_deletes, sha_adds):
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):
                     continue
-                delete_paths.add(old.path)
+                if is_delete:
+                    delete_paths.add(old.path)
                 add_paths.add(new.path)
                 new_type = is_delete and CHANGE_RENAME or CHANGE_COPY
                 self._changes.append(TreeChange(new_type, old, new))

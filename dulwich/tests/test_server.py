@@ -268,7 +268,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEquals((None, None), _split_proto_line('', allowed))
 
     def test_determine_wants(self):
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
+        self.assertEqual(None, self._walker.determine_wants({}))
+        self.assertEqual('None', self._walker.proto.get_received_line())
 
         self._walker.proto.set_output([
           'want %s multi_ack' % ONE,

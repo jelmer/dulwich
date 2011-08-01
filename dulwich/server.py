@@ -332,7 +332,9 @@ class ProtocolGraphWalker(object):
         :return: a list of SHA1s requested by the client
         """
         if not heads:
-            raise GitProtocolError('No heads found')
+            # The repo is empty, so short-circuit the whole process.
+            self.proto.write_pkt_line(None)
+            return None
         values = set(heads.itervalues())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(heads.iteritems()):

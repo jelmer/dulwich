@@ -121,6 +121,7 @@ class UnpackedObject(object):
 
     __slots__ = [
       'offset',         # Offset in its pack.
+      '_sha',           # Cached binary SHA.
       'obj_type_num',   # Type of this object.
       'obj_chunks',     # Decompressed and delta-resolved chunks.
       'pack_type_num',  # Type of this object in the pack (may be a delta).
@@ -135,6 +136,7 @@ class UnpackedObject(object):
     # methods of this object.
     def __init__(self, pack_type_num, delta_base, decomp_len, crc32):
         self.offset = None
+        self._sha = None
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
         self.comp_chunks = None
@@ -152,7 +154,9 @@ class UnpackedObject(object):
 
     def sha(self):
         """Return the binary SHA of this object."""
-        return obj_sha(self.obj_type_num, self.obj_chunks)
+        if self._sha is None:
+            self._sha = obj_sha(self.obj_type_num, self.obj_chunks)
+        return self._sha
 
     def sha_file(self):
         """Return a ShaFile from this object."""

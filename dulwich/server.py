@@ -660,7 +660,7 @@ class ReceivePackHandler(Handler):
                     ref = refs[i]
                     self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
             else:
-                self.proto.write_pkt_line("%s capabilities^{} %s" % (
+                self.proto.write_pkt_line("%s capabilities^{}\0%s" % (
                   ZERO_SHA, self.capability_line()))
 
             self.proto.write("0000")

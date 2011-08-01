@@ -426,7 +426,25 @@ class TreeChangesTest(DiffTestCase):
             None]],
           [parent1, parent2, parent3], merge)
 
-    def test_tree_changes_for_merge_octopus_add_rename_conflict(self):
+    def test_tree_changes_for_merge_add_add_same_conflict(self):
+        blob = make_object(Blob, data='a\nb\nc\nd\n')
+        parent1 = self.commit_tree([('a', blob)])
+        parent2 = self.commit_tree([])
+        merge = self.commit_tree([('b', blob)])
+        add = TreeChange.add(('b', F, blob.id))
+        self.assertChangesForMergeEqual([[add, add]], [parent1, parent2], merge)
+
+    def test_tree_changes_for_merge_add_exact_rename_conflict(self):
+        blob = make_object(Blob, data='a\nb\nc\nd\n')
+        parent1 = self.commit_tree([('a', blob)])
+        parent2 = self.commit_tree([])
+        merge = self.commit_tree([('b', blob)])
+        self.assertChangesForMergeEqual(
+          [[TreeChange(CHANGE_RENAME, ('a', F, blob.id), ('b', F, blob.id)),
+            TreeChange.add(('b', F, blob.id))]],
+          [parent1, parent2], merge, rename_detector=self.detector)
+
+    def test_tree_changes_for_merge_add_content_rename_conflict(self):
         blob1 = make_object(Blob, data='a\nb\nc\nd\n')
         blob2 = make_object(Blob, data='a\nb\nc\ne\n')
         parent1 = self.commit_tree([('a', blob1)])
@@ -437,7 +455,7 @@ class TreeChangesTest(DiffTestCase):
             TreeChange.add(('b', F, blob2.id))]],
           [parent1, parent2], merge, rename_detector=self.detector)
 
-    def test_tree_changes_for_merge_octopus_modify_rename_conflict(self):
+    def test_tree_changes_for_merge_modify_rename_conflict(self):
         blob1 = make_object(Blob, data='a\nb\nc\nd\n')
         blob2 = make_object(Blob, data='a\nb\nc\ne\n')
         parent1 = self.commit_tree([('a', blob1)])

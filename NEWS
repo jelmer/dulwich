@@ -51,6 +51,9 @@
 
   * Correctly advertise capabilities during receive-pack. (Dave Borowitz)
 
+  * Fix add/add and add/rename conflicts in tree_changes_for_merge.
+    (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

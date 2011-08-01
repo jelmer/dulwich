@@ -288,6 +288,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
         if _all_eq(have, change_type, CHANGE_DELETE):
             if not _all_same(have, old_sha):
                 yield changes
+        elif not _all_same(have, change_type):
+            yield changes
         elif not _matches_any_parent(store, parent_tree_ids, changes):
             yield changes
 

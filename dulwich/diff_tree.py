@@ -219,35 +219,6 @@ def _all_same(seq, key):
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
-def _matches_any_parent(store, parent_tree_ids, changes):
-    have = [c for c in changes if c is not None]
-    assert have
-    new = have[0].new
-
-    # Look in changes for parents we already have first.
-    for change in have:
-        if new.sha == change.old.sha:
-            return True
-
-    # A change may be None if that path was unchanged, so we need to actually
-    # look up the SHA for that path in any parent trees.
-    # TODO: We could precompute these old_shas (e.g. by passing want_unchanged
-    # to tree_changes), but the assumption is that the cost of tree lookups due
-    # to conflicts is less than the savings we're getting by pruning identical
-    # subtrees.
-    missing = [p for p, c in zip(parent_tree_ids, changes) if c is None]
-    get = store.__getitem__
-    for parent_tree_id in missing:
-        tree = get(parent_tree_id)
-        try:
-            _, old_sha = tree.lookup_path(get, new.path)
-        except KeyError:
-            continue
-        if new.sha == old_sha:
-            return True
-    return False
-
-
 def tree_changes_for_merge(store, parent_tree_ids, tree_id,
                            rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
@@ -294,7 +265,9 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
                 yield changes
         elif not _all_same(have, change_type):
             yield changes
-        elif not _matches_any_parent(store, parent_tree_ids, changes):
+        elif None not in changes:
+            # If no change was found relative to one parent, that means the SHA
+            # must have matched the SHA in that parent, so it is not a conflict.
             yield changes
 
 

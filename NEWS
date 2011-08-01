@@ -45,6 +45,8 @@
 
   * Teach ReceivePackHandler how to read empty packs. (Dave Borowitz)
 
+  * Don't send a pack with duplicates of the same object. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

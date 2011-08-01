@@ -49,6 +49,8 @@
 
   * Teach the server how to serve a clone of an empty repo. (Dave Borowitz)
 
+  * Correctly advertise capabilities during receive-pack. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

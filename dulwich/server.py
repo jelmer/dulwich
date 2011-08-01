@@ -337,7 +337,7 @@ class ProtocolGraphWalker(object):
             return None
         values = set(heads.itervalues())
         if self.advertise_refs or not self.http_req:
-            for i, (ref, sha) in enumerate(heads.iteritems()):
+            for i, (ref, sha) in enumerate(sorted(heads.iteritems())):
                 line = "%s %s" % (sha, ref)
                 if not i:
                     line = "%s\x00%s" % (line, self.handler.capability_line())
@@ -649,7 +649,7 @@ class ReceivePackHandler(Handler):
         flush()
 
     def handle(self):
-        refs = self.repo.get_refs().items()
+        refs = sorted(self.repo.get_refs().iteritems())
 
         if self.advertise_refs or not self.http_req:
             if refs:

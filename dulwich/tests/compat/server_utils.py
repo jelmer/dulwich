@@ -20,10 +20,14 @@
 """Utilities for testing git server compatibility."""
 
 
+import os
 import select
+import shutil
 import socket
+import tempfile
 import threading
 
+from dulwich.repo import Repo
 from dulwich.server import (
     ReceivePackHandler,
     )
@@ -99,6 +103,24 @@ class ServerTests(object):
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache = None
         self.assertReposEqual(self._old_repo, self._new_repo)
+
+    def test_clone_from_dulwich_empty(self):
+        old_repo_dir = os.path.join(tempfile.mkdtemp(), 'empty_old')
+        run_git_or_fail(['init', '--quiet', '--bare', old_repo_dir])
+        self._old_repo = Repo(old_repo_dir)
+        port = self._start_server(self._old_repo)
+
+        new_repo_base_dir = tempfile.mkdtemp()
+        try:
+            new_repo_dir = os.path.join(new_repo_base_dir, 'empty_new')
+            run_git_or_fail(['clone', self.url(port), new_repo_dir],
+                            cwd=new_repo_base_dir)
+            new_repo = Repo(new_repo_dir)
+            self.assertReposEqual(self._old_repo, new_repo)
+        finally:
+            # We don't create a Repo from new_repo_dir until after some errors
+            # may have occurred, so don't depend on tearDown to clean it up.
+            shutil.rmtree(new_repo_base_dir)
 
 
 class ShutdownServerMixIn:

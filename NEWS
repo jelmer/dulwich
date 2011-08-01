@@ -47,6 +47,8 @@
 
   * Don't send a pack with duplicates of the same object. (Dave Borowitz)
 
+  * Teach the server how to serve a clone of an empty repo. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

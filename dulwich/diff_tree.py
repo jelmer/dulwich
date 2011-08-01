@@ -18,12 +18,16 @@
 
 """Utilities for diffing files and trees."""
 
+try:
+    from collections import defaultdict
+except ImportError:
+    from dulwich._compat import defaultdict
+
 from cStringIO import StringIO
 import itertools
 import stat
 
 from dulwich._compat import (
-    defaultdict,
     namedtuple,
     )
 from dulwich.objects import (

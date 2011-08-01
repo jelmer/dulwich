@@ -731,9 +731,12 @@ class MissingObjectFinder(object):
         self.add_todo([(tag.object[1], None, False)])
 
     def next(self):
-        if not self.objects_to_send:
-            return None
-        (sha, name, leaf) = self.objects_to_send.pop()
+        while True:
+            if not self.objects_to_send:
+                return None
+            (sha, name, leaf) = self.objects_to_send.pop()
+            if sha not in self.sha_done:
+                break
         if not leaf:
             o = self.object_store[sha]
             if isinstance(o, Commit):

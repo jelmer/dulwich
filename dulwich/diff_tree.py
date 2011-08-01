@@ -491,18 +491,32 @@ class RenameDetector(object):
                     self._changes.append(TreeChange(CHANGE_COPY, old, new))
         self._prune(add_paths, delete_paths)
 
-    def _find_content_renames(self):
+    def _should_find_content_renames(self):
+        return len(self._adds) * len(self._deletes) <= self._max_files ** 2
+
+    def _rename_type(self, check_paths, delete, add):
+        if check_paths and delete.old.path == add.new.path:
+            # If the paths match, this must be a split modify, so make sure it
+            # comes out as a modify.
+            return CHANGE_MODIFY
+        elif delete.type != CHANGE_DELETE:
+            # If it's in deletes but not marked as a delete, it must have been
+            # added due to find_copies_harder, and needs to be marked as a copy.
+            return CHANGE_COPY
+        return CHANGE_RENAME
+
+    def _find_content_rename_candidates(self):
+        candidates = self._candidates = []
         # TODO: Optimizations:
         #  - Compare object sizes before counting blocks.
         #  - Skip if delete's S_IFMT differs from all adds.
         #  - Skip if adds or deletes is empty.
         # Match C git's behavior of not attempting to find content renames if
         # the matrix size exceeds the threshold.
-        if len(self._adds) * len(self._deletes) > self._max_files ** 2:
+        if not self._should_find_content_renames():
             return
 
         check_paths = self._rename_threshold is not None
-        candidates = []
         for delete in self._deletes:
             if S_ISGITLINK(delete.old.mode):
                 continue  # Git links don't exist in this repo.
@@ -516,26 +530,17 @@ class RenameDetector(object):
                 score = _similarity_score(old_obj, new_obj,
                                           block_cache={old_sha: old_blocks})
                 if score > self._rename_threshold:
-                    if check_paths and delete.old.path == add.new.path:
-                        # If the paths match, this must be a split modify, so
-                        # make sure it comes out as a modify.
-                        new_type = CHANGE_MODIFY
-                    elif delete.type != CHANGE_DELETE:
-                        # If it's in deletes but not marked as a delete, it must
-                        # have been added due to find_copies_harder, and needs
-                        # to be marked as a copy.
-                        new_type = CHANGE_COPY
-                    else:
-                        new_type = CHANGE_RENAME
+                    new_type = self._rename_type(check_paths, delete, add)
                     rename = TreeChange(new_type, delete.old, add.new)
                     candidates.append((-score, rename))
 
+    def _choose_content_renames(self):
         # Sort scores from highest to lowest, but keep names in ascending order.
-        candidates.sort()
+        self._candidates.sort()
 
         delete_paths = set()
         add_paths = set()
-        for _, change in candidates:
+        for _, change in self._candidates:
             new_path = change.new.path
             if new_path in add_paths:
                 continue
@@ -588,7 +593,8 @@ class RenameDetector(object):
         self._want_unchanged = want_unchanged
         self._collect_changes(tree1_id, tree2_id)
         self._find_exact_renames()
-        self._find_content_renames()
+        self._find_content_rename_candidates()
+        self._choose_content_renames()
         self._join_modifies()
         self._prune_unchanged()
         return self._sorted_changes()

@@ -11,6 +11,9 @@
 
   * New tree_changes_for_merge function in diff_tree. (Dave Borowitz)
 
+  * Easy rename detection in RenameDetector even without find_copies_harder.
+    (Dave Borowitz)
+
  BUG FIXES
 
   * Avoid storing all objects in memory when writing pack.

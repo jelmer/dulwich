@@ -43,6 +43,8 @@
     performance when wide revision graphs are involved.
     (Jelmer Vernooij, #818168)
 
+  * Teach ReceivePackHandler how to read empty packs. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

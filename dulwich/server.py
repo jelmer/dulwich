@@ -140,9 +140,10 @@ class FileSystemBackend(Backend):
 class Handler(object):
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, proto):
+    def __init__(self, backend, proto, http_req=None):
         self.backend = backend
         self.proto = proto
+        self.http_req = http_req
         self._client_capabilities = None
 
     @classmethod
@@ -186,12 +187,11 @@ class Handler(object):
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
 
-    def __init__(self, backend, args, proto,
-                 stateless_rpc=False, advertise_refs=False):
-        Handler.__init__(self, backend, proto)
+    def __init__(self, backend, args, proto, http_req=None,
+                 advertise_refs=False):
+        Handler.__init__(self, backend, proto, http_req=http_req)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
-        self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
     @classmethod
@@ -312,7 +312,7 @@ class ProtocolGraphWalker(object):
         self.store = object_store
         self.get_peeled = get_peeled
         self.proto = handler.proto
-        self.stateless_rpc = handler.stateless_rpc
+        self.http_req = handler.http_req
         self.advertise_refs = handler.advertise_refs
         self._wants = []
         self._cached = False
@@ -334,7 +334,7 @@ class ProtocolGraphWalker(object):
         if not heads:
             raise GitProtocolError('No heads found')
         values = set(heads.itervalues())
-        if self.advertise_refs or not self.stateless_rpc:
+        if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(heads.iteritems()):
                 line = "%s %s" % (sha, ref)
                 if not i:
@@ -371,7 +371,7 @@ class ProtocolGraphWalker(object):
 
         self.set_wants(want_revs)
 
-        if self.stateless_rpc and self.proto.eof():
+        if self.http_req and self.proto.eof():
             # The client may close the socket at this point, expecting a
             # flush-pkt from the server. We might be ready to send a packfile at
             # this point, so we need to explicitly short-circuit in this case.
@@ -388,7 +388,7 @@ class ProtocolGraphWalker(object):
 
     def next(self):
         if not self._cached:
-            if not self._impl and self.stateless_rpc:
+            if not self._impl and self.http_req:
                 return None
             return self._impl.next()
         self._cache_index += 1
@@ -553,7 +553,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
                 self.walker.send_nak()
-                if self.walker.stateless_rpc:
+                if self.walker.http_req:
                     return None
                 continue
             elif command == 'done':
@@ -575,11 +575,10 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto,
-                 stateless_rpc=False, advertise_refs=False):
-        Handler.__init__(self, backend, proto)
+    def __init__(self, backend, args, proto, http_req=None,
+                 advertise_refs=False):
+        Handler.__init__(self, backend, proto, http_req=http_req)
         self.repo = backend.open_repository(args[0])
-        self.stateless_rpc = stateless_rpc
         self.advertise_refs = advertise_refs
 
     @classmethod
@@ -650,7 +649,7 @@ class ReceivePackHandler(Handler):
     def handle(self):
         refs = self.repo.get_refs().items()
 
-        if self.advertise_refs or not self.stateless_rpc:
+        if self.advertise_refs or not self.http_req:
             if refs:
                 self.proto.write_pkt_line(
                   "%s %s\x00%s\n" % (refs[0][1], refs[0][0],

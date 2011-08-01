@@ -87,6 +87,8 @@
 
   * Optionally pass a RenameDetector to tree_changes. (Dave Borowitz)
 
+  * Optionally pass a request object through to server handlers. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.

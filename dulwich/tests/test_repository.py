@@ -445,6 +445,32 @@ class BuildRepoTests(TestCase):
         self.assertEqual(r[self._root_commit].tree, new_commit.tree)
         self.assertEqual('failed commit', new_commit.message)
 
+    def test_commit_branch(self):
+        r = self._repo
+
+        commit_sha = r.do_commit('commit to branch',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             branch="refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r["HEAD"].id)
+        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+        self.assertEqual([], r[commit_sha].parents)
+        self.assertTrue("refs/heads/new_branch" in r)
+
+        new_branch_head = commit_sha
+
+        commit_sha = r.do_commit('commit to branch 2',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             branch="refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r["HEAD"].id)
+        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+        self.assertEqual([new_branch_head], r[commit_sha].parents)
+
     def test_stage_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))

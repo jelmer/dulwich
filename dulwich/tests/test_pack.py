@@ -330,7 +330,6 @@ class TestPack(PackTests):
         finally:
             origpack.close()
 
-
     def test_commit_obj(self):
         p = self.get_pack(pack1_sha)
         commit = p[commit_sha]

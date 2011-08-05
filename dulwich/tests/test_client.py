@@ -35,6 +35,7 @@ from dulwich.protocol import (
 
 
 class DummyClient(GitClient):
+
     def __init__(self, can_read, read, write):
         self.can_read = can_read
         self.read = read
@@ -64,8 +65,9 @@ class GitClientTests(TestCase):
 
     def test_fetch_pack_none(self):
         self.rin.write(
-            '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack thin-pack '
-            'side-band side-band-64k ofs-delta shallow no-progress include-tag\n'
+            '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack '
+            'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
+            'include-tag\n'
             '0000')
         self.rin.seek(0)
         self.client.fetch_pack('bla', lambda heads: [], None, None, None)
@@ -92,7 +94,8 @@ class GitClientTests(TestCase):
         self.assertEquals(None, client.username)
         self.assertEqual('/bar/baz', path)
 
-        client, path = get_transport_and_path('git+ssh://foo.com:1234/bar/baz')
+        client, path = get_transport_and_path(
+            'git+ssh://foo.com:1234/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
         self.assertEquals('foo.com', client.host)
         self.assertEquals(1234, client.port)
@@ -128,7 +131,8 @@ class GitClientTests(TestCase):
     def test_get_transport_and_path_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
-        self.assertRaises(ValueError, get_transport_and_path, 'prospero://bar/baz')
+        self.assertRaises(ValueError, get_transport_and_path,
+        'prospero://bar/baz')
 
 
 class SSHGitClientTests(TestCase):
@@ -138,10 +142,12 @@ class SSHGitClientTests(TestCase):
         self.client = SSHGitClient('git.samba.org')
 
     def test_default_command(self):
-        self.assertEquals('git-upload-pack', self.client._get_cmd_path('upload-pack'))
+        self.assertEquals('git-upload-pack',
+                self.client._get_cmd_path('upload-pack'))
 
     def test_alternative_command_path(self):
-        self.client.alternative_paths['upload-pack'] = '/usr/lib/git/git-upload-pack'
+        self.client.alternative_paths['upload-pack'] = (
+            '/usr/lib/git/git-upload-pack')
         self.assertEquals('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path('upload-pack'))
 

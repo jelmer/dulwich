@@ -316,7 +316,7 @@ class SmartHandlersTestCase(WebTestCase):
         # Ensure all output was written via the write callback.
         self.assertEqual('', handler_output)
         self.assertEqual('handled input: foo', write_output)
-        self.assertContentTypeEquals('application/x-git-upload-pack-response')
+        self.assertContentTypeEquals('application/x-git-upload-pack-result')
         self.assertFalse(self._handler.advertise_refs)
         self.assertTrue(self._handler.http_req)
         self.assertFalse(self._req.cached)

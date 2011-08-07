@@ -41,6 +41,7 @@ from dulwich.objects import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    ObjectStoreGraphWalker,
     tree_lookup_path,
     )
 from dulwich.pack import (
@@ -300,3 +301,58 @@ class TreeLookupPathTests(TestCase):
         self.assertRaises(NotTreeError, tree_lookup_path, self.get_object, self.tree_id, 'ad/b/j')
 
 # TODO: MissingObjectFinderTests
+
+class ObjectStoreGraphWalkerTests(TestCase):
+
+    def get_walker(self, heads, parent_map):
+        return ObjectStoreGraphWalker(heads,
+            parent_map.__getitem__)
+
+    def test_empty(self):
+        gw = self.get_walker([], {})
+        self.assertIs(None, gw.next())
+        gw.ack("aa" * 20)
+        self.assertIs(None, gw.next())
+
+    def test_descends(self):
+        gw = self.get_walker(["a"], {"a": ["b"], "b": []})
+        self.assertEquals("a", gw.next())
+        self.assertEquals("b", gw.next())
+
+    def test_present(self):
+        gw = self.get_walker(["a"], {"a": ["b"], "b": []})
+        gw.ack("a")
+        self.assertIs(None, gw.next())
+
+    def test_parent_present(self):
+        gw = self.get_walker(["a"], {"a": ["b"], "b": []})
+        self.assertEquals("a", gw.next())
+        gw.ack("a")
+        self.assertIs(None, gw.next())
+
+    def test_child_ack_later(self):
+        gw = self.get_walker(["a"], {"a": ["b"], "b": ["c"], "c": []})
+        self.assertEquals("a", gw.next())
+        self.assertEquals("b", gw.next())
+        gw.ack("a")
+        self.assertIs(None, gw.next())
+
+    def test_only_once(self):
+        # a  b
+        # |  |
+        # c  d
+        # \ /
+        #  e
+        gw = self.get_walker(["a", "b"], {
+                "a": ["c"],
+                "b": ["d"],
+                "c": ["e"],
+                "d": ["e"],
+                "e": [],
+                })
+        self.assertEquals("a", gw.next())
+        self.assertEquals("c", gw.next())
+        gw.ack("a")
+        self.assertEquals("b", gw.next())
+        self.assertEquals("d", gw.next())
+        self.assertIs(None, gw.next())

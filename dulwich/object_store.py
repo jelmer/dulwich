@@ -20,19 +20,12 @@
 """Git object store interfaces and implementation."""
 
 
-from cStringIO import StringIO
 import errno
 import itertools
 import os
 import stat
 import tempfile
-import urllib2
 
-from dulwich._compat import (
-    make_sha,
-    SEEK_END,
-    SEEK_CUR,
-    )
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
@@ -56,10 +49,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
-    obj_sha,
     iter_sha1,
-    load_pack_index,
-    write_pack,
     write_pack_header,
     write_pack_index_v2,
     write_pack_object,
@@ -685,23 +675,17 @@ class ObjectStoreIterator(ObjectIterator):
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):
-    """Lookup an object in a Git tree.
+    """Look up an object in a Git tree.
 
     :param lookup_obj: Callback for retrieving object by SHA1
     :param root_sha: SHA1 of the root tree
     :param path: Path to lookup
+    :return: A tuple of (mode, SHA) of the resulting path.
     """
-    parts = path.split("/")
-    sha = root_sha
-    mode = None
-    for p in parts:
-        obj = lookup_obj(sha)
-        if not isinstance(obj, Tree):
-            raise NotTreeError(sha)
-        if p == '':
-            continue
-        mode, sha = obj[p]
-    return mode, sha
+    tree = lookup_obj(root_sha)
+    if not isinstance(tree, Tree):
+        raise NotTreeError(root_sha)
+    return tree.lookup_path(lookup_obj, path)
 
 
 class MissingObjectFinder(object):
@@ -747,9 +731,12 @@ class MissingObjectFinder(object):
         self.add_todo([(tag.object[1], None, False)])
 
     def next(self):
-        if not self.objects_to_send:
-            return None
-        (sha, name, leaf) = self.objects_to_send.pop()
+        while True:
+            if not self.objects_to_send:
+                return None
+            (sha, name, leaf) = self.objects_to_send.pop()
+            if sha not in self.sha_done:
+                break
         if not leaf:
             o = self.object_store[sha]
             if isinstance(o, Commit):
@@ -795,8 +782,10 @@ class ObjectStoreGraphWalker(object):
             # collect all ancestors
             new_ancestors = set()
             for a in ancestors:
-                if a in self.parents:
-                    new_ancestors.update(self.parents[a])
+                ps = self.parents.get(a)
+                if ps is not None:
+                    new_ancestors.update(ps)
+                self.parents[a] = None
 
             # no more ancestors; stop
             if not new_ancestors:
@@ -810,6 +799,6 @@ class ObjectStoreGraphWalker(object):
             ret = self.heads.pop()
             ps = self.get_parents(ret)
             self.parents[ret] = ps
-            self.heads.update(ps)
+            self.heads.update([p for p in ps if not p in self.parents])
             return ret
         return None

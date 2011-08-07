@@ -1,9 +1,17 @@
-0.8.0	UNRELEASED
+0.8.0	2011-08-07
 
  FEATURES
 
   * New DeltaChainIterator abstract class for quickly iterating all objects in
     a pack, with implementations for pack indexing and inflation.
+    (Dave Borowitz)
+
+  * New walk module with a Walker class for customizable commit walking.
+    (Dave Borowitz)
+
+  * New tree_changes_for_merge function in diff_tree. (Dave Borowitz)
+
+  * Easy rename detection in RenameDetector even without find_copies_harder.
     (Dave Borowitz)
 
  BUG FIXES
@@ -27,6 +35,26 @@
     left in the buffer. (Dave Borowitz)
 
   * Support ~ in git:// URL paths. (Jelmer Vernooij, #813555)
+
+  * Make ShaFile.__eq__ work when other is not a ShaFile. (Dave Borowitz)
+
+  * ObjectStore.get_graph_walker() now no longer yields the same
+    revision more than once. This has a significant improvement for
+    performance when wide revision graphs are involved.
+    (Jelmer Vernooij, #818168)
+
+  * Teach ReceivePackHandler how to read empty packs. (Dave Borowitz)
+
+  * Don't send a pack with duplicates of the same object. (Dave Borowitz)
+
+  * Teach the server how to serve a clone of an empty repo. (Dave Borowitz)
+
+  * Correctly advertise capabilities during receive-pack. (Dave Borowitz)
+
+  * Fix add/add and add/rename conflicts in tree_changes_for_merge.
+    (Dave Borowitz)
+
+  * Use correct MIME types in web server. (Dave Borowitz)
 
  API CHANGES
 
@@ -66,6 +94,17 @@
     value of unpack_object and various DeltaChainIterator methods.
     (Dave Borowitz)
 
+  * Add a lookup_path convenience method to Tree. (Dave Borowitz)
+
+  * Optionally create RenameDetectors without passing in tree SHAs.
+    (Dave Borowitz)
+
+  * Optionally include unchanged entries in RenameDetectors. (Dave Borowitz)
+
+  * Optionally pass a RenameDetector to tree_changes. (Dave Borowitz)
+
+  * Optionally pass a request object through to server handlers. (Dave Borowitz)
+
  TEST CHANGES
 
   * If setuptools is installed, "python setup.py test" will now run the testsuite.
@@ -73,6 +112,9 @@
 
   * Add a new build_pack test utility for building packs from a simple spec.
     (Dave Borowitz)
+
+  * Add a new build_commit_graph test utility for building commits from a
+    simple spec. (Dave Borowitz)
 
 0.7.1	2011-04-12
 

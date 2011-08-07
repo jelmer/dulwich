@@ -235,7 +235,7 @@ def handle_service_request(req, backend, mat):
         yield req.forbidden('Unsupported service %s' % service)
         return
     req.nocache()
-    write = req.respond(HTTP_OK, 'application/x-%s-response' % service)
+    write = req.respond(HTTP_OK, 'application/x-%s-result' % service)
 
     input = req.environ['wsgi.input']
     # This is not necessary if this app is run from a conforming WSGI server.

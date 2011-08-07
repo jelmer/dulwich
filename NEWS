@@ -54,6 +54,8 @@
   * Fix add/add and add/rename conflicts in tree_changes_for_merge.
     (Dave Borowitz)
 
+  * Use correct MIME types in web server. (Dave Borowitz)
+
  API CHANGES
 
   * write_pack no longer takes the num_objects argument and requires an object

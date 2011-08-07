@@ -1,9 +1,34 @@
 #!/usr/bin/make -f
 
+# Get the supported Python versions
+PYVERS = $(shell pyversions -r -v)
+# Get the default Python version
+PYVERSION = $(shell pyversions -d -v)
+
+# Callable functions to determine the correct PYTHONPATH
+pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
+pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
+
 %:
 	dh --buildsystem=python_distutils --with python2 $*
 
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/tmp
+	# Install everything excluding the *_d.so debug extensions to python-dulwich
+	dh_install -X"*_d.so" "debian/tmp/*" -p python-dulwich
+	# Install the debug extensions to python-dulwich-dbg
+	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=python-dulwich
+	dh_installdocs -ppython-dulwich docs/tutorial  -X.gitignore -XMakefile
+
 override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
-	$(MAKE) check TESTRUNNER=testtools.run
+	$(MAKE) check
+endif
+
+override_dh_strip:
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+	dh_strip --dbg-package=python-dulwich-dbg
 endif

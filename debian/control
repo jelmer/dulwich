@@ -3,8 +3,8 @@ Section: python
 Priority: optional
 Maintainer: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
-Build-Depends: python-all-dev (>= 2.6.6-3), debhelper (>= 7.0.50~), python-testtools, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293)
-Standards-Version: 3.9.1
+Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelper (>= 7.0.50~), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293)
+Standards-Version: 3.9.2
 X-Python-Version: >= 2.4
 Vcs-Bzr: http://bzr.debian.org/users/jelmer/dulwich/unstable
 
@@ -12,13 +12,33 @@ Package: python-dulwich
 Architecture: any
 Provides: ${python:Provides}
 Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Breaks: bzr-git (<< 0.6.2)
+Suggests: python-dulwich-dbg
 Recommends: python-fastimport
 Description: Python Git library
- Dulwich is a Python implementation of the file formats and protocols 
- used by the Git version control system. It can currently read from and write 
- to existing Git repositories and implements the protocol for pushing and 
+ Dulwich is a Python implementation of the file formats and protocols
+ used by the Git version control system. It can currently read from and write
+ to existing Git repositories and implements the protocol for pushing and
  receiving packs from remote servers.
  .
- All functionality is available in pure Python, but for improved performance 
- replacements of some modules written in C are also available. This package 
+ All functionality is available in pure Python, but for improved performance
+ replacements of some modules written in C are also available. This package
  includes the high performance versions.
+
+Package: python-dulwich-dbg
+Architecture: any
+Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}, python-dbg, python-dulwich (= ${binary:Version})
+Priority: extra
+Section: debug
+Provides: ${python:Provides}
+Description: Python Git library - Debug Extension
+ Dulwich is a Python implementation of the file formats and protocols
+ used by the Git version control system. It can currently read from and write
+ to existing Git repositories and implements the protocol for pushing and
+ receiving packs from remote servers.
+ .
+ All functionality is available in pure Python, but for improved performance
+ replacements of some modules written in C are also available. This package
+ includes the high performance versions.
+ .
+ This package contains the extensions built for the python debug interpreter.

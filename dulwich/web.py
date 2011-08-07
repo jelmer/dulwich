@@ -169,7 +169,7 @@ def get_info_refs(req, backend, mat):
         write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
         proto = ReceivableProtocol(StringIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
-                              stateless_rpc=True, advertise_refs=True)
+                              http_req=req, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
         handler.proto.write_pkt_line(None)
         handler.handle()
@@ -235,7 +235,7 @@ def handle_service_request(req, backend, mat):
         yield req.forbidden('Unsupported service %s' % service)
         return
     req.nocache()
-    write = req.respond(HTTP_OK, 'application/x-%s-response' % service)
+    write = req.respond(HTTP_OK, 'application/x-%s-result' % service)
 
     input = req.environ['wsgi.input']
     # This is not necessary if this app is run from a conforming WSGI server.
@@ -246,7 +246,7 @@ def handle_service_request(req, backend, mat):
     if content_length:
         input = _LengthLimitedFile(input, int(content_length))
     proto = ReceivableProtocol(input.read, write)
-    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
+    handler = handler_cls(backend, [url_prefix(mat)], proto, http_req=req)
     handler.handle()
 
 

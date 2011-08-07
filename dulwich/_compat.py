@@ -137,6 +137,20 @@ except ImportError:
 
 
 try:
+    all = all
+except NameError:
+    # Implementation of permutations from Python 2.6 documentation:
+    # http://docs.python.org/2.6/library/functions.html#all
+    # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+    # Licensed under the Python Software Foundation License.
+    def all(iterable):
+        for element in iterable:
+            if not element:
+                return False
+        return True
+
+
+try:
     from collections import namedtuple
 except ImportError:
     # Recipe for namedtuple from http://code.activestate.com/recipes/500261/

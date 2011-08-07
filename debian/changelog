@@ -1,10 +1,10 @@
-dulwich (0.8.0~bzr873-1) UNRELEASED; urgency=low
+dulwich (0.8.0-1) UNRELEASED; urgency=low
 
-  * New upstream snapshot.
+  * New upstream release.
    + Adds support for IPv6 to git:// client. Closes: #631490
    + Fixes use of ~username in git:// URLs. Closes: #631483
 
- -- Jelmer Vernooij <jelmer@debian.org>  Fri, 29 Jul 2011 12:10:15 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 07 Aug 2011 15:03:19 +0200
 
 dulwich (0.7.1-2) unstable; urgency=low
 

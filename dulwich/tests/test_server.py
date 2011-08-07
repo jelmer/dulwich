@@ -78,16 +78,11 @@ class TestProto(object):
         self._received[band].append(data)
 
     def write_pkt_line(self, data):
-        if data is None:
-            data = 'None'
         self._received[0].append(data)
 
     def get_received_line(self, band=0):
         lines = self._received[band]
-        if lines:
-            return lines.pop(0)
-        else:
-            return None
+        return lines.pop(0)
 
 
 class TestGenericHandler(Handler):
@@ -164,14 +159,14 @@ class UploadPackHandlerTestCase(TestCase):
                          self._handler.proto.get_received_line(2))
         self.assertEqual('second message',
                          self._handler.proto.get_received_line(2))
-        self.assertEqual(None, self._handler.proto.get_received_line(2))
+        self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
     def test_no_progress(self):
         caps = list(self._handler.required_capabilities()) + ['no-progress']
         self._handler.set_client_capabilities(caps)
         self._handler.progress('first message')
         self._handler.progress('second message')
-        self.assertEqual(None, self._handler.proto.get_received_line(2))
+        self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
     def test_get_tagged(self):
         refs = {
@@ -268,7 +263,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEquals((None, None), _split_proto_line('', allowed))
 
     def test_determine_wants(self):
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, {})
+        self.assertEqual(None, self._walker.determine_wants({}))
+        self.assertEqual(None, self._walker.proto.get_received_line())
 
         self._walker.proto.set_output([
           'want %s multi_ack' % ONE,
@@ -309,7 +305,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         lines = []
         while True:
             line = self._walker.proto.get_received_line()
-            if line == 'None':
+            if line is None:
                 break
             # strip capabilities list if present
             if '\x00' in line:
@@ -337,7 +333,7 @@ class TestProtocolGraphWalker(object):
         self.acks = []
         self.lines = []
         self.done = False
-        self.stateless_rpc = False
+        self.http_req = None
         self.advertise_refs = False
 
     def read_proto_line(self, allowed):
@@ -633,7 +629,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_stateless(self):
         # transmission ends with a flush-pkt
         self._walker.lines[-1] = (None, None)
-        self._walker.stateless_rpc = True
+        self._walker.http_req = True
 
         self.assertNextEquals(TWO)
         self.assertNoAck()

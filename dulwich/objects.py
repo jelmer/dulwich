@@ -469,15 +469,15 @@ class ShaFile(object):
         return "<%s %s>" % (self.__class__.__name__, self.id)
 
     def __ne__(self, other):
-        return self.id != other.id
+        return not isinstance(other, ShaFile) or self.id != other.id
 
     def __eq__(self, other):
-        """Return true if the sha of the two objects match.
+        """Return True if the SHAs of the two objects match.
 
-        The __le__ etc methods aren't overriden as they make no sense,
-        certainly at this level.
+        It doesn't make sense to talk about an order on ShaFiles, so we don't
+        override the rich comparison methods (__le__, etc.).
         """
-        return self.id == other.id
+        return isinstance(other, ShaFile) and self.id == other.id
 
 
 class Blob(ShaFile):
@@ -918,6 +918,25 @@ class Tree(ShaFile):
                 kind = "blob"
             text.append("%04o %s %s\t%s\n" % (mode, kind, hexsha, name))
         return "".join(text)
+
+    def lookup_path(self, lookup_obj, path):
+        """Look up an object in a Git tree.
+
+        :param lookup_obj: Callback for retrieving object by SHA1
+        :param path: Path to lookup
+        :return: A tuple of (mode, SHA) of the resulting path.
+        """
+        parts = path.split('/')
+        sha = self.id
+        mode = None
+        for p in parts:
+            if not p:
+                continue
+            obj = lookup_obj(sha)
+            if not isinstance(obj, Tree):
+                raise NotTreeError(sha)
+            mode, sha = obj[p]
+        return mode, sha
 
 
 def parse_timezone(text):

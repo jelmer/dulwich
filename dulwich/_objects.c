@@ -21,11 +21,15 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#if defined(__APPLE__)
+#include <Availability.h>
+#endif
+
 #if (PY_VERSION_HEX < 0x02050000)
 typedef int Py_ssize_t;
 #endif
 
-#if defined(__MINGW32_VERSION) || (defined(__APPLE__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070)
+#if defined(__MINGW32_VERSION) || (defined(__APPLE__) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1070)
 size_t strnlen(char *text, size_t maxlen)
 {
 	const char *last = memchr(text, '\0', maxlen);

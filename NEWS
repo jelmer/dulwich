@@ -1,5 +1,9 @@
 0.8.1	UNRELEASED
 
+ FEATURES
+
+  * Repo.do_commit has a new argument 'ref'.
+
 0.8.0	2011-08-07
 
  FEATURES

@@ -1004,7 +1004,7 @@ class BaseRepo(object):
     def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
-                  author_timezone=None, tree=None, encoding=None):
+                  author_timezone=None, tree=None, encoding=None, branch='HEAD'):
         """Create a new commit.
 
         :param message: Commit message
@@ -1053,18 +1053,18 @@ class BaseRepo(object):
             c.encoding = encoding
         c.message = message
         try:
-            old_head = self.refs["HEAD"]
+            old_head = self.refs[branch]
             c.parents = [old_head]
             self.object_store.add_object(c)
-            ok = self.refs.set_if_equals("HEAD", old_head, c.id)
+            ok = self.refs.set_if_equals(branch, old_head, c.id)
         except KeyError:
             c.parents = []
             self.object_store.add_object(c)
-            ok = self.refs.add_if_new("HEAD", c.id)
+            ok = self.refs.add_if_new(branch, c.id)
         if not ok:
             # Fail if the atomic compare-and-swap failed, leaving the commit and
             # all its objects as garbage.
-            raise CommitError("HEAD changed during commit")
+            raise CommitError("%s changed during commit" % (branch))
 
         return c.id
 

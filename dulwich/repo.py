@@ -1004,7 +1004,8 @@ class BaseRepo(object):
     def do_commit(self, message, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
-                  author_timezone=None, tree=None, encoding=None):
+                  author_timezone=None, tree=None, encoding=None,
+                  ref='HEAD'):
         """Create a new commit.
 
         :param message: Commit message
@@ -1018,6 +1019,7 @@ class BaseRepo(object):
         :param tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
         :param encoding: Encoding
+        :param ref: Ref to commit to
         :return: New commit SHA1
         """
         import time
@@ -1053,18 +1055,18 @@ class BaseRepo(object):
             c.encoding = encoding
         c.message = message
         try:
-            old_head = self.refs["HEAD"]
+            old_head = self.refs[ref]
             c.parents = [old_head]
             self.object_store.add_object(c)
-            ok = self.refs.set_if_equals("HEAD", old_head, c.id)
+            ok = self.refs.set_if_equals(ref, old_head, c.id)
         except KeyError:
             c.parents = []
             self.object_store.add_object(c)
-            ok = self.refs.add_if_new("HEAD", c.id)
+            ok = self.refs.add_if_new(ref, c.id)
         if not ok:
             # Fail if the atomic compare-and-swap failed, leaving the commit and
             # all its objects as garbage.
-            raise CommitError("HEAD changed during commit")
+            raise CommitError("%s changed during commit" % (ref,))
 
         return c.id
 

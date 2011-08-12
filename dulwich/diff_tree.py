@@ -405,26 +405,29 @@ class RenameDetector(object):
         new_obj = self._store[change.new.sha]
         return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
 
+    def _add_change(self, change):
+        if change.type == CHANGE_ADD:
+            self._adds.append(change)
+        elif change.type == CHANGE_DELETE:
+            self._deletes.append(change)
+        elif self._should_split(change):
+            self._deletes.append(TreeChange.delete(change.old))
+            self._adds.append(TreeChange.add(change.new))
+        elif ((self._find_copies_harder and change.type == CHANGE_UNCHANGED)
+              or change.type == CHANGE_MODIFY):
+            # Treat all modifies as potential deletes for rename detection,
+            # but don't split them (to avoid spurious renames). Setting
+            # find_copies_harder means we treat unchanged the same as
+            # modified.
+            self._deletes.append(change)
+        else:
+            self._changes.append(change)
+
     def _collect_changes(self, tree1_id, tree2_id):
         want_unchanged = self._find_copies_harder or self._want_unchanged
         for change in tree_changes(self._store, tree1_id, tree2_id,
                                    want_unchanged=want_unchanged):
-            if change.type == CHANGE_ADD:
-                self._adds.append(change)
-            elif change.type == CHANGE_DELETE:
-                self._deletes.append(change)
-            elif self._should_split(change):
-                self._deletes.append(TreeChange.delete(change.old))
-                self._adds.append(TreeChange.add(change.new))
-            elif ((self._find_copies_harder and change.type == CHANGE_UNCHANGED)
-                  or change.type == CHANGE_MODIFY):
-                # Treat all modifies as potential deletes for rename detection,
-                # but don't split them (to avoid spurious renames). Setting
-                # find_copies_harder means we treat unchanged the same as
-                # modified.
-                self._deletes.append(change)
-            else:
-                self._changes.append(change)
+            self._add_change(change)
 
     def _prune(self, add_paths, delete_paths):
         self._adds = [a for a in self._adds if a.new.path not in add_paths]

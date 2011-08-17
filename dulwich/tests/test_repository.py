@@ -254,6 +254,25 @@ class RepositoryTests(TestCase):
         self.assertEqual(shas, [r.head(),
                                 '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
+    def test_clone(self):
+        r = self._repo = open_repo('a.git')
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = r.clone(tmp_dir, mkdir=False)
+        self.assertEqual({
+            'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/remotes/origin/master':
+                'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            'refs/tags/mytag-packed':
+                'b0931cadc54336e78a1d980420e3268903b57a50',
+            }, t.refs.as_dict())
+        history = t.revision_history(t.head())
+        shas = [c.sha().hexdigest() for c in history]
+        self.assertEqual(shas, [t.head(),
+                         '2a72d929692c41d8554c07f6301757ba18a65d91'])
+
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
         history = r.revision_history(r.head())

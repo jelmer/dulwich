@@ -4,6 +4,8 @@
 
   * Repo.do_commit has a new argument 'ref'.
 
+  * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
+
 0.8.0	2011-08-07
 
  FEATURES

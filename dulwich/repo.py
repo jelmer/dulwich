@@ -26,7 +26,6 @@ import errno
 import os
 
 from dulwich.errors import (
-    MissingCommitError,
     NoIndexPresent,
     NotBlobError,
     NotCommitError,
@@ -1174,6 +1173,31 @@ class Repo(BaseRepo):
                     cleanup_mode(st.st_mode), st.st_uid, st.st_gid, st.st_size,
                     blob.id, 0)
         index.write()
+
+    def clone(self, target_path, mkdir=True, bare=False, origin="origin"):
+        """Clone this repository.
+
+        :param target_path: Target path
+        :param mkdir: Create the target directory
+        :param bare: Whether to create a bare repository
+        :return: Created repository
+        """
+        if not bare:
+            target = self.init(target_path, mkdir=mkdir)
+        else:
+            target = self.init_bare(target_path)
+        self.fetch(target)
+        target.refs.import_refs(
+            'refs/remotes/'+origin, self.refs.as_dict('refs/heads'))
+        target.refs.import_refs(
+            'refs/tags', self.refs.as_dict('refs/tags'))
+        try:
+            target.refs.add_if_new(
+                'refs/heads/master',
+                self.refs['refs/heads/master'])
+        except KeyError:
+            pass
+        return target
 
     def __repr__(self):
         return "<Repo at %r>" % self.path

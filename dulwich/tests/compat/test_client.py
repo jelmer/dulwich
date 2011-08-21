@@ -35,7 +35,7 @@ from dulwich import (
     repo,
     )
 from dulwich.tests import (
-    TestSkipped,
+    SkipTest,
     )
 
 from dulwich.tests.compat.utils import (
@@ -175,7 +175,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
-            raise TestSkipped('git-daemon was already running on port %s' %
+            raise SkipTest('git-daemon was already running on port %s' %
                               protocol.TCP_GIT_PORT)
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
@@ -186,7 +186,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
              '--detach', '--reuseaddr', '--enable=receive-pack',
              '--listen=localhost', self.gitroot], cwd=self.gitroot)
         if not check_for_daemon():
-            raise TestSkipped('git-daemon failed to start')
+            raise SkipTest('git-daemon failed to start')
 
     def tearDown(self):
         try:

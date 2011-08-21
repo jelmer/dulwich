@@ -20,8 +20,8 @@
 """Tests for git compatibility utilities."""
 
 from dulwich.tests import (
+    SkipTest,
     TestCase,
-    TestSkipped,
     )
 from dulwich.tests.compat import utils
 
@@ -61,11 +61,11 @@ class GitVersionTests(TestCase):
     def assertRequireSucceeds(self, required_version):
         try:
             utils.require_git_version(required_version)
-        except TestSkipped:
+        except SkipTest:
             self.fail()
 
     def assertRequireFails(self, required_version):
-        self.assertRaises(TestSkipped, utils.require_git_version,
+        self.assertRaises(SkipTest, utils.require_git_version,
                           required_version)
 
     def test_require_git_version(self):
@@ -87,6 +87,6 @@ class GitVersionTests(TestCase):
             self.assertRequireSucceeds((1, 7, 0, 2))
             self.assertRequireFails((1, 7, 0, 3))
             self.assertRequireFails((1, 7, 1))
-        except TestSkipped, e:
-            # This test is designed to catch all TestSkipped exceptions.
+        except SkipTest, e:
+            # This test is designed to catch all SkipTest exceptions.
             self.fail('Test unexpectedly skipped: %s' % e)

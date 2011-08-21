@@ -6,6 +6,11 @@
 
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
 
+ CHANGES
+
+  * unittest2 or python >= 2.7 is now required for the testsuite.
+    testtools is no longer supported. (Jelmer Vernooij, #830713)
+
 0.8.0	2011-08-07
 
  FEATURES

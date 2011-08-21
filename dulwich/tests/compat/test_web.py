@@ -31,7 +31,7 @@ from dulwich.server import (
     DictBackend,
     )
 from dulwich.tests import (
-    TestSkipped,
+    SkipTest,
     )
 from dulwich.web import (
     HTTPGitApplication,
@@ -144,4 +144,4 @@ class DumbWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # Note: remove this if dumb pushing is supported
-        raise TestSkipped('Dumb web pushing not supported.')
+        raise SkipTest('Dumb web pushing not supported.')

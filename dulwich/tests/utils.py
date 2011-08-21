@@ -47,7 +47,7 @@ from dulwich.pack import (
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
-    TestSkipped,
+    SkipTest,
     )
 
 # Plain files are very frequently used in tests, so let the mode be very short.
@@ -142,7 +142,7 @@ def ext_functest_builder(method, func):
 
     This is intended to generate test methods that test both a pure-Python
     version and an extension version using common test code. The extension test
-    will raise TestSkipped if the extension is not found.
+    will raise SkipTest if the extension is not found.
 
     Sample usage:
 
@@ -160,7 +160,7 @@ def ext_functest_builder(method, func):
 
     def do_test(self):
         if not isinstance(func, types.BuiltinFunctionType):
-            raise TestSkipped("%s extension not found", func.func_name)
+            raise SkipTest("%s extension not found", func.func_name)
         method(self, func)
 
     return do_test

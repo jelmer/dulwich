@@ -30,18 +30,10 @@ import tempfile
 if sys.version_info >= (2, 7):
     # If Python itself provides an exception, use that
     import unittest
-    from unittest import SkipTest as TestSkipped
-    from unittest import TestCase
+    from unittest import SkipTest, TestCase
 else:
-    try:
-        import unittest2 as unittest
-        from unittest2 import SkipTest as TestSkipped
-        from unittest2 import TestCase
-    except ImportError:
-        import unittest
-        from testtools.testcase import TestSkipped
-        from testtools.testcase import TestCase
-        TestCase.skipException = TestSkipped
+    import unittest2 as unittest
+    from unittest2 import SkipTest, TestCase
 
 
 class BlackboxTestCase(TestCase):

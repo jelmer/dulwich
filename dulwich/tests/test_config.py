@@ -38,19 +38,19 @@ from dulwich.tests.utils import (
     )
 
 
-default_config="""[core]
+default_config = """[core]
 	repositoryformatversion = 0
 	filemode = true
 	bare = true
 """
-dulwich_config="""[core]
+dulwich_config = """[core]
 	repositoryformatversion = 0
 	filemode = true
 [remote "upstream"]
 	url = https://github.com/jelmer/dulwich.git
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 """
-comprehensive_config="""[core]
+comprehensive_config = """[core]
     penguin = very blue
     Movie = BadPhysics
     UPPERCASE = true
@@ -90,6 +90,89 @@ inued
     quotecont = "cont;\\
 inued"
 """
+comprehensive_config_dict = {
+    "core": {
+        "_name": "core",
+        "subsections": {},
+        "options": {
+            "penguin": {"_name": "penguin", "value": ["very blue", "kingpin"]},
+            "movie": {"_name": "Movie", "value": ["BadPhysics"]},
+            "uppercase": {"_name": "UPPERCASE", "value": ["true"]},
+           },
+       },
+    "cores": {
+        "_name": "Cores",
+        "subsections": {},
+        "options": {
+            "whatever": {"_name": "WhatEver", "value": ["Second"]},
+            "baz": {"_name": "baz", "value": ["multiple lines"]},
+           },
+       },
+    "beta": {
+        "_name": "beta",
+        "subsections": {},
+        "options": {
+            "noindent": {"_name": "noIndent", "value": ["sillyValue"]},
+            "haha": {"_name": "haha", "value": ["\"beta\"", "hello", "bello"]},
+           },
+       },
+    "nextsection": {
+        "_name": "nextSection",
+        "subsections": {},
+        "options": {
+            "nonewline": {"_name": "noNewline", "value": ["ouch"]},
+           },
+       },
+    "a": {
+        "_name": "a",
+        "subsections": {
+            "b": {
+                "_name": "b",
+                "options": {
+                    "c": {"_name": "c", "value": ["d"]},
+                   },
+               },
+           },
+        "options": {
+            "x": {"_name": "x", "value": ["y"]},
+            "b": {"_name": "b", "value": ["c"]},
+           },
+       },
+    "b": {
+        "_name": "b",
+        "subsections": {},
+        "options": {
+            "x": {"_name": "x", "value": ["y"]},
+           },
+       },
+    "branch": {
+        "_name": "branch",
+        "subsections": {
+            "eins": {
+                "_name": "\"eins\"",
+                "options": {
+                    "x": {"_name": "x", "value": ["1"]},
+                    "y": {"_name": "y", "value": ["1"]},
+                   },
+               },
+            "1 234 blabl/a": {
+                "_name": "\"1 234 blabl/a\"",
+                "options": {},
+               },
+           },
+        "options": {},
+       },
+    "section": {
+        "_name": "section",
+        "subsections": {},
+        "options": {
+            "continued": {"_name": "continued", "value": ["continued"]},
+            "noncont": {"_name": "noncont", "value": ["not continued"]},
+            "quotecont": {"_name": "quotecont", "value": ["\"cont;inued\""]},
+           },
+       },
+   }
+
 
 class ConfigTests(TestCase):
 
@@ -118,7 +201,8 @@ class ConfigTests(TestCase):
         dulwichconf.close()
 
         try:
-            (comprehensiveconf_fd, self.comprehensiveconf_path) = tempfile.mkstemp()
+            (comprehensiveconf_fd, self.comprehensiveconf_path) = \
+                    tempfile.mkstemp()
         except OSError, e:
             raise
 
@@ -130,108 +214,121 @@ class ConfigTests(TestCase):
     def tearDown(self):
         os.remove(self.defaultconf_path)
         os.remove(self.dulwichconf_path)
+        os.remove(self.comprehensiveconf_path)
 
     def test_file_read(self):
         self.maxDiff = None
 
         defaultconf_fp = open(self.defaultconf_path)
 
-        defaultconf_dict = GitConfigParser.read_file(defaultconf_fp,self.defaultconf_path)
+        defaultconf_dict = GitConfigParser.read_file(defaultconf_fp,
+                self.defaultconf_path)
         self.assertEqual({
-            "core" : {
-                "_name" : "core",
-                "subsections" : {},
-                "options" : {
-                    "repositoryformatversion" : { "_name" : "repositoryformatversion", "value" : ["0",] },
-                    "filemode" : { "_name" : "filemode", "value" : ["true",] },
-                    "bare" : { "_name" : "bare", "value" : ["true",] },
-                    },
-                }
-            }, defaultconf_dict)
+            "core": {
+                "_name": "core",
+                "subsections": {},
+                "options": {
+                    "repositoryformatversion": {
+                        "_name": "repositoryformatversion",
+                        "value": ["0", ]},
+                    "filemode": {
+                        "_name": "filemode",
+                        "value": ["true", ]},
+                    "bare": {
+                        "_name": "bare",
+                        "value": ["true", ]},
+                   },
+               }
+           }, defaultconf_dict)
 
         comprehensiveconf_fp = open(self.comprehensiveconf_path)
 
-        comprehensiveconf_dict = GitConfigParser.read_file(comprehensiveconf_fp,self.comprehensiveconf_path)
-        self.assertEqual({
-            "core" : {
-                "_name" : "core",
-                "subsections" : {},
-                "options" : {
-                    "penguin" : { "_name" : "penguin", "value" : [ "very blue", "kingpin" ] },
-                    "movie" : { "_name" : "Movie", "value" : [ "BadPhysics" ] },
-                    "uppercase" : { "_name" : "UPPERCASE" , "value" : [ "true" ] },
-                    },
-                },
-            "cores" : {
-                "_name" : "Cores",
-                "subsections" : {},
-                "options" : {
-                    "whatever" : { "_name" : "WhatEver", "value" : [ "Second" ] },
-                    "baz" : { "_name" : "baz", "value" : [ "multiple lines" ] },
-                    },
-                },
-            "beta" : {
-                "_name" : "beta",
-                "subsections" : {},
-                "options" : {
-                    "noindent" : { "_name" : "noIndent", "value" : [ "sillyValue" ] },
-                    "haha" : { "_name" : "haha", "value" : [ "\"beta\"", "hello", "bello" ] },
-                    },
-                },
-            "nextsection" : {
-                "_name" : "nextSection",
-                "subsections" : {},
-                "options" : {
-                    "nonewline" : { "_name" : "noNewline", "value" : [ "ouch" ] },
-                    },
-                },
-            "a" : {
-                "_name" : "a",
-                "subsections" : {
-                    "b" : {
-                        "_name" : "b",
-                        "options" : {
-                            "c" : { "_name" : "c", "value" : [ "d" ] },
-                            },
-                        },
-                    },
-                "options" : {
-                    "x" : { "_name" : "x", "value" : [ "y" ] },
-                    "b" : { "_name" : "b", "value" : [ "c" ] },
-                    },
-                },
-            "b" : {
-                "_name" : "b",
-                "subsections" : {},
-                "options" : {
-                    "x" : { "_name" : "x", "value" : [ "y" ] },
-                    },
-                },
-            "branch" : {
-                "_name" : "branch",
-                "subsections" : {
-                    "eins" : {
-                        "_name" : "\"eins\"",
-                        "options" : {
-                            "x" : { "_name" : "x", "value" : [ "1" ] },
-                            "y" : { "_name" : "y", "value" : [ "1" ] },
-                            },
-                        },
-                    "1 234 blabl/a" : {
-                        "_name" : "\"1 234 blabl/a\"",
-                        "options" : {},
-                        },
-                    },
-                "options" : {},
-                },
-            "section" : {
-                "_name" : "section",
-                "subsections" : {},
-                "options" : {
-                    "continued" : { "_name" : "continued", "value" : [ "continued" ] },
-                    "noncont" : { "_name" : "noncont", "value" : [ "not continued" ] },
-                    "quotecont" : { "_name" : "quotecont", "value" : [ "\"cont;inued\"" ] },
-                    },
-                },
-            }, comprehensiveconf_dict)
+        comprehensiveconf_dict = GitConfigParser.read_file(
+                comprehensiveconf_fp, self.comprehensiveconf_path)
+        self.assertEqual(comprehensive_config_dict, comprehensiveconf_dict)
 
+    def test_read(self):
+        self.maxDiff = None
+
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        self.assertEqual({
+            "core": {
+                "_name": "core",
+                "subsections": {},
+                "options": {
+                    "repositoryformatversion": {
+                        "_name": "repositoryformatversion",
+                        "value": ["0", ]},
+                    "filemode": {
+                        "_name": "filemode",
+                        "value": ["true", ]},
+                    "bare": {
+                        "_name": "bare",
+                        "value": ["true", ]},
+                   },
+               }
+           }, parser.configdict)
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        self.assertEqual(comprehensive_config_dict, parser.configdict)
+
+    def test_getitem(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        self.assertEqual(comprehensive_config_dict['core'], parser['core'])
+        self.assertEqual(comprehensive_config_dict['core'], parser['CORE'])
+        self.assertEqual(comprehensive_config_dict['a'], parser['a'])
+        self.assertEqual(comprehensive_config_dict['a']['subsections']['b'], parser['a.b'])
+        self.assertEqual(comprehensive_config_dict['a']['subsections']['b']['options']['c'], parser['a.b.c'])
+
+        self.assertRaises(KeyError, lambda: parser['does not exist'])
+        self.assertRaises(KeyError, lambda: parser['a.b.d'])
+        self.assertRaises(KeyError, lambda: parser['a.b.c.d'])
+
+    def test_setitem(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        parser['core.bare'] = 'false'
+        self.assertEqual('false', parser.configdict['core']['options']['bare'])
+
+        parser['Core.filemode'] = 'false'
+        self.assertEqual('false', parser.configdict['core']['options']['filemode'])
+
+        parser['Cores.a'] = 'b'
+        self.assertEqual(True,  'cores' in parser.configdict)
+        self.assertEqual('Cores', parser.configdict['cores']['_name'])
+        self.assertEqual('b', parser.configdict['cores']['options']['a'])
+
+        self.assertRaises(KeyError, parser.__setitem__, 'does not exist', 'random')
+
+    def test_delitem(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        del parser['core.bare']
+        self.assertRaises(KeyError, lambda: parser.configdict['core']['options']['bare'])
+        del parser['Core']
+        self.assertRaises(KeyError, lambda: parser.configdict['core'])
+
+        self.assertRaises(KeyError, parser.__delitem__, 'does not exist')
+
+    def test_contains(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        self.assertEqual(True, 'core' in parser)
+        self.assertEqual(True, 'Core.UPPERCASE' in parser)
+        self.assertEqual(True, 'branch.eins.x' in parser)
+        self.assertEqual(True, 'branch.1 234 blabl/a' in parser)
+
+        self.assertEqual(False,'does not exist' in parser)

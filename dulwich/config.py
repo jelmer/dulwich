@@ -22,6 +22,7 @@
 
 import re
 
+
 # exception classes
 class Error(Exception):
     """Base class for ConfigParser exceptions."""
@@ -50,6 +51,7 @@ class Error(Exception):
 
     __str__ = __repr__
 
+
 class ParsingError(Error):
     """Raised when a configuration file does not follow legal syntax."""
 
@@ -61,6 +63,7 @@ class ParsingError(Error):
     def append(self, lineno, line):
         self.errors.append((lineno, line))
         self.message += '\n\t[line %2d]: %s' % (lineno, line)
+
 
 class MissingSectionHeaderError(ParsingError):
     """Raised when a key-value pair is found before any section header."""
@@ -81,8 +84,8 @@ class GitConfigParser(object):
     Implements collections.MutableMapping
 
     A git configuration file consists of sections ([section], [section
-    "subsection"], or [section.subsection]) and options within each section,
-    key = value. See git-config(1) for more details.  
+    "subsection"], or [section.subsection]) and options within each
+    section, key = value. See git-config(1) for more details.
 
     In general, the parser supports two types of accesses:
         keyed by "section.subsection.option" as a flat dict (aka git syntax)
@@ -92,7 +95,6 @@ class GitConfigParser(object):
     sensitive when enclosed in "" in the config file or when using dict
     syntax. Otherwise, subsection is case insensitive
     """
-
 
     # Splits section and subsection
     FULLSECTCRE = re.compile(
@@ -105,7 +107,7 @@ class GitConfigParser(object):
 
     # Options can have whitespace in front and may have values
     OPTCRE = re.compile(
-        r'^\s*(?P<option>[^=\s]+)'          # very permissive, incuding leading whitespace
+        r'^\s*(?P<option>[^=\s]+)'          # leading whitespace
         r'\s*=?\s*'                         # any number of space/tab,
                                             # followed by separator (=)
                                             # followed by any # space/tab
@@ -129,7 +131,7 @@ class GitConfigParser(object):
 
     # Utility functions
     @staticmethod
-    def findkey(configdict,section,subsection,option,case):
+    def findkey(configdict, section, subsection, option, case):
         try:
             sect = configdict[section.lower()]
             if subsection:
@@ -149,15 +151,140 @@ class GitConfigParser(object):
             return None
         return None
 
+    # Mappings Interface
+    # __contains__, keys, items, values, get, __eq__, and __ne__
+
+    def __contains__(self, key):
+        """Return existence of a section, subsection, or option
+
+        :param key: section.subsection.option (subsection and option
+            are optional)
+        :return True or False
+        """
+
+        try:
+            self.__getitem__(key)
+            return True
+        except KeyError:
+            return False
+
+    # MutableMapping Interface
+    # __delitem__, __getitem__, __iter__, __len__, __setitem__
+
+    def __getitem__(self, key):
+        """Get a section, subsection, or a single option
+
+        :param key: section.subsection.option (subsection and option
+            are optional)
+        :return: section or subsection dict, or option as string
+        """
+
+        if key is not None:
+            if key.count('.') == 1:  # subsection or option
+                (section, subkey) = key.split('.')
+                try:
+                    return self.configdict[section.lower()]['subsections'][subkey]
+                except KeyError:
+                    return self.configdict[section.lower()]['options'][subkey.lower()]
+            elif key.count('.') == 2:  # option
+                (section, subsection, option) = key.split('.')
+                return self.configdict[section.lower()]['subsections'][subsection]['options'][option.lower()]
+            elif key.count('.') > 2:
+                raise KeyError(key)
+            else:  # key is a section
+                return self.configdict[key.lower()]
+        raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        """Add or change an option
+
+        :param key: section.subsection.option (subsection is optional)
+        :return: (ignored)
+        """
+
+        if key is not None:
+            if key.count('.') == 1:  # section.option
+                (section, option) = key.split('.')
+                sect = GitConfigParser.findkey(self.configdict, section, None, None, None)
+                if sect is None:
+                    sect = self.configdict[section.lower()] = {
+                            "_name": section,
+                            "subsections": {},
+                            "options": {},
+                            }
+                self.configdict[section.lower()]['options'][option.lower()] = value
+            elif key.count('.') == 2:  # section.subsection.option
+                (section, subsection, option) = key.split('.')
+                sect = GitConfigParser.findkey(self.configdict, section, None, None, None)
+                if sect is None:
+                    sect = self.configdict[section.lower()] = {
+                            "_name": section,
+                            "subsections": {},
+                            "options": {},
+                            }
+                subsect = GitConfigParser.findkey(self.configdict, section, subsection, None, None, True)
+                if subsect is None:
+                    subsect = self.configdict[section.lower()]['subsections'][subsection] = {
+                            "_name": "\"%s\"" % subsection,
+                            "options": {},
+                            }
+                self.configdict[section.lower()]['subsections'][subsection]['options'][option.lower()]
+            elif key.count('.') == 0 or key.count('.') > 2:
+                raise KeyError(key)
+        else:
+            raise KeyError(key)
+
+    def __delitem__(self, key):
+        """Delete a section, subsection, or a single option
+
+        :param key: section.subsection.option (subsection and option
+            are optional)
+        :return: (ignored)
+        """
+
+        if key is not None:
+            if key.count('.') == 1:  # subsection or option
+                (section, subkey) = key.split('.')
+                try:
+                    del self.configdict[section.lower()]['subsections'][subkey]
+                except KeyError:
+                    del self.configdict[section.lower()]['options'][subkey.lower()]
+            elif key.count('.') == 2:  # option
+                (section, subsection, option) = key.split('.')
+                del self.configdict[section.lower()]['subsections'][subsection]['options'][option.lower()]
+            elif key.count('.') > 2:
+                raise KeyError(key)
+            else:  # key is a section
+                del self.configdict[key.lower()]
+        else:
+            raise KeyError(key)
+
+    def read(self, repo_path=None, exclusive_filename=None, bare_repo=False):
+        if exclusive_filename is not None:
+            exclusive_filename_fp = open(exclusive_filename)
+            self.configdict = GitConfigParser.read_file(exclusive_filename_fp, exclusive_filename)
+
+            return True
+        else:
+            if repo_path is not None:
+                repo_config_filename = repo_path + '/config' if bare_repo else repo_path + '/.git/config'
+                repo_config_fp = open(repo_config_filename)
+                repo_config = GitConfigParser.read_file(repo_config_fp, repo_config_filename)
+
+                self.configdict = repo_config
+
+                return True
+            else:
+                return False
 
     @staticmethod
     def read_file(fp, fpname):
         """Read git configuration from file to a dict
         """
-        cursect = None                        # None, or a dictionary
+        cursect = None
         optname = None
         lineno = 0
-        e = None                              # None, or an exception
+        e = None
         config = {}
         oline = ''
         while True:
@@ -180,28 +307,28 @@ class GitConfigParser(object):
                             'subsection', 'isubsection')
 
                     # Make sure section exists
-                    cursect = GitConfigParser.findkey(config,sectname,None,None,None)
+                    cursect = GitConfigParser.findkey(config, sectname, None, None, None)
                     if cursect is None:
                         cursect = config[sectname.lower()] = {
-                                "_name" : sectname,
-                                "subsections" : {},
-                                "options" : {},
+                                "_name": sectname,
+                                "subsections": {},
+                                "options": {},
                                 }
 
                     # Make sure subsection exists
                     if subsectname is not None:
-                        cursect = GitConfigParser.findkey(config,sectname,subsectname,None,True)
+                        cursect = GitConfigParser.findkey(config, sectname, subsectname, None, True)
                         if cursect is None:
                             cursect = config[sectname.lower()]["subsections"][subsectname] = {
-                                    "_name" : "\"%s\"" % subsectname,
-                                    "options" : {},
+                                    "_name": "\"%s\"" % subsectname,
+                                    "options": {},
                                     }
                     elif isubsectname is not None:
-                        cursect = GitConfigParser.findkey(config,sectname,isubsectname,None,False)
+                        cursect = GitConfigParser.findkey(config, sectname, isubsectname, None, False)
                         if cursect is None:
                             cursect = config[sectname.lower()]["subsections"][isubsectname.lower()] = {
-                                    "_name" : isubsectname,
-                                    "options" : {},
+                                    "_name": isubsectname,
+                                    "options": {},
                                     }
                     oline = line[mo.end():]
                 # no section header in the file?
@@ -220,8 +347,8 @@ class GitConfigParser(object):
                             opt = cursect["options"][optname.lower()]
                         except KeyError:
                             opt = cursect["options"][optname.lower()] = {
-                                    "_name" : optname,
-                                    "value" : [],
+                                    "_name": optname,
+                                    "value": [],
                                     }
 
                         # Parse value character by character

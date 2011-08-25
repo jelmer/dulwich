@@ -20,7 +20,6 @@
 
 """
 
-
 import errno
 import os
 import tempfile
@@ -36,7 +35,6 @@ from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
     )
-
 
 default_config = """[core]
 	repositoryformatversion = 0
@@ -175,7 +173,6 @@ comprehensive_config_dict = {
 
 
 class ConfigTests(TestCase):
-
     def setUp(self):
         super(ConfigTests, self).setUp()
         self.parser = GitConfigParser()
@@ -216,61 +213,8 @@ class ConfigTests(TestCase):
         os.remove(self.dulwichconf_path)
         os.remove(self.comprehensiveconf_path)
 
-    def test_file_read(self):
-        self.maxDiff = None
-
-        defaultconf_fp = open(self.defaultconf_path)
-
-        defaultconf_dict = GitConfigParser.read_file(defaultconf_fp,
-                self.defaultconf_path)
-        self.assertEqual({
-            "core": {
-                "_name": "core",
-                "subsections": {},
-                "options": {
-                    "repositoryformatversion": {
-                        "_name": "repositoryformatversion",
-                        "value": ["0", ]},
-                    "filemode": {
-                        "_name": "filemode",
-                        "value": ["true", ]},
-                    "bare": {
-                        "_name": "bare",
-                        "value": ["true", ]},
-                   },
-               }
-           }, defaultconf_dict)
-
-        comprehensiveconf_fp = open(self.comprehensiveconf_path)
-
-        comprehensiveconf_dict = GitConfigParser.read_file(
-                comprehensiveconf_fp, self.comprehensiveconf_path)
-        self.assertEqual(comprehensive_config_dict, comprehensiveconf_dict)
-
     def test_read(self):
-        self.maxDiff = None
-
         parser = self.parser
-
-        parser.read(exclusive_filename=self.defaultconf_path)
-
-        self.assertEqual({
-            "core": {
-                "_name": "core",
-                "subsections": {},
-                "options": {
-                    "repositoryformatversion": {
-                        "_name": "repositoryformatversion",
-                        "value": ["0", ]},
-                    "filemode": {
-                        "_name": "filemode",
-                        "value": ["true", ]},
-                    "bare": {
-                        "_name": "bare",
-                        "value": ["true", ]},
-                   },
-               }
-           }, parser.configdict)
 
         parser.read(exclusive_filename=self.comprehensiveconf_path)
 

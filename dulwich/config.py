@@ -22,6 +22,7 @@
 
 import re
 import itertools
+from collections import MutableMapping
 
 try:
     from collections import OrderedDict
@@ -83,7 +84,7 @@ class MissingSectionHeaderError(ParsingError):
         self.line = line
 
 
-class GitConfigParser(object):
+class GitConfigParser(MutableMapping):
     """parses and manages a git configuration file
 
     Implements collections.MutableMapping

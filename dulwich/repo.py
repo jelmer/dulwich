@@ -883,11 +883,10 @@ class BaseRepo(object):
         return self.commit(sha).parents
 
     def get_config(self):
-        import ConfigParser
-        p = ConfigParser.RawConfigParser()
-        p.read(os.path.join(self._controldir, 'config'))
-        return dict((section, dict(p.items(section)))
-                    for section in p.sections())
+        from dulwich.config import GitConfigParser
+        parser = GitConfigParser()
+        parser.read(exclusive_filename=os.path.join(self._controldir, 'config'))
+        return parser
 
     def commit(self, sha):
         """Retrieve the commit with a particular SHA.

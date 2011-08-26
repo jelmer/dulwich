@@ -344,6 +344,8 @@ class RepositoryTests(TestCase):
         r = Repo(temp_repo_dir)
         self.assertEquals({}, r.get_config())
 
+        shutil.rmtree(temp_repo_dir)
+
     def test_common_revisions(self):
         """
         This test demonstrates that ``find_common_revisions()`` actually returns

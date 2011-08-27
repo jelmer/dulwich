@@ -578,3 +578,29 @@ class GitConfigParser(object):
         # if any parsing errors occurred, raise an exception
         if e:
             raise e
+
+    def write(self, fp):
+        """Write back configuration to a single file"""
+        for sect in self.configdict.itervalues():
+            self._write_section(fp, sect)
+
+    def _write_section(self, fp, section):
+        """Write back a section to a single file"""
+
+        if len(section['options']) != 0:
+            fp.write("[{}]\n".format(section['_name']))
+            for optkey, opt in section['options'].iteritems():
+                optname = opt['_name']
+                for optval in opt['value']:
+                    fp.write("\t{} = {}\n".format(optname, optval))
+        for subsectkey, subsect in section['subsections'].iteritems():
+            case = subsect['_name'][0] == '"'
+            if case:
+                fp.write("[{} {}]\n".format(section['_name'], subsect['_name']))
+            else:
+                fp.write("[{}.{}]\n".format(section['_name'], subsect['_name']))
+
+            for optkey, opt in subsect['options'].iteritems():
+                optname = opt['_name']
+                for optval in opt['value']:
+                    fp.write("\t{} = {}\n".format(optname, optval))

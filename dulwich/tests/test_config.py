@@ -449,3 +449,50 @@ class ConfigTests(TestCase):
         self.assertEqual(False, parser == oparser)
 
         self.assertEqual(comprehensive_config_dict, oparser)
+
+    def test_write(self):
+        parser = self.parser
+        oparser = GitConfigParser()
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        (fd, path) = tempfile.mkstemp()
+        f = os.fdopen(fd, 'w+')
+        parser.write(f)
+        f.close()
+
+        self.assertEqual(default_config, open(path).read())
+
+        oparser.read(exclusive_filename=path)
+        self.assertEqual(oparser, parser)
+
+        oparser.clear()
+        parser.clear()
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        (comprehensive_fd, comprehensive_path) = tempfile.mkstemp()
+        comprehensive_f = os.fdopen(comprehensive_fd, 'w+')
+        parser.write(comprehensive_f)
+        comprehensive_f.close()
+
+        self.assertEqual(comprehensive_config_clean, open(comprehensive_path).read())
+
+        oparser.read(exclusive_filename=comprehensive_path)
+        self.assertEqual(oparser, parser)
+
+        oparser.clear()
+        parser.clear()
+
+        (empty_fd, empty_path) = tempfile.mkstemp()
+        empty_f = os.fdopen(empty_fd, 'w+')
+        parser.write(empty_f)
+        empty_f.close()
+
+        self.assertEqual("", open(empty_path).read())
+
+        oparser.read(exclusive_filename=empty_path)
+        self.assertEqual(oparser, parser)
+
+        os.remove(path)
+        os.remove(empty_path)

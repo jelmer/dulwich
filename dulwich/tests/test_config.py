@@ -311,13 +311,13 @@ class ConfigTests(TestCase):
 
     def test_clear(self):
         parser = self.parser
-        self.assertEqual({},parser)
-        
+        self.assertEqual({}, parser)
+
         parser.read(exclusive_filename=self.comprehensiveconf_path)
         self.assertEqual(comprehensive_config_dict, parser.configdict)
 
         parser.clear()
-        self.assertEqual({},parser)
+        self.assertEqual({}, parser)
 
     def test_contains(self):
         parser = self.parser
@@ -329,7 +329,7 @@ class ConfigTests(TestCase):
         self.assertEqual(True, 'branch.eins.x' in parser)
         self.assertEqual(True, 'branch.1 234 blabl/a' in parser)
 
-        self.assertEqual(False,'does not exist' in parser)
+        self.assertEqual(False, 'does not exist' in parser)
 
     def test_items(self):
         parser = self.parser
@@ -337,9 +337,9 @@ class ConfigTests(TestCase):
         parser.read(exclusive_filename=self.defaultconf_path)
 
         self.assertEqual([
-            ('core.repositoryformatversion','0'),
-            ('core.filemode','true'),
-            ('core.bare','true')], parser.items())
+            ('core.repositoryformatversion', '0'),
+            ('core.filemode', 'true'),
+            ('core.bare', 'true')], parser.items())
 
     def test_keys(self):
         parser = self.parser
@@ -356,7 +356,7 @@ class ConfigTests(TestCase):
 
         parser.read(exclusive_filename=self.defaultconf_path)
 
-        self.assertEqual(['0','true','true'], parser.values())
+        self.assertEqual(['0', 'true', 'true'], parser.values())
 
     def test_iter(self):
         parser = self.parser
@@ -406,7 +406,7 @@ class ConfigTests(TestCase):
         parser.clear()
 
         parser.read(exclusive_filename=self.comprehensiveconf_path)
-        
+
         self.assertEqual(20, len(parser))
 
     def test_eq(self):

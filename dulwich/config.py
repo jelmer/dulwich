@@ -1,5 +1,6 @@
 # config.py -- For dealing with git repositories.
 # Copyright (C) 2001-2010 Python Software Foundation
+# Copyright (C) 2011 milki
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,10 +25,12 @@ import re
 import itertools
 from collections import MutableMapping
 
+# Order is necessary to write back configuration to file
 try:
     from collections import OrderedDict
 except ImportError:
     from dulwich import OrderedDict
+
 
 # exception classes
 class Error(Exception):
@@ -91,15 +94,21 @@ class GitConfigParser(MutableMapping):
 
     A git configuration file consists of sections ([section], [section
     "subsection"], or [section.subsection]) and options within each
-    section, key = value. See git-config(1) for more details.
+    section, key = value. See git-config(1) for more details on
+    file syntax
 
     In general, the parser supports two types of accesses:
-        keyed by "section.subsection.option" as a flat dict (aka git syntax)
-        keyed by section and then option as nested dicts (aka dict syntax)
+        keyed by "section.subsection.option" as a flat dict
+            This is known as the canonical format.
+        keyed by section and then option as nested dicts
+            This is the dict interface.
 
     Both section and options are case insensitive. Subsection is case
     sensitive when enclosed in "" in the config file or when using dict
-    syntax. Otherwise, subsection is case insensitive
+    syntax. Otherwise, subsection is case insensitive.
+
+    Implementation largely borrowed from Python2.7's ConfigParser,
+    Python3.1's configparser, and spang's Config::GitLike perl module.
     """
 
     # Splits section and subsection
@@ -256,19 +265,26 @@ class GitConfigParser(MutableMapping):
         return ltype(l)
 
     # Mappings Interface
-    # __contains__, keys, items, values, get, __eq__, and __ne__
+    # __contains__, keys, items, values, _eq__
 
     def __eq__(self, other):
+        """Equality
+
+        :param other: A GitConfigParser or a dict
+        :note: dict can be a simple dict of key/value using the
+            canonical format or a complex dict matching the
+            internal dict format
+        """
         if isinstance(other, GitConfigParser):
             return super(GitConfigParser, self).__eq__(other)
-        elif isinstance(other, dict): # simple or complex dict
+        elif isinstance(other, dict):  # simple or complex dict
             keys = other.keys()
             if len(keys) != 0:
-                if '.' in keys[0]: # simple dict in canonical format
+                if '.' in keys[0]:  # simple dict in canonical format
                     return dict(self.items()) == other
-                else: # complex dict in internal format
+                else:  # complex dict in internal format
                     return self.configdict == other
-            else: # empty dict
+            else:  # empty dict
                 return self.items() == []
         else:
             raise NotImplemented
@@ -336,21 +352,21 @@ class GitConfigParser(MutableMapping):
                         for optname, opt in subsect['options'].iteritems()]
                         for subsectname, subsect
                         in sect['subsections'].iteritems()])
-            return GitConfigParser.flatten(items,ltypes=list)
+            return GitConfigParser.flatten(items, ltypes=list)
 
     def keys(self):
         """Get list of options
 
         :return: List of all options in canonical form
         """
-        return [ key for key, value in self.items() ]
+        return [key for key, value in self.items()]
 
     def values(self):
         """Get list of option values
 
         :return: List of all values
         """
-        return [ value for key, value in self.items() ]
+        return [value for key, value in self.items()]
 
     def __iter__(self):
         """Iterator over all options
@@ -360,10 +376,12 @@ class GitConfigParser(MutableMapping):
         return itertools.chain(self.keys())
 
     def __len__(self):
+        """Number of options"""
+
         return len(self.items())
 
     # MutableMapping Interface
-    # __delitem__, __getitem__, __iter__, __len__, __setitem__
+    # __delitem__, __getitem__, __iter__, __len__, __setitem__, clear
 
     def __getitem__(self, key):
         """Get a section, subsection, or a single option
@@ -422,7 +440,8 @@ class GitConfigParser(MutableMapping):
 
         :param key: section.subsection.option (subsection and option
             are optional)
-        :return: (ignored)
+        :note: If an option and subsection coincide in name,
+            the subsection is deleted first.
         """
 
         if key is not None:
@@ -443,6 +462,8 @@ class GitConfigParser(MutableMapping):
             raise KeyError(key)
 
     def clear(self):
+        """Clear stored git configuration"""
+
         del self.configdict
         self.configdict = OrderedDict()
 
@@ -451,17 +472,26 @@ class GitConfigParser(MutableMapping):
         raise NotImplemented
 
     def read(self, repo_path=None, exclusive_filename=None, bare_repo=False):
+        """Read and initialize git configuration
+
+        Either specify a repository path or a single config file.
+
+        :param repo_path: Path to a repository
+        :param exclusive_filename: Only read from specified file
+        :param bare_repo: repo at repo_path is a bare repo
+        """
         if exclusive_filename is not None:
             exclusive_filename_fp = open(exclusive_filename)
             self._read_file(exclusive_filename_fp, exclusive_filename)
 
             return True
-        else:
+        else:  # TODO: load from system, global files too
             if repo_path is not None:
-                repo_config_filename = repo_path + '/config' if bare_repo else repo_path + '/.git/config'
+                repo_config_filename = repo_path + '/config' \
+                        if bare_repo else repo_path + '/.git/config'
                 repo_config_fp = open(repo_config_filename)
-                repo_config = self._read_file(repo_config_fp, repo_config_filename)
-
+                repo_config = self._read_file(repo_config_fp,
+                        repo_config_filename)
 
                 return True
             else:
@@ -469,6 +499,9 @@ class GitConfigParser(MutableMapping):
 
     def _read_file(self, fp, fpname):
         """Read git configuration from file to a dict
+
+        :param fp: file handler to read from
+        :param fpname: file name for error messages
         """
         cursect = None
         optname = None
@@ -537,6 +570,7 @@ class GitConfigParser(MutableMapping):
                             if len(optval) == 0 or optval[0] in '#;':
                                 break
 
+                            # TODO: Handle quoting properly
                             mo = self.VALCRE.match(optval)
                             if mo:
                                 if mo.group('whitespace') is not None:
@@ -581,7 +615,14 @@ class GitConfigParser(MutableMapping):
             raise e
 
     def write(self, fp):
-        """Write back configuration to a single file"""
+        """Write back configuration to a single file
+
+        :param fp: Open filehandle to write to
+        :note: All comments, extraneous whitespace, and continuations
+            are lost. Also, case-sensitive subsections in all
+            lowercase and case-insective subsections with the same
+            name are merged.
+        """
         for sect in self.configdict.itervalues():
             self._write_section(fp, sect)
 

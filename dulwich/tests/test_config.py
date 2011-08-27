@@ -88,6 +88,39 @@ inued
     quotecont = "cont;\\
 inued"
 """
+
+comprehensive_config_clean = """[core]
+	penguin = very blue
+	penguin = kingpin
+	Movie = BadPhysics
+	UPPERCASE = true
+[Cores]
+	WhatEver = Second
+	baz = multiple lines
+[beta]
+	noIndent = sillyValue
+	haha = "beta"
+	haha = hello
+	haha = bello
+[nextSection]
+	noNewline = ouch
+[a]
+	x = y
+	b = c
+[a.b]
+	c = d
+[b]
+	x = y
+[branch "eins"]
+	x = 1
+	y = 1
+[branch "1 234 blabl/a"]
+[section]
+	continued = continued
+	noncont = not continued
+	quotecont = "cont;inued"
+"""
+
 comprehensive_config_dict = {
     "core": {
         "_name": "core",
@@ -265,6 +298,27 @@ class ConfigTests(TestCase):
 
         self.assertRaises(KeyError, parser.__delitem__, 'does not exist')
 
+    def test_pop(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        self.assertEqual(comprehensive_config_dict['a']['subsections']['b'], parser.pop('a.b'))
+        self.assertEqual(comprehensive_config_dict['a']['options']['b'], parser.pop('a.b'))
+        self.assertEqual(False, 'a.b' in parser)
+        self.assertEqual(comprehensive_config_dict['beta']['options']['haha'], parser.pop('beta.haha'))
+        self.assertEqual(False, 'beta.haha' in parser)
+
+    def test_clear(self):
+        parser = self.parser
+        self.assertEqual({},parser)
+        
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+        self.assertEqual(comprehensive_config_dict, parser.configdict)
+
+        parser.clear()
+        self.assertEqual({},parser)
+
     def test_contains(self):
         parser = self.parser
 
@@ -276,3 +330,122 @@ class ConfigTests(TestCase):
         self.assertEqual(True, 'branch.1 234 blabl/a' in parser)
 
         self.assertEqual(False,'does not exist' in parser)
+
+    def test_items(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        self.assertEqual([
+            ('core.repositoryformatversion','0'),
+            ('core.filemode','true'),
+            ('core.bare','true')], parser.items())
+
+    def test_keys(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        self.assertEqual([
+            'core.repositoryformatversion',
+            'core.filemode',
+            'core.bare'], parser.keys())
+
+    def test_values(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        self.assertEqual(['0','true','true'], parser.values())
+
+    def test_iter(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        it = iter(parser)
+        self.assertEqual('core.repositoryformatversion', it.next())
+        self.assertEqual('core.filemode', it.next())
+        self.assertEqual('core.bare', it.next())
+        self.assertRaises(StopIteration, lambda: it.next())
+
+        parser.clear()
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        it = iter(parser)
+        self.assertEqual('core.penguin', it.next())
+        self.assertEqual('core.penguin', it.next())
+        self.assertEqual('core.movie', it.next())
+        self.assertEqual('core.uppercase', it.next())
+        self.assertEqual('cores.whatever', it.next())
+        self.assertEqual('cores.baz', it.next())
+        self.assertEqual('beta.noindent', it.next())
+        self.assertEqual('beta.haha', it.next())
+        self.assertEqual('beta.haha', it.next())
+        self.assertEqual('beta.haha', it.next())
+        self.assertEqual('nextsection.nonewline', it.next())
+        self.assertEqual('a.x', it.next())
+        self.assertEqual('a.b', it.next())
+        self.assertEqual('a.b.c', it.next())
+        self.assertEqual('b.x', it.next())
+        self.assertEqual('branch.eins.x', it.next())
+        self.assertEqual('branch.eins.y', it.next())
+        self.assertEqual('section.continued', it.next())
+        self.assertEqual('section.noncont', it.next())
+        self.assertEqual('section.quotecont', it.next())
+        self.assertRaises(StopIteration, lambda: it.next())
+
+    def test_len(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+
+        self.assertEqual(3, len(parser))
+
+        parser.clear()
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+        
+        self.assertEqual(20, len(parser))
+
+    def test_eq(self):
+        parser = self.parser
+        oparser = GitConfigParser()
+
+        parser.read(exclusive_filename=self.defaultconf_path)
+        oparser.read(exclusive_filename=self.defaultconf_path)
+        self.assertEqual(parser, oparser)
+
+        self.assertEqual({
+            'core.repositoryformatversion': '0',
+	        'core.filemode': 'true',
+	        'core.bare': 'true',
+            }, parser)
+
+        self.assertEqual({
+            'core': {
+                '_name': 'core',
+                'subsections': {},
+                'options': {
+                    'repositoryformatversion': {
+                        '_name': 'repositoryformatversion',
+                        'value': ['0'],
+                        },
+	                'filemode': {
+                        '_name': 'filemode',
+                        'value': ['true'],
+                        },
+	                'bare': {
+                        '_name': 'bare',
+                        'value': ['true'],
+                        }
+                    },
+                },
+            }, parser)
+
+        oparser.clear()
+        oparser.read(exclusive_filename=self.comprehensiveconf_path)
+        self.assertEqual(False, parser == oparser)
+
+        self.assertEqual(comprehensive_config_dict, oparser)

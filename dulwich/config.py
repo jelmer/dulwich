@@ -21,6 +21,7 @@
 """Git Configuration parser"""
 
 import re
+import itertools
 
 try:
     from collections import OrderedDict
@@ -236,8 +237,40 @@ class GitConfigParser(object):
                 }
             return self.configdict[section.lower()]['subsections'][subsection.lower()]
 
+    # http://rightfootin.blogspot.com/2006/09/more-on-python-flatten.html
+    @staticmethod
+    def flatten(l, ltypes=(list, tuple)):
+        ltype = type(l)
+        l = list(l)
+        i = 0
+        while i < len(l):
+            while isinstance(l[i], ltypes):
+                if not l[i]:
+                    l.pop(i)
+                    i -= 1
+                    break
+                else:
+                    l[i:i + 1] = l[i]
+            i += 1
+        return ltype(l)
+
     # Mappings Interface
     # __contains__, keys, items, values, get, __eq__, and __ne__
+
+    def __eq__(self, other):
+        if isinstance(other, GitConfigParser):
+            return super(GitConfigParser, self).__eq__(other)
+        elif isinstance(other, dict): # simple or complex dict
+            keys = other.keys()
+            if len(keys) != 0:
+                if '.' in keys[0]: # simple dict in canonical format
+                    return dict(self.items()) == other
+                else: # complex dict in internal format
+                    return self.configdict == other
+            else: # empty dict
+                return self.items() == []
+        else:
+            raise NotImplemented
 
     def __contains__(self, key):
         """Return existence of a section, subsection, or option
@@ -254,6 +287,79 @@ class GitConfigParser(object):
             return True
         except KeyError:
             return False
+
+    def items(self, key=None):
+        """Get list of options with values
+
+        :param key: optional section or section.subsection
+        :return: List of all options and values optionally limited
+            by section/subsection
+        """
+
+        if key is not None:
+            if key.count('.') == 1:  # subsection
+                (section, subsection) = key.split('.')
+                sectname = section.lower()
+                subsectname = subsection
+
+                subsect = self.configdict[sectname]['subsections'][subsectname]
+                items = [[(sectname + '.' + subsectname + '.' + optname, optval)
+                        for optval in opt['value']]
+                        for optname, opt in subsect['options']]
+                return items
+            elif key.count('.') > 1:
+                raise KeyError(key)
+            else:  # key is a section
+                sectname = section.lower()
+                sect = self.configdict[sectname]
+
+                items = [[(sectname + '.' + optname, optval)
+                        for optval in opt['value']]
+                        for optname, opt in sect['options']]
+                items.append([[[(sectname + '.' + subsectname + '.' + optname, optval)
+                        for optval in opt['value']]
+                        for optname, opt in subsect['options']]
+                        for subsectname, subsect in sect['subsections']])
+                return items
+        else:
+            items = []
+            for sectname, sect in self.configdict.iteritems():
+                items.append(
+                    [[(sectname + '.' + optname, optval)
+                        for optval in opt['value']]
+                        for optname, opt in sect['options'].iteritems()])
+                items.append(
+                    [[[(sectname + '.' + subsectname +
+                    '.' + optname, optval)
+                        for optval in opt['value']]
+                        for optname, opt in subsect['options'].iteritems()]
+                        for subsectname, subsect
+                        in sect['subsections'].iteritems()])
+            return GitConfigParser.flatten(items,ltypes=list)
+
+    def keys(self):
+        """Get list of options
+
+        :return: List of all options in canonical form
+        """
+        return [ key for key, value in self.items() ]
+
+    def values(self):
+        """Get list of option values
+
+        :return: List of all values
+        """
+        return [ value for key, value in self.items() ]
+
+    def __iter__(self):
+        """Iterator over all options
+
+        :return: Iterator
+        """
+        return itertools.chain(self.keys())
+
+    def __len__(self):
+        return len(self.items())
 
     # MutableMapping Interface
     # __delitem__, __getitem__, __iter__, __len__, __setitem__
@@ -334,6 +440,14 @@ class GitConfigParser(object):
                 del self.configdict[key.lower()]
         else:
             raise KeyError(key)
+
+    def clear(self):
+        del self.configdict
+        self.configdict = OrderedDict()
+
+    # Methods not implemented
+    def setdefault(self, key, default):
+        raise NotImplemented
 
     def read(self, repo_path=None, exclusive_filename=None, bare_repo=False):
         if exclusive_filename is not None:

@@ -312,6 +312,71 @@ class GitClient(object):
         if data:
             raise SendPackError('Unexpected response %r' % data)
 
+    def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
+                                 wants, can_read):
+        """Handle the head of a 'git-upload-pack' request.
+
+        :param proto: Protocol object to read from
+        :param capabilities: List of negotiated capabilities
+        :param graph_walker: GraphWalker instance to call .ack() on
+        :param wants: List of commits to fetch
+        :param can_read: function that returns a boolean that indicates
+            whether there is extra graph data to read on proto
+        """
+        assert isinstance(wants, list) and type(wants[0]) == str
+        proto.write_pkt_line('want %s %s\n' % (
+            wants[0], ' '.join(capabilities)))
+        for want in wants[1:]:
+            proto.write_pkt_line('want %s\n' % want)
+        proto.write_pkt_line(None)
+        have = graph_walker.next()
+        while have:
+            proto.write_pkt_line('have %s\n' % have)
+            if can_read():
+                pkt = proto.read_pkt_line()
+                parts = pkt.rstrip('\n').split(' ')
+                if parts[0] == 'ACK':
+                    graph_walker.ack(parts[1])
+                    if parts[2] in ('continue', 'common'):
+                        pass
+                    elif parts[2] == 'ready':
+                        break
+                    else:
+                        raise AssertionError(
+                            "%s not in ('continue', 'ready', 'common)" %
+                            parts[2])
+            have = graph_walker.next()
+        proto.write_pkt_line('done\n')
+
+    def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
+                                 pack_data, progress):
+        """Handle the tail of a 'git-upload-pack' request.
+
+        :param proto: Protocol object to read from
+        :param capabilities: List of negotiated capabilities
+        :param graph_walker: GraphWalker instance to call .ack() on
+        :param pack_data: Function to call with pack data
+        :param progress: Optional progress reporting function
+        """
+        pkt = proto.read_pkt_line()
+        while pkt:
+            parts = pkt.rstrip('\n').split(' ')
+            if parts[0] == 'ACK':
+                graph_walker.ack(pkt.split(' ')[1])
+            if len(parts) < 3 or parts[2] not in ('continue', 'common'):
+                break
+            pkt = proto.read_pkt_line()
+        if "side-band-64k" in capabilities:
+            self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
+            # wait for EOF before returning
+            data = proto.read()
+            if data:
+                raise Exception('Unexpected response %r' % data)
+        else:
+            # FIXME: Buffering?
+            pack_data(self.read())
+
+
 
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
@@ -378,47 +443,10 @@ class TraditionalGitClient(GitClient):
         if not wants:
             proto.write_pkt_line(None)
             return refs
-        assert isinstance(wants, list) and type(wants[0]) == str
-        proto.write_pkt_line('want %s %s\n' % (
-            wants[0], ' '.join(negotiated_capabilities)))
-        for want in wants[1:]:
-            proto.write_pkt_line('want %s\n' % want)
-        proto.write_pkt_line(None)
-        have = graph_walker.next()
-        while have:
-            proto.write_pkt_line('have %s\n' % have)
-            if can_read():
-                pkt = proto.read_pkt_line()
-                parts = pkt.rstrip('\n').split(' ')
-                if parts[0] == 'ACK':
-                    graph_walker.ack(parts[1])
-                    if parts[2] in ('continue', 'common'):
-                        pass
-                    elif parts[2] == 'ready':
-                        break
-                    else:
-                        raise AssertionError(
-                            "%s not in ('continue', 'ready', 'common)" %
-                            parts[2])
-            have = graph_walker.next()
-        proto.write_pkt_line('done\n')
-        pkt = proto.read_pkt_line()
-        while pkt:
-            parts = pkt.rstrip('\n').split(' ')
-            if parts[0] == 'ACK':
-                graph_walker.ack(pkt.split(' ')[1])
-            if len(parts) < 3 or parts[2] not in ('continue', 'common'):
-                break
-            pkt = proto.read_pkt_line()
-        if "side-band-64k" in negotiated_capabilities:
-            self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
-            # wait for EOF before returning
-            data = proto.read()
-            if data:
-                raise Exception('Unexpected response %r' % data)
-        else:
-            # FIXME: Buffering?
-            pack_data(self.read())
+        self._handle_upload_pack_head(proto, negotiated_capabilities,
+            graph_walker, wants, can_read)
+        self._handle_upload_pack_tail(proto, negotiated_capabilities,
+            graph_walker, pack_data, progress)
         return refs
 
 
@@ -574,7 +602,7 @@ class HttpGitClient(GitClient):
             # The first line should mention the service
             pkts = list(proto.read_pkt_seq())
             if pkts != [('# service=%s\n' % service)]:
-                raise ValueError("unexpected first line %r from smart server" % pkt)
+                raise ValueError("unexpected first line %r from smart server" % pkts)
         return self._read_refs(proto)
 
     def _smart_request(self, service, url, data):
@@ -640,13 +668,23 @@ class HttpGitClient(GitClient):
         url = urlparse.urljoin(self.url, path)
         refs, server_capabilities = self._discover_references(
             "git-upload-pack", url)
+        negotiated_capabilities = list(server_capabilities)
         wants = determine_wants(refs)
         if not wants:
             return refs
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        resp = self._smart_request("git-upload-pack", url)
-        raise NotImplementedError(self.send_pack)
+        req_data = StringIO()
+        req_proto = Protocol(None, req_data.write)
+        self._handle_upload_pack_head(req_proto,
+            negotiated_capabilities, graph_walker, wants,
+            lambda: False)
+        resp = self._smart_request("git-upload-pack", url,
+            data=req_data.getvalue())
+        resp_proto = Protocol(resp.read, None)
+        self._handle_upload_pack_tail(resp_proto, negotiated_capabilities,
+            graph_walker, pack_data, progress)
+        return refs
 
 
 def get_transport_and_path(uri):

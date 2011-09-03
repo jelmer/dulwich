@@ -4,6 +4,8 @@
 
   * Repo.do_commit has a new argument 'ref'.
 
+  * Repo.do_commit has a new argument 'merge_heads'. (Jelmer Vernooij)
+
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
 
  CHANGES

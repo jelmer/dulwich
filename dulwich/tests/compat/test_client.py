@@ -277,6 +277,10 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def send_head(self):
         return self.run_backend()
 
+    def log_request(self, code='-', size='-'):
+        # Let's be quiet, the test suite is noisy enough already
+        pass
+
     def run_backend(self):
         """Call out to git http-backend."""
         # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
@@ -301,7 +305,6 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         env['REQUEST_METHOD'] = self.command
         uqrest = urllib.unquote(rest)
         env['PATH_INFO'] = uqrest
-        env['PATH_TRANSLATED'] = self.translate_path(uqrest)
         env['SCRIPT_NAME'] = "/"
         if query:
             env['QUERY_STRING'] = query

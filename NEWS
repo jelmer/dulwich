@@ -6,12 +6,19 @@
 
   * Repo.do_commit has a new argument 'merge_heads'. (Jelmer Vernooij)
 
+  * New ``Repo.get_walker`` method. (Jelmer Vernooij)
+
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
 
  CHANGES
 
   * unittest2 or python >= 2.7 is now required for the testsuite.
     testtools is no longer supported. (Jelmer Vernooij, #830713)
+
+ API CHANGES
+
+  * ``Repo.revision_history`` is now deprecated in favour of ``Repo.get_walker``.
+    (Jelmer Vernooij)
 
 0.8.0	2011-08-07
 

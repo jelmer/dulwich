@@ -77,6 +77,7 @@ class WebTests(ServerTests):
         dul_server = simple_server.make_server(
           'localhost', 0, app, server_class=WSGIServer,
           handler_class=HTTPGitRequestHandler)
+        self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server
         _, port = dul_server.socket.getsockname()
@@ -90,14 +91,6 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     """
 
     min_git_version = (1, 6, 6)
-
-    def setUp(self):
-        WebTests.setUp(self)
-        CompatTestCase.setUp(self)
-
-    def tearDown(self):
-        WebTests.tearDown(self)
-        CompatTestCase.tearDown(self)
 
     def _handlers(self):
         return {'git-receive-pack': NoSideBand64kReceivePackHandler}
@@ -130,14 +123,6 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
 
 class DumbWebTestCase(WebTests, CompatTestCase):
     """Test cases for dumb HTTP server."""
-
-    def setUp(self):
-        WebTests.setUp(self)
-        CompatTestCase.setUp(self)
-
-    def tearDown(self):
-        WebTests.tearDown(self)
-        CompatTestCase.tearDown(self)
 
     def _make_app(self, backend):
         return HTTPGitApplication(backend, dumb=True)

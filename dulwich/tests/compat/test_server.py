@@ -62,14 +62,6 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
     protocol = 'git'
 
-    def setUp(self):
-        ServerTests.setUp(self)
-        CompatTestCase.setUp(self)
-
-    def tearDown(self):
-        ServerTests.tearDown(self)
-        CompatTestCase.tearDown(self)
-
     def _handlers(self):
         return {'git-receive-pack': NoSideBand64kReceivePackHandler}
 
@@ -83,6 +75,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         dul_server = TCPGitServer(backend, 'localhost', 0,
                                   handlers=self._handlers())
         self._check_server(dul_server)
+        self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve).start()
         self._server = dul_server
         _, port = self._server.socket.getsockname()

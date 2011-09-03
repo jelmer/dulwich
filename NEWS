@@ -11,6 +11,9 @@
   * ``GitClient.send_pack`` now supports the 'side-band-64k' capability.
     (Jelmer Vernooij)
 
+  * ``HttpGitClient`` which supports the smart server protocol over
+    HTTP. "dumb" access is not yet supported. (Jelmer Vernooij, #373688)
+
  CHANGES
 
   * unittest2 or python >= 2.7 is now required for the testsuite.

@@ -77,6 +77,53 @@ class GitClient(object):
         if thin_packs:
             self._fetch_capabilities.append('thin-pack')
 
+    def send_pack(self, path, determine_wants, generate_pack_contents):
+        """Upload a pack to a remote repository.
+
+        :param path: Repository path
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
+        """
+        raise NotImplementedError(self.send_pack)
+
+    def fetch(self, path, target, determine_wants=None, progress=None):
+        """Fetch into a target repository.
+
+        :param path: Path to fetch from
+        :param target: Target repository to fetch into
+        :param determine_wants: Optional function to determine what refs
+            to fetch
+        :param progress: Optional progress function
+        :return: remote refs
+        """
+        if determine_wants is None:
+            determine_wants = target.object_store.determine_wants_all
+        f, commit = target.object_store.add_pack()
+        try:
+            return self.fetch_pack(path, determine_wants,
+                target.get_graph_walker(), f.write, progress)
+        finally:
+            commit()
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+                   progress):
+        """Retrieve a pack from a git smart server.
+
+        :param determine_wants: Callback that returns list of commits to fetch
+        :param graph_walker: Object with next() and ack().
+        :param pack_data: Callback called for each bit of data in the pack
+        :param progress: Callback for progress reports (strings)
+        """
+        raise NotImplementedError(self.fetch_pack)
+
+
+class TraditionalGitClient(GitClient):
+    """Traditional Git client."""
+
     def _connect(self, cmd, path):
         """Create a connection to the server.
 
@@ -142,7 +189,6 @@ class GitClient(object):
                                              if ref not in ok]),
                                   ref_status=ref_status)
 
-
     # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
@@ -193,25 +239,6 @@ class GitClient(object):
         if data:
             raise SendPackError('Unexpected response %r' % data)
         return new_refs
-
-    def fetch(self, path, target, determine_wants=None, progress=None):
-        """Fetch into a target repository.
-
-        :param path: Path to fetch from
-        :param target: Target repository to fetch into
-        :param determine_wants: Optional function to determine what refs
-            to fetch
-        :param progress: Optional progress function
-        :return: remote refs
-        """
-        if determine_wants is None:
-            determine_wants = target.object_store.determine_wants_all
-        f, commit = target.object_store.add_pack()
-        try:
-            return self.fetch_pack(path, determine_wants,
-                target.get_graph_walker(), f.write, progress)
-        finally:
-            commit()
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress):
@@ -268,7 +295,7 @@ class GitClient(object):
         return refs
 
 
-class TCPGitClient(GitClient):
+class TCPGitClient(TraditionalGitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
     def __init__(self, host, port=None, *args, **kwargs):
@@ -330,7 +357,7 @@ class SubprocessWrapper(object):
         self.proc.wait()
 
 
-class SubprocessGitClient(GitClient):
+class SubprocessGitClient(TraditionalGitClient):
     """Git client that talks to a server using a subprocess."""
 
     def __init__(self, *args, **kwargs):
@@ -367,7 +394,7 @@ class SSHVendor(object):
 get_ssh_vendor = SSHVendor
 
 
-class SSHGitClient(GitClient):
+class SSHGitClient(TraditionalGitClient):
 
     def __init__(self, host, port=None, username=None, *args, **kwargs):
         self.host = host
@@ -385,6 +412,47 @@ class SSHGitClient(GitClient):
             port=self.port, username=self.username)
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
+
+
+class HttpGitClient(GitClient):
+
+    def __init__(self, host, port=None, username=None, force_dumb=False, *args, **kwargs):
+        self.host = host
+        self.port = port
+        self.force_dumb = force_dumb
+        self.username = username
+        GitClient.__init__(self, *args, **kwargs)
+
+    @classmethod
+    def from_url(cls, url):
+        parsed = urlparse.urlparse(url)
+        assert parsed.scheme == 'http'
+        return cls(parsed.hostname, port=parsed.port, username=parsed.port,
+                   password=parsed.password)
+
+    def send_pack(self, path, determine_wants, generate_pack_contents):
+        """Upload a pack to a remote repository.
+
+        :param path: Repository path
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
+        """
+        raise NotImplementedError(self.send_pack)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+                   progress):
+        """Retrieve a pack from a git smart server.
+
+        :param determine_wants: Callback that returns list of commits to fetch
+        :param graph_walker: Object with next() and ack().
+        :param pack_data: Callback called for each bit of data in the pack
+        :param progress: Callback for progress reports (strings)
+        """
+        raise NotImplementedError(self.fetch_pack)
 
 
 def get_transport_and_path(uri):

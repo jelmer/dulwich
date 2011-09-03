@@ -19,7 +19,7 @@
 from cStringIO import StringIO
 
 from dulwich.client import (
-    GitClient,
+    TraditionalGitClient,
     TCPGitClient,
     SubprocessGitClient,
     SSHGitClient,
@@ -34,13 +34,13 @@ from dulwich.protocol import (
     )
 
 
-class DummyClient(GitClient):
+class DummyClient(TraditionalGitClient):
 
     def __init__(self, can_read, read, write):
         self.can_read = can_read
         self.read = read
         self.write = write
-        GitClient.__init__(self)
+        TraditionalGitClient.__init__(self)
 
     def _connect(self, service, path):
         return Protocol(self.read, self.write), self.can_read

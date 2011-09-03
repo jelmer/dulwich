@@ -255,6 +255,34 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
+    def _handle_receive_pack_tail(self, proto, capabilities, progress):
+        """Handle the tail of a 'git-receive-pack' request.
+
+        :param proto: Protocol object to read from
+        :param capabilities: List of negotiated capabilities
+        :param progress: Optional progress reporting function
+        """
+        if 'report-status' in capabilities:
+            report_status_parser = ReportStatusParser()
+        else:
+            report_status_parser = None
+        if "side-band-64k" in capabilities:
+            channel_callbacks = { 2: progress }
+            if 'report-status' in capabilities:
+                channel_callbacks[1] = PktLineParser(
+                    report_status_parser.handle_packet).parse
+            self._read_side_band64k_data(proto, channel_callbacks)
+        else:
+            if 'report-status':
+                for pkt in proto.read_pkt_seq():
+                    report_status_parser.handle_packet(pkt)
+        if report_status_parser is not None:
+            report_status_parser.check()
+        # wait for EOF before returning
+        data = proto.read()
+        if data:
+            raise SendPackError('Unexpected response %r' % data)
+
 
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
@@ -317,26 +345,8 @@ class TraditionalGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         entries, sha = write_pack_objects(proto.write_file(), objects)
-        if 'report-status' in negotiated_capabilities:
-            report_status_parser = ReportStatusParser()
-        else:
-            report_status_parser = None
-        if "side-band-64k" in negotiated_capabilities:
-            channel_callbacks = { 2: progress }
-            if 'report-status' in negotiated_capabilities:
-                channel_callbacks[1] = PktLineParser(
-                    report_status_parser.handle_packet).parse
-            self._read_side_band64k_data(proto, channel_callbacks)
-        else:
-            if 'report-status':
-                for pkt in proto.read_pkt_seq():
-                    report_status_parser.handle_packet(pkt)
-        if report_status_parser is not None:
-            report_status_parser.check()
-        # wait for EOF before returning
-        data = proto.read()
-        if data:
-            raise SendPackError('Unexpected response %r' % data)
+        self._handle_receive_pack_tail(proto, negotiated_capabilities,
+            progress)
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -610,26 +620,8 @@ class HttpGitClient(GitClient):
             raise ValueError("invalid http response during git-receive-pack: %d"
                              % resp.getcode())
         resp_proto = Protocol(resp.read, None)
-        if 'report-status' in negotiated_capabilities:
-            report_status_parser = ReportStatusParser()
-        else:
-            report_status_parser = None
-        if "side-band-64k" in negotiated_capabilities:
-            channel_callbacks = { 2: progress }
-            if 'report-status' in negotiated_capabilities:
-                channel_callbacks[1] = PktLineParser(
-                    report_status_parser.handle_packet).parse
-            self._read_side_band64k_data(resp_proto, channel_callbacks)
-        else:
-            if 'report-status':
-                for pkt in resp_proto.read_pkt_seq():
-                    report_status_parser.handle_packet(pkt)
-        if report_status_parser is not None:
-            report_status_parser.check()
-        # wait for EOF before returning
-        data = resp_proto.read()
-        if data:
-            raise SendPackError('Unexpected response %r' % data)
+        self._handle_receive_pack_tail(resp_proto, negotiated_capabilities,
+            progress)
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,

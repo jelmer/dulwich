@@ -30,6 +30,7 @@ import urlparse
 
 from dulwich.errors import (
     GitProtocolError,
+    NotGitRepository,
     SendPackError,
     UpdateRefsError,
     )
@@ -597,13 +598,19 @@ class HttpGitClient(GitClient):
             url += "?service=%s" % service
         req = urllib2.Request(url)
         resp = urllib2.urlopen(req)
+        if resp.getcode() == 404:
+            raise NotGitRepository()
+        if resp.getcode() != 200:
+            raise GitProtocolError("unexpected http response %d" %
+                resp.getcode())
         self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
         proto = Protocol(resp.read, None)
         if not self.dumb:
             # The first line should mention the service
             pkts = list(proto.read_pkt_seq())
             if pkts != [('# service=%s\n' % service)]:
-                raise ValueError("unexpected first line %r from smart server" % pkts)
+                raise GitProtocolError(
+                    "unexpected first line %r from smart server" % pkts)
         return self._read_refs(proto)
 
     def _smart_request(self, service, url, data):
@@ -612,10 +619,14 @@ class HttpGitClient(GitClient):
             headers={"Content-Type": "application/x-%s-request" % service},
             data=data)
         resp = urllib2.urlopen(req)
+        if resp.getcode() == 404:
+            raise NotGitRepository()
         if resp.getcode() != 200:
-            raise ValueError("Invalid HTTP response from server: %d" % resp.getcode())
+            raise GitProtocolError("Invalid HTTP response from server: %d"
+                % resp.getcode())
         if resp.info().gettype() != ("application/x-%s-result" % service):
-            raise ValueError("Invalid content-type from server: %s" % resp.info().gettype())
+            raise GitProtocolError("Invalid content-type from server: %s"
+                % resp.info().gettype())
         return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -649,9 +660,6 @@ class HttpGitClient(GitClient):
         entries, sha = write_pack_objects(req_proto.write_file(), objects)
         resp = self._smart_request("git-receive-pack", url,
             data=req_data.getvalue())
-        if resp.getcode() != 200:
-            raise ValueError("invalid http response during git-receive-pack: %d"
-                             % resp.getcode())
         resp_proto = Protocol(resp.read, None)
         self._handle_receive_pack_tail(resp_proto, negotiated_capabilities,
             progress)

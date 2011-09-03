@@ -12,7 +12,7 @@
     (Jelmer Vernooij)
 
   * ``HttpGitClient`` which supports the smart server protocol over
-    HTTP. "dumb" access is not yet supported. (Jelmer Vernooij)
+    HTTP. "dumb" access is not yet supported. (Jelmer Vernooij, #373688)
 
  CHANGES
 

@@ -8,6 +8,9 @@
 
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
 
+  * ``GitClient.send_pack`` now supports the 'side-band-64k' capability.
+    (Jelmer Vernooij)
+
  CHANGES
 
   * unittest2 or python >= 2.7 is now required for the testsuite.

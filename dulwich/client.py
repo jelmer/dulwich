@@ -21,6 +21,7 @@
 
 __docformat__ = 'restructuredText'
 
+from cStringIO import StringIO
 import select
 import socket
 import subprocess
@@ -134,24 +135,6 @@ class GitClient(object):
         """
         raise NotImplementedError(self.fetch_pack)
 
-
-class TraditionalGitClient(GitClient):
-    """Traditional Git client."""
-
-    def _connect(self, cmd, path):
-        """Create a connection to the server.
-
-        This method is abstract - concrete implementations should
-        implement their own variant which connects to the server and
-        returns an initialized Protocol object with the service ready
-        for use and a can_read function which may be used to see if
-        reads would block.
-
-        :param cmd: The git service name to which we should connect.
-        :param path: The path we should pass to the service.
-        """
-        raise NotImplementedError()
-
     def _parse_status_report(self, proto):
         unpack = proto.read_pkt_line().strip()
         if unpack != 'unpack ok':
@@ -189,6 +172,24 @@ class TraditionalGitClient(GitClient):
                                   ', '.join([ref for ref in ref_status
                                              if ref not in ok]),
                                   ref_status=ref_status)
+
+
+class TraditionalGitClient(GitClient):
+    """Traditional Git client."""
+
+    def _connect(self, cmd, path):
+        """Create a connection to the server.
+
+        This method is abstract - concrete implementations should
+        implement their own variant which connects to the server and
+        returns an initialized Protocol object with the service ready
+        for use and a can_read function which may be used to see if
+        reads would block.
+
+        :param cmd: The git service name to which we should connect.
+        :param path: The path we should pass to the service.
+        """
+        raise NotImplementedError()
 
     # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):
@@ -443,8 +444,25 @@ class HttpGitClient(GitClient):
         req = urllib2.Request(url)
         resp = urllib2.urlopen(req)
         self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
-        proto = Protocol(resp.read, None, report_activity=self._report_activity)
+        proto = Protocol(resp.read, None)
+        if not self.dumb:
+            # The first line should mention the service
+            pkts = list(proto.read_pkt_seq())
+            if pkts != [('# service=%s\n' % service)]:
+                raise ValueError("unexpected first line %r from smart server" % pkt)
         return self._read_refs(proto)
+
+    def _smart_request(self, service, url, data):
+        url = urlparse.urljoin(url+"/", service)
+        req = urllib2.Request(url,
+            headers={"Content-Type": "application/x-%s-request" % service},
+            data=data)
+        resp = urllib2.urlopen(req)
+        if resp.getcode() != 200:
+            raise ValueError("Invalid HTTP response from server: %d" % resp.getcode())
+        if resp.info().gettype() != ("application/x-%s-result" % service):
+            raise ValueError("Invalid content-type from server: %s" % resp.info().gettype())
+        return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
@@ -458,8 +476,47 @@ class HttpGitClient(GitClient):
                                  and rejects ref updates
         """
         url = urlparse.urljoin(self.url, path)
-        refs, server_capabilities = self._discover_references("git-upload-pack", url)
-        raise NotImplementedError(self.send_pack)
+        old_refs, server_capabilities = self._discover_references("git-receive-pack", url)
+        new_refs = determine_wants(old_refs)
+        if not new_refs:
+            return {}
+        if self.dumb:
+            raise NotImplementedError(self.fetch_pack)
+        if 'report-status' not in server_capabilities:
+            raise ValueError("Server does not support report-status")
+        req_data = StringIO()
+        req_proto = Protocol(None, req_data.write)
+        want = []
+        have = [x for x in old_refs.values() if not x == ZERO_SHA]
+        sent_capabilities = False
+        for refname in set(new_refs.keys() + old_refs.keys()):
+            old_sha1 = old_refs.get(refname, ZERO_SHA)
+            new_sha1 = new_refs.get(refname, ZERO_SHA)
+            if old_sha1 != new_sha1:
+                if sent_capabilities:
+                    req_proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
+                                                            refname))
+                else:
+                    req_proto.write_pkt_line(
+                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
+                                        ' '.join(self._send_capabilities)))
+                    sent_capabilities = True
+            if new_sha1 not in have and new_sha1 != ZERO_SHA:
+                want.append(new_sha1)
+        req_proto.write_pkt_line(None)
+        if not want:
+            return new_refs
+        objects = generate_pack_contents(have, want)
+        entries, sha = write_pack_objects(req_proto.write_file(), objects)
+        resp = self._smart_request("git-receive-pack", url,
+            data=req_data.getvalue())
+        if resp.getcode() != 200:
+            raise ValueError("invalid http response during git-receive-pack: %d"
+                             % resp.getcode())
+        resp_proto = Protocol(resp.read, None)
+        if 'report-status' in self._send_capabilities:
+            self._parse_status_report(resp_proto)
+        return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress):
@@ -471,8 +528,15 @@ class HttpGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         """
         url = urlparse.urljoin(self.url, path)
-        refs, server_capabilities = self._discover_references("git-receive-pack", url)
-        raise NotImplementedError(self.fetch_pack)
+        refs, server_capabilities = self._discover_references(
+            "git-upload-pack", url)
+        wants = determine_wants(refs)
+        if not wants:
+            return refs
+        if self.dumb:
+            raise NotImplementedError(self.send_pack)
+        resp = self._smart_request("git-upload-pack", url)
+        raise NotImplementedError(self.send_pack)
 
 
 def get_transport_and_path(uri):

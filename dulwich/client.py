@@ -56,6 +56,65 @@ COMMON_CAPABILITIES = ['ofs-delta']
 FETCH_CAPABILITIES = ['multi_ack', 'side-band-64k'] + COMMON_CAPABILITIES
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
+
+class ReportStatusParser(object):
+    """Handle status as reported by servers with the 'report-status' capability.
+    """
+
+    def __init__(self):
+        self._done = False
+        self._pack_status = None
+        self._ref_status_ok = True
+        self._ref_statuses = []
+
+    def check(self):
+        """Check if there were any errors and, if so, raise exceptions.
+
+        :raise SendPackError: Raised when the server could not unpack
+        :raise UpdateRefsError: Raised when refs could not be updated
+        """
+        if self._pack_status not in ('unpack ok', None):
+            raise SendPackError(self._pack_status)
+        if not self._ref_status_ok:
+            ref_status = {}
+            ok = set()
+            for status in self._ref_statuses:
+                if ' ' not in status:
+                    # malformed response, move on to the next one
+                    continue
+                status, ref = status.split(' ', 1)
+
+                if status == 'ng':
+                    if ' ' in ref:
+                        ref, status = ref.split(' ', 1)
+                else:
+                    ok.add(ref)
+                ref_status[ref] = status
+            raise UpdateRefsError('%s failed to update' %
+                                  ', '.join([ref for ref in ref_status
+                                             if ref not in ok]),
+                                  ref_status=ref_status)
+
+    def handle_packet(self, pkt):
+        """Handle a packet.
+
+        :raise GitProtocolError: Raised when packets are received after a
+            flush packet.
+        """
+        if self._done:
+            raise GitProtocolError("received more data after status report")
+        if pkt is None:
+            self._done = True
+            return
+        if self._pack_status is None:
+            self._pack_status = pkt.strip()
+        else:
+            ref_status = pkt.strip()
+            self._ref_statuses.append(ref_status)
+            if not ref_status.startswith('ok '):
+                self._ref_status_ok = False
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support side-band-64k and multi_ack.
@@ -105,43 +164,10 @@ class GitClient(object):
         return refs, server_capabilities
 
     def _parse_status_report(self, proto):
-        unpack = proto.read_pkt_line().strip()
-        if unpack != 'unpack ok':
-            st = True
-            # flush remaining error data
-            while st is not None:
-                st = proto.read_pkt_line()
-            raise SendPackError(unpack)
-        statuses = []
-        errs = False
-        ref_status = proto.read_pkt_line()
-        while ref_status:
-            ref_status = ref_status.strip()
-            statuses.append(ref_status)
-            if not ref_status.startswith('ok '):
-                errs = True
-            ref_status = proto.read_pkt_line()
-
-        if errs:
-            ref_status = {}
-            ok = set()
-            for status in statuses:
-                if ' ' not in status:
-                    # malformed response, move on to the next one
-                    continue
-                status, ref = status.split(' ', 1)
-
-                if status == 'ng':
-                    if ' ' in ref:
-                        ref, status = ref.split(' ', 1)
-                else:
-                    ok.add(ref)
-                ref_status[ref] = status
-            raise UpdateRefsError('%s failed to update' %
-                                  ', '.join([ref for ref in ref_status
-                                             if ref not in ok]),
-                                  ref_status=ref_status)
-
+        report_status_parser = ReportStatusParser()
+        for pkt in proto.read_pkt_seq():
+            report_status_parser.handle_packet(pkt)
+        report_status_parser.check()
 
     # TODO(durin42): add side-band-64k capability support here and advertise it
     def send_pack(self, path, determine_wants, generate_pack_contents):

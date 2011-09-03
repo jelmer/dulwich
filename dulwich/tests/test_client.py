@@ -23,6 +23,9 @@ from dulwich.client import (
     TCPGitClient,
     SubprocessGitClient,
     SSHGitClient,
+    ReportStatusParser,
+    SendPackError,
+    UpdateRefsError,
     get_transport_and_path,
     )
 from dulwich.tests import (
@@ -151,3 +154,26 @@ class SSHGitClientTests(TestCase):
         self.assertEquals('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path('upload-pack'))
 
+
+class ReportStatusParserTests(TestCase):
+
+    def test_invalid_pack(self):
+        parser = ReportStatusParser()
+        parser.handle_packet("unpack error - foo bar")
+        parser.handle_packet("ok refs/foo/bar")
+        parser.handle_packet(None)
+        self.assertRaises(SendPackError, parser.check)
+
+    def test_update_refs_error(self):
+        parser = ReportStatusParser()
+        parser.handle_packet("unpack ok")
+        parser.handle_packet("ng refs/foo/bar need to pull")
+        parser.handle_packet(None)
+        self.assertRaises(UpdateRefsError, parser.check)
+
+    def test_ok(self):
+        parser = ReportStatusParser()
+        parser.handle_packet("unpack ok")
+        parser.handle_packet("ok refs/foo/bar")
+        parser.handle_packet(None)
+        parser.check()

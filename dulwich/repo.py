@@ -52,9 +52,6 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     )
-from dulwich.walk import (
-    Walker,
-    )
 import warnings
 
 
@@ -953,6 +950,35 @@ class BaseRepo(object):
             return cached
         return self.object_store.peel_sha(self.refs[ref]).id
 
+    def get_walker(self, include=None, *args, **kwargs):
+        """Obtain a walker for this repository.
+
+        :param include: Iterable of SHAs of commits to include along with their
+            ancestors. Defaults to [HEAD]
+        :param exclude: Iterable of SHAs of commits to exclude along with their
+            ancestors, overriding includes.
+        :param order: ORDER_* constant specifying the order of results. Anything
+            other than ORDER_DATE may result in O(n) memory usage.
+        :param reverse: If True, reverse the order of output, requiring O(n)
+            memory.
+        :param max_entries: The maximum number of entries to yield, or None for
+            no limit.
+        :param paths: Iterable of file or subtree paths to show entries for.
+        :param rename_detector: diff.RenameDetector object for detecting
+            renames.
+        :param follow: If True, follow path across renames/copies. Forces a
+            default rename_detector.
+        :param since: Timestamp to list commits after.
+        :param until: Timestamp to list commits before.
+        :param queue_cls: A class to use for a queue of commits, supporting the
+            iterator protocol. The constructor takes a single argument, the
+            Walker.
+        """
+        from dulwich.walk import Walker
+        if include is None:
+            include = [self.head()]
+        return Walker(self.object_store, include, *args, **kwargs)
+
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.
 
@@ -962,9 +988,10 @@ class BaseRepo(object):
         :raise MissingCommitError: if any missing commits are referenced,
             including if the head parameter isn't the SHA of a commit.
         """
-        # TODO(dborowitz): Expose more of the Walker functionality here or in a
-        # separate Repo/BaseObjectStore method.
-        return [e.commit for e in Walker(self.object_store, [head])]
+        warnings.warn("Repo.revision_history() is deprecated."
+            "Use dulwich.walker.Walker(repo) instead.",
+            category=DeprecationWarning, stacklevel=2)
+        return [e.commit for e in self.get_walker(include=[head])]
 
     def __getitem__(self, name):
         if len(name) in (20, 40):

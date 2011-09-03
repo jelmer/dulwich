@@ -1000,11 +1000,11 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def do_commit(self, message, committer=None,
+    def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None, encoding=None,
-                  ref='HEAD'):
+                  ref='HEAD', merge_heads=None):
         """Create a new commit.
 
         :param message: Commit message
@@ -1018,7 +1018,8 @@ class BaseRepo(object):
         :param tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
         :param encoding: Encoding
-        :param ref: Ref to commit to
+        :param ref: Optional ref to commit to (defaults to current branch)
+        :param merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
         :return: New commit SHA1
         """
         import time
@@ -1030,6 +1031,9 @@ class BaseRepo(object):
             if len(tree) != 40:
                 raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
+        if merge_heads is None:
+            # FIXME: Read merge heads from .git/MERGE_HEADS
+            merge_heads = []
         # TODO: Allow username to be missing, and get it from .git/config
         if committer is None:
             raise ValueError("committer not set")
@@ -1052,14 +1056,17 @@ class BaseRepo(object):
         c.author_timezone = author_timezone
         if encoding is not None:
             c.encoding = encoding
+        if message is None:
+            # FIXME: Try to read commit message from .git/MERGE_MSG
+            raise ValueError("No commit message specified")
         c.message = message
         try:
             old_head = self.refs[ref]
-            c.parents = [old_head]
+            c.parents = [old_head] + merge_heads
             self.object_store.add_object(c)
             ok = self.refs.set_if_equals(ref, old_head, c.id)
         except KeyError:
-            c.parents = []
+            c.parents = merge_heads
             self.object_store.add_object(c)
             ok = self.refs.add_if_new(ref, c.id)
         if not ok:

@@ -490,6 +490,24 @@ class BuildRepoTests(TestCase):
         self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
         self.assertEqual([new_branch_head], r[commit_sha].parents)
 
+    def test_commit_merge_heads(self):
+        r = self._repo
+        merge_1 = r.do_commit('commit to branch 2',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref="refs/heads/new_branch")
+        commit_sha = r.do_commit('commit with merge',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             merge_heads=[merge_1])
+        self.assertEquals(
+            [self._root_commit, merge_1],
+            r[commit_sha].parents)
+
     def test_stage_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))

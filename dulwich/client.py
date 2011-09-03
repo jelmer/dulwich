@@ -54,7 +54,7 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 COMMON_CAPABILITIES = ['ofs-delta', 'side-band-64k']
-FETCH_CAPABILITIES = ['multi_ack'] + COMMON_CAPABILITIES
+FETCH_CAPABILITIES = ['multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
 
@@ -279,7 +279,14 @@ class GitClient(object):
                 parts = pkt.rstrip('\n').split(' ')
                 if parts[0] == 'ACK':
                     graph_walker.ack(parts[1])
-                    assert parts[2] == 'continue'
+                    if parts[2] in ('continue', 'common'):
+                        pass
+                    elif parts[2] == 'ready':
+                        break
+                    else:
+                        raise AssertionError(
+                            "%s not in ('continue', 'ready', 'common)" %
+                            parts[2])
             have = graph_walker.next()
         proto.write_pkt_line('done\n')
         pkt = proto.read_pkt_line()
@@ -287,7 +294,7 @@ class GitClient(object):
             parts = pkt.rstrip('\n').split(' ')
             if parts[0] == 'ACK':
                 graph_walker.ack(pkt.split(' ')[1])
-            if len(parts) < 3 or parts[2] != 'continue':
+            if len(parts) < 3 or parts[2] not in ('continue', 'common'):
                 break
             pkt = proto.read_pkt_line()
         if "side-band-64k" in negotiated_capabilities:

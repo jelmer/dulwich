@@ -363,7 +363,8 @@ class GitClient(object):
             parts = pkt.rstrip('\n').split(' ')
             if parts[0] == 'ACK':
                 graph_walker.ack(pkt.split(' ')[1])
-            if len(parts) < 3 or parts[2] not in ('continue', 'common'):
+            if len(parts) < 3 or parts[2] not in (
+                    'ready', 'continue', 'common'):
                 break
             pkt = proto.read_pkt_line()
         if "side-band-64k" in capabilities:

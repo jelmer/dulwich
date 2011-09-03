@@ -25,6 +25,7 @@ from dulwich.errors import (
     HangupException,
     )
 from dulwich.protocol import (
+    PktLineParser,
     Protocol,
     ReceivableProtocol,
     extract_capabilities,
@@ -280,3 +281,29 @@ class BufferedPktLineWriterTests(TestCase):
         self._writer.write('z')
         self._writer.flush()
         self.assertOutputEquals('0005z')
+
+
+class PktLineParserTests(TestCase):
+
+    def test_none(self):
+        pktlines = []
+        parser = PktLineParser(pktlines.append)
+        parser.parse("0000")
+        self.assertEquals(pktlines, [None])
+        self.assertEquals("", parser.get_tail())
+
+    def test_small_fragments(self):
+        pktlines = []
+        parser = PktLineParser(pktlines.append)
+        parser.parse("00")
+        parser.parse("05")
+        parser.parse("z0000")
+        self.assertEquals(pktlines, ["z", None])
+        self.assertEquals("", parser.get_tail())
+
+    def test_multiple_packets(self):
+        pktlines = []
+        parser = PktLineParser(pktlines.append)
+        parser.parse("0005z0006aba")
+        self.assertEquals(pktlines, ["z", "ab"])
+        self.assertEquals("a", parser.get_tail())

@@ -46,23 +46,11 @@ class ServerTests(object):
     Does not inherit from TestCase so tests are not automatically run.
     """
 
-    def setUp(self):
-        self._old_repo = None
-        self._new_repo = None
-        self._server = None
-
-    def tearDown(self):
-        if self._server is not None:
-            self._server.shutdown()
-            self._server = None
-        if self._old_repo is not None:
-            tear_down_repo(self._old_repo)
-        if self._new_repo is not None:
-            tear_down_repo(self._new_repo)
-
     def import_repos(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_new.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
 
     def url(self, port):
         return '%s://localhost:%s/' % (self.protocol, port)

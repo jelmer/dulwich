@@ -255,6 +255,35 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
+    def _handle_receive_pack_head(self, proto, capabilities, old_refs, new_refs):
+        """Handle the head of a 'git-receive-pack' request.
+
+        :param proto: Protocol object to read from
+        :param capabilities: List of negotiated capabilities
+        :param old_refs: Old refs, as received from the server
+        :param new_refs: New refs
+        :return: (have, want) tuple
+        """
+        want = []
+        have = [x for x in old_refs.values() if not x == ZERO_SHA]
+        sent_capabilities = False
+        for refname in set(new_refs.keys() + old_refs.keys()):
+            old_sha1 = old_refs.get(refname, ZERO_SHA)
+            new_sha1 = new_refs.get(refname, ZERO_SHA)
+            if old_sha1 != new_sha1:
+                if sent_capabilities:
+                    proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
+                                                            refname))
+                else:
+                    proto.write_pkt_line(
+                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
+                                        ' '.join(capabilities)))
+                    sent_capabilities = True
+            if new_sha1 not in have and new_sha1 != ZERO_SHA:
+                want.append(new_sha1)
+        proto.write_pkt_line(None)
+        return (have, want)
+
     def _handle_receive_pack_tail(self, proto, capabilities, progress):
         """Handle the tail of a 'git-receive-pack' request.
 
@@ -323,24 +352,8 @@ class TraditionalGitClient(GitClient):
         if not new_refs:
             proto.write_pkt_line(None)
             return {}
-        want = []
-        have = [x for x in old_refs.values() if not x == ZERO_SHA]
-        sent_capabilities = False
-        for refname in set(new_refs.keys() + old_refs.keys()):
-            old_sha1 = old_refs.get(refname, ZERO_SHA)
-            new_sha1 = new_refs.get(refname, ZERO_SHA)
-            if old_sha1 != new_sha1:
-                if sent_capabilities:
-                    proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
-                                                            refname))
-                else:
-                    proto.write_pkt_line(
-                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
-                                        ' '.join(negotiated_capabilities)))
-                    sent_capabilities = True
-            if new_sha1 not in have and new_sha1 != ZERO_SHA:
-                want.append(new_sha1)
-        proto.write_pkt_line(None)
+        (have, want) = self._handle_receive_pack_head(proto,
+            negotiated_capabilities, old_refs, new_refs)
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)
@@ -592,24 +605,8 @@ class HttpGitClient(GitClient):
             raise NotImplementedError(self.fetch_pack)
         req_data = StringIO()
         req_proto = Protocol(None, req_data.write)
-        want = []
-        have = [x for x in old_refs.values() if not x == ZERO_SHA]
-        sent_capabilities = False
-        for refname in set(new_refs.keys() + old_refs.keys()):
-            old_sha1 = old_refs.get(refname, ZERO_SHA)
-            new_sha1 = new_refs.get(refname, ZERO_SHA)
-            if old_sha1 != new_sha1:
-                if sent_capabilities:
-                    req_proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
-                                                            refname))
-                else:
-                    req_proto.write_pkt_line(
-                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
-                                        ' '.join(self._send_capabilities)))
-                    sent_capabilities = True
-            if new_sha1 not in have and new_sha1 != ZERO_SHA:
-                want.append(new_sha1)
-        req_proto.write_pkt_line(None)
+        (have, want) = self._handle_receive_pack_head(
+            req_proto, negotiated_capabilities, old_refs, new_refs)
         if not want:
             return new_refs
         objects = generate_pack_contents(have, want)

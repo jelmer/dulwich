@@ -30,6 +30,7 @@ import subprocess
 import tempfile
 import threading
 import urllib
+import urlparse
 
 from dulwich import (
     client,
@@ -296,6 +297,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         env['SERVER_PROTOCOL'] = self.protocol_version
         env['SERVER_PORT'] = str(self.server.server_port)
         env['GIT_PROJECT_ROOT'] = self.server.root_path
+        env["GIT_HTTP_EXPORT_ALL"] = "1"
         env['REQUEST_METHOD'] = self.command
         uqrest = urllib.unquote(rest)
         env['PATH_INFO'] = uqrest
@@ -369,7 +371,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         while select.select([self.rfile._sock], [], [], 0)[0]:
             if not self.rfile._sock.recv(1):
                 break
-        args = ['http-backend']
+        args = ['-c', 'http.uploadpack=true', '-c', 'http.receivepack=true', 'http-backend']
         if '=' not in decoded_query:
             args.append(decoded_query)
         stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
@@ -405,7 +407,7 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
-        self._httpd = HTTPGitServer(("localhost", 8080), self.gitroot)
+        self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
         self.addCleanup(self._httpd.shutdown)
         threading.Thread(target=self._httpd.serve_forever).start()
 
@@ -414,7 +416,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.HttpGitClient(self._httpd.get_url())
+        ret, self._path = client.HttpGitClient.from_url(self._httpd.get_url())
+        return ret
 
     def _build_path(self, path):
-        return path
+        return urlparse.urljoin(self._path.strip("/"), path.strip("/"))

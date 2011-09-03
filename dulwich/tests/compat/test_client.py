@@ -19,11 +19,17 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
+import BaseHTTPServer
+import SimpleHTTPServer
+import copy
 import os
+import select
 import shutil
 import signal
 import subprocess
 import tempfile
+import threading
+import urllib
 
 from dulwich import (
     client,
@@ -43,6 +49,9 @@ from dulwich.tests.compat.utils import (
     check_for_daemon,
     import_repo_to_dir,
     run_git_or_fail,
+    )
+from dulwich.tests.compat.server_utils import (
+    ShutdownServerMixIn,
     )
 
 
@@ -249,3 +258,163 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return self.gitroot + path
+
+
+class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    """HTTP Request handler that calls out to 'git http-backend'."""
+
+    # Make rfile unbuffered -- we need to read one line and then pass
+    # the rest to a subprocess, so we can't use buffered input.
+    rbufsize = 0
+
+    def do_POST(self):
+        self.run_backend()
+
+    def do_GET(self):
+        self.run_backend()
+
+    def send_head(self):
+        return self.run_backend()
+
+    def run_backend(self):
+        """Call out to git http-backend."""
+        # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
+        # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+        # Licensed under the Python Software Foundation License.
+        rest = self.path
+        # find an explicit query string, if present.
+        i = rest.rfind('?')
+        if i >= 0:
+            rest, query = rest[:i], rest[i+1:]
+        else:
+            query = ''
+
+        env = copy.deepcopy(os.environ)
+        env['SERVER_SOFTWARE'] = self.version_string()
+        env['SERVER_NAME'] = self.server.server_name
+        env['GATEWAY_INTERFACE'] = 'CGI/1.1'
+        env['SERVER_PROTOCOL'] = self.protocol_version
+        env['SERVER_PORT'] = str(self.server.server_port)
+        env['GIT_PROJECT_ROOT'] = self.server.root_path
+        env['REQUEST_METHOD'] = self.command
+        uqrest = urllib.unquote(rest)
+        env['PATH_INFO'] = uqrest
+        env['PATH_TRANSLATED'] = self.translate_path(uqrest)
+        env['SCRIPT_NAME'] = "/"
+        if query:
+            env['QUERY_STRING'] = query
+        host = self.address_string()
+        if host != self.client_address[0]:
+            env['REMOTE_HOST'] = host
+        env['REMOTE_ADDR'] = self.client_address[0]
+        authorization = self.headers.getheader("authorization")
+        if authorization:
+            authorization = authorization.split()
+            if len(authorization) == 2:
+                import base64, binascii
+                env['AUTH_TYPE'] = authorization[0]
+                if authorization[0].lower() == "basic":
+                    try:
+                        authorization = base64.decodestring(authorization[1])
+                    except binascii.Error:
+                        pass
+                    else:
+                        authorization = authorization.split(':')
+                        if len(authorization) == 2:
+                            env['REMOTE_USER'] = authorization[0]
+        # XXX REMOTE_IDENT
+        if self.headers.typeheader is None:
+            env['CONTENT_TYPE'] = self.headers.type
+        else:
+            env['CONTENT_TYPE'] = self.headers.typeheader
+        length = self.headers.getheader('content-length')
+        if length:
+            env['CONTENT_LENGTH'] = length
+        referer = self.headers.getheader('referer')
+        if referer:
+            env['HTTP_REFERER'] = referer
+        accept = []
+        for line in self.headers.getallmatchingheaders('accept'):
+            if line[:1] in "\t\n\r ":
+                accept.append(line.strip())
+            else:
+                accept = accept + line[7:].split(',')
+        env['HTTP_ACCEPT'] = ','.join(accept)
+        ua = self.headers.getheader('user-agent')
+        if ua:
+            env['HTTP_USER_AGENT'] = ua
+        co = filter(None, self.headers.getheaders('cookie'))
+        if co:
+            env['HTTP_COOKIE'] = ', '.join(co)
+        # XXX Other HTTP_* headers
+        # Since we're setting the env in the parent, provide empty
+        # values to override previously set values
+        for k in ('QUERY_STRING', 'REMOTE_HOST', 'CONTENT_LENGTH',
+                  'HTTP_USER_AGENT', 'HTTP_COOKIE', 'HTTP_REFERER'):
+            env.setdefault(k, "")
+
+        self.send_response(200, "Script output follows")
+
+        decoded_query = query.replace('+', ' ')
+
+        try:
+            nbytes = int(length)
+        except (TypeError, ValueError):
+            nbytes = 0
+        if self.command.lower() == "post" and nbytes > 0:
+            data = self.rfile.read(nbytes)
+        else:
+            data = None
+        # throw away additional data [see bug #427345]
+        while select.select([self.rfile._sock], [], [], 0)[0]:
+            if not self.rfile._sock.recv(1):
+                break
+        args = ['http-backend']
+        if '=' not in decoded_query:
+            args.append(decoded_query)
+        stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
+        self.wfile.write(stdout)
+
+
+class HTTPGitServer(BaseHTTPServer.HTTPServer):
+
+    allow_reuse_address = True
+
+    def __init__(self, server_address, root_path):
+        BaseHTTPServer.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
+        self.root_path = root_path
+
+    def get_url(self):
+        return 'http://%s:%s/' % (self.server_name, self.server_port)
+
+
+if not getattr(HTTPGitServer, 'shutdown', None):
+    _HTTPGitServer = HTTPGitServer
+
+    class TCPGitServer(ShutdownServerMixIn, HTTPGitServer):
+        """Subclass of HTTPGitServer that can be shut down."""
+
+        def __init__(self, *args, **kwargs):
+            # BaseServer is old-style so we have to call both __init__s
+            ShutdownServerMixIn.__init__(self)
+            _HTTPGitServer.__init__(self, *args, **kwargs)
+
+
+class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
+
+    def setUp(self):
+        CompatTestCase.setUp(self)
+        DulwichClientTestBase.setUp(self)
+        self._httpd = HTTPGitServer(("localhost", 8080), self.gitroot)
+        self.addCleanup(self._httpd.shutdown)
+        threading.Thread(target=self._httpd.serve_forever).start()
+
+    def tearDown(self):
+        DulwichClientTestBase.tearDown(self)
+        CompatTestCase.tearDown(self)
+
+    def _client(self):
+        return client.HttpGitClient(self._httpd.get_url())
+
+    def _build_path(self, path):
+        return path

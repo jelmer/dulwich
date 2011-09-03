@@ -20,7 +20,6 @@
 """Utility functions common to Dulwich tests."""
 
 
-from cStringIO import StringIO
 import datetime
 import os
 import shutil

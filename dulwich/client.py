@@ -24,6 +24,7 @@ __docformat__ = 'restructuredText'
 import select
 import socket
 import subprocess
+import urllib2
 import urlparse
 
 from dulwich.errors import (
@@ -76,6 +77,19 @@ class GitClient(object):
         self._send_capabilities = list(SEND_CAPABILITIES)
         if thin_packs:
             self._fetch_capabilities.append('thin-pack')
+
+    def _read_refs(self, proto):
+        server_capabilities = None
+        refs = {}
+        # Receive refs from server
+        for pkt in proto.read_pkt_seq():
+            (sha, ref) = pkt.rstrip('\n').split(' ', 1)
+            if sha == 'ERR':
+                raise GitProtocolError(ref)
+            if server_capabilities is None:
+                (ref, server_capabilities) = extract_capabilities(ref)
+            refs[ref] = sha
+        return refs, server_capabilities
 
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
@@ -137,19 +151,6 @@ class TraditionalGitClient(GitClient):
         :param path: The path we should pass to the service.
         """
         raise NotImplementedError()
-
-    def _read_refs(self, proto):
-        server_capabilities = None
-        refs = {}
-        # Receive refs from server
-        for pkt in proto.read_pkt_seq():
-            (sha, ref) = pkt.rstrip('\n').split(' ', 1)
-            if sha == 'ERR':
-                raise GitProtocolError(ref)
-            if server_capabilities is None:
-                (ref, server_capabilities) = extract_capabilities(ref)
-            refs[ref] = sha
-        return refs, server_capabilities
 
     def _parse_status_report(self, proto):
         unpack = proto.read_pkt_line().strip()
@@ -416,11 +417,16 @@ class SSHGitClient(TraditionalGitClient):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, host, port=None, username=None, force_dumb=False, *args, **kwargs):
+    def __init__(self, host, port=None, username=None, password=None, dumb=None, *args, **kwargs):
         self.host = host
         self.port = port
-        self.force_dumb = force_dumb
+        self.dumb = dumb
         self.username = username
+        self.password = password
+        netloc = self.host
+        if self.port:
+            netloc += ":%d" % self.port
+        self.url = "http://%s/" % netloc
         GitClient.__init__(self, *args, **kwargs)
 
     @classmethod
@@ -428,7 +434,17 @@ class HttpGitClient(GitClient):
         parsed = urlparse.urlparse(url)
         assert parsed.scheme == 'http'
         return cls(parsed.hostname, port=parsed.port, username=parsed.port,
-                   password=parsed.password)
+                   password=parsed.password), parsed.path
+
+    def _discover_references(self, service, url):
+        url = urlparse.urljoin(url+"/", "info/refs")
+        if not self.dumb:
+            url += "?service=%s" % service
+        req = urllib2.Request(url)
+        resp = urllib2.urlopen(req)
+        self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
+        proto = Protocol(resp.read, None, report_activity=self._report_activity)
+        return self._read_refs(proto)
 
     def send_pack(self, path, determine_wants, generate_pack_contents):
         """Upload a pack to a remote repository.
@@ -441,6 +457,8 @@ class HttpGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
+        url = urlparse.urljoin(self.url, path)
+        refs, server_capabilities = self._discover_references("git-upload-pack", url)
         raise NotImplementedError(self.send_pack)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -452,6 +470,8 @@ class HttpGitClient(GitClient):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
+        url = urlparse.urljoin(self.url, path)
+        refs, server_capabilities = self._discover_references("git-receive-pack", url)
         raise NotImplementedError(self.fetch_pack)
 
 
@@ -467,6 +487,9 @@ def get_transport_and_path(uri):
     elif parsed.scheme == 'git+ssh':
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username), parsed.path
+    elif parsed.scheme == 'http':
+        return HttpGitClient(parsed.hostname, port=parsed.port,
+                             username=parsed.username), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.

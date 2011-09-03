@@ -61,7 +61,7 @@ class GitClientTests(TestCase):
 
     def test_caps(self):
         self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',
-                               'thin-pack']),
+                               'thin-pack', 'multi_ack_detailed']),
                           set(self.client._fetch_capabilities))
         self.assertEquals(set(['ofs-delta', 'report-status', 'side-band-64k']),
                           set(self.client._send_capabilities))

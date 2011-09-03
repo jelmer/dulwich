@@ -419,8 +419,7 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        ret, self._path = client.HttpGitClient.from_url(self._httpd.get_url())
-        return ret
+        return client.HttpGitClient(self._httpd.get_url())
 
     def _build_path(self, path):
-        return urlparse.urljoin(self._path.strip("/"), path.strip("/"))
+        return path

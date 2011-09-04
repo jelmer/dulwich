@@ -387,10 +387,19 @@ class DiskObjectStore(PackBasedObjectStore):
         except OSError, e:
             if e.errno != errno.EEXIST:
                 raise
-        # FIXME: Locking
-        f = GitFile(os.path.join(self.path, "info/alternates"), 'wb')
+        alternates_path = os.path.join(self.path, "info/alternates")
+        f = GitFile(alternates_path, 'wb')
         try:
-            f.seek(0, os.SEEK_END)
+            try:
+                orig_f = open(alternates_path, 'rb')
+            except (OSError, IOError), e:
+                if e.errno != errno.ENOENT:
+                    raise
+            else:
+                try:
+                    f.write(orig_f.read())
+                finally:
+                    orig_f.close()
             f.write("%s\n" % path)
         finally:
             f.close()

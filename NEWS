@@ -14,6 +14,8 @@
   * ``HttpGitClient`` which supports the smart server protocol over
     HTTP. "dumb" access is not yet supported. (Jelmer Vernooij, #373688)
 
+  * Add basic support for alternates. (Jelmer Vernooij, #810429)
+
  CHANGES
 
   * unittest2 or python >= 2.7 is now required for the testsuite.

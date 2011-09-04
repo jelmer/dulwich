@@ -226,6 +226,10 @@ class PackBasedObjectStore(BaseObjectStore):
     def __init__(self):
         self._pack_cache = None
 
+    @property
+    def alternates(self):
+        return []
+
     def contains_packed(self, sha):
         """Check if a particular object is present by SHA1 and is packed."""
         for pack in self.packs:
@@ -310,6 +314,11 @@ class PackBasedObjectStore(BaseObjectStore):
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()
+        for alternate in self.alternates:
+            try:
+                return alternate.get_raw(hexsha)
+            except KeyError:
+                pass
         raise KeyError(hexsha)
 
     def add_objects(self, objects):
@@ -338,6 +347,63 @@ class DiskObjectStore(PackBasedObjectStore):
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._pack_cache_time = 0
+        self._alternates = None
+
+    @property
+    def alternates(self):
+        if self._alternates is not None:
+            return self._alternates
+        self._alternates = []
+        for path in self._read_alternate_paths():
+            self._alternates.append(DiskObjectStore(path))
+        return self._alternates
+
+    def _read_alternate_paths(self):
+        try:
+            f = GitFile(os.path.join(self.path, "info", "alternates"),
+                    'rb')
+        except (OSError, IOError), e:
+            if e.errno == errno.ENOENT:
+                return []
+            raise
+        ret = []
+        try:
+            for l in f.readlines():
+                l = l.rstrip("\n")
+                if l[0] == "#":
+                    continue
+                if not os.path.isabs(l):
+                    continue
+                ret.append(l)
+            return ret
+        finally:
+            f.close()
+
+    def add_alternate_path(self, path):
+        """Add an alternate path to this object store.
+        """
+        try:
+            os.mkdir(os.path.join(self.path, "info"))
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
+        alternates_path = os.path.join(self.path, "info/alternates")
+        f = GitFile(alternates_path, 'wb')
+        try:
+            try:
+                orig_f = open(alternates_path, 'rb')
+            except (OSError, IOError), e:
+                if e.errno != errno.ENOENT:
+                    raise
+            else:
+                try:
+                    f.write(orig_f.read())
+                finally:
+                    orig_f.close()
+            f.write("%s\n" % path)
+        finally:
+            f.close()
+        self.alternates.append(DiskObjectStore(path))
 
     def _load_packs(self):
         pack_files = []

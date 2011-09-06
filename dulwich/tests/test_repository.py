@@ -674,6 +674,7 @@ class RefsContainerTests(object):
 
     def test_check_refname(self):
         self._refs._check_refname('HEAD')
+        self._refs._check_refname('refs/stash')
         self._refs._check_refname('refs/heads/foo')
 
         self.assertRaises(errors.RefFormatError, self._refs._check_refname,

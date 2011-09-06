@@ -213,7 +213,7 @@ class RefsContainer(object):
         :param name: The name of the reference.
         :raises KeyError: if a refname is not HEAD or is otherwise not valid.
         """
-        if name == 'HEAD':
+        if name in ('HEAD', 'refs/stash'):
             return
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
             raise RefFormatError(name)

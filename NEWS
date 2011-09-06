@@ -25,6 +25,8 @@
 
   * Fix compilation with older versions of MSVC.  (Martin gz)
 
+  * Special case 'refs/stash' as a valid ref. (Jelmer Vernooij, #695577)
+
 0.8.0	2011-08-07
 
  FEATURES

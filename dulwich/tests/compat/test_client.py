@@ -60,9 +60,9 @@ class DulwichClientTestBase(object):
 
     def setUp(self):
         self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
-        dest = os.path.join(self.gitroot, 'dest')
-        file.ensure_dir_exists(dest)
-        run_git_or_fail(['init', '--quiet', '--bare'], cwd=dest)
+        self.dest = os.path.join(self.gitroot, 'dest')
+        file.ensure_dir_exists(self.dest)
+        run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
 
     def tearDown(self):
         shutil.rmtree(self.gitroot)
@@ -373,7 +373,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         while select.select([self.rfile._sock], [], [], 0)[0]:
             if not self.rfile._sock.recv(1):
                 break
-        args = ['-c', 'http.uploadpack=true', '-c', 'http.receivepack=true', 'http-backend']
+        args = ['http-backend']
         if '=' not in decoded_query:
             args.append(decoded_query)
         stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
@@ -414,6 +414,10 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
         self.addCleanup(self._httpd.shutdown)
         threading.Thread(target=self._httpd.serve_forever).start()
+        run_git_or_fail(['config', 'http.uploadpack', 'true'],
+                        cwd=self.dest)
+        run_git_or_fail(['config', 'http.receivepack', 'true'],
+                        cwd=self.dest)
 
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)

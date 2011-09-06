@@ -30,7 +30,6 @@ import subprocess
 import tempfile
 import threading
 import urllib
-import urlparse
 
 from dulwich import (
     client,
@@ -406,6 +405,8 @@ if not getattr(HTTPGitServer, 'shutdown', None):
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
+
+    min_git_version = (1, 7, 0, 2)
 
     def setUp(self):
         CompatTestCase.setUp(self)

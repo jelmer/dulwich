@@ -574,7 +574,7 @@ class SSHGitClient(TraditionalGitClient):
 class HttpGitClient(GitClient):
 
     def __init__(self, base_url, dumb=None, *args, **kwargs):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         GitClient.__init__(self, *args, **kwargs)
 
@@ -589,10 +589,13 @@ class HttpGitClient(GitClient):
         return urllib2.urlopen(req)
 
     def _discover_references(self, service, url):
-        url = urlparse.urljoin(url+"/", "info/refs")
-        if not self.dumb:
+        assert url[-1] == "/"
+        url = urlparse.urljoin(url, "info/refs")
+        headers = {}
+        if self.dumb != False:
             url += "?service=%s" % service
-        req = urllib2.Request(url)
+            headers["Content-Type"] = "application/x-%s-request" % service
+        req = urllib2.Request(url, headers=headers)
         resp = self._perform(req)
         if resp.getcode() == 404:
             raise NotGitRepository()
@@ -610,7 +613,8 @@ class HttpGitClient(GitClient):
         return self._read_refs(proto)
 
     def _smart_request(self, service, url, data):
-        url = urlparse.urljoin(url+"/", service)
+        assert url[-1] == "/"
+        url = urlparse.urljoin(url, service)
         req = urllib2.Request(url,
             headers={"Content-Type": "application/x-%s-request" % service},
             data=data)

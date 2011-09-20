@@ -578,6 +578,9 @@ class HttpGitClient(GitClient):
         self.dumb = dumb
         GitClient.__init__(self, *args, **kwargs)
 
+    def _get_url(self, path):
+        return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
+
     def _perform(self, req):
         """Perform a HTTP request.
 
@@ -642,8 +645,9 @@ class HttpGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        url = urlparse.urljoin(self.base_url, path)
-        old_refs, server_capabilities = self._discover_references("git-receive-pack", url)
+        url = self._get_url(path)
+        old_refs, server_capabilities = self._discover_references(
+            "git-receive-pack", url)
         negotiated_capabilities = list(self._send_capabilities)
         new_refs = determine_wants(old_refs)
         if not new_refs:
@@ -674,7 +678,7 @@ class HttpGitClient(GitClient):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
-        url = urlparse.urljoin(self.base_url, path)
+        url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             "git-upload-pack", url)
         negotiated_capabilities = list(server_capabilities)

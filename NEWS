@@ -27,6 +27,9 @@
 
   * Special case 'refs/stash' as a valid ref. (Jelmer Vernooij, #695577)
 
+  * Smart protocol clients can now change refs even if they are
+    not uploading new data. (Jelmer Vernooij, #855993)
+
 0.8.0	2011-08-07
 
  FEATURES

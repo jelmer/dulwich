@@ -108,11 +108,7 @@ class DulwichClientTestBase(object):
                     src.object_store.generate_pack_contents)
         self.assertDestEqualsSrc()
 
-    def disable_ff_and_make_dummy_commit(self):
-        # disable non-fast-forward pushes to the server
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        run_git_or_fail(['config', 'receive.denyNonFastForwards', 'true'],
-                        cwd=dest.path)
+    def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
         t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
@@ -123,7 +119,15 @@ class DulwichClientTestBase(object):
         c.message = 'hi'
         c.tree = t
         dest.object_store.add_object(c)
-        return dest, c.id
+        return c.id
+
+    def disable_ff_and_make_dummy_commit(self):
+        # disable non-fast-forward pushes to the server
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        run_git_or_fail(['config', 'receive.denyNonFastForwards', 'true'],
+                        cwd=dest.path)
+        commit_id = self.make_dummy_commit(dest)
+        return dest, commit_id
 
     def compute_send(self):
         srcpath = os.path.join(self.gitroot, 'server_new.export')
@@ -176,6 +180,20 @@ class DulwichClientTestBase(object):
         refs = c.fetch(self._build_path('/dest'), dest)
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
+
+    def test_send_remove_branch(self):
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        dummy_commit = self.make_dummy_commit(dest)
+        dest.refs['refs/heads/master'] = dummy_commit
+        dest.refs['refs/heads/abranch'] = dummy_commit
+        sendrefs = dict(dest.refs)
+        sendrefs['refs/heads/abranch'] = "00" * 20
+        del sendrefs['HEAD']
+        gen_pack = lambda have, want: []
+        c = self._client()
+        self.assertEquals(dest.refs["refs/heads/abranch"], dummy_commit)
+        c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+        self.assertFalse("refs/heads/abranch" in dest.refs)
 
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):

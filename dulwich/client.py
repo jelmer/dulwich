@@ -416,15 +416,16 @@ class TraditionalGitClient(GitClient):
         if 'report-status' not in server_capabilities:
             negotiated_capabilities.remove('report-status')
         new_refs = determine_wants(old_refs)
-        if not new_refs:
+        if new_refs is None:
             proto.write_pkt_line(None)
-            return {}
+            return old_refs
         (have, want) = self._handle_receive_pack_head(proto,
             negotiated_capabilities, old_refs, new_refs)
-        if not want:
+        if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_objects(proto.write_file(), objects)
+        if len(objects) > 0:
+            entries, sha = write_pack_objects(proto.write_file(), objects)
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
             progress)
         return new_refs
@@ -650,18 +651,19 @@ class HttpGitClient(GitClient):
             "git-receive-pack", url)
         negotiated_capabilities = list(self._send_capabilities)
         new_refs = determine_wants(old_refs)
-        if not new_refs:
-            return {}
+        if new_refs is None:
+            return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
         req_data = StringIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
-        if not want:
+        if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_objects(req_proto.write_file(), objects)
+        if len(objects) > 0:
+            entries, sha = write_pack_objects(req_proto.write_file(), objects)
         resp = self._smart_request("git-receive-pack", url,
             data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)

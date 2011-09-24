@@ -6,6 +6,8 @@
 
   * Repo.do_commit has a new argument 'merge_heads'. (Jelmer Vernooij)
 
+  * New ``Repo.get_walker`` method. (Jelmer Vernooij)
+
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
 
   * ``GitClient.send_pack`` now supports the 'side-band-64k' capability.
@@ -29,6 +31,11 @@
 
   * Smart protocol clients can now change refs even if they are
     not uploading new data. (Jelmer Vernooij, #855993)
+
+ API CHANGES
+
+  * ``Repo.revision_history`` is now deprecated in favor of ``Repo.get_walker``.
+    (Jelmer Vernooij)
 
 0.8.0	2011-08-07
 

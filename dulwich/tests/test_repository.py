@@ -247,8 +247,19 @@ class RepositoryTests(TestCase):
         self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
 
+    def test_get_walker(self):
+        r = self._repo = open_repo('a.git')
+        # include defaults to [r.head()]
+        self.assertEqual([e.commit.id for e in r.get_walker()],
+                         [r.head(), '2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
@@ -268,15 +279,13 @@ class RepositoryTests(TestCase):
             'refs/tags/mytag-packed':
                 'b0931cadc54336e78a1d980420e3268903b57a50',
             }, t.refs.as_dict())
-        history = t.revision_history(t.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, [t.head(),
                          '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
                                 'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                 '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
@@ -285,14 +294,15 @@ class RepositoryTests(TestCase):
 
     def test_revision_history_missing_commit(self):
         r = self._repo = open_repo('simple_merge.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
 
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
         r = self._repo = open_repo('ooo_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
                                 'f507291b64138b875c28e03469025b1ea20bc614',
                                 'fb5b0425c7ce46959bec94d54b9a157645e114f5',

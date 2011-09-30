@@ -30,7 +30,7 @@ typedef int Py_ssize_t;
 #endif
 
 #if defined(__MINGW32_VERSION) || (defined(__APPLE__) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1070) || (defined(_MSC_VER) && _MSC_VER < 1400)
-size_t strnlen(char *text, size_t maxlen)
+size_t strnlen(const char *text, size_t maxlen)
 {
 	const char *last = memchr(text, '\0', maxlen);
 	return last ? (size_t) (last - text) : maxlen;

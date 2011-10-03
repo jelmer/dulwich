@@ -1004,6 +1004,9 @@ class BaseRepo(object):
         except RefFormatError:
             raise KeyError(name)
 
+    def __iter__(self):
+        raise NotImplementedError(self.__iter__)
+
     def __contains__(self, name):
         if len(name) in (20, 40):
             return name in self.object_store or name in self.refs

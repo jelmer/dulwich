@@ -135,13 +135,25 @@ class GitConfigParser(MutableMapping):
             r'(?P<whitespace>\s+)|'         # Any amount of whitespace
             r'(?P<continuation>\\\s*$)|'    # A continuation character
             r'(?P<escbslash>\\\\)|'         # An escaped backslash
-            r'\\(?P<escquote>([\'"]))|'     # An escaped quote
+            r'(?P<escquote>(\\[\'"]))|'     # An escaped quote
             r'(?P<escnl>\\n)|'              # An escaped newline
             r'(?P<esctab>\\t)|'             # An escaped tab
             r'(?P<escbs>\\b)|'              # An escaped backspace
-            r'(?P<quoted>"([^"\\]*(?:(?:\\n|\\[tbn"\\])[^"\\]*)*)")|'
+            r'(?P<quoted>("[^"\\]*(?:(?:\\n|\\[tbn"\\])[^"\\]*)*"))|'
                                             # quote-delimited value
             r'(?P<noesc>([^\t \\\n]+))'     # normal value
+        )
+
+    # Quote parsing
+    QUOTECRE = re.compile(
+            r'(?P<continuation>\\\s*$)|'    # A continuation character
+            r'(?P<escbslash>\\\\)|'         # An escaped backslash
+            r'(?P<escquote>(\\[\'"]))|'     # An escaped quote
+            r'(?P<escnl>\\n)|'              # An escaped newline
+            r'(?P<esctab>\\t)|'             # An escaped tab
+            r'(?P<escbs>\\b)|'              # An escaped backspace
+            r'(?P<quoted>"([^"\\]*(?:(?:\\n|\\[tbn"\\])[^"\\]*)*)")'
+                                            # quote-delimited value
         )
 
     def __init__(self):
@@ -388,7 +400,7 @@ class GitConfigParser(MutableMapping):
 
         :param key: section.subsection.option (subsection and option
             are optional)
-        :return: section or subsection dict, or option as string
+        :return: section, subsection, or option dict
         """
 
         if key is not None:
@@ -406,6 +418,27 @@ class GitConfigParser(MutableMapping):
             else:  # key is a section
                 return self.configdict[key.lower()]
         raise KeyError(key)
+
+    def decode_value(self, value):
+        return re.sub(self.QUOTECRE, self.parse_quotes, value)
+
+    def parse_quotes(self, mo):
+        if mo.group('continuation') is not None:
+            return ''
+        elif mo.group('escbslash') is not None:
+            return "\\"
+        elif mo.group('escquote') is not None:
+            return mo.group('escquote')[1:]
+        elif mo.group('escnl') is not None:
+            return "\n"
+        elif mo.group('esctab') is not None:
+            return "\t"
+        elif mo.group('escbs') is not None:
+            return "\b"
+        elif mo.group('quoted') is not None:
+            return re.sub(self.QUOTECRE,self.parse_quotes, mo.group('quoted')[1:-1])
+        else:
+            raise ValueError
 
     def __setitem__(self, key, value):
         """Add or change an option
@@ -591,7 +624,7 @@ class GitConfigParser(MutableMapping):
                                     val += "\b"
                                 elif mo.group('quoted') is not None:
                                     v = mo.group('quoted')
-                                    # parse quoted value
+                                    # don't parse quoted value until requested
                                     val += v
                                 elif mo.group('noesc') is not None:
                                     val += mo.group('noesc')

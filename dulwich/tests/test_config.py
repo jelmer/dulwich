@@ -87,6 +87,8 @@ inued
     noncont   = not continued ; \\
     quotecont = "cont;\\
 inued"
+[foo]
+	bar = "foo"bar"baz"
 """
 
 comprehensive_config_clean = """[core]
@@ -119,6 +121,8 @@ comprehensive_config_clean = """[core]
 	continued = continued
 	noncont = not continued
 	quotecont = "cont;inued"
+[foo]
+	bar = "foo"bar"baz"
 """
 
 comprehensive_config_dict = {
@@ -202,8 +206,104 @@ comprehensive_config_dict = {
             "quotecont": {"_name": "quotecont", "value": ["\"cont;inued\""]},
            },
        },
+    "foo": {
+        "_name": "foo",
+        "subsections": {},
+        "options": {
+            "bar": {"_name": "bar", "value": ["\"foo\"bar\"baz\""]},
+            },
+        },
    }
 
+comprehensive_config_dict_parsed = {
+    "core": {
+        "_name": "core",
+        "subsections": {},
+        "options": {
+            "penguin": {"_name": "penguin", "value": ["very blue", "kingpin"]},
+            "movie": {"_name": "Movie", "value": ["BadPhysics"]},
+            "uppercase": {"_name": "UPPERCASE", "value": ["true"]},
+           },
+       },
+    "cores": {
+        "_name": "Cores",
+        "subsections": {},
+        "options": {
+            "whatever": {"_name": "WhatEver", "value": ["Second"]},
+            "baz": {"_name": "baz", "value": ["multiple lines"]},
+           },
+       },
+    "beta": {
+        "_name": "beta",
+        "subsections": {},
+        "options": {
+            "noindent": {"_name": "noIndent", "value": ["sillyValue"]},
+            "haha": {"_name": "haha", "value": ["\"beta\"", "hello", "bello"]},
+           },
+       },
+    "nextsection": {
+        "_name": "nextSection",
+        "subsections": {},
+        "options": {
+            "nonewline": {"_name": "noNewline", "value": ["ouch"]},
+           },
+       },
+    "a": {
+        "_name": "a",
+        "subsections": {
+            "b": {
+                "_name": "b",
+                "options": {
+                    "c": {"_name": "c", "value": ["d"]},
+                   },
+               },
+           },
+        "options": {
+            "x": {"_name": "x", "value": ["y"]},
+            "b": {"_name": "b", "value": ["c"]},
+           },
+       },
+    "b": {
+        "_name": "b",
+        "subsections": {},
+        "options": {
+            "x": {"_name": "x", "value": ["y"]},
+           },
+       },
+    "branch": {
+        "_name": "branch",
+        "subsections": {
+            "eins": {
+                "_name": "\"eins\"",
+                "options": {
+                    "x": {"_name": "x", "value": ["1"]},
+                    "y": {"_name": "y", "value": ["1"]},
+                   },
+               },
+            "1 234 blabl/a": {
+                "_name": "\"1 234 blabl/a\"",
+                "options": {},
+               },
+           },
+        "options": {},
+       },
+    "section": {
+        "_name": "section",
+        "subsections": {},
+        "options": {
+            "continued": {"_name": "continued", "value": ["continued"]},
+            "noncont": {"_name": "noncont", "value": ["not continued"]},
+            "quotecont": {"_name": "quotecont", "value": ["\"cont;inued\""]},
+           },
+       },
+    "foo": {
+        "_name": "foo",
+        "subsections": {},
+        "options": {
+            "bar": {"_name": "bar", "value": ["foobarbaz"]},
+            },
+        },
+   }
 
 class ConfigTests(TestCase):
     def setUp(self):
@@ -394,6 +494,7 @@ class ConfigTests(TestCase):
         self.assertEqual('section.continued', it.next())
         self.assertEqual('section.noncont', it.next())
         self.assertEqual('section.quotecont', it.next())
+        self.assertEqual('foo.bar', it.next())
         self.assertRaises(StopIteration, lambda: it.next())
 
     def test_len(self):
@@ -407,7 +508,7 @@ class ConfigTests(TestCase):
 
         parser.read(exclusive_filename=self.comprehensiveconf_path)
 
-        self.assertEqual(20, len(parser))
+        self.assertEqual(21, len(parser))
 
     def test_eq(self):
         parser = self.parser
@@ -449,6 +550,13 @@ class ConfigTests(TestCase):
         self.assertEqual(False, parser == oparser)
 
         self.assertEqual(comprehensive_config_dict, oparser)
+
+    def test_decode(self):
+        parser = self.parser
+
+        parser.read(exclusive_filename=self.comprehensiveconf_path)
+
+        self.assertEqual(comprehensive_config_dict_parsed['foo']['options']['bar']['value'][0], parser.decode_value(parser['foo.bar']['value'][0]))
 
     def test_write(self):
         parser = self.parser

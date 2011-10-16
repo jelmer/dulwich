@@ -74,6 +74,7 @@ class TestWalkEntry(object):
 class WalkerTest(TestCase):
 
     def setUp(self):
+        super(WalkerTest, self).setUp()
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):

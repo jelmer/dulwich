@@ -37,6 +37,7 @@ from utils import (
 class BuildCommitGraphTest(TestCase):
 
     def setUp(self):
+        super(BuildCommitGraphTest, self).setUp()
         self.store = MemoryObjectStore()
 
     def test_linear(self):

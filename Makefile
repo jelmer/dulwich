@@ -34,6 +34,8 @@ check-pypy:: clean
 check-noextensions:: clean
 	$(RUNTEST) dulwich.tests.test_suite
 
+check-all: check check-pypy check-noextensions
+
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so

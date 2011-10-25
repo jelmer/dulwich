@@ -27,7 +27,7 @@ class DulwichDistribution(Distribution):
             return True
 
     def has_ext_modules(self):
-        return not self.pure
+        return not self.pure and not '__pypy__' in sys.modules
 
     global_options = Distribution.global_options + [
         ('pure', None, 

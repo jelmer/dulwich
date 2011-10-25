@@ -32,6 +32,9 @@
   * Smart protocol clients can now change refs even if they are
     not uploading new data. (Jelmer Vernooij, #855993)
 
+ * Don't compile C extensions when running in pypy.
+   (Ronny Pfannschmidt, #881546)
+
  API CHANGES
 
   * ``Repo.revision_history`` is now deprecated in favor of ``Repo.get_walker``.

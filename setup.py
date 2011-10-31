@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.8.1'
+dulwich_version_string = '0.8.2'
 
 include_dirs = []
 # Windows MSVC support

@@ -24,8 +24,8 @@ import tempfile
 
 from dulwich.file import GitFile, fancy_rename
 from dulwich.tests import (
+    SkipTest,
     TestCase,
-    TestSkipped,
     )
 
 
@@ -70,7 +70,7 @@ class FancyRenameTests(TestCase):
 
     def test_dest_opened(self):
         if sys.platform != "win32":
-            raise TestSkipped("platform allows overwriting open files")
+            raise SkipTest("platform allows overwriting open files")
         self.create(self.bar, 'bar contents')
         dest_f = open(self.bar, 'rb')
         self.assertRaises(OSError, fancy_rename, self.foo, self.bar)

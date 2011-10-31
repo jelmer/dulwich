@@ -221,12 +221,33 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.store_dir)
         self.store = DiskObjectStore.init(self.store_dir)
 
     def tearDown(self):
         TestCase.tearDown(self)
         PackBasedObjectStoreTests.tearDown(self)
-        shutil.rmtree(self.store_dir)
+
+    def test_alternates(self):
+        alternate_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, alternate_dir)
+        alternate_store = DiskObjectStore(alternate_dir)
+        b2 = make_object(Blob, data="yummy data")
+        alternate_store.add_object(b2)
+        store = DiskObjectStore(self.store_dir)
+        self.assertRaises(KeyError, store.__getitem__, b2.id)
+        store.add_alternate_path(alternate_dir)
+        self.assertEquals(b2, store[b2.id])
+
+    def test_add_alternate_path(self):
+        store = DiskObjectStore(self.store_dir)
+        self.assertEquals([], store._read_alternate_paths())
+        store.add_alternate_path("/foo/path")
+        self.assertEquals(["/foo/path"], store._read_alternate_paths())
+        store.add_alternate_path("/bar/path")
+        self.assertEquals(
+            ["/foo/path", "/bar/path"],
+            store._read_alternate_paths())
 
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)

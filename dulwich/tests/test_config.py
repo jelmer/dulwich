@@ -18,14 +18,22 @@
 
 """Tests for reading and writing configuraiton files."""
 
+from cStringIO import StringIO
 from dulwich.config import ConfigFile
 from dulwich.tests import TestCase
 
 
 class ConfigFileTests(TestCase):
 
+    def from_file(self, text):
+        return ConfigFile.from_file(StringIO(text))
+
     def test_empty(self):
         ConfigFile()
 
     def test_eq(self):
         self.assertEquals(ConfigFile(), ConfigFile())
+
+    def test_from_file_empty(self):
+        cf = self.from_file("")
+        self.assertEquals(ConfigFile(), cf)

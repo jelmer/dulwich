@@ -33,6 +33,7 @@ from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich import objects
+from dulwich.config import ConfigFile
 from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
@@ -318,7 +319,7 @@ class RepositoryTests(TestCase):
 
     def test_get_config(self):
         r = self._repo = open_repo('ooo_merge.git')
-        self.assertEquals({}, r.get_config())
+        self.assertEquals(ConfigFile(), r.get_config())
 
     def test_common_revisions(self):
         """

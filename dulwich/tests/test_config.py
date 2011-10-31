@@ -18,4 +18,14 @@
 
 """Tests for reading and writing configuraiton files."""
 
+from dulwich.config import ConfigFile
+from dulwich.tests import TestCase
 
+
+class ConfigFileTests(TestCase):
+
+    def test_empty(self):
+        ConfigFile()
+
+    def test_eq(self):
+        self.assertEquals(ConfigFile(), ConfigFile())

@@ -20,6 +20,8 @@
 
 """
 
+from dulwich.file import GitFile
+
 
 class ConfigFile(object):
     """A Git configuration file, like .git/config or ~/.gitconfig."""
@@ -31,8 +33,29 @@ class ConfigFile(object):
         return isinstance(other, self.__class__)
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, f):
+        """Read configuration from a file-like object."""
         ret = cls()
-        f = open(path, 'r')
-        # FIXME?
-        f.close()
+        # FIXME
+        return ret
+
+    @classmethod
+    def from_path(cls, path):
+        """Read configuration from a file on disk."""
+        f = GitFile(path, 'r')
+        try:
+            return cls.from_file(f)
+        finally:
+            f.close()
+
+    def write_to_path(self, path):
+        """Write configuration to a file on disk."""
+        f = GitFile(path, 'w')
+        try:
+            self.write_to_file(f)
+        finally:
+            f.close()
+
+    def write_to_file(self, f):
+        """Write configuration to a file-like object."""
+        # FIXME

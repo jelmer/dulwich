@@ -35,6 +35,9 @@
  * Don't compile C extensions when running in pypy.
    (Ronny Pfannschmidt, #881546)
 
+ * Use different name for strnlen replacement function to avoid clashing
+   with system strnlen. (Jelmer Vernooij, #880362)
+
  API CHANGES
 
   * ``Repo.revision_history`` is now deprecated in favor of ``Repo.get_walker``.

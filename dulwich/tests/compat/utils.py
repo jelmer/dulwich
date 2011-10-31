@@ -30,8 +30,8 @@ from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
+    SkipTest,
     TestCase,
-    TestSkipped,
     )
 
 _DEFAULT_GIT = 'git'
@@ -77,12 +77,12 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     :param git_path: Path to the git executable; defaults to the version in
         the system path.
     :raise ValueError: if the required version tuple has too many parts.
-    :raise TestSkipped: if no suitable git version was found at the given path.
+    :raise SkipTest: if no suitable git version was found at the given path.
     """
     found_version = git_version(git_path=git_path)
     if found_version is None:
-        raise TestSkipped('Test requires git >= %s, but c git not found' %
-                         (required_version, ))
+        raise SkipTest('Test requires git >= %s, but c git not found' %
+                       (required_version, ))
 
     if len(required_version) > _VERSION_LEN:
         raise ValueError('Invalid version tuple %s, expected %i parts' %
@@ -96,8 +96,8 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     if found_version < required_version:
         required_version = '.'.join(map(str, required_version))
         found_version = '.'.join(map(str, found_version))
-        raise TestSkipped('Test requires git >= %s, found %s' %
-                         (required_version, found_version))
+        raise SkipTest('Test requires git >= %s, found %s' %
+                       (required_version, found_version))
 
 
 def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,

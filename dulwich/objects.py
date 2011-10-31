@@ -693,6 +693,8 @@ class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
 
     def in_path(self, path):
         """Return a copy of this entry with the given path prepended."""
+        if type(self.path) != str:
+            raise TypeError
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
@@ -747,6 +749,8 @@ def sorted_tree_items(entries, name_order):
     for name, entry in sorted(entries.iteritems(), cmp=cmp_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
+        if not isinstance(mode, int) and not isinstance(mode, long):
+            raise TypeError('Expected integer/long for mode, got %r' % mode)
         mode = int(mode)
         if not isinstance(hexsha, str):
             raise TypeError('Expected a string for SHA, got %r' % hexsha)

@@ -91,10 +91,7 @@ class PackTests(TestCase):
     def setUp(self):
         super(PackTests, self).setUp()
         self.tempdir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.tempdir)
-        super(PackTests, self).tearDown()
+        self.addCleanup(shutil.rmtree, self.tempdir)
 
     datadir = os.path.abspath(os.path.join(os.path.dirname(__file__),
         'data/packs'))
@@ -736,6 +733,7 @@ class TestPackIterator(DeltaChainIterator):
 class DeltaChainIteratorTests(TestCase):
 
     def setUp(self):
+        super(DeltaChainIteratorTests, self).setUp()
         self.store = MemoryObjectStore()
         self.fetched = set()
 

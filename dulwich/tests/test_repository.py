@@ -113,6 +113,10 @@ class RepositoryTests(TestCase):
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
+    def test_iter(self):
+        r = self._repo = open_repo('a.git')
+        self.assertRaises(NotImplementedError, r.__iter__)
+
     def test_setitem(self):
         r = self._repo = open_repo('a.git')
         r["refs/tags/foo"] = 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
@@ -247,17 +251,45 @@ class RepositoryTests(TestCase):
         self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
 
+    def test_get_walker(self):
+        r = self._repo = open_repo('a.git')
+        # include defaults to [r.head()]
+        self.assertEqual([e.commit.id for e in r.get_walker()],
+                         [r.head(), '2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
                                 '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
+    def test_clone(self):
+        r = self._repo = open_repo('a.git')
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = r.clone(tmp_dir, mkdir=False)
+        self.assertEqual({
+            'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/remotes/origin/master':
+                'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            'refs/tags/mytag-packed':
+                'b0931cadc54336e78a1d980420e3268903b57a50',
+            }, t.refs.as_dict())
+        shas = [e.commit.id for e in r.get_walker()]
+        self.assertEqual(shas, [t.head(),
+                         '2a72d929692c41d8554c07f6301757ba18a65d91'])
+
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
                                 'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                 '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
@@ -266,14 +298,15 @@ class RepositoryTests(TestCase):
 
     def test_revision_history_missing_commit(self):
         r = self._repo = open_repo('simple_merge.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
 
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
         r = self._repo = open_repo('ooo_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
                                 'f507291b64138b875c28e03469025b1ea20bc614',
                                 'fb5b0425c7ce46959bec94d54b9a157645e114f5',
@@ -445,6 +478,50 @@ class BuildRepoTests(TestCase):
         self.assertEqual(r[self._root_commit].tree, new_commit.tree)
         self.assertEqual('failed commit', new_commit.message)
 
+    def test_commit_branch(self):
+        r = self._repo
+
+        commit_sha = r.do_commit('commit to branch',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref="refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r["HEAD"].id)
+        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+        self.assertEqual([], r[commit_sha].parents)
+        self.assertTrue("refs/heads/new_branch" in r)
+
+        new_branch_head = commit_sha
+
+        commit_sha = r.do_commit('commit to branch 2',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref="refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r["HEAD"].id)
+        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+        self.assertEqual([new_branch_head], r[commit_sha].parents)
+
+    def test_commit_merge_heads(self):
+        r = self._repo
+        merge_1 = r.do_commit('commit to branch 2',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref="refs/heads/new_branch")
+        commit_sha = r.do_commit('commit with merge',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             merge_heads=[merge_1])
+        self.assertEquals(
+            [self._root_commit, merge_1],
+            r[commit_sha].parents)
+
     def test_stage_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))
@@ -611,6 +688,7 @@ class RefsContainerTests(object):
 
     def test_check_refname(self):
         self._refs._check_refname('HEAD')
+        self._refs._check_refname('refs/stash')
         self._refs._check_refname('refs/heads/foo')
 
         self.assertRaises(errors.RefFormatError, self._refs._check_refname,

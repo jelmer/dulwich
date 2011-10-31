@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Setup file for dulwich
-# Copyright (C) 2008-2010 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@samba.org>
 
 try:
     from setuptools import setup, Extension
@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.8.0'
+dulwich_version_string = '0.8.1'
 
 include_dirs = []
 # Windows MSVC support
@@ -27,11 +27,11 @@ class DulwichDistribution(Distribution):
             return True
 
     def has_ext_modules(self):
-        return not self.pure
+        return not self.pure and not '__pypy__' in sys.modules
 
     global_options = Distribution.global_options + [
         ('pure', None, 
-            "use pure (slower) Python code instead of C extensions")]
+            "use pure Python code instead of C extensions (slower on CPython)")]
 
     pure = False
 

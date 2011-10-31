@@ -883,9 +883,13 @@ class BaseRepo(object):
         return self.commit(sha).parents
 
     def get_config(self):
-        import ConfigParser
-        p = ConfigParser.RawConfigParser()
-        p.read(os.path.join(self._controldir, 'config'))
+        from dulwich.config import ConfigFile
+        try:
+            p = ConfigFile.from_file(os.path.join(self._controldir, 'config'))
+        except (IOError, OSError), e:
+            if e.errno == errno.ENOENT:
+                return ConfigFile()
+            raise
         return dict((section, dict(p.items(section)))
                     for section in p.sections())
 

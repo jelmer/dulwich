@@ -20,3 +20,19 @@
 
 """
 
+
+class ConfigFile(object):
+    """A Git configuration file, like .git/config or ~/.gitconfig."""
+
+    def __init__(self):
+        """Create a new ConfigFile."""
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__)
+
+    @classmethod
+    def from_file(cls, path):
+        ret = cls()
+        f = open(path, 'r')
+        # FIXME?
+        f.close()

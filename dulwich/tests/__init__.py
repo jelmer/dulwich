@@ -104,10 +104,12 @@ def tutorial_test_suite():
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
     def setup(test):
+        test.__old_cwd = os.getcwd()
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)
     def teardown(test):
         shutil.rmtree(test.__dulwich_tempdir)
+        os.chdir(test.__old_cwd)
     return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
         *tutorial_files)
 

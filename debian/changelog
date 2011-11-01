@@ -1,6 +1,8 @@
-dulwich (0.8.1-1) UNRELEASED; urgency=low
+dulwich (0.8.1-1) unstable; urgency=low
 
   * New upstream release.
+   + Now provides access to remote http(s) smart server repositories.
+     Closes: #636331
 
  -- Jelmer Vernooij <jelmer@debian.org>  Mon, 31 Oct 2011 13:07:39 -0700
 

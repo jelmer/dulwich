@@ -36,6 +36,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    NotGitRepository,
     UnexpectedCommandError,
     ObjectFormatException,
     )
@@ -72,14 +73,19 @@ class Backend(object):
     """A backend for the Git smart server implementation."""
 
     def open_repository(self, path):
-        """Open the repository at a path."""
+        """Open the repository at a path.
+
+        :param path: Path to the repository
+        :raise NotGitRepository: no git repository was found at path
+        :return: Instance of BackendRepo
+        """
         raise NotImplementedError(self.open_repository)
 
 
 class BackendRepo(object):
     """Repository abstraction used by the Git server.
-    
-    Please note that the methods required here are a 
+
+    Please note that the methods required here are a
     subset of those provided by dulwich.repo.Repo.
     """
 
@@ -125,8 +131,11 @@ class DictBackend(Backend):
 
     def open_repository(self, path):
         logger.debug('Opening repository at %s', path)
-        # FIXME: What to do in case there is no repo ?
-        return self.repos[path]
+        try:
+            return self.repos[path]
+        except KeyError:
+            raise NotGitRepository("No git repository was found at %(path)s",
+                path=path)
 
 
 class FileSystemBackend(Backend):

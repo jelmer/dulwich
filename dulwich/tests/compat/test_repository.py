@@ -45,12 +45,9 @@ class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 
     def setUp(self):
-        CompatTestCase.setUp(self)
+        super(ObjectStoreTestCase, self).setUp()
         self._repo = import_repo('server_new.export')
-
-    def tearDown(self):
-        CompatTestCase.tearDown(self)
-        tear_down_repo(self._repo)
+        self.addCleanup(tear_down_repo, self._repo)
 
     def _run_git(self, args):
         return run_git_or_fail(args, cwd=self._repo.path)

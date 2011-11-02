@@ -1,5 +1,10 @@
 0.8.2	UNELEASED
 
+ BUG FIXES
+
+  * Cope with different zlib buffer sizes in sha1 file parser.
+    (Jelmer Vernooij)
+
 0.8.1	2011-10-31
 
  FEATURES

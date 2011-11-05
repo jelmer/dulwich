@@ -23,6 +23,7 @@ from dulwich.client import (
     TCPGitClient,
     SubprocessGitClient,
     SSHGitClient,
+    HttpGitClient,
     ReportStatusParser,
     SendPackError,
     UpdateRefsError,
@@ -136,6 +137,12 @@ class GitClientTests(TestCase):
         # expected parsing of the URL on Python versions less than 2.6.5
         self.assertRaises(ValueError, get_transport_and_path,
         'prospero://bar/baz')
+
+    def test_get_transport_and_path_http(self):
+        url = 'https://github.com/jelmer/dulwich'
+        client, path = get_transport_and_path(url)
+        self.assertTrue(isinstance(client, HttpGitClient))
+        self.assertEquals('/jelmer/dulwich', path)
 
 
 class SSHGitClientTests(TestCase):

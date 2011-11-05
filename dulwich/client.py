@@ -715,8 +715,7 @@ def get_transport_and_path(uri):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username), parsed.path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(
-            parsed.scheme, parsed.netloc, path='/'))
+        return HttpGitClient(urlparse.urlunparse(parsed)), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.

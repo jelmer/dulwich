@@ -35,6 +35,7 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.protocol import (
+    _RBUFSIZE,
     PktLineParser,
     Protocol,
     TCP_GIT_PORT,
@@ -350,7 +351,7 @@ class GitClient(object):
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
-                                 pack_data, progress):
+                                 pack_data, progress, rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
         :param proto: Protocol object to read from
@@ -358,6 +359,7 @@ class GitClient(object):
         :param graph_walker: GraphWalker instance to call .ack() on
         :param pack_data: Function to call with pack data
         :param progress: Optional progress reporting function
+        :param rbufsize: Read buffer size
         """
         pkt = proto.read_pkt_line()
         while pkt:
@@ -375,9 +377,11 @@ class GitClient(object):
             if data:
                 raise Exception('Unexpected response %r' % data)
         else:
-            # FIXME: Buffering?
-            pack_data(self.read())
-
+            while True:
+                data = self.read(rbufsize)
+                if data == "":
+                    break
+                pack_data(data)
 
 
 class TraditionalGitClient(GitClient):

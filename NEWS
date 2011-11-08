@@ -5,6 +5,9 @@
   * Cope with different zlib buffer sizes in sha1 file parser.
     (Jelmer Vernooij)
 
+  * Fix get_transport_and_path for HTTP/HTTPS URLs.
+    (Bruno Renié)
+
 0.8.1	2011-10-31
 
  FEATURES

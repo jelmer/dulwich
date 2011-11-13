@@ -40,6 +40,52 @@ size_t rep_strnlen(char *text, size_t maxlen)
 static PyObject *tree_entry_cls;
 static PyObject *object_format_exception_cls;
 
+static PyObject* ParseTreeIter_iter(PyObject *self);
+static PyObject* ParseTreeIter_iternext(PyObject *self);
+
+typedef struct {
+	PyObject_HEAD
+	PyObject *py_text;
+	Py_ssize_t len;
+	int strict;
+	char *text;
+	char *start;
+	char *end;
+} ParseTreeIter_state;
+
+static PyTypeObject _objects_ParseTreeIterType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                                /* ob_size */
+	"_objects.ParseTreeIter",         /* tp_name */
+	sizeof(ParseTreeIter_state),      /* tp_basicsize */
+	0,                                /* tp_itemsize */
+	0,                                /* tp_dealloc */
+	0,                                /* tp_print */
+	0,                                /* tp_getattr */
+	0,                                /* tp_setattr */
+	0,                                /* tp_compare */
+	0,                                /* tp_repr */
+	0,                                /* tp_as_number */
+	0,                                /* tp_as_sequence */
+	0,                                /* tp_as_mapping */
+	0,                                /* tp_hash */
+	0,                                /* tp_call */
+	0,                                /* tp_str */
+	0,                                /* tp_getattro */
+	0,                                /* tp_setattro */
+	0,                                /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,
+	/* tp_flags: Py_TPFLAGS_HAVE_ITER tells python to
+	   use tp_iter and tp_iternext fields. */
+	"iterator object for parse_tree", /* tp_doc */
+	0,                                /* tp_traverse */
+	0,                                /* tp_clear */
+	0,                                /* tp_richcompare */
+	0,                                /* tp_weaklistoffset */
+	ParseTreeIter_iter,               /* tp_iter: __iter__() method */
+	ParseTreeIter_iternext            /* tp_iternext: next() method */
+};
+
 static PyObject *sha_to_pyhex(const unsigned char *sha)
 {
 	char hexsha[41];
@@ -52,83 +98,101 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 	return PyString_FromStringAndSize(hexsha, 40);
 }
 
-static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
-{
-	char *text, *start, *end;
-	int len, namelen, strict;
-	PyObject *ret, *item, *name, *py_strict = NULL;
-	static char *kwlist[] = {"text", "strict", NULL};
+static PyObject* ParseTreeIter_iter(PyObject *self) {
+	Py_INCREF(self);
+	return self;
+}
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "s#|O", kwlist,
-	                                 &text, &len, &py_strict))
-		return NULL;
+static PyObject* ParseTreeIter_iternext(PyObject *self) {
+	ParseTreeIter_state *state = (ParseTreeIter_state*)self;
+	PyObject *item, *name;
+	long mode;
+	int namelen;
 
-
-	strict = py_strict ?  PyObject_IsTrue(py_strict) : 0;
-
-	/* TODO: currently this returns a list; if memory usage is a concern,
-	 * consider rewriting as a custom iterator object */
-	ret = PyList_New(0);
-
-	if (ret == NULL) {
-		return NULL;
-	}
-
-	start = text;
-	end = text + len;
-
-	while (text < end) {
-		long mode;
-		if (strict && text[0] == '0') {
+	if (state->text < state->end) {
+		if (state->strict && state->text[0] == '0') {
 			PyErr_SetString(object_format_exception_cls,
 			                "Illegal leading zero on mode");
-			Py_DECREF(ret);
+			Py_DECREF(state->py_text);
 			return NULL;
 		}
 
-		mode = strtol(text, &text, 8);
+		mode = strtol(state->text, &(state->text), 8);
 
-		if (*text != ' ') {
+		if (*(state->text) != ' ') {
+			//printf("Expected space: %s\n", state->text);
 			PyErr_SetString(PyExc_ValueError, "Expected space");
-			Py_DECREF(ret);
+			Py_DECREF(state->py_text);
 			return NULL;
 		}
 
-		text++;
+		state->text += 1;
 
-		namelen = strnlen(text, len - (text - start));
-
-		name = PyString_FromStringAndSize(text, namelen);
+		namelen = strnlen(state->text, state->len - (state->text - state->start));
+		name = PyString_FromStringAndSize(state->text, namelen);
 		if (name == NULL) {
-			Py_DECREF(ret);
+			Py_DECREF(state->py_text);
 			return NULL;
 		}
 
-		if (text + namelen + 20 >= end) {
+		if (state->text + namelen + 20 >= state->end) {
 			PyErr_SetString(PyExc_ValueError, "SHA truncated");
-			Py_DECREF(ret);
 			Py_DECREF(name);
+			Py_DECREF(state->py_text);
 			return NULL;
 		}
 
 		item = Py_BuildValue("(NlN)", name, mode,
-		                     sha_to_pyhex((unsigned char *)text+namelen+1));
+		                     sha_to_pyhex((unsigned char *)state->text+namelen+1));
 		if (item == NULL) {
-			Py_DECREF(ret);
 			Py_DECREF(name);
+			Py_DECREF(state->py_text);
 			return NULL;
 		}
-		if (PyList_Append(ret, item) == -1) {
-			Py_DECREF(ret);
-			Py_DECREF(item);
-			return NULL;
-		}
-		Py_DECREF(item);
 
-		text += namelen+21;
+		state->text += namelen + 21;
+		return item;
+	} else {
+		/* Raising of standard StopIteration exception with empty
+		 * value. */
+		PyErr_SetNone(PyExc_StopIteration);
+		Py_DECREF(state->py_text);
+		return NULL;
+	}
+}
+
+static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw) {
+	static char *kwlist[] = {"text", "strict", NULL};
+	PyObject *py_text = NULL, *py_strict = NULL;
+	ParseTreeIter_state *state = NULL;
+
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "O|O", kwlist,
+	                                 &py_text, &py_strict))
+		return NULL;
+
+	if (!PyString_Check(py_text)) {
+		PyErr_SetString(PyExc_TypeError, "Text is not a string");
+		return NULL;
 	}
 
-	return ret;
+	state = PyObject_New(ParseTreeIter_state, &_objects_ParseTreeIterType);
+	if (!state)
+		return NULL;
+
+	if (!PyObject_Init((PyObject*)state, &_objects_ParseTreeIterType)) {
+		Py_DECREF(state);
+		return NULL;
+	}
+
+	Py_INCREF(py_text);
+	state->py_text = py_text;
+	state->strict = py_strict ? PyObject_IsTrue(py_strict) : 0;
+	state->text = PyString_AS_STRING(py_text);
+	state->len = PyString_GET_SIZE(py_text);
+	state->start = state->text;
+	state->end = state->text + state->len;
+
+	return (PyObject*)state;
 }
 
 struct tree_item {
@@ -266,6 +330,9 @@ init_objects(void)
 	if (m == NULL)
 		return;
 
+	_objects_ParseTreeIterType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&_objects_ParseTreeIterType) < 0)
+		return NULL;
 
 	errors_mod = PyImport_ImportModule("dulwich.errors");
 	if (errors_mod == NULL)

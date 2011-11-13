@@ -135,7 +135,8 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 	return result;
 
 error:
-	free_objects(result, i);
+	if (result)
+		free_objects(result, i);
 	Py_DECREF(items);
 	return NULL;
 }
@@ -243,8 +244,10 @@ error:
 	result = NULL;
 
 done:
-	free_objects(entries1, n1);
-	free_objects(entries2, n2);
+	if (entries1)
+		free_objects(entries1, n1);
+	if (entries2)
+		free_objects(entries2, n2);
 	return result;
 }
 

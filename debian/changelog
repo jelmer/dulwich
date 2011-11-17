@@ -1,6 +1,7 @@
-dulwich (0.8.1-2) UNRELEASED; urgency=low
+dulwich (0.8.1~bzr973-1) UNRELEASED; urgency=low
 
   * Fix Vcs URL.
+  * New upstream snapshot.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Thu, 17 Nov 2011 04:37:28 +0100
 

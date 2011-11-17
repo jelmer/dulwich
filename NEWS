@@ -1,3 +1,15 @@
+0.8.2	UNRELEASED
+
+ BUG FIXES
+
+  * Cope with different zlib buffer sizes in sha1 file parser.
+    (Jelmer Vernooij)
+
+  * Fix get_transport_and_path for HTTP/HTTPS URLs.
+    (Bruno Renié)
+
+  * Avoid calling free_objects() on NULL in error cases. (Chris Eberle)
+
 0.8.1	2011-10-31
 
  FEATURES

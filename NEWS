@@ -10,6 +10,8 @@
 
   * Avoid calling free_objects() on NULL in error cases. (Chris Eberle)
 
+  * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
+
 0.8.1	2011-10-31
 
  FEATURES

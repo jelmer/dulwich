@@ -54,6 +54,7 @@ from dulwich.web import (
     _LengthLimitedFile,
     HTTPGitRequest,
     HTTPGitApplication,
+    NoSuchFileException,
     )
 
 from dulwich.tests.utils import (
@@ -182,7 +183,10 @@ class DumbHandlersTestCase(WebTestCase):
 
     def test_get_loose_object_missing(self):
         mat = re.search('^(..)(.{38})$', '1' * 40)
-        list(get_loose_object(self._req, _test_backend([]), mat))
+        try:
+            list(get_loose_object(self._req, _test_backend([]), mat))
+        except NoSuchFileException, e:
+            self._req.not_found(e.message)
         self.assertEquals(HTTP_NOT_FOUND, self._status)
 
     def test_get_loose_object_error(self):

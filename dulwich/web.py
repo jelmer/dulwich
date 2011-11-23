@@ -120,17 +120,13 @@ def get_text_file(req, backend, mat):
     req.nocache()
     path = _url_to_path(mat.group())
     logger.info('Sending plain text file %s', path)
-    return send_file(req, get_repo(backend, mat).get_named_file(path),
-                     'text/plain')
+    f = get_repo(backend, mat).get_named_file(path)
+    if f is None:
+        raise NoSuchFileException('File not found')
+    return send_file(req, f, 'text/plain')
 
 
-def get_loose_object(req, backend, mat):
-    sha = mat.group(1) + mat.group(2)
-    logger.info('Sending loose object %s', sha)
-    object_store = get_repo(backend, mat).object_store
-    if not object_store.contains_loose(sha):
-        yield req.not_found('Object not found')
-        return
+def send_loose_object(req, object_store, sha):
     try:
         data = object_store[sha].as_legacy_object()
     except IOError:
@@ -141,20 +137,33 @@ def get_loose_object(req, backend, mat):
     yield data
 
 
+def get_loose_object(req, backend, mat):
+    sha = mat.group(1) + mat.group(2)
+    logger.info('Sending loose object %s', sha)
+    object_store = get_repo(backend, mat).object_store
+    if not object_store.contains_loose(sha):
+        raise NoSuchFileException('Object not found')
+    return send_loose_object(req, object_store, sha)
+
+
 def get_pack_file(req, backend, mat):
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info('Sending pack file %s', path)
-    return send_file(req, get_repo(backend, mat).get_named_file(path),
-                     'application/x-git-packed-objects')
+    f = get_repo(backend, mat).get_named_file(path)
+    if f is None:
+        raise NoSuchFileException('File not found')
+    return send_file(req, f, 'application/x-git-packed-objects')
 
 
 def get_idx_file(req, backend, mat):
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info('Sending pack file %s', path)
-    return send_file(req, get_repo(backend, mat).get_named_file(path),
-                     'application/x-git-packed-objects-toc')
+    f = get_repo(backend, mat).get_named_file(path)
+    if f is None:
+        raise NoSuchFileException('File not found')
+    return send_file(req, f, 'application/x-git-packed-objects-toc')
 
 
 def get_info_refs(req, backend, mat):
@@ -360,7 +369,33 @@ class HTTPGitApplication(object):
                 break
         if handler is None:
             return req.not_found('Sorry, that method is not supported')
-        return handler(req, self.backend, mat)
+
+        # When a dumb client asks for a file, and the server replies with 404,
+        # it will immediately disconnect. Unfortunately for us, wsgi doesn't
+        # know this, and treats everything as a normal message. Thus it still
+        # tries to send a message (e.g. "<html>oops something went horribly
+        # wrong</html>") which leads to - you guessed it - broken pipe errors.
+        # This nifty little trick instructs wsgi to treat this request as a
+        # file, meaning don't even bother to send a message. Just hangup.
+
+        try:
+            return handler(req, self.backend, mat)
+        except NoSuchFileException, e:
+            if self.dumb:
+                file_wrapper = environ.get('wsgi.file_wrapper', None)
+                set_sendfile = environ.get('wsgi.set_sendfile', None)
+                if file_wrapper and set_sendfile:
+                    req.not_found(None)
+                    set_sendfile(True)
+                    return file_wrapper(StringIO())
+            return (req.not_found(e.message),)
+
+class NoSuchFileException(Exception):
+    """A file doesn't exist."""
+
+    def __init__(self, message):
+        Exception.__init__(self)
+        self.message = message
 
 
 # The reference server implementation is based on wsgiref, which is not
@@ -369,8 +404,34 @@ class HTTPGitApplication(object):
 try:
     from wsgiref.simple_server import (
         WSGIRequestHandler,
+        ServerHandler,
         make_server,
         )
+
+    class HTTPGitServerHandler(ServerHandler):
+        """The default sendfile is hard-coded to return False. This class exists
+        solely to provide the ability to set this.
+        """
+
+        def __init__(self, stdin, stdout, stderr, environ):
+            ServerHandler.__init__(self, stdin, stdout, stderr, environ)
+            self._sendfile = False
+
+        def sendfile(self):
+            """ServerHandler.finish_response uses this (partially) to decide
+            whether or not to send an error message to a client.
+            """
+            return self._sendfile
+
+        def setup_environ(self):
+            ServerHandler.setup_environ(self)
+
+            # A little bit hackish, but this gives the HTTPGitApplication class
+            # the ability to easily tell WSGI that this request is supposed to
+            # be returning a file.
+            def set_sendfile(val):
+                self._sendfile = val
+            self.environ['wsgi.set_sendfile'] = set_sendfile
 
     class HTTPGitRequestHandler(WSGIRequestHandler):
         """Handler that uses dulwich's logger for logging exceptions."""
@@ -385,6 +446,19 @@ try:
         def log_error(self, *args):
             logger.error(*args)
 
+        # Copied verbatim from simple_server.py, changed ServerHandler to HTTPGitServerHandler
+        def handle(self):
+            """Handle a single HTTP request"""
+
+            self.raw_requestline = self.rfile.readline()
+            if not self.parse_request(): # An error code has been sent, just exit
+                return
+
+            handler = HTTPGitServerHandler(
+                self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            )
+            handler.request_handler = self      # backpointer for logging
+            handler.run(self.server.get_app())
 
     def main(argv=sys.argv):
         """Entry point for starting an HTTP git server."""

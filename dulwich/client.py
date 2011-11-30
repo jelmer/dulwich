@@ -524,6 +524,10 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def __init__(self, *args, **kwargs):
         self._connection = None
+        self._stderr = None
+        self._stderr = kwargs.get('stderr')
+        if 'stderr' in kwargs:
+            del kwargs['stderr']
         GitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
@@ -531,7 +535,8 @@ class SubprocessGitClient(TraditionalGitClient):
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE))
+                             stdout=subprocess.PIPE,
+                             stderr=self._stderr))
         return Protocol(p.read, p.write,
                         report_activity=self._report_activity), p.can_read
 

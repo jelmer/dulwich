@@ -123,7 +123,7 @@ class WalkerTest(TestCase):
         del self.store[cs[-1].id]
         for i in xrange(1, 11):
             self.assertWalkYields(cs[:i], [cs[0].id], max_entries=i)
-        self.assertRaises(MissingCommitError, Walker, self.store, cs[0].id)
+        self.assertRaises(MissingCommitError, Walker, self.store, [cs[-1].id])
 
     def test_branch(self):
         c1, x2, x3, y4 = self.make_commits([[1], [2, 1], [3, 2], [4, 1]])

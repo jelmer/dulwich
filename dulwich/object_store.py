@@ -610,9 +610,17 @@ class MemoryObjectStore(BaseObjectStore):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
 
+    def _to_hexsha(self, sha):
+        if len(sha) == 40:
+            return sha
+        elif len(sha) == 20:
+            return sha_to_hex(sha)
+        else:
+            raise ValueError("Invalid sha %r" % sha)
+
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""
-        return sha in self._data
+        return self._to_hexsha(sha) in self._data
 
     def contains_packed(self, sha):
         """Check if a particular object is present by SHA1 and is packed."""
@@ -633,15 +641,15 @@ class MemoryObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
-        obj = self[name]
+        obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
-        return self._data[name]
+        return self._data[self._to_hexsha(name)]
 
     def __delitem__(self, name):
         """Delete an object from this store, for testing only."""
-        del self._data[name]
+        del self._data[self._to_hexsha(name)]
 
     def add_object(self, obj):
         """Add a single object to this object store.

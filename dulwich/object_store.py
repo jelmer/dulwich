@@ -476,6 +476,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Complete the pack.
         for ext_sha in indexer.ext_refs():
+            assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
             crc32 = write_pack_object(f, type_num, data, sha=new_sha)

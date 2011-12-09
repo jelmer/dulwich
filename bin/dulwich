@@ -1,6 +1,8 @@
 #!/usr/bin/python -u
+#
 # dulwich - Simple command-line interface to Dulwich
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@samba.org>
+# vim: expandtab
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -33,6 +35,13 @@ from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.repo import Repo
+
+
+def cmd_archive(args):
+    opts, args = getopt(args, "", [])
+    client, path = get_transport_and_path(args.pop(0))
+    committish = args.pop(0)
+    client.archive(path, committish, sys.stdout.write, sys.stderr.write)
 
 
 def cmd_fetch_pack(args):
@@ -173,6 +182,7 @@ commands = {
     "init": cmd_init,
     "log": cmd_log,
     "clone": cmd_clone,
+    "archive": cmd_archive,
     }
 
 if len(sys.argv) < 2:

@@ -12,6 +12,9 @@
 
   * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
 
+  * Properly abort connections when the determine_wants function
+    raises an exception. (Jelmer Vernooij, #856769)
+
  FEATURES
 
   * Add support for retrieving tarballs from remote servers.

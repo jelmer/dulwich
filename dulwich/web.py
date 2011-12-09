@@ -29,6 +29,7 @@ try:
 except ImportError:
     from dulwich._compat import parse_qs
 from dulwich import log_utils
+from dulwich.gzip import GzipConsumer
 from dulwich.protocol import (
     ReceivableProtocol,
     )
@@ -38,6 +39,8 @@ from dulwich.repo import (
 from dulwich.server import (
     DictBackend,
     DEFAULT_HANDLERS,
+    generate_info_refs,
+    generate_objects_info_packs,
     )
 
 
@@ -180,28 +183,15 @@ def get_info_refs(req, backend, mat):
         req.respond(HTTP_OK, 'text/plain')
         logger.info('Emulating dumb info/refs')
         repo = get_repo(backend, mat)
-        refs = repo.get_refs()
-        for name in sorted(refs.iterkeys()):
-            # get_refs() includes HEAD as a special case, but we don't want to
-            # advertise it
-            if name == 'HEAD':
-                continue
-            sha = refs[name]
-            o = repo[sha]
-            if not o:
-                continue
-            yield '%s\t%s\n' % (sha, name)
-            peeled_sha = repo.get_peeled(name)
-            if peeled_sha != sha:
-                yield '%s\t%s^{}\n' % (peeled_sha, name)
+        for text in generate_info_refs(repo):
+            yield text
 
 
 def get_info_packs(req, backend, mat):
     req.nocache()
     req.respond(HTTP_OK, 'text/plain')
     logger.info('Emulating dumb info/packs')
-    for pack in get_repo(backend, mat).object_store.packs:
-        yield 'P pack-%s.pack\n' % pack.name()
+    return generate_objects_info_packs(get_repo(backend, mat))
 
 
 class _LengthLimitedFile(object):

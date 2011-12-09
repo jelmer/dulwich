@@ -19,6 +19,7 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
+from cStringIO import StringIO
 import BaseHTTPServer
 import SimpleHTTPServer
 import copy
@@ -27,6 +28,7 @@ import select
 import shutil
 import signal
 import subprocess
+import tarfile
 import tempfile
 import threading
 import urllib
@@ -164,6 +166,14 @@ class DulwichClientTestBase(object):
                               'refs/heads/master': 'non-fast-forward'},
                              e.ref_status)
 
+    def test_archive(self):
+        c = self._client()
+        f = StringIO()
+        c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
+        f.seek(0)
+        tf = tarfile.open(fileobj=f)
+        self.assertEquals(['baz', 'foo'], tf.getnames())
+
     def test_fetch_pack(self):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
@@ -211,7 +221,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             ['daemon', '--verbose', '--export-all',
              '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
              '--detach', '--reuseaddr', '--enable=receive-pack',
-             '--listen=localhost', self.gitroot], cwd=self.gitroot)
+             '--enable=upload-archive', '--listen=localhost', self.gitroot], cwd=self.gitroot)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
 
@@ -446,3 +456,6 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return path
+
+    def test_archive(self):
+        raise SkipTest("exporting archives not supported over http")

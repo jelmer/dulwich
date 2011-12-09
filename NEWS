@@ -12,6 +12,11 @@
 
   * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
 
+ FEATURES
+
+  * Add support for retrieving tarballs from remote servers.
+    (Jelmer Vernooij, #379087)
+
 0.8.1	2011-10-31
 
  FEATURES

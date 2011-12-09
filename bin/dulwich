@@ -35,6 +35,7 @@ from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.repo import Repo
+from dulwich.server import update_server_info
 
 
 def cmd_archive(args):
@@ -174,6 +175,11 @@ def cmd_commit(args):
     r.do_commit(committer=committer, author=author, message=opts["--message"])
 
 
+def cmd_update_server_info(args):
+    r = Repo(".")
+    update_server_info(r)
+
+
 commands = {
     "commit": cmd_commit,
     "fetch-pack": cmd_fetch_pack,
@@ -183,6 +189,7 @@ commands = {
     "log": cmd_log,
     "clone": cmd_clone,
     "archive": cmd_archive,
+    "update-server-info": cmd_update_server_info,
     }
 
 if len(sys.argv) < 2:

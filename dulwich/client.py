@@ -419,7 +419,11 @@ class TraditionalGitClient(GitClient):
         negotiated_capabilities = list(self._send_capabilities)
         if 'report-status' not in server_capabilities:
             negotiated_capabilities.remove('report-status')
-        new_refs = determine_wants(old_refs)
+        try:
+            new_refs = determine_wants(old_refs)
+        except:
+            proto.write_pkt_line(None)
+            raise
         if new_refs is None:
             proto.write_pkt_line(None)
             return old_refs
@@ -446,7 +450,11 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect('upload-pack', path)
         (refs, server_capabilities) = self._read_refs(proto)
         negotiated_capabilities = list(self._fetch_capabilities)
-        wants = determine_wants(refs)
+        try:
+            wants = determine_wants(refs)
+        except:
+            proto.write_pkt_line(None)
+            raise
         if not wants:
             proto.write_pkt_line(None)
             return refs

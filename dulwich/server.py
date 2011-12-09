@@ -27,6 +27,7 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 
 import collections
+import os
 import socket
 import SocketServer
 import sys
@@ -787,3 +788,40 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
     # FIXME: Catch exceptions and write a single-line summary to outf.
     handler.handle()
     return 0
+
+
+def generate_info_refs(repo):
+    """Generate an info refs file."""
+    refs = repo.get_refs()
+    for name in sorted(refs.iterkeys()):
+        # get_refs() includes HEAD as a special case, but we don't want to
+        # advertise it
+        if name == 'HEAD':
+            continue
+        sha = refs[name]
+        o = repo[sha]
+        if not o:
+            continue
+        yield '%s\t%s\n' % (sha, name)
+        peeled_sha = repo.get_peeled(name)
+        if peeled_sha != sha:
+            yield '%s\t%s^{}\n' % (peeled_sha, name)
+
+
+def generate_objects_info_packs(repo):
+    """Generate an index for for packs."""
+    for pack in repo.object_store.packs:
+        yield 'P pack-%s.pack\n' % pack.name()
+
+
+def update_server_info(repo):
+    """Generate server info for dumb file access.
+
+    This generates info/refs and objects/info/packs,
+    similar to "git update-server-info".
+    """
+    repo._put_named_file(os.path.join('info', 'refs'),
+        "".join(generate_info_refs(repo)))
+
+    repo._put_named_file(os.path.join('objects', 'info', 'packs'),
+        "".join(generate_objects_info_packs(repo)))

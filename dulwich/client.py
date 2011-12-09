@@ -456,6 +456,24 @@ class TraditionalGitClient(GitClient):
             graph_walker, pack_data, progress)
         return refs
 
+    def archive(self, path, committish, write_data, progress=None):
+        proto, can_read = self._connect('upload-archive', path)
+        proto.write_pkt_line("argument %s" % committish)
+        proto.write_pkt_line(None)
+        pkt = proto.read_pkt_line()
+        if pkt == "NACK\n":
+            return
+        elif pkt == "ACK\n":
+            pass
+        elif pkt.startswith("ERR "):
+            raise GitProtocolError(pkt[4:].rstrip("\n"))
+        else:
+            raise AssertionError("invalid response %r" % pkt)
+        ret = proto.read_pkt_line()
+        if ret is not None:
+            raise AssertionError("expected pkt tail")
+        self._read_side_band64k_data(proto, {1: write_data, 2: progress})
+
 
 class TCPGitClient(TraditionalGitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""

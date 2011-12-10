@@ -938,3 +938,10 @@ class InfoRefsContainerTests(TestCase):
         refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
         self.assertTrue('refs/heads/master' in refs)
         self.assertFalse('refs/heads/bar' in refs)
+
+    def test_get_peeled(self):
+        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        # refs/heads/loop does not show up even if it exists
+        self.assertEqual(
+            _TEST_REFS['refs/heads/master'],
+            refs.get_peeled('refs/heads/master'))

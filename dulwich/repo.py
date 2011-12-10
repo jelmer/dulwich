@@ -388,6 +388,37 @@ class DictRefsContainer(RefsContainer):
         self._peeled.update(peeled)
 
 
+class InfoRefsContainer(RefsContainer):
+    """Refs container that reads refs from a info/refs file."""
+
+    def __init__(self, f):
+        self._refs = {}
+        self._peeled = {}
+        for l in f.readlines():
+            sha, name = l.rstrip("\n").split("\t")
+            if name.endswith("^{}"):
+                name = name[:-3]
+                if not check_ref_format(name):
+                    raise ValueError("invalid ref name '%s'" % name)
+                self._peeled[name] = sha
+            else:
+                if not check_ref_format(name):
+                    raise ValueError("invalid ref name '%s'" % name)
+                self._refs[name] = sha
+
+    def allkeys(self):
+        return self._refs.keys()
+
+    def read_loose_ref(self, name):
+        return self._refs.get(name, None)
+
+    def get_packed_refs(self):
+        return {}
+
+    def get_peeled(self, name):
+        return self._peeled.get(name)
+
+
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 

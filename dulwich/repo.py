@@ -416,7 +416,10 @@ class InfoRefsContainer(RefsContainer):
         return {}
 
     def get_peeled(self, name):
-        return self._peeled.get(name)
+        try:
+            return self._peeled[name]
+        except KeyError:
+            return self._refs[name]
 
 
 class DiskRefsContainer(RefsContainer):

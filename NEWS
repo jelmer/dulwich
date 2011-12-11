@@ -10,6 +10,19 @@
 
   * Avoid calling free_objects() on NULL in error cases. (Chris Eberle)
 
+  * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
+
+  * Properly abort connections when the determine_wants function
+    raises an exception. (Jelmer Vernooij, #856769)
+
+ FEATURES
+
+  * Add support for retrieving tarballs from remote servers.
+    (Jelmer Vernooij, #379087)
+
+  * New method ``update_server_info`` which generates data
+    for dumb server access. (Jelmer Vernooij, #731235)
+
 0.8.1	2011-10-31
 
  FEATURES

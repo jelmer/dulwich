@@ -67,6 +67,14 @@ class GitClientTests(TestCase):
         self.assertEquals(set(['ofs-delta', 'report-status', 'side-band-64k']),
                           set(self.client._send_capabilities))
 
+    def test_archive_ack(self):
+        self.rin.write(
+            '0009NACK\n'
+            '0000')
+        self.rin.seek(0)
+        self.client.archive('bla', 'HEAD', None, None)
+        self.assertEquals(self.rout.getvalue(), '0011argument HEAD0000')
+
     def test_fetch_pack_none(self):
         self.rin.write(
             '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack '

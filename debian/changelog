@@ -1,4 +1,4 @@
-dulwich (0.8.1~bzr973-1) UNRELEASED; urgency=low
+dulwich (0.8.1~bzr983-1) UNRELEASED; urgency=low
 
   * Fix Vcs URL.
   * New upstream snapshot.

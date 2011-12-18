@@ -1,4 +1,4 @@
-0.8.2	UNRELEASED
+0.8.2	2011-12-18
 
  BUG FIXES
 
@@ -14,6 +14,9 @@
 
   * Properly abort connections when the determine_wants function
     raises an exception. (Jelmer Vernooij, #856769)
+
+  * Tweak xcodebuild hack to deal with more error output.
+    (Jelmer Vernooij, #903840)
 
  FEATURES
 

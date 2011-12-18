@@ -799,7 +799,7 @@ def generate_info_refs(repo):
         if name == 'HEAD':
             continue
         sha = refs[name]
-        o = repo[sha]
+        o = repo.object_store[sha]
         if not o:
             continue
         yield '%s\t%s\n' % (sha, name)

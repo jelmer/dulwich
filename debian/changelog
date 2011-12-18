@@ -1,4 +1,4 @@
-dulwich (0.8.2-1) UNRELEASED; urgency=low
+dulwich (0.8.2-1) unstable; urgency=low
 
   * Fix Vcs URL.
   * New upstream release.

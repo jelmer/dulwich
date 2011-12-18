@@ -275,19 +275,13 @@ class Index(object):
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
-        mine = set(self._byname.keys())
-        for (name, mode, sha) in object_store.iter_tree_contents(tree):
-            if name in mine:
-                if (want_unchanged or self.get_sha1(name) != sha or 
-                    self.get_mode(name) != mode):
-                    yield ((name, name), (mode, self.get_mode(name)), (sha, self.get_sha1(name)))
-                mine.remove(name)
-            else:
-                # Was removed
-                yield ((name, None), (mode, None), (sha, None))
-        # Mention added files
-        for name in mine:
-            yield ((None, name), (None, self.get_mode(name)), (None, self.get_sha1(name)))
+        def lookup_entry(path):
+            entry = self[path]
+            return entry[-2], entry[-6]
+        for (name, mode, sha) in changes_from_tree(self._byname.keys(),
+                lookup_entry, object_store, tree,
+                want_unchanged=want_unchanged):
+            yield (name, mode, sha)
 
     def commit(self, object_store):
         """Create a new tree from an index.
@@ -345,3 +339,49 @@ def commit_index(object_store, index):
     :return: Root tree sha.
     """
     return commit_tree(object_store, index.iterblobs())
+
+
+def changes_from_tree(names, lookup_entry, object_store, tree,
+        want_unchanged=False):
+    """Find the differences between the contents of a tree and
+    a working copy.
+
+    :param names: Iterable of names in the working copy
+    :param lookup_entry: Function to lookup an entry in the working copy
+    :param object_store: Object store to use for retrieving tree contents
+    :param tree: SHA1 of the root tree
+    :param want_unchanged: Whether unchanged files should be reported
+    :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
+        (oldsha, newsha)
+    """
+    other_names = set(names)
+    for (name, mode, sha) in object_store.iter_tree_contents(tree):
+        try:
+            (other_sha, other_mode) = lookup_entry(name)
+        except KeyError:
+            # Was removed
+            yield ((name, None), (mode, None), (sha, None))
+        else:
+            other_names.remove(name)
+            if (want_unchanged or other_sha != sha or other_mode != mode):
+                yield (
+                    (name, name),
+                    (mode, other_mode),
+                    (sha, other_sha))
+
+        # Mention added files
+        for name in other_names:
+            (other_sha, other_mode) = lookup_entry(name)
+            yield ((None, name), (None, other_mode), (None, other_sha))
+
+
+def index_entry_from_stat(stat_val, hex_sha, flags):
+    """Create a new index entry from a stat value.
+
+    :param stat_val: POSIX stat_result instance
+    :param hex_sha: Hex sha of the object
+    :param flags: Index flags
+    """
+    return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
+            stat_val.st_ino, stat_val.st_mode, stat_val.st_uid,
+            stat_val.st_gid, stat_val.st_size, hex_sha, flags)

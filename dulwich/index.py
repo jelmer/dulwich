@@ -364,15 +364,12 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
         else:
             other_names.remove(name)
             if (want_unchanged or other_sha != sha or other_mode != mode):
-                yield (
-                    (name, name),
-                    (mode, other_mode),
-                    (sha, other_sha))
+                yield ((name, name), (mode, other_mode), (sha, other_sha))
 
-        # Mention added files
-        for name in other_names:
-            (other_sha, other_mode) = lookup_entry(name)
-            yield ((None, name), (None, other_mode), (None, other_sha))
+    # Mention added files
+    for name in other_names:
+        (other_sha, other_mode) = lookup_entry(name)
+        yield ((None, name), (None, other_mode), (None, other_sha))
 
 
 def index_entry_from_stat(stat_val, hex_sha, flags):

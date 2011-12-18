@@ -15,6 +15,9 @@
   * Properly abort connections when the determine_wants function
     raises an exception. (Jelmer Vernooij, #856769)
 
+  * Tweak xcodebuild hack to deal with more error output.
+    (Jelmer Vernooij, #903840)
+
  FEATURES
 
   * Add support for retrieving tarballs from remote servers.

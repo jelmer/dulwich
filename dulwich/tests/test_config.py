@@ -44,6 +44,30 @@ class ConfigFileTests(TestCase):
         cf = self.from_file("")
         self.assertEquals(ConfigFile(), cf)
 
+    def test_from_file_section(self):
+        cf = self.from_file("[core]\nfoo = bar\n")
+        self.assertEquals("bar", cf.get("core.foo"))
+
+    def test_write_to_file_empty(self):
+        c = ConfigFile()
+        f = StringIO()
+        c.write_to_file(f)
+        self.assertEquals("", f.getvalue())
+
+    def test_write_to_file_section(self):
+        c = ConfigFile()
+        c.set("core.foo", "bar")
+        f = StringIO()
+        c.write_to_file(f)
+        self.assertEquals("[core]\nfoo = bar\n", f.getvalue())
+
+    def test_write_to_file_subsection(self):
+        c = ConfigFile()
+        c.set("branch.blie.foo", "bar")
+        f = StringIO()
+        c.write_to_file(f)
+        self.assertEquals("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
+
 
 class ConfigDictTests(TestCase):
 

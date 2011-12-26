@@ -372,13 +372,15 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
         yield ((None, name), (None, other_mode), (None, other_sha))
 
 
-def index_entry_from_stat(stat_val, hex_sha, flags):
+def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     """Create a new index entry from a stat value.
 
     :param stat_val: POSIX stat_result instance
     :param hex_sha: Hex sha of the object
     :param flags: Index flags
     """
+    if mode is None:
+        mode = stat_val.st_mode
     return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
-            stat_val.st_ino, stat_val.st_mode, stat_val.st_uid,
+            stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)

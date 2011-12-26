@@ -23,6 +23,7 @@ from dulwich.client import (
     TCPGitClient,
     SubprocessGitClient,
     SSHGitClient,
+    HttpGitClient,
     ReportStatusParser,
     SendPackError,
     UpdateRefsError,
@@ -65,6 +66,14 @@ class GitClientTests(TestCase):
                           set(self.client._fetch_capabilities))
         self.assertEquals(set(['ofs-delta', 'report-status', 'side-band-64k']),
                           set(self.client._send_capabilities))
+
+    def test_archive_ack(self):
+        self.rin.write(
+            '0009NACK\n'
+            '0000')
+        self.rin.seek(0)
+        self.client.archive('bla', 'HEAD', None, None)
+        self.assertEquals(self.rout.getvalue(), '0011argument HEAD0000')
 
     def test_fetch_pack_none(self):
         self.rin.write(
@@ -136,6 +145,12 @@ class GitClientTests(TestCase):
         # expected parsing of the URL on Python versions less than 2.6.5
         self.assertRaises(ValueError, get_transport_and_path,
         'prospero://bar/baz')
+
+    def test_get_transport_and_path_http(self):
+        url = 'https://github.com/jelmer/dulwich'
+        client, path = get_transport_and_path(url)
+        self.assertTrue(isinstance(client, HttpGitClient))
+        self.assertEquals('/jelmer/dulwich', path)
 
 
 class SSHGitClientTests(TestCase):

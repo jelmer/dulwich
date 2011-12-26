@@ -1,4 +1,32 @@
-0.8.1	UNRELEASED
+0.8.2	UNRELEASED
+
+ BUG FIXES
+
+  * Cope with different zlib buffer sizes in sha1 file parser.
+    (Jelmer Vernooij)
+
+  * Fix get_transport_and_path for HTTP/HTTPS URLs.
+    (Bruno Renié)
+
+  * Avoid calling free_objects() on NULL in error cases. (Chris Eberle)
+
+  * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
+
+  * Properly abort connections when the determine_wants function
+    raises an exception. (Jelmer Vernooij, #856769)
+
+  * Tweak xcodebuild hack to deal with more error output.
+    (Jelmer Vernooij, #903840)
+
+ FEATURES
+
+  * Add support for retrieving tarballs from remote servers.
+    (Jelmer Vernooij, #379087)
+
+  * New method ``update_server_info`` which generates data
+    for dumb server access. (Jelmer Vernooij, #731235)
+
+0.8.1	2011-10-31
 
  FEATURES
 
@@ -34,6 +62,9 @@
 
  * Don't compile C extensions when running in pypy.
    (Ronny Pfannschmidt, #881546)
+
+ * Use different name for strnlen replacement function to avoid clashing
+   with system strnlen. (Jelmer Vernooij, #880362)
 
  API CHANGES
 

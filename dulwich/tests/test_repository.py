@@ -318,8 +318,34 @@ class RepositoryTests(TestCase):
         self.assertEqual({}, r.refs.as_dict('refs/tags'))
 
     def test_get_config(self):
-        r = self._repo = open_repo('ooo_merge.git')
+        default_config="""
+[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = true
+"""
+        temp_repo_dir = tempfile.mkdtemp(suffix='.git')
+        os.mkdir(os.path.join(temp_repo_dir, 'objects'))
+        os.mkdir(os.path.join(temp_repo_dir, 'refs'))
+        config = open(os.path.join(temp_repo_dir, 'config'), 'w+')
+        config.write(default_config)
+        config.close()
+
+        r = Repo(temp_repo_dir)
+        self.assertEquals({
+            'core.repositoryformatversion': '0',
+            'core.filemode': 'true',
+            'core.bare': 'true',
+            }, r.get_config())
+
+        config = open(os.path.join(temp_repo_dir,'config'), 'w+')
+        config.write('')
+        config.close()
+
+        r = Repo(temp_repo_dir)
         self.assertEquals({}, r.get_config())
+
+        shutil.rmtree(temp_repo_dir)
 
     def test_common_revisions(self):
         """

@@ -44,5 +44,5 @@ class ConfigFileTests(TestCase):
 
 class StackedConfigTests(TestCase):
 
-    def test_default(self):
-        StackedConfig.default()
+    def test_default_backends(self):
+        StackedConfig.default_backends()

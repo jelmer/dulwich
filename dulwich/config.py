@@ -29,22 +29,90 @@ from dulwich.file import GitFile
 class Config(object):
     """A Git configuration."""
 
+    def get(self, name):
+        """Retrieve the contents of a configuration setting.
+        
+        :param name: Name of the setting, including section and 
+            possible subsection.
+        :return: Contents of the setting
+        :raise KeyError: if the value is not set
+        """
+        raise NotImplementedError(self.get)
+
+    def set(self, name, value):
+        """Set a configuration value.
+        
+        :param name: Name of the configuration value, including section
+            and optional subsection
+        :param: Value of the setting
+        """
+        raise NotImplementedError(self.set)
 
 
-class ConfigFile(Config):
-    """A Git configuration file, like .git/config or ~/.gitconfig."""
+class ConfigDict(Config):
+    """Git configuration stored in a dictionary."""
 
     def __init__(self):
-        """Create a new ConfigFile."""
+        """Create a new ConfigDict."""
+        self._values = {}
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__)
+        return (
+            isinstance(other, self.__class__) and
+            other._values == self._values)
+
+    @classmethod
+    def _parse_setting(cls, name):
+        parts = name.split(".")
+        if len(parts) == 3:
+            return (parts[0], parts[1], parts[2])
+        else:
+            return (parts[0], None, parts[1])
+
+    def get(self, name):
+        (section, subsection, variable) = self._parse_setting(name)
+        if subsection is not None:
+            try:
+                return self._values[section][subsection][variable]
+            except KeyError:
+                pass
+        return self._values[section][None][variable]
+
+    def set(self, name, value):
+        (section, subsection, variable) = self._parse_setting(name)
+        self._values.setdefault(section, {}).setdefault(subsection, {})[variable] = value
+
+
+class ConfigFile(ConfigDict):
+    """A Git configuration file, like .git/config or ~/.gitconfig.
+    """
 
     @classmethod
     def from_file(cls, f):
         """Read configuration from a file-like object."""
         ret = cls()
-        # FIXME
+        section = None
+        setting = None
+        for lineno, line in enumerate(f.readlines()):
+            line = line.lstrip()
+            if setting is None:
+                if line[0] == "[" and line.rstrip()[-1] == "]":
+                    section = (line.strip()[1:-1], None)
+                    ret._values[section[0]] = {section[1]: {}}
+                    # FIXME: Parse section
+                elif "=" in line:
+                    setting, value = line.split("=", 1)
+                    if section is None:
+                        raise ValueError("setting %r without section" % line)
+                    setting = setting.strip()
+                    ret._values[section[0]][section[1]][setting] = ""
+                else:
+                    setting = line.strip()
+                    value = True
+            if setting is not None:
+                if section is None:
+                    raise ValueError("setting %r without section" % line)
+                ret._values[section[0]][section[1]][setting] += line
         return ret
 
     @classmethod
@@ -70,7 +138,14 @@ class ConfigFile(Config):
 
     def write_to_file(self, f):
         """Write configuration to a file-like object."""
-        # FIXME
+        for section_name, section in self._values.iteritems():
+            for subsection_name, subsection in section.iteritems():
+                if subsection_name is None:
+                    f.write("[%s]\n" % section_name)
+                else:
+                    f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
+                for key, value in subsection.iteritems():
+                    f.write("%s = %s\n" % (key, value))
 
 
 class StackedConfig(Config):
@@ -106,3 +181,14 @@ class StackedConfig(Config):
                     continue
             backends.append(cf)
         return cls(backends)
+
+    def get(self, name):
+        for backend in self._backends:
+            try:
+                return backend.get(name)
+            except KeyError:
+                pass
+        raise KeyError(name)
+
+    def set(self, name, value):
+        raise NotImplementedError(self.set)

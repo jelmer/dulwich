@@ -800,12 +800,16 @@ class BaseRepo(object):
 
     def _init_files(self, bare):
         """Initialize a default set of named files."""
+        from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        self._put_named_file('config', ('[core]\n'
-                                        'repositoryformatversion = 0\n'
-                                        'filemode = true\n'
-                                        'bare = ' + str(bare).lower() + '\n'
-                                        'logallrefupdates = true\n'))
+        f = StringIO()
+        cf = ConfigFile()
+        cf.set("core.repositoryformatversion", "0")
+        cf.set("core.filemode", "true")
+        cf.set("core.bare", str(bare).lower())
+        cf.set("core.logallrefupdates", "true")
+        cf.write_to_file(f)
+        self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), '')
 
     def get_named_file(self, path):
@@ -919,7 +923,7 @@ class BaseRepo(object):
     def get_config(self):
         from dulwich.config import ConfigFile
         try:
-            p = ConfigFile.from_file(os.path.join(self._controldir, 'config'))
+            p = ConfigFile.from_path(os.path.join(self._controldir, 'config'))
         except (IOError, OSError), e:
             if e.errno == errno.ENOENT:
                 return ConfigFile()

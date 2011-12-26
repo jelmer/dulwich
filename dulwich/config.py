@@ -110,7 +110,7 @@ def _unescape_value(value):
 
 def _escape_value(value):
     """Escape a value."""
-    return value.replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"").replace("\\", "\\\\")
+    return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"")
 
 
 class ConfigFile(ConfigDict):

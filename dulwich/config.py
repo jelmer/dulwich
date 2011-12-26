@@ -108,6 +108,11 @@ def _unescape_value(value):
     return re.sub(r"(\\.)", unescape, value)
 
 
+def _escape_value(value):
+    """Escape a value."""
+    return value.replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"").replace("\\", "\\\\")
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig.
     """

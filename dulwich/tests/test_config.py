@@ -23,6 +23,7 @@ from dulwich.config import (
     ConfigDict,
     ConfigFile,
     StackedConfig,
+    _escape_value,
     _unescape_value,
     )
 from dulwich.tests import TestCase
@@ -75,3 +76,11 @@ class UnescapeTests(TestCase):
     def test_quote(self):
         self.assertEquals("\"foo\"", _unescape_value("\\\"foo\\\""))
 
+
+class EscapeTests(TestCase):
+
+    def test_nothing(self):
+        self.assertEquals("foo", _escape_value("foo"))
+
+    def test_backslash(self):
+        self.assertEquals("foo\\\\", _escape_value("foo\\"))

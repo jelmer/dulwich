@@ -11,3 +11,11 @@ maintained by Jelmer Vernooij et al.
 Please file bugs in the Dulwich project on Launchpad: 
 
 https://bugs.launchpad.net/dulwich/+filebug
+
+The dulwich documentation can be found in doc/ and on the web:
+
+http://www.samba.org/~jelmer/dulwich/docs/
+
+The API reference can be generated using pydoctor, by running "make pydoctor", or on the web:
+
+http://www.samba.org/~jelmer/dulwich/apidocs

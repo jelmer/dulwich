@@ -38,6 +38,7 @@ from dulwich.objects import (
     Blob,
     Tree,
     Commit,
+    ShaFile,
     Tag,
     format_timezone,
     hex_to_sha,
@@ -227,6 +228,31 @@ class ShaFileCheckTests(TestCase):
         obj = cls()
         obj.set_raw_string(data)
         self.assertEqual(None, obj.check())
+
+
+small_buffer_zlib_object = (
+ "\x48\x89\x15\xcc\x31\x0e\xc2\x30\x0c\x40\x51\xe6"
+ "\x9c\xc2\x3b\xaa\x64\x37\xc4\xc1\x12\x42\x5c\xc5"
+ "\x49\xac\x52\xd4\x92\xaa\x78\xe1\xf6\x94\xed\xeb"
+ "\x0d\xdf\x75\x02\xa2\x7c\xea\xe5\x65\xd5\x81\x8b"
+ "\x9a\x61\xba\xa0\xa9\x08\x36\xc9\x4c\x1a\xad\x88"
+ "\x16\xba\x46\xc4\xa8\x99\x6a\x64\xe1\xe0\xdf\xcd"
+ "\xa0\xf6\x75\x9d\x3d\xf8\xf1\xd0\x77\xdb\xfb\xdc"
+ "\x86\xa3\x87\xf1\x2f\x93\xed\x00\xb7\xc7\xd2\xab"
+ "\x2e\xcf\xfe\xf1\x3b\x50\xa4\x91\x53\x12\x24\x38"
+ "\x23\x21\x86\xf0\x03\x2f\x91\x24\x52"
+ )
+
+
+class ShaFileTests(TestCase):
+
+    def test_deflated_smaller_window_buffer(self):
+        # zlib on some systems uses smaller buffers,
+        # resulting in a different header.
+        # See https://github.com/libgit2/libgit2/pull/464
+        sf = ShaFile.from_file(StringIO(small_buffer_zlib_object))
+        self.assertEquals(sf.type_name, "tag")
+        self.assertEquals(sf.tagger, " <@localhost>")
 
 
 class CommitSerializationTests(TestCase):
@@ -582,6 +608,7 @@ OK2XeQOiEeXtT76rV4t2WR4=
 
 
 class TagParseTests(ShaFileCheckTests):
+
     def make_tag_lines(self,
                        object_sha="a38d6181ff27824c79fc7df825164a212eff6a3f",
                        object_type_name="commit",

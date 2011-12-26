@@ -35,6 +35,7 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.protocol import (
+    _RBUFSIZE,
     PktLineParser,
     Protocol,
     TCP_GIT_PORT,
@@ -350,7 +351,7 @@ class GitClient(object):
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
-                                 pack_data, progress):
+                                 pack_data, progress, rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
         :param proto: Protocol object to read from
@@ -358,6 +359,7 @@ class GitClient(object):
         :param graph_walker: GraphWalker instance to call .ack() on
         :param pack_data: Function to call with pack data
         :param progress: Optional progress reporting function
+        :param rbufsize: Read buffer size
         """
         pkt = proto.read_pkt_line()
         while pkt:
@@ -375,9 +377,11 @@ class GitClient(object):
             if data:
                 raise Exception('Unexpected response %r' % data)
         else:
-            # FIXME: Buffering?
-            pack_data(self.read())
-
+            while True:
+                data = self.read(rbufsize)
+                if data == "":
+                    break
+                pack_data(data)
 
 
 class TraditionalGitClient(GitClient):
@@ -415,7 +419,11 @@ class TraditionalGitClient(GitClient):
         negotiated_capabilities = list(self._send_capabilities)
         if 'report-status' not in server_capabilities:
             negotiated_capabilities.remove('report-status')
-        new_refs = determine_wants(old_refs)
+        try:
+            new_refs = determine_wants(old_refs)
+        except:
+            proto.write_pkt_line(None)
+            raise
         if new_refs is None:
             proto.write_pkt_line(None)
             return old_refs
@@ -442,7 +450,11 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect('upload-pack', path)
         (refs, server_capabilities) = self._read_refs(proto)
         negotiated_capabilities = list(self._fetch_capabilities)
-        wants = determine_wants(refs)
+        try:
+            wants = determine_wants(refs)
+        except:
+            proto.write_pkt_line(None)
+            raise
         if not wants:
             proto.write_pkt_line(None)
             return refs
@@ -451,6 +463,24 @@ class TraditionalGitClient(GitClient):
         self._handle_upload_pack_tail(proto, negotiated_capabilities,
             graph_walker, pack_data, progress)
         return refs
+
+    def archive(self, path, committish, write_data, progress=None):
+        proto, can_read = self._connect('upload-archive', path)
+        proto.write_pkt_line("argument %s" % committish)
+        proto.write_pkt_line(None)
+        pkt = proto.read_pkt_line()
+        if pkt == "NACK\n":
+            return
+        elif pkt == "ACK\n":
+            pass
+        elif pkt.startswith("ERR "):
+            raise GitProtocolError(pkt[4:].rstrip("\n"))
+        else:
+            raise AssertionError("invalid response %r" % pkt)
+        ret = proto.read_pkt_line()
+        if ret is not None:
+            raise AssertionError("expected pkt tail")
+        self._read_side_band64k_data(proto, {1: write_data, 2: progress})
 
 
 class TCPGitClient(TraditionalGitClient):
@@ -520,6 +550,10 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def __init__(self, *args, **kwargs):
         self._connection = None
+        self._stderr = None
+        self._stderr = kwargs.get('stderr')
+        if 'stderr' in kwargs:
+            del kwargs['stderr']
         GitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
@@ -527,7 +561,8 @@ class SubprocessGitClient(TraditionalGitClient):
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE))
+                             stdout=subprocess.PIPE,
+                             stderr=self._stderr))
         return Protocol(p.read, p.write,
                         report_activity=self._report_activity), p.can_read
 
@@ -715,8 +750,7 @@ def get_transport_and_path(uri):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username), parsed.path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(
-            parsed.scheme, parsed.netloc, path='/'))
+        return HttpGitClient(urlparse.urlunparse(parsed)), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.

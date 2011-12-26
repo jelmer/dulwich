@@ -158,7 +158,7 @@ class StackedConfig(Config):
         return "<%s for %r>" % (self.__class__.__name__, self._backends)
 
     @classmethod
-    def default(cls, for_path=None):
+    def default_backends(cls):
         """Retrieve the default configuration.
 
         This will look in the repository configuration (if for_path is
@@ -166,21 +166,19 @@ class StackedConfig(Config):
         configuration.
         """
         paths = []
-        if for_path is not None:
-            paths.append(for_path)
         paths.append(os.path.expanduser("~/.gitconfig"))
         paths.append("/etc/gitconfig")
         backends = []
         for path in paths:
             try:
                 cf = ConfigFile.from_path(path)
-            except IOError, e:
+            except (IOError, OSError), e:
                 if e.errno != errno.ENOENT:
                     raise
                 else:
                     continue
             backends.append(cf)
-        return cls(backends)
+        return backends
 
     def get(self, name):
         for backend in self._backends:

@@ -135,14 +135,15 @@ class ConfigFile(ConfigDict):
                     if section is None:
                         raise ValueError("setting %r without section" % line)
                     setting = setting.strip()
+                    value = value.strip()
                     ret._values[section[0]][section[1]][setting] = ""
                 else:
                     setting = line.strip()
-                    value = True
+                    value = ""
             if setting is not None:
                 if section is None:
                     raise ValueError("setting %r without section" % line)
-                ret._values[section[0]][section[1]][setting] += line
+                ret._values[section[0]][section[1]][setting] += value
         return ret
 
     @classmethod
@@ -175,7 +176,7 @@ class ConfigFile(ConfigDict):
                 else:
                     f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
                 for key, value in subsection.iteritems():
-                    f.write("%s = %s\n" % (key, value))
+                    f.write("%s = %s\n" % (key, _escape_value(value)))
 
 
 class StackedConfig(Config):

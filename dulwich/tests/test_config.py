@@ -20,8 +20,10 @@
 
 from cStringIO import StringIO
 from dulwich.config import (
+    ConfigDict,
     ConfigFile,
     StackedConfig,
+    _unescape_value,
     )
 from dulwich.tests import TestCase
 
@@ -42,7 +44,34 @@ class ConfigFileTests(TestCase):
         self.assertEquals(ConfigFile(), cf)
 
 
+class ConfigDictTests(TestCase):
+
+    def test_get_set(self):
+        cd = ConfigDict()
+        self.assertRaises(KeyError, cd.get, "core.foo")
+        cd.set("core.foo", "bla")
+        self.assertEquals("bla", cd.get("core.foo"))
+        cd.set("core.foo", "bloe")
+        self.assertEquals("bloe", cd.get("core.foo"))
+
+
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
         StackedConfig.default_backends()
+
+
+class UnescapeTests(TestCase):
+
+    def test_nothing(self):
+        self.assertEquals("", _unescape_value(""))
+
+    def test_tab(self):
+        self.assertEquals("\tbar\t", _unescape_value("\\tbar\\t"))
+
+    def test_newline(self):
+        self.assertEquals("\nbar\t", _unescape_value("\\nbar\\t"))
+
+    def test_quote(self):
+        self.assertEquals("\"foo\"", _unescape_value("\\\"foo\\\""))
+

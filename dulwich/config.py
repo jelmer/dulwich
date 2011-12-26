@@ -22,6 +22,7 @@
 
 import errno
 import os
+import re
 
 from dulwich.file import GitFile
 
@@ -38,6 +39,16 @@ class Config(object):
         :raise KeyError: if the value is not set
         """
         raise NotImplementedError(self.get)
+
+    def get_boolean(self, name):
+        """Retrieve a configuration setting as boolean.
+
+        :parma name: Name of the setting, including section and possible
+            subsection.
+        :return: Contents of the setting
+        :raise KeyError: if the value is not set
+        """
+        return bool(self.get(name))
 
     def set(self, name, value):
         """Set a configuration value.
@@ -79,8 +90,22 @@ class ConfigDict(Config):
         return self._values[section][None][variable]
 
     def set(self, name, value):
-        (section, subsection, variable) = self._parse_setting(name)
-        self._values.setdefault(section, {}).setdefault(subsection, {})[variable] = value
+        (section_name, subsection_name, variable) = self._parse_setting(name)
+        section = self._values.setdefault(section_name, {})
+        section.setdefault(subsection_name, {})[variable] = value
+
+
+def _unescape_value(value):
+    """Unescape a value."""
+    def unescape(c):
+        return {
+            "\\\\": "\\",
+            "\\\"": "\"",
+            "\\n": "\n",
+            "\\t": "\t",
+            "\\b": "\b",
+            }[c.group(0)]
+    return re.sub(r"(\\.)", unescape, value)
 
 
 class ConfigFile(ConfigDict):

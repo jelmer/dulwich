@@ -84,3 +84,6 @@ class EscapeTests(TestCase):
 
     def test_backslash(self):
         self.assertEquals("foo\\\\", _escape_value("foo\\"))
+
+    def test_newline(self):
+        self.assertEquals("foo\\n", _escape_value("foo\n"))

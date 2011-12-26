@@ -19,7 +19,10 @@
 """Tests for reading and writing configuraiton files."""
 
 from cStringIO import StringIO
-from dulwich.config import ConfigFile
+from dulwich.config import (
+    ConfigFile,
+    StackedConfig,
+    )
 from dulwich.tests import TestCase
 
 
@@ -37,3 +40,9 @@ class ConfigFileTests(TestCase):
     def test_from_file_empty(self):
         cf = self.from_file("")
         self.assertEquals(ConfigFile(), cf)
+
+
+class StackedConfigTests(TestCase):
+
+    def test_default(self):
+        StackedConfig.default()

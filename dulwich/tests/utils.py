@@ -230,6 +230,7 @@ def build_pack(f, objects_spec, store=None):
     expected = []
     for i in xrange(num_objects):
         type_num, data, sha = full_objects[i]
+        assert len(sha) == 20
         expected.append((offsets[i], type_num, data, sha, crc32s[i]))
 
     sf.write_sha()

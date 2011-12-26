@@ -29,7 +29,6 @@ try:
 except ImportError:
     from dulwich._compat import parse_qs
 from dulwich import log_utils
-from dulwich.gzip import GzipConsumer
 from dulwich.protocol import (
     ReceivableProtocol,
     )

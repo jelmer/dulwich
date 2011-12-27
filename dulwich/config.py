@@ -127,9 +127,15 @@ class ConfigFile(ConfigDict):
             line = line.lstrip()
             if setting is None:
                 if line[0] == "[" and line.rstrip()[-1] == "]":
-                    section = (line.strip()[1:-1], None)
+                    key = line.strip()
+                    pts = key[1:-1].split(" ", 1)
+                    if len(pts) == 2:
+                        if pts[1][0] != "\"" or pts[1][-1] != "\"":
+                            raise ValueError(pts[1])
+                        section = (pts[0], pts[1][1:-1])
+                    else:
+                        section = (pts[0], None)
                     ret._values[section[0]] = {section[1]: {}}
-                    # FIXME: Parse section
                 elif "=" in line:
                     setting, value = line.split("=", 1)
                     if section is None:

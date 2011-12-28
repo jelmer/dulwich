@@ -23,6 +23,7 @@ from dulwich.config import (
     ConfigDict,
     ConfigFile,
     StackedConfig,
+    _check_section_name,
     _check_variable_name,
     _format_string,
     _escape_value,
@@ -187,3 +188,16 @@ class CheckVariableNameTests(TestCase):
         self.assertTrue(_check_variable_name("FOO"))
         self.assertTrue(_check_variable_name("foo"))
         self.assertTrue(_check_variable_name("foo-bar"))
+
+
+class CheckSectionNameTests(TestCase):
+
+    def test_invalid(self):
+        self.assertFalse(_check_section_name("foo "))
+        self.assertFalse(_check_section_name("bar,bar"))
+
+    def test_valid(self):
+        self.assertTrue(_check_section_name("FOO"))
+        self.assertTrue(_check_section_name("foo"))
+        self.assertTrue(_check_section_name("foo-bar"))
+        self.assertTrue(_check_section_name("bar.bar"))

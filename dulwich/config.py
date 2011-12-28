@@ -95,6 +95,24 @@ class ConfigDict(Config):
         section.setdefault(subsection_name, {})[variable] = value
 
 
+def _format_string(value):
+    if (value.startswith(" ") or
+        value.startswith("\t") or
+        value.endswith(" ") or
+        value.endswith("\t")):
+        return '"%s"' % _escape_value(value)
+    return _escape_value(value)
+
+
+def _parse_string(value):
+    value = value.strip()
+    if value.startswith("\""):
+        if not value.endswith("\""):
+            raise ValueError("value starts with quote but lacks end quote")
+        return _unescape_value(value[1:-1])
+    return _unescape_value(value)
+
+
 def _unescape_value(value):
     """Unescape a value."""
     def unescape(c):
@@ -141,15 +159,31 @@ class ConfigFile(ConfigDict):
                     if section is None:
                         raise ValueError("setting %r without section" % line)
                     setting = setting.strip()
-                    value = value.strip()
-                    ret._values[section[0]][section[1]][setting] = ""
+                    if value.endswith("\\\n"):
+                        value = value[:-2]
+                        continuation = True
+                    else:
+                        continuation = True
+                    value = _parse_string(value)
+                    ret._values[section[0]][section[1]][setting] = value
+                    if not continuation:
+                        setting = None
                 else:
                     setting = line.strip()
-                    value = ""
-            if setting is not None:
-                if section is None:
-                    raise ValueError("setting %r without section" % line)
+                    if section is None:
+                        raise ValueError("setting %r without section" % line)
+                    ret._values[section[0]][section[1]][setting] = ""
+                    setting = None
+            else:
+                if line.endswith("\\\n"):
+                    line = line[:-2]
+                    continuation = True
+                else:
+                    continuation = True
+                value = _parse_string(line)
                 ret._values[section[0]][section[1]][setting] += value
+                if not continuation:
+                    setting = None
         return ret
 
     @classmethod

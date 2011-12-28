@@ -23,7 +23,9 @@ from dulwich.config import (
     ConfigDict,
     ConfigFile,
     StackedConfig,
+    _format_string,
     _escape_value,
+    _parse_string,
     _unescape_value,
     )
 from dulwich.tests import TestCase
@@ -48,6 +50,19 @@ class ConfigFileTests(TestCase):
         cf = self.from_file("[core]\nfoo = bar\n")
         self.assertEquals("bar", cf.get("core.foo"))
         self.assertEquals("bar", cf.get("core.foo.foo"))
+
+    def test_from_file_with_quotes(self):
+        cf = self.from_file(
+            "[core]\n"
+            'foo = " bar"\n')
+        self.assertEquals(" bar", cf.get("core.foo"))
+
+    def test_from_file_with_interrupted_line(self):
+        cf = self.from_file(
+            "[core]\n"
+            'foo = bar\\\n'
+            ' la\n')
+        self.assertEquals("barla", cf.get("core.foo"))
 
     def test_from_file_subsection(self):
         cf = self.from_file("[branch \"foo\"]\nfoo = bar\n")
@@ -106,7 +121,7 @@ class UnescapeTests(TestCase):
         self.assertEquals("\"foo\"", _unescape_value("\\\"foo\\\""))
 
 
-class EscapeTests(TestCase):
+class EscapeValueTests(TestCase):
 
     def test_nothing(self):
         self.assertEquals("foo", _escape_value("foo"))
@@ -116,3 +131,25 @@ class EscapeTests(TestCase):
 
     def test_newline(self):
         self.assertEquals("foo\\n", _escape_value("foo\n"))
+
+
+class FormatStringTests(TestCase):
+
+    def test_quoted(self):
+        self.assertEquals('" foo"', _format_string(" foo"))
+        self.assertEquals('"\\tfoo"', _format_string("\tfoo"))
+
+    def test_not_quoted(self):
+        self.assertEquals('foo', _format_string("foo"))
+        self.assertEquals('foo bar', _format_string("foo bar"))
+
+
+class ParseStringTests(TestCase):
+
+    def test_quoted(self):
+        self.assertEquals(' foo', _parse_string('" foo"'))
+        self.assertEquals('\tfoo', _parse_string('"\\tfoo"'))
+
+    def test_not_quoted(self):
+        self.assertEquals('foo', _parse_string("foo"))
+        self.assertEquals('foo bar', _parse_string("foo bar"))

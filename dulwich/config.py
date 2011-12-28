@@ -44,15 +44,21 @@ class Config(object):
         """
         raise NotImplementedError(self.get)
 
-    def get_boolean(self, name):
+    def get_boolean(self, section, name):
         """Retrieve a configuration setting as boolean.
 
-        :parma name: Name of the setting, including section and possible
+        :param section: Tuple with section name and optional subsection namee
+        :param name: Name of the setting, including section and possible
             subsection.
         :return: Contents of the setting
         :raise KeyError: if the value is not set
         """
-        return bool(self.get(name))
+        value = self.get(section, name)
+        if value.lower() == "true":
+            return True
+        elif value.lower() == "false":
+            return False
+        raise ValueError("not a valid boolean string: %r" % value)
 
     def set(self, section, name, value):
         """Set a configuration value.

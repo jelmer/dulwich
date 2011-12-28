@@ -144,6 +144,15 @@ class ConfigDictTests(TestCase):
         cd.set(("core", ), "foo", "bloe")
         self.assertEquals("bloe", cd.get(("core", ), "foo"))
 
+    def test_get_boolean(self):
+        cd = ConfigDict()
+        cd.set(("core", ), "foo", "true")
+        self.assertTrue(cd.get_boolean(("core", ), "foo"))
+        cd.set(("core", ), "foo", "false")
+        self.assertFalse(cd.get_boolean(("core", ), "foo"))
+        cd.set(("core", ), "foo", "invalid")
+        self.assertRaises(ValueError, cd.get_boolean, ("core", ), "foo")
+
 
 class StackedConfigTests(TestCase):
 

@@ -48,7 +48,7 @@ class ConfigFileTests(TestCase):
 
     def test_empty_line_before_section(self):
         cf = self.from_file("\n[section]\n")
-        self.assertEquals(ConfigFile({"section": {None: {}}}), cf)
+        self.assertEquals(ConfigFile({("section", ): {}}), cf)
 
     def test_comment_before_section(self):
         cf = self.from_file("# foo\n[section]\n")
@@ -60,33 +60,33 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_section(self):
         cf = self.from_file("[core]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get("core.foo"))
-        self.assertEquals("bar", cf.get("core.foo.foo"))
+        self.assertEquals("bar", cf.get(("core", ), "foo"))
+        self.assertEquals("bar", cf.get(("core", "foo"), "foo"))
 
     def test_from_file_with_quotes(self):
         cf = self.from_file(
             "[core]\n"
             'foo = " bar"\n')
-        self.assertEquals(" bar", cf.get("core.foo"))
+        self.assertEquals(" bar", cf.get(("core", ), "foo"))
 
     def test_from_file_with_interrupted_line(self):
         cf = self.from_file(
             "[core]\n"
             'foo = bar\\\n'
             ' la\n')
-        self.assertEquals("barla", cf.get("core.foo"))
+        self.assertEquals("barla", cf.get(("core", ), "foo"))
 
     def test_from_file_subsection(self):
         cf = self.from_file("[branch \"foo\"]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get("branch.foo.foo"))
+        self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))
 
     def test_from_file_subsection_invalid(self):
         self.assertRaises(ValueError,
             self.from_file, "[branch \"foo]\nfoo = bar\n")
 
     def test_from_file_subsection_not_quoted(self):
-        cf = self.from_file("[branch foo]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get("branch.foo.foo"))
+        cf = self.from_file("[branch.foo]\nfoo = bar\n")
+        self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))
 
     def test_write_to_file_empty(self):
         c = ConfigFile()
@@ -96,14 +96,14 @@ class ConfigFileTests(TestCase):
 
     def test_write_to_file_section(self):
         c = ConfigFile()
-        c.set("core.foo", "bar")
+        c.set(("core", ), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
         self.assertEquals("[core]\nfoo = bar\n", f.getvalue())
 
     def test_write_to_file_subsection(self):
         c = ConfigFile()
-        c.set("branch.blie.foo", "bar")
+        c.set(("branch", "blie"), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
         self.assertEquals("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
@@ -113,11 +113,11 @@ class ConfigDictTests(TestCase):
 
     def test_get_set(self):
         cd = ConfigDict()
-        self.assertRaises(KeyError, cd.get, "core.foo")
-        cd.set("core.foo", "bla")
-        self.assertEquals("bla", cd.get("core.foo"))
-        cd.set("core.foo", "bloe")
-        self.assertEquals("bloe", cd.get("core.foo"))
+        self.assertRaises(KeyError, cd.get, "foo", "core")
+        cd.set(("core", ), "foo", "bla")
+        self.assertEquals("bla", cd.get(("core", ), "foo"))
+        cd.set(("core", ), "foo", "bloe")
+        self.assertEquals("bloe", cd.get(("core", ), "foo"))
 
 
 class StackedConfigTests(TestCase):

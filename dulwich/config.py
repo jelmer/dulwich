@@ -30,11 +30,11 @@ from dulwich.file import GitFile
 class Config(object):
     """A Git configuration."""
 
-    def get(self, name):
+    def get(self, section, name):
         """Retrieve the contents of a configuration setting.
         
-        :param name: Name of the setting, including section and 
-            possible subsection.
+        :param section: Tuple with section name and optional subsection namee
+        :param subsection: Subsection name
         :return: Contents of the setting
         :raise KeyError: if the value is not set
         """
@@ -50,7 +50,7 @@ class Config(object):
         """
         return bool(self.get(name))
 
-    def set(self, name, value):
+    def set(self, section, name, value):
         """Set a configuration value.
         
         :param name: Name of the configuration value, including section
@@ -85,19 +85,20 @@ class ConfigDict(Config):
         else:
             return (parts[0], None, parts[1])
 
-    def get(self, name):
-        (section, subsection, variable) = self._parse_setting(name)
-        if subsection is not None:
+    def get(self, section, name):
+        if isinstance(section, basestring):
+            section = (section, )
+        if len(section) > 1:
             try:
-                return self._values[section][subsection][variable]
+                return self._values[section][name]
             except KeyError:
                 pass
-        return self._values[section][None][variable]
+        return self._values[(section[0],)][name]
 
-    def set(self, name, value):
-        (section_name, subsection_name, variable) = self._parse_setting(name)
-        section = self._values.setdefault(section_name, {})
-        section.setdefault(subsection_name, {})[variable] = value
+    def set(self, section, name, value):
+        if isinstance(section, basestring):
+            section = (section, )
+        self._values.setdefault(section, {})[name] = value
 
 
 def _format_string(value):
@@ -155,16 +156,19 @@ class ConfigFile(ConfigDict):
                     key = line.strip()
                     pts = key[1:-1].split(" ", 1)
                     if len(pts) == 2:
-                        if pts[1][0] == "\"":
-                            if pts[1][-1] != "\"":
-                                raise ValueError(
-                                    "Invalid subsection " + pts[1])
-                            else:
-                                pts[1] = pts[1][1:-1]
+                        if pts[1][0] != "\"" or pts[1][-1] != "\"":
+                            raise ValueError(
+                                "Invalid subsection " + pts[1])
+                        else:
+                            pts[1] = pts[1][1:-1]
                         section = (pts[0], pts[1])
                     else:
-                        section = (pts[0], None)
-                    ret._values[section[0]] = {section[1]: {}}
+                        pts = pts[0].split(".", 1)
+                        if len(pts) == 2:
+                            section = (pts[0], pts[1])
+                        else:
+                            section = (pts[0], )
+                    ret._values[section] = {}
                 elif "=" in line:
                     setting, value = line.split("=", 1)
                     if section is None:
@@ -176,14 +180,14 @@ class ConfigFile(ConfigDict):
                     else:
                         continuation = True
                     value = _parse_string(value)
-                    ret._values[section[0]][section[1]][setting] = value
+                    ret._values[section][setting] = value
                     if not continuation:
                         setting = None
                 else:
                     setting = line.strip()
                     if section is None:
                         raise ValueError("setting %r without section" % line)
-                    ret._values[section[0]][section[1]][setting] = ""
+                    ret._values[section][setting] = ""
                     setting = None
             else:
                 if line.endswith("\\\n"):
@@ -192,7 +196,7 @@ class ConfigFile(ConfigDict):
                 else:
                     continuation = True
                 value = _parse_string(line)
-                ret._values[section[0]][section[1]][setting] += value
+                ret._values[section][setting] += value
                 if not continuation:
                     setting = None
         return ret
@@ -220,14 +224,18 @@ class ConfigFile(ConfigDict):
 
     def write_to_file(self, f):
         """Write configuration to a file-like object."""
-        for section_name, section in self._values.iteritems():
-            for subsection_name, subsection in section.iteritems():
-                if subsection_name is None:
-                    f.write("[%s]\n" % section_name)
-                else:
-                    f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
-                for key, value in subsection.iteritems():
-                    f.write("%s = %s\n" % (key, _escape_value(value)))
+        for section, values in self._values.iteritems():
+            try:
+                section_name, subsection_name = section
+            except ValueError:
+                (section_name, ) = section
+                subsection_name = None
+            if subsection_name is None:
+                f.write("[%s]\n" % section_name)
+            else:
+                f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
+            for key, value in values.iteritems():
+                f.write("%s = %s\n" % (key, _escape_value(value)))
 
 
 class StackedConfig(Config):
@@ -262,13 +270,13 @@ class StackedConfig(Config):
             backends.append(cf)
         return backends
 
-    def get(self, name):
+    def get(self, section, name):
         for backend in self._backends:
             try:
-                return backend.get(name)
+                return backend.get(section, name)
             except KeyError:
                 pass
         raise KeyError(name)
 
-    def set(self, name, value):
+    def set(self, section, name, value):
         raise NotImplementedError(self.set)

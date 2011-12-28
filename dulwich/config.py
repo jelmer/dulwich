@@ -112,11 +112,26 @@ def _format_string(value):
 
 def _parse_string(value):
     value = value.strip()
-    if value.startswith("\""):
-        if not value.endswith("\""):
-            raise ValueError("value starts with quote but lacks end quote")
-        return _unescape_value(value[1:-1])
-    return _unescape_value(value)
+    ret = []
+    block = []
+    in_quotes  = False
+    for c in value:
+        if c == "\"":
+            in_quotes = (not in_quotes)
+            ret.append(_unescape_value("".join(block)))
+            block = []
+        elif c in ("#", ";") and not in_quotes:
+            # the rest of the line is a comment
+            break
+        else:
+            block.append(c)
+
+    if in_quotes:
+        raise ValueError("value starts with quote but lacks end quote")
+
+    ret.append(_unescape_value("".join(block)).rstrip())
+
+    return "".join(ret)
 
 
 def _unescape_value(value):
@@ -151,6 +166,12 @@ def _check_section_name(name):
     return True
 
 
+def _strip_comments(line):
+    line = line.split("#")[0]
+    line = line.split(";")[0]
+    return line
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig.
     """
@@ -164,9 +185,12 @@ class ConfigFile(ConfigDict):
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
-                if line.strip() == "":
+                if _strip_comments(line).strip() == "":
                     continue
-                if line[0] == "[" and line.rstrip()[-1] == "]":
+                if line[0] == "[":
+                    line = _strip_comments(line).rstrip()
+                    if line[-1] != "]":
+                        raise ValueError("expected trailing ]")
                     key = line.strip()
                     pts = key[1:-1].split(" ", 1)
                     if len(pts) == 2:
@@ -209,7 +233,7 @@ class ConfigFile(ConfigDict):
                     ret._values[section][setting] = value
                     if not continuation:
                         setting = None
-            else:
+            else: # continuation line
                 if line.endswith("\\\n"):
                     line = line[:-2]
                     continuation = True

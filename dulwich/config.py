@@ -239,7 +239,7 @@ class ConfigFile(ConfigDict):
                         value = value[:-2]
                         continuation = True
                     else:
-                        continuation = True
+                        continuation = False
                     value = _parse_string(value)
                     ret._values[section][setting] = value
                     if not continuation:
@@ -249,7 +249,7 @@ class ConfigFile(ConfigDict):
                     line = line[:-2]
                     continuation = True
                 else:
-                    continuation = True
+                    continuation = False
                 value = _parse_string(line)
                 ret._values[section][setting] += value
                 if not continuation:

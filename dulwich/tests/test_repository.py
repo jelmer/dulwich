@@ -323,6 +323,10 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config(), Config)
 
+    def test_get_config_stack(self):
+        r = self._repo = open_repo('ooo_merge.git')
+        self.assertIsInstance(r.get_config_stack(), Config)
+
     def test_common_revisions(self):
         """
         This test demonstrates that ``find_common_revisions()`` actually returns

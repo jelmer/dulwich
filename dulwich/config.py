@@ -44,7 +44,7 @@ class Config(object):
         """
         raise NotImplementedError(self.get)
 
-    def get_boolean(self, section, name):
+    def get_boolean(self, section, name, default=None):
         """Retrieve a configuration setting as boolean.
 
         :param section: Tuple with section name and optional subsection namee
@@ -53,7 +53,10 @@ class Config(object):
         :return: Contents of the setting
         :raise KeyError: if the value is not set
         """
-        value = self.get(section, name)
+        try:
+            value = self.get(section, name)
+        except KeyError:
+            return default
         if value.lower() == "true":
             return True
         elif value.lower() == "false":
@@ -296,11 +299,12 @@ class ConfigFile(ConfigDict):
 class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
-    def __init__(self, backends):
-        self._backends = backends
+    def __init__(self, backends, writable=None):
+        self.backends = backends
+        self.writable = writable
 
     def __repr__(self):
-        return "<%s for %r>" % (self.__class__.__name__, self._backends)
+        return "<%s for %r>" % (self.__class__.__name__, self.backends)
 
     @classmethod
     def default_backends(cls):
@@ -326,7 +330,7 @@ class StackedConfig(Config):
         return backends
 
     def get(self, section, name):
-        for backend in self._backends:
+        for backend in self.backends:
             try:
                 return backend.get(section, name)
             except KeyError:
@@ -334,6 +338,6 @@ class StackedConfig(Config):
         raise KeyError(name)
 
     def set(self, section, name, value):
-        raise NotImplementedError(self.set)
-
-
+        if self.writable is None:
+            raise NotImplementedError(self.set)
+        return self.writable.set(section, name, value)

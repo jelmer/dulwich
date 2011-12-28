@@ -137,6 +137,13 @@ def _escape_value(value):
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"")
 
 
+def _check_variable_name(name):
+    for c in name:
+        if not c.isalnum() and c != '-':
+            return False
+    return True
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig.
     """
@@ -174,6 +181,8 @@ class ConfigFile(ConfigDict):
                     if section is None:
                         raise ValueError("setting %r without section" % line)
                     setting = setting.strip()
+                    if not _check_variable_name(setting):
+                        raise ValueError("invalid variable name %s" % setting)
                     if value.endswith("\\\n"):
                         value = value[:-2]
                         continuation = True
@@ -185,6 +194,8 @@ class ConfigFile(ConfigDict):
                         setting = None
                 else:
                     setting = line.strip()
+                    if not _check_variable_name(setting):
+                        raise ValueError("invalid variable name %s" % setting)
                     if section is None:
                         raise ValueError("setting %r without section" % line)
                     ret._values[section][setting] = ""
@@ -280,3 +291,5 @@ class StackedConfig(Config):
 
     def set(self, section, name, value):
         raise NotImplementedError(self.set)
+
+

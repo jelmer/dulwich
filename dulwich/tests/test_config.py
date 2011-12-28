@@ -23,6 +23,7 @@ from dulwich.config import (
     ConfigDict,
     ConfigFile,
     StackedConfig,
+    _check_variable_name,
     _format_string,
     _escape_value,
     _parse_string,
@@ -173,3 +174,16 @@ class ParseStringTests(TestCase):
     def test_not_quoted(self):
         self.assertEquals('foo', _parse_string("foo"))
         self.assertEquals('foo bar', _parse_string("foo bar"))
+
+
+class CheckVariableNameTests(TestCase):
+
+    def test_invalid(self):
+        self.assertFalse(_check_variable_name("foo "))
+        self.assertFalse(_check_variable_name("bar,bar"))
+        self.assertFalse(_check_variable_name("bar.bar"))
+
+    def test_valid(self):
+        self.assertTrue(_check_variable_name("FOO"))
+        self.assertTrue(_check_variable_name("foo"))
+        self.assertTrue(_check_variable_name("foo-bar"))

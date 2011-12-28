@@ -46,6 +46,18 @@ class ConfigFileTests(TestCase):
         cf = self.from_file("")
         self.assertEquals(ConfigFile(), cf)
 
+    def test_empty_line_before_section(self):
+        cf = self.from_file("\n[section]\n")
+        self.assertEquals(ConfigFile({"section": {None: {}}}), cf)
+
+    def test_comment_before_section(self):
+        cf = self.from_file("# foo\n[section]\n")
+        self.assertEquals(ConfigFile(), cf)
+
+    def test_comment_after_section(self):
+        cf = self.from_file("[section] # foo\n")
+        self.assertEquals(ConfigFile(), cf)
+
     def test_from_file_section(self):
         cf = self.from_file("[core]\nfoo = bar\n")
         self.assertEquals("bar", cf.get("core.foo"))
@@ -66,6 +78,14 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_subsection(self):
         cf = self.from_file("[branch \"foo\"]\nfoo = bar\n")
+        self.assertEquals("bar", cf.get("branch.foo.foo"))
+
+    def test_from_file_subsection_invalid(self):
+        self.assertRaises(ValueError,
+            self.from_file, "[branch \"foo]\nfoo = bar\n")
+
+    def test_from_file_subsection_not_quoted(self):
+        cf = self.from_file("[branch foo]\nfoo = bar\n")
         self.assertEquals("bar", cf.get("branch.foo.foo"))
 
     def test_write_to_file_empty(self):

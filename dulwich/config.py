@@ -63,9 +63,14 @@ class Config(object):
 class ConfigDict(Config):
     """Git configuration stored in a dictionary."""
 
-    def __init__(self):
+    def __init__(self, values=None):
         """Create a new ConfigDict."""
-        self._values = {}
+        if values is None:
+            values = {}
+        self._values = values
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self._values)
 
     def __eq__(self, other):
         return (
@@ -144,13 +149,19 @@ class ConfigFile(ConfigDict):
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
+                if line.strip() == "":
+                    continue
                 if line[0] == "[" and line.rstrip()[-1] == "]":
                     key = line.strip()
                     pts = key[1:-1].split(" ", 1)
                     if len(pts) == 2:
-                        if pts[1][0] != "\"" or pts[1][-1] != "\"":
-                            raise ValueError(pts[1])
-                        section = (pts[0], pts[1][1:-1])
+                        if pts[1][0] == "\"":
+                            if pts[1][-1] != "\"":
+                                raise ValueError(
+                                    "Invalid subsection " + pts[1])
+                            else:
+                                pts[1] = pts[1][1:-1]
+                        section = (pts[0], pts[1])
                     else:
                         section = (pts[0], None)
                     ret._values[section[0]] = {section[1]: {}}

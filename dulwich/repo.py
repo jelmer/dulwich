@@ -928,6 +928,10 @@ class BaseRepo(object):
         except (IOError, OSError), e:
             if e.errno != errno.ENOENT:
                 raise
+            writable = None
+        else:
+            writable = p
+            backends.append(p)
         backends.extend(StackedConfig.default_backends())
         return StackedConfig(backends)
 

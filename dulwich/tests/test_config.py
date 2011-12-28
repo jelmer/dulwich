@@ -44,6 +44,19 @@ class ConfigFileTests(TestCase):
     def test_eq(self):
         self.assertEquals(ConfigFile(), ConfigFile())
 
+    def test_default_config(self):
+        cf = self.from_file("""[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+""")
+        self.assertEquals(ConfigFile({("core", ): {
+            "repositoryformatversion": "0",
+            "filemode": "true",
+            "bare": "false",
+            "logallrefupdates": "true"}}), cf)
+
     def test_from_file_empty(self):
         cf = self.from_file("")
         self.assertEquals(ConfigFile(), cf)

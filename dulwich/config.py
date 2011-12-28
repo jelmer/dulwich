@@ -144,6 +144,13 @@ def _check_variable_name(name):
     return True
 
 
+def _check_section_name(name):
+    for c in name:
+        if not c.isalnum() and c not in ('-', '.'):
+            return False
+    return True
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig.
     """
@@ -168,8 +175,14 @@ class ConfigFile(ConfigDict):
                                 "Invalid subsection " + pts[1])
                         else:
                             pts[1] = pts[1][1:-1]
+                        if not _check_section_name(pts[0]):
+                            raise ValueError("invalid section name %s" %
+                                             pts[0])
                         section = (pts[0], pts[1])
                     else:
+                        if not _check_section_name(pts[0]):
+                            raise ValueError("invalid section name %s" %
+                                    pts[0])
                         pts = pts[0].split(".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])

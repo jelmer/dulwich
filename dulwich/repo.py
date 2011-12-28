@@ -921,19 +921,21 @@ class BaseRepo(object):
         return self.commit(sha).parents
 
     def get_config(self):
-        from dulwich.config import ConfigFile, StackedConfig
-        backends = []
+        from dulwich.config import ConfigFile
+        path = os.path.join(self._controldir, 'config')
         try:
-            p = ConfigFile.from_path(os.path.join(self._controldir, 'config'))
+            return ConfigFile.from_path(path)
         except (IOError, OSError), e:
             if e.errno != errno.ENOENT:
                 raise
-            writable = None
-        else:
-            writable = p
-            backends.append(p)
-        backends.extend(StackedConfig.default_backends())
-        return StackedConfig(backends)
+            ret = ConfigFile()
+            ret.path = path
+            return ret
+
+    def get_config_stack(self):
+        from dulwich.config import StackedConfig
+        backends = [self.get_config()] + StackedConfig.default_backends()
+        return StackedConfig(backends, writable=backends[0])
 
     def commit(self, sha):
         """Retrieve the commit with a particular SHA.

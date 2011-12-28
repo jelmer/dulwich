@@ -33,6 +33,7 @@ from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich import objects
+from dulwich.config import Config
 from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
@@ -73,7 +74,8 @@ class CreateRepositoryTests(TestCase):
         self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
         barestr = 'bare = %s' % str(expect_bare).lower()
-        self.assertTrue(barestr in repo.get_named_file('config').read())
+        config_text = repo.get_named_file('config').read()
+        self.assertTrue(barestr in config_text, "%r" % config_text)
 
     def test_create_disk_bare(self):
         tmp_dir = tempfile.mkdtemp()
@@ -319,7 +321,7 @@ class RepositoryTests(TestCase):
 
     def test_get_config(self):
         r = self._repo = open_repo('ooo_merge.git')
-        self.assertEquals({}, r.get_config())
+        self.assertIsInstance(r.get_config(), Config)
 
     def test_common_revisions(self):
         """

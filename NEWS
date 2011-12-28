@@ -1,5 +1,11 @@
 0.8.3	UNRELEASED
 
+ FEATURES
+
+  * The config parser now supports the git-config file format as
+    described in git-config(1) and can write git config files.
+    (Jelmer Vernooij, #531092)
+
 0.8.2	2011-12-18
 
  BUG FIXES

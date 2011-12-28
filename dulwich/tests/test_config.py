@@ -54,16 +54,28 @@ class ConfigFileTests(TestCase):
 
     def test_comment_before_section(self):
         cf = self.from_file("# foo\n[section]\n")
-        self.assertEquals(ConfigFile(), cf)
+        self.assertEquals(ConfigFile({("section", ): {}}), cf)
 
     def test_comment_after_section(self):
         cf = self.from_file("[section] # foo\n")
-        self.assertEquals(ConfigFile(), cf)
+        self.assertEquals(ConfigFile({("section", ): {}}), cf)
+
+    def test_comment_after_variable(self):
+        cf = self.from_file("[section]\nbar= foo # a comment\n")
+        self.assertEquals(ConfigFile({("section", ): {"bar": "foo"}}), cf)
 
     def test_from_file_section(self):
         cf = self.from_file("[core]\nfoo = bar\n")
         self.assertEquals("bar", cf.get(("core", ), "foo"))
         self.assertEquals("bar", cf.get(("core", "foo"), "foo"))
+
+    def test_from_file_with_mixed_quoted(self):
+        cf = self.from_file("[core]\nfoo = \"bar\"la\n")
+        self.assertEquals("barla", cf.get(("core", ), "foo"))
+
+    def test_from_file_with_open_quoted(self):
+        self.assertRaises(ValueError,
+            self.from_file, "[core]\nfoo = \"bar\n")
 
     def test_from_file_with_quotes(self):
         cf = self.from_file(

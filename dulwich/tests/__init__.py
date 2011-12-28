@@ -75,6 +75,7 @@ def self_test_suite():
     names = [
         'blackbox',
         'client',
+        'config',
         'diff_tree',
         'fastexport',
         'file',

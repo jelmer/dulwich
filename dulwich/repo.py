@@ -800,12 +800,16 @@ class BaseRepo(object):
 
     def _init_files(self, bare):
         """Initialize a default set of named files."""
+        from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        self._put_named_file('config', ('[core]\n'
-                                        'repositoryformatversion = 0\n'
-                                        'filemode = true\n'
-                                        'bare = ' + str(bare).lower() + '\n'
-                                        'logallrefupdates = true\n'))
+        f = StringIO()
+        cf = ConfigFile()
+        cf.set("core", "repositoryformatversion", "0")
+        cf.set("core", "filemode", "true")
+        cf.set("core", "bare", str(bare).lower())
+        cf.set("core", "logallrefupdates", "true")
+        cf.write_to_file(f)
+        self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), '')
 
     def get_named_file(self, path):
@@ -917,11 +921,15 @@ class BaseRepo(object):
         return self.commit(sha).parents
 
     def get_config(self):
-        import ConfigParser
-        p = ConfigParser.RawConfigParser()
-        p.read(os.path.join(self._controldir, 'config'))
-        return dict((section, dict(p.items(section)))
-                    for section in p.sections())
+        from dulwich.config import ConfigFile, StackedConfig
+        backends = []
+        try:
+            p = ConfigFile.from_path(os.path.join(self._controldir, 'config'))
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
+        backends.extend(StackedConfig.default_backends())
+        return StackedConfig(backends)
 
     def commit(self, sha):
         """Retrieve the commit with a particular SHA.

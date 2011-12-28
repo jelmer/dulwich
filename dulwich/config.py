@@ -18,6 +18,10 @@
 
 """Reading and writing Git configuration files.
 
+TODO:
+ * preserve formatting when updating configuration files
+ * treat subsection names as case-insensitive for [branch.foo] style
+   subsections
 """
 
 import errno
@@ -193,6 +197,7 @@ class ConfigFile(ConfigDict):
                         raise ValueError("expected trailing ]")
                     key = line.strip()
                     pts = key[1:-1].split(" ", 1)
+                    pts[0] = pts[0].lower()
                     if len(pts) == 2:
                         if pts[1][0] != "\"" or pts[1][-1] != "\"":
                             raise ValueError(
@@ -221,7 +226,7 @@ class ConfigFile(ConfigDict):
                     except ValueError:
                         setting = line
                         value = "true"
-                    setting = setting.strip()
+                    setting = setting.strip().lower()
                     if not _check_variable_name(setting):
                         raise ValueError("invalid variable name %s" % setting)
                     if value.endswith("\\\n"):

@@ -78,6 +78,12 @@ class ConfigFileTests(TestCase):
             ' la\n')
         self.assertEquals("barla", cf.get(("core", ), "foo"))
 
+    def test_from_file_with_boolean_setting(self):
+        cf = self.from_file(
+            "[core]\n"
+            'foo\n')
+        self.assertEquals("true", cf.get(("core", ), "foo"))
+
     def test_from_file_subsection(self):
         cf = self.from_file("[branch \"foo\"]\nfoo = bar\n")
         self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))

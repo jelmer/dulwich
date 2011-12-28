@@ -189,10 +189,14 @@ class ConfigFile(ConfigDict):
                         else:
                             section = (pts[0], )
                     ret._values[section] = {}
-                elif "=" in line:
-                    setting, value = line.split("=", 1)
+                else:
                     if section is None:
                         raise ValueError("setting %r without section" % line)
+                    try:
+                        setting, value = line.split("=", 1)
+                    except ValueError:
+                        setting = line
+                        value = "true"
                     setting = setting.strip()
                     if not _check_variable_name(setting):
                         raise ValueError("invalid variable name %s" % setting)
@@ -205,14 +209,6 @@ class ConfigFile(ConfigDict):
                     ret._values[section][setting] = value
                     if not continuation:
                         setting = None
-                else:
-                    setting = line.strip()
-                    if not _check_variable_name(setting):
-                        raise ValueError("invalid variable name %s" % setting)
-                    if section is None:
-                        raise ValueError("setting %r without section" % line)
-                    ret._values[section][setting] = ""
-                    setting = None
             else:
                 if line.endswith("\\\n"):
                     line = line[:-2]

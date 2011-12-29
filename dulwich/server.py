@@ -23,8 +23,22 @@ Documentation/technical directory in the cgit distribution, and in particular:
 
 * Documentation/technical/protocol-capabilities.txt
 * Documentation/technical/pack-protocol.txt
-"""
 
+Currently supported capabilities:
+
+ * include-tag
+ * thin-pack
+ * multi_ack_detailed
+ * multi_ack
+ * side-band-64k
+ * ofs-delta
+ * no-progress
+ * report-status
+ * delete-refs
+
+Known capabilities that are not supported:
+ * shallow (http://pad.lv/909524)
+"""
 
 import collections
 import os

@@ -17,7 +17,24 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Client side support for the Git protocol."""
+"""Client side support for the Git protocol.
+
+The Dulwich client supports the following capabilities:
+
+ * thin-pack
+ * multi_ack_detailed
+ * multi_ack
+ * side-band-64k
+ * ofs-delta
+ * report-status
+ * delete-refs
+
+Known capabilities that are not supported:
+
+ * shallow
+ * no-progress
+ * include-tag
+"""
 
 __docformat__ = 'restructuredText'
 

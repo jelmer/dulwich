@@ -101,6 +101,7 @@ def tutorial_test_suite():
         'introduction',
         'repo',
         'object-store',
+        'remote',
         'conclusion',
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]

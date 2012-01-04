@@ -19,7 +19,13 @@
 # MA  02110-1301, USA.
 
 
-"""Repository access."""
+"""Repository access.
+
+This module contains the base class for git repositories
+(BaseRepo) and an implementation which uses a repository on 
+local disk (Repo).
+
+"""
 
 from cStringIO import StringIO
 import errno
@@ -791,7 +797,8 @@ class BaseRepo(object):
 
     :ivar object_store: Dictionary-like object for accessing
         the objects
-    :ivar refs: Dictionary-like object with the refs in this repository
+    :ivar refs: Dictionary-like object with the refs in this
+        repository
     """
 
     def __init__(self, object_store, refs):
@@ -1156,7 +1163,13 @@ class BaseRepo(object):
 
 
 class Repo(BaseRepo):
-    """A git repository backed by local disk."""
+    """A git repository backed by local disk.
+
+    To open an existing repository, call the contructor with
+    the path of the repository.
+
+    To create a new repository, use the Repo.init class method.
+    """
 
     def __init__(self, root):
         if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
@@ -1259,7 +1272,8 @@ class Repo(BaseRepo):
                     blob.id, 0)
         index.write()
 
-    def clone(self, target_path, mkdir=True, bare=False, origin="origin"):
+    def clone(self, target_path, mkdir=True, bare=False,
+            origin="origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -1299,6 +1313,12 @@ class Repo(BaseRepo):
 
     @classmethod
     def init(cls, path, mkdir=False):
+        """Create a new repository.
+
+        :param path: Path in which to create the repository
+        :param mkdir: Whether to create the directory
+        :return: `Repo` instance
+        """
         if mkdir:
             os.mkdir(path)
         controldir = os.path.join(path, ".git")
@@ -1308,6 +1328,13 @@ class Repo(BaseRepo):
 
     @classmethod
     def init_bare(cls, path):
+        """Create a new bare repository.
+
+        `path` should already exist and be an emty directory.
+
+        :param path: Path to create bare repository in
+        :return: a `Repo` instance
+        """
         return cls._init_maybe_bare(path, True)
 
     create = init_bare
@@ -1354,6 +1381,13 @@ class MemoryRepo(BaseRepo):
 
     @classmethod
     def init_bare(cls, objects, refs):
+        """Create a new bare repository in memory.
+
+        :param objects: Objects for the new repository,
+            as iterable
+        :param refs: Refs as dictionary, mapping names
+            to object SHA1s
+        """
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)

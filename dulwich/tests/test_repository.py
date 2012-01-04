@@ -116,10 +116,6 @@ class RepositoryTests(TestCase):
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
-    def test_iter(self):
-        r = self._repo = open_repo('a.git')
-        self.assertRaises(NotImplementedError, r.__iter__)
-
     def test_setitem(self):
         r = self._repo = open_repo('a.git')
         r["refs/tags/foo"] = 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'

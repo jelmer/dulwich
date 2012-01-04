@@ -185,7 +185,7 @@ class IndexEntryFromStatTests(TestCase):
             1324180496,
             64769L,
             131078,
-            16877,
+            16384,
             1000,
             1000,
             12288,

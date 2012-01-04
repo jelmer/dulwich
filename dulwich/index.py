@@ -193,6 +193,9 @@ class Index(object):
         self.clear()
         self.read()
 
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self._filename)
+
     def write(self):
         """Write current contents of index to disk."""
         f = GitFile(self._filename, 'wb')
@@ -380,7 +383,7 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     :param flags: Index flags
     """
     if mode is None:
-        mode = stat_val.st_mode
+        mode = cleanup_mode(stat_val.st_mode)
     return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)

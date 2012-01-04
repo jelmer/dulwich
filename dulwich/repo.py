@@ -1251,11 +1251,12 @@ class Repo(BaseRepo):
 
         :param paths: List of paths, relative to the repository path
         """
-        from dulwich.index import cleanup_mode
+        if isinstance(paths, basestring):
+            paths = [paths]
+        from dulwich.index import index_entry_from_stat
         index = self.open_index()
         for path in paths:
             full_path = os.path.join(self.path, path)
-            blob = Blob()
             try:
                 st = os.stat(full_path)
             except OSError:
@@ -1263,18 +1264,16 @@ class Repo(BaseRepo):
                 try:
                     del index[path]
                 except KeyError:
-                    pass  # Doesn't exist in the index either
+                    pass # already removed
             else:
+                blob = Blob()
                 f = open(full_path, 'rb')
                 try:
                     blob.data = f.read()
                 finally:
                     f.close()
                 self.object_store.add_object(blob)
-                # XXX: Cleanup some of the other file properties as well?
-                index[path] = (st.st_ctime, st.st_mtime, st.st_dev, st.st_ino,
-                    cleanup_mode(st.st_mode), st.st_uid, st.st_gid, st.st_size,
-                    blob.id, 0)
+                index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,

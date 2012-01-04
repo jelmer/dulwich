@@ -472,6 +472,8 @@ class TraditionalGitClient(GitClient):
         except:
             proto.write_pkt_line(None)
             raise
+        if wants is not None:
+            wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
             proto.write_pkt_line(None)
             return refs
@@ -738,6 +740,8 @@ class HttpGitClient(GitClient):
             "git-upload-pack", url)
         negotiated_capabilities = list(server_capabilities)
         wants = determine_wants(refs)
+        if wants is not None:
+            wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
             return refs
         if self.dumb:

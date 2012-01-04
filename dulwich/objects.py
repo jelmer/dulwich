@@ -114,6 +114,8 @@ def object_header(num_type, length):
 
 
 def serializable_property(name, docstring=None):
+    """A property that helps tracking whether serialization is necessary.
+    """
     def set(obj, value):
         obj._ensure_parsed()
         setattr(obj, "_"+name, value)
@@ -135,6 +137,12 @@ def object_class(type):
 
 
 def check_hexsha(hex, error_msg):
+    """Check if a string is a valid hex sha string.
+
+    :param hex: Hex string to check
+    :param error_msg: Error message to use in exception
+    :raise ObjectFormatException: Raised when the string is not valid
+    """
     try:
         hex_to_sha(hex)
     except (TypeError, AssertionError):
@@ -168,9 +176,11 @@ class FixedSha(object):
         self._sha = hex_to_sha(hexsha)
 
     def digest(self):
+        """Return the raw SHA digest."""
         return self._sha
 
     def hexdigest(self):
+        """Return the hex SHA digest."""
         return self._hexsha
 
 
@@ -213,6 +223,10 @@ class ShaFile(object):
         self.set_raw_string(text[header_end+1:])
 
     def as_legacy_object_chunks(self):
+        """Return chunks representing the object in the experimental format.
+
+        :return: List of strings
+        """
         compobj = zlib.compressobj()
         yield compobj.compress(self._header())
         for chunk in self.as_raw_chunks():
@@ -220,9 +234,15 @@ class ShaFile(object):
         yield compobj.flush()
 
     def as_legacy_object(self):
+        """Return string representing the object in the experimental format.
+        """
         return "".join(self.as_legacy_object_chunks())
 
     def as_raw_chunks(self):
+        """Return chunks with serialization of the object.
+
+        :return: List of strings, not necessarily one per line
+        """
         if self._needs_parsing:
             self._ensure_parsed()
         elif self._needs_serialization:
@@ -230,15 +250,22 @@ class ShaFile(object):
         return self._chunked_text
 
     def as_raw_string(self):
+        """Return raw string with serialization of the object.
+
+        :return: String object
+        """
         return "".join(self.as_raw_chunks())
 
     def __str__(self):
+        """Return raw string serialization of this object."""
         return self.as_raw_string()
 
     def __hash__(self):
+        """Return unique hash for this object."""
         return hash(self.id)
 
     def as_pretty_string(self):
+        """Return a string representing this object, fit for display."""
         return self.as_raw_string()
 
     def _ensure_parsed(self):
@@ -256,11 +283,13 @@ class ShaFile(object):
             self._needs_parsing = False
 
     def set_raw_string(self, text):
+        """Set the contents of this object from a serialized string."""
         if type(text) != str:
             raise TypeError(text)
         self.set_raw_chunks([text])
 
     def set_raw_chunks(self, chunks):
+        """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
         self._deserialize(chunks)
         self._sha = None
@@ -339,6 +368,7 @@ class ShaFile(object):
 
     @classmethod
     def from_path(cls, path):
+        """Open a SHA file from disk."""
         f = GitFile(path, 'rb')
         try:
             obj = cls.from_file(f)
@@ -454,12 +484,15 @@ class ShaFile(object):
 
     @property
     def id(self):
+        """The hex SHA of this object."""
         return self.sha().hexdigest()
 
     def get_type(self):
+        """Return the type number for this object class."""
         return self.type_num
 
     def set_type(self, type):
+        """Set the type number for this object class."""
         self.type_num = type
 
     # DEPRECATED: use type_num or type_name as needed.
@@ -557,6 +590,7 @@ def _parse_tag_or_commit(text):
 
 
 def parse_tag(text):
+    """Parse a tag object."""
     return _parse_tag_or_commit(text)
 
 

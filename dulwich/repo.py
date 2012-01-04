@@ -1085,6 +1085,12 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
+    def _get_user_identity(self):
+        config = self.get_config_stack()
+        return "%s <%s>" % (
+            config.get(("user", ), "name"),
+            config.get(("user", ), "email"))
+
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
@@ -1119,9 +1125,8 @@ class BaseRepo(object):
         if merge_heads is None:
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
-        # TODO: Allow username to be missing, and get it from .git/config
         if committer is None:
-            raise ValueError("committer not set")
+            committer = self._get_user_identity()
         c.committer = committer
         if commit_timestamp is None:
             commit_timestamp = time.time()

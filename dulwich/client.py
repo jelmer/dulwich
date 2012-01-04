@@ -206,7 +206,7 @@ class GitClient(object):
             commit()
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress):
+                   progress=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch
@@ -303,7 +303,7 @@ class GitClient(object):
         proto.write_pkt_line(None)
         return (have, want)
 
-    def _handle_receive_pack_tail(self, proto, capabilities, progress):
+    def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
 
         :param proto: Protocol object to read from
@@ -315,6 +315,8 @@ class GitClient(object):
         else:
             report_status_parser = None
         if "side-band-64k" in capabilities:
+            if progress is None:
+                progress = lambda x: None
             channel_callbacks = { 2: progress }
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
@@ -368,7 +370,7 @@ class GitClient(object):
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
-                                 pack_data, progress, rbufsize=_RBUFSIZE):
+                                 pack_data, progress=None, rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
         :param proto: Protocol object to read from
@@ -388,6 +390,9 @@ class GitClient(object):
                 break
             pkt = proto.read_pkt_line()
         if "side-band-64k" in capabilities:
+            if progress is None:
+                # Just ignore progress data
+                progress = lambda x: None
             self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
             # wait for EOF before returning
             data = proto.read()
@@ -726,7 +731,7 @@ class HttpGitClient(GitClient):
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress):
+                   progress=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch

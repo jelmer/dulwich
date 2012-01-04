@@ -1389,7 +1389,7 @@ class Repo(BaseRepo):
     def init_bare(cls, path):
         """Create a new bare repository.
 
-        `path` should already exist and be an emty directory.
+        ``path`` should already exist and be an emty directory.
 
         :param path: Path to create bare repository in
         :return: a `Repo` instance

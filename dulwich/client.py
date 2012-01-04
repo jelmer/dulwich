@@ -194,7 +194,7 @@ class GitClient(object):
         :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
-        :return: remote refs
+        :return: remote refs as dictionary
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -731,6 +731,7 @@ class HttpGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :return: Dictionary with the refs of the remote repository
         """
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(

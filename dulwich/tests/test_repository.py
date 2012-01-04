@@ -461,6 +461,21 @@ class BuildRepoTests(TestCase):
              encoding="iso8859-1")
         self.assertEquals("iso8859-1", r[commit_sha].encoding)
 
+    def test_commit_config_identity(self):
+        # commit falls back to the users' identity if it wasn't specified
+        r = self._repo
+        c = r.get_config()
+        c.set(("user", ), "name", "Jelmer")
+        c.set(("user", ), "email", "jelmer@apache.org")
+        c.write_to_path()
+        commit_sha = r.do_commit('message')
+        self.assertEquals(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEquals(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].committer)
+
     def test_commit_fail_ref(self):
         r = self._repo
 

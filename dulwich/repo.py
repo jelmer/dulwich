@@ -802,6 +802,14 @@ class BaseRepo(object):
     """
 
     def __init__(self, object_store, refs):
+        """Open a repository.
+
+        This shouldn't be called directly, but rather through one of the
+        base classes, such as MemoryRepo or Repo.
+
+        :param object_store: Object store to use
+        :param refs: Refs container to use
+        """
         self.object_store = object_store
         self.refs = refs
 
@@ -888,6 +896,14 @@ class BaseRepo(object):
                                                  get_tagged))
 
     def get_graph_walker(self, heads=None):
+        """Retrieve a graph walker.
+
+        A graph walker is used by a remote repository (or proxy)
+        to find out which objects are present in this repository.
+
+        :param heads: Repository heads to use (optional)
+        :return: A graph walker object
+        """
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
         return self.object_store.get_graph_walker(heads)
@@ -922,12 +938,27 @@ class BaseRepo(object):
         return ret
 
     def get_object(self, sha):
+        """Retrieve the object with the specified SHA.
+
+        :param sha: SHA to retrieve
+        :return: A ShaFile object
+        :raise KeyError: when the object can not be found
+        """
         return self.object_store[sha]
 
     def get_parents(self, sha):
+        """Retrieve the parents of a specific commit.
+
+        :param sha: SHA of the commit for which to retrieve the parents
+        :return: List of parents
+        """
         return self.commit(sha).parents
 
     def get_config(self):
+        """Retrieve the config object.
+
+        :return: `ConfigFile` object for the ``.git/config`` file.
+        """
         from dulwich.config import ConfigFile
         path = os.path.join(self._controldir, 'config')
         try:
@@ -940,6 +971,14 @@ class BaseRepo(object):
             return ret
 
     def get_config_stack(self):
+        """Return a config stack for this repository.
+
+        This stack accesses the configuration for both this repository
+        itself (.git/config) and the global configuration, which usually
+        lives in ~/.gitconfig.
+
+        :return: `Config` instance for this repository
+        """
         from dulwich.config import StackedConfig
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
@@ -1049,6 +1088,12 @@ class BaseRepo(object):
         return [e.commit for e in self.get_walker(include=[head])]
 
     def __getitem__(self, name):
+        """Retrieve a Git object by SHA1 or ref.
+
+        :param name: A Git object SHA1 or a ref name
+        :return: A `ShaFile` object, such as a Commit or Blob
+        :raise KeyError: when the specified ref or object does not exist
+        """
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
@@ -1059,16 +1104,22 @@ class BaseRepo(object):
         except RefFormatError:
             raise KeyError(name)
 
-    def __iter__(self):
-        raise NotImplementedError(self.__iter__)
-
     def __contains__(self, name):
+        """Check if a specific Git object or ref is present.
+
+        :param name: Git object SHA1 or ref name
+        """
         if len(name) in (20, 40):
             return name in self.object_store or name in self.refs
         else:
             return name in self.refs
 
     def __setitem__(self, name, value):
+        """Set a ref.
+
+        :param name: ref name
+        :param value: Ref value - either a ShaFile object, or a hex sha
+        """
         if name.startswith("refs/") or name == "HEAD":
             if isinstance(value, ShaFile):
                 self.refs[name] = value.id
@@ -1080,7 +1131,11 @@ class BaseRepo(object):
             raise ValueError(name)
 
     def __delitem__(self, name):
-        if name.startswith("refs") or name == "HEAD":
+        """Remove a ref.
+
+        :param name: Name of the ref to remove
+        """
+        if name.startswith("refs/") or name == "HEAD":
             del self.refs[name]
         else:
             raise ValueError(name)

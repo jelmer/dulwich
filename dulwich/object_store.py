@@ -132,8 +132,8 @@ class BaseObjectStore(object):
     def tree_changes(self, source, target, want_unchanged=False):
         """Find the differences between the contents of two trees
 
-        :param object_store: Object store to use for retrieving tree contents
-        :param tree: SHA1 of the root tree
+        :param source: SHA1 of the source tree
+        :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)

@@ -6,7 +6,7 @@ Most of the tests in this file require a Dulwich server, so let's start one:
     >>> from dulwich.server import DictBackend, TCPGitServer
     >>> import threading
     >>> repo = Repo.init("remote", mkdir=True)
-    >>> cid = repo.do_commit("message")
+    >>> cid = repo.do_commit("message", committer="Jelmer <jelmer@samba.org>")
     >>> backend = DictBackend({'/': repo})
     >>> dul_server = TCPGitServer(backend, 'localhost', 0)
     >>> threading.Thread(target=dul_server.serve).start()

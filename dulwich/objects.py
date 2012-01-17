@@ -19,7 +19,6 @@
 
 """Access to base git objects."""
 
-
 import binascii
 from cStringIO import (
     StringIO,
@@ -64,6 +63,11 @@ _TAGGER_HEADER = "tagger"
 S_IFGITLINK = 0160000
 
 def S_ISGITLINK(m):
+    """Check if a mode indicates a submodule.
+
+    :param m: Mode to check
+    :return: a `boolean`
+    """
     return (stat.S_IFMT(m) == S_IFGITLINK)
 
 

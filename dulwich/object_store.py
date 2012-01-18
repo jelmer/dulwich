@@ -471,8 +471,14 @@ class DiskObjectStore(PackBasedObjectStore):
         f.seek(0)
         write_pack_header(f, len(entries) + len(indexer.ext_refs()))
 
+        # Must flush before reading (http://bugs.python.org/issue3207)
+        f.flush()
+
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(f, end_ofs=-20)
+
+        # Must reposition before writing (http://bugs.python.org/issue3207)
+        f.seek(0, os.SEEK_CUR)
 
         # Complete the pack.
         for ext_sha in indexer.ext_refs():

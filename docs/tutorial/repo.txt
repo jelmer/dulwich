@@ -52,8 +52,8 @@ so only non-bare repositories will have an index, too. To open the index, simply
 call::
 
     >>> index = repo.open_index()
-    >>> index
-    Index('myrepo/.git/index')
+    >>> repr(index).replace('\\\\', '/')
+    "Index('myrepo/.git/index')"
 
 Since the repository was just created, the index will be empty::
 

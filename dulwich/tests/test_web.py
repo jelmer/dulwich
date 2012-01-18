@@ -20,6 +20,7 @@
 
 from cStringIO import StringIO
 import re
+import os
 
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -198,7 +199,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEquals(HTTP_ERROR, self._status)
 
     def test_get_pack_file(self):
-        pack_name = 'objects/pack/pack-%s.pack' % ('1' * 40)
+        pack_name = os.path.join('objects', 'pack', 'pack-%s.pack' % ('1' * 40))
         backend = _test_backend([], named_files={pack_name: 'pack contents'})
         mat = re.search('.*', pack_name)
         output = ''.join(get_pack_file(self._req, backend, mat))
@@ -208,7 +209,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertTrue(self._req.cached)
 
     def test_get_idx_file(self):
-        idx_name = 'objects/pack/pack-%s.idx' % ('1' * 40)
+        idx_name = os.path.join('objects', 'pack', 'pack-%s.idx' % ('1' * 40))
         backend = _test_backend([], named_files={idx_name: 'idx contents'})
         mat = re.search('.*', idx_name)
         output = ''.join(get_idx_file(self._req, backend, mat))

@@ -132,8 +132,8 @@ class BaseObjectStore(object):
     def tree_changes(self, source, target, want_unchanged=False):
         """Find the differences between the contents of two trees
 
-        :param object_store: Object store to use for retrieving tree contents
-        :param tree: SHA1 of the root tree
+        :param source: SHA1 of the source tree
+        :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
@@ -471,8 +471,14 @@ class DiskObjectStore(PackBasedObjectStore):
         f.seek(0)
         write_pack_header(f, len(entries) + len(indexer.ext_refs()))
 
+        # Must flush before reading (http://bugs.python.org/issue3207)
+        f.flush()
+
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(f, end_ofs=-20)
+
+        # Must reposition before writing (http://bugs.python.org/issue3207)
+        f.seek(0, os.SEEK_CUR)
 
         # Complete the pack.
         for ext_sha in indexer.ext_refs():

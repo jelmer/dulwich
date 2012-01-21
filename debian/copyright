@@ -1,21 +1,22 @@
-Format-Specification: http://wiki.debian.org/Proposals/CopyrightFormat?action=recall&rev=143
+Format: http://dep.debian.net/deps/dep5
 Upstream-Name: dulwich
+Upstream-Contact: Jelmer Vernooij <jelmer@samba.org>
+Source: http://samba.org/~jelmer/dulwich
 Debianized-By: Jelmer Vernooij <jelmer@debian.org>
 Debianized-Date: Tue, 13 Jan 2009 16:56:47 +0100
 
-It was downloaded from http://launchpad.net/dulwich.
-
 Files: *
-Copyright 2005 Linus Torvalds
-Copyright 2007 James Westby <jw+debian@jameswestby.net>
-Copyright 2007-2009 Jelmer Vernooij <jelmer@samba.org>
-Copyright 2008 John Carr <john.carr@unrouted.co.uk>
-License: GPL-2
+Copyright: 2005 Linus Torvalds
+Copyright: 2007 James Westby <jw+debian@jameswestby.net>
+Copyright: 2007-2012 Jelmer Vernooij <jelmer@samba.org>
+Copyright: 2008 John Carr <john.carr@unrouted.co.uk>
+Copyright: 2010 Google, Inc. <dborowitz@google.com>
+License: GPL-2+
  On Debian systems the full text of the GNU General Public License version 2 
  can be found in the `/usr/share/common-licenses/GPL-2' file.
 
 Files: debian/*
-Copyright 2009 Jelmer Vernooij <jelmer@debian.org>
+Copyright: 2009-2012 Jelmer Vernooij <jelmer@debian.org>
 License: GPL-2+
  On Debian systems the full text of the GNU General Public License version 2 
  can be found in the `/usr/share/common-licenses/GPL-2' file.

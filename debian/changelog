@@ -1,3 +1,9 @@
+dulwich (0.8.3-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 21 Jan 2012 22:24:12 +0100
+
 dulwich (0.8.2-1) unstable; urgency=low
 
   * Fix Vcs URL.

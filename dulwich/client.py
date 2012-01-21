@@ -17,7 +17,24 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Client side support for the Git protocol."""
+"""Client side support for the Git protocol.
+
+The Dulwich client supports the following capabilities:
+
+ * thin-pack
+ * multi_ack_detailed
+ * multi_ack
+ * side-band-64k
+ * ofs-delta
+ * report-status
+ * delete-refs
+
+Known capabilities that are not supported:
+
+ * shallow
+ * no-progress
+ * include-tag
+"""
 
 __docformat__ = 'restructuredText'
 
@@ -177,7 +194,7 @@ class GitClient(object):
         :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
-        :return: remote refs
+        :return: remote refs as dictionary
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -189,7 +206,7 @@ class GitClient(object):
             commit()
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress):
+                   progress=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch
@@ -286,7 +303,7 @@ class GitClient(object):
         proto.write_pkt_line(None)
         return (have, want)
 
-    def _handle_receive_pack_tail(self, proto, capabilities, progress):
+    def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
 
         :param proto: Protocol object to read from
@@ -298,6 +315,8 @@ class GitClient(object):
         else:
             report_status_parser = None
         if "side-band-64k" in capabilities:
+            if progress is None:
+                progress = lambda x: None
             channel_callbacks = { 2: progress }
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
@@ -351,7 +370,7 @@ class GitClient(object):
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
-                                 pack_data, progress, rbufsize=_RBUFSIZE):
+                                 pack_data, progress=None, rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
         :param proto: Protocol object to read from
@@ -371,6 +390,9 @@ class GitClient(object):
                 break
             pkt = proto.read_pkt_line()
         if "side-band-64k" in capabilities:
+            if progress is None:
+                # Just ignore progress data
+                progress = lambda x: None
             self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
             # wait for EOF before returning
             data = proto.read()
@@ -455,6 +477,8 @@ class TraditionalGitClient(GitClient):
         except:
             proto.write_pkt_line(None)
             raise
+        if wants is not None:
+            wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
             proto.write_pkt_line(None)
             return refs
@@ -707,19 +731,22 @@ class HttpGitClient(GitClient):
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress):
+                   progress=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :return: Dictionary with the refs of the remote repository
         """
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             "git-upload-pack", url)
         negotiated_capabilities = list(server_capabilities)
         wants = determine_wants(refs)
+        if wants is not None:
+            wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
             return refs
         if self.dumb:

@@ -54,8 +54,17 @@ def cmd_fetch_pack(args):
         determine_wants = r.object_store.determine_wants_all
     else:
         determine_wants = lambda x: [y for y in args if not y in r.object_store]
-    graphwalker = r.get_graph_walker()
-    client.fetch(path, r.object_store, determine_wants)
+    client.fetch(path, r, determine_wants)
+
+
+def cmd_fetch(args):
+    opts, args = getopt(args, "", [])
+    opts = dict(opts)
+    client, path = get_transport_and_path(args.pop(0))
+    r = Repo(".")
+    if "--all" in opts:
+        determine_wants = r.object_store.determine_wants_all
+    refs = client.fetch(path, r, progress=sys.stdout.write)
 
 
 def cmd_log(args):
@@ -183,6 +192,7 @@ def cmd_update_server_info(args):
 commands = {
     "commit": cmd_commit,
     "fetch-pack": cmd_fetch_pack,
+    "fetch": cmd_fetch,
     "dump-pack": cmd_dump_pack,
     "dump-index": cmd_dump_index,
     "init": cmd_init,

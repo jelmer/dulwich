@@ -1,3 +1,20 @@
+0.8.3	2012-01-21
+
+ FEATURES
+
+  * The config parser now supports the git-config file format as
+    described in git-config(1) and can write git config files.
+    (Jelmer Vernooij, #531092, #768687)
+
+  * ``Repo.do_commit`` will now use the user identity from
+    .git/config or ~/.gitconfig if none was explicitly specified.
+   (Jelmer Vernooij)
+
+ BUG FIXES
+
+  * Allow ``determine_wants`` methods to include the zero sha in their
+    return value. (Jelmer Vernooij)
+
 0.8.2	2011-12-18
 
  BUG FIXES

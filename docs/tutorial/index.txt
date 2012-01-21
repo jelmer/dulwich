@@ -10,5 +10,6 @@ Tutorial
    introduction
    repo
    object-store
+   remote
    conclusion
 

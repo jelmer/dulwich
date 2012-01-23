@@ -1,5 +1,9 @@
 0.8.4	UNRELEASED
 
+ * $HOME is now explicitly specified for tests that use it to read
+   ``~/.gitconfig``, to prevent test isolation issues.
+   (Jelmer Vernooij, #920330)
+
 0.8.3	2012-01-21
 
  FEATURES

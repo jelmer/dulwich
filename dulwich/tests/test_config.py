@@ -31,6 +31,7 @@ from dulwich.config import (
     _unescape_value,
     )
 from dulwich.tests import TestCase
+import os
 
 
 class ConfigFileTests(TestCase):
@@ -170,6 +171,8 @@ class ConfigDictTests(TestCase):
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
+        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        os.environ["HOME"] = "/nonexistant"
         StackedConfig.default_backends()
 
 

@@ -1,8 +1,15 @@
 0.8.4	UNRELEASED
 
- * $HOME is now explicitly specified for tests that use it to read
-   ``~/.gitconfig``, to prevent test isolation issues.
-   (Jelmer Vernooij, #920330)
+ BUG FIXES
+
+  * Options on the same line as sections in config files are now supported.
+    (Jelmer Vernooij, #920553)
+
+ TESTS
+
+  * $HOME is now explicitly specified for tests that use it to read
+    ``~/.gitconfig``, to prevent test isolation issues.
+    (Jelmer Vernooij, #920330)
 
 0.8.3	2012-01-21
 

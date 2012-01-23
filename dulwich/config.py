@@ -198,14 +198,13 @@ class ConfigFile(ConfigDict):
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
-                if _strip_comments(line).strip() == "":
-                    continue
-                if line[0] == "[":
+                if len(line) > 0 and line[0] == "[":
                     line = _strip_comments(line).rstrip()
-                    if line[-1] != "]":
+                    last = line.index("]")
+                    if last == -1:
                         raise ValueError("expected trailing ]")
-                    key = line.strip()
-                    pts = key[1:-1].split(" ", 1)
+                    pts = line[1:last].split(" ", 1)
+                    line = line[last+1:]
                     pts[0] = pts[0].lower()
                     if len(pts) == 2:
                         if pts[1][0] != "\"" or pts[1][-1] != "\"":
@@ -227,26 +226,27 @@ class ConfigFile(ConfigDict):
                         else:
                             section = (pts[0], )
                     ret._values[section] = {}
+                if _strip_comments(line).strip() == "":
+                    continue
+                if section is None:
+                    raise ValueError("setting %r without section" % line)
+                try:
+                    setting, value = line.split("=", 1)
+                except ValueError:
+                    setting = line
+                    value = "true"
+                setting = setting.strip().lower()
+                if not _check_variable_name(setting):
+                    raise ValueError("invalid variable name %s" % setting)
+                if value.endswith("\\\n"):
+                    value = value[:-2]
+                    continuation = True
                 else:
-                    if section is None:
-                        raise ValueError("setting %r without section" % line)
-                    try:
-                        setting, value = line.split("=", 1)
-                    except ValueError:
-                        setting = line
-                        value = "true"
-                    setting = setting.strip().lower()
-                    if not _check_variable_name(setting):
-                        raise ValueError("invalid variable name %s" % setting)
-                    if value.endswith("\\\n"):
-                        value = value[:-2]
-                        continuation = True
-                    else:
-                        continuation = False
-                    value = _parse_string(value)
-                    ret._values[section][setting] = value
-                    if not continuation:
-                        setting = None
+                    continuation = False
+                value = _parse_string(value)
+                ret._values[section][setting] = value
+                if not continuation:
+                    setting = None
             else: # continuation line
                 if line.endswith("\\\n"):
                     line = line[:-2]

@@ -147,6 +147,10 @@ class ConfigFileTests(TestCase):
         c.write_to_file(f)
         self.assertEquals("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
 
+    def test_same_line(self):
+        cf = self.from_file("[branch.foo] foo = bar\n")
+        self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))
+
 
 class ConfigDictTests(TestCase):
 

@@ -444,7 +444,13 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
         self.root_path = root_path
 
     def get_url(self):
-        return 'http://%s:%s/' % (self.server_name, self.server_port)
+        # Do not use "self.server_name" to build the URL.
+        # BaseHTTPServer.HTTPServer.server_name returns a fully qualified
+        # name of the host having the address the server is listening on
+        # (on Windows). However, the server is not necessarily listening on
+        # the interface corresponding to the fully qualified name,
+        # e.g. "localhost" vs. "host.example.com".
+        return 'http://%s:%s/' % (self.socket.getsockname()[0], self.server_port)
 
 
 if not getattr(HTTPGitServer, 'shutdown', None):

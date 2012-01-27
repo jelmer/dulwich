@@ -281,6 +281,14 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
     def _build_path(self, path):
         return self.gitroot + path
 
+    def test_archive(self):
+        if os.name == 'nt':
+            raise SkipTest(
+                'upload-archive: Function not implemented: see '
+                'http://permalink.gmane.org/gmane.comp.version-control.msysgit/13035'
+            )
+        super(DulwichMockSSHClientTest, self).test_archive()
+
 
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
@@ -297,6 +305,14 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return self.gitroot + path
+
+    def test_archive(self):
+        if os.name == 'nt':
+            raise SkipTest(
+                'upload-archive: Function not implemented: see '
+                'http://permalink.gmane.org/gmane.comp.version-control.msysgit/13035'
+            )
+        super(DulwichSubprocessClientTest, self).test_archive()
 
 
 class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):

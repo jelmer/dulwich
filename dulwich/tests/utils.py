@@ -23,6 +23,7 @@
 import datetime
 import os
 import shutil
+import stat
 import tempfile
 import time
 import types
@@ -52,6 +53,15 @@ from dulwich.tests import (
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0100644  # Shorthand mode for Files.
 
+def rmtree(path):
+    def forcedelete(fn, path, exc):
+        # make sure file is not read-only
+        os.chmod(path, os.stat(path).st_mode | stat.S_IWRITE)
+        if os.path.isdir(path):
+            os.rmdir(path)
+        else:
+            os.remove(path)
+    shutil.rmtree(path, onerror=forcedelete)
 
 def open_repo(name):
     """Open a copy of a repo in a temporary directory.
@@ -74,7 +84,7 @@ def open_repo(name):
 def tear_down_repo(repo):
     """Tear down a test repository."""
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
-    shutil.rmtree(temp_dir)
+    rmtree(temp_dir)
 
 
 def make_object(cls, **attrs):

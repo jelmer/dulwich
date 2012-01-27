@@ -25,7 +25,6 @@ import SimpleHTTPServer
 import copy
 import os
 import select
-import shutil
 import signal
 import tarfile
 import tempfile
@@ -55,6 +54,9 @@ from dulwich.tests.compat.utils import (
 from dulwich.tests.compat.server_utils import (
     ShutdownServerMixIn,
     )
+from dulwich.tests.utils import (
+    rmtree
+)
 
 
 class DulwichClientTestBase(object):
@@ -67,7 +69,7 @@ class DulwichClientTestBase(object):
         run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
 
     def tearDown(self):
-        shutil.rmtree(self.gitroot)
+        rmtree(self.gitroot)
 
     def assertDestEqualsSrc(self):
         src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))

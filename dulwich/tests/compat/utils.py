@@ -22,10 +22,10 @@
 import errno
 import os
 import socket
-import subprocess
 import tempfile
 import time
 
+from dulwich import sp as subprocess
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 

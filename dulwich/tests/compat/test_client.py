@@ -27,7 +27,6 @@ import os
 import select
 import shutil
 import signal
-import subprocess
 import tarfile
 import tempfile
 import threading
@@ -42,6 +41,7 @@ from dulwich import (
     objects,
     repo,
     )
+from dulwich import sp as subprocess
 from dulwich.tests import (
     SkipTest,
     )
@@ -253,7 +253,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 class TestSSHVendor(object):
     @staticmethod
     def connect_ssh(host, command, username=None, port=None):
-        cmd, path = command[0].replace("'", '').split(' ')
+        cmd, path = command[0].replace("'", '').split(' ', 1)
         cmd = cmd.split('-', 1)
         p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)

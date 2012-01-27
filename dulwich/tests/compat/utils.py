@@ -185,11 +185,13 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
     for _ in xrange(limit):
         time.sleep(delay)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(delay)
+        s.settimeout(timeout)
         try:
             s.connect(('localhost', port))
             s.close()
             return True
+        except socket.timeout:
+                pass
         except socket.error, e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise

@@ -171,7 +171,10 @@ class ConfigDictTests(TestCase):
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
-        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        if "HOME" in os.environ:
+            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        else:
+            self.addCleanup(os.environ.__delitem__, "HOME")
         os.environ["HOME"] = "/nonexistant"
         StackedConfig.default_backends()
 

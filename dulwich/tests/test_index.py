@@ -36,6 +36,7 @@ from dulwich.index import (
     read_index,
     write_cache_time,
     write_index,
+    build_index_from_tree,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -44,6 +45,12 @@ from dulwich.objects import (
     Blob,
     )
 from dulwich.tests import TestCase
+from dulwich.repo import Repo
+from dulwich.tests.utils import (
+    open_repo,
+    tear_down_repo,
+)
+
 
 
 class IndexTestCase(TestCase):
@@ -208,3 +215,46 @@ class IndexEntryFromStatTests(TestCase):
             12288,
             '2222222222222222222222222222222222222222',
             0))
+
+
+class BuildIndexTests(TestCase):
+
+    def test_nonempty(self):
+        repo = open_repo('a.git')
+
+        target_repo_dir = tempfile.mkdtemp()
+        target_repo = Repo.init(target_repo_dir)
+
+        repo.fetch(target_repo)
+
+        target_repo.refs.add_if_new(
+                'refs/heads/master',
+                repo.refs['refs/heads/master'])
+
+        self.assertFalse(os.path.exists(target_repo.index_path()))
+        build_index_from_tree(target_repo.path, target_repo.index_path(),
+                target_repo.object_store, target_repo['refs/heads/master'].tree)
+        self.assertTrue(os.path.exists(target_repo.index_path()))
+ 
+        index = target_repo.open_index()
+
+        for entry in repo.object_store.iter_tree_contents(repo['refs/heads/master'].tree):
+            full_path = os.path.join(target_repo.path, entry.path)
+            self.assertTrue(os.path.exists(full_path))
+
+            st = os.stat(full_path)
+            f = open(full_path, 'rb')
+            blob = Blob()
+            try:
+                blob.data = f.read()
+            finally:
+                f.close()
+
+            index_entry = index_entry_from_stat(st, blob.id, 0)
+
+            index_entry_cmp = ((int(index_entry[0]),0), (int(index_entry[1]),0)) + (int(index_entry[2]),) + index_entry[3:]
+
+            self.assertEquals(index_entry_cmp, index[entry.path])
+
+        shutil.rmtree(target_repo.path)
+        tear_down_repo(repo)

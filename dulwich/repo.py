@@ -1353,54 +1353,14 @@ class Repo(BaseRepo):
             target.refs.add_if_new(
                 'refs/heads/master',
                 self.refs['refs/heads/master'])
+
+            from dulwich.index import ( build_index_from_tree )
+            if not bare:
+                build_index_from_tree(target.path, target.index_path(), target.object_store, target['refs/heads/master'].tree);
         except KeyError:
             pass
 
-        target.checkout()
         return target
-
-    def checkout(self, branch='refs/heads/master'):
-        """Checkout a branch.
-
-        This current only supports checking out master on fresh clones.
-
-        :param branch: Branch to checkout
-        """
-
-        if self.bare:
-            raise # Cannot checkout in a bare repo
-
-        from dulwich.index import (
-                Index,
-                index_entry_from_stat
-                )
-        import stat
-
-        try:
-            index = self.open_index()
-            index.clear() # FIXME: When switching branches, merge working dir
-        except NoIndexPresent:
-            index = Index(self.index_path())
-
-        tree_id = self[branch].tree
-
-        # FIXME: When switching branches, merge working dir
-        for entry in self.object_store.iter_tree_contents(tree_id):
-            full_path = os.path.join(self.path, entry.path)
-
-            if not os.path.exists( os.path.dirname(full_path) ):
-                os.makedirs(os.path.dirname(full_path))
-
-            with open(full_path, 'wb') as file:
-                # Write out file
-                file.write(self.get_object(entry.sha).as_raw_string()) 
-                os.chmod(full_path, entry.mode)
-
-                # Add file to index
-                st = os.stat(full_path)
-                index[entry.path] = index_entry_from_stat(st, entry.sha, entry.mode)
-
-        index.write()
 
     def __repr__(self):
         return "<Repo at %r>" % self.path

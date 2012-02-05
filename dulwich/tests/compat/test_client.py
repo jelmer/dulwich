@@ -251,11 +251,29 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
 
 class TestSSHVendor(object):
+    _tmp_dir = None
+
+    @staticmethod
+    def get_tmp_dir():
+        if TestSSHVendor._tmp_dir is None:
+            TestSSHVendor._tmp_dir = tempfile.mkdtemp()
+        return TestSSHVendor._tmp_dir
+
+    @staticmethod
+    def close():
+        if TestSSHVendor._tmp_dir is not None:
+            shutil.rmtree(TestSSHVendor._tmp_dir)
+        TestSSHVendor._tmp_dir = None
+
     @staticmethod
     def connect_ssh(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
+        env = os.environ.copy()
+        # Direct "HOME" to an empty directory to avoid any effects
+        # of user's local "~/.gitconfig" in the tests
+        env["HOME"] = TestSSHVendor.get_tmp_dir()
+        p = subprocess.Popen(cmd + [path], env=env, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 
@@ -272,6 +290,7 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
         client.get_ssh_vendor = self.real_vendor
+        TestSSHVendor.close()
 
     def _client(self):
         return client.SSHGitClient('localhost')
@@ -285,8 +304,17 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
+        self.tmp_dir = tempfile.mkdtemp()
+        # Direct "HOME" to an empty directory to avoid any effects
+        # of user's local "~/.gitconfig" in the tests
+        if "HOME" in os.environ:
+            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        else:
+            self.addCleanup(os.environ.__delitem__, "HOME")
+        os.environ["HOME"] = self.tmp_dir
 
     def tearDown(self):
+        shutil.rmtree(self.tmp_dir)
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 

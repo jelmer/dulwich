@@ -387,3 +387,36 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
+ 
+def build_index_from_tree(prefix, index_path, object_store, tree_id):
+    """Generate and materialize index from a tree
+
+    :param tree_id: Tree to materialize
+    :param prefix: Target dir for materialized index files
+    :param index_path: Target path for generated index
+    :param object_store: Non-empty object store holding tree contents
+
+    Note: existing index is wiped and contents are not merged
+    in a working dir. Suiteable only for fresh clones.
+    """
+
+    index = Index(index_path)
+
+    for entry in object_store.iter_tree_contents(tree_id):
+        full_path = os.path.join(prefix, entry.path)
+
+        if not os.path.exists( os.path.dirname(full_path) ):
+            os.makedirs(os.path.dirname(full_path))
+
+        # FIXME: Merge new index into working tree
+        with open(full_path, 'wb') as file:
+            # Write out file
+            file.write(object_store[entry.sha].as_raw_string()) 
+
+        os.chmod(full_path, entry.mode)
+
+        # Add file to index
+        st = os.stat(full_path)
+        index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
+
+    index.write()

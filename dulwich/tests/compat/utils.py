@@ -21,6 +21,7 @@
 
 import errno
 import os
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -117,14 +118,37 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
         False, None will be returned as stdout contents.
     :raise OSError: if the git executable was not found.
     """
+
+    env = popen_kwargs.pop('env', None)
+    if env is None:
+        env = os.environ.copy()
+    # Set the environment so that Git doesn't use the user's
+    # customization while the tests are run.
+    #
+    # On Windows it's not enough to set "HOME" to a non-existing
+    # directory. Git.cmd takes the first existing directory out of
+    # "%HOME%", "%HOMEDRIVE%%HOMEPATH%" and "%USERPROFILE%".
+    #
+    # However, USERPROFILE cannot be set to a non-existing
+    # directory, because "cmd" starts complaining.
+    #
+    # We point "HOME" to a temporary, empty directory instead. This
+    # means we create a lot of temporary directories. If it turns
+    # out to be a problem there could be a "class IsolatedGit"
+    # which creates a single directory and it would have a "run_git()"
+    # method.
+    tmp_dir = tempfile.mkdtemp()
+    env["HOME"] = tmp_dir
+
     args = [git_path] + args
     popen_kwargs['stdin'] = subprocess.PIPE
     if capture_stdout:
         popen_kwargs['stdout'] = subprocess.PIPE
     else:
         popen_kwargs.pop('stdout', None)
-    p = subprocess.Popen(args, **popen_kwargs)
+    p = subprocess.Popen(args, env=env, **popen_kwargs)
     stdout, stderr = p.communicate(input=input)
+    shutil.rmtree(tmp_dir)
     return (p.returncode, stdout)
 
 

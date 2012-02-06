@@ -43,14 +43,10 @@ from dulwich.object_store import (
     )
 from dulwich.objects import (
     Blob,
+    Tree,
     )
 from dulwich.tests import TestCase
 from dulwich.repo import Repo
-from dulwich.tests.utils import (
-    open_repo,
-    tear_down_repo,
-)
-
 
 
 class IndexTestCase(TestCase):
@@ -220,35 +216,48 @@ class IndexEntryFromStatTests(TestCase):
 class BuildIndexTests(TestCase):
 
     def test_nonempty(self):
-        repo = open_repo('a.git')
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir) 
 
-        target_repo_dir = tempfile.mkdtemp()
-        target_repo = Repo.init(target_repo_dir)
+        # Populate repo
+        filea = Blob.from_string('file a')
+        fileb = Blob.from_string('file b')
+        filed = Blob.from_string('file d')
+        filee = Blob.from_string('d')
 
-        repo.fetch(target_repo)
+        tree = Tree()
+        tree['a'] = (33188, filea.id)
+        tree['b'] = (33188, fileb.id)
+        tree['c/d'] = (33188, filed.id)
+        tree['c/e'] = (40960, filee.id) # symlink
 
-        target_repo.refs.add_if_new(
-                'refs/heads/master',
-                repo.refs['refs/heads/master'])
+        repo.object_store.add_object(filea)
+        repo.object_store.add_object(fileb)
+        repo.object_store.add_object(filed)
+        repo.object_store.add_object(filee)
+        repo.object_store.add_object(tree)
 
-        self.assertFalse(os.path.exists(target_repo.index_path()))
-        build_index_from_tree(target_repo.path, target_repo.index_path(),
-                target_repo.object_store, target_repo['refs/heads/master'].tree)
-        self.assertTrue(os.path.exists(target_repo.index_path()))
+        build_index_from_tree(repo.path, repo.index_path(),
+                repo.object_store, tree.id)
  
-        index = target_repo.open_index()
-
-        for entry in repo.object_store.iter_tree_contents(repo['refs/heads/master'].tree):
-            full_path = os.path.join(target_repo.path, entry.path)
+        # Verify index entries
+        index = repo.open_index()
+        for entry in tree.iteritems():
+            full_path = os.path.join(repo.path, entry.path)
             self.assertTrue(os.path.exists(full_path))
 
-            st = os.stat(full_path)
-            f = open(full_path, 'rb')
+            st = os.lstat(full_path)
+
             blob = Blob()
-            try:
-                blob.data = f.read()
-            finally:
-                f.close()
+            if( stat.S_ISLNK(st.st_mode) ):
+                blob.data = os.readlink(full_path)
+            else:
+                f = open(full_path, 'rb')
+                try:
+                    blob.data = f.read()
+                finally:
+                    f.close()
 
             index_entry = index_entry_from_stat(st, blob.id, 0)
 
@@ -256,5 +265,6 @@ class BuildIndexTests(TestCase):
 
             self.assertEquals(index_entry_cmp, index[entry.path])
 
-        shutil.rmtree(target_repo.path)
-        tear_down_repo(repo)
+        # Verify files
+        self.assertEquals(['.git', 'a', 'b', 'c'], os.listdir(repo.path))
+        self.assertEquals(['d', 'e'], os.listdir(os.path.join(repo.path, 'c')))

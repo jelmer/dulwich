@@ -218,7 +218,7 @@ class BuildIndexTests(TestCase):
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)
-        self.addCleanup(shutil.rmtree, repo_dir) 
+        self.addCleanup(shutil.rmtree, repo_dir)
 
         tree = Tree()
 
@@ -226,7 +226,7 @@ class BuildIndexTests(TestCase):
 
         build_index_from_tree(repo.path, repo.index_path(),
                 repo.object_store, tree.id)
- 
+
         # Verify index entries
         index = repo.open_index()
         self.assertEquals(len(index), 0)
@@ -237,7 +237,7 @@ class BuildIndexTests(TestCase):
     def test_nonempty(self):
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)
-        self.addCleanup(shutil.rmtree, repo_dir) 
+        self.addCleanup(shutil.rmtree, repo_dir)
 
         # Populate repo
         filea = Blob.from_string('file a')
@@ -249,7 +249,7 @@ class BuildIndexTests(TestCase):
         tree['a'] = (33188, filea.id)
         tree['b'] = (33188, fileb.id)
         tree['c/d'] = (33188, filed.id)
-        tree['c/e'] = (40960, filee.id) # symlink
+        tree['c/e'] = (40960, filee.id)  # symlink
 
         repo.object_store.add_object(filea)
         repo.object_store.add_object(fileb)
@@ -259,10 +259,10 @@ class BuildIndexTests(TestCase):
 
         build_index_from_tree(repo.path, repo.index_path(),
                 repo.object_store, tree.id)
- 
+
         # Verify index entries
         index = repo.open_index()
-        self.assertEquals(len(index),4)
+        self.assertEquals(len(index), 4)
         for entry in tree.iteritems():
             full_path = os.path.join(repo.path, entry.path)
             self.assertTrue(os.path.exists(full_path))
@@ -270,7 +270,7 @@ class BuildIndexTests(TestCase):
             st = os.lstat(full_path)
 
             blob = Blob()
-            if( stat.S_ISLNK(st.st_mode) ):
+            if(stat.S_ISLNK(st.st_mode)):
                 blob.data = os.readlink(full_path)
             else:
                 f = open(full_path, 'rb')
@@ -281,7 +281,10 @@ class BuildIndexTests(TestCase):
 
             index_entry = index_entry_from_stat(st, blob.id, 0)
 
-            index_entry_cmp = ((int(index_entry[0]),0), (int(index_entry[1]),0)) + (int(index_entry[2]),) + index_entry[3:]
+            index_entry_cmp = \
+                    ((int(index_entry[0]), 0), (int(index_entry[1]), 0)) + \
+                    (int(index_entry[2]), ) + \
+                    index_entry[3:]
 
             self.assertEquals(index_entry_cmp, index[entry.path])
 

@@ -36,14 +36,17 @@ from dulwich.index import (
     read_index,
     write_cache_time,
     write_index,
+    build_index_from_tree,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
     )
 from dulwich.objects import (
     Blob,
+    Tree,
     )
 from dulwich.tests import TestCase
+from dulwich.repo import Repo
 
 
 class IndexTestCase(TestCase):
@@ -208,3 +211,83 @@ class IndexEntryFromStatTests(TestCase):
             12288,
             '2222222222222222222222222222222222222222',
             0))
+
+
+class BuildIndexTests(TestCase):
+
+    def test_empty(self):
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        tree = Tree()
+
+        repo.object_store.add_object(tree)
+
+        build_index_from_tree(repo.path, repo.index_path(),
+                repo.object_store, tree.id)
+
+        # Verify index entries
+        index = repo.open_index()
+        self.assertEquals(len(index), 0)
+
+        # Verify no files
+        self.assertEquals(['.git'], os.listdir(repo.path))
+
+    def test_nonempty(self):
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        # Populate repo
+        filea = Blob.from_string('file a')
+        fileb = Blob.from_string('file b')
+        filed = Blob.from_string('file d')
+        filee = Blob.from_string('d')
+
+        tree = Tree()
+        tree['a'] = (33188, filea.id)
+        tree['b'] = (33188, fileb.id)
+        tree['c/d'] = (33188, filed.id)
+        tree['c/e'] = (40960, filee.id)  # symlink
+
+        repo.object_store.add_object(filea)
+        repo.object_store.add_object(fileb)
+        repo.object_store.add_object(filed)
+        repo.object_store.add_object(filee)
+        repo.object_store.add_object(tree)
+
+        build_index_from_tree(repo.path, repo.index_path(),
+                repo.object_store, tree.id)
+
+        # Verify index entries
+        index = repo.open_index()
+        self.assertEquals(len(index), 4)
+        for entry in tree.iteritems():
+            full_path = os.path.join(repo.path, entry.path)
+            self.assertTrue(os.path.exists(full_path))
+
+            st = os.lstat(full_path)
+
+            blob = Blob()
+            if(stat.S_ISLNK(st.st_mode)):
+                blob.data = os.readlink(full_path)
+            else:
+                f = open(full_path, 'rb')
+                try:
+                    blob.data = f.read()
+                finally:
+                    f.close()
+
+            index_entry = index_entry_from_stat(st, blob.id, 0)
+
+            index_entry_cmp = \
+                    ((int(index_entry[0]), 0), (int(index_entry[1]), 0)) + \
+                    (int(index_entry[2]), ) + \
+                    index_entry[3:]
+
+            self.assertEquals(index_entry_cmp, index[entry.path])
+
+        # Verify files
+        self.assertEquals(['.git', 'a', 'b', 'c'], os.listdir(repo.path))
+        self.assertEquals(['d', 'e'], os.listdir(os.path.join(repo.path, 'c')))

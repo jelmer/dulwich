@@ -22,7 +22,7 @@
 """Repository access.
 
 This module contains the base class for git repositories
-(BaseRepo) and an implementation which uses a repository on 
+(BaseRepo) and an implementation which uses a repository on
 local disk (Repo).
 
 """
@@ -201,7 +201,7 @@ class RefsContainer(object):
             try:
                 ret[key] = self[("%s/%s" % (base, key)).strip("/")]
             except KeyError:
-                continue # Unable to resolve
+                continue  # Unable to resolve
 
         return ret
 
@@ -553,7 +553,7 @@ class DiskRefsContainer(RefsContainer):
                     return header + iter(f).next().rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
-                    return header + f.read(40-len(SYMREF))
+                    return header + f.read(40 - len(SYMREF))
             finally:
                 f.close()
         except IOError, e:
@@ -635,7 +635,7 @@ class DiskRefsContainer(RefsContainer):
                     f.abort()
                     raise
             try:
-                f.write(new_ref+"\n")
+                f.write(new_ref + "\n")
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -668,7 +668,7 @@ class DiskRefsContainer(RefsContainer):
                 f.abort()
                 return False
             try:
-                f.write(ref+"\n")
+                f.write(ref + "\n")
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -1319,7 +1319,7 @@ class Repo(BaseRepo):
                 try:
                     del index[path]
                 except KeyError:
-                    pass # already removed
+                    pass  # already removed
             else:
                 blob = Blob()
                 f = open(full_path, 'rb')
@@ -1346,7 +1346,7 @@ class Repo(BaseRepo):
             target = self.init_bare(target_path)
         self.fetch(target)
         target.refs.import_refs(
-            'refs/remotes/'+origin, self.refs.as_dict('refs/heads'))
+            'refs/remotes/' + origin, self.refs.as_dict('refs/heads'))
         target.refs.import_refs(
             'refs/tags', self.refs.as_dict('refs/tags'))
         try:
@@ -1355,6 +1355,18 @@ class Repo(BaseRepo):
                 self.refs['refs/heads/master'])
         except KeyError:
             pass
+
+        # Update target head
+        head, head_sha = self.refs._follow('HEAD')
+        target.refs.set_symbolic_ref('HEAD', head)
+        target['HEAD'] = head_sha
+
+        if not bare:
+            # Checkout HEAD to target dir
+            from dulwich.index import build_index_from_tree
+            build_index_from_tree(target.path, target.index_path(),
+                    target.object_store, target['HEAD'].tree)
+
         return target
 
     def __repr__(self):

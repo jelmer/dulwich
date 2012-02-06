@@ -255,7 +255,12 @@ class TestSSHVendor(object):
     def connect_ssh(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
+        env = os.environ.copy()
+        # Direct "HOME" to an empty directory to avoid any effects
+        # of user's local "~/.gitconfig" in the tests
+        for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+            env[e] = '/nosuchdir'
+        p = subprocess.Popen(cmd + [path], env=env, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 
@@ -285,6 +290,14 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
+        # Direct "HOME" to an empty directory to avoid any effects
+        # of user's local "~/.gitconfig" in the tests
+        for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+            if e in os.environ:
+                self.addCleanup(os.environ.__setitem__, e, os.environ[e])
+            else:
+                self.addCleanup(os.environ.__delitem__, e)
+            os.environ[e] = '/nosuchdir'
 
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)

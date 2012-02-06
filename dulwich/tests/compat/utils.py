@@ -117,13 +117,26 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
         False, None will be returned as stdout contents.
     :raise OSError: if the git executable was not found.
     """
+
+    env = popen_kwargs.pop('env', None)
+    if env is None:
+        env = os.environ.copy()
+    # Set the environment so that Git doesn't use the user's
+    # customization while the tests are run.
+    #
+    # On Windows it's not enough to set "HOME" to a non-existing
+    # directory. Git.cmd takes the first existing directory out of
+    # "%HOME%", "%HOMEDRIVE%%HOMEPATH%" and "%USERPROFILE%".
+    for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+        env[e] = '/nosuchdir'
+
     args = [git_path] + args
     popen_kwargs['stdin'] = subprocess.PIPE
     if capture_stdout:
         popen_kwargs['stdout'] = subprocess.PIPE
     else:
         popen_kwargs.pop('stdout', None)
-    p = subprocess.Popen(args, **popen_kwargs)
+    p = subprocess.Popen(args, env=env, **popen_kwargs)
     stdout, stderr = p.communicate(input=input)
     return (p.returncode, stdout)
 

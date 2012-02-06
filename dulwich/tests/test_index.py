@@ -215,6 +215,25 @@ class IndexEntryFromStatTests(TestCase):
 
 class BuildIndexTests(TestCase):
 
+    def test_empty(self):
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir) 
+
+        tree = Tree()
+
+        repo.object_store.add_object(tree)
+
+        build_index_from_tree(repo.path, repo.index_path(),
+                repo.object_store, tree.id)
+ 
+        # Verify index entries
+        index = repo.open_index()
+        self.assertEquals(len(index), 0)
+
+        # Verify no files
+        self.assertEquals(['.git'], os.listdir(repo.path))
+
     def test_nonempty(self):
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)
@@ -243,6 +262,7 @@ class BuildIndexTests(TestCase):
  
         # Verify index entries
         index = repo.open_index()
+        self.assertEquals(len(index),4)
         for entry in tree.iteritems():
             full_path = os.path.join(repo.path, entry.path)
             self.assertTrue(os.path.exists(full_path))

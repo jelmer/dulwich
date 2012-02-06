@@ -1353,12 +1353,19 @@ class Repo(BaseRepo):
             target.refs.add_if_new(
                 'refs/heads/master',
                 self.refs['refs/heads/master'])
-
-            from dulwich.index import ( build_index_from_tree )
-            if not bare:
-                build_index_from_tree(target.path, target.index_path(), target.object_store, target['refs/heads/master'].tree);
         except KeyError:
             pass
+
+        # Update target head
+        head, head_sha = self.refs._follow('HEAD')
+        target.refs.set_symbolic_ref('HEAD', head)
+        target['HEAD'] = head_sha
+
+        if not bare:
+            # Checkout HEAD to target dir
+            from dulwich.index import ( build_index_from_tree )
+            build_index_from_tree(target.path, target.index_path(),
+                    target.object_store, target['HEAD'].tree);
 
         return target
 

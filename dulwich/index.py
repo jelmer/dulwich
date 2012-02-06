@@ -59,7 +59,7 @@ def pathjoin(*args):
 
 def read_cache_time(f):
     """Read a cache time.
-    
+
     :param f: File-like object to read from
     :return: Tuple with seconds and nanoseconds
     """
@@ -68,7 +68,7 @@ def read_cache_time(f):
 
 def write_cache_time(f, t):
     """Write a cache time.
-    
+
     :param f: File-like object to write to
     :param t: Time to write (as int, float or tuple with secs and nsecs)
     """
@@ -97,7 +97,7 @@ def read_cache_entry(f):
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     data = f.read((beginoffset + real_size) - f.tell())
-    return (name, ctime, mtime, dev, ino, mode, uid, gid, size, 
+    return (name, ctime, mtime, dev, ino, mode, uid, gid, size,
             sha_to_hex(sha), flags & ~0x0fff)
 
 
@@ -105,7 +105,7 @@ def write_cache_entry(f, entry):
     """Write an index entry to a file.
 
     :param f: File object
-    :param entry: Entry to write, tuple with: 
+    :param entry: Entry to write, tuple with:
         (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
     """
     beginoffset = f.tell()
@@ -132,7 +132,7 @@ def read_index(f):
 
 def read_index_dict(f):
     """Read an index file and return it as a dictionary.
-    
+
     :param f: File object to read from
     """
     ret = {}
@@ -143,7 +143,7 @@ def read_index_dict(f):
 
 def write_index(f, entries):
     """Write an index file.
-    
+
     :param f: File-like object to write to
     :param entries: Iterable over the entries to write
     """
@@ -167,7 +167,7 @@ def cleanup_mode(mode):
     """Cleanup a mode value.
 
     This will return a mode that can be stored in a tree object.
-    
+
     :param mode: Mode to clean up.
     """
     if stat.S_ISLNK(mode):
@@ -186,7 +186,7 @@ class Index(object):
 
     def __init__(self, filename):
         """Open an index file.
-        
+
         :param filename: Path to the index file
         """
         self._filename = filename
@@ -226,7 +226,7 @@ class Index(object):
 
     def __getitem__(self, name):
         """Retrieve entry by relative path.
-        
+
         :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
         """
         return self._byname[name]
@@ -302,7 +302,9 @@ def commit_tree(object_store, blobs):
     :param blobs: Iterable over blob path, sha, mode entries
     :return: SHA1 of the created tree.
     """
+
     trees = {"": {}}
+
     def add_tree(path):
         if path in trees:
             return trees[path]
@@ -387,7 +389,8 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
- 
+
+
 def build_index_from_tree(prefix, index_path, object_store, tree_id):
     """Generate and materialize index from a tree
 
@@ -405,7 +408,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
     for entry in object_store.iter_tree_contents(tree_id):
         full_path = os.path.join(prefix, entry.path)
 
-        if not os.path.exists( os.path.dirname(full_path) ):
+        if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
@@ -414,7 +417,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
         else:
             with open(full_path, 'wb') as file:
                 # Write out file
-                file.write(object_store[entry.sha].as_raw_string()) 
+                file.write(object_store[entry.sha].as_raw_string())
 
             os.chmod(full_path, entry.mode)
 

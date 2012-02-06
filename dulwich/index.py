@@ -409,14 +409,17 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
-        with open(full_path, 'wb') as file:
-            # Write out file
-            file.write(object_store[entry.sha].as_raw_string()) 
+        if stat.S_ISLNK(entry.mode):
+            os.symlink(object_store[entry.sha].as_raw_string(), full_path)
+        else:
+            with open(full_path, 'wb') as file:
+                # Write out file
+                file.write(object_store[entry.sha].as_raw_string()) 
 
-        os.chmod(full_path, entry.mode)
+            os.chmod(full_path, entry.mode)
 
         # Add file to index
-        st = os.stat(full_path)
+        st = os.lstat(full_path)
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()

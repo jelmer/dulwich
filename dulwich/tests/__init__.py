@@ -30,10 +30,22 @@ import tempfile
 if sys.version_info >= (2, 7):
     # If Python itself provides an exception, use that
     import unittest
-    from unittest import SkipTest, TestCase
+    from unittest import SkipTest, TestCase as _TestCase
 else:
     import unittest2 as unittest
-    from unittest2 import SkipTest, TestCase
+    from unittest2 import SkipTest, TestCase as _TestCase
+
+
+class TestCase(_TestCase):
+    def makeSafeEnv(self):
+        """Modifies HOME to point to a non-existing directory to avoid
+        side-effects caused by user's ~/.gitconfig"""
+
+        if "HOME" in os.environ:
+            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        else:
+            self.addCleanup(os.environ.__delitem__, "HOME")
+        os.environ["HOME"] = "/nonexistant"
 
 
 class BlackboxTestCase(TestCase):

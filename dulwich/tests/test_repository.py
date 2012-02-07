@@ -320,7 +320,10 @@ class RepositoryTests(TestCase):
         self.assertIsInstance(r.get_config(), Config)
 
     def test_get_config_stack(self):
-        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        if "HOME" in os.environ:
+            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        else:
+            self.addCleanup(os.environ.__delitem__, "HOME")
         os.environ["HOME"] = "/nonexistant"
         r = self._repo = open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
@@ -460,7 +463,10 @@ class BuildRepoTests(TestCase):
         self.assertEquals("iso8859-1", r[commit_sha].encoding)
 
     def test_commit_config_identity(self):
-        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        if "HOME" in os.environ:
+            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        else:
+            self.addCleanup(os.environ.__delitem__, "HOME")
         os.environ["HOME"] = "/nonexistant"
         # commit falls back to the users' identity if it wasn't specified
         r = self._repo

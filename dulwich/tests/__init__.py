@@ -35,17 +35,30 @@ else:
     import unittest2 as unittest
     from unittest2 import SkipTest, TestCase as _TestCase
 
+def get_safe_env(env=None):
+    """Returns the environment "env" (or a copy of "os.environ" by default)
+    modified to avoid side-effects caused by user's ~/.gitconfig"""
+
+    if env is None:
+        env = os.environ.copy()
+    # On Windows it's not enough to set "HOME" to a non-existing
+    # directory. Git.cmd takes the first existing directory out of
+    # "%HOME%", "%HOMEDRIVE%%HOMEPATH%" and "%USERPROFILE%".
+    for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+        env[e] = '/nosuchdir'
+    return env
 
 class TestCase(_TestCase):
     def makeSafeEnv(self):
-        """Modifies HOME to point to a non-existing directory to avoid
+        """Modifies "os.environ" for the duration of a test case to avoid
         side-effects caused by user's ~/.gitconfig"""
 
-        if "HOME" in os.environ:
-            self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
-        else:
-            self.addCleanup(os.environ.__delitem__, "HOME")
-        os.environ["HOME"] = "/nonexistant"
+        for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+            if e in os.environ:
+                self.addCleanup(os.environ.__setitem__, e, os.environ[e])
+            else:
+                self.addCleanup(os.environ.__delitem__, e)
+            os.environ[e] = '/nosuchdir'
 
 
 class BlackboxTestCase(TestCase):

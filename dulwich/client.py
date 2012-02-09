@@ -515,7 +515,7 @@ class TCPGitClient(TraditionalGitClient):
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        GitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
         sockaddrs = socket.getaddrinfo(self._host, self._port,
@@ -578,7 +578,7 @@ class SubprocessGitClient(TraditionalGitClient):
         self._stderr = kwargs.get('stderr')
         if 'stderr' in kwargs:
             del kwargs['stderr']
-        GitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
         import subprocess
@@ -617,7 +617,7 @@ class SSHGitClient(TraditionalGitClient):
         self.host = host
         self.port = port
         self.username = username
-        GitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, *args, **kwargs)
         self.alternative_paths = {}
 
     def _get_cmd_path(self, cmd):

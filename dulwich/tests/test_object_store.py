@@ -221,12 +221,33 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.store_dir)
         self.store = DiskObjectStore.init(self.store_dir)
 
     def tearDown(self):
         TestCase.tearDown(self)
         PackBasedObjectStoreTests.tearDown(self)
-        shutil.rmtree(self.store_dir)
+
+    def test_alternates(self):
+        alternate_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, alternate_dir)
+        alternate_store = DiskObjectStore(alternate_dir)
+        b2 = make_object(Blob, data="yummy data")
+        alternate_store.add_object(b2)
+        store = DiskObjectStore(self.store_dir)
+        self.assertRaises(KeyError, store.__getitem__, b2.id)
+        store.add_alternate_path(alternate_dir)
+        self.assertEquals(b2, store[b2.id])
+
+    def test_add_alternate_path(self):
+        store = DiskObjectStore(self.store_dir)
+        self.assertEquals([], store._read_alternate_paths())
+        store.add_alternate_path("/foo/path")
+        self.assertEquals(["/foo/path"], store._read_alternate_paths())
+        store.add_alternate_path("/bar/path")
+        self.assertEquals(
+            ["/foo/path", "/bar/path"],
+            store._read_alternate_paths())
 
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)
@@ -249,15 +270,20 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
           (REF_DELTA, (blob.id, 'more yummy data')),
           ], store=o)
         pack = o.add_thin_pack(f.read, None)
+        try:
+            packed_blob_sha = sha_to_hex(entries[0][3])
+            pack.check_length_and_checksum()
+            self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
+            self.assertTrue(o.contains_packed(packed_blob_sha))
+            self.assertTrue(o.contains_packed(blob.id))
+            self.assertEqual((Blob.type_num, 'more yummy data'),
+                             o.get_raw(packed_blob_sha))
+        finally:
+            # FIXME: DiskObjectStore should have close() which do the following:
+            for p in o._pack_cache or []:
+                p.close()
 
-        packed_blob_sha = sha_to_hex(entries[0][3])
-        pack.check_length_and_checksum()
-        self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
-        self.assertTrue(o.contains_packed(packed_blob_sha))
-        self.assertTrue(o.contains_packed(blob.id))
-        self.assertEqual((Blob.type_num, 'more yummy data'),
-                         o.get_raw(packed_blob_sha))
-
+            pack.close()
 
 class TreeLookupPathTests(TestCase):
 

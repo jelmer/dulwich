@@ -132,8 +132,8 @@ class BaseObjectStore(object):
     def tree_changes(self, source, target, want_unchanged=False):
         """Find the differences between the contents of two trees
 
-        :param object_store: Object store to use for retrieving tree contents
-        :param tree: SHA1 of the root tree
+        :param source: SHA1 of the source tree
+        :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
@@ -226,6 +226,10 @@ class PackBasedObjectStore(BaseObjectStore):
     def __init__(self):
         self._pack_cache = None
 
+    @property
+    def alternates(self):
+        return []
+
     def contains_packed(self, sha):
         """Check if a particular object is present by SHA1 and is packed."""
         for pack in self.packs:
@@ -310,6 +314,11 @@ class PackBasedObjectStore(BaseObjectStore):
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()
+        for alternate in self.alternates:
+            try:
+                return alternate.get_raw(hexsha)
+            except KeyError:
+                pass
         raise KeyError(hexsha)
 
     def add_objects(self, objects):
@@ -338,6 +347,63 @@ class DiskObjectStore(PackBasedObjectStore):
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._pack_cache_time = 0
+        self._alternates = None
+
+    @property
+    def alternates(self):
+        if self._alternates is not None:
+            return self._alternates
+        self._alternates = []
+        for path in self._read_alternate_paths():
+            self._alternates.append(DiskObjectStore(path))
+        return self._alternates
+
+    def _read_alternate_paths(self):
+        try:
+            f = GitFile(os.path.join(self.path, "info", "alternates"),
+                    'rb')
+        except (OSError, IOError), e:
+            if e.errno == errno.ENOENT:
+                return []
+            raise
+        ret = []
+        try:
+            for l in f.readlines():
+                l = l.rstrip("\n")
+                if l[0] == "#":
+                    continue
+                if not os.path.isabs(l):
+                    continue
+                ret.append(l)
+            return ret
+        finally:
+            f.close()
+
+    def add_alternate_path(self, path):
+        """Add an alternate path to this object store.
+        """
+        try:
+            os.mkdir(os.path.join(self.path, "info"))
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
+        alternates_path = os.path.join(self.path, "info/alternates")
+        f = GitFile(alternates_path, 'wb')
+        try:
+            try:
+                orig_f = open(alternates_path, 'rb')
+            except (OSError, IOError), e:
+                if e.errno != errno.ENOENT:
+                    raise
+            else:
+                try:
+                    f.write(orig_f.read())
+                finally:
+                    orig_f.close()
+            f.write("%s\n" % path)
+        finally:
+            f.close()
+        self.alternates.append(DiskObjectStore(path))
 
     def _load_packs(self):
         pack_files = []
@@ -405,11 +471,18 @@ class DiskObjectStore(PackBasedObjectStore):
         f.seek(0)
         write_pack_header(f, len(entries) + len(indexer.ext_refs()))
 
+        # Must flush before reading (http://bugs.python.org/issue3207)
+        f.flush()
+
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(f, end_ofs=-20)
 
+        # Must reposition before writing (http://bugs.python.org/issue3207)
+        f.seek(0, os.SEEK_CUR)
+
         # Complete the pack.
         for ext_sha in indexer.ext_refs():
+            assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
             crc32 = write_pack_object(f, type_num, data, sha=new_sha)
@@ -544,9 +617,17 @@ class MemoryObjectStore(BaseObjectStore):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
 
+    def _to_hexsha(self, sha):
+        if len(sha) == 40:
+            return sha
+        elif len(sha) == 20:
+            return sha_to_hex(sha)
+        else:
+            raise ValueError("Invalid sha %r" % sha)
+
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""
-        return sha in self._data
+        return self._to_hexsha(sha) in self._data
 
     def contains_packed(self, sha):
         """Check if a particular object is present by SHA1 and is packed."""
@@ -567,15 +648,15 @@ class MemoryObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
-        obj = self[name]
+        obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
-        return self._data[name]
+        return self._data[self._to_hexsha(name)]
 
     def __delitem__(self, name):
         """Delete an object from this store, for testing only."""
-        del self._data[name]
+        del self._data[self._to_hexsha(name)]
 
     def add_object(self, obj):
         """Add a single object to this object store.

@@ -221,6 +221,8 @@ class Walker(object):
             iterator protocol. The constructor takes a single argument, the
             Walker.
         """
+        # Note: when adding arguments to this method, please also update
+        # dulwich.repo.BaseRepo.get_walker
         if order not in ALL_ORDERS:
             raise ValueError('Unknown walk order %s' % order)
         self.store = store

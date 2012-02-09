@@ -733,6 +733,7 @@ class TestPackIterator(DeltaChainIterator):
 class DeltaChainIteratorTests(TestCase):
 
     def setUp(self):
+        super(DeltaChainIteratorTests, self).setUp()
         self.store = MemoryObjectStore()
         self.fetched = set()
 

@@ -1,4 +1,62 @@
-0.8.1	UNRELEASED
+0.8.4	UNRELEASED
+
+ BUG FIXES
+
+  * Options on the same line as sections in config files are now supported.
+    (Jelmer Vernooij, #920553)
+
+ TESTS
+
+  * $HOME is now explicitly specified for tests that use it to read
+    ``~/.gitconfig``, to prevent test isolation issues.
+    (Jelmer Vernooij, #920330)
+
+0.8.3	2012-01-21
+
+ FEATURES
+
+  * The config parser now supports the git-config file format as
+    described in git-config(1) and can write git config files.
+    (Jelmer Vernooij, #531092, #768687)
+
+  * ``Repo.do_commit`` will now use the user identity from
+    .git/config or ~/.gitconfig if none was explicitly specified.
+   (Jelmer Vernooij)
+
+ BUG FIXES
+
+  * Allow ``determine_wants`` methods to include the zero sha in their
+    return value. (Jelmer Vernooij)
+
+0.8.2	2011-12-18
+
+ BUG FIXES
+
+  * Cope with different zlib buffer sizes in sha1 file parser.
+    (Jelmer Vernooij)
+
+  * Fix get_transport_and_path for HTTP/HTTPS URLs.
+    (Bruno Renié)
+
+  * Avoid calling free_objects() on NULL in error cases. (Chris Eberle)
+
+  * Fix use --bare argument to 'dulwich init'. (Chris Eberle)
+
+  * Properly abort connections when the determine_wants function
+    raises an exception. (Jelmer Vernooij, #856769)
+
+  * Tweak xcodebuild hack to deal with more error output.
+    (Jelmer Vernooij, #903840)
+
+ FEATURES
+
+  * Add support for retrieving tarballs from remote servers.
+    (Jelmer Vernooij, #379087)
+
+  * New method ``update_server_info`` which generates data
+    for dumb server access. (Jelmer Vernooij, #731235)
+
+0.8.1	2011-10-31
 
  FEATURES
 
@@ -6,12 +64,42 @@
 
   * Repo.do_commit has a new argument 'merge_heads'. (Jelmer Vernooij)
 
+  * New ``Repo.get_walker`` method. (Jelmer Vernooij)
+
   * New ``Repo.clone`` method. (Jelmer Vernooij, #725369)
+
+  * ``GitClient.send_pack`` now supports the 'side-band-64k' capability.
+    (Jelmer Vernooij)
+
+  * ``HttpGitClient`` which supports the smart server protocol over
+    HTTP. "dumb" access is not yet supported. (Jelmer Vernooij, #373688)
+
+  * Add basic support for alternates. (Jelmer Vernooij, #810429)
 
  CHANGES
 
   * unittest2 or python >= 2.7 is now required for the testsuite.
     testtools is no longer supported. (Jelmer Vernooij, #830713)
+
+ BUG FIXES
+
+  * Fix compilation with older versions of MSVC.  (Martin gz)
+
+  * Special case 'refs/stash' as a valid ref. (Jelmer Vernooij, #695577)
+
+  * Smart protocol clients can now change refs even if they are
+    not uploading new data. (Jelmer Vernooij, #855993)
+
+ * Don't compile C extensions when running in pypy.
+   (Ronny Pfannschmidt, #881546)
+
+ * Use different name for strnlen replacement function to avoid clashing
+   with system strnlen. (Jelmer Vernooij, #880362)
+
+ API CHANGES
+
+  * ``Repo.revision_history`` is now deprecated in favor of ``Repo.get_walker``.
+    (Jelmer Vernooij)
 
 0.8.0	2011-08-07
 

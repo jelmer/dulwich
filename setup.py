@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.8.1'
+dulwich_version_string = '0.8.4'
 
 include_dirs = []
 # Windows MSVC support
@@ -27,35 +27,27 @@ class DulwichDistribution(Distribution):
             return True
 
     def has_ext_modules(self):
-        return not self.pure
+        return not self.pure and not '__pypy__' in sys.modules
 
     global_options = Distribution.global_options + [
         ('pure', None, 
-            "use pure (slower) Python code instead of C extensions")]
+            "use pure Python code instead of C extensions (slower on CPython)")]
 
     pure = False
-
-def runcmd(cmd, env):
-    import subprocess
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE, env=env)
-    out, err = p.communicate()
-    err = [e for e in err.splitlines()
-           if not e.startswith('Not trusting file') \
-              and not e.startswith('warning: Not importing')]
-    if err:
-        return ''
-    return out
-
 
 if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
     # distutils.sysconfig
-    version = runcmd(['/usr/bin/xcodebuild', '-version'], {}).splitlines()[0]
-    # Also parse only first digit, because 3.2.1 can't be parsed nicely
-    if (version.startswith('Xcode') and
-        int(version.split()[1].split('.')[0]) >= 4):
-        os.environ['ARCHFLAGS'] = ''
+    import subprocess
+    p = subprocess.Popen(
+        ['/usr/bin/xcodebuild', '-version'], stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, env={})
+    out, err = p.communicate()
+    for l in out.splitlines():
+        # Also parse only first digit, because 3.2.1 can't be parsed nicely
+        if (l.startswith('Xcode') and
+            int(l.split()[1].split('.')[0]) >= 4):
+            os.environ['ARCHFLAGS'] = ''
 
 setup_kwargs = {}
 

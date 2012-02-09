@@ -44,6 +44,7 @@ from dulwich.server import (
     ReceivePackHandler,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
+    update_server_info,
     )
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
@@ -689,3 +690,30 @@ class ServeCommandTests(TestCase):
             outlines[0][4:].split("\x00")[0])
         self.assertEquals("0000", outlines[-1])
         self.assertEquals(0, exitcode)
+
+
+class UpdateServerInfoTests(TestCase):
+    """Tests for update_server_info."""
+
+    def setUp(self):
+        super(UpdateServerInfoTests, self).setUp()
+        self.path = tempfile.mkdtemp()
+        self.repo = Repo.init(self.path)
+
+    def test_empty(self):
+        update_server_info(self.repo)
+        self.assertEquals("",
+            open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
+        self.assertEquals("",
+            open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
+
+    def test_simple(self):
+        commit_id = self.repo.do_commit(
+            message="foo",
+            committer="Joe Example <joe@example.com>",
+            ref="refs/heads/foo")
+        update_server_info(self.repo)
+        ref_text = open(os.path.join(self.path, ".git", "info", "refs"), 'r').read()
+        self.assertEquals(ref_text, "%s\trefs/heads/foo\n" % commit_id)
+        packs_text = open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read()
+        self.assertEquals(packs_text, "")

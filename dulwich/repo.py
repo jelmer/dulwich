@@ -19,7 +19,13 @@
 # MA  02110-1301, USA.
 
 
-"""Repository access."""
+"""Repository access.
+
+This module contains the base class for git repositories
+(BaseRepo) and an implementation which uses a repository on 
+local disk (Repo).
+
+"""
 
 from cStringIO import StringIO
 import errno
@@ -51,9 +57,6 @@ from dulwich.objects import (
     Tag,
     Tree,
     hex_to_sha,
-    )
-from dulwich.walk import (
-    Walker,
     )
 import warnings
 
@@ -213,7 +216,7 @@ class RefsContainer(object):
         :param name: The name of the reference.
         :raises KeyError: if a refname is not HEAD or is otherwise not valid.
         """
-        if name == 'HEAD':
+        if name in ('HEAD', 'refs/stash'):
             return
         if not name.startswith('refs/') or not check_ref_format(name[5:]):
             raise RefFormatError(name)
@@ -389,6 +392,40 @@ class DictRefsContainer(RefsContainer):
     def _update_peeled(self, peeled):
         """Update cached peeled refs; intended only for testing."""
         self._peeled.update(peeled)
+
+
+class InfoRefsContainer(RefsContainer):
+    """Refs container that reads refs from a info/refs file."""
+
+    def __init__(self, f):
+        self._refs = {}
+        self._peeled = {}
+        for l in f.readlines():
+            sha, name = l.rstrip("\n").split("\t")
+            if name.endswith("^{}"):
+                name = name[:-3]
+                if not check_ref_format(name):
+                    raise ValueError("invalid ref name '%s'" % name)
+                self._peeled[name] = sha
+            else:
+                if not check_ref_format(name):
+                    raise ValueError("invalid ref name '%s'" % name)
+                self._refs[name] = sha
+
+    def allkeys(self):
+        return self._refs.keys()
+
+    def read_loose_ref(self, name):
+        return self._refs.get(name, None)
+
+    def get_packed_refs(self):
+        return {}
+
+    def get_peeled(self, name):
+        try:
+            return self._peeled[name]
+        except KeyError:
+            return self._refs[name]
 
 
 class DiskRefsContainer(RefsContainer):
@@ -760,21 +797,34 @@ class BaseRepo(object):
 
     :ivar object_store: Dictionary-like object for accessing
         the objects
-    :ivar refs: Dictionary-like object with the refs in this repository
+    :ivar refs: Dictionary-like object with the refs in this
+        repository
     """
 
     def __init__(self, object_store, refs):
+        """Open a repository.
+
+        This shouldn't be called directly, but rather through one of the
+        base classes, such as MemoryRepo or Repo.
+
+        :param object_store: Object store to use
+        :param refs: Refs container to use
+        """
         self.object_store = object_store
         self.refs = refs
 
     def _init_files(self, bare):
         """Initialize a default set of named files."""
+        from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        self._put_named_file('config', ('[core]\n'
-                                        'repositoryformatversion = 0\n'
-                                        'filemode = true\n'
-                                        'bare = ' + str(bare).lower() + '\n'
-                                        'logallrefupdates = true\n'))
+        f = StringIO()
+        cf = ConfigFile()
+        cf.set("core", "repositoryformatversion", "0")
+        cf.set("core", "filemode", "true")
+        cf.set("core", "bare", str(bare).lower())
+        cf.set("core", "logallrefupdates", "true")
+        cf.write_to_file(f)
+        self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), '')
 
     def get_named_file(self, path):
@@ -846,6 +896,14 @@ class BaseRepo(object):
                                                  get_tagged))
 
     def get_graph_walker(self, heads=None):
+        """Retrieve a graph walker.
+
+        A graph walker is used by a remote repository (or proxy)
+        to find out which objects are present in this repository.
+
+        :param heads: Repository heads to use (optional)
+        :return: A graph walker object
+        """
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
         return self.object_store.get_graph_walker(heads)
@@ -880,17 +938,50 @@ class BaseRepo(object):
         return ret
 
     def get_object(self, sha):
+        """Retrieve the object with the specified SHA.
+
+        :param sha: SHA to retrieve
+        :return: A ShaFile object
+        :raise KeyError: when the object can not be found
+        """
         return self.object_store[sha]
 
     def get_parents(self, sha):
+        """Retrieve the parents of a specific commit.
+
+        :param sha: SHA of the commit for which to retrieve the parents
+        :return: List of parents
+        """
         return self.commit(sha).parents
 
     def get_config(self):
-        import ConfigParser
-        p = ConfigParser.RawConfigParser()
-        p.read(os.path.join(self._controldir, 'config'))
-        return dict((section, dict(p.items(section)))
-                    for section in p.sections())
+        """Retrieve the config object.
+
+        :return: `ConfigFile` object for the ``.git/config`` file.
+        """
+        from dulwich.config import ConfigFile
+        path = os.path.join(self._controldir, 'config')
+        try:
+            return ConfigFile.from_path(path)
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
+            ret = ConfigFile()
+            ret.path = path
+            return ret
+
+    def get_config_stack(self):
+        """Return a config stack for this repository.
+
+        This stack accesses the configuration for both this repository
+        itself (.git/config) and the global configuration, which usually
+        lives in ~/.gitconfig.
+
+        :return: `Config` instance for this repository
+        """
+        from dulwich.config import StackedConfig
+        backends = [self.get_config()] + StackedConfig.default_backends()
+        return StackedConfig(backends, writable=backends[0])
 
     def commit(self, sha):
         """Retrieve the commit with a particular SHA.
@@ -953,6 +1044,35 @@ class BaseRepo(object):
             return cached
         return self.object_store.peel_sha(self.refs[ref]).id
 
+    def get_walker(self, include=None, *args, **kwargs):
+        """Obtain a walker for this repository.
+
+        :param include: Iterable of SHAs of commits to include along with their
+            ancestors. Defaults to [HEAD]
+        :param exclude: Iterable of SHAs of commits to exclude along with their
+            ancestors, overriding includes.
+        :param order: ORDER_* constant specifying the order of results. Anything
+            other than ORDER_DATE may result in O(n) memory usage.
+        :param reverse: If True, reverse the order of output, requiring O(n)
+            memory.
+        :param max_entries: The maximum number of entries to yield, or None for
+            no limit.
+        :param paths: Iterable of file or subtree paths to show entries for.
+        :param rename_detector: diff.RenameDetector object for detecting
+            renames.
+        :param follow: If True, follow path across renames/copies. Forces a
+            default rename_detector.
+        :param since: Timestamp to list commits after.
+        :param until: Timestamp to list commits before.
+        :param queue_cls: A class to use for a queue of commits, supporting the
+            iterator protocol. The constructor takes a single argument, the
+            Walker.
+        """
+        from dulwich.walk import Walker
+        if include is None:
+            include = [self.head()]
+        return Walker(self.object_store, include, *args, **kwargs)
+
     def revision_history(self, head):
         """Returns a list of the commits reachable from head.
 
@@ -962,11 +1082,18 @@ class BaseRepo(object):
         :raise MissingCommitError: if any missing commits are referenced,
             including if the head parameter isn't the SHA of a commit.
         """
-        # TODO(dborowitz): Expose more of the Walker functionality here or in a
-        # separate Repo/BaseObjectStore method.
-        return [e.commit for e in Walker(self.object_store, [head])]
+        warnings.warn("Repo.revision_history() is deprecated."
+            "Use dulwich.walker.Walker(repo) instead.",
+            category=DeprecationWarning, stacklevel=2)
+        return [e.commit for e in self.get_walker(include=[head])]
 
     def __getitem__(self, name):
+        """Retrieve a Git object by SHA1 or ref.
+
+        :param name: A Git object SHA1 or a ref name
+        :return: A `ShaFile` object, such as a Commit or Blob
+        :raise KeyError: when the specified ref or object does not exist
+        """
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
@@ -978,12 +1105,21 @@ class BaseRepo(object):
             raise KeyError(name)
 
     def __contains__(self, name):
+        """Check if a specific Git object or ref is present.
+
+        :param name: Git object SHA1 or ref name
+        """
         if len(name) in (20, 40):
             return name in self.object_store or name in self.refs
         else:
             return name in self.refs
 
     def __setitem__(self, name, value):
+        """Set a ref.
+
+        :param name: ref name
+        :param value: Ref value - either a ShaFile object, or a hex sha
+        """
         if name.startswith("refs/") or name == "HEAD":
             if isinstance(value, ShaFile):
                 self.refs[name] = value.id
@@ -995,10 +1131,20 @@ class BaseRepo(object):
             raise ValueError(name)
 
     def __delitem__(self, name):
-        if name.startswith("refs") or name == "HEAD":
+        """Remove a ref.
+
+        :param name: Name of the ref to remove
+        """
+        if name.startswith("refs/") or name == "HEAD":
             del self.refs[name]
         else:
             raise ValueError(name)
+
+    def _get_user_identity(self):
+        config = self.get_config_stack()
+        return "%s <%s>" % (
+            config.get(("user", ), "name"),
+            config.get(("user", ), "email"))
 
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
@@ -1034,9 +1180,8 @@ class BaseRepo(object):
         if merge_heads is None:
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
-        # TODO: Allow username to be missing, and get it from .git/config
         if committer is None:
-            raise ValueError("committer not set")
+            committer = self._get_user_identity()
         c.committer = committer
         if commit_timestamp is None:
             commit_timestamp = time.time()
@@ -1078,7 +1223,13 @@ class BaseRepo(object):
 
 
 class Repo(BaseRepo):
-    """A git repository backed by local disk."""
+    """A git repository backed by local disk.
+
+    To open an existing repository, call the contructor with
+    the path of the repository.
+
+    To create a new repository, use the Repo.init class method.
+    """
 
     def __init__(self, root):
         if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
@@ -1155,11 +1306,12 @@ class Repo(BaseRepo):
 
         :param paths: List of paths, relative to the repository path
         """
-        from dulwich.index import cleanup_mode
+        if isinstance(paths, basestring):
+            paths = [paths]
+        from dulwich.index import index_entry_from_stat
         index = self.open_index()
         for path in paths:
             full_path = os.path.join(self.path, path)
-            blob = Blob()
             try:
                 st = os.stat(full_path)
             except OSError:
@@ -1167,21 +1319,20 @@ class Repo(BaseRepo):
                 try:
                     del index[path]
                 except KeyError:
-                    pass  # Doesn't exist in the index either
+                    pass # already removed
             else:
+                blob = Blob()
                 f = open(full_path, 'rb')
                 try:
                     blob.data = f.read()
                 finally:
                     f.close()
                 self.object_store.add_object(blob)
-                # XXX: Cleanup some of the other file properties as well?
-                index[path] = (st.st_ctime, st.st_mtime, st.st_dev, st.st_ino,
-                    cleanup_mode(st.st_mode), st.st_uid, st.st_gid, st.st_size,
-                    blob.id, 0)
+                index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
-    def clone(self, target_path, mkdir=True, bare=False, origin="origin"):
+    def clone(self, target_path, mkdir=True, bare=False,
+            origin="origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -1221,6 +1372,12 @@ class Repo(BaseRepo):
 
     @classmethod
     def init(cls, path, mkdir=False):
+        """Create a new repository.
+
+        :param path: Path in which to create the repository
+        :param mkdir: Whether to create the directory
+        :return: `Repo` instance
+        """
         if mkdir:
             os.mkdir(path)
         controldir = os.path.join(path, ".git")
@@ -1230,6 +1387,13 @@ class Repo(BaseRepo):
 
     @classmethod
     def init_bare(cls, path):
+        """Create a new bare repository.
+
+        ``path`` should already exist and be an emty directory.
+
+        :param path: Path to create bare repository in
+        :return: a `Repo` instance
+        """
         return cls._init_maybe_bare(path, True)
 
     create = init_bare
@@ -1276,6 +1440,13 @@ class MemoryRepo(BaseRepo):
 
     @classmethod
     def init_bare(cls, objects, refs):
+        """Create a new bare repository in memory.
+
+        :param objects: Objects for the new repository,
+            as iterable
+        :param refs: Refs as dictionary, mapping names
+            to object SHA1s
+        """
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)

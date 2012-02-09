@@ -605,9 +605,11 @@ class PackIndex2(FilePackIndex):
 
     def __init__(self, filename, file=None, contents=None, size=None):
         super(PackIndex2, self).__init__(filename, file, contents, size)
-        assert self._contents[:4] == '\377tOc', 'Not a v2 pack index file'
+        if self._contents[:4] != '\377tOc':
+            raise AssertionError('Not a v2 pack index file')
         (self.version, ) = unpack_from('>L', self._contents, 4)
-        assert self.version == 2, 'Version was %d' % self.version
+        if self.version != 2:
+            raise AssertionError('Version was %d' % self.version)
         self._fan_out_table = self._read_fan_out_table(8)
         self._name_table_offset = 8 + 0x100 * 4
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
@@ -641,9 +643,11 @@ def read_pack_header(read):
     header = read(12)
     if not header:
         return None, None
-    assert header[:4] == 'PACK'
+    if header[:4] != 'PACK':
+        raise AssertionError('Invalid pack header %r' % header)
     (version,) = unpack_from('>L', header, 4)
-    assert version in (2, 3), 'Version was %d' % version
+    if version not in (2, 3):
+        raise AssertionError('Version was %d' % version)
     (num_objects,) = unpack_from('>L', header, 8)
     return (version, num_objects)
 
@@ -693,7 +697,8 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
     if type_num == OFS_DELTA:
         bytes, crc32 = take_msb_bytes(read_all, crc32=crc32)
         raw_base += len(bytes)
-        assert not (bytes[-1] & 0x80)
+        if bytes[-1] & 0x80:
+            raise AssertionError
         delta_base_offset = bytes[0] & 0x7f
         for byte in bytes[1:]:
             delta_base_offset += 1

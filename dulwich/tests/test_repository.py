@@ -33,9 +33,11 @@ from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich import objects
+from dulwich.config import Config
 from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
+    InfoRefsContainer,
     Repo,
     MemoryRepo,
     read_packed_refs,
@@ -72,7 +74,8 @@ class CreateRepositoryTests(TestCase):
         self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
         barestr = 'bare = %s' % str(expect_bare).lower()
-        self.assertTrue(barestr in repo.get_named_file('config').read())
+        config_text = repo.get_named_file('config').read()
+        self.assertTrue(barestr in config_text, "%r" % config_text)
 
     def test_create_disk_bare(self):
         tmp_dir = tempfile.mkdtemp()
@@ -247,8 +250,19 @@ class RepositoryTests(TestCase):
         self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.NotBlobError, r.get_blob, r.head())
 
+    def test_get_walker(self):
+        r = self._repo = open_repo('a.git')
+        # include defaults to [r.head()]
+        self.assertEqual([e.commit.id for e in r.get_walker()],
+                         [r.head(), '2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         history = r.revision_history(r.head())
         shas = [c.sha().hexdigest() for c in history]
         self.assertEqual(shas, [r.head(),
@@ -268,15 +282,13 @@ class RepositoryTests(TestCase):
             'refs/tags/mytag-packed':
                 'b0931cadc54336e78a1d980420e3268903b57a50',
             }, t.refs.as_dict())
-        history = t.revision_history(t.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, [t.head(),
                          '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['5dac377bdded4c9aeb8dff595f0faeebcc8498cc',
                                 'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                                 '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
@@ -285,14 +297,15 @@ class RepositoryTests(TestCase):
 
     def test_revision_history_missing_commit(self):
         r = self._repo = open_repo('simple_merge.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
+        self.addCleanup(warnings.resetwarnings)
         self.assertRaises(errors.MissingCommitError, r.revision_history,
                           missing_sha)
 
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""
         r = self._repo = open_repo('ooo_merge.git')
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
+        shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, ['7601d7f6231db6a57f7bbb79ee52e4d462fd44d1',
                                 'f507291b64138b875c28e03469025b1ea20bc614',
                                 'fb5b0425c7ce46959bec94d54b9a157645e114f5',
@@ -304,7 +317,13 @@ class RepositoryTests(TestCase):
 
     def test_get_config(self):
         r = self._repo = open_repo('ooo_merge.git')
-        self.assertEquals({}, r.get_config())
+        self.assertIsInstance(r.get_config(), Config)
+
+    def test_get_config_stack(self):
+        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        os.environ["HOME"] = "/nonexistant"
+        r = self._repo = open_repo('ooo_merge.git')
+        self.assertIsInstance(r.get_config_stack(), Config)
 
     def test_common_revisions(self):
         """
@@ -439,6 +458,23 @@ class BuildRepoTests(TestCase):
              author_timestamp=12395, author_timezone=0,
              encoding="iso8859-1")
         self.assertEquals("iso8859-1", r[commit_sha].encoding)
+
+    def test_commit_config_identity(self):
+        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        os.environ["HOME"] = "/nonexistant"
+        # commit falls back to the users' identity if it wasn't specified
+        r = self._repo
+        c = r.get_config()
+        c.set(("user", ), "name", "Jelmer")
+        c.set(("user", ), "email", "jelmer@apache.org")
+        c.write_to_path()
+        commit_sha = r.do_commit('message')
+        self.assertEquals(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEquals(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].committer)
 
     def test_commit_fail_ref(self):
         r = self._repo
@@ -674,6 +710,7 @@ class RefsContainerTests(object):
 
     def test_check_refname(self):
         self._refs._check_refname('HEAD')
+        self._refs._check_refname('refs/stash')
         self._refs._check_refname('refs/heads/foo')
 
         self.assertRaises(errors.RefFormatError, self._refs._check_refname,
@@ -876,3 +913,56 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             self._refs.read_ref("refs/heads/packed"))
         self.assertEqual(None,
             self._refs.read_ref("nonexistant"))
+
+
+_TEST_REFS_SERIALIZED = (
+'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/master\n'
+'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/packed\n'
+'df6800012397fb85c56e7418dd4eb9405dee075c\trefs/tags/refs-0.1\n'
+'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8\trefs/tags/refs-0.2\n')
+
+
+class InfoRefsContainerTests(TestCase):
+
+    def test_invalid_refname(self):
+        text = _TEST_REFS_SERIALIZED + '00' * 20 + '\trefs/stash\n'
+        refs = InfoRefsContainer(StringIO(text))
+        expected_refs = dict(_TEST_REFS)
+        del expected_refs['HEAD']
+        expected_refs["refs/stash"] = "00" * 20
+        self.assertEquals(expected_refs, refs.as_dict())
+
+    def test_keys(self):
+        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        actual_keys = set(refs.keys())
+        self.assertEqual(set(refs.allkeys()), actual_keys)
+        # ignore the symref loop if it exists
+        actual_keys.discard('refs/heads/loop')
+        expected_refs = dict(_TEST_REFS)
+        del expected_refs['HEAD']
+        self.assertEqual(set(expected_refs.iterkeys()), actual_keys)
+
+        actual_keys = refs.keys('refs/heads')
+        actual_keys.discard('loop')
+        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(['refs-0.1', 'refs-0.2'],
+                         sorted(refs.keys('refs/tags')))
+
+    def test_as_dict(self):
+        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        # refs/heads/loop does not show up even if it exists
+        expected_refs = dict(_TEST_REFS)
+        del expected_refs['HEAD']
+        self.assertEqual(expected_refs, refs.as_dict())
+
+    def test_contains(self):
+        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        self.assertTrue('refs/heads/master' in refs)
+        self.assertFalse('refs/heads/bar' in refs)
+
+    def test_get_peeled(self):
+        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        # refs/heads/loop does not show up even if it exists
+        self.assertEqual(
+            _TEST_REFS['refs/heads/master'],
+            refs.get_peeled('refs/heads/master'))

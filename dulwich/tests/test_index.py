@@ -32,6 +32,7 @@ from dulwich.index import (
     Index,
     cleanup_mode,
     commit_tree,
+    index_entry_from_stat,
     read_index,
     write_cache_time,
     write_index,
@@ -169,3 +170,41 @@ class WriteCacheTimeTests(TestCase):
         f = StringIO()
         write_cache_time(f, 434343.000000021)
         self.assertEquals(struct.pack(">LL", 434343, 21), f.getvalue())
+
+
+class IndexEntryFromStatTests(TestCase):
+
+    def test_simple(self):
+        st = os.stat_result((16877, 131078, 64769L,
+                154, 1000, 1000, 12288,
+                1323629595, 1324180496, 1324180496))
+        entry = index_entry_from_stat(st, "22" * 20, 0)
+        self.assertEquals(entry, (
+            1324180496,
+            1324180496,
+            64769L,
+            131078,
+            16384,
+            1000,
+            1000,
+            12288,
+            '2222222222222222222222222222222222222222',
+            0))
+
+    def test_override_mode(self):
+        st = os.stat_result((stat.S_IFREG + 0644, 131078, 64769L,
+                154, 1000, 1000, 12288,
+                1323629595, 1324180496, 1324180496))
+        entry = index_entry_from_stat(st, "22" * 20, 0,
+                mode=stat.S_IFREG + 0755)
+        self.assertEquals(entry, (
+            1324180496,
+            1324180496,
+            64769L,
+            131078,
+            33261,
+            1000,
+            1000,
+            12288,
+            '2222222222222222222222222222222222222222',
+            0))

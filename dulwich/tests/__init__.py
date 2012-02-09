@@ -68,6 +68,7 @@ class BlackboxTestCase(TestCase):
         return subprocess.Popen(argv,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True,
             env=env)
 
 
@@ -75,6 +76,7 @@ def self_test_suite():
     names = [
         'blackbox',
         'client',
+        'config',
         'diff_tree',
         'fastexport',
         'file',
@@ -100,13 +102,16 @@ def tutorial_test_suite():
         'introduction',
         'repo',
         'object-store',
+        'remote',
         'conclusion',
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
     def setup(test):
+        test.__old_cwd = os.getcwd()
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)
     def teardown(test):
+        os.chdir(test.__old_cwd)
         shutil.rmtree(test.__dulwich_tempdir)
     return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
         *tutorial_files)

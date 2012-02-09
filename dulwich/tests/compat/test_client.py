@@ -19,6 +19,7 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
+from cStringIO import StringIO
 import BaseHTTPServer
 import SimpleHTTPServer
 import copy
@@ -27,6 +28,7 @@ import select
 import shutil
 import signal
 import subprocess
+import tarfile
 import tempfile
 import threading
 import urllib
@@ -60,9 +62,9 @@ class DulwichClientTestBase(object):
 
     def setUp(self):
         self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
-        dest = os.path.join(self.gitroot, 'dest')
-        file.ensure_dir_exists(dest)
-        run_git_or_fail(['init', '--quiet', '--bare'], cwd=dest)
+        self.dest = os.path.join(self.gitroot, 'dest')
+        file.ensure_dir_exists(self.dest)
+        run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
 
     def tearDown(self):
         shutil.rmtree(self.gitroot)
@@ -108,11 +110,7 @@ class DulwichClientTestBase(object):
                     src.object_store.generate_pack_contents)
         self.assertDestEqualsSrc()
 
-    def disable_ff_and_make_dummy_commit(self):
-        # disable non-fast-forward pushes to the server
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        run_git_or_fail(['config', 'receive.denyNonFastForwards', 'true'],
-                        cwd=dest.path)
+    def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
         t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
@@ -123,7 +121,15 @@ class DulwichClientTestBase(object):
         c.message = 'hi'
         c.tree = t
         dest.object_store.add_object(c)
-        return dest, c.id
+        return c.id
+
+    def disable_ff_and_make_dummy_commit(self):
+        # disable non-fast-forward pushes to the server
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        run_git_or_fail(['config', 'receive.denyNonFastForwards', 'true'],
+                        cwd=dest.path)
+        commit_id = self.make_dummy_commit(dest)
+        return dest, commit_id
 
     def compute_send(self):
         srcpath = os.path.join(self.gitroot, 'server_new.export')
@@ -160,6 +166,14 @@ class DulwichClientTestBase(object):
                               'refs/heads/master': 'non-fast-forward'},
                              e.ref_status)
 
+    def test_archive(self):
+        c = self._client()
+        f = StringIO()
+        c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
+        f.seek(0)
+        tf = tarfile.open(fileobj=f)
+        self.assertEquals(['baz', 'foo'], tf.getnames())
+
     def test_fetch_pack(self):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
@@ -177,6 +191,29 @@ class DulwichClientTestBase(object):
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
 
+    def test_fetch_pack_zero_sha(self):
+        # zero sha1s are already present on the client, and should
+        # be ignored
+        c = self._client()
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        refs = c.fetch(self._build_path('/server_new.export'), dest,
+            lambda refs: [protocol.ZERO_SHA])
+        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+
+    def test_send_remove_branch(self):
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        dummy_commit = self.make_dummy_commit(dest)
+        dest.refs['refs/heads/master'] = dummy_commit
+        dest.refs['refs/heads/abranch'] = dummy_commit
+        sendrefs = dict(dest.refs)
+        sendrefs['refs/heads/abranch'] = "00" * 20
+        del sendrefs['HEAD']
+        gen_pack = lambda have, want: []
+        c = self._client()
+        self.assertEquals(dest.refs["refs/heads/abranch"], dummy_commit)
+        c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+        self.assertFalse("refs/heads/abranch" in dest.refs)
+
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
@@ -193,7 +230,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             ['daemon', '--verbose', '--export-all',
              '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
              '--detach', '--reuseaddr', '--enable=receive-pack',
-             '--listen=localhost', self.gitroot], cwd=self.gitroot)
+             '--enable=upload-archive', '--listen=localhost', self.gitroot], cwd=self.gitroot)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
 
@@ -254,7 +291,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.SubprocessGitClient()
+        return client.SubprocessGitClient(stderr=subprocess.PIPE)
 
     def _build_path(self, path):
         return self.gitroot + path
@@ -276,6 +313,10 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def send_head(self):
         return self.run_backend()
 
+    def log_request(self, code='-', size='-'):
+        # Let's be quiet, the test suite is noisy enough already
+        pass
+
     def run_backend(self):
         """Call out to git http-backend."""
         # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
@@ -296,10 +337,10 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         env['SERVER_PROTOCOL'] = self.protocol_version
         env['SERVER_PORT'] = str(self.server.server_port)
         env['GIT_PROJECT_ROOT'] = self.server.root_path
+        env["GIT_HTTP_EXPORT_ALL"] = "1"
         env['REQUEST_METHOD'] = self.command
         uqrest = urllib.unquote(rest)
         env['PATH_INFO'] = uqrest
-        env['PATH_TRANSLATED'] = self.translate_path(uqrest)
         env['SCRIPT_NAME'] = "/"
         if query:
             env['QUERY_STRING'] = query
@@ -402,12 +443,18 @@ if not getattr(HTTPGitServer, 'shutdown', None):
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
+    min_git_version = (1, 7, 0, 2)
+
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
-        self._httpd = HTTPGitServer(("localhost", 8080), self.gitroot)
+        self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
         self.addCleanup(self._httpd.shutdown)
         threading.Thread(target=self._httpd.serve_forever).start()
+        run_git_or_fail(['config', 'http.uploadpack', 'true'],
+                        cwd=self.dest)
+        run_git_or_fail(['config', 'http.receivepack', 'true'],
+                        cwd=self.dest)
 
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)
@@ -418,3 +465,6 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return path
+
+    def test_archive(self):
+        raise SkipTest("exporting archives not supported over http")

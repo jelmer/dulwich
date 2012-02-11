@@ -215,13 +215,32 @@ class IndexEntryFromStatTests(TestCase):
 
 class BuildIndexTests(TestCase):
 
+    def assertReasonableIndexEntry(self, index_entry, values):
+        delta = 1000000
+        self.assertEquals(index_entry[0], index_entry[1])  # ctime and atime
+        self.assertTrue(index_entry[0] > values[0] - delta)
+        self.assertEquals(index_entry[4], values[4])  # mode
+        self.assertEquals(index_entry[5], values[5])  # uid
+        self.assertTrue(index_entry[6] in values[6])  # gid
+        self.assertEquals(index_entry[7], values[7])  # filesize
+        self.assertEquals(index_entry[8], values[8])  # sha
+
+    def assertFileContents(self, path, contents, symlink=False):
+        if symlink:
+            self.assertEquals(os.readlink(path), contents)
+        else:
+            f = open(path, 'rb')
+            try:
+                self.assertEquals(f.read(), contents)
+            finally:
+                f.close()
+
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
         tree = Tree()
-
         repo.object_store.add_object(tree)
 
         build_index_from_tree(repo.path, repo.index_path(),
@@ -235,6 +254,8 @@ class BuildIndexTests(TestCase):
         self.assertEquals(['.git'], os.listdir(repo.path))
 
     def test_nonempty(self):
+        if os.name != 'posix': self.skip("test depends on POSIX shell")
+
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -261,33 +282,63 @@ class BuildIndexTests(TestCase):
                 repo.object_store, tree.id)
 
         # Verify index entries
+        import time
+        ctime = time.time()
         index = repo.open_index()
         self.assertEquals(len(index), 4)
-        for entry in tree.iteritems():
-            full_path = os.path.join(repo.path, entry.path)
-            self.assertTrue(os.path.exists(full_path))
 
-            st = os.lstat(full_path)
+        # filea
+        apath = os.path.join(repo.path, 'a')
+        self.assertTrue(os.path.exists(apath))
+        self.assertReasonableIndexEntry(index['a'], (
+            ctime, ctime,
+            None, None,
+            33188,
+            os.getuid(), os.getgroups(),
+            6,
+            filea.id,
+            None))
+        self.assertFileContents(apath, 'file a')
 
-            blob = Blob()
-            if(stat.S_ISLNK(st.st_mode)):
-                blob.data = os.readlink(full_path)
-            else:
-                f = open(full_path, 'rb')
-                try:
-                    blob.data = f.read()
-                finally:
-                    f.close()
+        # fileb
+        bpath = os.path.join(repo.path, 'b')
+        self.assertTrue(os.path.exists(bpath))
+        self.assertReasonableIndexEntry(index['b'], (
+            ctime, ctime,
+            None, None,
+            33188,
+            os.getuid(), os.getgroups(),
+            6,
+            fileb.id,
+            None))
+        self.assertFileContents(bpath, 'file b')
 
-            index_entry = index_entry_from_stat(st, blob.id, 0)
+        # filed
+        dpath = os.path.join(repo.path, 'c', 'd')
+        self.assertTrue(os.path.exists(dpath))
+        self.assertReasonableIndexEntry(index['c/d'], (
+            ctime, ctime,
+            None, None,
+            33188,
+            os.getuid(), os.getgroups(),
+            6,
+            filed.id,
+            None))
+        self.assertFileContents(dpath, 'file d')
 
-            index_entry_cmp = \
-                    ((int(index_entry[0]), 0), (int(index_entry[1]), 0)) + \
-                    (int(index_entry[2]), ) + \
-                    index_entry[3:]
+        # symlink to d
+        epath = os.path.join(repo.path, 'c', 'e')
+        self.assertTrue(os.path.exists(epath))
+        self.assertReasonableIndexEntry(index['c/e'], (
+            ctime, ctime,
+            None, None,
+            40960,
+            os.getuid(), os.getgroups(),
+            1,
+            filee.id,
+            None))
+        self.assertFileContents(epath, 'd', symlink=True)
 
-            self.assertEquals(index_entry_cmp, index[entry.path])
-
-        # Verify files
+        # Verify no extra files
         self.assertEquals(['.git', 'a', 'b', 'c'], os.listdir(repo.path))
         self.assertEquals(['d', 'e'], os.listdir(os.path.join(repo.path, 'c')))

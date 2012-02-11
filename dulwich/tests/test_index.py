@@ -267,10 +267,10 @@ class BuildIndexTests(TestCase):
         filee = Blob.from_string('d')
 
         tree = Tree()
-        tree['a'] = (33188, filea.id)
-        tree['b'] = (33188, fileb.id)
-        tree['c/d'] = (33188, filed.id)
-        tree['c/e'] = (40960, filee.id)  # symlink
+        tree['a'] = (stat.S_IFREG | 0644, filea.id)
+        tree['b'] = (stat.S_IFREG | 0644, fileb.id)
+        tree['c/d'] = (stat.S_IFREG | 0644, filed.id)
+        tree['c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
         repo.object_store.add_object(filea)
         repo.object_store.add_object(fileb)
@@ -293,7 +293,7 @@ class BuildIndexTests(TestCase):
         self.assertReasonableIndexEntry(index['a'], (
             ctime, ctime,
             None, None,
-            33188,
+            stat.S_IFREG | 0644,
             os.getuid(), os.getgroups(),
             6,
             filea.id,
@@ -306,7 +306,7 @@ class BuildIndexTests(TestCase):
         self.assertReasonableIndexEntry(index['b'], (
             ctime, ctime,
             None, None,
-            33188,
+            stat.S_IFREG | 0644,
             os.getuid(), os.getgroups(),
             6,
             fileb.id,
@@ -319,7 +319,7 @@ class BuildIndexTests(TestCase):
         self.assertReasonableIndexEntry(index['c/d'], (
             ctime, ctime,
             None, None,
-            33188,
+            stat.S_IFREG | 0644,
             os.getuid(), os.getgroups(),
             6,
             filed.id,
@@ -332,7 +332,7 @@ class BuildIndexTests(TestCase):
         self.assertReasonableIndexEntry(index['c/e'], (
             ctime, ctime,
             None, None,
-            40960,
+            stat.S_IFLNK,
             os.getuid(), os.getgroups(),
             1,
             filee.id,

@@ -254,7 +254,8 @@ class BuildIndexTests(TestCase):
         self.assertEquals(['.git'], os.listdir(repo.path))
 
     def test_nonempty(self):
-        if os.name != 'posix': self.skip("test depends on POSIX shell")
+        if os.name != 'posix':
+            self.skip("test depends on POSIX shell")
 
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)

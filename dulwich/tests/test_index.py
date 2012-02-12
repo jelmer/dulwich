@@ -273,11 +273,8 @@ class BuildIndexTests(TestCase):
         tree['c/d'] = (stat.S_IFREG | 0644, filed.id)
         tree['c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
-        repo.object_store.add_object(filea)
-        repo.object_store.add_object(fileb)
-        repo.object_store.add_object(filed)
-        repo.object_store.add_object(filee)
-        repo.object_store.add_object(tree)
+        repo.object_store.add_objects([(o, None)
+            for o in [filea, fileb, filed, filee, tree]])
 
         build_index_from_tree(repo.path, repo.index_path(),
                 repo.object_store, tree.id)

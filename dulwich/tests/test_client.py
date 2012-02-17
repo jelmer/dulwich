@@ -153,6 +153,22 @@ class GitClientTests(TestCase):
         self.assertEquals('/jelmer/dulwich', path)
 
 
+    def test_send_pack(self):
+        self.rin.write(
+            '009655dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack\0'
+            'thin-pack side-band report-status side-band-64k ofs-delta shallow no-progress '
+            'include-tag\n'
+            '0000')
+
+        pkts = ["unpack ok", "ng refs/foo/bar pre-receive hook declined"]
+        for pkt in pkts:
+            self.rin.write( "%04x%s" % (len(pkt)+4, pkt))
+        self.rin.write('0000')
+        self.rin.seek(0)
+
+        self.assertRaises(UpdateRefsError, lambda : self.client.send_pack("blah", lambda x: {} , lambda h,w: []))
+
+
 class SSHGitClientTests(TestCase):
 
     def setUp(self):

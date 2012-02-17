@@ -254,7 +254,7 @@ class GitClient(object):
                                              if ref not in ok]),
                                   ref_status=ref_status)
 
-    def _read_side_band64k_data(self, proto, channel_callbacks):
+    def _read_side_band64k_data(self, proto, channel_callbacks, report_status=None):
         """Read per-channel data.
 
         This requires the side-band-64k capability.
@@ -265,7 +265,12 @@ class GitClient(object):
         """
         for pkt in proto.read_pkt_seq():
             channel = ord(pkt[0])
-            pkt = pkt[1:]
+            if channel not in channel_callbacks and report_status is not None:
+                report_status(pkt)
+                continue
+            else:
+                pkt = pkt[1:]
+
             try:
                 cb = channel_callbacks[channel]
             except KeyError:
@@ -319,9 +324,10 @@ class GitClient(object):
                 progress = lambda x: None
             channel_callbacks = { 2: progress }
             if 'report-status' in capabilities:
-                channel_callbacks[1] = PktLineParser(
-                    report_status_parser.handle_packet).parse
-            self._read_side_band64k_data(proto, channel_callbacks)
+                report_status = report_status_parser.handle_packet
+            else:
+                report_status = lambda x: None
+            self._read_side_band64k_data(proto, channel_callbacks, report_status)
         else:
             if 'report-status':
                 for pkt in proto.read_pkt_seq():

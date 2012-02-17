@@ -265,7 +265,6 @@ class GitClient(object):
         """
         for pkt in proto.read_pkt_seq():
             channel = ord(pkt[0])
-            # pkt = pkt[1:]
             if channel not in channel_callbacks and report_status is not None:
                 report_status(pkt)
                 continue

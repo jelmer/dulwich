@@ -161,9 +161,13 @@ class GitClientTests(TestCase):
                 "ng refs/foo/bar pre-receive hook declined",
                 '']
         for pkt in pkts:
-            self.rin.write("0000" if pkt == '' else "%04x%s" % (len(pkt)+4, pkt))
+            if pkt == '':
+                self.rin.write("0000")
+            else:
+                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
         self.rin.seek(0)
-        self.assertRaises(UpdateRefsError, lambda : self.client.send_pack("blah", lambda x: {} , lambda h,w: []))
+        self.assertRaises(UpdateRefsError,
+            self.client.send_pack, "blah", lambda x: {}, lambda h,w: [])
 
 
 class SSHGitClientTests(TestCase):

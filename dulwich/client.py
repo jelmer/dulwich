@@ -153,10 +153,10 @@ class GitClient(object):
             activity.
         """
         self._report_activity = report_activity
-        self._fetch_capabilities = list(FETCH_CAPABILITIES)
-        self._send_capabilities = list(SEND_CAPABILITIES)
+        self._fetch_capabilities = set(FETCH_CAPABILITIES)
+        self._send_capabilities = set(SEND_CAPABILITIES)
         if thin_packs:
-            self._fetch_capabilities.append('thin-pack')
+            self._fetch_capabilities.add('thin-pack')
 
     def _read_refs(self, proto):
         server_capabilities = None
@@ -169,7 +169,7 @@ class GitClient(object):
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha
-        return refs, server_capabilities
+        return refs, set(server_capabilities)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None):
@@ -438,9 +438,7 @@ class TraditionalGitClient(GitClient):
         """
         proto, unused_can_read = self._connect('receive-pack', path)
         old_refs, server_capabilities = self._read_refs(proto)
-        negotiated_capabilities = list(self._send_capabilities)
-        if 'report-status' not in server_capabilities:
-            negotiated_capabilities.remove('report-status')
+        negotiated_capabilities = self._send_capabilities & server_capabilities
         try:
             new_refs = determine_wants(old_refs)
         except:
@@ -470,8 +468,8 @@ class TraditionalGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         """
         proto, can_read = self._connect('upload-pack', path)
-        (refs, server_capabilities) = self._read_refs(proto)
-        negotiated_capabilities = list(self._fetch_capabilities)
+        refs, server_capabilities = self._read_refs(proto)
+        negotiated_capabilities = self._fetch_capabilities & server_capabilities
         try:
             wants = determine_wants(refs)
         except:
@@ -708,7 +706,7 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
             "git-receive-pack", url)
-        negotiated_capabilities = list(self._send_capabilities)
+        negotiated_capabilities = self._send_capabilities & server_capabilities
         new_refs = determine_wants(old_refs)
         if new_refs is None:
             return old_refs
@@ -743,7 +741,7 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             "git-upload-pack", url)
-        negotiated_capabilities = list(server_capabilities)
+        negotiated_capabilities = server_capabilities
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]

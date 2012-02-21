@@ -28,6 +28,7 @@ import posixpath
 import stat
 import warnings
 import zlib
+import re
 
 from dulwich.errors import (
     ChecksumMismatch,
@@ -865,7 +866,7 @@ class Tree(ShaFile):
     def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all 
+        :param mode: The mode of the entry as an integral type. Not all
             possible modes are supported by git; see check() for details.
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
@@ -989,7 +990,18 @@ def parse_timezone(text):
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
-    offset = int(text)
+    # create a regex to be generous about parsing the format
+    # ...any number is suitable with an optional +/- prefix.
+    pattern = re.compile('([-+]?\d+)')
+    try:
+        match = pattern.search(text)
+        if not match:
+            raise ValueError("Invalid text")
+        text = match.group(0)
+        offset = int(text)
+    except ValueError:
+        # timezone could not be parsed at all; assume 0
+        return 0, False
     negative_utc = (offset == 0 and text[0] == '-')
     signum = (offset < 0) and -1 or 1
     offset = abs(offset)

@@ -762,31 +762,35 @@ class HttpGitClient(GitClient):
         return refs
 
 
-def get_transport_and_path(uri):
+def get_transport_and_path(uri, **kwargs):
     """Obtain a git client from a URI or path.
 
     :param uri: URI or path
+    :param thin_packs: Whether or not thin packs should be retrieved
+    :param report_activity: Optional callback for reporting transport
+        activity.
     :return: Tuple with client instance and relative path.
     """
     parsed = urlparse.urlparse(uri)
     if parsed.scheme == 'git':
-        return TCPGitClient(parsed.hostname, port=parsed.port), parsed.path
+        return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
+                parsed.path)
     elif parsed.scheme == 'git+ssh':
         return SSHGitClient(parsed.hostname, port=parsed.port,
-                            username=parsed.username), parsed.path
+                            username=parsed.username, **kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed)), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.
-        return SSHGitClient(parsed.scheme), parsed.path
+        return SSHGitClient(parsed.scheme, **kwargs), parsed.path
     elif parsed.scheme:
         raise ValueError('Unknown git protocol scheme: %s' % parsed.scheme)
     elif '@' in parsed.path and ':' in parsed.path:
         # SSH with user@host:foo.
         user_host, path = parsed.path.split(':')
         user, host = user_host.rsplit('@')
-        return SSHGitClient(host, username=user), path
+        return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.
-    return SubprocessGitClient(), uri
+    return SubprocessGitClient(**kwargs), uri

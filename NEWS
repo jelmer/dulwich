@@ -14,6 +14,11 @@
     ``~/.gitconfig``, to prevent test isolation issues.
     (Jelmer Vernooij, #920330)
 
+ FEATURES
+
+  * Additional arguments to get_transport_and_path are now passed
+    on to the constructor of the transport. (Sam Vilain)
+
 0.8.3	2012-01-21
 
  FEATURES

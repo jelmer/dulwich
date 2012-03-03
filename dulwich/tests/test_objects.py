@@ -752,3 +752,6 @@ class TimezoneTests(TestCase):
     def test_parse_timezone_pdt_half(self):
         self.assertEquals((((-4 * 60) - 40) * 60, False),
             parse_timezone("-0440"))
+
+    def test_parse_timezone_double_negative(self):
+        self.assertEquals(parse_timezone("+0700"), parse_timezone("--700"))

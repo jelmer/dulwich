@@ -8,6 +8,9 @@
   * Only negotiate capabilities that are also supported by the server.
     (Rod Cloutier, Risto Kankkunen)
 
+  * Fix parsing of invalid timezone offsets with two minus signs.
+    (Jason R. Coombs, #697828)
+
  TESTS
 
   * $HOME is now explicitly specified for tests that use it to read

@@ -865,7 +865,7 @@ class Tree(ShaFile):
     def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all 
+        :param mode: The mode of the entry as an integral type. Not all
             possible modes are supported by git; see check() for details.
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
@@ -989,8 +989,16 @@ def parse_timezone(text):
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
-    offset = int(text)
-    negative_utc = (offset == 0 and text[0] == '-')
+    # cgit parses the first character as the sign, and the rest
+    #  as an integer (using strtol), which could also be negative.
+    #  We do the same for compatibility. See #697828.
+    if not text[0] in '+-':
+        raise ValueError("Timezone must start with + or - (%(text)s)" % vars())
+    sign = text[0]
+    offset = int(text[1:])
+    if sign == '-':
+        offset = -offset
+    negative_utc = (offset == 0 and sign == '-')
     signum = (offset < 0) and -1 or 1
     offset = abs(offset)
     hours = int(offset / 100)

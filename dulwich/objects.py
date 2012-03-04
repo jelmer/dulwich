@@ -998,28 +998,29 @@ def parse_timezone(text):
     offset = int(text[1:])
     if sign == '-':
         offset = -offset
-    negative_utc = (offset == 0 and sign == '-')
+    unnecessary_negative_timezone = (offset >= 0 and sign == '-')
     signum = (offset < 0) and -1 or 1
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = (offset % 100)
-    return signum * (hours * 3600 + minutes * 60), negative_utc
+    return (signum * (hours * 3600 + minutes * 60),
+            unnecessary_negative_timezone)
 
 
-def format_timezone(offset, negative_utc=False):
+def format_timezone(offset, unnecessary_negative_timezone=False):
     """Format a timezone for Git serialization.
 
     :param offset: Timezone offset as seconds difference to UTC
-    :param negative_utc: Whether to use a minus sign for UTC
-        (-0000 rather than +0000).
+    :param unnecessary_negative_timezone: Whether to use a minus sign for
+        UTC or positive timezones (-0000 and --700 rather than +0000 / +0700).
     """
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
-    if offset < 0 or (offset == 0 and negative_utc):
+    if offset < 0 or unnecessary_negative_timezone:
         sign = '-'
+        offset = -offset
     else:
         sign = '+'
-    offset = abs(offset)
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 

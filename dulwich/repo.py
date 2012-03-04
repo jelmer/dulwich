@@ -920,7 +920,7 @@ class BaseRepo(object):
     def get_refs(self):
         """Get dictionary with all refs.
 
-        :return: A `dict` mapping ref names to SHA1s
+        :return: A ``dict`` mapping ref names to SHA1s
         """
         return self.refs.as_dict()
 

@@ -66,7 +66,7 @@ def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
     :param m: Mode to check
-    :return: a `boolean`
+    :return: a ``boolean``
     """
     return (stat.S_IFMT(m) == S_IFGITLINK)
 

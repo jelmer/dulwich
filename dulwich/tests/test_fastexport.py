@@ -54,7 +54,7 @@ class GitFastExporterTests(TestCase):
         b = Blob()
         b.data = "fooBAR"
         self.fastexporter.emit_blob(b)
-        self.assertEquals('blob\nmark :1\ndata 6\nfooBAR\n',
+        self.assertEqual('blob\nmark :1\ndata 6\nfooBAR\n',
             self.stream.getvalue())
 
     def test_emit_commit(self):
@@ -70,7 +70,7 @@ class GitFastExporterTests(TestCase):
         c.tree = t.id
         self.store.add_objects([(b, None), (t, None), (c, None)])
         self.fastexporter.emit_commit(c, "refs/heads/master")
-        self.assertEquals("""blob
+        self.assertEqual("""blob
 mark :1
 data 3
 FOO
@@ -104,15 +104,15 @@ class GitImportProcessorTests(TestCase):
             "FOO", None, [], [])
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
-        self.assertEquals("Jelmer <jelmer@samba.org>", commit.author)
-        self.assertEquals("Jelmer <jelmer@samba.org>", commit.committer)
-        self.assertEquals("FOO", commit.message)
-        self.assertEquals([], commit.parents)
-        self.assertEquals(432432432.0, commit.commit_time)
-        self.assertEquals(432432432.0, commit.author_time)
-        self.assertEquals(3600, commit.commit_timezone)
-        self.assertEquals(3600, commit.author_timezone)
-        self.assertEquals(commit, self.repo["refs/heads/foo"])
+        self.assertEqual("Jelmer <jelmer@samba.org>", commit.author)
+        self.assertEqual("Jelmer <jelmer@samba.org>", commit.committer)
+        self.assertEqual("FOO", commit.message)
+        self.assertEqual([], commit.parents)
+        self.assertEqual(432432432.0, commit.commit_time)
+        self.assertEqual(432432432.0, commit.author_time)
+        self.assertEqual(3600, commit.commit_timezone)
+        self.assertEqual(3600, commit.author_timezone)
+        self.assertEqual(commit, self.repo["refs/heads/foo"])
 
     def test_import_stream(self):
         markers = self.processor.import_stream(StringIO("""blob
@@ -128,7 +128,7 @@ data 20
 M 100644 :1 a
 
 """))
-        self.assertEquals(2, len(markers))
+        self.assertEqual(2, len(markers))
         self.assertTrue(isinstance(self.repo[markers["1"]], Blob))
         self.assertTrue(isinstance(self.repo[markers["2"]], Commit))
 
@@ -142,7 +142,7 @@ M 100644 :1 a
             "FOO", None, [], [commands.FileModifyCommand("path", 0100644, ":23", None)])
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
-        self.assertEquals([
+        self.assertEqual([
             ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172')],
             self.repo[commit.tree].items())
 
@@ -176,7 +176,7 @@ M 100644 :1 a
         from fastimport import commands
         self.simple_commit()
         commit = self.make_file_commit([commands.FileCopyCommand("path", "new_path")])
-        self.assertEquals([
+        self.assertEqual([
             ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
             ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
             ], self.repo[commit.tree].items())
@@ -185,7 +185,7 @@ M 100644 :1 a
         from fastimport import commands
         self.simple_commit()
         commit = self.make_file_commit([commands.FileRenameCommand("path", "new_path")])
-        self.assertEquals([
+        self.assertEqual([
             ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
             ], self.repo[commit.tree].items())
 
@@ -193,10 +193,10 @@ M 100644 :1 a
         from fastimport import commands
         self.simple_commit()
         commit = self.make_file_commit([commands.FileDeleteCommand("path")])
-        self.assertEquals([], self.repo[commit.tree].items())
+        self.assertEqual([], self.repo[commit.tree].items())
 
     def test_file_deleteall(self):
         from fastimport import commands
         self.simple_commit()
         commit = self.make_file_commit([commands.FileDeleteAllCommand()])
-        self.assertEquals([], self.repo[commit.tree].items())
+        self.assertEqual([], self.repo[commit.tree].items())

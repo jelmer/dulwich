@@ -113,7 +113,7 @@ class HandlerTestCase(TestCase):
             self.fail(e)
 
     def test_capability_line(self):
-        self.assertEquals('cap1 cap2 cap3', self._handler.capability_line())
+        self.assertEqual('cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
@@ -186,13 +186,13 @@ class UploadPackHandlerTestCase(TestCase):
 
         caps = list(self._handler.required_capabilities()) + ['include-tag']
         self._handler.set_client_capabilities(caps)
-        self.assertEquals({'1234' * 10: ONE, '5678' * 10: TWO},
+        self.assertEqual({'1234' * 10: ONE, '5678' * 10: TWO},
                           self._handler.get_tagged(refs, repo=self._repo))
 
         # non-include-tag case
         caps = self._handler.required_capabilities()
         self._handler.set_client_capabilities(caps)
-        self.assertEquals({}, self._handler.get_tagged(refs, repo=self._repo))
+        self.assertEqual({}, self._handler.get_tagged(refs, repo=self._repo))
 
 
 class TestUploadPackHandler(UploadPackHandler):
@@ -249,9 +249,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def test_split_proto_line(self):
         allowed = ('want', 'done', None)
-        self.assertEquals(('want', ONE),
+        self.assertEqual(('want', ONE),
                           _split_proto_line('want %s\n' % ONE, allowed))
-        self.assertEquals(('want', TWO),
+        self.assertEqual(('want', TWO),
                           _split_proto_line('want %s\n' % TWO, allowed))
         self.assertRaises(GitProtocolError, _split_proto_line,
                           'want xxxx\n', allowed)
@@ -260,8 +260,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertRaises(GitProtocolError, _split_proto_line,
                           'foo %s\n' % FOUR, allowed)
         self.assertRaises(GitProtocolError, _split_proto_line, 'bar', allowed)
-        self.assertEquals(('done', None), _split_proto_line('done\n', allowed))
-        self.assertEquals((None, None), _split_proto_line('', allowed))
+        self.assertEqual(('done', None), _split_proto_line('done\n', allowed))
+        self.assertEqual((None, None), _split_proto_line('', allowed))
 
     def test_determine_wants(self):
         self.assertEqual(None, self._walker.determine_wants({}))
@@ -277,13 +277,13 @@ class ProtocolGraphWalkerTestCase(TestCase):
           'refs/heads/ref3': THREE,
           }
         self._repo.refs._update(heads)
-        self.assertEquals([ONE, TWO], self._walker.determine_wants(heads))
+        self.assertEqual([ONE, TWO], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
         self._walker.proto.set_output([])
-        self.assertEquals([], self._walker.determine_wants(heads))
+        self.assertEqual([], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo'])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
@@ -313,7 +313,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
                 line = line[:line.index('\x00')]
             lines.append(line.rstrip())
 
-        self.assertEquals([
+        self.assertEqual([
           '%s refs/heads/ref4' % FOUR,
           '%s refs/heads/ref5' % FIVE,
           '%s refs/heads/tag6^{}' % FIVE,
@@ -323,7 +323,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         # ensure peeled tag was advertised immediately following tag
         for i, line in enumerate(lines):
             if line.endswith(' refs/heads/tag6'):
-                self.assertEquals('%s refs/heads/tag6^{}' % FIVE, lines[i+1])
+                self.assertEqual('%s refs/heads/tag6^{}' % FIVE, lines[i+1])
 
     # TODO: test commit time cutoff
 
@@ -373,11 +373,11 @@ class AckGraphWalkerImplTestCase(TestCase):
         self._impl = self.impl_cls(self._walker)
 
     def assertNoAck(self):
-        self.assertEquals(None, self._walker.pop_ack())
+        self.assertEqual(None, self._walker.pop_ack())
 
     def assertAcks(self, acks):
         for sha, ack_type in acks:
-            self.assertEquals((sha, ack_type), self._walker.pop_ack())
+            self.assertEqual((sha, ack_type), self._walker.pop_ack())
         self.assertNoAck()
 
     def assertAck(self, sha, ack_type=''):
@@ -387,7 +387,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertAck(None, 'nak')
 
     def assertNextEquals(self, sha):
-        self.assertEquals(sha, self._impl.next())
+        self.assertEqual(sha, self._impl.next())
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
@@ -660,7 +660,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
-        self.assertEquals(repo.path, self.repo.path)
+        self.assertEqual(repo.path, self.repo.path)
 
     def test_child(self):
         self.assertRaises(NotGitRepository,
@@ -685,11 +685,11 @@ class ServeCommandTests(TestCase):
         outf = StringIO()
         exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
         outlines = outf.getvalue().splitlines()
-        self.assertEquals(2, len(outlines))
-        self.assertEquals("1111111111111111111111111111111111111111 refs/heads/master",
+        self.assertEqual(2, len(outlines))
+        self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",
             outlines[0][4:].split("\x00")[0])
-        self.assertEquals("0000", outlines[-1])
-        self.assertEquals(0, exitcode)
+        self.assertEqual("0000", outlines[-1])
+        self.assertEqual(0, exitcode)
 
 
 class UpdateServerInfoTests(TestCase):
@@ -702,9 +702,9 @@ class UpdateServerInfoTests(TestCase):
 
     def test_empty(self):
         update_server_info(self.repo)
-        self.assertEquals("",
+        self.assertEqual("",
             open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
-        self.assertEquals("",
+        self.assertEqual("",
             open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
 
     def test_simple(self):
@@ -714,6 +714,6 @@ class UpdateServerInfoTests(TestCase):
             ref="refs/heads/foo")
         update_server_info(self.repo)
         ref_text = open(os.path.join(self.path, ".git", "info", "refs"), 'r').read()
-        self.assertEquals(ref_text, "%s\trefs/heads/foo\n" % commit_id)
+        self.assertEqual(ref_text, "%s\trefs/heads/foo\n" % commit_id)
         packs_text = open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read()
-        self.assertEquals(packs_text, "")
+        self.assertEqual(packs_text, "")

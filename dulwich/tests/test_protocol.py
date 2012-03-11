@@ -43,57 +43,57 @@ class BaseProtocolTests(object):
 
     def test_write_pkt_line_none(self):
         self.proto.write_pkt_line(None)
-        self.assertEquals(self.rout.getvalue(), '0000')
+        self.assertEqual(self.rout.getvalue(), '0000')
 
     def test_write_pkt_line(self):
         self.proto.write_pkt_line('bla')
-        self.assertEquals(self.rout.getvalue(), '0007bla')
+        self.assertEqual(self.rout.getvalue(), '0007bla')
 
     def test_read_pkt_line(self):
         self.rin.write('0008cmd ')
         self.rin.seek(0)
-        self.assertEquals('cmd ', self.proto.read_pkt_line())
+        self.assertEqual('cmd ', self.proto.read_pkt_line())
 
     def test_eof(self):
         self.rin.write('0000')
         self.rin.seek(0)
         self.assertFalse(self.proto.eof())
-        self.assertEquals(None, self.proto.read_pkt_line())
+        self.assertEqual(None, self.proto.read_pkt_line())
         self.assertTrue(self.proto.eof())
         self.assertRaises(HangupException, self.proto.read_pkt_line)
 
     def test_unread_pkt_line(self):
         self.rin.write('0007foo0000')
         self.rin.seek(0)
-        self.assertEquals('foo', self.proto.read_pkt_line())
+        self.assertEqual('foo', self.proto.read_pkt_line())
         self.proto.unread_pkt_line('bar')
-        self.assertEquals('bar', self.proto.read_pkt_line())
-        self.assertEquals(None, self.proto.read_pkt_line())
+        self.assertEqual('bar', self.proto.read_pkt_line())
+        self.assertEqual(None, self.proto.read_pkt_line())
         self.proto.unread_pkt_line('baz1')
         self.assertRaises(ValueError, self.proto.unread_pkt_line, 'baz2')
 
     def test_read_pkt_seq(self):
         self.rin.write('0008cmd 0005l0000')
         self.rin.seek(0)
-        self.assertEquals(['cmd ', 'l'], list(self.proto.read_pkt_seq()))
+        self.assertEqual(['cmd ', 'l'], list(self.proto.read_pkt_seq()))
 
     def test_read_pkt_line_none(self):
         self.rin.write('0000')
         self.rin.seek(0)
-        self.assertEquals(None, self.proto.read_pkt_line())
+        self.assertEqual(None, self.proto.read_pkt_line())
 
     def test_write_sideband(self):
         self.proto.write_sideband(3, 'bloe')
-        self.assertEquals(self.rout.getvalue(), '0009\x03bloe')
+        self.assertEqual(self.rout.getvalue(), '0009\x03bloe')
 
     def test_send_cmd(self):
         self.proto.send_cmd('fetch', 'a', 'b')
-        self.assertEquals(self.rout.getvalue(), '000efetch a\x00b\x00')
+        self.assertEqual(self.rout.getvalue(), '000efetch a\x00b\x00')
 
     def test_read_cmd(self):
         self.rin.write('0012cmd arg1\x00arg2\x00')
         self.rin.seek(0)
-        self.assertEquals(('cmd', ['arg1', 'arg2']), self.proto.read_cmd())
+        self.assertEqual(('cmd', ['arg1', 'arg2']), self.proto.read_cmd())
 
     def test_read_cmd_noend0(self):
         self.rin.write('0011cmd arg1\x00arg2')
@@ -155,23 +155,23 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
             data += self.proto.recv(10)
         # any more reads would block
         self.assertRaises(AssertionError, self.proto.recv, 10)
-        self.assertEquals(all_data, data)
+        self.assertEqual(all_data, data)
 
     def test_recv_read(self):
         all_data = '1234567'  # recv exactly in one call
         self.rin.write(all_data)
         self.rin.seek(0)
-        self.assertEquals('1234', self.proto.recv(4))
-        self.assertEquals('567', self.proto.read(3))
+        self.assertEqual('1234', self.proto.recv(4))
+        self.assertEqual('567', self.proto.read(3))
         self.assertRaises(AssertionError, self.proto.recv, 10)
 
     def test_read_recv(self):
         all_data = '12345678abcdefg'
         self.rin.write(all_data)
         self.rin.seek(0)
-        self.assertEquals('1234', self.proto.read(4))
-        self.assertEquals('5678abc', self.proto.recv(8))
-        self.assertEquals('defg', self.proto.read(4))
+        self.assertEqual('1234', self.proto.read(4))
+        self.assertEqual('5678abc', self.proto.recv(8))
+        self.assertEqual('defg', self.proto.read(4))
         self.assertRaises(AssertionError, self.proto.recv, 10)
 
     def test_mixed(self):
@@ -196,34 +196,34 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
             # didn't break, something must have gone wrong
             self.fail()
 
-        self.assertEquals(all_data, data)
+        self.assertEqual(all_data, data)
 
 
 class CapabilitiesTestCase(TestCase):
 
     def test_plain(self):
-        self.assertEquals(('bla', []), extract_capabilities('bla'))
+        self.assertEqual(('bla', []), extract_capabilities('bla'))
 
     def test_caps(self):
-        self.assertEquals(('bla', ['la']), extract_capabilities('bla\0la'))
-        self.assertEquals(('bla', ['la']), extract_capabilities('bla\0la\n'))
-        self.assertEquals(('bla', ['la', 'la']), extract_capabilities('bla\0la la'))
+        self.assertEqual(('bla', ['la']), extract_capabilities('bla\0la'))
+        self.assertEqual(('bla', ['la']), extract_capabilities('bla\0la\n'))
+        self.assertEqual(('bla', ['la', 'la']), extract_capabilities('bla\0la la'))
 
     def test_plain_want_line(self):
-        self.assertEquals(('want bla', []), extract_want_line_capabilities('want bla'))
+        self.assertEqual(('want bla', []), extract_want_line_capabilities('want bla'))
 
     def test_caps_want_line(self):
-        self.assertEquals(('want bla', ['la']), extract_want_line_capabilities('want bla la'))
-        self.assertEquals(('want bla', ['la']), extract_want_line_capabilities('want bla la\n'))
-        self.assertEquals(('want bla', ['la', 'la']), extract_want_line_capabilities('want bla la la'))
+        self.assertEqual(('want bla', ['la']), extract_want_line_capabilities('want bla la'))
+        self.assertEqual(('want bla', ['la']), extract_want_line_capabilities('want bla la\n'))
+        self.assertEqual(('want bla', ['la', 'la']), extract_want_line_capabilities('want bla la la'))
 
     def test_ack_type(self):
-        self.assertEquals(SINGLE_ACK, ack_type(['foo', 'bar']))
-        self.assertEquals(MULTI_ACK, ack_type(['foo', 'bar', 'multi_ack']))
-        self.assertEquals(MULTI_ACK_DETAILED,
+        self.assertEqual(SINGLE_ACK, ack_type(['foo', 'bar']))
+        self.assertEqual(MULTI_ACK, ack_type(['foo', 'bar', 'multi_ack']))
+        self.assertEqual(MULTI_ACK_DETAILED,
                           ack_type(['foo', 'bar', 'multi_ack_detailed']))
         # choose detailed when both present
-        self.assertEquals(MULTI_ACK_DETAILED,
+        self.assertEqual(MULTI_ACK_DETAILED,
                           ack_type(['foo', 'bar', 'multi_ack',
                                     'multi_ack_detailed']))
 
@@ -236,7 +236,7 @@ class BufferedPktLineWriterTests(TestCase):
         self._writer = BufferedPktLineWriter(self._output.write, bufsize=16)
 
     def assertOutputEquals(self, expected):
-        self.assertEquals(expected, self._output.getvalue())
+        self.assertEqual(expected, self._output.getvalue())
 
     def _truncate(self):
         self._output.seek(0)
@@ -289,8 +289,8 @@ class PktLineParserTests(TestCase):
         pktlines = []
         parser = PktLineParser(pktlines.append)
         parser.parse("0000")
-        self.assertEquals(pktlines, [None])
-        self.assertEquals("", parser.get_tail())
+        self.assertEqual(pktlines, [None])
+        self.assertEqual("", parser.get_tail())
 
     def test_small_fragments(self):
         pktlines = []
@@ -298,12 +298,12 @@ class PktLineParserTests(TestCase):
         parser.parse("00")
         parser.parse("05")
         parser.parse("z0000")
-        self.assertEquals(pktlines, ["z", None])
-        self.assertEquals("", parser.get_tail())
+        self.assertEqual(pktlines, ["z", None])
+        self.assertEqual("", parser.get_tail())
 
     def test_multiple_packets(self):
         pktlines = []
         parser = PktLineParser(pktlines.append)
         parser.parse("0005z0006aba")
-        self.assertEquals(pktlines, ["z", "ab"])
-        self.assertEquals("a", parser.get_tail())
+        self.assertEqual(pktlines, ["z", "ab"])
+        self.assertEqual("a", parser.get_tail())

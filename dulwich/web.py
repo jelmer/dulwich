@@ -19,6 +19,7 @@
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
 from cStringIO import StringIO
+import gzip
 import os
 import re
 import sys
@@ -353,21 +354,12 @@ class GunzipFilter(object):
 
     def __call__(self, environ, start_response):
         if environ.get('HTTP_CONTENT_ENCODING', '') == 'gzip':
-            from dulwich.gzip import GzipConsumer
-            # Note, we decompress everything in wsgi.input
-            # so that anything further in the chain sees
-            # a regular stream, and all relevant HTTP headers
-            # are updated
             zlength = int(environ.get('CONTENT_LENGTH', '0'))
-            consumer = GzipConsumer()
-            consumer.feed(environ['wsgi.input'].read(zlength))
-            buf = consumer.close()
             environ.pop('HTTP_CONTENT_ENCODING')
-
-            environ['CONTENT_LENGTH'] = str(buf.tell())
-            buf.seek(0)
-            environ['wsgi.input'] = buf
-
+            if 'CONTENT_LENGTH' in environ:
+                del environ['CONTENT_LENGTH']
+            environ['wsgi.input'] = gzip.GzipFile(filename=None,
+                fileobj=environ['wsgi.input'], mode='r')
         return self.app(environ, start_response)
 
 
@@ -386,10 +378,8 @@ class LimitedInputFilter(object):
         # content-length
         content_length = environ.get('CONTENT_LENGTH', '')
         if content_length:
-            input = environ['wsgi.input']
-            environ['wsgi.input'] = _LengthLimitedFile(input,
-                                                       int(content_length))
-
+            environ['wsgi.input'] = _LengthLimitedFile(
+                environ['wsgi.input'], int(content_length))
         return self.app(environ, start_response)
 
 

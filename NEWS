@@ -22,6 +22,10 @@
   * Additional arguments to get_transport_and_path are now passed
     on to the constructor of the transport. (Sam Vilain)
 
+  * The WSGI server now transparently handles when a git client submits data
+    using Content-Encoding: gzip.
+    (David Blewett)
+
 0.8.3	2012-01-21
 
  FEATURES

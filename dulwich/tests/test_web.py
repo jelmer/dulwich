@@ -428,9 +428,9 @@ class HTTPGitApplicationTestCase(TestCase):
 
     def _test_handler(self, req, backend, mat):
         # tests interface used by all handlers
-        self.assertEquals(self._environ, req.environ)
-        self.assertEquals('backend', backend)
-        self.assertEquals('/foo', mat.group(0))
+        self.assertEqual(self._environ, req.environ)
+        self.assertEqual('backend', backend)
+        self.assertEqual('/foo', mat.group(0))
         return 'output'
 
     def _add_handler(self, app):
@@ -441,7 +441,7 @@ class HTTPGitApplicationTestCase(TestCase):
 
     def test_call(self):
         self._add_handler(self._app)
-        self.assertEquals('output', self._app(self._environ, None))
+        self.assertEqual('output', self._app(self._environ, None))
 
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
@@ -469,13 +469,13 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         zlength = zstream.tell()
         zstream.seek(0)
         self.assertLess(zlength, len(orig))
-        self.assertEquals(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
+        self.assertEqual(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
         self._environ['CONTENT_LENGTH'] = zlength
         self._environ['wsgi.input'] = zstream
         app_output = self._app(self._environ, None)
         buf = self._environ['wsgi.input']
         self.assertIsNot(buf, zstream)
         buf.seek(0)
-        self.assertEquals(orig, buf.read())
+        self.assertEqual(orig, buf.read())
         self.assertIs(None, self._environ.get('CONTENT_LENGTH'))
         self.assertNotIn('HTTP_CONTENT_ENCODING', self._environ)

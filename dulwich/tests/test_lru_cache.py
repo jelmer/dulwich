@@ -228,7 +228,7 @@ class TestLRUCache(TestCase):
         cache.add(1, 10)
         cache.add(2, 20)
         self.assertEqual(20, cache.get(2))
-        self.assertEquals(None, cache.get(3))
+        self.assertEqual(None, cache.get(3))
         obj = object()
         self.assertTrue(obj is cache.get(3, obj))
         self.assertEqual([2, 1], [n.key for n in cache._walk_lru()])

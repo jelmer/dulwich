@@ -469,8 +469,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         zlength = zstream.tell()
         zstream.seek(0)
         self.assertLess(zlength, len(orig))
-        self.assertEquals(self._environ['HTTP_CONTENT_ENCODING'],
-                          'gzip')
+        self.assertEquals(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
         self._environ['CONTENT_LENGTH'] = zlength
         self._environ['wsgi.input'] = zstream
         app_output = self._app(self._environ, None)
@@ -478,5 +477,5 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self.assertIsNot(buf, zstream)
         buf.seek(0)
         self.assertEquals(orig, buf.read())
-        self.assertLess(zlength, int(self._environ['CONTENT_LENGTH']))
+        self.assertIs(None, self._environ.get('CONTENT_LENGTH'))
         self.assertNotIn('HTTP_CONTENT_ENCODING', self._environ)

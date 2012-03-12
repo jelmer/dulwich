@@ -24,7 +24,7 @@
 
   * The WSGI server now transparently handles when a git client submits data
     using Content-Encoding: gzip.
-    (David Blewett)
+    (David Blewett, Jelmer Vernooij)
 
 0.8.3	2012-01-21
 

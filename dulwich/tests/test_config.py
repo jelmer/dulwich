@@ -175,8 +175,7 @@ class ConfigDictTests(TestCase):
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
-        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
-        os.environ["HOME"] = "/nonexistant"
+        self.makeSafeEnv()
         StackedConfig.default_backends()
 
 

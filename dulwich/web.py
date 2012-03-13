@@ -354,7 +354,6 @@ class GunzipFilter(object):
 
     def __call__(self, environ, start_response):
         if environ.get('HTTP_CONTENT_ENCODING', '') == 'gzip':
-            zlength = int(environ.get('CONTENT_LENGTH', '0'))
             environ.pop('HTTP_CONTENT_ENCODING')
             if 'CONTENT_LENGTH' in environ:
                 del environ['CONTENT_LENGTH']

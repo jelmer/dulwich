@@ -30,10 +30,47 @@ import tempfile
 if sys.version_info >= (2, 7):
     # If Python itself provides an exception, use that
     import unittest
-    from unittest import SkipTest, TestCase
+    from unittest import SkipTest, TestCase as _TestCase
 else:
     import unittest2 as unittest
-    from unittest2 import SkipTest, TestCase
+    from unittest2 import SkipTest, TestCase as _TestCase
+
+
+def get_safe_env(env=None):
+    """Returns the environment "env" (or a copy of "os.environ" by default)
+    modified to avoid side-effects caused by user's ~/.gitconfig"""
+
+    if env is None:
+        env = os.environ.copy()
+    # On Windows it's not enough to set "HOME" to a non-existing
+    # directory. Git.cmd takes the first existing directory out of
+    # "%HOME%", "%HOMEDRIVE%%HOMEPATH%" and "%USERPROFILE%".
+    for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
+        env[e] = '/nosuchdir'
+    return env
+
+
+class TestCase(_TestCase):
+
+    def makeSafeEnv(self):
+        """Create environment with homedirectory-related variables stripped.
+
+        Modifies os.environ for the duration of a test case to avoid
+        side-effects caused by the user's ~/.gitconfig and other
+        files in their home directory.
+        """
+        old_env = os.environ
+        def restore():
+            os.environ = old_env
+        self.addCleanup(restore)
+        new_env = dict(os.environ)
+        for e in ['HOME', 'HOMEPATH', 'USERPROFILE']:
+            new_env[e] = '/nosuchdir'
+        os.environ = new_env
+
+    def setUp(self):
+        super(TestCase, self).setUp()
+        self.makeSafeEnv()
 
 
 class BlackboxTestCase(TestCase):

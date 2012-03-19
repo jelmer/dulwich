@@ -35,6 +35,7 @@ else:
     import unittest2 as unittest
     from unittest2 import SkipTest, TestCase as _TestCase
 
+
 def get_safe_env(env=None):
     """Returns the environment "env" (or a copy of "os.environ" by default)
     modified to avoid side-effects caused by user's ~/.gitconfig"""
@@ -48,17 +49,28 @@ def get_safe_env(env=None):
         env[e] = '/nosuchdir'
     return env
 
-class TestCase(_TestCase):
-    def makeSafeEnv(self):
-        """Modifies "os.environ" for the duration of a test case to avoid
-        side-effects caused by user's ~/.gitconfig"""
 
-        for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
-            if e in os.environ:
-                self.addCleanup(os.environ.__setitem__, e, os.environ[e])
-            else:
-                self.addCleanup(os.environ.__delitem__, e)
-            os.environ[e] = '/nosuchdir'
+class TestCase(_TestCase):
+
+    def makeSafeEnv(self):
+        """Create environment with homedirectory-related variables stripped.
+
+        Modifies os.environ for the duration of a test case to avoid
+        side-effects caused by the user's ~/.gitconfig and other
+        files in their home directory.
+        """
+        old_env = os.environ
+        def restore():
+            os.environ = old_env
+        self.addCleanup(restore)
+        new_env = dict(os.environ)
+        for e in ['HOME', 'HOMEPATH', 'USERPROFILE']:
+            new_env[e] = '/nosuchdir'
+        os.environ = new_env
+
+    def setUp(self):
+        super(TestCase, self).setUp()
+        self.makeSafeEnv()
 
 
 class BlackboxTestCase(TestCase):

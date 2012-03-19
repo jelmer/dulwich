@@ -73,10 +73,10 @@ tag_sha = '71033db03a03c6a36721efcf1968dd8f8e0cf023'
 class TestHexToSha(TestCase):
 
     def test_simple(self):
-        self.assertEquals("\xab\xcd" * 10, hex_to_sha("abcd" * 10))
+        self.assertEqual("\xab\xcd" * 10, hex_to_sha("abcd" * 10))
 
     def test_reverse(self):
-        self.assertEquals("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
+        self.assertEqual("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
 class BlobReadTests(TestCase):
@@ -125,7 +125,7 @@ class BlobReadTests(TestCase):
         b1 = Blob.from_string("foo")
         b_raw = b1.as_legacy_object()
         b2 = b1.from_file(StringIO(b_raw))
-        self.assertEquals(b1, b2)
+        self.assertEqual(b1, b2)
 
     def test_chunks(self):
         string = 'test 5\n'
@@ -251,8 +251,8 @@ class ShaFileTests(TestCase):
         # resulting in a different header.
         # See https://github.com/libgit2/libgit2/pull/464
         sf = ShaFile.from_file(StringIO(small_buffer_zlib_object))
-        self.assertEquals(sf.type_name, "tag")
-        self.assertEquals(sf.tagger, " <@localhost>")
+        self.assertEqual(sf.type_name, "tag")
+        self.assertEqual(sf.tagger, " <@localhost>")
 
 
 class CommitSerializationTests(TestCase):
@@ -279,16 +279,16 @@ class CommitSerializationTests(TestCase):
         c = self.make_commit(commit_time=30)
         c1 = Commit()
         c1.set_raw_string(c.as_raw_string())
-        self.assertEquals(30, c1.commit_time)
+        self.assertEqual(30, c1.commit_time)
 
     def test_raw_length(self):
         c = self.make_commit()
-        self.assertEquals(len(c.as_raw_string()), c.raw_length())
+        self.assertEqual(len(c.as_raw_string()), c.raw_length())
 
     def test_simple(self):
         c = self.make_commit()
-        self.assertEquals(c.id, '5dac377bdded4c9aeb8dff595f0faeebcc8498cc')
-        self.assertEquals(
+        self.assertEqual(c.id, '5dac377bdded4c9aeb8dff595f0faeebcc8498cc')
+        self.assertEqual(
                 'tree d80c186a03f423a81b39df39dc87fd269736ca86\n'
                 'parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd\n'
                 'parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6\n'
@@ -345,31 +345,31 @@ class CommitParseTests(ShaFileCheckTests):
 
     def test_simple(self):
         c = Commit.from_string(self.make_commit_text())
-        self.assertEquals('Merge ../b\n', c.message)
-        self.assertEquals('James Westby <jw+debian@jameswestby.net>', c.author)
-        self.assertEquals('James Westby <jw+debian@jameswestby.net>',
+        self.assertEqual('Merge ../b\n', c.message)
+        self.assertEqual('James Westby <jw+debian@jameswestby.net>', c.author)
+        self.assertEqual('James Westby <jw+debian@jameswestby.net>',
                           c.committer)
-        self.assertEquals('d80c186a03f423a81b39df39dc87fd269736ca86', c.tree)
-        self.assertEquals(['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+        self.assertEqual('d80c186a03f423a81b39df39dc87fd269736ca86', c.tree)
+        self.assertEqual(['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
                            '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
                           c.parents)
         expected_time = datetime.datetime(2007, 3, 24, 22, 1, 59)
-        self.assertEquals(expected_time,
+        self.assertEqual(expected_time,
                           datetime.datetime.utcfromtimestamp(c.commit_time))
-        self.assertEquals(0, c.commit_timezone)
-        self.assertEquals(expected_time,
+        self.assertEqual(0, c.commit_timezone)
+        self.assertEqual(expected_time,
                           datetime.datetime.utcfromtimestamp(c.author_time))
-        self.assertEquals(0, c.author_timezone)
-        self.assertEquals(None, c.encoding)
+        self.assertEqual(0, c.author_timezone)
+        self.assertEqual(None, c.encoding)
 
     def test_custom(self):
         c = Commit.from_string(self.make_commit_text(
           extra={'extra-field': 'data'}))
-        self.assertEquals([('extra-field', 'data')], c.extra)
+        self.assertEqual([('extra-field', 'data')], c.extra)
 
     def test_encoding(self):
         c = Commit.from_string(self.make_commit_text(encoding='UTF-8'))
-        self.assertEquals('UTF-8', c.encoding)
+        self.assertEqual('UTF-8', c.encoding)
 
     def test_check(self):
         self.assertCheckSucceeds(Commit, self.make_commit_text())
@@ -435,8 +435,8 @@ class TreeTests(ShaFileCheckTests):
         myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
         x = Tree()
         x.add("myname", 0100755, myhexsha)
-        self.assertEquals(x["myname"], (0100755, myhexsha))
-        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+        self.assertEqual(x["myname"], (0100755, myhexsha))
+        self.assertEqual('100755 myname\0' + hex_to_sha(myhexsha),
                 x.as_raw_string())
 
     def test_add_old_order(self):
@@ -447,40 +447,40 @@ class TreeTests(ShaFileCheckTests):
             x.add(0100755, "myname", myhexsha)
         finally:
             warnings.resetwarnings()
-        self.assertEquals(x["myname"], (0100755, myhexsha))
-        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+        self.assertEqual(x["myname"], (0100755, myhexsha))
+        self.assertEqual('100755 myname\0' + hex_to_sha(myhexsha),
                 x.as_raw_string())
 
     def test_simple(self):
         myhexsha = "d80c186a03f423a81b39df39dc87fd269736ca86"
         x = Tree()
         x["myname"] = (0100755, myhexsha)
-        self.assertEquals('100755 myname\0' + hex_to_sha(myhexsha),
+        self.assertEqual('100755 myname\0' + hex_to_sha(myhexsha),
                 x.as_raw_string())
 
     def test_tree_update_id(self):
         x = Tree()
         x["a.c"] = (0100755, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        self.assertEquals("0c5c6bc2c081accfbc250331b19e43b904ab9cdd", x.id)
+        self.assertEqual("0c5c6bc2c081accfbc250331b19e43b904ab9cdd", x.id)
         x["a.b"] = (stat.S_IFDIR, "d80c186a03f423a81b39df39dc87fd269736ca86")
-        self.assertEquals("07bfcb5f3ada15bbebdfa3bbb8fd858a363925c8", x.id)
+        self.assertEqual("07bfcb5f3ada15bbebdfa3bbb8fd858a363925c8", x.id)
 
     def test_tree_iteritems_dir_sort(self):
         x = Tree()
         for name, item in _TREE_ITEMS.iteritems():
             x[name] = item
-        self.assertEquals(_SORTED_TREE_ITEMS, list(x.iteritems()))
+        self.assertEqual(_SORTED_TREE_ITEMS, list(x.iteritems()))
 
     def test_tree_items_dir_sort(self):
         x = Tree()
         for name, item in _TREE_ITEMS.iteritems():
             x[name] = item
-        self.assertEquals(_SORTED_TREE_ITEMS, x.items())
+        self.assertEqual(_SORTED_TREE_ITEMS, x.items())
 
     def _do_test_parse_tree(self, parse_tree):
         dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
-        self.assertEquals([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
+        self.assertEqual([('a', 0100644, a_sha), ('b', 0100644, b_sha)],
                           list(parse_tree(o.as_raw_string())))
         # test a broken tree that has a leading 0 on the file mode
         broken_tree = '0100644 foo\0' + hex_to_sha(a_sha)
@@ -488,7 +488,7 @@ class TreeTests(ShaFileCheckTests):
         def eval_parse_tree(*args, **kwargs):
             return list(parse_tree(*args, **kwargs))
 
-        self.assertEquals([('foo', 0100644, a_sha)],
+        self.assertEqual([('foo', 0100644, a_sha)],
                           eval_parse_tree(broken_tree))
         self.assertRaises(ObjectFormatException,
                           eval_parse_tree, broken_tree, strict=True)
@@ -572,7 +572,7 @@ class TreeTests(ShaFileCheckTests):
     def test_iter(self):
         t = Tree()
         t["foo"] = (0100644, a_sha)
-        self.assertEquals(set(["foo"]), set(t))
+        self.assertEqual(set(["foo"]), set(t))
 
 
 class TagSerializeTests(TestCase):
@@ -585,7 +585,7 @@ class TagSerializeTests(TestCase):
                         object=(Blob, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
                         tag_time=423423423,
                         tag_timezone=0)
-        self.assertEquals(('object d80c186a03f423a81b39df39dc87fd269736ca86\n'
+        self.assertEqual(('object d80c186a03f423a81b39df39dc87fd269736ca86\n'
                            'type blob\n'
                            'tag 0.1\n'
                            'tagger Jelmer Vernooij <jelmer@samba.org> '
@@ -635,22 +635,22 @@ class TagParseTests(ShaFileCheckTests):
     def test_parse(self):
         x = Tag()
         x.set_raw_string(self.make_tag_text())
-        self.assertEquals(
+        self.assertEqual(
             "Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger)
-        self.assertEquals("v2.6.22-rc7", x.name)
+        self.assertEqual("v2.6.22-rc7", x.name)
         object_type, object_sha = x.object
-        self.assertEquals("a38d6181ff27824c79fc7df825164a212eff6a3f",
+        self.assertEqual("a38d6181ff27824c79fc7df825164a212eff6a3f",
                           object_sha)
-        self.assertEquals(Commit, object_type)
-        self.assertEquals(datetime.datetime.utcfromtimestamp(x.tag_time),
+        self.assertEqual(Commit, object_type)
+        self.assertEqual(datetime.datetime.utcfromtimestamp(x.tag_time),
                           datetime.datetime(2007, 7, 1, 19, 54, 34))
-        self.assertEquals(-25200, x.tag_timezone)
+        self.assertEqual(-25200, x.tag_timezone)
 
     def test_parse_no_tagger(self):
         x = Tag()
         x.set_raw_string(self.make_tag_text(tagger=None))
-        self.assertEquals(None, x.tagger)
-        self.assertEquals("v2.6.22-rc7", x.name)
+        self.assertEqual(None, x.tagger)
+        self.assertEqual("v2.6.22-rc7", x.name)
 
     def test_check(self):
         self.assertCheckSucceeds(Tag, self.make_tag_text())
@@ -722,33 +722,43 @@ class CheckTests(TestCase):
 class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
-        self.assertEquals((0, False), parse_timezone("+0000"))
+        self.assertEqual((0, False), parse_timezone("+0000"))
 
     def test_parse_timezone_utc_negative(self):
-        self.assertEquals((0, True), parse_timezone("-0000"))
+        self.assertEqual((0, True), parse_timezone("-0000"))
 
     def test_generate_timezone_utc(self):
-        self.assertEquals("+0000", format_timezone(0))
+        self.assertEqual("+0000", format_timezone(0))
 
     def test_generate_timezone_utc_negative(self):
-        self.assertEquals("-0000", format_timezone(0, True))
+        self.assertEqual("-0000", format_timezone(0, True))
 
     def test_parse_timezone_cet(self):
-        self.assertEquals((60 * 60, False), parse_timezone("+0100"))
+        self.assertEqual((60 * 60, False), parse_timezone("+0100"))
 
     def test_format_timezone_cet(self):
-        self.assertEquals("+0100", format_timezone(60 * 60))
+        self.assertEqual("+0100", format_timezone(60 * 60))
 
     def test_format_timezone_pdt(self):
-        self.assertEquals("-0400", format_timezone(-4 * 60 * 60))
+        self.assertEqual("-0400", format_timezone(-4 * 60 * 60))
 
     def test_parse_timezone_pdt(self):
-        self.assertEquals((-4 * 60 * 60, False), parse_timezone("-0400"))
+        self.assertEqual((-4 * 60 * 60, False), parse_timezone("-0400"))
 
     def test_format_timezone_pdt_half(self):
-        self.assertEquals("-0440",
+        self.assertEqual("-0440",
             format_timezone(int(((-4 * 60) - 40) * 60)))
 
+    def test_format_timezone_double_negative(self):
+        self.assertEqual("--700",
+            format_timezone(int(((7 * 60)) * 60), True))
+
     def test_parse_timezone_pdt_half(self):
-        self.assertEquals((((-4 * 60) - 40) * 60, False),
+        self.assertEqual((((-4 * 60) - 40) * 60, False),
             parse_timezone("-0440"))
+
+    def test_parse_timezone_double_negative(self):
+        self.assertEqual(
+            (int(((7 * 60)) * 60), False), parse_timezone("+700"))
+        self.assertEqual(
+            (int(((7 * 60)) * 60), True), parse_timezone("--700"))

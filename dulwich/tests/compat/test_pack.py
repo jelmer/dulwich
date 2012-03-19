@@ -63,4 +63,4 @@ class TestPack(PackTests):
                 continue  # non-sha line
             pack_shas.add(sha)
         orig_shas = set(o.id for o in origpack.iterobjects())
-        self.assertEquals(orig_shas, pack_shas)
+        self.assertEqual(orig_shas, pack_shas)

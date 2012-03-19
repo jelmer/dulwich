@@ -56,20 +56,20 @@ class WriteCommitPatchTests(TestCase):
         f.seek(0)
         lines = f.readlines()
         self.assertTrue(lines[0].startswith("From 0b0d34d1b5b596c928adc9a727a4b9e03d025298"))
-        self.assertEquals(lines[1], "From: Jelmer <jelmer@samba.org>\n")
+        self.assertEqual(lines[1], "From: Jelmer <jelmer@samba.org>\n")
         self.assertTrue(lines[2].startswith("Date: "))
-        self.assertEquals([
+        self.assertEqual([
             "Subject: [PATCH 1/1] This is the first line\n",
             "And this is the second line.\n",
             "\n",
             "\n",
             "---\n"], lines[3:8])
-        self.assertEquals([
+        self.assertEqual([
             "CONTENTS-- \n",
             "custom\n"], lines[-2:])
         if len(lines) >= 12:
             # diffstat may not be present
-            self.assertEquals(lines[8], " 0 files changed\n")
+            self.assertEqual(lines[8], " 0 files changed\n")
 
 
 class ReadGitAmPatch(TestCase):
@@ -89,16 +89,16 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.committer)
-        self.assertEquals("Jelmer Vernooij <jelmer@samba.org>", c.author)
-        self.assertEquals("Remove executable bit from prey.ico "
+        self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.committer)
+        self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.author)
+        self.assertEqual("Remove executable bit from prey.ico "
             "(triggers a lintian warning).\n", c.message)
-        self.assertEquals(""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+        self.assertEqual(""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
 
 """, diff)
-        self.assertEquals("1.7.0.4", version)
+        self.assertEqual("1.7.0.4", version)
 
     def test_extract_spaces(self):
         text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
@@ -119,7 +119,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertEquals('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
     def test_extract_pseudo_from_header(self):
         text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
@@ -142,8 +142,8 @@ From: Jelmer Vernooy <jelmer@debian.org>
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertEquals("Jelmer Vernooy <jelmer@debian.org>", c.author)
-        self.assertEquals('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        self.assertEqual("Jelmer Vernooy <jelmer@debian.org>", c.author)
+        self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
     def test_extract_no_version_tail(self):
         text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
@@ -161,7 +161,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
 
 """
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertEquals(None, version)
+        self.assertEqual(None, version)
 
     def test_extract_mercurial(self):
         raise SkipTest("git_am_patch_split doesn't handle Mercurial patches properly yet")
@@ -173,7 +173,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
  '''
          c, diff, version = git_am_patch_split(StringIO(text))
 -        self.assertIs(None, version)
-+        self.assertEquals(None, version)
++        self.assertEqual(None, version)
  
  
  class DiffTests(TestCase):
@@ -197,8 +197,8 @@ More help   : https://help.launchpad.net/ListHelp
 
 """ % expected_diff
         c, diff, version = git_am_patch_split(StringIO(text))
-        self.assertEquals(expected_diff, diff)
-        self.assertEquals(None, version)
+        self.assertEqual(expected_diff, diff)
+        self.assertEqual(None, version)
 
 
 class DiffTests(TestCase):
@@ -208,7 +208,7 @@ class DiffTests(TestCase):
         f = StringIO()
         write_blob_diff(f, ("foo.txt", 0644, Blob.from_string("old\nsame\n")),
                            ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
-        self.assertEquals([
+        self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
             "--- a/foo.txt",
@@ -223,7 +223,7 @@ class DiffTests(TestCase):
         f = StringIO()
         write_blob_diff(f, (None, None, None),
                            ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
-        self.assertEquals([
+        self.assertEqual([
             'diff --git /dev/null b/bar.txt',
              'new mode 644',
              'index 0000000..a116b51 644',
@@ -238,7 +238,7 @@ class DiffTests(TestCase):
         f = StringIO()
         write_blob_diff(f, ("bar.txt", 0644, Blob.from_string("new\nsame\n")),
                            (None, None, None))
-        self.assertEquals([
+        self.assertEqual([
             'diff --git a/bar.txt /dev/null',
             'deleted mode 644',
             'index a116b51..0000000',
@@ -268,7 +268,7 @@ class DiffTests(TestCase):
         store.add_objects([(o, None) for o in [
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
-        self.assertEquals([
+        self.assertEqual([
             'diff --git /dev/null b/added.txt',
             'new mode 644',
             'index 0000000..76d4bb8 644',
@@ -304,7 +304,7 @@ class DiffTests(TestCase):
             "cc975646af69f279396d4d5e1379ac6af80ee637")
         store.add_objects([(o, None) for o in [tree1, tree2]])
         write_tree_diff(f, store, tree1.id, tree2.id)
-        self.assertEquals([
+        self.assertEqual([
             'diff --git a/asubmodule b/asubmodule',
             'index 06d0bdd..cc97564 160000',
             '--- a/asubmodule',
@@ -322,7 +322,7 @@ class DiffTests(TestCase):
         store.add_objects([(b1, None), (b2, None)])
         write_object_diff(f, store, ("foo.txt", 0644, b1.id),
                                     ("bar.txt", 0644, b2.id))
-        self.assertEquals([
+        self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
             "--- a/foo.txt",
@@ -340,7 +340,7 @@ class DiffTests(TestCase):
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
                                     ("bar.txt", 0644, b2.id))
-        self.assertEquals([
+        self.assertEqual([
             'diff --git /dev/null b/bar.txt',
              'new mode 644',
              'index 0000000..a116b51 644',
@@ -358,7 +358,7 @@ class DiffTests(TestCase):
         store.add_object(b1)
         write_object_diff(f, store, ("bar.txt", 0644, b1.id),
                                     (None, None, None))
-        self.assertEquals([
+        self.assertEqual([
             'diff --git a/bar.txt /dev/null',
             'deleted mode 644',
             'index a116b51..0000000',
@@ -376,7 +376,7 @@ class DiffTests(TestCase):
         store.add_object(b1)
         write_object_diff(f, store, ("bar.txt", 0644, b1.id),
             ("bar.txt", 0160000, "06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
-        self.assertEquals([
+        self.assertEqual([
             'diff --git a/bar.txt b/bar.txt',
             'old mode 644',
             'new mode 160000',

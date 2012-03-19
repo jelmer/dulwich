@@ -43,7 +43,7 @@ class ConfigFileTests(TestCase):
         ConfigFile()
 
     def test_eq(self):
-        self.assertEquals(ConfigFile(), ConfigFile())
+        self.assertEqual(ConfigFile(), ConfigFile())
 
     def test_default_config(self):
         cf = self.from_file("""[core]
@@ -52,7 +52,7 @@ class ConfigFileTests(TestCase):
 	bare = false
 	logallrefupdates = true
 """)
-        self.assertEquals(ConfigFile({("core", ): {
+        self.assertEqual(ConfigFile({("core", ): {
             "repositoryformatversion": "0",
             "filemode": "true",
             "bare": "false",
@@ -60,37 +60,37 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_empty(self):
         cf = self.from_file("")
-        self.assertEquals(ConfigFile(), cf)
+        self.assertEqual(ConfigFile(), cf)
 
     def test_empty_line_before_section(self):
         cf = self.from_file("\n[section]\n")
-        self.assertEquals(ConfigFile({("section", ): {}}), cf)
+        self.assertEqual(ConfigFile({("section", ): {}}), cf)
 
     def test_comment_before_section(self):
         cf = self.from_file("# foo\n[section]\n")
-        self.assertEquals(ConfigFile({("section", ): {}}), cf)
+        self.assertEqual(ConfigFile({("section", ): {}}), cf)
 
     def test_comment_after_section(self):
         cf = self.from_file("[section] # foo\n")
-        self.assertEquals(ConfigFile({("section", ): {}}), cf)
+        self.assertEqual(ConfigFile({("section", ): {}}), cf)
 
     def test_comment_after_variable(self):
         cf = self.from_file("[section]\nbar= foo # a comment\n")
-        self.assertEquals(ConfigFile({("section", ): {"bar": "foo"}}), cf)
+        self.assertEqual(ConfigFile({("section", ): {"bar": "foo"}}), cf)
 
     def test_from_file_section(self):
         cf = self.from_file("[core]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get(("core", ), "foo"))
-        self.assertEquals("bar", cf.get(("core", "foo"), "foo"))
+        self.assertEqual("bar", cf.get(("core", ), "foo"))
+        self.assertEqual("bar", cf.get(("core", "foo"), "foo"))
 
     def test_from_file_section_case_insensitive(self):
         cf = self.from_file("[cOre]\nfOo = bar\n")
-        self.assertEquals("bar", cf.get(("core", ), "foo"))
-        self.assertEquals("bar", cf.get(("core", "foo"), "foo"))
+        self.assertEqual("bar", cf.get(("core", ), "foo"))
+        self.assertEqual("bar", cf.get(("core", "foo"), "foo"))
 
     def test_from_file_with_mixed_quoted(self):
         cf = self.from_file("[core]\nfoo = \"bar\"la\n")
-        self.assertEquals("barla", cf.get(("core", ), "foo"))
+        self.assertEqual("barla", cf.get(("core", ), "foo"))
 
     def test_from_file_with_open_quoted(self):
         self.assertRaises(ValueError,
@@ -100,24 +100,24 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(
             "[core]\n"
             'foo = " bar"\n')
-        self.assertEquals(" bar", cf.get(("core", ), "foo"))
+        self.assertEqual(" bar", cf.get(("core", ), "foo"))
 
     def test_from_file_with_interrupted_line(self):
         cf = self.from_file(
             "[core]\n"
             'foo = bar\\\n'
             ' la\n')
-        self.assertEquals("barla", cf.get(("core", ), "foo"))
+        self.assertEqual("barla", cf.get(("core", ), "foo"))
 
     def test_from_file_with_boolean_setting(self):
         cf = self.from_file(
             "[core]\n"
             'foo\n')
-        self.assertEquals("true", cf.get(("core", ), "foo"))
+        self.assertEqual("true", cf.get(("core", ), "foo"))
 
     def test_from_file_subsection(self):
         cf = self.from_file("[branch \"foo\"]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))
+        self.assertEqual("bar", cf.get(("branch", "foo"), "foo"))
 
     def test_from_file_subsection_invalid(self):
         self.assertRaises(ValueError,
@@ -125,27 +125,31 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file("[branch.foo]\nfoo = bar\n")
-        self.assertEquals("bar", cf.get(("branch", "foo"), "foo"))
+        self.assertEqual("bar", cf.get(("branch", "foo"), "foo"))
 
     def test_write_to_file_empty(self):
         c = ConfigFile()
         f = StringIO()
         c.write_to_file(f)
-        self.assertEquals("", f.getvalue())
+        self.assertEqual("", f.getvalue())
 
     def test_write_to_file_section(self):
         c = ConfigFile()
         c.set(("core", ), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
-        self.assertEquals("[core]\nfoo = bar\n", f.getvalue())
+        self.assertEqual("[core]\nfoo = bar\n", f.getvalue())
 
     def test_write_to_file_subsection(self):
         c = ConfigFile()
         c.set(("branch", "blie"), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
-        self.assertEquals("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
+        self.assertEqual("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
+
+    def test_same_line(self):
+        cf = self.from_file("[branch.foo] foo = bar\n")
+        self.assertEqual("bar", cf.get(("branch", "foo"), "foo"))
 
 
 class ConfigDictTests(TestCase):
@@ -154,9 +158,9 @@ class ConfigDictTests(TestCase):
         cd = ConfigDict()
         self.assertRaises(KeyError, cd.get, "foo", "core")
         cd.set(("core", ), "foo", "bla")
-        self.assertEquals("bla", cd.get(("core", ), "foo"))
+        self.assertEqual("bla", cd.get(("core", ), "foo"))
         cd.set(("core", ), "foo", "bloe")
-        self.assertEquals("bloe", cd.get(("core", ), "foo"))
+        self.assertEqual("bloe", cd.get(("core", ), "foo"))
 
     def test_get_boolean(self):
         cd = ConfigDict()
@@ -178,50 +182,50 @@ class StackedConfigTests(TestCase):
 class UnescapeTests(TestCase):
 
     def test_nothing(self):
-        self.assertEquals("", _unescape_value(""))
+        self.assertEqual("", _unescape_value(""))
 
     def test_tab(self):
-        self.assertEquals("\tbar\t", _unescape_value("\\tbar\\t"))
+        self.assertEqual("\tbar\t", _unescape_value("\\tbar\\t"))
 
     def test_newline(self):
-        self.assertEquals("\nbar\t", _unescape_value("\\nbar\\t"))
+        self.assertEqual("\nbar\t", _unescape_value("\\nbar\\t"))
 
     def test_quote(self):
-        self.assertEquals("\"foo\"", _unescape_value("\\\"foo\\\""))
+        self.assertEqual("\"foo\"", _unescape_value("\\\"foo\\\""))
 
 
 class EscapeValueTests(TestCase):
 
     def test_nothing(self):
-        self.assertEquals("foo", _escape_value("foo"))
+        self.assertEqual("foo", _escape_value("foo"))
 
     def test_backslash(self):
-        self.assertEquals("foo\\\\", _escape_value("foo\\"))
+        self.assertEqual("foo\\\\", _escape_value("foo\\"))
 
     def test_newline(self):
-        self.assertEquals("foo\\n", _escape_value("foo\n"))
+        self.assertEqual("foo\\n", _escape_value("foo\n"))
 
 
 class FormatStringTests(TestCase):
 
     def test_quoted(self):
-        self.assertEquals('" foo"', _format_string(" foo"))
-        self.assertEquals('"\\tfoo"', _format_string("\tfoo"))
+        self.assertEqual('" foo"', _format_string(" foo"))
+        self.assertEqual('"\\tfoo"', _format_string("\tfoo"))
 
     def test_not_quoted(self):
-        self.assertEquals('foo', _format_string("foo"))
-        self.assertEquals('foo bar', _format_string("foo bar"))
+        self.assertEqual('foo', _format_string("foo"))
+        self.assertEqual('foo bar', _format_string("foo bar"))
 
 
 class ParseStringTests(TestCase):
 
     def test_quoted(self):
-        self.assertEquals(' foo', _parse_string('" foo"'))
-        self.assertEquals('\tfoo', _parse_string('"\\tfoo"'))
+        self.assertEqual(' foo', _parse_string('" foo"'))
+        self.assertEqual('\tfoo', _parse_string('"\\tfoo"'))
 
     def test_not_quoted(self):
-        self.assertEquals('foo', _parse_string("foo"))
-        self.assertEquals('foo bar', _parse_string("foo bar"))
+        self.assertEqual('foo', _parse_string("foo"))
+        self.assertEqual('foo bar', _parse_string("foo bar"))
 
 
 class CheckVariableNameTests(TestCase):

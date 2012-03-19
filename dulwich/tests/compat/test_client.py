@@ -173,7 +173,7 @@ class DulwichClientTestBase(object):
         c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
         f.seek(0)
         tf = tarfile.open(fileobj=f)
-        self.assertEquals(['baz', 'foo'], tf.getnames())
+        self.assertEqual(['baz', 'foo'], tf.getnames())
 
     def test_fetch_pack(self):
         c = self._client()
@@ -211,7 +211,7 @@ class DulwichClientTestBase(object):
         del sendrefs['HEAD']
         gen_pack = lambda have, want: []
         c = self._client()
-        self.assertEquals(dest.refs["refs/heads/abranch"], dummy_commit)
+        self.assertEqual(dest.refs["refs/heads/abranch"], dummy_commit)
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         self.assertFalse("refs/heads/abranch" in dest.refs)
 

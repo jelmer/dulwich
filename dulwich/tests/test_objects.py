@@ -415,6 +415,17 @@ class CommitParseTests(ShaFileCheckTests):
             else:
                 self.assertCheckFails(Commit, text)
 
+    def test_float_time(self):
+        lines = self.make_commit_lines(
+            author='James Westby <jw+debian@jameswestby.net> 1174773719.0 +0000')
+        c = Commit.from_string(self.make_commit_text())
+        self.assertEquals('James Westby <jw+debian@jameswestby.net>', c.author)
+        expected_time = datetime.datetime(2007, 3, 24, 22, 1, 59)
+        self.assertEquals(expected_time,
+                          datetime.datetime.utcfromtimestamp(c.author_time))
+        self.assertEquals(0, c.author_timezone)
+
+
 
 _TREE_ITEMS = {
   'a.c': (0100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),

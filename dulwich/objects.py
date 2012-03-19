@@ -1066,12 +1066,12 @@ class Commit(ShaFile):
                 self._parents.append(value)
             elif field == _AUTHOR_HEADER:
                 self._author, timetext, timezonetext = value.rsplit(" ", 2)
-                self._author_time = int(timetext)
+                self._author_time = int(float(timetext))
                 self._author_timezone, self._author_timezone_neg_utc =\
                     parse_timezone(timezonetext)
             elif field == _COMMITTER_HEADER:
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
-                self._commit_time = int(timetext)
+                self._commit_time = int(float(timetext))
                 self._commit_timezone, self._commit_timezone_neg_utc =\
                     parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:

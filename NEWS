@@ -11,6 +11,9 @@
   * Fix parsing of invalid timezone offsets with two minus signs.
     (Jason R. Coombs, #697828)
 
+  * Reset environment variables during tests, to avoid
+    test isolation leaks reading ~/.gitconfig. (Risto Kankkunen)
+
  TESTS
 
   * $HOME is now explicitly specified for tests that use it to read

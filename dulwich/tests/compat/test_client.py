@@ -43,6 +43,7 @@ from dulwich import (
     repo,
     )
 from dulwich.tests import (
+    get_safe_env,
     SkipTest,
     )
 
@@ -255,7 +256,7 @@ class TestSSHVendor(object):
     def connect_ssh(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
+        p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 

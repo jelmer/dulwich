@@ -31,7 +31,6 @@ from dulwich.config import (
     _unescape_value,
     )
 from dulwich.tests import TestCase
-import os
 
 
 class ConfigFileTests(TestCase):
@@ -175,7 +174,6 @@ class ConfigDictTests(TestCase):
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
-        self.makeSafeEnv()
         StackedConfig.default_backends()
 
 

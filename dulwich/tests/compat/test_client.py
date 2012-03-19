@@ -286,7 +286,6 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
-        self.makeSafeEnv()
 
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)

@@ -66,7 +66,7 @@ def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
     :param m: Mode to check
-    :return: a `boolean`
+    :return: a ``boolean``
     """
     return (stat.S_IFMT(m) == S_IFGITLINK)
 
@@ -865,7 +865,7 @@ class Tree(ShaFile):
     def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all 
+        :param mode: The mode of the entry as an integral type. Not all
             possible modes are supported by git; see check() for details.
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
@@ -989,29 +989,38 @@ def parse_timezone(text):
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
-    offset = int(text)
-    negative_utc = (offset == 0 and text[0] == '-')
+    # cgit parses the first character as the sign, and the rest
+    #  as an integer (using strtol), which could also be negative.
+    #  We do the same for compatibility. See #697828.
+    if not text[0] in '+-':
+        raise ValueError("Timezone must start with + or - (%(text)s)" % vars())
+    sign = text[0]
+    offset = int(text[1:])
+    if sign == '-':
+        offset = -offset
+    unnecessary_negative_timezone = (offset >= 0 and sign == '-')
     signum = (offset < 0) and -1 or 1
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = (offset % 100)
-    return signum * (hours * 3600 + minutes * 60), negative_utc
+    return (signum * (hours * 3600 + minutes * 60),
+            unnecessary_negative_timezone)
 
 
-def format_timezone(offset, negative_utc=False):
+def format_timezone(offset, unnecessary_negative_timezone=False):
     """Format a timezone for Git serialization.
 
     :param offset: Timezone offset as seconds difference to UTC
-    :param negative_utc: Whether to use a minus sign for UTC
-        (-0000 rather than +0000).
+    :param unnecessary_negative_timezone: Whether to use a minus sign for
+        UTC or positive timezones (-0000 and --700 rather than +0000 / +0700).
     """
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
-    if offset < 0 or (offset == 0 and negative_utc):
+    if offset < 0 or unnecessary_negative_timezone:
         sign = '-'
+        offset = -offset
     else:
         sign = '+'
-    offset = abs(offset)
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 

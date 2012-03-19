@@ -270,7 +270,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def pack_loose_objects(self):
         """Pack loose objects.
-        
+
         :return: Number of objects packed
         """
         objects = set()

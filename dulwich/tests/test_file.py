@@ -56,7 +56,7 @@ class FancyRenameTests(TestCase):
         self.assertFalse(os.path.exists(self.foo))
 
         new_f = open(self.bar, 'rb')
-        self.assertEquals('foo contents', new_f.read())
+        self.assertEqual('foo contents', new_f.read())
         new_f.close()
          
     def test_dest_exists(self):
@@ -65,7 +65,7 @@ class FancyRenameTests(TestCase):
         self.assertFalse(os.path.exists(self.foo))
 
         new_f = open(self.bar, 'rb')
-        self.assertEquals('foo contents', new_f.read())
+        self.assertEqual('foo contents', new_f.read())
         new_f.close()
 
     def test_dest_opened(self):
@@ -78,11 +78,11 @@ class FancyRenameTests(TestCase):
         self.assertTrue(os.path.exists(self.path('foo')))
 
         new_f = open(self.foo, 'rb')
-        self.assertEquals('foo contents', new_f.read())
+        self.assertEqual('foo contents', new_f.read())
         new_f.close()
 
         new_f = open(self.bar, 'rb')
-        self.assertEquals('bar contents', new_f.read())
+        self.assertEqual('bar contents', new_f.read())
         new_f.close()
 
 
@@ -113,15 +113,15 @@ class GitFileTests(TestCase):
     def test_readonly(self):
         f = GitFile(self.path('foo'), 'rb')
         self.assertTrue(isinstance(f, file))
-        self.assertEquals('foo contents', f.read())
-        self.assertEquals('', f.read())
+        self.assertEqual('foo contents', f.read())
+        self.assertEqual('', f.read())
         f.seek(4)
-        self.assertEquals('contents', f.read())
+        self.assertEqual('contents', f.read())
         f.close()
 
     def test_default_mode(self):
         f = GitFile(self.path('foo'))
-        self.assertEquals('foo contents', f.read())
+        self.assertEqual('foo contents', f.read())
         f.close()
 
     def test_write(self):
@@ -129,7 +129,7 @@ class GitFileTests(TestCase):
         foo_lock = '%s.lock' % foo
 
         orig_f = open(foo, 'rb')
-        self.assertEquals(orig_f.read(), 'foo contents')
+        self.assertEqual(orig_f.read(), 'foo contents')
         orig_f.close()
 
         self.assertFalse(os.path.exists(foo_lock))
@@ -145,7 +145,7 @@ class GitFileTests(TestCase):
         self.assertFalse(os.path.exists(foo_lock))
 
         new_f = open(foo, 'rb')
-        self.assertEquals('new contents', new_f.read())
+        self.assertEqual('new contents', new_f.read())
         new_f.close()
 
     def test_open_twice(self):
@@ -156,13 +156,13 @@ class GitFileTests(TestCase):
             f2 = GitFile(foo, 'wb')
             self.fail()
         except OSError, e:
-            self.assertEquals(errno.EEXIST, e.errno)
+            self.assertEqual(errno.EEXIST, e.errno)
         f1.write(' contents')
         f1.close()
 
         # Ensure trying to open twice doesn't affect original.
         f = open(foo, 'rb')
-        self.assertEquals('new contents', f.read())
+        self.assertEqual('new contents', f.read())
         f.close()
 
     def test_abort(self):
@@ -170,7 +170,7 @@ class GitFileTests(TestCase):
         foo_lock = '%s.lock' % foo
 
         orig_f = open(foo, 'rb')
-        self.assertEquals(orig_f.read(), 'foo contents')
+        self.assertEqual(orig_f.read(), 'foo contents')
         orig_f.close()
 
         f = GitFile(foo, 'wb')
@@ -180,7 +180,7 @@ class GitFileTests(TestCase):
         self.assertFalse(os.path.exists(foo_lock))
 
         new_orig_f = open(foo, 'rb')
-        self.assertEquals(new_orig_f.read(), 'foo contents')
+        self.assertEqual(new_orig_f.read(), 'foo contents')
         new_orig_f.close()
 
     def test_abort_close(self):

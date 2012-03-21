@@ -29,6 +29,8 @@
     using Content-Encoding: gzip.
     (David Blewett, Jelmer Vernooij)
 
+  * Add dulwich.index.build_index_from_tree(). (milki)
+
 0.8.3	2012-01-21
 
  FEATURES

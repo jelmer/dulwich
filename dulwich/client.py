@@ -323,7 +323,7 @@ class GitClient(object):
                     report_status_parser.handle_packet).parse
             self._read_side_band64k_data(proto, channel_callbacks)
         else:
-            if 'report-status':
+            if 'report-status' in capabilities:
                 for pkt in proto.read_pkt_seq():
                     report_status_parser.handle_packet(pkt)
         if report_status_parser is not None:

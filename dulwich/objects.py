@@ -1044,7 +1044,7 @@ class Commit(ShaFile):
         super(Commit, self).__init__()
         self._parents = []
         self._encoding = None
-        self._extra = {}
+        self._extra = []
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False
 

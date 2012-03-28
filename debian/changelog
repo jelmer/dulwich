@@ -2,8 +2,9 @@ dulwich (0.8.4-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Bump standards version to 3.9.3 (no changes).
+  * Fix header of copyright file format.
 
- -- Jelmer Vernooij <jelmer@debian.org>  Wed, 28 Mar 2012 14:22:31 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 28 Mar 2012 14:23:05 +0200
 
 dulwich (0.8.3-1) unstable; urgency=low
 

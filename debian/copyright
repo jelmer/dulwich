@@ -1,4 +1,4 @@
-Format: http://dep.debian.net/deps/dep5
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: dulwich
 Upstream-Contact: Jelmer Vernooij <jelmer@samba.org>
 Source: http://samba.org/~jelmer/dulwich

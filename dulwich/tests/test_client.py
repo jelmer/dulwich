@@ -61,10 +61,10 @@ class GitClientTests(TestCase):
                                   self.rout.write)
 
     def test_caps(self):
-        self.assertEquals(set(['multi_ack', 'side-band-64k', 'ofs-delta',
+        self.assertEqual(set(['multi_ack', 'side-band-64k', 'ofs-delta',
                                'thin-pack', 'multi_ack_detailed']),
                           set(self.client._fetch_capabilities))
-        self.assertEquals(set(['ofs-delta', 'report-status', 'side-band-64k']),
+        self.assertEqual(set(['ofs-delta', 'report-status', 'side-band-64k']),
                           set(self.client._send_capabilities))
 
     def test_archive_ack(self):
@@ -73,7 +73,7 @@ class GitClientTests(TestCase):
             '0000')
         self.rin.seek(0)
         self.client.archive('bla', 'HEAD', None, None)
-        self.assertEquals(self.rout.getvalue(), '0011argument HEAD0000')
+        self.assertEqual(self.rout.getvalue(), '0011argument HEAD0000')
 
     def test_fetch_pack_none(self):
         self.rin.write(
@@ -83,62 +83,62 @@ class GitClientTests(TestCase):
             '0000')
         self.rin.seek(0)
         self.client.fetch_pack('bla', lambda heads: [], None, None, None)
-        self.assertEquals(self.rout.getvalue(), '0000')
+        self.assertEqual(self.rout.getvalue(), '0000')
 
     def test_get_transport_and_path_tcp(self):
         client, path = get_transport_and_path('git://foo.com/bar/baz')
         self.assertTrue(isinstance(client, TCPGitClient))
-        self.assertEquals('foo.com', client._host)
-        self.assertEquals(TCP_GIT_PORT, client._port)
+        self.assertEqual('foo.com', client._host)
+        self.assertEqual(TCP_GIT_PORT, client._port)
         self.assertEqual('/bar/baz', path)
 
         client, path = get_transport_and_path('git://foo.com:1234/bar/baz')
         self.assertTrue(isinstance(client, TCPGitClient))
-        self.assertEquals('foo.com', client._host)
-        self.assertEquals(1234, client._port)
+        self.assertEqual('foo.com', client._host)
+        self.assertEqual(1234, client._port)
         self.assertEqual('/bar/baz', path)
 
     def test_get_transport_and_path_ssh_explicit(self):
         client, path = get_transport_and_path('git+ssh://foo.com/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
-        self.assertEquals('foo.com', client.host)
-        self.assertEquals(None, client.port)
-        self.assertEquals(None, client.username)
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
         self.assertEqual('/bar/baz', path)
 
         client, path = get_transport_and_path(
             'git+ssh://foo.com:1234/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
-        self.assertEquals('foo.com', client.host)
-        self.assertEquals(1234, client.port)
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(1234, client.port)
         self.assertEqual('/bar/baz', path)
 
     def test_get_transport_and_path_ssh_implicit(self):
         client, path = get_transport_and_path('foo:/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
-        self.assertEquals('foo', client.host)
-        self.assertEquals(None, client.port)
-        self.assertEquals(None, client.username)
+        self.assertEqual('foo', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
         self.assertEqual('/bar/baz', path)
 
         client, path = get_transport_and_path('foo.com:/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
-        self.assertEquals('foo.com', client.host)
-        self.assertEquals(None, client.port)
-        self.assertEquals(None, client.username)
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
         self.assertEqual('/bar/baz', path)
 
         client, path = get_transport_and_path('user@foo.com:/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
-        self.assertEquals('foo.com', client.host)
-        self.assertEquals(None, client.port)
-        self.assertEquals('user', client.username)
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual('user', client.username)
         self.assertEqual('/bar/baz', path)
 
     def test_get_transport_and_path_subprocess(self):
         client, path = get_transport_and_path('foo.bar/baz')
         self.assertTrue(isinstance(client, SubprocessGitClient))
-        self.assertEquals('foo.bar/baz', path)
+        self.assertEqual('foo.bar/baz', path)
 
     def test_get_transport_and_path_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
@@ -150,7 +150,24 @@ class GitClientTests(TestCase):
         url = 'https://github.com/jelmer/dulwich'
         client, path = get_transport_and_path(url)
         self.assertTrue(isinstance(client, HttpGitClient))
-        self.assertEquals('/jelmer/dulwich', path)
+        self.assertEqual('/jelmer/dulwich', path)
+
+    def test_send_pack_no_sideband64k_with_update_ref_error(self):
+        # No side-bank-64k reported by server shouldn't try to parse
+        # side band data
+        pkts = ['55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 capabilities^{}\x00 report-status ofs-delta\n',
+                '',
+                "unpack ok",
+                "ng refs/foo/bar pre-receive hook declined",
+                '']
+        for pkt in pkts:
+            if pkt == '':
+                self.rin.write("0000")
+            else:
+                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
+        self.rin.seek(0)
+        self.assertRaises(UpdateRefsError,
+            self.client.send_pack, "blah", lambda x: {}, lambda h,w: [])
 
 
 class SSHGitClientTests(TestCase):
@@ -160,13 +177,13 @@ class SSHGitClientTests(TestCase):
         self.client = SSHGitClient('git.samba.org')
 
     def test_default_command(self):
-        self.assertEquals('git-upload-pack',
+        self.assertEqual('git-upload-pack',
                 self.client._get_cmd_path('upload-pack'))
 
     def test_alternative_command_path(self):
         self.client.alternative_paths['upload-pack'] = (
             '/usr/lib/git/git-upload-pack')
-        self.assertEquals('/usr/lib/git/git-upload-pack',
+        self.assertEqual('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path('upload-pack'))
 
 

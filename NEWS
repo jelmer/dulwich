@@ -1,3 +1,36 @@
+0.8.4	2012-03-28
+
+ BUG FIXES
+
+  * Options on the same line as sections in config files are now supported.
+    (Jelmer Vernooij, #920553)
+
+  * Only negotiate capabilities that are also supported by the server.
+    (Rod Cloutier, Risto Kankkunen)
+
+  * Fix parsing of invalid timezone offsets with two minus signs.
+    (Jason R. Coombs, #697828)
+
+  * Reset environment variables during tests, to avoid
+    test isolation leaks reading ~/.gitconfig. (Risto Kankkunen)
+
+ TESTS
+
+  * $HOME is now explicitly specified for tests that use it to read
+    ``~/.gitconfig``, to prevent test isolation issues.
+    (Jelmer Vernooij, #920330)
+
+ FEATURES
+
+  * Additional arguments to get_transport_and_path are now passed
+    on to the constructor of the transport. (Sam Vilain)
+
+  * The WSGI server now transparently handles when a git client submits data
+    using Content-Encoding: gzip.
+    (David Blewett, Jelmer Vernooij)
+
+  * Add dulwich.index.build_index_from_tree(). (milki)
+
 0.8.3	2012-01-21
 
  FEATURES

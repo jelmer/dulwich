@@ -43,6 +43,7 @@ from dulwich import (
     repo,
     )
 from dulwich.tests import (
+    get_safe_env,
     SkipTest,
     )
 
@@ -172,7 +173,7 @@ class DulwichClientTestBase(object):
         c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
         f.seek(0)
         tf = tarfile.open(fileobj=f)
-        self.assertEquals(['baz', 'foo'], tf.getnames())
+        self.assertEqual(['baz', 'foo'], tf.getnames())
 
     def test_fetch_pack(self):
         c = self._client()
@@ -210,7 +211,7 @@ class DulwichClientTestBase(object):
         del sendrefs['HEAD']
         gen_pack = lambda have, want: []
         c = self._client()
-        self.assertEquals(dest.refs["refs/heads/abranch"], dummy_commit)
+        self.assertEqual(dest.refs["refs/heads/abranch"], dummy_commit)
         c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         self.assertFalse("refs/heads/abranch" in dest.refs)
 
@@ -255,7 +256,7 @@ class TestSSHVendor(object):
     def connect_ssh(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], stdin=subprocess.PIPE,
+        p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 

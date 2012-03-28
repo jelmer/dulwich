@@ -41,4 +41,4 @@ Description: Python Git library - Debug Extension
  replacements of some modules written in C are also available. This package
  includes the high performance versions.
  .
- This package contains the extensions built for the python debug interpreter.
+ This package contains the extensions built for the Python debug interpreter.

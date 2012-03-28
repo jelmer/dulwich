@@ -1,3 +1,9 @@
+dulwich (0.8.4-2) UNRELEASED; urgency=low
+
+  * Install upstream changelog.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 28 Mar 2012 14:58:59 +0200
+
 dulwich (0.8.4-1) unstable; urgency=low
 
   * New upstream release.

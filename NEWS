@@ -1,5 +1,9 @@
 0.8.5	UNRELEASED
 
+ BUG FIXES
+
+  * Avoid use of 'with' in dulwich.index. (Jelmer Vernooij)
+
 0.8.4	2012-03-28
 
  BUG FIXES

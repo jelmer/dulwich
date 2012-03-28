@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
 Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelper (>= 7.0.50~), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293)
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 X-Python-Version: >= 2.4
 Vcs-Bzr: http://alioth.debian.org/~jelmer/bzr/dulwich/unstable
 

@@ -1,4 +1,4 @@
-dulwich (0.8.4-1) UNRELEASED; urgency=low
+dulwich (0.8.4-1) unstable; urgency=low
 
   * New upstream release.
   * Bump standards version to 3.9.3 (no changes).

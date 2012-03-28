@@ -22,7 +22,7 @@
 """Repository access.
 
 This module contains the base class for git repositories
-(BaseRepo) and an implementation which uses a repository on 
+(BaseRepo) and an implementation which uses a repository on
 local disk (Repo).
 
 """
@@ -201,7 +201,7 @@ class RefsContainer(object):
             try:
                 ret[key] = self[("%s/%s" % (base, key)).strip("/")]
             except KeyError:
-                continue # Unable to resolve
+                continue  # Unable to resolve
 
         return ret
 
@@ -553,7 +553,7 @@ class DiskRefsContainer(RefsContainer):
                     return header + iter(f).next().rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
-                    return header + f.read(40-len(SYMREF))
+                    return header + f.read(40 - len(SYMREF))
             finally:
                 f.close()
         except IOError, e:
@@ -635,7 +635,7 @@ class DiskRefsContainer(RefsContainer):
                     f.abort()
                     raise
             try:
-                f.write(new_ref+"\n")
+                f.write(new_ref + "\n")
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -668,7 +668,7 @@ class DiskRefsContainer(RefsContainer):
                 f.abort()
                 return False
             try:
-                f.write(ref+"\n")
+                f.write(ref + "\n")
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -850,8 +850,8 @@ class BaseRepo(object):
     def open_index(self):
         """Open the index for this repository.
 
-        :raises NoIndexPresent: If no index is present
-        :return: Index instance
+        :raise NoIndexPresent: If no index is present
+        :return: The matching `Index`
         """
         raise NotImplementedError(self.open_index)
 
@@ -909,11 +909,19 @@ class BaseRepo(object):
         return self.object_store.get_graph_walker(heads)
 
     def ref(self, name):
-        """Return the SHA1 a ref is pointing to."""
+        """Return the SHA1 a ref is pointing to.
+
+        :param name: Name of the ref to look up
+        :raise KeyError: when the ref (or the one it points to) does not exist
+        :return: SHA1 it is pointing at
+        """
         return self.refs[name]
 
     def get_refs(self):
-        """Get dictionary with all refs."""
+        """Get dictionary with all refs.
+
+        :return: A ``dict`` mapping ref names to SHA1s
+        """
         return self.refs.as_dict()
 
     def head(self):
@@ -1067,6 +1075,7 @@ class BaseRepo(object):
         :param queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
+        :return: A `Walker` object
         """
         from dulwich.walk import Walker
         if include is None:
@@ -1141,6 +1150,8 @@ class BaseRepo(object):
             raise ValueError(name)
 
     def _get_user_identity(self):
+        """Determine the identity to use for new commits.
+        """
         config = self.get_config_stack()
         return "%s <%s>" % (
             config.get(("user", ), "name"),
@@ -1289,7 +1300,11 @@ class Repo(BaseRepo):
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
     def open_index(self):
-        """Open the index for this repository."""
+        """Open the index for this repository.
+
+        :raise NoIndexPresent: If no index is present
+        :return: The matching `Index`
+        """
         from dulwich.index import Index
         if not self.has_index():
             raise NoIndexPresent()
@@ -1319,7 +1334,7 @@ class Repo(BaseRepo):
                 try:
                     del index[path]
                 except KeyError:
-                    pass # already removed
+                    pass  # already removed
             else:
                 blob = Blob()
                 f = open(full_path, 'rb')
@@ -1338,7 +1353,9 @@ class Repo(BaseRepo):
         :param target_path: Target path
         :param mkdir: Create the target directory
         :param bare: Whether to create a bare repository
-        :return: Created repository
+        :param origin: Base name for refs in target repository
+            cloned from this repository
+        :return: Created repository as `Repo`
         """
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
@@ -1346,7 +1363,7 @@ class Repo(BaseRepo):
             target = self.init_bare(target_path)
         self.fetch(target)
         target.refs.import_refs(
-            'refs/remotes/'+origin, self.refs.as_dict('refs/heads'))
+            'refs/remotes/' + origin, self.refs.as_dict('refs/heads'))
         target.refs.import_refs(
             'refs/tags', self.refs.as_dict('refs/tags'))
         try:
@@ -1355,6 +1372,18 @@ class Repo(BaseRepo):
                 self.refs['refs/heads/master'])
         except KeyError:
             pass
+
+        # Update target head
+        head, head_sha = self.refs._follow('HEAD')
+        target.refs.set_symbolic_ref('HEAD', head)
+        target['HEAD'] = head_sha
+
+        if not bare:
+            # Checkout HEAD to target dir
+            from dulwich.index import build_index_from_tree
+            build_index_from_tree(target.path, target.index_path(),
+                    target.object_store, target['HEAD'].tree)
+
         return target
 
     def __repr__(self):
@@ -1435,7 +1464,10 @@ class MemoryRepo(BaseRepo):
         return StringIO(contents)
 
     def open_index(self):
-        """Fail to open index for this repo, since it is bare."""
+        """Fail to open index for this repo, since it is bare.
+
+        :raise NoIndexPresent: Raised when no index is present
+        """
         raise NoIndexPresent()
 
     @classmethod

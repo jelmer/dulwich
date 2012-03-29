@@ -26,6 +26,7 @@ import os
 import shutil
 import stat
 import struct
+import sys
 import tempfile
 
 from dulwich.index import (
@@ -215,15 +216,17 @@ class IndexEntryFromStatTests(TestCase):
 
 class BuildIndexTests(TestCase):
 
-    def assertReasonableIndexEntry(self, index_entry, values):
+    def assertReasonableIndexEntry(self, index_entry, 
+            time, mode, filesize, sha):
         delta = 1000000
         self.assertEquals(index_entry[0], index_entry[1])  # ctime and atime
-        self.assertTrue(index_entry[0] > values[0] - delta)
-        self.assertEquals(index_entry[4], values[4])  # mode
-        self.assertEquals(index_entry[5], values[5])  # uid
-        self.assertTrue(index_entry[6] in values[6])  # gid
-        self.assertEquals(index_entry[7], values[7])  # filesize
-        self.assertEquals(index_entry[8], values[8])  # sha
+        self.assertTrue(index_entry[0] > time - delta)
+        self.assertEquals(index_entry[4], mode)  # mode
+        if sys.platform != 'nt':
+            self.assertEquals(index_entry[5], os.getuid())
+            self.assertEquals(index_entry[6], os.getgid())
+        self.assertEquals(index_entry[7], filesize)  # filesize
+        self.assertEquals(index_entry[8], sha)  # sha
 
     def assertFileContents(self, path, contents, symlink=False):
         if symlink:
@@ -288,53 +291,29 @@ class BuildIndexTests(TestCase):
         # filea
         apath = os.path.join(repo.path, 'a')
         self.assertTrue(os.path.exists(apath))
-        self.assertReasonableIndexEntry(index['a'], (
-            ctime, ctime,
-            None, None,
-            stat.S_IFREG | 0644,
-            os.getuid(), os.getgroups(),
-            6,
-            filea.id,
-            None))
+        self.assertReasonableIndexEntry(index['a'],
+            ctime, stat.S_IFREG | 0644, 6, filea.id)
         self.assertFileContents(apath, 'file a')
 
         # fileb
         bpath = os.path.join(repo.path, 'b')
         self.assertTrue(os.path.exists(bpath))
-        self.assertReasonableIndexEntry(index['b'], (
-            ctime, ctime,
-            None, None,
-            stat.S_IFREG | 0644,
-            os.getuid(), os.getgroups(),
-            6,
-            fileb.id,
-            None))
+        self.assertReasonableIndexEntry(index['b'],
+            ctime, stat.S_IFREG | 0644, 6, fileb.id)
         self.assertFileContents(bpath, 'file b')
 
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
-        self.assertReasonableIndexEntry(index['c/d'], (
-            ctime, ctime,
-            None, None,
-            stat.S_IFREG | 0644,
-            os.getuid(), os.getgroups(),
-            6,
-            filed.id,
-            None))
+        self.assertReasonableIndexEntry(index['c/d'], 
+            ctime, stat.S_IFREG | 0644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d
         epath = os.path.join(repo.path, 'c', 'e')
         self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index['c/e'], (
-            ctime, ctime,
-            None, None,
-            stat.S_IFLNK,
-            os.getuid(), os.getgroups(),
-            1,
-            filee.id,
-            None))
+        self.assertReasonableIndexEntry(index['c/e'], 
+            ctime, stat.S_IFLNK, 1, filee.id)
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files

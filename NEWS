@@ -1,5 +1,10 @@
 0.8.6	UNRELEASED
 
+ API CHANGES
+
+  * dulwich.__init__ no longer imports client, protocol, repo and
+    server modules. (Jelmer Vernooij)
+
 0.8.5	2012-03-29
 
  BUG FIXES

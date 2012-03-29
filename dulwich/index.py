@@ -413,11 +413,15 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
 
         # FIXME: Merge new index into working tree
         if stat.S_ISLNK(entry.mode):
+            # FIXME: This will fail on Windows. What should we do instead?
             os.symlink(object_store[entry.sha].as_raw_string(), full_path)
         else:
-            with open(full_path, 'wb') as file:
+            f = open(full_path, 'wb')
+            try:
                 # Write out file
-                file.write(object_store[entry.sha].as_raw_string())
+                f.write(object_store[entry.sha].as_raw_string())
+            finally:
+                f.close()
 
             os.chmod(full_path, entry.mode)
 

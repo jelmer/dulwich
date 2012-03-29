@@ -4,6 +4,9 @@
 
   * Avoid use of 'with' in dulwich.index. (Jelmer Vernooij)
 
+  * Be a little bit strict about OS behaviour in index tests.
+    Should fix the tests on Debian GNU/kFreeBSD. (Jelmer Vernooij)
+
 0.8.4	2012-03-28
 
  BUG FIXES

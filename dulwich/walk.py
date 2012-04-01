@@ -255,6 +255,9 @@ class Walker(object):
         return False
 
     def _change_matches(self, change):
+        if not change:
+            return False
+
         old_path = change.old.path
         new_path = change.new.path
         if self._path_matches(new_path):

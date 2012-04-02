@@ -222,9 +222,6 @@ class BuildIndexTests(TestCase):
         self.assertEquals(index_entry[0], index_entry[1])  # ctime and atime
         self.assertTrue(index_entry[0] > time - delta)
         self.assertEquals(index_entry[4], mode)  # mode
-        if sys.platform != 'nt':
-            self.assertEquals(index_entry[5], os.getuid())
-            self.assertEquals(index_entry[6], os.getgid())
         self.assertEquals(index_entry[7], filesize)  # filesize
         self.assertEquals(index_entry[8], sha)  # sha
 

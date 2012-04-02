@@ -26,7 +26,6 @@ import os
 import shutil
 import stat
 import struct
-import sys
 import tempfile
 
 from dulwich.index import (
@@ -216,11 +215,7 @@ class IndexEntryFromStatTests(TestCase):
 
 class BuildIndexTests(TestCase):
 
-    def assertReasonableIndexEntry(self, index_entry, 
-            time, mode, filesize, sha):
-        delta = 1000000
-        self.assertEquals(index_entry[0], index_entry[1])  # ctime and atime
-        self.assertTrue(index_entry[0] > time - delta)
+    def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
         self.assertEquals(index_entry[4], mode)  # mode
         self.assertEquals(index_entry[7], filesize)  # filesize
         self.assertEquals(index_entry[8], sha)  # sha
@@ -280,8 +275,6 @@ class BuildIndexTests(TestCase):
                 repo.object_store, tree.id)
 
         # Verify index entries
-        import time
-        ctime = time.time()
         index = repo.open_index()
         self.assertEquals(len(index), 4)
 
@@ -289,28 +282,28 @@ class BuildIndexTests(TestCase):
         apath = os.path.join(repo.path, 'a')
         self.assertTrue(os.path.exists(apath))
         self.assertReasonableIndexEntry(index['a'],
-            ctime, stat.S_IFREG | 0644, 6, filea.id)
+            stat.S_IFREG | 0644, 6, filea.id)
         self.assertFileContents(apath, 'file a')
 
         # fileb
         bpath = os.path.join(repo.path, 'b')
         self.assertTrue(os.path.exists(bpath))
         self.assertReasonableIndexEntry(index['b'],
-            ctime, stat.S_IFREG | 0644, 6, fileb.id)
+            stat.S_IFREG | 0644, 6, fileb.id)
         self.assertFileContents(bpath, 'file b')
 
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
         self.assertReasonableIndexEntry(index['c/d'], 
-            ctime, stat.S_IFREG | 0644, 6, filed.id)
+            stat.S_IFREG | 0644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d
         epath = os.path.join(repo.path, 'c', 'e')
         self.assertTrue(os.path.exists(epath))
         self.assertReasonableIndexEntry(index['c/e'], 
-            ctime, stat.S_IFLNK, 1, filee.id)
+            stat.S_IFLNK, 1, filee.id)
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files

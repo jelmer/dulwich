@@ -5,6 +5,12 @@
   * dulwich.__init__ no longer imports client, protocol, repo and
     server modules. (Jelmer Vernooij)
 
+ TESTING
+
+  * Make index entry tests a little bit less strict, to cope with
+    slightly different behaviour on various platforms.
+    (Jelmer Vernooij)
+
 0.8.5	2012-03-29
 
  BUG FIXES

@@ -1,3 +1,10 @@
+dulwich (0.8.5-2) UNRELEASED; urgency=low
+
+  * Make index tests a bit less strict, fixes FTBFS on some systems.
+    Closes: #666328
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 02 Apr 2012 12:49:38 +0200
+
 dulwich (0.8.5-1) unstable; urgency=low
 
   * Install upstream changelog.

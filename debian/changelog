@@ -1,4 +1,4 @@
-dulwich (0.8.5-2) UNRELEASED; urgency=low
+dulwich (0.8.5-2) unstable; urgency=low
 
   * Make index tests a bit less strict, fixes FTBFS on some systems.
     Closes: #666328

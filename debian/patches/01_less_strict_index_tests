@@ -7,8 +7,8 @@ Applied-Upstream: merged in revision 1044
 X-Bzr-Revision-Id: git-v1:c398d692d1ba6c5fcee26383bfc78f73875de20b
 
 === modified file 'dulwich/tests/test_index.py'
---- old/dulwich/tests/test_index.py	2012-04-02 10:29:11 +0000
-+++ new/dulwich/tests/test_index.py	2012-04-02 10:37:42 +0000
+--- old/dulwich/tests/test_index.py	2012-03-29 00:21:54 +0000
++++ new/dulwich/tests/test_index.py	2012-04-02 11:05:18 +0000
 @@ -26,7 +26,6 @@
  import shutil
  import stat
@@ -17,7 +17,7 @@ X-Bzr-Revision-Id: git-v1:c398d692d1ba6c5fcee26383bfc78f73875de20b
  import tempfile
  
  from dulwich.index import (
-@@ -216,11 +215,7 @@
+@@ -216,15 +215,8 @@
  
  class BuildIndexTests(TestCase):
  
@@ -28,9 +28,13 @@ X-Bzr-Revision-Id: git-v1:c398d692d1ba6c5fcee26383bfc78f73875de20b
 -        self.assertTrue(index_entry[0] > time - delta)
 +    def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
          self.assertEquals(index_entry[4], mode)  # mode
+-        if sys.platform != 'nt':
+-            self.assertEquals(index_entry[5], os.getuid())
+-            self.assertEquals(index_entry[6], os.getgid())
          self.assertEquals(index_entry[7], filesize)  # filesize
          self.assertEquals(index_entry[8], sha)  # sha
-@@ -280,8 +275,6 @@
+ 
+@@ -283,8 +275,6 @@
                  repo.object_store, tree.id)
  
          # Verify index entries
@@ -39,7 +43,7 @@ X-Bzr-Revision-Id: git-v1:c398d692d1ba6c5fcee26383bfc78f73875de20b
          index = repo.open_index()
          self.assertEquals(len(index), 4)
  
-@@ -289,28 +282,28 @@
+@@ -292,28 +282,28 @@
          apath = os.path.join(repo.path, 'a')
          self.assertTrue(os.path.exists(apath))
          self.assertReasonableIndexEntry(index['a'],

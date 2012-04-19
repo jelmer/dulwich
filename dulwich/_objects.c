@@ -56,27 +56,21 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 {
 	char *text, *start, *end;
 	int len, namelen, strict;
-	PyObject *ret, *item, *name, *py_strict = NULL;
+	PyObject *ret, *item, *name, *sha, *py_strict = NULL;
 	static char *kwlist[] = {"text", "strict", NULL};
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw, "s#|O", kwlist,
 	                                 &text, &len, &py_strict))
 		return NULL;
-
-
 	strict = py_strict ?  PyObject_IsTrue(py_strict) : 0;
-
 	/* TODO: currently this returns a list; if memory usage is a concern,
 	 * consider rewriting as a custom iterator object */
 	ret = PyList_New(0);
-
 	if (ret == NULL) {
 		return NULL;
 	}
-
 	start = text;
 	end = text + len;
-
 	while (text < end) {
 		long mode;
 		if (strict && text[0] == '0') {
@@ -85,36 +79,35 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 			Py_DECREF(ret);
 			return NULL;
 		}
-
 		mode = strtol(text, &text, 8);
-
 		if (*text != ' ') {
 			PyErr_SetString(PyExc_ValueError, "Expected space");
 			Py_DECREF(ret);
 			return NULL;
 		}
-
 		text++;
-
 		namelen = strnlen(text, len - (text - start));
-
 		name = PyString_FromStringAndSize(text, namelen);
 		if (name == NULL) {
 			Py_DECREF(ret);
 			return NULL;
 		}
-
 		if (text + namelen + 20 >= end) {
 			PyErr_SetString(PyExc_ValueError, "SHA truncated");
 			Py_DECREF(ret);
 			Py_DECREF(name);
 			return NULL;
 		}
-
-		item = Py_BuildValue("(NlN)", name, mode,
-		                     sha_to_pyhex((unsigned char *)text+namelen+1));
+		sha = sha_to_pyhex((unsigned char *)text+namelen+1);
+		if (sha == NULL) {
+			Py_DECREF(ret);
+			Py_DECREF(name);
+			return NULL;
+		}
+		item = Py_BuildValue("(NlN)", name, mode, sha); 
 		if (item == NULL) {
 			Py_DECREF(ret);
+			Py_DECREF(sha);
 			Py_DECREF(name);
 			return NULL;
 		}
@@ -124,10 +117,8 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 			return NULL;
 		}
 		Py_DECREF(item);
-
 		text += namelen+21;
 	}
-
 	return ret;
 }
 

@@ -5,4 +5,7 @@ dist
 apidocs
 *,cover
 .testrepository
+*.pyc
+*.so
+*~
 docs/tutorial/index.html

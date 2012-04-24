@@ -8,6 +8,8 @@ TESTRUNNER ?= unittest2.__main__
 endif
 RUNTEST = PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER)
 
+DESTDIR=/
+
 all: build
 
 doc:: pydoctor
@@ -20,7 +22,7 @@ build::
 	$(SETUP) build_ext -i
 
 install::
-	$(SETUP) install
+	$(SETUP) install --root="$(DESTDIR)"
 
 check:: build
 	$(RUNTEST) dulwich.tests.test_suite

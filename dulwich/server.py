@@ -149,8 +149,9 @@ class DictBackend(Backend):
         try:
             return self.repos[path]
         except KeyError:
-            raise NotGitRepository("No git repository was found at %(path)s",
-                path=path)
+            raise NotGitRepository(
+                "No git repository was found at %(path)s" % dict(path=path)
+            )
 
 
 class FileSystemBackend(Backend):

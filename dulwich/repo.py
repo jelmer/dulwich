@@ -1251,7 +1251,9 @@ class Repo(BaseRepo):
             self.bare = True
             self._controldir = root
         else:
-            raise NotGitRepository(root)
+            raise NotGitRepository(
+                "No git repository was found at %(path)s" % dict(path=root)
+            )
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.controldir(),
                                                     OBJECTDIR))

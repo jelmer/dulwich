@@ -666,6 +666,13 @@ class FileSystemBackendTests(TestCase):
         self.assertRaises(NotGitRepository,
             self.backend.open_repository, os.path.join(self.path, "foo"))
 
+    def test_bad_repo_path(self):
+        repo = MemoryRepo.init_bare([], {})
+        backend = DictBackend({'/': repo})
+
+        self.assertRaises(NotGitRepository,
+                          lambda: backend.open_repository('/ups'))
+
 
 class ServeCommandTests(TestCase):
     """Tests for serve_command."""

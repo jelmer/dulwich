@@ -25,9 +25,7 @@ import SimpleHTTPServer
 import copy
 import os
 import select
-import shutil
 import signal
-import subprocess
 import tarfile
 import tempfile
 import threading
@@ -42,6 +40,7 @@ from dulwich import (
     objects,
     repo,
     )
+from dulwich import sp as subprocess
 from dulwich.tests import (
     get_safe_env,
     SkipTest,
@@ -56,6 +55,9 @@ from dulwich.tests.compat.utils import (
 from dulwich.tests.compat.server_utils import (
     ShutdownServerMixIn,
     )
+from dulwich.tests.utils import (
+    rmtree
+)
 
 
 class DulwichClientTestBase(object):
@@ -68,7 +70,7 @@ class DulwichClientTestBase(object):
         run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
 
     def tearDown(self):
-        shutil.rmtree(self.gitroot)
+        rmtree(self.gitroot)
 
     def assertDestEqualsSrc(self):
         src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
@@ -254,7 +256,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 class TestSSHVendor(object):
     @staticmethod
     def connect_ssh(host, command, username=None, port=None):
-        cmd, path = command[0].replace("'", '').split(' ')
+        cmd, path = command[0].replace("'", '').split(' ', 1)
         cmd = cmd.split('-', 1)
         p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -280,6 +282,14 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
     def _build_path(self, path):
         return self.gitroot + path
 
+    def test_archive(self):
+        if os.name == 'nt':
+            raise SkipTest(
+                'upload-archive: Function not implemented: see '
+                'http://permalink.gmane.org/gmane.comp.version-control.msysgit/13035'
+            )
+        super(DulwichMockSSHClientTest, self).test_archive()
+
 
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
@@ -296,6 +306,14 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return self.gitroot + path
+
+    def test_archive(self):
+        if os.name == 'nt':
+            raise SkipTest(
+                'upload-archive: Function not implemented: see '
+                'http://permalink.gmane.org/gmane.comp.version-control.msysgit/13035'
+            )
+        super(DulwichSubprocessClientTest, self).test_archive()
 
 
 class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
@@ -427,7 +445,13 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
         self.root_path = root_path
 
     def get_url(self):
-        return 'http://%s:%s/' % (self.server_name, self.server_port)
+        # Do not use "self.server_name" to build the URL.
+        # BaseHTTPServer.HTTPServer.server_name returns a fully qualified
+        # name of the host having the address the server is listening on
+        # (on Windows). However, the server is not necessarily listening on
+        # the interface corresponding to the fully qualified name,
+        # e.g. "localhost" vs. "host.example.com".
+        return 'http://%s:%s/' % (self.socket.getsockname()[0], self.server_port)
 
 
 if not getattr(HTTPGitServer, 'shutdown', None):

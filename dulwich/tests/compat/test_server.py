@@ -25,10 +25,14 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 """
 
 import threading
+import os
 
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
+    )
+from dulwich.tests import (
+    SkipTest,
     )
 from dulwich.tests.compat.server_utils import (
     ServerTests,
@@ -95,3 +99,11 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         receive_pack_handler_cls = server.handlers['git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
         self.assertTrue('side-band-64k' in caps)
+
+    def test_push_to_dulwich(self):
+        if os.name == 'nt':
+            raise SkipTest(
+                'Issue 457: Push over git protocol hangs in msysGit: '
+                'http://code.google.com/p/msysgit/issues/detail?id=457'
+            )
+        super(GitServerSideBand64kTestCase, self).test_push_to_dulwich()

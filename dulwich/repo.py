@@ -1250,6 +1250,12 @@ class Repo(BaseRepo):
               os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
+        elif (os.path.isfile(os.path.join(root, ".git"))):
+            import re
+            with open(os.path.join(root, ".git"), 'r') as f:
+                _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
+            self.bare = False
+            self._controldir = os.path.join(root, path)
         else:
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)

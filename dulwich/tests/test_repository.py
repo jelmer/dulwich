@@ -323,6 +323,16 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
 
+    def test_submodule(self):
+        temp_dir = tempfile.mkdtemp()
+        repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
+        shutil.copytree(os.path.join(repo_dir, 'a.git'),
+                        os.path.join(temp_dir, 'a.git'), symlinks=True)
+        rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
+        os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
+        r = Repo(temp_dir)
+        self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
+
     def test_common_revisions(self):
         """
         This test demonstrates that ``find_common_revisions()`` actually returns

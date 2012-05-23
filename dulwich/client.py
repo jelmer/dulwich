@@ -452,8 +452,7 @@ class TraditionalGitClient(GitClient):
         if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
-        if len(objects) > 0:
-            entries, sha = write_pack_objects(proto.write_file(), objects)
+        entries, sha = write_pack_objects(proto.write_file(), objects)
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
             progress)
         return new_refs

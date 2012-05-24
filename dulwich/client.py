@@ -409,6 +409,10 @@ class GitClient(object):
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
 
+    _force_send = False
+    """ Some clients must write pack objects even if there are no objects,
+    subclasses should set this attribute as required in this case. """
+
     def _connect(self, cmd, path):
         """Create a connection to the server.
 
@@ -452,7 +456,8 @@ class TraditionalGitClient(GitClient):
         if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
-        entries, sha = write_pack_objects(proto.write_file(), objects)
+        if len(objects) > 0 or self._force_send:
+            entries, sha = write_pack_objects(proto.write_file(), objects)
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
             progress)
         return new_refs
@@ -576,6 +581,7 @@ class SubprocessGitClient(TraditionalGitClient):
         if 'stderr' in kwargs:
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
+        self._force_send = True
 
     def _connect(self, service, path):
         import subprocess

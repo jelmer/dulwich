@@ -170,6 +170,17 @@ class ConfigDictTests(TestCase):
         cd.set(("core", ), "foo", "invalid")
         self.assertRaises(ValueError, cd.get_boolean, ("core", ), "foo")
 
+    def test_dict(self):
+        cd = ConfigDict()
+        cd.set(("core", ), "foo", "bla")
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual([("core2", ), ("core", )], cd.keys())
+        self.assertEqual(cd[("core", )], {'foo': 'bla'})
+
+        cd['a'] = 'b'
+        self.assertEqual(cd['a'], 'b')
+
 
 class StackedConfigTests(TestCase):
 

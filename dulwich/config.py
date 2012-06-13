@@ -92,14 +92,14 @@ class ConfigDict(Config, DictMixin):
             isinstance(other, self.__class__) and
             other._values == self._values)
 
-   def __getitem__(self, key):
-      return self._values[key]
+    def __getitem__(self, key):
+        return self._values[key]
       
-   def __setitem__(self, key, value):
-      self._values[key] = value
-
-   def keys(self):
-      return self._values.keys()
+    def __setitem__(self, key, value):
+        self._values[key] = value
+        
+    def keys(self):
+        return self._values.keys()
 
     @classmethod
     def _parse_setting(cls, name):

@@ -5,6 +5,9 @@
   * dulwich.__init__ no longer imports client, protocol, repo and
     server modules. (Jelmer Vernooij)
 
+  * ConfigDict now behaves more like a dictionary.
+    (Adam 'Cezar' Jenkins, issue #58)
+
  TESTING
 
   * Make index entry tests a little bit less strict, to cope with

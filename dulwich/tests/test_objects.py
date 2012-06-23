@@ -307,6 +307,12 @@ class CommitSerializationTests(TestCase):
         c = self.make_commit(commit_timezone=(-1 * 3600))
         self.assertTrue(" -0100\n" in c.as_raw_string())
 
+    def test_deserialize(self):
+        c = self.make_commit()
+        d = Commit()
+        d._deserialize(c.as_raw_chunks())
+        self.assertEqual(c, d)
+
 
 default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'
 

@@ -1059,7 +1059,7 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
-        for field, value in parse_commit(''.join(self._chunked_text)):
+        for field, value in parse_commit(''.join(chunks)):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:

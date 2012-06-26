@@ -720,7 +720,7 @@ class HttpGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(req_proto.write_file(), objects)
+            entries, sha = write_pack_objects(req_proto.write_file(), objects, thin_pack=False)
         resp = self._smart_request("git-receive-pack", url,
             data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)

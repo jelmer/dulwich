@@ -155,6 +155,7 @@ class GitClient(object):
         self._report_activity = report_activity
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
+        self._thin_packs = thin_packs
         if thin_packs:
             self._fetch_capabilities.add('thin-pack')
 
@@ -198,10 +199,34 @@ class GitClient(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
-        f, commit = target.object_store.add_pack()
+
+        if self._thin_packs:
+            ringbuf = []
+            def take_this(data):
+                ringbuf.append(data)
+            write_cb = take_this
+            def read_all(size):
+                size_left = size
+                ret = ""
+                while len(ringbuf) and size_left > 0:
+                    if len(ringbuf[0]) > size_left:
+                        chunk = ringbuf[0][:size_left]
+                        ringbuf[0] = ringbuf[0][size_left:]
+                    else:
+                        chunk = ringbuf[0]
+                        del ringbuf[0]
+                    ret += chunk
+                    size_left -= len(chunk)
+                return ret
+            def commit():
+                target.object_store.add_thin_pack(read_all, None)
+        else:
+            f, commit = target.object_store.add_pack()
+            write_cb = f.write
+
         try:
             return self.fetch_pack(path, determine_wants,
-                target.get_graph_walker(), f.write, progress)
+                target.get_graph_walker(), write_cb, progress)
         finally:
             commit()
 

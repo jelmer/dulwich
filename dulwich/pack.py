@@ -1886,7 +1886,6 @@ class Pack(object):
 
 
 try:
-    # from dulwich._pack import apply_delta, bisect_find_sha
-    pass
+    from dulwich._pack import apply_delta, bisect_find_sha
 except ImportError:
     pass

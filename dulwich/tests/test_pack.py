@@ -162,6 +162,7 @@ class TestPackDeltas(TestCase):
 
     test_string_empty = ''
     test_string_big = 'Z' * 8192
+    test_string_huge = 'Z' * 100000
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(target,
@@ -178,6 +179,9 @@ class TestPackDeltas(TestCase):
 
     def test_overflow(self):
         self._test_roundtrip(self.test_string_empty, self.test_string_big)
+
+    def test_overflow_64k(self):
+        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
 
 
 class TestPackData(PackTests):

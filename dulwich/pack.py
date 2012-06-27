@@ -1533,11 +1533,11 @@ def write_pack_data(f, num_records, records):
             try:
                 base_offset, base_crc32 = entries[delta_base]
             except KeyError:
-                type_num = REF_DELTA
-                raw = (delta_base, raw)
-            else:
                 type_num = OFS_DELTA
                 raw = (base_offset, raw)
+            else:
+                type_num = REF_DELTA
+                raw = (delta_base, raw)
         offset = f.offset()
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)

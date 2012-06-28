@@ -1497,7 +1497,7 @@ def deltify_pack_objects(objects, window=10):
             possible_bases.pop()
 
 
-def write_pack_objects(f, objects, window=10, num_objects=None, thin_pack=True):
+def write_pack_objects(f, objects, window=10, num_objects=None):
     """Write a new pack data file.
 
     :param f: File to write to
@@ -1510,12 +1510,7 @@ def write_pack_objects(f, objects, window=10, num_objects=None, thin_pack=True):
     """
     if num_objects is None:
         num_objects = len(objects)
-    if thin_pack:
-        pack_contents = deltify_pack_objects(objects, window)
-    else:
-        pack_contents = (
-            (o.type_num, o.sha().digest(), None, o.as_raw_string())
-            for (o, path) in objects)
+    pack_contents = deltify_pack_objects(objects, window)
     return write_pack_data(f, num_objects, pack_contents)
 
 

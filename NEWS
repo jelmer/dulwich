@@ -14,6 +14,10 @@
     slightly different behaviour on various platforms.
     (Jelmer Vernooij)
 
+  * ``setup.py test`` (available when setuptools is installed) now
+    runs all tests, not just the basic unit tests.
+    (Jelmer Vernooij)
+
  BUG FIXES
 
   * Commit._deserialize now actually deserializes the current state rather than

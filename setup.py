@@ -52,7 +52,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 setup_kwargs = {}
 
 if has_setuptools:
-    setup_kwargs['test_suite'] = 'dulwich.tests'
+    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
 
 setup(name='dulwich',
       description='Python Git Library',

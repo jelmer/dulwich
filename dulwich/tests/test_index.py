@@ -250,7 +250,7 @@ class BuildIndexTests(TestCase):
 
     def test_nonempty(self):
         if os.name != 'posix':
-            self.skip("test depends on POSIX shell")
+            self.skipTest("test depends on POSIX shell")
 
         repo_dir = tempfile.mkdtemp()
         repo = Repo.init(repo_dir)

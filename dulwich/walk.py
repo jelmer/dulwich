@@ -153,7 +153,7 @@ class _CommitTimeQueue(object):
                 if self._pq and all(c.id in self._excluded
                                     for _, c in self._pq):
                     _, n = self._pq[0]
-                    if n.commit_time >= self._last.commit_time:
+                    if self._last and n.commit_time >= self._last.commit_time:
                         # If the next commit is newer than the last one, we need
                         # to keep walking in case its parents (which we may not
                         # have seen yet) are excluded. This gives the excluded

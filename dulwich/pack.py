@@ -1507,10 +1507,7 @@ def write_pack_objects(f, objects, window=10, num_objects=None):
     """
     if num_objects is None:
         num_objects = len(objects)
-    # FIXME: pack_contents = deltify_pack_objects(objects, window)
-    pack_contents = (
-        (o.type_num, o.sha().digest(), None, o.as_raw_string())
-        for (o, path) in objects)
+    pack_contents = deltify_pack_objects(objects, window)
     return write_pack_data(f, num_objects, pack_contents)
 
 
@@ -1531,11 +1528,11 @@ def write_pack_data(f, num_records, records):
             try:
                 base_offset, base_crc32 = entries[delta_base]
             except KeyError:
-                type_num = REF_DELTA
-                raw = (delta_base, raw)
-            else:
                 type_num = OFS_DELTA
                 raw = (base_offset, raw)
+            else:
+                type_num = REF_DELTA
+                raw = (delta_base, raw)
         offset = f.offset()
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)
@@ -1597,20 +1594,24 @@ def create_delta(base_buf, target_buf):
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            scratch = ''
-            op = 0x80
             o = i1
-            for i in range(4):
-                if o & 0xff << i*8:
-                    scratch += chr((o >> i*8) & 0xff)
-                    op |= 1 << i
             s = i2 - i1
-            for i in range(2):
-                if s & 0xff << i*8:
-                    scratch += chr((s >> i*8) & 0xff)
-                    op |= 1 << (4+i)
-            out_buf += chr(op)
-            out_buf += scratch
+            for pos in xrange(0, s, 65535):
+                scratch = ''
+                op = 0x80
+                for i in range(4):
+                    if o & 0xff << i*8:
+                        scratch += chr((o >> i*8) & 0xff)
+                        op |= 1 << i
+
+                size = min(65535, s - pos)
+                for i in range(4):
+                    if size & 0xff << i*8:
+                        scratch += chr((size >> i*8) & 0xff)
+                        op |= 1 << (4+i)
+                out_buf += chr(op)
+                out_buf += scratch
+                o += size
         if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)

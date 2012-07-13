@@ -425,6 +425,7 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
     def __init__(self, server_address, root_path):
         BaseHTTPServer.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
+        self.server_name = "localhost"
 
     def get_url(self):
         return 'http://%s:%s/' % (self.server_name, self.server_port)

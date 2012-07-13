@@ -410,3 +410,7 @@ class WalkerTest(TestCase):
         # Ensure that c1..y4 get excluded even though they're popped from the
         # priority queue long before y5.
         self.assertWalkYields([m6, x2], [m6.id], exclude=[y5.id])
+
+    def test_empty_walk(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        self.assertWalkYields([], [c3.id], exclude=[c3.id])

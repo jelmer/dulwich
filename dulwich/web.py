@@ -318,10 +318,11 @@ class HTTPGitApplication(object):
       ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
-    def __init__(self, backend, dumb=False, handlers=None):
+    def __init__(self, backend, dumb=False, handlers=None, fallback_app=None):
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)
+        self.fallback_app = fallback_app
         if handlers is not None:
             self.handlers.update(handlers)
 
@@ -339,8 +340,13 @@ class HTTPGitApplication(object):
             if mat:
                 handler = self.services[smethod, spath]
                 break
+
         if handler is None:
-            return req.not_found('Sorry, that method is not supported')
+            if self.fallback_app:
+                return self.fallback_app(environ, start_response)
+            else:
+                return req.not_found('Sorry, that method is not supported')
+
         return handler(req, self.backend, mat)
 
 
@@ -382,11 +388,11 @@ class LimitedInputFilter(object):
         return self.app(environ, start_response)
 
 
-def make_wsgi_chain(backend, dumb=False, handlers=None):
+def make_wsgi_chain(*args, **kwargs):
     """Factory function to create an instance of HTTPGitApplication,
     correctly wrapped with needed middleware.
     """
-    app = HTTPGitApplication(backend, dumb, handlers)
+    app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = GunzipFilter(LimitedInputFilter(app))
     return wrapped_app
 

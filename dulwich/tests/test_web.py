@@ -443,6 +443,13 @@ class HTTPGitApplicationTestCase(TestCase):
         self._add_handler(self._app)
         self.assertEqual('output', self._app(self._environ, None))
 
+    def test_fallback_app(self):
+        def test_app(environ, start_response):
+            return 'output'
+
+        app = HTTPGitApplication('backend', fallback_app=test_app)
+        self.assertEqual('output', app(self._environ, None))
+
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
     """TestCase for testing the GunzipFilter, ensuring the wsgi.input

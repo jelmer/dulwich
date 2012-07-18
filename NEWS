@@ -5,8 +5,13 @@
   * dulwich.__init__ no longer imports client, protocol, repo and
     server modules. (Jelmer Vernooij)
 
+ FEATURES
+
   * ConfigDict now behaves more like a dictionary.
     (Adam 'Cezar' Jenkins, issue #58)
+
+  * HTTPGitApplication now takes an optional
+    `fallback_app` argument. (Jonas Haag, issue #67)
 
  TESTING
 

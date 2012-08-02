@@ -1383,8 +1383,9 @@ class Repo(BaseRepo):
 
         # Update target head
         head, head_sha = self.refs._follow('HEAD')
-        target.refs.set_symbolic_ref('HEAD', head)
-        target['HEAD'] = head_sha
+        if head is not None and head_sha is not None:
+            target.refs.set_symbolic_ref('HEAD', head)
+            target['HEAD'] = head_sha
 
         if not bare:
             # Checkout HEAD to target dir

@@ -28,6 +28,8 @@
   * Commit._deserialize now actually deserializes the current state rather than
     the previous one. (Yifan Zhang, issue #59)
 
+  * Handle None elements in lists of TreeChange objects. (Alex Holmes)
+
 0.8.5	2012-03-29
 
  BUG FIXES

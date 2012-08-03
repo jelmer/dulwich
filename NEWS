@@ -82,7 +82,7 @@
 
   * ``Repo.do_commit`` will now use the user identity from
     .git/config or ~/.gitconfig if none was explicitly specified.
-   (Jelmer Vernooij)
+    (Jelmer Vernooij)
 
  BUG FIXES
 

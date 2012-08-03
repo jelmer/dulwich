@@ -30,6 +30,9 @@
 
   * Handle None elements in lists of TreeChange objects. (Alex Holmes)
 
+  * Support cloning repositories without HEAD set.
+    (D-Key, Jelmer Vernooij, issue #69)
+
 0.8.5	2012-03-29
 
  BUG FIXES

@@ -303,6 +303,19 @@ class RepositoryTests(TestCase):
                 'b0931cadc54336e78a1d980420e3268903b57a50',
             }, t.refs.as_dict())
 
+    def test_clone_empty(self):
+        """Test clone() doesn't crash if HEAD points to a non-existing ref.
+
+        This simulates cloning server-side bare repository either when it is
+        still empty or if user renames master branch and pushes private repo
+        to the server.
+        Non-bare repo HEAD always points to an existing ref.
+        """
+        r = self._repo = open_repo('empty.git')
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        r.clone(tmp_dir, mkdir=False, bare=True)
+
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
         shas = [e.commit.id for e in r.get_walker()]

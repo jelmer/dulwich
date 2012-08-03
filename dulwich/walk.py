@@ -341,8 +341,8 @@ def _topo_reorder(entries):
     order, e.g. in commit time order.
 
     :param entries: An iterable of WalkEntry objects.
-    :yield: WalkEntry objects from entries in FIFO order, except where a parent
-        would be yielded before any of its children.
+    :return: iterator over WalkEntry objects from entries in FIFO order, except
+        where a parent would be yielded before any of its children.
     """
     todo = collections.deque()
     pending = {}

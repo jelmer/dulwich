@@ -228,7 +228,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
     :param tree_id: The SHA of the merge tree.
     :param rename_detector: RenameDetector object for detecting renames.
 
-    :yield: Lists of TreeChange objects, one per conflicted path in the merge.
+    :return: Iterator over lists of TreeChange objects, one per conflicted path
+        in the merge.
 
         Each list contains one element per parent, with the TreeChange for that
         path relative to that parent. An element may be None if it never existed

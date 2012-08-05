@@ -1221,7 +1221,7 @@ class DeltaChainIterator(object):
         type_num = unpacked.pack_type_num
         offset = unpacked.offset
         if type_num == OFS_DELTA:
-            base_offset = offset - unpacked.delta_base
+            base_offset = offset-unpacked.delta_base
             self._pending_ofs[base_offset].append(offset)
         elif type_num == REF_DELTA:
             self._pending_ref[unpacked.delta_base].append(offset)
@@ -1282,15 +1282,21 @@ class DeltaChainIterator(object):
                                               unpacked.decomp_chunks)
         return unpacked
 
-    def _follow_chain(self, offset, obj_type_num, base_chunks):
+    def _follow_chain(self, offset, obj_type_num, base_chunks, base_offset=None):
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
+        if base_offset:
+            offset = base_offset
         unpacked = self._resolve_object(offset, obj_type_num, base_chunks)
         yield self._result(unpacked)
 
-        pending = chain(self._pending_ofs.pop(unpacked.offset, []),
-                        self._pending_ref.pop(unpacked.sha(), []))
-        for new_offset in pending:
+        for new_offset in self._pending_ofs.pop(unpacked.offset, []):
+            new_offset -= unpacked.offset
+            for new_result in self._follow_chain(
+              new_offset, unpacked.obj_type_num, unpacked.obj_chunks, new_offset + unpacked.offset):
+                yield new_result
+
+        for new_offset in self._pending_ref.pop(unpacked.sha(), []):
             for new_result in self._follow_chain(
               new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
                 yield new_result
@@ -1527,16 +1533,16 @@ def write_pack_data(f, num_records, records):
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
     for type_num, object_id, delta_base, raw in records:
+        offset = f.offset()
         if delta_base is not None:
             try:
                 base_offset, base_crc32 = entries[delta_base]
             except KeyError:
-                type_num = OFS_DELTA
-                raw = (base_offset, raw)
-            else:
                 type_num = REF_DELTA
                 raw = (delta_base, raw)
-        offset = f.offset()
+            else:
+                type_num = OFS_DELTA
+                raw = (offset-base_offset, raw)
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)
     return entries, f.write_sha()

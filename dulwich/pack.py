@@ -1282,11 +1282,11 @@ class DeltaChainIterator(object):
                                               unpacked.decomp_chunks)
         return unpacked
 
-    def _follow_chain(self, offset, obj_type_num, base_chunks, base_offset=None):
+    def _follow_chain(self, offset, obj_type_num, base_chunks, adjusted_offset=None):
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
-        if base_offset:
-            offset = base_offset
+        if adjusted_offset:
+            offset = adjusted_offset
         unpacked = self._resolve_object(offset, obj_type_num, base_chunks)
         yield self._result(unpacked)
 

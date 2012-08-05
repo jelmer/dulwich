@@ -1483,9 +1483,6 @@ def deltify_pack_objects(objects, window=10):
 
     possible_bases = deque()
 
-    def to_lines(raw_string):
-        return raw_string.splitlines(True)
-
     for type_num, path, neg_length, o in magic:
         raw = o.as_raw_string()
         winner = raw
@@ -1493,7 +1490,7 @@ def deltify_pack_objects(objects, window=10):
         for base in possible_bases:
             if base.type_num != type_num:
                 continue
-            delta = create_delta(to_lines(base.as_raw_string()), to_lines(raw))
+            delta = create_delta(base.as_raw_string(), raw)
             if len(delta) < len(winner):
                 winner_base = base.sha().digest()
                 winner = delta
@@ -1578,12 +1575,8 @@ def create_delta(base_buf, target_buf):
     :param base_buf: Base buffer
     :param target_buf: Target buffer
     """
-    if type(base_buf) == str:
-        base_buf = [base_buf]
-    if type(target_buf) == str:
-        target_buf = [target_buf]
-    base_bytes = ''.join(base_buf)
-    target_bytes = ''.join(target_buf)
+    assert isinstance(base_buf, str)
+    assert isinstance(target_buf, str)
     out_buf = ''
     # write delta header
     def encode_size(size):
@@ -1596,8 +1589,8 @@ def create_delta(base_buf, target_buf):
             size >>= 7
         ret += chr(c)
         return ret
-    out_buf += encode_size(len(base_bytes))
-    out_buf += encode_size(len(target_bytes))
+    out_buf += encode_size(len(base_buf))
+    out_buf += encode_size(len(target_buf))
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
@@ -1607,8 +1600,8 @@ def create_delta(base_buf, target_buf):
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            o = chunks_length(base_buf[:i1])
-            s = chunks_length(base_buf[i1:i2])
+            o = i1
+            s = i2 - i1
             for pos in xrange(0, s, 65535):
                 scratch = ''
                 op = 0x80
@@ -1628,15 +1621,15 @@ def create_delta(base_buf, target_buf):
         if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
-            s = chunks_length(target_buf[j1:j2])
-            o = chunks_length(target_buf[:j1])
+            s = j2 - j1
+            o = j1
             while s > 127:
                 out_buf += chr(127)
-                out_buf += target_bytes[o:o+127]
+                out_buf += target_buf[o:o+127]
                 s -= 127
                 o += 127
             out_buf += chr(s)
-            out_buf += target_bytes[o:o+s]
+            out_buf += target_buf[o:o+s]
     return out_buf
 
 

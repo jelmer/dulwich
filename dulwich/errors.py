@@ -171,3 +171,7 @@ class CommitError(Exception):
 
 class RefFormatError(Exception):
     """Indicates an invalid ref name."""
+
+
+class HookError(Exception):
+    """An error occurred while executing a hook."""

@@ -117,6 +117,7 @@ def self_test_suite():
         'diff_tree',
         'fastexport',
         'file',
+        'hooks',
         'index',
         'lru_cache',
         'objects',

@@ -33,6 +33,9 @@ check-tutorial:: build
 check-nocompat:: build
 	$(RUNTEST) dulwich.tests.nocompat_test_suite
 
+check-compat:: build
+	$(RUNTEST) dulwich.tests.compat_test_suite
+
 check-pypy:: clean
 	$(MAKE) check-noextensions PYTHON=pypy
 

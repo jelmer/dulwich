@@ -967,16 +967,7 @@ class BaseRepo(object):
 
         :return: `ConfigFile` object for the ``.git/config`` file.
         """
-        from dulwich.config import ConfigFile
-        path = os.path.join(self._controldir, 'config')
-        try:
-            return ConfigFile.from_path(path)
-        except (IOError, OSError), e:
-            if e.errno != errno.ENOENT:
-                raise
-            ret = ConfigFile()
-            ret.path = path
-            return ret
+        raise NotImplementedError(self.get_config)
 
     def get_config_stack(self):
         """Return a config stack for this repository.
@@ -1395,6 +1386,22 @@ class Repo(BaseRepo):
 
         return target
 
+    def get_config(self):
+        """Retrieve the config object.
+
+        :return: `ConfigFile` object for the ``.git/config`` file.
+        """
+        from dulwich.config import ConfigFile
+        path = os.path.join(self._controldir, 'config')
+        try:
+            return ConfigFile.from_path(path)
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
+            ret = ConfigFile()
+            ret.path = path
+            return ret
+
     def __repr__(self):
         return "<Repo at %r>" % self.path
 
@@ -1478,6 +1485,14 @@ class MemoryRepo(BaseRepo):
         :raise NoIndexPresent: Raised when no index is present
         """
         raise NoIndexPresent()
+
+    def get_config(self):
+        """Retrieve the config object.
+
+        :return: `ConfigFile` object.
+        """
+        from dulwich.config import ConfigFile
+        return ConfigFile()
 
     @classmethod
     def init_bare(cls, objects, refs):

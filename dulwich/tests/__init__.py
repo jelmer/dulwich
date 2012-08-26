@@ -161,6 +161,13 @@ def nocompat_test_suite():
     return result
 
 
+def compat_test_suite():
+    result = unittest.TestSuite()
+    from dulwich.tests.compat import test_suite as compat_test_suite
+    result.addTests(compat_test_suite())
+    return result
+
+
 def test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())

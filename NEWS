@@ -33,6 +33,8 @@
   * Support cloning repositories without HEAD set.
     (D-Key, Jelmer Vernooij, issue #69)
 
+  * Support ``MemoryRepo.get_config``. (Jelmer Vernooij)
+
 0.8.5	2012-03-29
 
  BUG FIXES

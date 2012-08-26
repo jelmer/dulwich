@@ -8,4 +8,5 @@ apidocs
 *.pyc
 *.so
 *~
+*.swp
 docs/tutorial/index.html

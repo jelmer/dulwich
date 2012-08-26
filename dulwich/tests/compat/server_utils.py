@@ -19,7 +19,7 @@
 
 """Utilities for testing git server compatibility."""
 
-
+import errno
 import os
 import select
 import shutil
@@ -200,3 +200,10 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
     def capabilities(cls):
         return tuple(c for c in ReceivePackHandler.capabilities()
                      if c != 'side-band-64k')
+
+
+def ignore_error((e_type, e_value, e_tb)):
+    """Check whether this error is safe to ignore."""
+    return (issubclass(e_type, socket.error) and
+            e_value[0] in (errno.ECONNRESET, errno.EPIPE))
+

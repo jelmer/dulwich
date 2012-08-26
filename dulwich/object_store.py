@@ -623,7 +623,7 @@ class MemoryObjectStore(BaseObjectStore):
         elif len(sha) == 20:
             return sha_to_hex(sha)
         else:
-            raise ValueError("Invalid sha %r" % sha)
+            raise ValueError("Invalid sha %r" % (sha,))
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""

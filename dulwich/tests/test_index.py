@@ -76,6 +76,13 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual(0, len(i))
         self.assertFalse(os.path.exists(i._filename))
 
+    def test_against_empty_tree(self):
+        i = self.get_simple_index("index")
+        changes = list(i.changes_from_tree(MemoryObjectStore(), None))
+        self.assertEqual(1, len(changes))
+        (oldname, newname), (oldmode, newmode), (oldsha, newsha) = changes[0]
+        self.assertEqual('bla', newname)
+        self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
 
 class SimpleIndexWriterTestCase(IndexTestCase):
 

@@ -354,22 +354,24 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
     :param names: Iterable of names in the working copy
     :param lookup_entry: Function to lookup an entry in the working copy
     :param object_store: Object store to use for retrieving tree contents
-    :param tree: SHA1 of the root tree
+    :param tree: SHA1 of the root tree, or None for an empty tree
     :param want_unchanged: Whether unchanged files should be reported
     :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
         (oldsha, newsha)
     """
     other_names = set(names)
-    for (name, mode, sha) in object_store.iter_tree_contents(tree):
-        try:
-            (other_sha, other_mode) = lookup_entry(name)
-        except KeyError:
-            # Was removed
-            yield ((name, None), (mode, None), (sha, None))
-        else:
-            other_names.remove(name)
-            if (want_unchanged or other_sha != sha or other_mode != mode):
-                yield ((name, name), (mode, other_mode), (sha, other_sha))
+
+    if tree is not None:
+        for (name, mode, sha) in object_store.iter_tree_contents(tree):
+            try:
+                (other_sha, other_mode) = lookup_entry(name)
+            except KeyError:
+                # Was removed
+                yield ((name, None), (mode, None), (sha, None))
+            else:
+                other_names.remove(name)
+                if (want_unchanged or other_sha != sha or other_mode != mode):
+                    yield ((name, name), (mode, other_mode), (sha, other_sha))
 
     # Mention added files
     for name in other_names:

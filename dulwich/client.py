@@ -779,7 +779,7 @@ def get_transport_and_path(uri, **kwargs):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username, **kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed)), parsed.path
+        return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.

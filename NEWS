@@ -35,6 +35,9 @@
 
   * Support ``MemoryRepo.get_config``. (Jelmer Vernooij)
 
+  * In ``get_transport_and_path``, pass extra keyword arguments on to
+    HttpGitClient. (Jelmer Vernooij)
+
 0.8.5	2012-03-29
 
  BUG FIXES

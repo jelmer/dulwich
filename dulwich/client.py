@@ -75,7 +75,7 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 COMMON_CAPABILITIES = ['ofs-delta', 'side-band-64k']
-FETCH_CAPABILITIES = ['multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
+FETCH_CAPABILITIES = ['thin-pack', 'multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
 
@@ -155,8 +155,8 @@ class GitClient(object):
         self._report_activity = report_activity
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
-        if thin_packs:
-            self._fetch_capabilities.add('thin-pack')
+        if not thin_packs:
+            self._fetch_capabilities.remove('thin-pack')
 
     def _read_refs(self, proto):
         server_capabilities = None

@@ -65,6 +65,9 @@ def cmd_fetch(args):
     if "--all" in opts:
         determine_wants = r.object_store.determine_wants_all
     refs = client.fetch(path, r, progress=sys.stdout.write)
+    print "Remote refs:"
+    for item in refs.iteritems():
+        print "%s -> %s" % item
 
 
 def cmd_log(args):

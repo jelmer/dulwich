@@ -153,6 +153,7 @@ class GitClient(object):
             activity.
         """
         self._report_activity = report_activity
+        self._report_status_parser = None
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
         if not thin_packs:
@@ -288,9 +289,11 @@ class GitClient(object):
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
         sent_capabilities = False
+
         for refname in set(new_refs.keys() + old_refs.keys()):
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             new_sha1 = new_refs.get(refname, ZERO_SHA)
+
             if old_sha1 != new_sha1:
                 if sent_capabilities:
                     proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
@@ -312,24 +315,20 @@ class GitClient(object):
         :param capabilities: List of negotiated capabilities
         :param progress: Optional progress reporting function
         """
-        if 'report-status' in capabilities:
-            report_status_parser = ReportStatusParser()
-        else:
-            report_status_parser = None
         if "side-band-64k" in capabilities:
             if progress is None:
                 progress = lambda x: None
             channel_callbacks = { 2: progress }
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
-                    report_status_parser.handle_packet).parse
+                    self._report_status_parser.handle_packet).parse
             self._read_side_band64k_data(proto, channel_callbacks)
         else:
             if 'report-status' in capabilities:
                 for pkt in proto.read_pkt_seq():
-                    report_status_parser.handle_packet(pkt)
-        if report_status_parser is not None:
-            report_status_parser.check()
+                    self._report_status_parser.handle_packet(pkt)
+        if self._report_status_parser is not None:
+            self._report_status_parser.check()
         # wait for EOF before returning
         data = proto.read()
         if data:
@@ -441,14 +440,46 @@ class TraditionalGitClient(GitClient):
         proto, unused_can_read = self._connect('receive-pack', path)
         old_refs, server_capabilities = self._read_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
+
+        if 'report-status' in negotiated_capabilities:
+            self._report_status_parser = ReportStatusParser()
+        report_status_parser = self._report_status_parser
+
         try:
-            new_refs = determine_wants(dict(old_refs))
+            new_refs = orig_new_refs = determine_wants(dict(old_refs))
         except:
             proto.write_pkt_line(None)
             raise
+
+        if not 'delete-refs' in server_capabilities:
+            # Server does not support deletions. Fail later.
+            def remove_del(pair):
+                if pair[1] == ZERO_SHA:
+                    if 'report-status' in negotiated_capabilities:
+                        report_status_parser._ref_statuses.append(
+                            'ng %s remote does not support deleting refs'
+                            % pair[1])
+                        report_status_parser._ref_status_ok = False
+                    return False
+                else:
+                    return True
+
+            new_refs = dict(
+                filter(
+                    remove_del,
+                    [(ref, sha) for ref, sha in new_refs.iteritems()]))
+
         if new_refs is None:
             proto.write_pkt_line(None)
             return old_refs
+
+        if len(new_refs) == 0 and len(orig_new_refs):
+            # NOOP - Original new refs filtered out by policy
+            proto.write_pkt_line(None)
+            if self._report_status_parser is not None:
+                self._report_status_parser.check()
+            return old_refs
+
         (have, want) = self._handle_receive_pack_head(proto,
             negotiated_capabilities, old_refs, new_refs)
         if not want and old_refs == new_refs:
@@ -723,6 +754,10 @@ class HttpGitClient(GitClient):
         old_refs, server_capabilities = self._discover_references(
             "git-receive-pack", url)
         negotiated_capabilities = self._send_capabilities & server_capabilities
+
+        if 'report-status' in negotiated_capabilities:
+            self._report_status_parser = ReportStatusParser()
+
         new_refs = determine_wants(dict(old_refs))
         if new_refs is None:
             return old_refs

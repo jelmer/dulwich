@@ -340,18 +340,43 @@ class GitClientTests(TestCase):
             return {
                 'refs/heads/blah12': commit.id,
                 'refs/heads/master': '310ca9477129b8586fa2afc779c1f57cf64bba6c'
-                }
+            }
+
         def generate_pack_contents(have, want):
-            return [ (commit, None), (tree, ''), ]
+            return [(commit, None), (tree, ''), ]
 
         f = StringIO()
         pack = write_pack_objects(f, generate_pack_contents(None, None))
-        self.client.send_pack('/', determine_wants , generate_pack_contents)
+        self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertEqual(
             self.rout.getvalue(),
             '007f0000000000000000000000000000000000000000 %s '
             'refs/heads/blah12\x00report-status ofs-delta0000%s'
             % (commit.id, f.getvalue()))
+
+    def test_send_pack_no_deleteref_delete_only(self):
+        pkts = ['310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'
+                '\x00 report-status ofs-delta\n',
+                '',
+                '']
+        for pkt in pkts:
+            if pkt == '':
+                self.rin.write("0000")
+            else:
+                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {'refs/heads/master': '0' * 40}
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        self.assertRaises(UpdateRefsError,
+                          self.client.send_pack, "/",
+                          determine_wants, generate_pack_contents)
+        self.assertEqual(self.rout.getvalue(), '0000')
+
 
 class TestSSHVendor(object):
 

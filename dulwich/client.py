@@ -169,6 +169,9 @@ class GitClient(object):
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha
+
+        if len(refs) == 0:
+            return None, set([])
         return refs, set(server_capabilities)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -469,6 +472,11 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect('upload-pack', path)
         refs, server_capabilities = self._read_refs(proto)
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
+
+        if refs is None:
+            proto.write_pkt_line(None)
+            return refs
+
         try:
             wants = determine_wants(refs)
         except:

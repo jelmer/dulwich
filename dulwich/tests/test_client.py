@@ -78,6 +78,11 @@ class GitClientTests(TestCase):
         self.client.archive('bla', 'HEAD', None, None)
         self.assertEqual(self.rout.getvalue(), '0011argument HEAD0000')
 
+    def test_fetch_empty(self):
+        self.rin.write('0000')
+        self.rin.seek(0)
+        self.client.fetch_pack('/', lambda heads: [], None, None)
+
     def test_fetch_pack_none(self):
         self.rin.write(
             '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack '

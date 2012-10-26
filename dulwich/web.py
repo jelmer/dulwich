@@ -166,7 +166,7 @@ def get_info_refs(req, backend, mat):
     if service and not req.dumb:
         handler_cls = req.handlers.get(service, None)
         if handler_cls is None:
-            yield req.forbidden('Unsupported service %s' % service)
+            yield req.forbidden('Unsupported service')
             return
         req.nocache()
         write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)

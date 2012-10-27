@@ -615,6 +615,9 @@ class PackIndex2(FilePackIndex):
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
         self._pack_offset_table_offset = (self._crc32_table_offset +
                                           4 * len(self))
+        self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
+                                          4 * len(self))
+
 
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
@@ -626,7 +629,11 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
-        return unpack_from('>L', self._contents, offset)[0]
+        offset = unpack_from('>L', self._contents, offset)[0]
+        if (offset&0x80000000):
+            offset = self._pack_offset_largetable_offset + (offset&0x7fffffff) * 8
+            offset = unpack_from('>Q', self._contents, offset)[0]
+        return offset
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from('>L', self._contents,
@@ -1036,8 +1043,8 @@ class PackData(object):
         if type == OFS_DELTA:
             (delta_offset, delta) = obj
             # TODO: clean up asserts and replace with nicer error messages
-            assert isinstance(offset, int)
-            assert isinstance(delta_offset, int)
+            assert isinstance(offset, int) or isinstance(offset, long)
+            assert isinstance(delta_offset, int) or isinstance(offset, long)
             base_offset = offset-delta_offset
             type, base_obj = self.get_object_at(base_offset)
             assert isinstance(type, int)
@@ -1828,8 +1835,6 @@ class Pack(object):
     def get_raw(self, sha1):
         offset = self.index.object_index(sha1)
         obj_type, obj = self.data.get_object_at(offset)
-        if type(offset) is long:
-          offset = int(offset)
         type_num, chunks = self.data.resolve_object(offset, obj_type, obj)
         return type_num, ''.join(chunks)
 

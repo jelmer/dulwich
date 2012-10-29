@@ -618,7 +618,6 @@ class PackIndex2(FilePackIndex):
         self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
                                           4 * len(self))
 
-
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
                 self._unpack_crc32_checksum(i))
@@ -1567,6 +1566,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
+        assert offset <= 0xffffffff
         f.write(struct.pack('>L20s', offset, name))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
@@ -1714,6 +1714,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
+    largetable = []
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
@@ -1722,9 +1723,13 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         f.write(struct.pack('>L', entry_checksum))
     for (name, offset, entry_checksum) in entries:
-        # FIXME: handle if MSBit is set in offset
-        f.write(struct.pack('>L', offset))
-    # FIXME: handle table for pack files > 8 Gb
+        if offset < 0x80000000:
+            f.write(struct.pack('>L', offset))
+        else:
+            f.write(struct.pack('>L', 0x80000000 + len(largetable)))
+            largetable.append(offset)
+    for offset in largetable:
+        f.write(struct.pack('>Q', offset))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
     return f.write_sha()

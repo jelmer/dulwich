@@ -479,9 +479,14 @@ class BaseTestPackIndexWriting(object):
     def test_single(self):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
+        if self._has_crc32_checksum:
+            entry_sha = hex_to_sha('4e6388232ec39792661e2e75db8fb117fc869ce6')
+            my_entries.append([entry_sha, 0xf2972d0830529b87, 24])
+            entry_sha = hex_to_sha('e98f071751bd77f59967bfa671cd2caebdccc9a2')
+            my_entries.append([entry_sha, (~0xf2972d0830529b87)&(2**64-1), 92])
         idx = self.index('single.idx', my_entries, pack_checksum)
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
-        self.assertEqual(1, len(idx))
+        self.assertEqual(len(my_entries), len(idx))
         actual_entries = list(idx.iterentries())
         self.assertEqual(len(my_entries), len(actual_entries))
         for mine, actual in zip(my_entries, actual_entries):

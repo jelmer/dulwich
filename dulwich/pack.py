@@ -629,8 +629,8 @@ class PackIndex2(FilePackIndex):
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
-        if (offset&0x80000000):
-            offset = self._pack_offset_largetable_offset + (offset&0x7fffffff) * 8
+        if (offset&(2**31)):
+            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 
@@ -1723,10 +1723,10 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         f.write(struct.pack('>L', entry_checksum))
     for (name, offset, entry_checksum) in entries:
-        if offset < 0x80000000:
+        if offset < 2**31:
             f.write(struct.pack('>L', offset))
         else:
-            f.write(struct.pack('>L', 0x80000000 + len(largetable)))
+            f.write(struct.pack('>L', 2**31 + len(largetable)))
             largetable.append(offset)
     for offset in largetable:
         f.write(struct.pack('>Q', offset))

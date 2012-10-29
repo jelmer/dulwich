@@ -615,6 +615,8 @@ class PackIndex2(FilePackIndex):
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
         self._pack_offset_table_offset = (self._crc32_table_offset +
                                           4 * len(self))
+        self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
+                                          4 * len(self))
 
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
@@ -626,7 +628,11 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
-        return unpack_from('>L', self._contents, offset)[0]
+        offset = unpack_from('>L', self._contents, offset)[0]
+        if (offset&(2**31)):
+            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
+            offset = unpack_from('>Q', self._contents, offset)[0]
+        return offset
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from('>L', self._contents,
@@ -1036,8 +1042,8 @@ class PackData(object):
         if type == OFS_DELTA:
             (delta_offset, delta) = obj
             # TODO: clean up asserts and replace with nicer error messages
-            assert isinstance(offset, int)
-            assert isinstance(delta_offset, int)
+            assert isinstance(offset, int) or isinstance(offset, long)
+            assert isinstance(delta_offset, int) or isinstance(offset, long)
             base_offset = offset-delta_offset
             type, base_obj = self.get_object_at(base_offset)
             assert isinstance(type, int)
@@ -1560,6 +1566,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
+        assert offset <= 0xffffffff
         f.write(struct.pack('>L20s', offset, name))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
@@ -1707,6 +1714,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
+    largetable = []
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
@@ -1715,9 +1723,13 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         f.write(struct.pack('>L', entry_checksum))
     for (name, offset, entry_checksum) in entries:
-        # FIXME: handle if MSBit is set in offset
-        f.write(struct.pack('>L', offset))
-    # FIXME: handle table for pack files > 8 Gb
+        if offset < 2**31:
+            f.write(struct.pack('>L', offset))
+        else:
+            f.write(struct.pack('>L', 2**31 + len(largetable)))
+            largetable.append(offset)
+    for offset in largetable:
+        f.write(struct.pack('>Q', offset))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
     return f.write_sha()
@@ -1828,8 +1840,6 @@ class Pack(object):
     def get_raw(self, sha1):
         offset = self.index.object_index(sha1)
         obj_type, obj = self.data.get_object_at(offset)
-        if type(offset) is long:
-          offset = int(offset)
         type_num, chunks = self.data.resolve_object(offset, obj_type, obj)
         return type_num, ''.join(chunks)
 

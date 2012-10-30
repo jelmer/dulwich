@@ -13,6 +13,8 @@
   * HTTPGitApplication now takes an optional
     `fallback_app` argument. (Jonas Haag, issue #67)
 
+  * Support for large pack index files. (Jameson Nash)
+
  TESTING
 
   * Make index entry tests a little bit less strict, to cope with

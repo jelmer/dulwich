@@ -629,7 +629,7 @@ class PackIndex2(FilePackIndex):
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
-        if (offset&(2**31)):
+        if offset & (2**31):
             offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
@@ -1566,7 +1566,8 @@ def write_pack_index_v1(f, entries, pack_checksum):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
-        assert offset <= 0xffffffff
+        if not (offset <= 0xffffffff):
+            raise TypeError("pack format 1 only supports offsets < 2Gb")
         f.write(struct.pack('>L20s', offset, name))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)

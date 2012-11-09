@@ -1,5 +1,10 @@
 #!/usr/bin/make -f
 
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
 # Get the supported Python versions
 PYVERS = $(shell pyversions -r -v)
 # Get the default Python version
@@ -10,7 +15,7 @@ pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
 pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
 
 %:
-	dh --buildsystem=python_distutils --with python2 $*
+	dh $* --with python2 --buildsystem=python_distutils
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/tmp

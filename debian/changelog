@@ -1,4 +1,4 @@
-dulwich (0.8.6-1) UNRELEASED; urgency=low
+dulwich (0.8.6-1) experimental; urgency=low
 
   * New upstream release.
    + Drop 01_less_strict_index_tests: applied upstream.

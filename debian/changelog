@@ -3,6 +3,7 @@ dulwich (0.8.6-1) UNRELEASED; urgency=low
   * New upstream release.
    + Drop 01_less_strict_index_tests: applied upstream.
   * Migrate to Git; replace Vcs-Bzr header with Vcs-Git header.
+  * Remove duplicate field copyright in copyright file.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Fri, 09 Nov 2012 23:44:30 +0100
 

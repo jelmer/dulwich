@@ -6,10 +6,11 @@ Debianized-By: Jelmer Vernooij <jelmer@debian.org>
 Debianized-Date: Tue, 13 Jan 2009 16:56:47 +0100
 
 Files: *
-Copyright: 2007 James Westby <jw+debian@jameswestby.net>
-Copyright: 2007-2012 Jelmer Vernooij <jelmer@samba.org>
-Copyright: 2008 John Carr <john.carr@unrouted.co.uk>
-Copyright: 2010 Google, Inc. <dborowitz@google.com>
+Copyright:
+  2007 James Westby <jw+debian@jameswestby.net>
+  2007-2012 Jelmer Vernooij <jelmer@samba.org>
+  2008 John Carr <john.carr@unrouted.co.uk>
+  2010 Google, Inc. <dborowitz@google.com>
 License: GPL-2+
  On Debian systems the full text of the GNU General Public License version 2
  can be found in the `/usr/share/common-licenses/GPL-2' file.

@@ -8,6 +8,8 @@ TESTRUNNER ?= unittest2.__main__
 endif
 RUNTEST = PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER)
 
+DESTDIR=/
+
 all: build
 
 doc:: pydoctor
@@ -20,7 +22,7 @@ build::
 	$(SETUP) build_ext -i
 
 install::
-	$(SETUP) install
+	$(SETUP) install --root="$(DESTDIR)"
 
 check:: build
 	$(RUNTEST) dulwich.tests.test_suite
@@ -30,6 +32,9 @@ check-tutorial:: build
 
 check-nocompat:: build
 	$(RUNTEST) dulwich.tests.nocompat_test_suite
+
+check-compat:: build
+	$(RUNTEST) dulwich.tests.compat_test_suite
 
 check-pypy:: clean
 	$(MAKE) check-noextensions PYTHON=pypy

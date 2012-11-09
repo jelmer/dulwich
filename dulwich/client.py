@@ -75,7 +75,7 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 COMMON_CAPABILITIES = ['ofs-delta', 'side-band-64k']
-FETCH_CAPABILITIES = ['multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
+FETCH_CAPABILITIES = ['thin-pack', 'multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
 
@@ -155,8 +155,8 @@ class GitClient(object):
         self._report_activity = report_activity
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
-        if thin_packs:
-            self._fetch_capabilities.add('thin-pack')
+        if not thin_packs:
+            self._fetch_capabilities.remove('thin-pack')
 
     def _read_refs(self, proto):
         server_capabilities = None
@@ -440,7 +440,7 @@ class TraditionalGitClient(GitClient):
         old_refs, server_capabilities = self._read_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
         try:
-            new_refs = determine_wants(old_refs)
+            new_refs = determine_wants(dict(old_refs))
         except:
             proto.write_pkt_line(None)
             raise
@@ -707,7 +707,7 @@ class HttpGitClient(GitClient):
         old_refs, server_capabilities = self._discover_references(
             "git-receive-pack", url)
         negotiated_capabilities = self._send_capabilities & server_capabilities
-        new_refs = determine_wants(old_refs)
+        new_refs = determine_wants(dict(old_refs))
         if new_refs is None:
             return old_refs
         if self.dumb:
@@ -779,7 +779,7 @@ def get_transport_and_path(uri, **kwargs):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username, **kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed)), parsed.path
+        return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 
     if parsed.scheme and not parsed.netloc:
         # SSH with no user@, zero or one leading slash.

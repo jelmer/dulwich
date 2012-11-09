@@ -153,7 +153,7 @@ class _CommitTimeQueue(object):
                 if self._pq and all(c.id in self._excluded
                                     for _, c in self._pq):
                     _, n = self._pq[0]
-                    if n.commit_time >= self._last.commit_time:
+                    if self._last and n.commit_time >= self._last.commit_time:
                         # If the next commit is newer than the last one, we need
                         # to keep walking in case its parents (which we may not
                         # have seen yet) are excluded. This gives the excluded
@@ -255,6 +255,9 @@ class Walker(object):
         return False
 
     def _change_matches(self, change):
+        if not change:
+            return False
+
         old_path = change.old.path
         new_path = change.new.path
         if self._path_matches(new_path):
@@ -338,8 +341,8 @@ def _topo_reorder(entries):
     order, e.g. in commit time order.
 
     :param entries: An iterable of WalkEntry objects.
-    :yield: WalkEntry objects from entries in FIFO order, except where a parent
-        would be yielded before any of its children.
+    :return: iterator over WalkEntry objects from entries in FIFO order, except
+        where a parent would be yielded before any of its children.
     """
     todo = collections.deque()
     pending = {}

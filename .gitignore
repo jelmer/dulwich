@@ -1,0 +1,12 @@
+_trial_temp
+build
+MANIFEST
+dist
+apidocs
+*,cover
+.testrepository
+*.pyc
+*.so
+*~
+*.swp
+docs/tutorial/index.html

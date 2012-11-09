@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.8.5'
+dulwich_version_string = '0.8.6'
 
 include_dirs = []
 # Windows MSVC support
@@ -52,7 +52,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 setup_kwargs = {}
 
 if has_setuptools:
-    setup_kwargs['test_suite'] = 'dulwich.tests'
+    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
 
 setup(name='dulwich',
       description='Python Git Library',

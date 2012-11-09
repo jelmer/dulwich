@@ -28,6 +28,8 @@ import errno
 import os
 import re
 
+from UserDict import DictMixin
+
 from dulwich.file import GitFile
 
 
@@ -73,7 +75,7 @@ class Config(object):
         raise NotImplementedError(self.set)
 
 
-class ConfigDict(Config):
+class ConfigDict(Config, DictMixin):
     """Git configuration stored in a dictionary."""
 
     def __init__(self, values=None):
@@ -89,6 +91,15 @@ class ConfigDict(Config):
         return (
             isinstance(other, self.__class__) and
             other._values == self._values)
+
+    def __getitem__(self, key):
+        return self._values[key]
+      
+    def __setitem__(self, key, value):
+        self._values[key] = value
+        
+    def keys(self):
+        return self._values.keys()
 
     @classmethod
     def _parse_setting(cls, name):

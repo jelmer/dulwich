@@ -162,6 +162,7 @@ class TestPackDeltas(TestCase):
 
     test_string_empty = ''
     test_string_big = 'Z' * 8192
+    test_string_huge = 'Z' * 100000
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(target,
@@ -178,6 +179,10 @@ class TestPackDeltas(TestCase):
 
     def test_overflow(self):
         self._test_roundtrip(self.test_string_empty, self.test_string_big)
+
+    def test_overflow_64k(self):
+        self.skipTest("big strings don't work yet")
+        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
 
 
 class TestPackData(PackTests):
@@ -471,6 +476,30 @@ class BaseTestPackIndexWriting(object):
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
         self.assertEqual(0, len(idx))
 
+    def test_large(self):
+        entry1_sha = hex_to_sha('4e6388232ec39792661e2e75db8fb117fc869ce6')
+        entry2_sha = hex_to_sha('e98f071751bd77f59967bfa671cd2caebdccc9a2')
+        entries = [(entry1_sha, 0xf2972d0830529b87, 24),
+                   (entry2_sha, (~0xf2972d0830529b87)&(2**64-1), 92)]
+        if not self._supports_large:
+            self.assertRaises(TypeError, self.index, 'single.idx',
+                entries, pack_checksum)
+            return
+        idx = self.index('single.idx', entries, pack_checksum)
+        self.assertEqual(idx.get_pack_checksum(), pack_checksum)
+        self.assertEqual(2, len(idx))
+        actual_entries = list(idx.iterentries())
+        self.assertEqual(len(entries), len(actual_entries))
+        for mine, actual in zip(entries, actual_entries):
+            my_sha, my_offset, my_crc = mine
+            actual_sha, actual_offset, actual_crc = actual
+            self.assertEqual(my_sha, actual_sha)
+            self.assertEqual(my_offset, actual_offset)
+            if self._has_crc32_checksum:
+                self.assertEqual(my_crc, actual_crc)
+            else:
+                self.assertTrue(actual_crc is None)
+
     def test_single(self):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
@@ -520,6 +549,7 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
     def setUp(self):
         TestCase.setUp(self)
         self._has_crc32_checksum = True
+        self._supports_large = True
 
     def index(self, filename, entries, pack_checksum):
         return MemoryPackIndex(entries, pack_checksum)
@@ -535,6 +565,7 @@ class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
         BaseTestFilePackIndexWriting.setUp(self)
         self._has_crc32_checksum = False
         self._expected_version = 1
+        self._supports_large = False
         self._write_fn = write_pack_index_v1
 
     def tearDown(self):
@@ -548,6 +579,7 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
         TestCase.setUp(self)
         BaseTestFilePackIndexWriting.setUp(self)
         self._has_crc32_checksum = True
+        self._supports_large = True
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
 

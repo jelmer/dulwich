@@ -286,6 +286,36 @@ class RepositoryTests(TestCase):
         self.assertEqual(shas, [t.head(),
                          '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
+    def test_clone_no_head(self):
+        temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, temp_dir)
+        repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
+        dest_dir = os.path.join(temp_dir, 'a.git')
+        shutil.copytree(os.path.join(repo_dir, 'a.git'),
+                        dest_dir, symlinks=True)
+        r = Repo(dest_dir)
+        del r.refs["refs/heads/master"]
+        del r.refs["HEAD"]
+        t = r.clone(os.path.join(temp_dir, 'b.git'), mkdir=True)
+        self.assertEqual({
+            'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            'refs/tags/mytag-packed':
+                'b0931cadc54336e78a1d980420e3268903b57a50',
+            }, t.refs.as_dict())
+
+    def test_clone_empty(self):
+        """Test clone() doesn't crash if HEAD points to a non-existing ref.
+
+        This simulates cloning server-side bare repository either when it is
+        still empty or if user renames master branch and pushes private repo
+        to the server.
+        Non-bare repo HEAD always points to an existing ref.
+        """
+        r = self._repo = open_repo('empty.git')
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        r.clone(tmp_dir, mkdir=False, bare=True)
+
     def test_merge_history(self):
         r = self._repo = open_repo('simple_merge.git')
         shas = [e.commit.id for e in r.get_walker()]
@@ -322,6 +352,16 @@ class RepositoryTests(TestCase):
     def test_get_config_stack(self):
         r = self._repo = open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
+
+    def test_submodule(self):
+        temp_dir = tempfile.mkdtemp()
+        repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
+        shutil.copytree(os.path.join(repo_dir, 'a.git'),
+                        os.path.join(temp_dir, 'a.git'), symlinks=True)
+        rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
+        os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
+        r = Repo(temp_dir)
+        self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_common_revisions(self):
         """

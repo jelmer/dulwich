@@ -1,3 +1,45 @@
+0.8.6	2012-11-09
+
+ API CHANGES
+
+  * dulwich.__init__ no longer imports client, protocol, repo and
+    server modules. (Jelmer Vernooij)
+
+ FEATURES
+
+  * ConfigDict now behaves more like a dictionary.
+    (Adam 'Cezar' Jenkins, issue #58)
+
+  * HTTPGitApplication now takes an optional
+    `fallback_app` argument. (Jonas Haag, issue #67)
+
+  * Support for large pack index files. (Jameson Nash)
+
+ TESTING
+
+  * Make index entry tests a little bit less strict, to cope with
+    slightly different behaviour on various platforms.
+    (Jelmer Vernooij)
+
+  * ``setup.py test`` (available when setuptools is installed) now
+    runs all tests, not just the basic unit tests.
+    (Jelmer Vernooij)
+
+ BUG FIXES
+
+  * Commit._deserialize now actually deserializes the current state rather than
+    the previous one. (Yifan Zhang, issue #59)
+
+  * Handle None elements in lists of TreeChange objects. (Alex Holmes)
+
+  * Support cloning repositories without HEAD set.
+    (D-Key, Jelmer Vernooij, issue #69)
+
+  * Support ``MemoryRepo.get_config``. (Jelmer Vernooij)
+
+  * In ``get_transport_and_path``, pass extra keyword arguments on to
+    HttpGitClient. (Jelmer Vernooij)
+
 0.8.5	2012-03-29
 
  BUG FIXES
@@ -50,7 +92,7 @@
 
   * ``Repo.do_commit`` will now use the user identity from
     .git/config or ~/.gitconfig if none was explicitly specified.
-   (Jelmer Vernooij)
+    (Jelmer Vernooij)
 
  BUG FIXES
 

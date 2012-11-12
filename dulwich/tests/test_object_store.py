@@ -237,6 +237,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         store = DiskObjectStore(self.store_dir)
         self.assertRaises(KeyError, store.__getitem__, b2.id)
         store.add_alternate_path(alternate_dir)
+        self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
 
     def test_add_alternate_path(self):

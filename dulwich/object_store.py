@@ -237,19 +237,17 @@ class PackBasedObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def contains_alternate(self, sha):
-        """Check if a particular object is present by SHA1 in the alternate storage."""
-        for alternate in self.alternates:
-            if alternate.contains_loose(sha) or alternate.contains_packed(sha):
-                return True
-        return False
-
     def __contains__(self, sha):
         """Check if a particular object is present by SHA1 in the main or alternate stores.
 
         This method makes no distinction between loose and packed objects.
         """
-        return self.contains_packed(sha) or self.contains_loose(sha) or self.contains_alternate(sha)
+        if self.contains_packed(sha) or self.contains_loose(sha):
+            return True
+        for alternate in self.alternates:
+            if alternate.contains_packed(sha) or alternate.contains_loose(sha):
+                return True
+        return False
 
     def _load_packs(self):
         raise NotImplementedError(self._load_packs)

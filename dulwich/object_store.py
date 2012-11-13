@@ -237,6 +237,18 @@ class PackBasedObjectStore(BaseObjectStore):
                 return True
         return False
 
+    def __contains__(self, sha):
+        """Check if a particular object is present by SHA1 in the main or alternate stores.
+
+        This method makes no distinction between loose and packed objects.
+        """
+        if self.contains_packed(sha) or self.contains_loose(sha):
+            return True
+        for alternate in self.alternates:
+            if alternate.contains_packed(sha) or alternate.contains_loose(sha):
+                return True
+        return False
+
     def _load_packs(self):
         raise NotImplementedError(self._load_packs)
 
@@ -257,6 +269,12 @@ class PackBasedObjectStore(BaseObjectStore):
         if self._pack_cache is None or self._pack_cache_stale():
             self._pack_cache = self._load_packs()
         return self._pack_cache
+
+    def _iter_alternate_objects(self):
+        """Iterate over the SHAs of all the objects in alternate stores."""
+        for alternate in self.alternates:
+            for alternate_object in alternate:
+                yield alternate_object
 
     def _iter_loose_objects(self):
         """Iterate over the SHAs of all loose objects."""
@@ -283,7 +301,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()]
+        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return itertools.chain(*iterables)
 
     def contains_loose(self, sha):

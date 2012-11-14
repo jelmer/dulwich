@@ -231,21 +231,24 @@ class PackBasedObjectStore(BaseObjectStore):
         return []
 
     def contains_packed(self, sha):
-        """Check if a particular object is present by SHA1 and is packed."""
+        """Check if a particular object is present by SHA1 and is packed.
+
+        This does not check alternates.
+        """
         for pack in self.packs:
             if sha in pack:
                 return True
         return False
 
     def __contains__(self, sha):
-        """Check if a particular object is present by SHA1 in the main or alternate stores.
+        """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
         """
         if self.contains_packed(sha) or self.contains_loose(sha):
             return True
         for alternate in self.alternates:
-            if alternate.contains_packed(sha) or alternate.contains_loose(sha):
+            if sha in alternate:
                 return True
         return False
 
@@ -305,7 +308,10 @@ class PackBasedObjectStore(BaseObjectStore):
         return itertools.chain(*iterables)
 
     def contains_loose(self, sha):
-        """Check if a particular object is present by SHA1 and is loose."""
+        """Check if a particular object is present by SHA1 and is loose.
+
+        This does not check alternates.
+        """
         return self._get_loose_object(sha) is not None
 
     def get_raw(self, name):

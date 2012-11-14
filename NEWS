@@ -1,5 +1,10 @@
 0.9.0	UNRELEASED
 
+ BUG FIXES
+
+  * Fix use of alternates in ``DiskObjectStore``.{__contains__,__iter__}.
+    (Dmitriy)
+
 0.8.6	2012-11-09
 
  API CHANGES

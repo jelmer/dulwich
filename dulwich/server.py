@@ -276,10 +276,8 @@ class UploadPackHandler(Handler):
         if objects_iter is None:
             return
 
-        self.progress("dul-daemon says what\n")
         self.progress("counting objects: %d, done.\n" % len(objects_iter))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
 

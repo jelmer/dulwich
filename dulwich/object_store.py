@@ -231,9 +231,24 @@ class PackBasedObjectStore(BaseObjectStore):
         return []
 
     def contains_packed(self, sha):
-        """Check if a particular object is present by SHA1 and is packed."""
+        """Check if a particular object is present by SHA1 and is packed.
+
+        This does not check alternates.
+        """
         for pack in self.packs:
             if sha in pack:
+                return True
+        return False
+
+    def __contains__(self, sha):
+        """Check if a particular object is present by SHA1.
+
+        This method makes no distinction between loose and packed objects.
+        """
+        if self.contains_packed(sha) or self.contains_loose(sha):
+            return True
+        for alternate in self.alternates:
+            if sha in alternate:
                 return True
         return False
 
@@ -257,6 +272,12 @@ class PackBasedObjectStore(BaseObjectStore):
         if self._pack_cache is None or self._pack_cache_stale():
             self._pack_cache = self._load_packs()
         return self._pack_cache
+
+    def _iter_alternate_objects(self):
+        """Iterate over the SHAs of all the objects in alternate stores."""
+        for alternate in self.alternates:
+            for alternate_object in alternate:
+                yield alternate_object
 
     def _iter_loose_objects(self):
         """Iterate over the SHAs of all loose objects."""
@@ -283,11 +304,14 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()]
+        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return itertools.chain(*iterables)
 
     def contains_loose(self, sha):
-        """Check if a particular object is present by SHA1 and is loose."""
+        """Check if a particular object is present by SHA1 and is loose.
+
+        This does not check alternates.
+        """
         return self._get_loose_object(sha) is not None
 
     def get_raw(self, name):

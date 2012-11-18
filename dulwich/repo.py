@@ -26,7 +26,7 @@ This module contains the base class for git repositories
 local disk (Repo).
 
 """
-
+from __future__ import with_statement
 from cStringIO import StringIO
 import errno
 import os

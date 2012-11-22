@@ -5,6 +5,8 @@
   * Fix use of alternates in ``DiskObjectStore``.{__contains__,__iter__}.
     (Dmitriy)
 
+  * Fix compatibility with Python 2.4. (David Carr)
+
 0.8.6	2012-11-09
 
  API CHANGES

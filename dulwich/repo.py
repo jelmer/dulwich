@@ -1243,8 +1243,11 @@ class Repo(BaseRepo):
             self._controldir = root
         elif (os.path.isfile(os.path.join(root, ".git"))):
             import re
-            with open(os.path.join(root, ".git"), 'r') as f:
+            f = open(os.path.join(root, ".git"), 'r')
+            try:
                 _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
+            finally:
+                f.close()
             self.bare = False
             self._controldir = os.path.join(root, path)
         else:

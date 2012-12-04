@@ -591,7 +591,7 @@ class SubprocessGitClient(TraditionalGitClient):
 
 class SSHVendor(object):
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def connect_ssh(self, host, command, username=None, port=None, **kwargs):
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -605,16 +605,51 @@ class SSHVendor(object):
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
+
+try:
+    import paramiko
+
+    class ParamikoWrapper(object):
+        """A socket-like object that talks to a subprocess via pipes."""
+
+        def __init__(self, client, channel):
+            self.client = client
+            self.channel = channel
+            self.write = lambda b: self.channel.sendall(b)
+            self.can_read = lambda: self.channel.recv_ready
+
+        def read(self, n=None):
+            return self.channel.recv(n)
+
+        def close(self):
+            self.channel.close()
+
+    class ParamikoSSHVendor(object):
+        def connect_ssh(self, host, command, **kwargs):
+            client = paramiko.SSHClient()
+            client.connect(host, **kwargs)
+
+            channel = client.get_transport().open_session()
+            channel.exec_command(command[0])
+
+            return ParamikoWrapper(client, channel)
+except ImportError:
+    ParamikoSSHVendor = None
+
 # Can be overridden by users
-get_ssh_vendor = SSHVendor
+get_ssh_vendor = ParamikoSSHVendor or SSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
+    SSH_KWARGS_KEYS = ['username', 'password', 'port', 'pkey', 'look_for_keys']
 
-    def __init__(self, host, port=None, username=None, *args, **kwargs):
-        self.host = host
-        self.port = port
-        self.username = username
+    def __init__(self, host, *args, **kwargs):
+        self.ssh_kwargs = {}
+
+        # Extra SSH kwargs
+        for key in self.SSH_KWARGS_KEYS:
+            self.ssh_kwargs[key] = kwargs.pop(key)
+
         TraditionalGitClient.__init__(self, *args, **kwargs)
         self.alternative_paths = {}
 
@@ -622,9 +657,8 @@ class SSHGitClient(TraditionalGitClient):
         return self.alternative_paths.get(cmd, 'git-%s' % cmd)
 
     def _connect(self, cmd, path):
-        con = get_ssh_vendor().connect_ssh(
-            self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
-            port=self.port, username=self.username)
+        command = ["%s '%s'" % (self._get_cmd_path(cmd), path)]
+        con = get_ssh_vendor().connect_ssh(self.host, command, **self.ssh_kwargs)
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
 
@@ -771,13 +805,34 @@ def get_transport_and_path(uri, **kwargs):
         activity.
     :return: Tuple with client instance and relative path.
     """
+
+    # Parse URL Scheme
     parsed = urlparse.urlparse(uri)
+
+    DEFAULTS = {
+        'port': parsed.port,
+        'username': parsed.username,
+        'look_for_keys': False
+    }
+
+    extra_kwargs = {
+        key: kwargs.pop(key, DEFAULTS.get(key))
+        for key in SSHGitClient.SSH_KWARGS_KEYS
+    }
+
+    # SSH kwargs
+    ssh_kwargs = {}.update(extra_kwargs)
+    ssh_kwargs.update(extra_kwargs)
+
+    # TCP
+    tcp_kwargs = {
+        'port': extra_kwargs['port']
+    }.update(kwargs)
+
     if parsed.scheme == 'git':
-        return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
-                parsed.path)
+        return TCPGitClient(parsed.hostname, **tcp_kwargs), parsed.path
     elif parsed.scheme == 'git+ssh':
-        return SSHGitClient(parsed.hostname, port=parsed.port,
-                            username=parsed.username, **kwargs), parsed.path
+        return SSHGitClient(parsed.hostname, **ssh_kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 
@@ -790,7 +845,7 @@ def get_transport_and_path(uri, **kwargs):
         # SSH with user@host:foo.
         user_host, path = parsed.path.split(':')
         user, host = user_host.rsplit('@')
-        return SSHGitClient(host, username=user, **kwargs), path
+        return SSHGitClient(host, **ssh_kwargs), path
 
     # Otherwise, assume it's a local path.
     return SubprocessGitClient(**kwargs), uri

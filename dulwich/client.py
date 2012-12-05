@@ -611,13 +611,18 @@ try:
     import paramiko
 
     class ParamikoWrapper(object):
-        """A socket-like object that talks to a subprocess via pipes."""
-
         def __init__(self, client, channel):
             self.client = client
             self.channel = channel
-            self.write = lambda b: self.channel.sendall(b)
-            self.can_read = lambda: self.channel.recv_ready()
+
+            # Channel must block
+            channel.setblocking(1)
+
+        def can_read(self):
+            return self.channel.recv_ready()
+
+        def write(self, data):
+            return self.channel.sendall(data)
 
         def read(self, n=None):
             return self.channel.recv(n)
@@ -633,12 +638,16 @@ try:
             client.set_missing_host_key_policy(policy)
             client.connect(host, **kwargs)
 
+            # Open SSH session
             channel = client.get_transport().open_session()
-            channel.exec_command(command[0])
+
+            # Run commands
+            apply(channel.exec_command, command)
 
             return ParamikoWrapper(client, channel)
+
 except ImportError:
-    warnings.warn('Install to have better SSH support')
+    warnings.warn('Install paramiko to have better SSH support (RSA and username/password authentication)')
     ParamikoSSHVendor = None
 
 # Can be overridden by users

@@ -1,5 +1,6 @@
 # object_store.py -- Object store for git objects
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2012 Jelmer Vernooij <jelmer@samba.org>
+#                         and others
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -219,6 +220,30 @@ class BaseObjectStore(object):
             obj_class, sha = obj.object
             obj = self[sha]
         return obj
+
+    def _collect_ancestors(self, heads, common=set()):
+        """Collect all ancestors of heads up to (excluding) those in common.
+
+        :param heads: commits to start from
+        :param common: commits to end at, or empty set to walk repository
+            completely
+        :return: a tuple (A, B) where A - all commits reachable
+            from heads but not present in common, B - common (shared) elements
+            that are directly reachable from heads
+        """
+        bases = set()
+        commits = set()
+        queue = []
+        queue.extend(heads)
+        while queue:
+            e = queue.pop(0)
+            if e in common:
+                bases.add(e)
+            elif e not in commits:
+                commits.add(e)
+                cmt = self[e]
+                queue.extend(cmt.parents)
+        return (commits, bases)
 
 
 class PackBasedObjectStore(BaseObjectStore):
@@ -793,6 +818,54 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     return tree.lookup_path(lookup_obj, path)
 
 
+def _collect_filetree_revs(obj_store, tree_sha, kset):
+    """Collect SHA1s of files and directories for specified tree.
+
+    :param obj_store: Object store to get objects by SHA from
+    :param tree_sha: tree reference to walk
+    :param kset: set to fill with references to files and directories
+    """
+    filetree = obj_store[tree_sha]
+    for name, mode, sha in filetree.iteritems():
+       if not S_ISGITLINK(mode) and sha not in kset:
+           kset.add(sha)
+           if stat.S_ISDIR(mode):
+               _collect_filetree_revs(obj_store, sha, kset)
+
+
+def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
+    """Split object id list into two list with commit SHA1s and tag SHA1s.
+
+    Commits referenced by tags are included into commits
+    list as well. Only SHA1s known in this repository will get
+    through, and unless ignore_unknown argument is True, KeyError
+    is thrown for SHA1 missing in the repository
+
+    :param obj_store: Object store to get objects by SHA1 from
+    :param lst: Collection of commit and tag SHAs
+    :param ignore_unknown: True to skip SHA1 missing in the repository
+        silently.
+    :return: A tuple of (commits, tags) SHA1s
+    """
+    commits = set()
+    tags = set()
+    for e in lst:
+        try:
+            o = obj_store[e]
+        except KeyError:
+            if not ignore_unknown:
+                raise
+        else:
+            if isinstance(o, Commit):
+                commits.add(e)
+            elif isinstance(o, Tag):
+                tags.add(e)
+                commits.add(o.object[1])
+            else:
+                raise KeyError('Not a commit or a tag: %s' % e)
+    return (commits, tags)
+
+
 class MissingObjectFinder(object):
     """Find the objects missing from another object store.
 
@@ -808,11 +881,44 @@ class MissingObjectFinder(object):
 
     def __init__(self, object_store, haves, wants, progress=None,
                  get_tagged=None):
-        haves = set(haves)
-        self.sha_done = haves
-        self.objects_to_send = set([(w, None, False) for w in wants
-                                    if w not in haves])
         self.object_store = object_store
+        # process Commits and Tags differently
+        # Note, while haves may list commits/tags not available locally,
+        # and such SHAs would get filtered out by _split_commits_and_tags,
+        # wants shall list only known SHAs, and otherwise
+        # _split_commits_and_tags fails with KeyError
+        have_commits, have_tags = \
+                _split_commits_and_tags(object_store, haves, True)
+        want_commits, want_tags = \
+                _split_commits_and_tags(object_store, wants, False)
+        # all_ancestors is a set of commits that shall not be sent
+        # (complete repository up to 'haves')
+        all_ancestors = object_store._collect_ancestors(have_commits)[0]
+        # all_missing - complete set of commits between haves and wants
+        # common - commits from all_ancestors we hit into while
+        # traversing parent hierarchy of wants
+        missing_commits, common_commits = \
+            object_store._collect_ancestors(want_commits, all_ancestors)
+        self.sha_done = set()
+        # Now, fill sha_done with commits and revisions of
+        # files and directories known to be both locally
+        # and on target. Thus these commits and files
+        # won't get selected for fetch
+        for h in common_commits:
+            self.sha_done.add(h)
+            cmt = object_store[h]
+            _collect_filetree_revs(object_store, cmt.tree, self.sha_done)
+        # record tags we have as visited, too
+        for t in have_tags:
+            self.sha_done.add(t)
+
+        missing_tags = want_tags.difference(have_tags)
+        # in fact, what we 'want' is commits and tags
+        # we've found missing
+        wants = missing_commits.union(missing_tags)
+
+        self.objects_to_send = set([(w, None, False) for w in wants])
+
         if progress is None:
             self.progress = lambda x: None
         else:
@@ -822,18 +928,6 @@ class MissingObjectFinder(object):
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries
                                      if not e[0] in self.sha_done])
-
-    def parse_tree(self, tree):
-        self.add_todo([(sha, name, not stat.S_ISDIR(mode))
-                       for name, mode, sha in tree.iteritems()
-                       if not S_ISGITLINK(mode)])
-
-    def parse_commit(self, commit):
-        self.add_todo([(commit.tree, "", False)])
-        self.add_todo([(p, None, False) for p in commit.parents])
-
-    def parse_tag(self, tag):
-        self.add_todo([(tag.object[1], None, False)])
 
     def next(self):
         while True:
@@ -845,11 +939,13 @@ class MissingObjectFinder(object):
         if not leaf:
             o = self.object_store[sha]
             if isinstance(o, Commit):
-                self.parse_commit(o)
+                self.add_todo([(o.tree, "", False)])
             elif isinstance(o, Tree):
-                self.parse_tree(o)
+                self.add_todo([(s, n, not stat.S_ISDIR(m))
+                               for n, m, s in o.iteritems()
+                               if not S_ISGITLINK(m)])
             elif isinstance(o, Tag):
-                self.parse_tag(o)
+                self.add_todo([(o.object[1], None, False)])
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)

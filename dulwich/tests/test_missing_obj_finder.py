@@ -109,12 +109,11 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
 
 
 class MOFMergeForkRepoTest(MissingObjectFinderTest):
-    """ 1 --- 2 --- 4 --- 6 --- 7
-               \        /
-                3  ---
-                 \
-                  5
-    """
+    # 1 --- 2 --- 4 --- 6 --- 7
+    #          \        /
+    #           3  ---
+    #            \
+    #             5
 
     def setUp(self):
         super(MOFMergeForkRepoTest, self).setUp()

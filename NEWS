@@ -1,5 +1,9 @@
 0.9.0	UNRELEASED
 
+ BUG FIXES
+
+  * Push efficiency - report missing objects only. (#562676, Artem Tikhomirov)
+
 0.8.7	2012-11-27
 
  BUG FIXES

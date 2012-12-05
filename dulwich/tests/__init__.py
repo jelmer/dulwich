@@ -121,6 +121,7 @@ def self_test_suite():
         'lru_cache',
         'objects',
         'object_store',
+        'missing_obj_finder',
         'pack',
         'patch',
         'protocol',

@@ -616,10 +616,10 @@ try:
             self.client = client
             self.channel = channel
             self.write = lambda b: self.channel.sendall(b)
-            self.can_read = lambda: self.channel.recv_ready
+            self.can_read = lambda: self.channel.recv_ready()
 
         def read(self, n=None):
-            return self.channel.recv(n)
+            self.channel.recv(n)
 
         def close(self):
             self.channel.close()
@@ -627,6 +627,9 @@ try:
     class ParamikoSSHVendor(object):
         def connect_ssh(self, host, command, **kwargs):
             client = paramiko.SSHClient()
+
+            policy = paramiko.client.MissingHostKeyPolicy()
+            client.set_missing_host_key_policy(policy)
             client.connect(host, **kwargs)
 
             channel = client.get_transport().open_session()
@@ -641,9 +644,18 @@ get_ssh_vendor = ParamikoSSHVendor or SSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
-    SSH_KWARGS_KEYS = ['username', 'password', 'port', 'pkey', 'look_for_keys']
+    SSH_KWARGS_KEYS = (
+        'username',
+        'password',
+        'port',
+        'pkey',
+        'look_for_keys',
+        'allow_agent',
+        'key_filename',
+    )
 
     def __init__(self, host, *args, **kwargs):
+        self.host = host
         self.ssh_kwargs = {}
 
         # Extra SSH kwargs
@@ -809,10 +821,17 @@ def get_transport_and_path(uri, **kwargs):
     # Parse URL Scheme
     parsed = urlparse.urlparse(uri)
 
+    try:
+        port = parsed.port
+    except:
+        port = None
+    port = port or 22
+
     DEFAULTS = {
-        'port': parsed.port,
+        'port': port,
         'username': parsed.username,
-        'look_for_keys': False
+        'look_for_keys': False,
+        'allow_agent': False,
     }
 
     extra_kwargs = {

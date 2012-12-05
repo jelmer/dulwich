@@ -16,22 +16,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.errors import (
-    MissingCommitError,
-    )
 from dulwich.object_store import (
     MemoryObjectStore,
     )
 from dulwich.objects import (
-    Commit,
     Blob,
     )
 from dulwich.tests import TestCase
 from utils import (
-    F,
     make_object,
     build_commit_graph,
     )
+
 
 class MissingObjectFinderTest(TestCase):
 
@@ -40,21 +36,21 @@ class MissingObjectFinderTest(TestCase):
         self.store = MemoryObjectStore()
         self.commits = []
 
-    def __getitem__(self, n):
-        # rename for brevity
+    def cmt(self, n):
         return self.commits[n-1]
 
-    def cmt(self, n):
-        return self[n]
-
     def assertMissingMatch(self, haves, wants, expected):
-        for sha,path in self.store.find_missing_objects(haves, wants):
-            self.assertTrue(sha in expected, "FAILURE: (%s,%s) erroneously reported as missing" % (sha,path))
+        for sha, path in self.store.find_missing_objects(haves, wants):
+            self.assertTrue(sha in expected,
+                "FAILURE: (%s,%s) erroneously reported as missing" %
+                (sha, path))
             expected.remove(sha)
 
         self.assertFalse(len(expected) > 0, "FAILURE: some objects are not reported as missing: %s" % (expected))
 
+
 class MOFLinearRepoTest(MissingObjectFinderTest):
+
     def setUp(self):
         super(MOFLinearRepoTest, self).setUp()
         f1_1 = make_object(Blob, data='f1') # present in 1, removed in 3
@@ -80,13 +76,16 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
 
 
     def test_1_to_2(self):
-        self.assertMissingMatch([self.cmt(1).id], [self.cmt(2).id], self.missing_1_2)
+        self.assertMissingMatch([self.cmt(1).id], [self.cmt(2).id],
+            self.missing_1_2)
 
     def test_2_to_3(self):
-        self.assertMissingMatch([self.cmt(2).id], [self.cmt(3).id], self.missing_2_3)
+        self.assertMissingMatch([self.cmt(2).id], [self.cmt(3).id],
+            self.missing_2_3)
 
     def test_1_to_3(self):
-        self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id], self.missing_1_3)
+        self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id],
+            self.missing_1_3)
 
     def test_bogus_haves_failure(self):
         """Ensure non-existent SHA in haves are not tolerated"""
@@ -100,10 +99,12 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
-        self.assertRaises(KeyError, self.store.find_missing_objects, self.store, haves, wants)
+        self.assertRaises(KeyError, self.store.find_missing_objects,
+            self.store, haves, wants)
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
+
 
 class MOFMergeForkRepoTest(MissingObjectFinderTest):
     """ 1 --- 2 --- 4 --- 6 --- 7
@@ -187,10 +188,9 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
           have 5, want 7. Common parent is rev2, hence children of rev2 from
           a descent line other than rev5 shall be reported
         """
-        # expects f1_4 from rev6. f3_5 is known in rev5; 
+        # expects f1_4 from rev6. f3_5 is known in rev5;
         # f1_7 shall be the same as f1_2 (known, too)
         self.assertMissingMatch([self.cmt(5).id], [self.cmt(7).id], [
               self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
               self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
-              self.f1_4_id]) 
-
+              self.f1_4_id])

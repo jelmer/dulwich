@@ -221,10 +221,12 @@ class BaseObjectStore(object):
             obj = self[sha]
         return obj
 
-    def _collect_ancestors(self, heads, common = set()):
-        """Collect all ancestors of heads up to (excluding) those in common
+    def _collect_ancestors(self, heads, common=set()):
+        """Collect all ancestors of heads up to (excluding) those in common.
+
         :param heads: commits to start from
-        :param common: commits to end at, or empty set to walk repository completely
+        :param common: commits to end at, or empty set to walk repository
+            completely
         :return: a tuple (A, B) where A - all commits reachable
             from heads but not present in common, B - common (shared) elements
             that are directly reachable from heads
@@ -815,30 +817,34 @@ def tree_lookup_path(lookup_obj, root_sha, path):
         raise NotTreeError(root_sha)
     return tree.lookup_path(lookup_obj, path)
 
+
 def _collect_filetree_revs(obj_store, tree_sha, kset):
-    """Collect SHA1s of files and directories for specified tree
-        (identified by SHA1)
+    """Collect SHA1s of files and directories for specified tree.
+
     :param obj_store: Object store to get objects by SHA from
     :param tree_sha: tree reference to walk
     :param kset: set to fill with references to files and directories
     """
     filetree = obj_store[tree_sha]
-    for name,mode,sha in filetree.iteritems():
+    for name, mode, sha in filetree.iteritems():
        if not S_ISGITLINK(mode) and sha not in kset:
            kset.add(sha)
            if stat.S_ISDIR(mode):
                _collect_filetree_revs(obj_store, sha, kset)
 
-def _split_commits_and_tags(obj_store, lst, ignore_unknown = False):
-    """Split lst into two lists, one with commit SHA1s, another with
-        tag SHA1s. Commits referenced by tags are included into commits
-        list as well. Only SHA1s known in this repository will get
-        through, and unless ignore_unknown argument is True, KeyError
-        is thrown for SHA1 missing in the repository
+
+def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
+    """Split object id list into two list with commit SHA1s and tag SHA1s.
+
+    Commits referenced by tags are included into commits
+    list as well. Only SHA1s known in this repository will get
+    through, and unless ignore_unknown argument is True, KeyError
+    is thrown for SHA1 missing in the repository
+
     :param obj_store: Object store to get objects by SHA1 from
     :param lst: Collection of commit and tag SHAs
-    :param ignore_unknown: True to skip SHA1 missing in the 
-        repository silently.
+    :param ignore_unknown: True to skip SHA1 missing in the repository
+        silently.
     :return: A tuple of (commits, tags) SHA1s
     """
     commits = set()
@@ -847,9 +853,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown = False):
         try:
             o = obj_store[e]
         except KeyError:
-            if ignore_unknown:
-                pass
-            else:
+            if not ignore_unknown:
                 raise
         else:
             if isinstance(o, Commit):

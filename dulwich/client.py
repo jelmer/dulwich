@@ -625,7 +625,12 @@ try:
             return self.channel.sendall(data)
 
         def read(self, n=None):
-            return self.channel.recv(n)
+            data = self.channel.recv(n)
+            data_len = len(data)
+            if n and data_len < n:
+                diff_len = n - data_len
+                return data + self.read(diff_len)
+            return data
 
         def close(self):
             self.channel.close()
@@ -832,21 +837,27 @@ def get_transport_and_path(uri, **kwargs):
     # Parse URL Scheme
     parsed = urlparse.urlparse(uri)
 
+    # Extract port
     try:
         port = parsed.port
     except:
         port = None
     port = port or 22
 
+    # Extract username
+    username = None
+    if parsed.path.find('@') >= 0:
+        username = parsed.path.split('@')[0]
+
     DEFAULTS = {
         'port': port,
-        'username': parsed.username,
+        'username': username,
         'look_for_keys': False,
         'allow_agent': False,
     }
 
     extra_kwargs = {
-        key: kwargs.pop(key, DEFAULTS.get(key))
+        key: (kwargs.pop(key, None) or DEFAULTS.get(key))
         for key in SSHGitClient.SSH_KWARGS_KEYS
     }
 

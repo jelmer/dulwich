@@ -31,6 +31,9 @@ from dulwich.objects import (
     S_ISGITLINK,
     )
 
+FIRST_FEW_BYTES = 8000
+
+
 def write_commit_patch(f, commit, contents, progress, version=None):
     """Write a individual file patch.
 
@@ -103,6 +106,11 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
                     yield '+' + line
 
 
+def is_binary(content):
+    """See if the first few bytes contains any null characters."""
+    return '\0' in content[:FIRST_FEW_BYTES]
+
+
 def write_object_diff(f, store, (old_path, old_mode, old_id),
                                 (new_path, new_mode, new_id)):
     """Write the diff for an object.
@@ -119,13 +127,21 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
             return "0" * 7
         else:
             return hexsha[:7]
-    def lines(mode, hexsha):
+
+    def content(mode, hexsha):
         if hexsha is None:
-            return []
+            return ''
         elif S_ISGITLINK(mode):
-            return ["Submodule commit " + hexsha + "\n"]
+            return "Submodule commit " + hexsha + "\n"
         else:
-            return store[hexsha].data.splitlines(True)
+            return store[hexsha].data
+
+    def lines(content):
+        if not content:
+            return []
+        else:
+            return content.splitlines(True)
+
     if old_path is None:
         old_path = "/dev/null"
     else:
@@ -146,10 +162,13 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
     if new_mode is not None:
         f.write(" %o" % new_mode)
     f.write("\n")
-    old_contents = lines(old_mode, old_id)
-    new_contents = lines(new_mode, new_id)
-    f.writelines(unified_diff(old_contents, new_contents,
-        old_path, new_path))
+    old_content = content(old_mode, old_id)
+    new_content = content(new_mode, new_id)
+    if is_binary(old_content) or is_binary(new_content):
+        f.write("Binary files %s and %s differ\n" % (old_path, new_path))
+    else:
+        f.writelines(unified_diff(lines(old_content), lines(new_content),
+            old_path, new_path))
 
 
 def write_blob_diff(f, (old_path, old_mode, old_blob),

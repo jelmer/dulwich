@@ -622,6 +622,8 @@ class SSHGitClient(TraditionalGitClient):
         return self.alternative_paths.get(cmd, 'git-%s' % cmd)
 
     def _connect(self, cmd, path):
+        if path.startswith("/~"):
+            path = path[1:]
         con = get_ssh_vendor().connect_ssh(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)

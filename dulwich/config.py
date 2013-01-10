@@ -28,6 +28,7 @@ import errno
 import os
 import re
 
+from collections import OrderedDict
 from UserDict import DictMixin
 
 from dulwich.file import GitFile
@@ -81,7 +82,7 @@ class ConfigDict(Config, DictMixin):
     def __init__(self, values=None):
         """Create a new ConfigDict."""
         if values is None:
-            values = {}
+            values = OrderedDict()
         self._values = values
 
     def __repr__(self):
@@ -122,7 +123,7 @@ class ConfigDict(Config, DictMixin):
     def set(self, section, name, value):
         if isinstance(section, basestring):
             section = (section, )
-        self._values.setdefault(section, {})[name] = value
+        self._values.setdefault(section, OrderedDict())[name] = value
 
 
 def _format_string(value):
@@ -236,7 +237,7 @@ class ConfigFile(ConfigDict):
                             section = (pts[0], pts[1])
                         else:
                             section = (pts[0], )
-                    ret._values[section] = {}
+                    ret._values[section] = OrderedDict()
                 if _strip_comments(line).strip() == "":
                     continue
                 if section is None:

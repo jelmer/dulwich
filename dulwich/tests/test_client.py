@@ -18,6 +18,9 @@
 
 from cStringIO import StringIO
 
+from dulwich import (
+    client,
+    )
 from dulwich.client import (
     TraditionalGitClient,
     TCPGitClient,
@@ -214,11 +217,41 @@ class GitClientTests(TestCase):
             self.client.send_pack, "blah", lambda x: {}, lambda h,w: [])
 
 
+class TestSSHVendor(object):
+
+    def __init__(self):
+        self.host = None
+        self.command = ""
+        self.username = None
+        self.port = None
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        self.host = host
+        self.command = command
+        self.username = username
+        self.port = port
+
+        class Subprocess: pass
+        setattr(Subprocess, 'read', lambda: None)
+        setattr(Subprocess, 'write', lambda: None)
+        setattr(Subprocess, 'can_read', lambda: None)
+        return Subprocess()
+
+
 class SSHGitClientTests(TestCase):
 
     def setUp(self):
         super(SSHGitClientTests, self).setUp()
+
+        self.server = TestSSHVendor()
+        self.real_vendor = client.get_ssh_vendor
+        client.get_ssh_vendor = lambda: self.server
+
         self.client = SSHGitClient('git.samba.org')
+
+    def tearDown(self):
+        super(SSHGitClientTests, self).tearDown()
+        client.get_ssh_vendor = self.real_vendor
 
     def test_default_command(self):
         self.assertEqual('git-upload-pack',
@@ -230,6 +263,21 @@ class SSHGitClientTests(TestCase):
         self.assertEqual('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path('upload-pack'))
 
+    def test_connect(self):
+        server = self.server
+        client = self.client
+
+        client.username = "username"
+        client.port = 1337
+
+        client._connect("command", "/path/to/repo")
+        self.assertEquals("username", server.username)
+        self.assertEquals(1337, server.port)
+        self.assertEquals(["git-command '/path/to/repo'"], server.command)
+
+        client._connect("relative-command", "/~/path/to/repo")
+        self.assertEquals(["git-relative-command '~/path/to/repo'"],
+                          server.command)
 
 class ReportStatusParserTests(TestCase):
 

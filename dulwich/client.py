@@ -867,9 +867,8 @@ def get_transport_and_path(uri, **kwargs):
     ssh_kwargs.update(kwargs)
 
     # TCP
-    tcp_kwargs = {
-        'port': extra_kwargs['port']
-    }.update(kwargs)
+    tcp_kwargs = {}
+    tcp_kwargs.update(kwargs)
 
     if parsed.scheme == 'git':
         return TCPGitClient(parsed.hostname, **tcp_kwargs), parsed.path

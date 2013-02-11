@@ -657,7 +657,6 @@ class HttpGitClient(GitClient):
         :param req: urllib2.Request instance
         :return: matching response
         """
-        #raise NotGitRepository()
         return urllib2.urlopen(req)
 
     def _discover_references(self, service, url):

@@ -728,10 +728,10 @@ class CheckTests(TestCase):
 class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
-        self.assertEqual((0, False), parse_timezone("+0000"))
+        self.assertEqual((0, None), parse_timezone("+0000"))
 
     def test_parse_timezone_utc_negative(self):
-        self.assertEqual((0, True), parse_timezone("-0000"))
+        self.assertEqual((0, "-0000"), parse_timezone("-0000"))
 
     def test_generate_timezone_utc(self):
         self.assertEqual("+0000", format_timezone(0))
@@ -740,7 +740,7 @@ class TimezoneTests(TestCase):
         self.assertEqual("-0000", format_timezone(0, True))
 
     def test_parse_timezone_cet(self):
-        self.assertEqual((60 * 60, False), parse_timezone("+0100"))
+        self.assertEqual((60 * 60, None), parse_timezone("+0100"))
 
     def test_format_timezone_cet(self):
         self.assertEqual("+0100", format_timezone(60 * 60))
@@ -749,7 +749,7 @@ class TimezoneTests(TestCase):
         self.assertEqual("-0400", format_timezone(-4 * 60 * 60))
 
     def test_parse_timezone_pdt(self):
-        self.assertEqual((-4 * 60 * 60, False), parse_timezone("-0400"))
+        self.assertEqual((-4 * 60 * 60, None), parse_timezone("-0400"))
 
     def test_format_timezone_pdt_half(self):
         self.assertEqual("-0440",
@@ -760,11 +760,11 @@ class TimezoneTests(TestCase):
             format_timezone(int(((7 * 60)) * 60), True))
 
     def test_parse_timezone_pdt_half(self):
-        self.assertEqual((((-4 * 60) - 40) * 60, False),
+        self.assertEqual((((-4 * 60) - 40) * 60, None),
             parse_timezone("-0440"))
 
     def test_parse_timezone_double_negative(self):
         self.assertEqual(
-            (int(((7 * 60)) * 60), False), parse_timezone("+700"))
+            (int(((7 * 60)) * 60), "+700"), parse_timezone("+700"))
         self.assertEqual(
-            (int(((7 * 60)) * 60), True), parse_timezone("--700"))
+            (int(((7 * 60)) * 60), "--700"), parse_timezone("--700"))

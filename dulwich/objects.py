@@ -604,13 +604,13 @@ class Tag(ShaFile):
     type_name = 'tag'
     type_num = 4
 
-    __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha',
+    __slots__ = ('_tag_timezone_raw', '_name', '_object_sha',
                  '_object_class', '_tag_time', '_tag_timezone',
                  '_tagger', '_message')
 
     def __init__(self):
         super(Tag, self).__init__()
-        self._tag_timezone_neg_utc = False
+        self._tag_timezone_raw = None
 
     @classmethod
     def from_path(cls, filename):
@@ -660,8 +660,7 @@ class Tag(ShaFile):
             else:
                 chunks.append("%s %s %d %s\n" % (
                   _TAGGER_HEADER, self._tagger, self._tag_time,
-                  format_timezone(self._tag_timezone,
-                    self._tag_timezone_neg_utc)))
+                  self._tag_timezone_raw or format_timezone(self._tag_timezone)))
         chunks.append("\n") # To close headers
         chunks.append(self._message)
         return chunks
@@ -686,13 +685,13 @@ class Tag(ShaFile):
                     self._tagger = value
                     self._tag_time = None
                     self._tag_timezone = None
-                    self._tag_timezone_neg_utc = False
+                    self._tag_timezone_raw = None
                 else:
                     self._tagger = value[0:sep+1]
                     try:
                         (timetext, timezonetext) = value[sep+2:].rsplit(" ", 1)
                         self._tag_time = int(timetext)
-                        self._tag_timezone, self._tag_timezone_neg_utc = \
+                        self._tag_timezone, self._tag_timezone_raw = \
                                 parse_timezone(timezonetext)
                     except ValueError, e:
                         raise ObjectFormatException(e)
@@ -1003,8 +1002,11 @@ def parse_timezone(text):
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = (offset % 100)
-    return (signum * (hours * 3600 + minutes * 60),
-            unnecessary_negative_timezone)
+    raw = None
+    parsed = signum * (hours * 3600 + minutes * 60)
+    if unnecessary_negative_timezone or text != format_timezone(parsed):
+        raw = text
+    return (parsed, raw)
 
 
 def format_timezone(offset, unnecessary_negative_timezone=False):
@@ -1034,8 +1036,8 @@ class Commit(ShaFile):
     type_name = 'commit'
     type_num = 1
 
-    __slots__ = ('_parents', '_encoding', '_extra', '_author_timezone_neg_utc',
-                 '_commit_timezone_neg_utc', '_commit_time',
+    __slots__ = ('_parents', '_encoding', '_extra', '_author_timezone_raw',
+                 '_commit_timezone_raw', '_commit_time',
                  '_author_time', '_author_timezone', '_commit_timezone',
                  '_author', '_committer', '_parents', '_extra',
                  '_encoding', '_tree', '_message')
@@ -1045,8 +1047,8 @@ class Commit(ShaFile):
         self._parents = []
         self._encoding = None
         self._extra = []
-        self._author_timezone_neg_utc = False
-        self._commit_timezone_neg_utc = False
+        self._author_timezone_raw = None
+        self._commit_timezone_raw = None
 
     @classmethod
     def from_path(cls, path):
@@ -1067,12 +1069,12 @@ class Commit(ShaFile):
             elif field == _AUTHOR_HEADER:
                 self._author, timetext, timezonetext = value.rsplit(" ", 2)
                 self._author_time = int(timetext)
-                self._author_timezone, self._author_timezone_neg_utc =\
+                self._author_timezone, self._author_timezone_raw =\
                     parse_timezone(timezonetext)
             elif field == _COMMITTER_HEADER:
                 self._committer, timetext, timezonetext = value.rsplit(" ", 2)
                 self._commit_time = int(timetext)
-                self._commit_timezone, self._commit_timezone_neg_utc =\
+                self._commit_timezone, self._commit_timezone_raw =\
                     parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:
                 self._encoding = value
@@ -1124,12 +1126,10 @@ class Commit(ShaFile):
             chunks.append("%s %s\n" % (_PARENT_HEADER, p))
         chunks.append("%s %s %s %s\n" % (
           _AUTHOR_HEADER, self._author, str(self._author_time),
-          format_timezone(self._author_timezone,
-                          self._author_timezone_neg_utc)))
+          self._author_timezone_raw or format_timezone(self._author_timezone)))
         chunks.append("%s %s %s %s\n" % (
           _COMMITTER_HEADER, self._committer, str(self._commit_time),
-          format_timezone(self._commit_timezone,
-                          self._commit_timezone_neg_utc)))
+         self._commit_timezone_raw or format_timezone(self._commit_timezone)))
         if self.encoding:
             chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
         for k, v in self.extra:
@@ -1177,11 +1177,19 @@ class Commit(ShaFile):
     commit_timezone = serializable_property("commit_timezone",
         "The zone the commit time is in")
 
+    commit_timezone_raw = serializable_property("commit_timezone_raw",
+        "The raw zone the commit time is in, if reserializing the parsed"
+        "offset would result in a different value; otherwise, None")
+
     author_time = serializable_property("author_time",
         "The timestamp the commit was written. as the number of seconds since the epoch.")
 
     author_timezone = serializable_property("author_timezone",
         "Returns the zone the author time is in.")
+
+    author_timezone_raw = serializable_property("author_timezone_raw",
+        "The raw zone the author time is in, if reserializing the parsed"
+        "offset would result in a different value; otherwise, None")
 
     encoding = serializable_property("encoding",
         "Encoding of the commit message.")

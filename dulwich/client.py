@@ -592,7 +592,7 @@ class SubprocessGitClient(TraditionalGitClient):
 
 class SSHVendor(object):
 
-    def connect_ssh(self, host, command, username=None, port=None, **kwargs):
+    def connect_ssh(self, host, command, username=None, port=None, progress_stderr=None, **kwargs):
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -608,15 +608,55 @@ class SSHVendor(object):
 
 
 try:
+    import sys
     import paramiko
+    import threading
 
     class ParamikoWrapper(object):
-        def __init__(self, client, channel):
+        STDERR_READ_N = 2048  # 2k
+
+        def __init__(self, client, channel, progress_stderr=None):
             self.client = client
             self.channel = channel
+            self.progress_stderr = progress_stderr
+            self.should_monitor = bool(progress_stderr) or True
+            self.monitor_thread = None
+            self.stderr = ''
 
             # Channel must block
-            channel.setblocking(1)
+            self.channel.setblocking(True)
+
+            # Start
+            if self.should_monitor:
+                self.monitor_thread = threading.Thread(target=self.monitor_stderr)
+                self.monitor_thread.start()
+
+        def monitor_stderr(self):
+            while self.should_monitor:
+                # Block and read
+                data = self.read_stderr(self.STDERR_READ_N)
+
+                # Socket closed
+                if not data:
+                    self.should_monitor = False
+                    break
+
+                # Emit data
+                if self.progress_stderr:
+                    self.progress_stderr(data)
+
+                # Append to buffer
+                self.stderr += data
+
+        def stop_monitoring(self):
+            # Stop StdErr thread
+            if self.should_monitor:
+                self.should_monitor = False
+                self.monitor_thread.join()
+
+                # Get left over data
+                data = self.channel.in_stderr_buffer.empty()
+                self.stderr += data
 
         def can_read(self):
             return self.channel.recv_ready()
@@ -624,9 +664,18 @@ try:
         def write(self, data):
             return self.channel.sendall(data)
 
+        def read_stderr(self, n):
+            return self.channel.recv_stderr(n)
+
         def read(self, n=None):
             data = self.channel.recv(n)
             data_len = len(data)
+
+            # Closed socket
+            if not data:
+                return
+
+            # Read more if needed
             if n and data_len < n:
                 diff_len = n - data_len
                 return data + self.read(diff_len)
@@ -634,9 +683,13 @@ try:
 
         def close(self):
             self.channel.close()
+            self.stop_monitoring()
+
+        def __del__(self):
+            self.close()
 
     class ParamikoSSHVendor(object):
-        def connect_ssh(self, host, command, **kwargs):
+        def connect_ssh(self, host, command, progress_stderr=None, **kwargs):
             client = paramiko.SSHClient()
 
             policy = paramiko.client.MissingHostKeyPolicy()
@@ -649,7 +702,7 @@ try:
             # Run commands
             apply(channel.exec_command, command)
 
-            return ParamikoWrapper(client, channel)
+            return ParamikoWrapper(client, channel, progress_stderr=progress_stderr)
 
 except ImportError:
     warnings.warn('Install paramiko to have better SSH support (RSA and username/password authentication)')
@@ -668,6 +721,7 @@ class SSHGitClient(TraditionalGitClient):
         'look_for_keys',
         'allow_agent',
         'key_filename',
+        'progress_stderr'
     )
 
     def __init__(self, host, *args, **kwargs):

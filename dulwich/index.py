@@ -391,13 +391,16 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
-def build_index_from_tree(prefix, index_path, object_store, tree_id):
+def build_index_from_tree(prefix, index_path, object_store, tree_id,
+                          honor_filemode=True):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
     :param prefix: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
+    :param honor_filemode: An optional flag to honor core.filemode setting in
+        config file, default is core.filemode=True, change executable bit
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
@@ -423,7 +426,8 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
             finally:
                 f.close()
 
-            os.chmod(full_path, entry.mode)
+            if honor_filemode:
+                os.chmod(full_path, entry.mode)
 
         # Add file to index
         st = os.lstat(full_path)

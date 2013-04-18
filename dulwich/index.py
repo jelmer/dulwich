@@ -22,7 +22,6 @@ import os
 import stat
 import struct
 
-from dulwich.config import ConfigFile
 from dulwich.file import GitFile
 from dulwich.objects import (
     S_IFGITLINK,
@@ -35,7 +34,6 @@ from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
     )
-from dulwich.repo import Repo
 
 
 def pathsplit(path):
@@ -393,23 +391,20 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
-def build_index_from_tree(prefix, index_path, object_store, tree_id):
+def build_index_from_tree(prefix, index_path, object_store, tree_id,
+                          honor_filemode=True):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
     :param prefix: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
+    :param honor_filemode: An optional flag to honor core.filemode setting in
+        config file, default is core.filemode=True, change executable bit
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
     """
-
-    # get git config
-    repo = Repo(prefix)
-    # Do we really need `controldir()`? Could just use ".git" instead?
-    cnf_file = os.path.join(repo.controldir(),'config')
-    conf = ConfigFile.from_path(cnf_file)
 
     index = Index(index_path)
 
@@ -420,11 +415,9 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
-        # checkout symlink if core.symlinks and OS name
-        if conf.get_boolean('core','symlinks') and os.name != "nt":
-            if stat.S_ISLNK(entry.mode):
-                # FIXME: This will fail on Windows. What should we do instead?
-                os.symlink(object_store[entry.sha].as_raw_string(), full_path)
+        if stat.S_ISLNK(entry.mode):
+            # FIXME: This will fail on Windows. What should we do instead?
+            os.symlink(object_store[entry.sha].as_raw_string(), full_path)
         else:
             f = open(full_path, 'wb')
             try:
@@ -433,8 +426,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
             finally:
                 f.close()
 
-            # change file permissions if core.filemode is true
-            if conf.get_boolean('core','filemode'):
+            if honor_filemode:
                 os.chmod(full_path, entry.mode)
 
         # Add file to index

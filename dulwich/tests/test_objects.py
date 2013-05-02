@@ -406,7 +406,7 @@ Merge ../b
 
         d = Commit()
         d._deserialize(commit.as_raw_chunks())
-        self.assertEquals(commit, d)
+        self.assertEqual(commit, d)
 
     def test_deserialize_mergetags(self):
         tag = make_object(

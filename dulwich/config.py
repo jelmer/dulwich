@@ -38,7 +38,7 @@ class Config(object):
 
     def get(self, section, name):
         """Retrieve the contents of a configuration setting.
-        
+
         :param section: Tuple with section name and optional subsection namee
         :param subsection: Subsection name
         :return: Contents of the setting
@@ -67,7 +67,7 @@ class Config(object):
 
     def set(self, section, name, value):
         """Set a configuration value.
-        
+
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
@@ -94,10 +94,10 @@ class ConfigDict(Config, DictMixin):
 
     def __getitem__(self, key):
         return self._values[key]
-      
+
     def __setitem__(self, key, value):
         self._values[key] = value
-        
+
     def keys(self):
         return self._values.keys()
 

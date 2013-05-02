@@ -7,6 +7,10 @@
   * Use indentation consistent with C Git in config files.
     (#1031356, Curt Moore, Jelmer Vernooij)
 
+ FEATURES
+
+  * Add support for mergetags. (milki, #963525)
+
 0.8.7	2012-11-27
 
  BUG FIXES

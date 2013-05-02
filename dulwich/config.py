@@ -304,7 +304,7 @@ class ConfigFile(ConfigDict):
             else:
                 f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
             for key, value in values.iteritems():
-                f.write("%s = %s\n" % (key, _escape_value(value)))
+                f.write("\t%s = %s\n" % (key, _escape_value(value)))
 
 
 class StackedConfig(Config):

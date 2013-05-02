@@ -52,7 +52,6 @@ _AUTHOR_HEADER = "author"
 _COMMITTER_HEADER = "committer"
 _ENCODING_HEADER = "encoding"
 _MERGETAG_HEADER = "mergetag"
-_INTERNAL_EXTRA_HEADER = "_extra_"
 
 # Header fields for objects
 _OBJECT_HEADER = "object"
@@ -584,20 +583,18 @@ def _parse_tag_or_commit(text):
         field named None for the freeform tag/commit text.
     """
     f = StringIO(text)
-    extra = ""
+    k = None
+    v = ""
     for l in f:
         if l.startswith(" "):
-            # Beginning space indicates embedded extra header
-            extra += l.lstrip(" ")
-            continue
-        if extra:
-            yield _INTERNAL_EXTRA_HEADER, extra
-            extra = ""
-        l = l.rstrip("\n")
-        if l == "":
-            # Empty line indicates end of headers
-            break
-        yield l.split(" ", 1)
+            v += l[1:]
+        else:
+            if k is not None:
+                yield (k, v.rstrip("\n"))
+            if l == "\n":
+                # Empty line indicates end of headers
+                break
+            (k, v) = l.split(" ", 1)
     yield (None, f.read())
     f.close()
 
@@ -1069,7 +1066,6 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
-        mergetag = ""
         for field, value in parse_commit(''.join(chunks)):
             if field == _TREE_HEADER:
                 self._tree = value
@@ -1090,11 +1086,7 @@ class Commit(ShaFile):
             elif field is None:
                 self._message = value
             elif field == _MERGETAG_HEADER:
-                mergetag = "%s\n" % value
-            elif field == _INTERNAL_EXTRA_HEADER:
-                if mergetag:
-                    self._mergetag.append(Tag.from_string(mergetag + value))
-                    mergetag = ""
+                self._mergetag.append(Tag.from_string(value + "\n"))
             else:
                 self._extra.append((field, value))
 

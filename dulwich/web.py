@@ -398,13 +398,13 @@ def make_wsgi_chain(*args, **kwargs):
 
 
 # The reference server implementation is based on wsgiref, which is not
-# distributed with python 2.4. If wsgiref is not present, users will not be able
-# to use the HTTP server without a little extra work.
+# distributed with python 2.4. If wsgiref is not present, users will not be
+# able to use the HTTP server without a little extra work.
 try:
     from wsgiref.simple_server import (
         WSGIRequestHandler,
         make_server,
-        )
+    )
 
     class HTTPGitRequestHandler(WSGIRequestHandler):
         """Handler that uses dulwich's logger for logging exceptions."""
@@ -419,7 +419,6 @@ try:
         def log_error(self, *args):
             logger.error(*args)
 
-
     def main(argv=sys.argv):
         """Entry point for starting an HTTP git server."""
         if len(argv) > 1:
@@ -428,7 +427,7 @@ try:
             gitdir = os.getcwd()
 
         # TODO: allow serving on other addresses/ports via command-line flag
-        listen_addr=''
+        listen_addr = ''
         port = 8000
 
         log_utils.default_logging_config()
@@ -441,9 +440,10 @@ try:
         server.serve_forever()
 
 except ImportError:
-    # No wsgiref found; don't provide the reference functionality, but leave the
-    # rest of the WSGI-based implementation.
+    # No wsgiref found; don't provide the reference functionality, but leave
+    # the rest of the WSGI-based implementation.
     def main(argv=sys.argv):
         """Stub entry point for failing to start a server without wsgiref."""
-        sys.stderr.write('Sorry, the wsgiref module is required for dul-web.\n')
+        sys.stderr.write(
+            'Sorry, the wsgiref module is required for dul-web.\n')
         sys.exit(1)

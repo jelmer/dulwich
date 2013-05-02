@@ -776,8 +776,11 @@ def get_transport_and_path(uri, **kwargs):
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
                 parsed.path)
     elif parsed.scheme == 'git+ssh':
+        path = parsed.path
+        if path.startswith('/'):
+            path = parsed.path[1:]
         return SSHGitClient(parsed.hostname, port=parsed.port,
-                            username=parsed.username, **kwargs), parsed.path
+                            username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 

@@ -137,14 +137,14 @@ class ConfigFileTests(TestCase):
         c.set(("core", ), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
-        self.assertEqual("[core]\nfoo = bar\n", f.getvalue())
+        self.assertEqual("[core]\n\tfoo = bar\n", f.getvalue())
 
     def test_write_to_file_subsection(self):
         c = ConfigFile()
         c.set(("branch", "blie"), "foo", "bar")
         f = StringIO()
         c.write_to_file(f)
-        self.assertEqual("[branch \"blie\"]\nfoo = bar\n", f.getvalue())
+        self.assertEqual("[branch \"blie\"]\n\tfoo = bar\n", f.getvalue())
 
     def test_same_line(self):
         cf = self.from_file("[branch.foo] foo = bar\n")

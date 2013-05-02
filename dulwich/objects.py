@@ -51,7 +51,8 @@ _PARENT_HEADER = "parent"
 _AUTHOR_HEADER = "author"
 _COMMITTER_HEADER = "committer"
 _ENCODING_HEADER = "encoding"
-
+_MERGETAG_HEADER = "mergetag"
+_INTERNAL_EXTRA_HEADER = "_extra_"
 
 # Header fields for objects
 _OBJECT_HEADER = "object"
@@ -583,7 +584,15 @@ def _parse_tag_or_commit(text):
         field named None for the freeform tag/commit text.
     """
     f = StringIO(text)
+    extra = ""
     for l in f:
+        if l.startswith(" "):
+            # Beginning space indicates embedded extra header
+            extra += l.lstrip(" ")
+            continue
+        if extra:
+            yield _INTERNAL_EXTRA_HEADER, extra
+            extra = ""
         l = l.rstrip("\n")
         if l == "":
             # Empty line indicates end of headers
@@ -1038,12 +1047,13 @@ class Commit(ShaFile):
                  '_commit_timezone_neg_utc', '_commit_time',
                  '_author_time', '_author_timezone', '_commit_timezone',
                  '_author', '_committer', '_parents', '_extra',
-                 '_encoding', '_tree', '_message')
+                 '_encoding', '_tree', '_message', '_mergetag')
 
     def __init__(self):
         super(Commit, self).__init__()
         self._parents = []
         self._encoding = None
+        self._mergetag = []
         self._extra = []
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False
@@ -1059,6 +1069,7 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._author = None
+        mergetag = ""
         for field, value in parse_commit(''.join(chunks)):
             if field == _TREE_HEADER:
                 self._tree = value
@@ -1078,6 +1089,12 @@ class Commit(ShaFile):
                 self._encoding = value
             elif field is None:
                 self._message = value
+            elif field == _MERGETAG_HEADER:
+                mergetag = "%s\n" % value
+            elif field == _INTERNAL_EXTRA_HEADER:
+                if mergetag:
+                    self._mergetag.append(Tag.from_string(mergetag + value))
+                    mergetag = ""
             else:
                 self._extra.append((field, value))
 
@@ -1132,6 +1149,16 @@ class Commit(ShaFile):
                           self._commit_timezone_neg_utc)))
         if self.encoding:
             chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
+        for mergetag in self.mergetag:
+            mergetag_chunks = mergetag.as_raw_string().split("\n")
+
+            chunks.append("%s %s\n" % (_MERGETAG_HEADER, mergetag_chunks[0]))
+            # Embedded extra header needs leading space
+            for chunk in mergetag_chunks[1:]:
+                chunks.append(" %s\n" % chunk)
+
+            # No trailing empty line
+            chunks[-1] = chunks[-1].rstrip(" \n")
         for k, v in self.extra:
             if "\n" in k or "\n" in v:
                 raise AssertionError("newline in extra data: %r -> %r" % (k, v))
@@ -1185,6 +1212,9 @@ class Commit(ShaFile):
 
     encoding = serializable_property("encoding",
         "Encoding of the commit message.")
+
+    mergetag = serializable_property("mergetag",
+        "Associated signed tag.")
 
 
 OBJECT_CLASSES = (

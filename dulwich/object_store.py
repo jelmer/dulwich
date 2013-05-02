@@ -421,9 +421,10 @@ class DiskObjectStore(PackBasedObjectStore):
                 l = l.rstrip("\n")
                 if l[0] == "#":
                     continue
-                if not os.path.isabs(l):
-                    continue
-                ret.append(l)
+                if os.path.isabs(l):
+                    ret.append(l)
+                else:
+                    ret.append(os.path.join(self.path, l))
             return ret
         finally:
             f.close()
@@ -452,6 +453,9 @@ class DiskObjectStore(PackBasedObjectStore):
             f.write("%s\n" % path)
         finally:
             f.close()
+
+        if not os.path.isabs(path):
+            path = os.path.join(self.path, path)
         self.alternates.append(DiskObjectStore(path))
 
     def _load_packs(self):

@@ -4,6 +4,9 @@
 
   * Push efficiency - report missing objects only. (#562676, Artem Tikhomirov)
 
+  * Use indentation consistent with C Git in config files.
+    (#1031356, Curt Moore, Jelmer Vernooij)
+
 0.8.7	2012-11-27
 
  BUG FIXES

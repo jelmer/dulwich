@@ -43,7 +43,12 @@ import select
 import socket
 import subprocess
 import urllib2
+
 import urlparse
+try:
+    urlparse.urlparse('https://user@nowhere.none:89/baz').username
+except AttributeError:
+    import urlparse_local as urlparse
 
 from dulwich.errors import (
     GitProtocolError,

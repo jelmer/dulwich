@@ -18,6 +18,9 @@
 
   * Support ~ expansion in SSH client paths. (milki, #1083439)
 
+  * Support relative paths in alternate paths.
+    (milki, Michel Lespinasse, #1175007)
+
  IMPROVEMENTS:
 
   * Add optional honor_filemode flag to build_index_from_tree.

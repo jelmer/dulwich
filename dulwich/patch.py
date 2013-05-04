@@ -107,18 +107,24 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
 
 
 def is_binary(content):
-    """See if the first few bytes contains any null characters."""
+    """See if the first few bytes contain any null characters.
+
+    :param content: Bytestring to check for binary content
+    """
     return '\0' in content[:FIRST_FEW_BYTES]
 
 
 def write_object_diff(f, store, (old_path, old_mode, old_id),
-                                (new_path, new_mode, new_id)):
+                                (new_path, new_mode, new_id),
+                                diff_binary=False):
     """Write the diff for an object.
 
     :param f: File-like object to write to
     :param store: Store to retrieve objects from, if necessary
     :param (old_path, old_mode, old_hexsha): Old file
     :param (new_path, new_mode, new_hexsha): New file
+    :param diff_binary: Whether to diff files even if they
+        are considered binary files by is_binary().
 
     :note: the tuple elements should be None for nonexistant files
     """
@@ -164,7 +170,7 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
     f.write("\n")
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
-    if is_binary(old_content) or is_binary(new_content):
+    if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
         f.write("Binary files %s and %s differ\n" % (old_path, new_path))
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
@@ -217,17 +223,20 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
         old_path, new_path))
 
 
-def write_tree_diff(f, store, old_tree, new_tree):
+def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """Write tree diff.
 
     :param f: File-like object to write to.
     :param old_tree: Old tree id
     :param new_tree: New tree id
+    :param diff_binary: Whether to diff files even if they
+        are considered binary files by is_binary().
     """
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
         write_object_diff(f, store, (oldpath, oldmode, oldsha),
-                                    (newpath, newmode, newsha))
+                                    (newpath, newmode, newsha),
+                                    diff_binary=diff_binary)
 
 
 def git_am_patch_split(f):

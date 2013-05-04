@@ -175,7 +175,7 @@ class ConfigDictTests(TestCase):
         cd.set(("core", ), "foo", "bla")
         cd.set(("core2", ), "foo", "bloe")
 
-        self.assertEqual([("core2", ), ("core", )], cd.keys())
+        self.assertEqual([("core", ), ("core2", )], cd.keys())
         self.assertEqual(cd[("core", )], {'foo': 'bla'})
 
         cd['a'] = 'b'

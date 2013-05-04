@@ -11,7 +11,7 @@
     (Takeshi Kanemoto)
 
   * Fix handling of relative paths in dulwich.client.get_transport_and_path.
-    (eode)
+    (Brian Visel, #1169368)
 
   * Preserve ordering of entries in configuration.
     (Benjamin Pollack)

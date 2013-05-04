@@ -7,6 +7,9 @@
   * Use indentation consistent with C Git in config files.
     (#1031356, Curt Moore, Jelmer Vernooij)
 
+  * Recognize and skip binary files in diff function.
+    (Takeshi Kanemoto)
+
  FEATURES
 
   * Add support for mergetags. (milki, #963525)

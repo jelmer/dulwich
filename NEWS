@@ -16,6 +16,8 @@
   * Preserve ordering of entries in configuration.
     (Benjamin Pollack)
 
+  * Support ~ expansion in SSH client paths. (milki, #1083439)
+
  IMPROVEMENTS:
 
   * Add optional honor_filemode flag to build_index_from_tree.

@@ -1383,11 +1383,17 @@ class Repo(BaseRepo):
 
             if not bare:
                 # Checkout HEAD to target dir
-                from dulwich.index import build_index_from_tree
-                build_index_from_tree(target.path, target.index_path(),
-                        target.object_store, target['HEAD'].tree)
+                target._build_tree()
 
         return target
+
+    def _build_tree(self):
+        from dulwich.index import build_index_from_tree
+        config = self.get_config()
+        honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        return build_index_from_tree(self.path, self.index_path(),
+                self.object_store, self['HEAD'].tree,
+                honor_filemode=honor_filemode)
 
     def get_config(self):
         """Retrieve the config object.

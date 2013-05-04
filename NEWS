@@ -10,6 +10,9 @@
   * Recognize and skip binary files in diff function.
     (Takeshi Kanemoto)
 
+  * Fix handling of relative paths in dulwich.client.get_transport_and_path.
+    (eode)
+
  FEATURES
 
   * Add support for mergetags. (milki, #963525)

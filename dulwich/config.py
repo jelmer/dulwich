@@ -28,7 +28,11 @@ import errno
 import os
 import re
 
-from collections import OrderedDict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from dulwich._compat import OrderedDict
+
 from UserDict import DictMixin
 
 from dulwich.file import GitFile

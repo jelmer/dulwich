@@ -11,5 +11,6 @@ Tutorial
    repo
    object-store
    remote
+   tag
    conclusion
 

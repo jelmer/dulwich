@@ -902,7 +902,7 @@ def get_transport_and_path(uri, **kwargs):
     if parsed.path.find('@') >= 0:
         username = parsed.path.split('@')[0]
 
-    DEFAULTS = {
+    SSH_DEFAULTS = {
         'port': port or 22,
         'username': username,
         'look_for_keys': False,
@@ -910,7 +910,7 @@ def get_transport_and_path(uri, **kwargs):
     }
 
     extra_kwargs = {
-        key: (kwargs.pop(key, None) or DEFAULTS.get(key))
+        key: (kwargs.pop(key, None) or SSH_DEFAULTS.get(key))
         for key in SSHGitClient.SSH_KWARGS_KEYS
     }
 

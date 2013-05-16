@@ -896,22 +896,21 @@ def get_transport_and_path(uri, **kwargs):
         port = parsed.port
     except:
         port = None
-    port = port or 22
 
     # Extract username
     username = None
     if parsed.path.find('@') >= 0:
         username = parsed.path.split('@')[0]
 
-    DEFAULTS = {
-        'port': port,
+    SSH_DEFAULTS = {
+        'port': port or 22,
         'username': username,
         'look_for_keys': False,
         'allow_agent': False,
     }
 
     extra_kwargs = {
-        key: (kwargs.pop(key, None) or DEFAULTS.get(key))
+        key: (kwargs.pop(key, None) or SSH_DEFAULTS.get(key))
         for key in SSHGitClient.SSH_KWARGS_KEYS
     }
 
@@ -921,7 +920,7 @@ def get_transport_and_path(uri, **kwargs):
     ssh_kwargs.update(kwargs)
 
     # TCP
-    tcp_kwargs = {}
+    tcp_kwargs = {'port': port}
     tcp_kwargs.update(kwargs)
 
     if parsed.scheme == 'git':

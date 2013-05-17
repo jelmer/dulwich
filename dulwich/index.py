@@ -417,6 +417,9 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         # FIXME: Merge new index into working tree
         if stat.S_ISLNK(entry.mode):
             # FIXME: This will fail on Windows. What should we do instead?
+            if os.path.exists(full_path):
+                # Must delete symlink dest to overwrite
+                os.remove(full_path)
             os.symlink(object_store[entry.sha].as_raw_string(), full_path)
         else:
             f = open(full_path, 'wb')

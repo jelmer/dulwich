@@ -360,10 +360,10 @@ class OrderedDict(dict):
         dict.clear(self)
 
     def popitem(self, last=True):
-        '''od.popitem() -> (k, v), return and remove a (key, value) pair.
+        """od.popitem() -> (k, v), return and remove a (key, value) pair.
         Pairs are returned in LIFO order if last is true or FIFO order if false.
 
-        '''
+        """
         if not self:
             raise KeyError('dictionary is empty')
         root = self.__root
@@ -385,40 +385,40 @@ class OrderedDict(dict):
     # -- the following methods do not depend on the internal structure --
 
     def keys(self):
-        'od.keys() -> list of keys in od'
+       """'od.keys() -> list of keys in od"""
         return list(self)
 
     def values(self):
-        'od.values() -> list of values in od'
+        """od.values() -> list of values in od"""
         return [self[key] for key in self]
 
     def items(self):
-        'od.items() -> list of (key, value) pairs in od'
+        """od.items() -> list of (key, value) pairs in od"""
         return [(key, self[key]) for key in self]
 
     def iterkeys(self):
-        'od.iterkeys() -> an iterator over the keys in od'
+        """od.iterkeys() -> an iterator over the keys in od"""
         return iter(self)
 
     def itervalues(self):
-        'od.itervalues -> an iterator over the values in od'
+        """od.itervalues -> an iterator over the values in od"""
         for k in self:
             yield self[k]
 
     def iteritems(self):
-        'od.iteritems -> an iterator over the (key, value) items in od'
+        """od.iteritems -> an iterator over the (key, value) items in od"""
         for k in self:
             yield (k, self[k])
 
     def update(*args, **kwds):
-        '''od.update(E, **F) -> None.  Update od from dict/iterable E and F.
+        """od.update(E, **F) -> None.  Update od from dict/iterable E and F.
 
         If E is a dict instance, does:           for k in E: od[k] = E[k]
         If E has a .keys() method, does:         for k in E.keys(): od[k] = E[k]
         Or if E is an iterable of items, does:   for k, v in E: od[k] = v
         In either case, this is followed by:     for k, v in F.items(): od[k] = v
 
-        '''
+        """
         if len(args) > 2:
             raise TypeError('update() takes at most 2 positional '
                             'arguments (%d given)' % (len(args),))
@@ -446,10 +446,10 @@ class OrderedDict(dict):
     __marker = object()
 
     def pop(self, key, default=__marker):
-        '''od.pop(k[,d]) -> v, remove specified key and return the corresponding value.
+        """od.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
 
-        '''
+        """
         if key in self:
             result = self[key]
             del self[key]

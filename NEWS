@@ -28,6 +28,8 @@
 
   * Support core/filemode setting when building trees. (Jelmer Vernooij)
 
+  * Add chapter on tags in tutorial. (Ryan Faulkner)
+
  FEATURES
 
   * Add support for mergetags. (milki, #963525)

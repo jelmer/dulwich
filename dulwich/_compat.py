@@ -385,7 +385,7 @@ class OrderedDict(dict):
     # -- the following methods do not depend on the internal structure --
 
     def keys(self):
-       """'od.keys() -> list of keys in od"""
+        """'od.keys() -> list of keys in od"""
         return list(self)
 
     def values(self):

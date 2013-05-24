@@ -403,11 +403,25 @@ def make_wsgi_chain(*args, **kwargs):
 try:
     from wsgiref.simple_server import (
         WSGIRequestHandler,
+        ServerHandler,
+        WSGIServer,
         make_server,
     )
+    class ServerHandlerLogger(ServerHandler):
+        """ServerHandler that uses dulwich's logger for logging exceptions."""
+        
+        def log_exception(self, exc_info):
+            logger.exception('Exception happened during processing of request',
+                             exc_info=exc_info)
 
-    class HTTPGitRequestHandler(WSGIRequestHandler):
-        """Handler that uses dulwich's logger for logging exceptions."""
+        def log_message(self, format, *args):
+            logger.info(format, *args)
+
+        def log_error(self, *args):
+            logger.error(*args)
+
+    class WSGIRequestHandlerLogger(WSGIRequestHandler):
+        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -418,6 +432,24 @@ try:
 
         def log_error(self, *args):
             logger.error(*args)
+        
+        def handle(self):
+            """Handle a single HTTP request"""
+    
+            self.raw_requestline = self.rfile.readline()
+            if not self.parse_request(): # An error code has been sent, just exit
+                return
+    
+            handler = ServerHandlerLogger(
+                self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            )
+            handler.request_handler = self      # backpointer for logging
+            handler.run(self.server.get_app())
+    
+    class WSGIServerLogger(WSGIServer):
+        def handle_error(self, request, client_address):
+            """Handle an error. """
+            logger.exception('Exception happened during processing of request from %s' % str(client_address))
 
     def main(argv=sys.argv):
         """Entry point for starting an HTTP git server."""
@@ -434,7 +466,8 @@ try:
         backend = DictBackend({'/': Repo(gitdir)})
         app = make_wsgi_chain(backend)
         server = make_server(listen_addr, port, app,
-                             handler_class=HTTPGitRequestHandler)
+                             handler_class=WSGIRequestHandlerLogger,
+                             server_class=WSGIServerLogger)
         logger.info('Listening for HTTP connections on %s:%d', listen_addr,
                     port)
         server.serve_forever()

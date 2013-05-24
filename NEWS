@@ -21,6 +21,9 @@
   * Support relative paths in alternate paths.
     (milki, Michel Lespinasse, #1175007)
 
+  * Log all error messages from wsgiref server to the logging module. This
+    makes the test suit quiet again. (Gary van der Merwe)
+
  IMPROVEMENTS:
 
   * Add optional honor_filemode flag to build_index_from_tree.

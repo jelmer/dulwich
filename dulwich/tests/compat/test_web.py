@@ -36,7 +36,8 @@ from dulwich.tests import (
 from dulwich.web import (
     make_wsgi_chain,
     HTTPGitApplication,
-    HTTPGitRequestHandler,
+    WSGIRequestHandlerLogger,
+    WSGIServerLogger,
     )
 
 from dulwich.tests.compat.server_utils import (
@@ -50,9 +51,9 @@ from dulwich.tests.compat.utils import (
 
 
 if getattr(simple_server.WSGIServer, 'shutdown', None):
-    WSGIServer = simple_server.WSGIServer
+    WSGIServer = WSGIServerLogger
 else:
-    class WSGIServer(ShutdownServerMixIn, simple_server.WSGIServer):
+    class WSGIServer(ShutdownServerMixIn, WSGIServerLogger):
         """Subclass of WSGIServer that can be shut down."""
 
         def __init__(self, *args, **kwargs):
@@ -77,7 +78,7 @@ class WebTests(ServerTests):
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
           'localhost', 0, app, server_class=WSGIServer,
-          handler_class=HTTPGitRequestHandler)
+          handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server

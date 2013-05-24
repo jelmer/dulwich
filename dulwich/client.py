@@ -199,11 +199,10 @@ class GitClient(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
-        try:
-            return self.fetch_pack(path, determine_wants,
+        result = self.fetch_pack(path, determine_wants,
                 target.get_graph_walker(), f.write, progress)
-        finally:
-            commit()
+        commit()
+        return result
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None):
@@ -641,6 +640,17 @@ class HttpGitClient(GitClient):
     def _get_url(self, path):
         return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
 
+    def _http_request(self, url, headers={}, data=None):
+        req = urllib2.Request(url, headers=headers, data=data)
+        try:
+            resp = self._perform(req)
+            return resp
+        except urllib2.HTTPError as e:
+            if e.code == 404:
+                raise NotGitRepository()
+            if e.code != 200:
+                raise GitProtocolError("unexpected http response %d" % e.code)
+
     def _perform(self, req):
         """Perform a HTTP request.
 
@@ -658,13 +668,7 @@ class HttpGitClient(GitClient):
         if self.dumb != False:
             url += "?service=%s" % service
             headers["Content-Type"] = "application/x-%s-request" % service
-        req = urllib2.Request(url, headers=headers)
-        resp = self._perform(req)
-        if resp.getcode() == 404:
-            raise NotGitRepository()
-        if resp.getcode() != 200:
-            raise GitProtocolError("unexpected http response %d" %
-                resp.getcode())
+        resp = self._http_request(url, headers)
         self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
         proto = Protocol(resp.read, None)
         if not self.dumb:
@@ -678,15 +682,8 @@ class HttpGitClient(GitClient):
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, service)
-        req = urllib2.Request(url,
-            headers={"Content-Type": "application/x-%s-request" % service},
-            data=data)
-        resp = self._perform(req)
-        if resp.getcode() == 404:
-            raise NotGitRepository()
-        if resp.getcode() != 200:
-            raise GitProtocolError("Invalid HTTP response from server: %d"
-                % resp.getcode())
+        headers={"Content-Type": "application/x-%s-request" % service}
+        resp = self._http_request(url, headers, data)
         if resp.info().gettype() != ("application/x-%s-result" % service):
             raise GitProtocolError("Invalid content-type from server: %s"
                 % resp.info().gettype())

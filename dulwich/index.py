@@ -18,6 +18,7 @@
 
 """Parser for the git index file format."""
 
+import errno
 import os
 import stat
 import struct
@@ -417,10 +418,15 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         # FIXME: Merge new index into working tree
         if stat.S_ISLNK(entry.mode):
             # FIXME: This will fail on Windows. What should we do instead?
-            if os.path.exists(full_path):
-                # Must delete symlink dest to overwrite
-                os.remove(full_path)
-            os.symlink(object_store[entry.sha].as_raw_string(), full_path)
+            src_path = object_store[entry.sha].as_raw_string()
+            try:
+                os.symlink(src_path, full_path)
+            except OSError, e:
+                if e.errno == errno.EEXIST:
+                    os.unlink(full_path)
+                    os.symlink(src_path, full_path)
+                else:
+                    raise
         else:
             f = open(full_path, 'wb')
             try:

@@ -27,6 +27,8 @@
   * Support passing None for empty tree in changes_from_tree.
     (Kevin Watters)
 
+  * Support fetching empty repository in client. (milki, #1060462)
+
  IMPROVEMENTS:
 
   * Add optional honor_filemode flag to build_index_from_tree.

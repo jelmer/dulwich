@@ -24,6 +24,9 @@
   * Log all error messages from wsgiref server to the logging module. This
     makes the test suit quiet again. (Gary van der Merwe)
 
+  * Support passing None for empty tree in changes_from_tree.
+    (Kevin Watters)
+
  IMPROVEMENTS:
 
   * Add optional honor_filemode flag to build_index_from_tree.

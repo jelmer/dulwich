@@ -276,10 +276,8 @@ class UploadPackHandler(Handler):
         if objects_iter is None:
             return
 
-        self.progress("dul-daemon says what\n")
         self.progress("counting objects: %d, done.\n" % len(objects_iter))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress("how was that, then?\n")
         # we are done
         self.proto.write("0000")
 
@@ -381,7 +379,7 @@ class ProtocolGraphWalker(object):
         # Now client will sending want want want commands
         want = self.proto.read_pkt_line()
         if not want:
-            return []
+            return None
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
@@ -415,7 +413,7 @@ class ProtocolGraphWalker(object):
 
     def next(self):
         if not self._cached:
-            if not self._impl and self.http_req:
+            if not self._impl:
                 return None
             return self._impl.next()
         self._cache_index += 1

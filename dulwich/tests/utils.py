@@ -26,6 +26,7 @@ import shutil
 import tempfile
 import time
 import types
+import warnings
 
 from dulwich.index import (
     commit_tree,
@@ -310,3 +311,16 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         commits.append(commit_obj)
 
     return commits
+
+
+def setup_warning_catcher():
+    """Wrap warnings.showwarning with code that records warnings."""
+
+    caught_warnings = []
+    original_showwarning = warnings.showwarning
+
+    def custom_showwarning(*args,  **kwargs):
+        caught_warnings.append(args[0])
+
+    warnings.showwarning = custom_showwarning
+    return caught_warnings

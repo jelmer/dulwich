@@ -42,6 +42,8 @@
 
   * Add support for mergetags. (milki, #963525)
 
+  * Add support for posix shell hooks. (milki)
+
 0.8.7	2012-11-27
 
  BUG FIXES

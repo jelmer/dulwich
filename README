@@ -1,0 +1,2 @@
+This branch contains delta files that pristine-tar can use to
+regenerate tarballs for its own releases.

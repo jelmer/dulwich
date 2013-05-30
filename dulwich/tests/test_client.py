@@ -18,6 +18,9 @@
 
 from cStringIO import StringIO
 
+from dulwich import (
+    client,
+    )
 from dulwich.client import (
     TraditionalGitClient,
     TCPGitClient,
@@ -75,6 +78,11 @@ class GitClientTests(TestCase):
         self.client.archive('bla', 'HEAD', None, None)
         self.assertEqual(self.rout.getvalue(), '0011argument HEAD0000')
 
+    def test_fetch_empty(self):
+        self.rin.write('0000')
+        self.rin.seek(0)
+        self.client.fetch_pack('/', lambda heads: [], None, None)
+
     def test_fetch_pack_none(self):
         self.rin.write(
             '008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack '
@@ -92,6 +100,7 @@ class GitClientTests(TestCase):
         self.assertEqual(TCP_GIT_PORT, client._port)
         self.assertEqual('/bar/baz', path)
 
+    def test_get_transport_and_path_tcp_port(self):
         client, path = get_transport_and_path('git://foo.com:1234/bar/baz')
         self.assertTrue(isinstance(client, TCPGitClient))
         self.assertEqual('foo.com', client._host)
@@ -104,10 +113,27 @@ class GitClientTests(TestCase):
         self.assertEqual('foo.com', client.host)
         self.assertEqual(None, client.port)
         self.assertEqual(None, client.username)
-        self.assertEqual('/bar/baz', path)
+        self.assertEqual('bar/baz', path)
 
+    def test_get_transport_and_path_ssh_port_explicit(self):
         client, path = get_transport_and_path(
             'git+ssh://foo.com:1234/bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(1234, client.port)
+        self.assertEqual('bar/baz', path)
+
+    def test_get_transport_and_path_ssh_abspath_explicit(self):
+        client, path = get_transport_and_path('git+ssh://foo.com//bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
+        self.assertEqual('/bar/baz', path)
+
+    def test_get_transport_and_path_ssh_port_abspath_explicit(self):
+        client, path = get_transport_and_path(
+            'git+ssh://foo.com:1234//bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
         self.assertEqual('foo.com', client.host)
         self.assertEqual(1234, client.port)
@@ -121,6 +147,7 @@ class GitClientTests(TestCase):
         self.assertEqual(None, client.username)
         self.assertEqual('/bar/baz', path)
 
+    def test_get_transport_and_path_ssh_host(self):
         client, path = get_transport_and_path('foo.com:/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
         self.assertEqual('foo.com', client.host)
@@ -128,12 +155,37 @@ class GitClientTests(TestCase):
         self.assertEqual(None, client.username)
         self.assertEqual('/bar/baz', path)
 
+    def test_get_transport_and_path_ssh_user_host(self):
         client, path = get_transport_and_path('user@foo.com:/bar/baz')
         self.assertTrue(isinstance(client, SSHGitClient))
         self.assertEqual('foo.com', client.host)
         self.assertEqual(None, client.port)
         self.assertEqual('user', client.username)
         self.assertEqual('/bar/baz', path)
+
+    def test_get_transport_and_path_ssh_relpath(self):
+        client, path = get_transport_and_path('foo:bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
+        self.assertEqual('foo', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
+        self.assertEqual('bar/baz', path)
+
+    def test_get_transport_and_path_ssh_host_relpath(self):
+        client, path = get_transport_and_path('foo.com:bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual(None, client.username)
+        self.assertEqual('bar/baz', path)
+
+    def test_get_transport_and_path_ssh_user_host_relpath(self):
+        client, path = get_transport_and_path('user@foo.com:bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
+        self.assertEqual('foo.com', client.host)
+        self.assertEqual(None, client.port)
+        self.assertEqual('user', client.username)
+        self.assertEqual('bar/baz', path)
 
     def test_get_transport_and_path_subprocess(self):
         client, path = get_transport_and_path('foo.bar/baz')
@@ -170,11 +222,41 @@ class GitClientTests(TestCase):
             self.client.send_pack, "blah", lambda x: {}, lambda h,w: [])
 
 
+class TestSSHVendor(object):
+
+    def __init__(self):
+        self.host = None
+        self.command = ""
+        self.username = None
+        self.port = None
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        self.host = host
+        self.command = command
+        self.username = username
+        self.port = port
+
+        class Subprocess: pass
+        setattr(Subprocess, 'read', lambda: None)
+        setattr(Subprocess, 'write', lambda: None)
+        setattr(Subprocess, 'can_read', lambda: None)
+        return Subprocess()
+
+
 class SSHGitClientTests(TestCase):
 
     def setUp(self):
         super(SSHGitClientTests, self).setUp()
+
+        self.server = TestSSHVendor()
+        self.real_vendor = client.get_ssh_vendor
+        client.get_ssh_vendor = lambda: self.server
+
         self.client = SSHGitClient('git.samba.org')
+
+    def tearDown(self):
+        super(SSHGitClientTests, self).tearDown()
+        client.get_ssh_vendor = self.real_vendor
 
     def test_default_command(self):
         self.assertEqual('git-upload-pack',
@@ -186,6 +268,21 @@ class SSHGitClientTests(TestCase):
         self.assertEqual('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path('upload-pack'))
 
+    def test_connect(self):
+        server = self.server
+        client = self.client
+
+        client.username = "username"
+        client.port = 1337
+
+        client._connect("command", "/path/to/repo")
+        self.assertEquals("username", server.username)
+        self.assertEquals(1337, server.port)
+        self.assertEquals(["git-command '/path/to/repo'"], server.command)
+
+        client._connect("relative-command", "/~/path/to/repo")
+        self.assertEquals(["git-relative-command '~/path/to/repo'"],
+                          server.command)
 
 class ReportStatusParserTests(TestCase):
 

@@ -398,17 +398,18 @@ def make_wsgi_chain(*args, **kwargs):
 
 
 # The reference server implementation is based on wsgiref, which is not
-# distributed with python 2.4. If wsgiref is not present, users will not be able
-# to use the HTTP server without a little extra work.
+# distributed with python 2.4. If wsgiref is not present, users will not be
+# able to use the HTTP server without a little extra work.
 try:
     from wsgiref.simple_server import (
         WSGIRequestHandler,
+        ServerHandler,
+        WSGIServer,
         make_server,
-        )
-
-    class HTTPGitRequestHandler(WSGIRequestHandler):
-        """Handler that uses dulwich's logger for logging exceptions."""
-
+    )
+    class ServerHandlerLogger(ServerHandler):
+        """ServerHandler that uses dulwich's logger for logging exceptions."""
+        
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
                              exc_info=exc_info)
@@ -419,6 +420,36 @@ try:
         def log_error(self, *args):
             logger.error(*args)
 
+    class WSGIRequestHandlerLogger(WSGIRequestHandler):
+        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
+
+        def log_exception(self, exc_info):
+            logger.exception('Exception happened during processing of request',
+                             exc_info=exc_info)
+
+        def log_message(self, format, *args):
+            logger.info(format, *args)
+
+        def log_error(self, *args):
+            logger.error(*args)
+        
+        def handle(self):
+            """Handle a single HTTP request"""
+    
+            self.raw_requestline = self.rfile.readline()
+            if not self.parse_request(): # An error code has been sent, just exit
+                return
+    
+            handler = ServerHandlerLogger(
+                self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            )
+            handler.request_handler = self      # backpointer for logging
+            handler.run(self.server.get_app())
+    
+    class WSGIServerLogger(WSGIServer):
+        def handle_error(self, request, client_address):
+            """Handle an error. """
+            logger.exception('Exception happened during processing of request from %s' % str(client_address))
 
     def main(argv=sys.argv):
         """Entry point for starting an HTTP git server."""
@@ -428,22 +459,24 @@ try:
             gitdir = os.getcwd()
 
         # TODO: allow serving on other addresses/ports via command-line flag
-        listen_addr=''
+        listen_addr = ''
         port = 8000
 
         log_utils.default_logging_config()
         backend = DictBackend({'/': Repo(gitdir)})
         app = make_wsgi_chain(backend)
         server = make_server(listen_addr, port, app,
-                             handler_class=HTTPGitRequestHandler)
+                             handler_class=WSGIRequestHandlerLogger,
+                             server_class=WSGIServerLogger)
         logger.info('Listening for HTTP connections on %s:%d', listen_addr,
                     port)
         server.serve_forever()
 
 except ImportError:
-    # No wsgiref found; don't provide the reference functionality, but leave the
-    # rest of the WSGI-based implementation.
+    # No wsgiref found; don't provide the reference functionality, but leave
+    # the rest of the WSGI-based implementation.
     def main(argv=sys.argv):
         """Stub entry point for failing to start a server without wsgiref."""
-        sys.stderr.write('Sorry, the wsgiref module is required for dul-web.\n')
+        sys.stderr.write(
+            'Sorry, the wsgiref module is required for dul-web.\n')
         sys.exit(1)

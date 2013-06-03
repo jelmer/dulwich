@@ -1107,7 +1107,7 @@ class BaseRepo(object):
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
-            except KeyError:
+            except (KeyError, ValueError):
                 pass
         try:
             return self.object_store[self.refs[name]]

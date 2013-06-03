@@ -88,7 +88,12 @@ def sha_to_hex(sha):
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha"""
     assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
-    return binascii.unhexlify(hex)
+    try:
+        return binascii.unhexlify(hex)
+    except TypeError, exc:
+        if not isinstance(hex, str):
+            raise
+        raise ValueError(exc.message)
 
 
 def hex_to_filename(path, hex):
@@ -149,7 +154,7 @@ def check_hexsha(hex, error_msg):
     """
     try:
         hex_to_sha(hex)
-    except (TypeError, AssertionError):
+    except (TypeError, AssertionError, ValueError):
         raise ObjectFormatException("%s %s" % (error_msg, hex))
 
 

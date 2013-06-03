@@ -829,6 +829,7 @@ class PackedRefsFileTests(TestCase):
 # Dict of refs that we expect all RefsContainerTests subclasses to define.
 _TEST_REFS = {
   'HEAD': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+  'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/master': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/packed': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
@@ -847,7 +848,9 @@ class RefsContainerTests(object):
 
         actual_keys = self._refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(self._refs.keys('refs/tags')))
 
@@ -1111,6 +1114,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
 
 _TEST_REFS_SERIALIZED = (
+'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/master\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/packed\n'
 'df6800012397fb85c56e7418dd4eb9405dee075c\trefs/tags/refs-0.1\n'
@@ -1139,7 +1143,9 @@ class InfoRefsContainerTests(TestCase):
 
         actual_keys = refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(refs.keys('refs/tags')))
 

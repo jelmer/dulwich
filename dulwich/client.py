@@ -402,7 +402,7 @@ class GitClient(object):
                 raise Exception('Unexpected response %r' % data)
         else:
             while True:
-                data = self.read(rbufsize)
+                data = proto.read(rbufsize)
                 if data == "":
                     break
                 pack_data(data)

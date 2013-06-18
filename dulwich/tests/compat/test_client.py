@@ -193,6 +193,14 @@ class DulwichClientTestBase(object):
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
         self.assertDestEqualsSrc()
 
+    def test_fetch_pack_no_side_band_64k(self):
+        c = self._client()
+        c._fetch_capabilities.remove('side-band-64k')
+        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
+        refs = c.fetch(self._build_path('/server_new.export'), dest)
+        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        self.assertDestEqualsSrc()
+
     def test_fetch_pack_zero_sha(self):
         # zero sha1s are already present on the client, and should
         # be ignored

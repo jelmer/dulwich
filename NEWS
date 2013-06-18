@@ -4,6 +4,8 @@
 
   * Support lookups of 40-character refs in BaseRepo.__getitem__. (Chow Loong Jin, Jelmer Vernooij)
 
+  * Fix fetching packs with side-band-64k capability disabled. (David Keijser, Jelmer Vernooij)
+
 0.9.0	2013-05-31
 
  BUG FIXES

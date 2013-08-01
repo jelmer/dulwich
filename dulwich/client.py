@@ -892,10 +892,8 @@ def get_transport_and_path(uri, **kwargs):
     parsed = urlparse.urlparse(uri)
 
     # Extract port
-    try:
-        port = parsed.port
-    except:
-        port = None
+    # if not port in url port object will be None
+    port = parsed.port
 
     # Extract username
     username = None

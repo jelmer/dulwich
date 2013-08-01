@@ -260,6 +260,9 @@ class RepositoryTests(TestCase):
         self.assertEqual(
             [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
             ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker('2a72d929692c41d8554c07f6301757ba18a65d91')],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')

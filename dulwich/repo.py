@@ -1081,6 +1081,8 @@ class BaseRepo(object):
         from dulwich.walk import Walker
         if include is None:
             include = [self.head()]
+        if isinstance(include, str):
+            include = [include]
         return Walker(self.object_store, include, *args, **kwargs)
 
     def revision_history(self, head):

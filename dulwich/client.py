@@ -590,8 +590,17 @@ class SubprocessGitClient(TraditionalGitClient):
                         report_activity=self._report_activity), p.can_read
 
 
-class SSHVendor(object):
+# Popen only accepts a file like object
+# so turn the callback function into a file like object
+class WritableStream(object):
+    def __init__(self, write_function=None):
+        self.write_function = write_function or (lambda x: None)
 
+    def write(self, data, *args, **kwargs):
+        return write_function(data)
+
+
+class SSHVendor(object):
     def connect_ssh(self, host, command, username=None, port=None, progress_stderr=None, **kwargs):
         import subprocess
         #FIXME: This has no way to deal with passwords..
@@ -601,9 +610,11 @@ class SSHVendor(object):
         if username is not None:
             host = '%s@%s' % (username, host)
         args.append(host)
+        stderr_stream = WritableStream(progress_stderr)
         proc = subprocess.Popen(args + command,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                stderr=stderr_stream)
         return SubprocessWrapper(proc)
 
 

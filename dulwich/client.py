@@ -700,8 +700,20 @@ try:
             self.close()
 
     class ParamikoSSHVendor(object):
+        SSH_DEFAULTS = {
+            'port': 22,
+            'look_for_keys': False,
+            'allow_agent': False,
+        }
+
         def connect_ssh(self, host, command, progress_stderr=None, **kwargs):
             client = paramiko.SSHClient()
+
+            # Set defaults for non existant keys
+            # as well as keys whose value is None
+            for k, v in self.SSH_DEFAULTS.items():
+                if kwargs.get(k) is None:
+                    kwargs[k] = v
 
             policy = paramiko.client.MissingHostKeyPolicy()
             client.set_missing_host_key_policy(policy)
@@ -911,21 +923,18 @@ def get_transport_and_path(uri, **kwargs):
     if parsed.path.find('@') >= 0:
         username = parsed.path.split('@')[0]
 
-    SSH_DEFAULTS = {
-        'port': port or 22,
-        'username': username,
-        'look_for_keys': False,
-        'allow_agent': False,
-    }
+    # Set some default kwargs from the values we got
+    kwargs.setdefault('port', port)
+    kwargs.setdefault('username', username)
 
-    extra_kwargs = {
-        key: (kwargs.pop(key, None) or SSH_DEFAULTS.get(key))
+    # Remove SSH specific kwargs from the kwargs
+    # Since the TCP and HTTP clients don't support them
+    ssh_kwargs = {
+        key: kwargs.pop(key, None)
         for key in SSHGitClient.SSH_KWARGS_KEYS
     }
 
-    # SSH kwargs
-    ssh_kwargs = {}
-    ssh_kwargs.update(extra_kwargs)
+    # Mixin other kwargs
     ssh_kwargs.update(kwargs)
 
     # TCP

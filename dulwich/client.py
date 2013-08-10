@@ -753,7 +753,8 @@ class SSHGitClient(TraditionalGitClient):
 
         # Extra SSH kwargs
         for key in self.SSH_KWARGS_KEYS:
-            self.ssh_kwargs[key] = kwargs.pop(key, None)
+            if key in kwargs:
+                self.ssh_kwargs[key] = kwargs.pop(key)
 
         TraditionalGitClient.__init__(self, *args, **kwargs)
         self.alternative_paths = {}

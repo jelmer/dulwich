@@ -6,6 +6,9 @@
 
   * Fix fetching packs with side-band-64k capability disabled. (David Keijser, Jelmer Vernooij)
 
+  * Several fixes in send-pack protocol behaviour - handling of empty pack files and deletes.
+    (milki, #1063087)
+
  IMPROVEMENTS
 
   * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 

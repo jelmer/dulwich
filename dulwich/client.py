@@ -637,6 +637,24 @@ class SubprocessGitClient(TraditionalGitClient):
 
 
 class SSHVendor(object):
+    """A client side SSH implementation."""
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        """Connect to an SSH server.
+
+        Run a command remotely and return a file-like object for interaction
+        with the remote command.
+
+        :param host: Host name
+        :param command: Command to run
+        :param username: Optional ame of user to log in as
+        :param port: Optional SSH port to use
+        """
+        raise NotImplementedError(self.connect_ssh)
+
+
+class SubprocessSSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'ssh' command."""
 
     def connect_ssh(self, host, command, username=None, port=None):
         import subprocess
@@ -652,8 +670,9 @@ class SSHVendor(object):
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
+
 # Can be overridden by users
-get_ssh_vendor = SSHVendor
+get_ssh_vendor = SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):

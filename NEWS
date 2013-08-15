@@ -9,6 +9,9 @@
   * Several fixes in send-pack protocol behaviour - handling of empty pack files and deletes.
     (milki, #1063087)
 
+  * Fix capability negotiation when fetching packs over HTTP.
+    (#1072461, William Grant)
+
  IMPROVEMENTS
 
   * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 

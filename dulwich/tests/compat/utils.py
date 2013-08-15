@@ -134,7 +134,8 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
 
 def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     """Run a git command, capture stdout/stderr, and fail if git fails."""
-    popen_kwargs['stderr'] = subprocess.STDOUT
+    if 'stderr' not in popen_kwargs:
+        popen_kwargs['stderr'] = subprocess.STDOUT
     returncode, stdout = run_git(args, git_path=git_path, input=input,
                                  capture_stdout=True, **popen_kwargs)
     if returncode != 0:

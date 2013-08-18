@@ -17,6 +17,8 @@
   * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 
     (Alberto Ruiz)
 
+  * Add `Repo.get_description` method. (Jelmer Vernooij)
+
 0.9.0	2013-05-31
 
  BUG FIXES

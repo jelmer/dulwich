@@ -979,6 +979,14 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.get_config)
 
+    def get_description(self):
+        """Retrieve the description for this repository.
+
+        :return: String with the description of the repository
+            as set by the user.
+        """
+        raise NotImplementedError(self.get_description)
+
     def get_config_stack(self):
         """Return a config stack for this repository.
 
@@ -1451,6 +1459,23 @@ class Repo(BaseRepo):
             ret.path = path
             return ret
 
+    def get_description(self):
+        """Retrieve the description of this repository.
+
+        :return: A string describing the repository or None.
+        """
+        path = os.path.join(self._controldir, 'description')
+        try:
+            f = GitFile(path, 'rb')
+            try:
+                return f.read()
+            finally:
+                f.close()
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None
+
     def __repr__(self):
         return "<Repo at %r>" % self.path
 
@@ -1542,6 +1567,13 @@ class MemoryRepo(BaseRepo):
         """
         from dulwich.config import ConfigFile
         return ConfigFile()
+
+    def get_description(self):
+        """Retrieve the repository description.
+
+        This defaults to None, for no description.
+        """
+        return None
 
     @classmethod
     def init_bare(cls, objects, refs):

@@ -420,6 +420,58 @@ class TestPack(PackTests):
         self.assertTrue(isinstance(objs[commit_sha], Commit))
 
 
+class TestThinPack(PackTests):
+
+    def setUp(self):
+        super(TestThinPack, self).setUp()
+        self.store = MemoryObjectStore()
+        self.blobs = {}
+        for blob in ('foo', 'bar', 'foo1234', 'bar2468'):
+            self.blobs[blob] = make_object(Blob, data=blob)
+        self.store.add_object(self.blobs['foo'])
+        self.store.add_object(self.blobs['bar'])
+
+        # Build a thin pack. 'foo' is as an external reference, 'bar' an
+        # internal reference.
+        self.pack_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.pack_dir)
+        self.pack_prefix = os.path.join(self.pack_dir, 'pack')
+        with open(self.pack_prefix + '.pack', 'wb') as f:
+            build_pack(f, [
+                (REF_DELTA, (self.blobs['foo'].id, 'foo1234')),
+                (Blob.type_num, 'bar'),
+                (REF_DELTA, (self.blobs['bar'].id, 'bar2468'))],
+                store=self.store)
+
+        # Index the new pack.
+        pack = self.make_pack(resolve_ext_ref=True)
+        data = PackData(pack._data_path)
+        data.pack = pack
+        data.create_index(self.pack_prefix + '.idx')
+
+        del self.store[self.blobs['bar'].id]
+
+    def make_pack(self, resolve_ext_ref):
+        pack = Pack(self.pack_prefix)
+        if resolve_ext_ref:
+            pack.resolve_ext_ref = self.store.get_raw
+        return pack
+
+    def test_get_raw(self):
+        self.assertRaises(
+            KeyError, self.make_pack(False).get_raw, self.blobs['foo1234'].id)
+        self.assertEqual(
+            (3, 'foo1234'),
+            self.make_pack(True).get_raw(self.blobs['foo1234'].id))
+
+    def test_iterobjects(self):
+        self.assertRaises(KeyError, list, self.make_pack(False).iterobjects())
+        self.assertEqual(
+            sorted([self.blobs['foo1234'].id, self.blobs['bar'].id,
+                    self.blobs['bar2468'].id]),
+            sorted(o.id for o in self.make_pack(True).iterobjects()))
+
+
 class WritePackTests(TestCase):
 
     def test_write_pack_header(self):

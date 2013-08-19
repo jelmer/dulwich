@@ -444,7 +444,7 @@ class TestThinPack(PackTests):
                 store=self.store)
 
         # Index the new pack.
-        pack = self.make_pack(resolve_ext_ref=True)
+        pack = self.make_pack(True)
         data = PackData(pack._data_path)
         data.pack = pack
         data.create_index(self.pack_prefix + '.idx')
@@ -452,10 +452,9 @@ class TestThinPack(PackTests):
         del self.store[self.blobs['bar'].id]
 
     def make_pack(self, resolve_ext_ref):
-        pack = Pack(self.pack_prefix)
-        if resolve_ext_ref:
-            pack.resolve_ext_ref = self.store.get_raw
-        return pack
+        return Pack(
+            self.pack_prefix,
+            resolve_ext_ref=self.store.get_raw if resolve_ext_ref else None)
 
     def test_get_raw(self):
         self.assertRaises(

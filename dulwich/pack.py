@@ -1749,7 +1749,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
 class Pack(object):
     """A Git pack object."""
 
-    def __init__(self, basename):
+    def __init__(self, basename, resolve_ext_ref=None):
         self._basename = basename
         self._data = None
         self._idx = None
@@ -1757,7 +1757,7 @@ class Pack(object):
         self._data_path = self._basename + '.pack'
         self._data_load = lambda: PackData(self._data_path)
         self._idx_load = lambda: load_pack_index(self._idx_path)
-        self.resolve_ext_ref = None
+        self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
     def from_lazy_objects(self, data_fn, idx_fn):

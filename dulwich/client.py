@@ -44,7 +44,6 @@ import socket
 import subprocess
 import urllib2
 import urlparse
-import warnings
 
 from dulwich.errors import (
     GitProtocolError,
@@ -792,7 +791,6 @@ try:
             return ParamikoWrapper(client, channel, progress_stderr=progress_stderr)
 
 except ImportError:
-    warnings.warn('Install paramiko to have better SSH support (RSA and username/password authentication)')
     ParamikoSSHVendor = None
 
 # Can be overridden by users

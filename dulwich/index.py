@@ -18,6 +18,7 @@
 
 """Parser for the git index file format."""
 
+import errno
 import os
 import stat
 import struct
@@ -354,22 +355,24 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
     :param names: Iterable of names in the working copy
     :param lookup_entry: Function to lookup an entry in the working copy
     :param object_store: Object store to use for retrieving tree contents
-    :param tree: SHA1 of the root tree
+    :param tree: SHA1 of the root tree, or None for an empty tree
     :param want_unchanged: Whether unchanged files should be reported
     :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
         (oldsha, newsha)
     """
     other_names = set(names)
-    for (name, mode, sha) in object_store.iter_tree_contents(tree):
-        try:
-            (other_sha, other_mode) = lookup_entry(name)
-        except KeyError:
-            # Was removed
-            yield ((name, None), (mode, None), (sha, None))
-        else:
-            other_names.remove(name)
-            if (want_unchanged or other_sha != sha or other_mode != mode):
-                yield ((name, name), (mode, other_mode), (sha, other_sha))
+
+    if tree is not None:
+        for (name, mode, sha) in object_store.iter_tree_contents(tree):
+            try:
+                (other_sha, other_mode) = lookup_entry(name)
+            except KeyError:
+                # Was removed
+                yield ((name, None), (mode, None), (sha, None))
+            else:
+                other_names.remove(name)
+                if (want_unchanged or other_sha != sha or other_mode != mode):
+                    yield ((name, name), (mode, other_mode), (sha, other_sha))
 
     # Mention added files
     for name in other_names:
@@ -391,13 +394,16 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
-def build_index_from_tree(prefix, index_path, object_store, tree_id):
+def build_index_from_tree(prefix, index_path, object_store, tree_id,
+                          honor_filemode=True):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
     :param prefix: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
+    :param honor_filemode: An optional flag to honor core.filemode setting in
+        config file, default is core.filemode=True, change executable bit
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
@@ -414,10 +420,15 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
         # FIXME: Merge new index into working tree
         if stat.S_ISLNK(entry.mode):
             # FIXME: This will fail on Windows. What should we do instead?
-            if os.path.exists(full_path):
-                # Must delete symlink dest to overwrite
-                os.remove(full_path)
-            os.symlink(object_store[entry.sha].as_raw_string(), full_path)
+            src_path = object_store[entry.sha].as_raw_string()
+            try:
+                os.symlink(src_path, full_path)
+            except OSError, e:
+                if e.errno == errno.EEXIST:
+                    os.unlink(full_path)
+                    os.symlink(src_path, full_path)
+                else:
+                    raise
         else:
             f = open(full_path, 'wb')
             try:
@@ -426,7 +437,8 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id):
             finally:
                 f.close()
 
-            os.chmod(full_path, entry.mode)
+            if honor_filemode:
+                os.chmod(full_path, entry.mode)
 
         # Add file to index
         st = os.lstat(full_path)

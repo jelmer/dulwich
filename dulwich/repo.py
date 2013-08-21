@@ -41,6 +41,7 @@ from dulwich.errors import (
     PackedRefsException,
     CommitError,
     RefFormatError,
+    HookError,
     )
 from dulwich.file import (
     ensure_dir_exists,
@@ -58,6 +59,13 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     )
+
+from dulwich.hooks import (
+    PreCommitShellHook,
+    PostCommitShellHook,
+    CommitMsgShellHook,
+)
+
 import warnings
 
 
@@ -813,6 +821,8 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+        self.hooks = {}
+
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
@@ -1071,6 +1081,8 @@ class BaseRepo(object):
         from dulwich.walk import Walker
         if include is None:
             include = [self.head()]
+        if isinstance(include, str):
+            include = [include]
         return Walker(self.object_store, include, *args, **kwargs)
 
     def revision_history(self, head):
@@ -1097,7 +1109,7 @@ class BaseRepo(object):
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
-            except KeyError:
+            except (KeyError, ValueError):
                 pass
         try:
             return self.object_store[self.refs[name]]
@@ -1179,6 +1191,14 @@ class BaseRepo(object):
             if len(tree) != 40:
                 raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
+
+        try:
+            self.hooks['pre-commit'].execute()
+        except HookError, e:
+            raise CommitError(e)
+        except KeyError:  # no hook defined, silent fallthrough
+            pass
+
         if merge_heads is None:
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
@@ -1206,7 +1226,16 @@ class BaseRepo(object):
         if message is None:
             # FIXME: Try to read commit message from .git/MERGE_MSG
             raise ValueError("No commit message specified")
-        c.message = message
+
+        try:
+            c.message = self.hooks['commit-msg'].execute(message)
+            if c.message is None:
+                c.message = message
+        except HookError, e:
+            raise CommitError(e)
+        except KeyError:  # no hook defined, message not modified
+            c.message = message
+
         try:
             old_head = self.refs[ref]
             c.parents = [old_head] + merge_heads
@@ -1220,6 +1249,13 @@ class BaseRepo(object):
             # Fail if the atomic compare-and-swap failed, leaving the commit and
             # all its objects as garbage.
             raise CommitError("%s changed during commit" % (ref,))
+
+        try:
+            self.hooks['post-commit'].execute()
+        except HookError, e:  # silent failure
+            warnings.warn("post-commit hook failed: %s" % e, UserWarning)
+        except KeyError:  # no hook defined, silent fallthrough
+            pass
 
         return c.id
 
@@ -1259,6 +1295,10 @@ class Repo(BaseRepo):
                                                     OBJECTDIR))
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
+
+        self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
+        self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
+        self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
 
     def controldir(self):
         """Return the path of the control directory."""
@@ -1383,11 +1423,17 @@ class Repo(BaseRepo):
 
             if not bare:
                 # Checkout HEAD to target dir
-                from dulwich.index import build_index_from_tree
-                build_index_from_tree(target.path, target.index_path(),
-                        target.object_store, target['HEAD'].tree)
+                target._build_tree()
 
         return target
+
+    def _build_tree(self):
+        from dulwich.index import build_index_from_tree
+        config = self.get_config()
+        honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        return build_index_from_tree(self.path, self.index_path(),
+                self.object_store, self['HEAD'].tree,
+                honor_filemode=honor_filemode)
 
     def get_config(self):
         """Retrieve the config object.

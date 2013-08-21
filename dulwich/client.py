@@ -170,6 +170,9 @@ class GitClient(object):
             if server_capabilities is None:
                 (ref, server_capabilities) = extract_capabilities(ref)
             refs[ref] = sha
+
+        if len(refs) == 0:
+            return None, set([])
         return refs, set(server_capabilities)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -200,11 +203,10 @@ class GitClient(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
-        try:
-            return self.fetch_pack(path, determine_wants,
+        result = self.fetch_pack(path, determine_wants,
                 target.get_graph_walker(), f.write, progress)
-        finally:
-            commit()
+        commit()
+        return result
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None):
@@ -401,7 +403,7 @@ class GitClient(object):
                 raise Exception('Unexpected response %r' % data)
         else:
             while True:
-                data = self.read(rbufsize)
+                data = proto.read(rbufsize)
                 if data == "":
                     break
                 pack_data(data)
@@ -471,6 +473,11 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect('upload-pack', path)
         refs, server_capabilities = self._read_refs(proto)
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
+
+        if refs is None:
+            proto.write_pkt_line(None)
+            return refs
+
         try:
             wants = determine_wants(refs)
         except:
@@ -752,11 +759,20 @@ class SSHGitClient(TraditionalGitClient):
         self.ssh_kwargs = {}
 
         # Extra SSH kwargs
-        for key in self.SSH_KWARGS_KEYS:
-            if key in kwargs:
-                self.ssh_kwargs[key] = kwargs.pop(key)
+        for key in set.intersection(set(self.SSH_KWARGS_KEYS), set(kwargs)):
+            # Remove value from kwargs
+            # So that we don't pass it to the TraditionalGitClient constructor
+            # Set as ssh specfic kwarg
+            self.ssh_kwargs[key] = kwargs.pop(key)
 
+        # Contstruct traditional Git Client
         TraditionalGitClient.__init__(self, *args, **kwargs)
+
+        # Set all SSH kwargs as attributes to self
+        # default those not in **kwargs to None
+        for key in self.SSH_KWARGS_KEYS:
+            setattr(self, key, self.ssh_kwargs.get(key))
+
         self.alternative_paths = {}
 
     def _get_cmd_path(self, cmd):
@@ -764,6 +780,12 @@ class SSHGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         command = ["%s '%s'" % (self._get_cmd_path(cmd), path)]
+
+        if path.startswith("/~"):
+            path = path[1:]
+        #con = get_ssh_vendor().connect_ssh(
+        #    self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
+        #    port=self.port, username=self.username)
         con = get_ssh_vendor().connect_ssh(self.host, command, **self.ssh_kwargs)
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
@@ -778,6 +800,17 @@ class HttpGitClient(GitClient):
 
     def _get_url(self, path):
         return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
+
+    def _http_request(self, url, headers={}, data=None):
+        req = urllib2.Request(url, headers=headers, data=data)
+        try:
+            resp = self._perform(req)
+        except urllib2.HTTPError as e:
+            if e.code == 404:
+                raise NotGitRepository()
+            if e.code != 200:
+                raise GitProtocolError("unexpected http response %d" % e.code)
+        return resp
 
     def _perform(self, req):
         """Perform a HTTP request.
@@ -796,13 +829,7 @@ class HttpGitClient(GitClient):
         if self.dumb != False:
             url += "?service=%s" % service
             headers["Content-Type"] = "application/x-%s-request" % service
-        req = urllib2.Request(url, headers=headers)
-        resp = self._perform(req)
-        if resp.getcode() == 404:
-            raise NotGitRepository()
-        if resp.getcode() != 200:
-            raise GitProtocolError("unexpected http response %d" %
-                resp.getcode())
+        resp = self._http_request(url, headers)
         self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
         proto = Protocol(resp.read, None)
         if not self.dumb:
@@ -816,15 +843,8 @@ class HttpGitClient(GitClient):
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, service)
-        req = urllib2.Request(url,
-            headers={"Content-Type": "application/x-%s-request" % service},
-            data=data)
-        resp = self._perform(req)
-        if resp.getcode() == 404:
-            raise NotGitRepository()
-        if resp.getcode() != 200:
-            raise GitProtocolError("Invalid HTTP response from server: %d"
-                % resp.getcode())
+        headers = {"Content-Type": "application/x-%s-request" % service}
+        resp = self._http_request(url, headers, data)
         if resp.info().gettype() != ("application/x-%s-result" % service):
             raise GitProtocolError("Invalid content-type from server: %s"
                 % resp.info().gettype())
@@ -945,7 +965,10 @@ def get_transport_and_path(uri, **kwargs):
     if parsed.scheme == 'git':
         return TCPGitClient(parsed.hostname, **tcp_kwargs), parsed.path
     elif parsed.scheme == 'git+ssh':
-        return SSHGitClient(parsed.hostname, **ssh_kwargs), parsed.path
+        path = parsed.path
+        if path.startswith('/'):
+            path = parsed.path[1:]
+        return SSHGitClient(parsed.hostname, **ssh_kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 

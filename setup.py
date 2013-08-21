@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.0'
+dulwich_version_string = '0.9.1'
 
 include_dirs = []
 # Windows MSVC support
@@ -30,8 +30,8 @@ class DulwichDistribution(Distribution):
         return not self.pure and not '__pypy__' in sys.modules
 
     global_options = Distribution.global_options + [
-        ('pure', None, 
-            "use pure Python code instead of C extensions (slower on CPython)")]
+        ('pure', None, "use pure Python code instead of C "
+                       "extensions (slower on CPython)")]
 
     pure = False
 
@@ -45,8 +45,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     out, err = p.communicate()
     for l in out.splitlines():
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if (l.startswith('Xcode') and
-            int(l.split()[1].split('.')[0]) >= 4):
+        if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
 
 setup_kwargs = {}
@@ -59,7 +58,8 @@ setup(name='dulwich',
       keywords='git',
       version=dulwich_version_string,
       url='http://samba.org/~jelmer/dulwich',
-      download_url='http://samba.org/~jelmer/dulwich/dulwich-%s.tar.gz' % dulwich_version_string,
+      download_url='http://samba.org/~jelmer/dulwich/'
+                   'dulwich-%s.tar.gz' % dulwich_version_string,
       license='GPLv2 or later',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',
@@ -73,14 +73,14 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
-      ext_modules = [
+      ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),
           Extension('dulwich._pack', ['dulwich/_pack.c'],
               include_dirs=include_dirs),
           Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
               include_dirs=include_dirs),
-          ],
+      ],
       distclass=DulwichDistribution,
       **setup_kwargs
       )

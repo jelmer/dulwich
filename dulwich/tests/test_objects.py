@@ -157,7 +157,8 @@ class BlobReadTests(TestCase):
 
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)
-        self.assertEqual(t.object, (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
+        self.assertEqual(t.object,
+            (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
         self.assertEqual(t.name,'signed')
         self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
         self.assertEqual(t.tag_time, 1231203091)
@@ -312,6 +313,115 @@ class CommitSerializationTests(TestCase):
         d = Commit()
         d._deserialize(c.as_raw_chunks())
         self.assertEqual(c, d)
+
+    def test_serialize_mergetag(self):
+        tag = make_object(
+            Tag, object=(Commit, "a38d6181ff27824c79fc7df825164a212eff6a3f"),
+            object_type_name="commit",
+            name="v2.6.22-rc7",
+            tag_time=1183319674,
+            tag_timezone=0,
+            tagger="Linus Torvalds <torvalds@woody.linux-foundation.org>",
+            message=default_message)
+        commit = self.make_commit(mergetag=[tag])
+
+        self.assertEqual("""tree d80c186a03f423a81b39df39dc87fd269736ca86
+parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd
+parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6
+author James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
+ type commit
+ tag v2.6.22-rc7
+ tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
+ 
+ Linux 2.6.22-rc7
+ -----BEGIN PGP SIGNATURE-----
+ Version: GnuPG v1.4.7 (GNU/Linux)
+ 
+ iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+ OK2XeQOiEeXtT76rV4t2WR4=
+ =ivrA
+ -----END PGP SIGNATURE-----
+
+Merge ../b
+""", commit.as_raw_string())
+
+    def test_serialize_mergetags(self):
+        tag = make_object(
+            Tag, object=(Commit, "a38d6181ff27824c79fc7df825164a212eff6a3f"),
+            object_type_name="commit",
+            name="v2.6.22-rc7",
+            tag_time=1183319674,
+            tag_timezone=0,
+            tagger="Linus Torvalds <torvalds@woody.linux-foundation.org>",
+            message=default_message)
+        commit = self.make_commit(mergetag=[tag, tag])
+
+        self.assertEqual("""tree d80c186a03f423a81b39df39dc87fd269736ca86
+parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd
+parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6
+author James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
+ type commit
+ tag v2.6.22-rc7
+ tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
+ 
+ Linux 2.6.22-rc7
+ -----BEGIN PGP SIGNATURE-----
+ Version: GnuPG v1.4.7 (GNU/Linux)
+ 
+ iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+ OK2XeQOiEeXtT76rV4t2WR4=
+ =ivrA
+ -----END PGP SIGNATURE-----
+mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
+ type commit
+ tag v2.6.22-rc7
+ tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
+ 
+ Linux 2.6.22-rc7
+ -----BEGIN PGP SIGNATURE-----
+ Version: GnuPG v1.4.7 (GNU/Linux)
+ 
+ iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+ OK2XeQOiEeXtT76rV4t2WR4=
+ =ivrA
+ -----END PGP SIGNATURE-----
+
+Merge ../b
+""", commit.as_raw_string())
+
+    def test_deserialize_mergetag(self):
+        tag = make_object(
+            Tag, object=(Commit, "a38d6181ff27824c79fc7df825164a212eff6a3f"),
+            object_type_name="commit",
+            name="v2.6.22-rc7",
+            tag_time=1183319674,
+            tag_timezone=0,
+            tagger="Linus Torvalds <torvalds@woody.linux-foundation.org>",
+            message=default_message)
+        commit = self.make_commit(mergetag=[tag])
+
+        d = Commit()
+        d._deserialize(commit.as_raw_chunks())
+        self.assertEqual(commit, d)
+
+    def test_deserialize_mergetags(self):
+        tag = make_object(
+            Tag, object=(Commit, "a38d6181ff27824c79fc7df825164a212eff6a3f"),
+            object_type_name="commit",
+            name="v2.6.22-rc7",
+            tag_time=1183319674,
+            tag_timezone=0,
+            tagger="Linus Torvalds <torvalds@woody.linux-foundation.org>",
+            message=default_message)
+        commit = self.make_commit(mergetag=[tag, tag])
+
+        d = Commit()
+        d._deserialize(commit.as_raw_chunks())
+        self.assertEquals(commit, d)
 
 
 default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'

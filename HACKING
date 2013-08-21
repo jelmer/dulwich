@@ -1,3 +1,12 @@
+All functionality should be available in pure Python. Optional C
+implementations may be written for performance reasons, but should never
+replace the Python implementation. The C implementations should follow the
+kernel/git coding style.
+
+Where possible include updates to NEWS along with your improvements.
+
+New functionality and bug fixes should be accompanied with matching unit tests.
+
 Coding style
 ------------
 Where possible, please follow PEP8 with regard to coding style.
@@ -5,16 +14,9 @@ Where possible, please follow PEP8 with regard to coding style.
 Furthermore, triple-quotes should always be """, single quotes are ' unless
 using " would result in less escaping within the string.
 
-All functionality should be available in pure Python. Optional C
-implementations may be written for performance reasons, but should never
-replace the Python implementation. The C implementations should follow the
-kernel/git coding style.
-
 Public methods, functions and classes should all have doc strings. Please use
 epydoc style docstrings to document parameters and return values.
 You can generate the documentation by running "make doc".
-
-Where possible please include updates to NEWS along with your improvements.
 
 Running the tests
 -----------------

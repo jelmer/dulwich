@@ -21,6 +21,7 @@
 
 from cStringIO import StringIO
 import os
+import stat
 import shutil
 import tempfile
 import warnings
@@ -51,6 +52,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
+    setup_warning_catcher,
     )
 
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
@@ -258,6 +260,9 @@ class RepositoryTests(TestCase):
         self.assertEqual(
             [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
             ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker('2a72d929692c41d8554c07f6301757ba18a65d91')],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_linear_history(self):
         r = self._repo = open_repo('a.git')
@@ -411,6 +416,163 @@ class RepositoryTests(TestCase):
         finally:
             shutil.rmtree(r1_dir)
             shutil.rmtree(r2_dir)
+
+    def test_shell_hook_pre_commit(self):
+        if os.name != 'posix':
+            self.skipTest('shell hook tests requires POSIX shell')
+
+        pre_commit_fail = """#!/bin/sh
+exit 1
+"""
+
+        pre_commit_success = """#!/bin/sh
+exit 0
+"""
+
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        r = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        pre_commit = os.path.join(r.controldir(), 'hooks', 'pre-commit')
+
+        f = open(pre_commit, 'wb')
+        try:
+            f.write(pre_commit_fail)
+        finally:
+            f.close()
+        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
+                          committer='Test Committer <test@nodomain.com>',
+                          author='Test Author <test@nodomain.com>',
+                          commit_timestamp=12345, commit_timezone=0,
+                          author_timestamp=12345, author_timezone=0)
+
+        f = open(pre_commit, 'wb')
+        try:
+            f.write(pre_commit_success)
+        finally:
+            f.close()
+        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        commit_sha = r.do_commit(
+            'empty commit',
+            committer='Test Committer <test@nodomain.com>',
+            author='Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
+        self.assertEqual([], r[commit_sha].parents)
+
+    def test_shell_hook_commit_msg(self):
+        if os.name != 'posix':
+            self.skipTest('shell hook tests requires POSIX shell')
+
+        commit_msg_fail = """#!/bin/sh
+exit 1
+"""
+
+        commit_msg_success = """#!/bin/sh
+exit 0
+"""
+
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        r = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        commit_msg = os.path.join(r.controldir(), 'hooks', 'commit-msg')
+
+        f = open(commit_msg, 'wb')
+        try:
+            f.write(commit_msg_fail)
+        finally:
+            f.close()
+        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
+                          committer='Test Committer <test@nodomain.com>',
+                          author='Test Author <test@nodomain.com>',
+                          commit_timestamp=12345, commit_timezone=0,
+                          author_timestamp=12345, author_timezone=0)
+
+        f = open(commit_msg, 'wb')
+        try:
+            f.write(commit_msg_success)
+        finally:
+            f.close()
+        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        commit_sha = r.do_commit(
+            'empty commit',
+            committer='Test Committer <test@nodomain.com>',
+            author='Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
+        self.assertEqual([], r[commit_sha].parents)
+
+    def test_shell_hook_post_commit(self):
+        if os.name != 'posix':
+            self.skipTest('shell hook tests requires POSIX shell')
+
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        r = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        (fd, path) = tempfile.mkstemp(dir=repo_dir)
+        post_commit_msg = """#!/bin/sh
+unlink %(file)s
+""" % {'file': path}
+
+        root_sha = r.do_commit(
+            'empty commit',
+            committer='Test Committer <test@nodomain.com>',
+            author='Test Author <test@nodomain.com>',
+            commit_timestamp=12345, commit_timezone=0,
+            author_timestamp=12345, author_timezone=0)
+        self.assertEqual([], r[root_sha].parents)
+
+        post_commit = os.path.join(r.controldir(), 'hooks', 'post-commit')
+
+        f = open(post_commit, 'wb')
+        try:
+            f.write(post_commit_msg)
+        finally:
+            f.close()
+        os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        commit_sha = r.do_commit(
+            'empty commit',
+            committer='Test Committer <test@nodomain.com>',
+            author='Test Author <test@nodomain.com>',
+            commit_timestamp=12345, commit_timezone=0,
+            author_timestamp=12345, author_timezone=0)
+        self.assertEqual([root_sha], r[commit_sha].parents)
+
+        self.assertFalse(os.path.exists(path))
+
+        post_commit_msg_fail = """#!/bin/sh
+exit 1
+"""
+        f = open(post_commit, 'wb')
+        try:
+            f.write(post_commit_msg_fail)
+        finally:
+            f.close()
+        os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        warnings.simplefilter("always", UserWarning)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list = setup_warning_catcher()
+
+        commit_sha2 = r.do_commit(
+            'empty commit',
+            committer='Test Committer <test@nodomain.com>',
+            author='Test Author <test@nodomain.com>',
+            commit_timestamp=12345, commit_timezone=0,
+            author_timestamp=12345, author_timezone=0)
+        self.assertEqual(len(warnings_list), 1)
+        self.assertIsInstance(warnings_list[-1], UserWarning)
+        self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
+        self.assertEqual([commit_sha], r[commit_sha2].parents)
 
 
 class BuildRepoTests(TestCase):
@@ -670,6 +832,7 @@ class PackedRefsFileTests(TestCase):
 # Dict of refs that we expect all RefsContainerTests subclasses to define.
 _TEST_REFS = {
   'HEAD': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+  'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/master': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/packed': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
@@ -688,7 +851,9 @@ class RefsContainerTests(object):
 
         actual_keys = self._refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(self._refs.keys('refs/tags')))
 
@@ -952,6 +1117,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
 
 _TEST_REFS_SERIALIZED = (
+'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/master\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/packed\n'
 'df6800012397fb85c56e7418dd4eb9405dee075c\trefs/tags/refs-0.1\n'
@@ -980,7 +1146,9 @@ class InfoRefsContainerTests(TestCase):
 
         actual_keys = refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(refs.keys('refs/tags')))
 

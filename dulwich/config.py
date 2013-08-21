@@ -28,6 +28,11 @@ import errno
 import os
 import re
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from dulwich._compat import OrderedDict
+
 from UserDict import DictMixin
 
 from dulwich.file import GitFile
@@ -38,7 +43,7 @@ class Config(object):
 
     def get(self, section, name):
         """Retrieve the contents of a configuration setting.
-        
+
         :param section: Tuple with section name and optional subsection namee
         :param subsection: Subsection name
         :return: Contents of the setting
@@ -67,7 +72,7 @@ class Config(object):
 
     def set(self, section, name, value):
         """Set a configuration value.
-        
+
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
@@ -81,7 +86,7 @@ class ConfigDict(Config, DictMixin):
     def __init__(self, values=None):
         """Create a new ConfigDict."""
         if values is None:
-            values = {}
+            values = OrderedDict()
         self._values = values
 
     def __repr__(self):
@@ -94,10 +99,10 @@ class ConfigDict(Config, DictMixin):
 
     def __getitem__(self, key):
         return self._values[key]
-      
+
     def __setitem__(self, key, value):
         self._values[key] = value
-        
+
     def keys(self):
         return self._values.keys()
 
@@ -122,7 +127,7 @@ class ConfigDict(Config, DictMixin):
     def set(self, section, name, value):
         if isinstance(section, basestring):
             section = (section, )
-        self._values.setdefault(section, {})[name] = value
+        self._values.setdefault(section, OrderedDict())[name] = value
 
 
 def _format_string(value):
@@ -236,7 +241,7 @@ class ConfigFile(ConfigDict):
                             section = (pts[0], pts[1])
                         else:
                             section = (pts[0], )
-                    ret._values[section] = {}
+                    ret._values[section] = OrderedDict()
                 if _strip_comments(line).strip() == "":
                     continue
                 if section is None:
@@ -304,7 +309,7 @@ class ConfigFile(ConfigDict):
             else:
                 f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
             for key, value in values.iteritems():
-                f.write("%s = %s\n" % (key, _escape_value(value)))
+                f.write("\t%s = %s\n" % (key, _escape_value(value)))
 
 
 class StackedConfig(Config):

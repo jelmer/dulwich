@@ -1,4 +1,56 @@
-0.9.0	UNRELEASED
+0.9.1	UNRELEASED
+
+ BUG FIXES
+
+  * Support lookups of 40-character refs in BaseRepo.__getitem__. (Chow Loong Jin, Jelmer Vernooij)
+
+  * Fix fetching packs with side-band-64k capability disabled. (David Keijser, Jelmer Vernooij)
+
+0.9.0	2013-05-31
+
+ BUG FIXES
+
+  * Push efficiency - report missing objects only. (#562676, Artem Tikhomirov)
+
+  * Use indentation consistent with C Git in config files.
+    (#1031356, Curt Moore, Jelmer Vernooij)
+
+  * Recognize and skip binary files in diff function.
+    (Takeshi Kanemoto)
+
+  * Fix handling of relative paths in dulwich.client.get_transport_and_path.
+    (Brian Visel, #1169368)
+
+  * Preserve ordering of entries in configuration.
+    (Benjamin Pollack)
+
+  * Support ~ expansion in SSH client paths. (milki, #1083439)
+
+  * Support relative paths in alternate paths.
+    (milki, Michel Lespinasse, #1175007)
+
+  * Log all error messages from wsgiref server to the logging module. This
+    makes the test suit quiet again. (Gary van der Merwe)
+
+  * Support passing None for empty tree in changes_from_tree.
+    (Kevin Watters)
+
+  * Support fetching empty repository in client. (milki, #1060462)
+
+ IMPROVEMENTS:
+
+  * Add optional honor_filemode flag to build_index_from_tree.
+    (Mark Mikofski)
+
+  * Support core/filemode setting when building trees. (Jelmer Vernooij)
+
+  * Add chapter on tags in tutorial. (Ryan Faulkner)
+
+ FEATURES
+
+  * Add support for mergetags. (milki, #963525)
+
+  * Add support for posix shell hooks. (milki)
 
 0.8.7	2012-11-27
 

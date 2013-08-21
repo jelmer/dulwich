@@ -830,6 +830,7 @@ class SSHGitClient(TraditionalGitClient):
         return dict(
             (key, getattr(self, key, None))
             for key in self.SSH_KWARGS_KEYS
+            if not getattr(self, key, None) is None
         )
 
     def _get_cmd_path(self, cmd):

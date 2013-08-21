@@ -636,6 +636,15 @@ class SubprocessGitClient(TraditionalGitClient):
                         report_activity=self._report_activity), p.can_read
 
 
+# Popen only accepts a file like object
+# so turn the callback function into a file like object
+class WritableStream(object):
+    def __init__(self, write_function=None):
+        self.write_function = write_function or (lambda x: None)
+
+    def write(self, data, *args, **kwargs):
+        return write_function(data)
+
 class SSHVendor(object):
     """A client side SSH implementation."""
 
@@ -656,7 +665,7 @@ class SSHVendor(object):
 class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def connect_ssh(self, host, command, username=None, port=None, progress_stderr=None, **kwargs):
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -665,24 +674,164 @@ class SubprocessSSHVendor(SSHVendor):
         if username is not None:
             host = '%s@%s' % (username, host)
         args.append(host)
+        stderr_stream = WritableStream(progress_stderr)
         proc = subprocess.Popen(args + command,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                stderr=stderr_stream)
         return SubprocessWrapper(proc)
 
+try:
+    import sys
+    import paramiko
+    import threading
+
+    class ParamikoWrapper(object):
+        STDERR_READ_N = 2048  # 2k
+
+        def __init__(self, client, channel, progress_stderr=None):
+            self.client = client
+            self.channel = channel
+            self.progress_stderr = progress_stderr
+            self.should_monitor = bool(progress_stderr) or True
+            self.monitor_thread = None
+            self.stderr = ''
+
+            # Channel must block
+            self.channel.setblocking(True)
+
+            # Start
+            if self.should_monitor:
+                self.monitor_thread = threading.Thread(target=self.monitor_stderr)
+                self.monitor_thread.start()
+
+        def monitor_stderr(self):
+            while self.should_monitor:
+                # Block and read
+                data = self.read_stderr(self.STDERR_READ_N)
+
+                # Socket closed
+                if not data:
+                    self.should_monitor = False
+                    break
+
+                # Emit data
+                if self.progress_stderr:
+                    self.progress_stderr(data)
+
+                # Append to buffer
+                self.stderr += data
+
+        def stop_monitoring(self):
+            # Stop StdErr thread
+            if self.should_monitor:
+                self.should_monitor = False
+                self.monitor_thread.join()
+
+                # Get left over data
+                data = self.channel.in_stderr_buffer.empty()
+                self.stderr += data
+
+        def can_read(self):
+            return self.channel.recv_ready()
+
+        def write(self, data):
+            return self.channel.sendall(data)
+
+        def read_stderr(self, n):
+            return self.channel.recv_stderr(n)
+
+        def read(self, n=None):
+            data = self.channel.recv(n)
+            data_len = len(data)
+
+            # Closed socket
+            if not data:
+                return
+
+            # Read more if needed
+            if n and data_len < n:
+                diff_len = n - data_len
+                return data + self.read(diff_len)
+            return data
+
+        def close(self):
+            self.channel.close()
+            self.stop_monitoring()
+
+        def __del__(self):
+            self.close()
+
+    class ParamikoSSHVendor(object):
+        SSH_DEFAULTS = {
+            'port': 22,
+            'look_for_keys': False,
+            'allow_agent': False,
+        }
+
+        def connect_ssh(self, host, command, progress_stderr=None, **kwargs):
+            client = paramiko.SSHClient()
+
+            # Set defaults for non existant keys
+            # as well as keys whose value is None
+            for k, v in self.SSH_DEFAULTS.items():
+                if kwargs.get(k) is None:
+                    kwargs[k] = v
+
+            policy = paramiko.client.MissingHostKeyPolicy()
+            client.set_missing_host_key_policy(policy)
+            client.connect(host, **kwargs)
+
+            # Open SSH session
+            channel = client.get_transport().open_session()
+
+            # Run commands
+            apply(channel.exec_command, command)
+
+            return ParamikoWrapper(client, channel, progress_stderr=progress_stderr)
+
+except ImportError:
+    ParamikoSSHVendor = None
 
 # Can be overridden by users
-get_ssh_vendor = SubprocessSSHVendor
+get_ssh_vendor = ParamikoSSHVendor or SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
+    SSH_KWARGS_KEYS = (
+        'username',
+        'password',
+        'port',
+        'pkey',
+        'look_for_keys',
+        'allow_agent',
+        'key_filename',
+        'progress_stderr'
+    )
 
-    def __init__(self, host, port=None, username=None, *args, **kwargs):
+    def __init__(self, host, *args, **kwargs):
         self.host = host
-        self.port = port
-        self.username = username
+
+        # Extra SSH kwargs
+        for key in self.SSH_KWARGS_KEYS:
+            # Remove value from kwargs
+            # So that we don't pass it to the TraditionalGitClient constructor
+            # AND
+            # Set all SSH kwargs as attributes to self (dulwich needs this)
+            # default those not in **kwargs to None
+            setattr(self, key, kwargs.pop(key, None))
+
+        # Contstruct traditional Git Client
         TraditionalGitClient.__init__(self, *args, **kwargs)
+
         self.alternative_paths = {}
+
+    def _ssh_kwargs(self):
+        return dict(
+            (key, getattr(self, key, None))
+            for key in self.SSH_KWARGS_KEYS
+            if not getattr(self, key, None) is None
+        )
 
     def _get_cmd_path(self, cmd):
         return self.alternative_paths.get(cmd, 'git-%s' % cmd)
@@ -690,9 +839,10 @@ class SSHGitClient(TraditionalGitClient):
     def _connect(self, cmd, path):
         if path.startswith("/~"):
             path = path[1:]
-        con = get_ssh_vendor().connect_ssh(
-            self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
-            port=self.port, username=self.username)
+
+        command = ["%s '%s'" % (self._get_cmd_path(cmd), path)]
+
+        con = get_ssh_vendor().connect_ssh(self.host, command, **self._ssh_kwargs())
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
 
@@ -841,16 +991,44 @@ def get_transport_and_path(uri, **kwargs):
         activity.
     :return: Tuple with client instance and relative path.
     """
+
+    # Parse URL Scheme
     parsed = urlparse.urlparse(uri)
+
+    # Extract port
+    # if not port in url port object will be None
+    port = parsed.port
+
+    # Extract username
+    username = None
+    if parsed.path.find('@') >= 0:
+        username = parsed.path.split('@')[0]
+
+    # Set some default kwargs from the values we got
+    kwargs.setdefault('port', port)
+    kwargs.setdefault('username', username)
+
+    # Remove SSH specific kwargs from the kwargs
+    # Since the TCP and HTTP clients don't support them
+    ssh_kwargs = {
+        key: kwargs.pop(key, None)
+        for key in SSHGitClient.SSH_KWARGS_KEYS
+    }
+
+    # Mixin other kwargs
+    ssh_kwargs.update(kwargs)
+
+    # TCP
+    tcp_kwargs = {'port': port}
+    tcp_kwargs.update(kwargs)
+
     if parsed.scheme == 'git':
-        return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
-                parsed.path)
+        return TCPGitClient(parsed.hostname, **tcp_kwargs), parsed.path
     elif parsed.scheme == 'git+ssh':
         path = parsed.path
         if path.startswith('/'):
             path = parsed.path[1:]
-        return SSHGitClient(parsed.hostname, port=parsed.port,
-                            username=parsed.username, **kwargs), path
+        return SSHGitClient(parsed.hostname, **ssh_kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
 
@@ -863,7 +1041,7 @@ def get_transport_and_path(uri, **kwargs):
         # SSH with user@host:foo.
         user_host, path = parsed.path.split(':')
         user, host = user_host.rsplit('@')
-        return SSHGitClient(host, username=user, **kwargs), path
+        return SSHGitClient(host, **ssh_kwargs), path
 
     # Otherwise, assume it's a local path.
     return SubprocessGitClient(**kwargs), uri

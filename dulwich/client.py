@@ -154,6 +154,7 @@ class GitClient(object):
             activity.
         """
         self._report_activity = report_activity
+        self._report_status_parser = None
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
         if not thin_packs:
@@ -289,9 +290,11 @@ class GitClient(object):
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
         sent_capabilities = False
+
         for refname in set(new_refs.keys() + old_refs.keys()):
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             new_sha1 = new_refs.get(refname, ZERO_SHA)
+
             if old_sha1 != new_sha1:
                 if sent_capabilities:
                     proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
@@ -313,24 +316,20 @@ class GitClient(object):
         :param capabilities: List of negotiated capabilities
         :param progress: Optional progress reporting function
         """
-        if 'report-status' in capabilities:
-            report_status_parser = ReportStatusParser()
-        else:
-            report_status_parser = None
         if "side-band-64k" in capabilities:
             if progress is None:
                 progress = lambda x: None
             channel_callbacks = { 2: progress }
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
-                    report_status_parser.handle_packet).parse
+                    self._report_status_parser.handle_packet).parse
             self._read_side_band64k_data(proto, channel_callbacks)
         else:
             if 'report-status' in capabilities:
                 for pkt in proto.read_pkt_seq():
-                    report_status_parser.handle_packet(pkt)
-        if report_status_parser is not None:
-            report_status_parser.check()
+                    self._report_status_parser.handle_packet(pkt)
+        if self._report_status_parser is not None:
+            self._report_status_parser.check()
         # wait for EOF before returning
         data = proto.read()
         if data:
@@ -442,14 +441,46 @@ class TraditionalGitClient(GitClient):
         proto, unused_can_read = self._connect('receive-pack', path)
         old_refs, server_capabilities = self._read_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
+
+        if 'report-status' in negotiated_capabilities:
+            self._report_status_parser = ReportStatusParser()
+        report_status_parser = self._report_status_parser
+
         try:
-            new_refs = determine_wants(dict(old_refs))
+            new_refs = orig_new_refs = determine_wants(dict(old_refs))
         except:
             proto.write_pkt_line(None)
             raise
+
+        if not 'delete-refs' in server_capabilities:
+            # Server does not support deletions. Fail later.
+            def remove_del(pair):
+                if pair[1] == ZERO_SHA:
+                    if 'report-status' in negotiated_capabilities:
+                        report_status_parser._ref_statuses.append(
+                            'ng %s remote does not support deleting refs'
+                            % pair[1])
+                        report_status_parser._ref_status_ok = False
+                    return False
+                else:
+                    return True
+
+            new_refs = dict(
+                filter(
+                    remove_del,
+                    [(ref, sha) for ref, sha in new_refs.iteritems()]))
+
         if new_refs is None:
             proto.write_pkt_line(None)
             return old_refs
+
+        if len(new_refs) == 0 and len(orig_new_refs):
+            # NOOP - Original new refs filtered out by policy
+            proto.write_pkt_line(None)
+            if self._report_status_parser is not None:
+                self._report_status_parser.check()
+            return old_refs
+
         (have, want) = self._handle_receive_pack_head(proto,
             negotiated_capabilities, old_refs, new_refs)
         if not want and old_refs == new_refs:
@@ -457,6 +488,15 @@ class TraditionalGitClient(GitClient):
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
             entries, sha = write_pack_objects(proto.write_file(), objects)
+        elif len(set(new_refs.values()) - set([ZERO_SHA])) > 0:
+            # Check for valid create/update refs
+            filtered_new_refs = \
+                dict([(ref, sha) for ref, sha in new_refs.iteritems()
+                     if sha != ZERO_SHA])
+            if len(set(filtered_new_refs.iteritems()) -
+                    set(old_refs.iteritems())) > 0:
+                entries, sha = write_pack_objects(proto.write_file(), objects)
+
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
             progress)
         return new_refs
@@ -606,8 +646,26 @@ class WritableStream(object):
     def write(self, data, *args, **kwargs):
         return write_function(data)
 
-
 class SSHVendor(object):
+    """A client side SSH implementation."""
+
+    def connect_ssh(self, host, command, username=None, port=None):
+        """Connect to an SSH server.
+
+        Run a command remotely and return a file-like object for interaction
+        with the remote command.
+
+        :param host: Host name
+        :param command: Command to run
+        :param username: Optional ame of user to log in as
+        :param port: Optional SSH port to use
+        """
+        raise NotImplementedError(self.connect_ssh)
+
+
+class SubprocessSSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'ssh' command."""
+
     def connect_ssh(self, host, command, username=None, port=None, progress_stderr=None, **kwargs):
         import subprocess
         #FIXME: This has no way to deal with passwords..
@@ -623,7 +681,6 @@ class SSHVendor(object):
                                 stdout=subprocess.PIPE,
                                 stderr=stderr_stream)
         return SubprocessWrapper(proc)
-
 
 try:
     import sys
@@ -739,7 +796,7 @@ except ImportError:
     ParamikoSSHVendor = None
 
 # Can be overridden by users
-get_ssh_vendor = ParamikoSSHVendor or SSHVendor
+get_ssh_vendor = ParamikoSSHVendor or SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
@@ -756,37 +813,37 @@ class SSHGitClient(TraditionalGitClient):
 
     def __init__(self, host, *args, **kwargs):
         self.host = host
-        self.ssh_kwargs = {}
 
         # Extra SSH kwargs
-        for key in set.intersection(set(self.SSH_KWARGS_KEYS), set(kwargs)):
+        for key in self.SSH_KWARGS_KEYS:
             # Remove value from kwargs
             # So that we don't pass it to the TraditionalGitClient constructor
-            # Set as ssh specfic kwarg
-            self.ssh_kwargs[key] = kwargs.pop(key)
+            # AND
+            # Set all SSH kwargs as attributes to self (dulwich needs this)
+            # default those not in **kwargs to None
+            setattr(self, key, kwargs.pop(key, None))
 
         # Contstruct traditional Git Client
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
-        # Set all SSH kwargs as attributes to self
-        # default those not in **kwargs to None
-        for key in self.SSH_KWARGS_KEYS:
-            setattr(self, key, self.ssh_kwargs.get(key))
-
         self.alternative_paths = {}
+
+    def _ssh_kwargs(self):
+        return dict(
+            (key, getattr(self, key, None))
+            for key in self.SSH_KWARGS_KEYS
+        )
 
     def _get_cmd_path(self, cmd):
         return self.alternative_paths.get(cmd, 'git-%s' % cmd)
 
     def _connect(self, cmd, path):
-        command = ["%s '%s'" % (self._get_cmd_path(cmd), path)]
-
         if path.startswith("/~"):
             path = path[1:]
-        #con = get_ssh_vendor().connect_ssh(
-        #    self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
-        #    port=self.port, username=self.username)
-        con = get_ssh_vendor().connect_ssh(self.host, command, **self.ssh_kwargs)
+
+        command = ["%s '%s'" % (self._get_cmd_path(cmd), path)]
+
+        con = get_ssh_vendor().connect_ssh(self.host, command, **self._ssh_kwargs())
         return (Protocol(con.read, con.write, report_activity=self._report_activity),
                 con.can_read)
 
@@ -867,6 +924,10 @@ class HttpGitClient(GitClient):
         old_refs, server_capabilities = self._discover_references(
             "git-receive-pack", url)
         negotiated_capabilities = self._send_capabilities & server_capabilities
+
+        if 'report-status' in negotiated_capabilities:
+            self._report_status_parser = ReportStatusParser()
+
         new_refs = determine_wants(dict(old_refs))
         if new_refs is None:
             return old_refs
@@ -901,7 +962,7 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             "git-upload-pack", url)
-        negotiated_capabilities = server_capabilities
+        negotiated_capabilities = self._fetch_capabilities & server_capabilities
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]

@@ -21,6 +21,7 @@
 """Git object store interfaces and implementation."""
 
 
+from cStringIO import StringIO
 import errno
 import itertools
 import os
@@ -50,6 +51,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
+    PackInflater,
     iter_sha1,
     write_pack_header,
     write_pack_index_v2,
@@ -724,6 +726,65 @@ class MemoryObjectStore(BaseObjectStore):
         """
         for obj, path in objects:
             self._data[obj.id] = obj
+
+    def add_pack(self):
+        """Add a new pack to this object store.
+
+        Because this object store doesn't support packs, we extract and add the
+        individual objects.
+
+        :return: Fileobject to write to and a commit function to
+            call when the pack is finished.
+        """
+        f = StringIO()
+        def commit():
+            p = PackData.from_file(StringIO(f.getvalue()), f.tell())
+            f.close()
+            for obj in PackInflater.for_pack_data(p):
+                self._data[obj.id] = obj
+        return f, commit
+
+    def _complete_thin_pack(self, f, indexer):
+        """Complete a thin pack by adding external references.
+
+        :param f: Open file object for the pack.
+        :param indexer: A PackIndexer for indexing the pack.
+        """
+        entries = list(indexer)
+
+        # Update the header with the new number of objects.
+        f.seek(0)
+        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+
+        # Rescan the rest of the pack, computing the SHA with the new header.
+        new_sha = compute_file_sha(f, end_ofs=-20)
+
+        # Complete the pack.
+        for ext_sha in indexer.ext_refs():
+            assert len(ext_sha) == 20
+            type_num, data = self.get_raw(ext_sha)
+            write_pack_object(f, type_num, data, sha=new_sha)
+        pack_sha = new_sha.digest()
+        f.write(pack_sha)
+
+    def add_thin_pack(self, read_all, read_some):
+        """Add a new thin pack to this object store.
+
+        Thin packs are packs that contain deltas with parents that exist outside
+        the pack. Because this object store doesn't support packs, we extract
+        and add the individual objects.
+
+        :param read_all: Read function that blocks until the number of requested
+            bytes are read.
+        :param read_some: Read function that returns at least one byte, but may
+            not return the number of bytes requested.
+        """
+        f, commit = self.add_pack()
+        indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
+        copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+        copier.verify()
+        self._complete_thin_pack(f, indexer)
+        commit()
 
 
 class ObjectImporter(object):

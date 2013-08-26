@@ -25,6 +25,8 @@
   * Add `MemoryObjectStore.add_pack` and `MemoryObjectStore.add_thin_pack` methods.
     (David Bennett)
 
+  * Add paramiko-based SSH vendor. (Aaron O'Mullan)
+
 0.9.0	2013-05-31
 
  BUG FIXES

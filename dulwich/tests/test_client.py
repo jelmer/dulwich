@@ -386,7 +386,7 @@ class TestSSHVendor(object):
         self.username = None
         self.port = None
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None):
         self.host = host
         self.command = command
         self.username = username

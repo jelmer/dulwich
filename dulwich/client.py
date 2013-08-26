@@ -639,7 +639,7 @@ class SubprocessGitClient(TraditionalGitClient):
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None):
         """Connect to an SSH server.
 
         Run a command remotely and return a file-like object for interaction
@@ -650,13 +650,13 @@ class SSHVendor(object):
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
         """
-        raise NotImplementedError(self.connect_ssh)
+        raise NotImplementedError(self.run_command)
 
 
 class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None):
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -756,7 +756,7 @@ else:
 
     class ParamikoSSHVendor(object):
 
-        def connect_ssh(self, host, command, username=None, port=None,
+        def run_command(self, host, command, username=None, port=None,
                 progress_stderr=None, **kwargs):
             client = paramiko.SSHClient()
 
@@ -793,7 +793,7 @@ class SSHGitClient(TraditionalGitClient):
     def _connect(self, cmd, path):
         if path.startswith("/~"):
             path = path[1:]
-        con = get_ssh_vendor().connect_ssh(
+        con = get_ssh_vendor().run_command(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
         return (Protocol(con.read, con.write, report_activity=self._report_activity),

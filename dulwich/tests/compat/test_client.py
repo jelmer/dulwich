@@ -262,7 +262,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
 class TestSSHVendor(object):
     @staticmethod
-    def connect_ssh(host, command, username=None, port=None):
+    def run_command(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
         p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,

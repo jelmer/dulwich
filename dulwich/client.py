@@ -173,7 +173,7 @@ class GitClient(object):
 
         if len(refs) == 0:
             return None, set([])
-        return refs, set(server_capabilities)
+        return refs, set(server_capabilities or [])
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None):

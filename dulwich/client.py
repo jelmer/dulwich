@@ -203,9 +203,11 @@ class GitClient(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         f, commit = target.object_store.add_pack()
-        result = self.fetch_pack(path, determine_wants,
-                target.get_graph_walker(), f.write, progress)
-        commit()
+        try:
+            result = self.fetch_pack(path, determine_wants,
+                    target.get_graph_walker(), f.write, progress)
+        finally:
+            commit()
         return result
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,

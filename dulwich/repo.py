@@ -896,7 +896,7 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if wants is None:
+        if not wants:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
             return None

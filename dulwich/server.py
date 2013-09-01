@@ -617,15 +617,26 @@ class ReceivePackHandler(Handler):
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
-        # TODO: more informative error messages than just the exception string
-        try:
-            recv = getattr(self.proto, "recv", None)
-            p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+        will_send_pack = False
+
+        for command in refs:
+            if command[1] != ZERO_SHA:
+                will_send_pack = True
+
+        if will_send_pack:
+            # TODO: more informative error messages than just the exception string
+            try:
+                recv = getattr(self.proto, "recv", None)
+                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                status.append(('unpack', 'ok'))
+            except all_exceptions, e:
+                status.append(('unpack', str(e).replace('\n', '')))
+                # The pack may still have been moved in, but it may contain broken
+                # objects. We trust a later GC to clean it up.
+        else:
+            # The git protocol want to find a status entry related to unpack process
+            # even if no pack data has been sent.
             status.append(('unpack', 'ok'))
-        except all_exceptions, e:
-            status.append(('unpack', str(e).replace('\n', '')))
-            # The pack may still have been moved in, but it may contain broken
-            # objects. We trust a later GC to clean it up.
 
         for oldsha, sha, ref in refs:
             ref_status = 'ok'
@@ -776,6 +787,7 @@ def main(argv=sys.argv):
 
     log_utils.default_logging_config()
     backend = DictBackend({'/': Repo(gitdir)})
+    #backend = FileSystemBackend()
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
 

@@ -12,6 +12,9 @@
   * Fix capability negotiation when fetching packs over HTTP.
     (#1072461, William Grant)
 
+  * In Client.fetch_pack(), allow determine_wants to return an empty
+    dictionary. (Fabien Boucher)
+
  IMPROVEMENTS
 
   * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 

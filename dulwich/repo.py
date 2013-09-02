@@ -896,10 +896,12 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if not wants:
+        if type(wants) is not list:
+            raise TypeError("determine_wants() did not return a list")
+        if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
-            return None
+            return []
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(haves, wants, progress,

@@ -50,7 +50,9 @@ from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_commit,
     )
-
+from dulwich.protocol import (
+    ZERO_SHA,
+    )
 
 ONE = '1' * 40
 TWO = '2' * 40
@@ -199,6 +201,27 @@ class TestUploadPackHandler(UploadPackHandler):
     @classmethod
     def required_capabilities(self):
         return ()
+
+class ReceivePackHandlerTestCase(TestCase):
+
+    def setUp(self):
+        super(ReceivePackHandlerTestCase, self).setUp()
+        self._repo = MemoryRepo.init_bare([], {})
+        backend = DictBackend({'/': self._repo})
+        self._handler = ReceivePackHandler(
+          backend, ['/', 'host=lolcathost'], TestProto())
+
+    def test_apply_pack_del_ref(self):
+        refs = {
+            'refs/heads/master': TWO,
+            'refs/heads/fake-branch': ONE}
+        self._repo.refs._update(refs)
+        update_refs = [[ONE, ZERO_SHA, 'refs/heads/fake-branch'], ]
+        status = self._handler._apply_pack(update_refs)
+        self.assertEqual(status[0][0], 'unpack')
+        self.assertEqual(status[0][1], 'ok')
+        self.assertEqual(status[1][0], 'refs/heads/fake-branch')
+        self.assertEqual(status[1][1], 'ok')
 
 
 class ProtocolGraphWalkerTestCase(TestCase):

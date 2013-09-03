@@ -787,7 +787,6 @@ def main(argv=sys.argv):
 
     log_utils.default_logging_config()
     backend = DictBackend({'/': Repo(gitdir)})
-    #backend = FileSystemBackend()
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
 

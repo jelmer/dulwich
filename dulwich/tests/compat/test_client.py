@@ -32,7 +32,6 @@ import tarfile
 import tempfile
 import threading
 import urllib
-from socket import gethostname
 
 from dulwich import (
     client,

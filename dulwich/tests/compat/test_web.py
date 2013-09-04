@@ -136,3 +136,7 @@ class DumbWebTestCase(WebTests, CompatTestCase):
     def test_push_to_dulwich(self):
         # Note: remove this if dumb pushing is supported
         raise SkipTest('Dumb web pushing not supported.')
+
+    def test_push_to_dulwich_remove_branch(self):
+        # Note: remove this if dumb pushing is supported
+        raise SkipTest('Dumb web pushing not supported.')

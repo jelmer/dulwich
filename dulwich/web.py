@@ -409,7 +409,7 @@ try:
     )
     class ServerHandlerLogger(ServerHandler):
         """ServerHandler that uses dulwich's logger for logging exceptions."""
-        
+
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
                              exc_info=exc_info)
@@ -432,20 +432,20 @@ try:
 
         def log_error(self, *args):
             logger.error(*args)
-        
+
         def handle(self):
             """Handle a single HTTP request"""
-    
+
             self.raw_requestline = self.rfile.readline()
             if not self.parse_request(): # An error code has been sent, just exit
                 return
-    
+
             handler = ServerHandlerLogger(
                 self.rfile, self.wfile, self.get_stderr(), self.get_environ()
             )
             handler.request_handler = self      # backpointer for logging
             handler.run(self.server.get_app())
-    
+
     class WSGIServerLogger(WSGIServer):
         def handle_error(self, request, client_address):
             """Handle an error. """

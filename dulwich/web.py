@@ -480,3 +480,7 @@ except ImportError:
         sys.stderr.write(
             'Sorry, the wsgiref module is required for dul-web.\n')
         sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

@@ -29,6 +29,9 @@
 
   * Add paramiko-based SSH vendor. (Aaron O'Mullan)
 
+  * Support running 'dulwich.server' and 'dulwich.web' using 'python -m'.
+    (Jelmer Vernooij)
+
  API CHANGES
 
   * SSHVendor.connect_ssh has been renamed to SSHVendor.run_command.

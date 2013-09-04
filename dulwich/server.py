@@ -851,3 +851,7 @@ def update_server_info(repo):
 
     repo._put_named_file(os.path.join('objects', 'info', 'packs'),
         "".join(generate_objects_info_packs(repo)))
+
+
+if __name__ == '__main__':
+    main()

@@ -14,6 +14,8 @@
 
   * Enforce determine_wants returning an empty list rather than None. (Fabien Boucher, Jelmer Vernooij)
 
+  * In the server, support pushes just removing refs. (Fabien Boucher, Jelmer Vernooij)
+
  IMPROVEMENTS
 
   * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 

@@ -69,6 +69,28 @@ class ServerTests(object):
                         cwd=self._new_repo.path)
         self.assertReposEqual(self._old_repo, self._new_repo)
 
+    def test_push_to_dulwich_no_op(self):
+        self._old_repo = import_repo('server_old.export')
+        self._new_repo = import_repo('server_old.export')
+        self.assertReposEqual(self._old_repo, self._new_repo)
+        port = self._start_server(self._old_repo)
+
+        run_git_or_fail(['push', self.url(port)] + self.branch_args(),
+                        cwd=self._new_repo.path)
+        self.assertReposEqual(self._old_repo, self._new_repo)
+
+    def test_push_to_dulwich_remove_branch(self):
+        self._old_repo = import_repo('server_old.export')
+        self._new_repo = import_repo('server_old.export')
+        self.assertReposEqual(self._old_repo, self._new_repo)
+        port = self._start_server(self._old_repo)
+
+        run_git_or_fail(['push', self.url(port), ":master"],
+                        cwd=self._new_repo.path)
+
+        self.assertEquals(
+            self._old_repo.get_refs().keys(), ["refs/heads/branch"])
+
     def test_fetch_from_dulwich(self):
         self.import_repos()
         self.assertReposNotEqual(self._old_repo, self._new_repo)

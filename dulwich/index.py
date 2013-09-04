@@ -393,6 +393,21 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
+def symlink(source, link_name):
+    # Ripped off directly from SO
+    # http://stackoverflow.com/a/15043806
+    import os
+    os_symlink = getattr(os, "symlink", None)
+    if callable(os_symlink):
+        os_symlink(source, link_name)
+    else:
+        import ctypes
+        csl = ctypes.windll.kernel32.CreateSymbolicLinkW
+        csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
+        csl.restype = ctypes.c_ubyte
+        flags = 1 if os.path.isdir(source) else 0
+        if csl(link_name, source, flags) == 0:
+            raise ctypes.WinError()
 
 def build_index_from_tree(prefix, index_path, object_store, tree_id,
                           honor_filemode=True):
@@ -420,13 +435,15 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         # FIXME: Merge new index into working tree
         if stat.S_ISLNK(entry.mode):
             # FIXME: This will fail on Windows. What should we do instead?
+            # IDEA: Above is a replacement for os.symlink, that will use ctypes
+            #   on windows to create a symlink.  !!!REQUIRES UAC ELEVATION!!!
             src_path = object_store[entry.sha].as_raw_string()
             try:
-                os.symlink(src_path, full_path)
+                symlink(src_path, full_path)
             except OSError, e:
                 if e.errno == errno.EEXIST:
                     os.unlink(full_path)
-                    os.symlink(src_path, full_path)
+                    symlink(src_path, full_path)
                 else:
                     raise
         else:

@@ -39,6 +39,10 @@
   * SSHVendor.connect_ssh has been renamed to SSHVendor.run_command.
     (Jelmer Vernooij)
 
+  * ObjectStore.add_pack() now returns a 3-tuple. The last element will be an
+    abort() method that can be used to cancel the pack operation.
+    (Jelmer Vernooij)
+
 0.9.0	2013-05-31
 
  BUG FIXES

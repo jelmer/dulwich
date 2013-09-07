@@ -197,10 +197,15 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def test_add_pack(self):
         o = MemoryObjectStore()
-        f, commit = o.add_pack()
-        b = make_object(Blob, data="more yummy data")
-        write_pack_objects(f, [(b, None)])
-        commit()
+        f, commit, abort = o.add_pack()
+        try:
+            b = make_object(Blob, data="more yummy data")
+            write_pack_objects(f, [(b, None)])
+        except:
+            abort()
+            raise
+        else:
+            commit()
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
@@ -290,10 +295,15 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_add_pack(self):
         o = DiskObjectStore(self.store_dir)
-        f, commit = o.add_pack()
-        b = make_object(Blob, data="more yummy data")
-        write_pack_objects(f, [(b, None)])
-        commit()
+        f, commit, abort = o.add_pack()
+        try:
+            b = make_object(Blob, data="more yummy data")
+            write_pack_objects(f, [(b, None)])
+        except:
+            abort()
+            raise
+        else:
+            commit()
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)

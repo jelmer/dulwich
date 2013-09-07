@@ -381,9 +381,14 @@ class PackBasedObjectStore(BaseObjectStore):
         if len(objects) == 0:
             # Don't bother writing an empty pack file
             return
-        f, commit = self.add_pack()
-        write_pack_objects(f, objects)
-        return commit()
+        f, commit, abort = self.add_pack()
+        try:
+            write_pack_objects(f, objects)
+        except:
+            abort()
+            raise
+        else:
+            return commit()
 
 
 class DiskObjectStore(PackBasedObjectStore):
@@ -618,8 +623,9 @@ class DiskObjectStore(PackBasedObjectStore):
     def add_pack(self):
         """Add a new pack to this object store.
 
-        :return: Fileobject to write to and a commit function to
-            call when the pack is finished.
+        :return: Fileobject to write to, a commit function to
+            call when the pack is finished and an abort
+            function.
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
@@ -631,7 +637,10 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 os.remove(path)
                 return None
-        return f, commit
+        def abort():
+            f.close()
+            os.remove(path)
+        return f, commit, abort
 
     def add_object(self, obj):
         """Add a single object to this object store.
@@ -742,7 +751,9 @@ class MemoryObjectStore(BaseObjectStore):
             f.close()
             for obj in PackInflater.for_pack_data(p):
                 self._data[obj.id] = obj
-        return f, commit
+        def abort():
+            pass
+        return f, commit, abort
 
     def _complete_thin_pack(self, f, indexer):
         """Complete a thin pack by adding external references.
@@ -779,12 +790,17 @@ class MemoryObjectStore(BaseObjectStore):
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         """
-        f, commit = self.add_pack()
-        indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-        copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
-        copier.verify()
-        self._complete_thin_pack(f, indexer)
-        commit()
+        f, commit, abort = self.add_pack()
+        try:
+            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
+            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier.verify()
+            self._complete_thin_pack(f, indexer)
+        except:
+            abort()
+            raise
+        else:
+            commit()
 
 
 class ObjectImporter(object):

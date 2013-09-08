@@ -188,6 +188,11 @@ class ObjectStoreTests(object):
         self.assertEqual((Blob.type_num, 'yummy data'),
                          self.store.get_raw(testobject.id))
 
+    def test_close(self):
+        # For now, just check that close doesn't barf.
+        self.store.add_object(testobject)
+        self.store.close()
+
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 

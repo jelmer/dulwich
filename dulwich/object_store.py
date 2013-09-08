@@ -247,6 +247,10 @@ class BaseObjectStore(object):
                 queue.extend(cmt.parents)
         return (commits, bases)
 
+    def close(self):
+        """Close any files opened by this object store."""
+        # Default implementation is a NO-OP
+
 
 class PackBasedObjectStore(BaseObjectStore):
 
@@ -292,6 +296,13 @@ class PackBasedObjectStore(BaseObjectStore):
         """
         if self._pack_cache is not None:
             self._pack_cache.append(pack)
+
+    def close(self):
+        pack_cache = self._pack_cache
+        self._pack_cache = None
+        while pack_cache:
+            pack = pack_cache.pop()
+            pack.close()
 
     @property
     def packs(self):

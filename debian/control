@@ -7,6 +7,7 @@ Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelp
 Standards-Version: 3.9.4
 X-Python-Version: >= 2.4
 Vcs-Git: git://git.debian.org/users/jelmer/dulwich.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=users/jelmer/dulwich.git
 
 Package: python-dulwich
 Architecture: any

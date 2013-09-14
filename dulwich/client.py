@@ -644,6 +644,13 @@ class SubprocessGitClient(TraditionalGitClient):
 class SSHVendor(object):
     """A client side SSH implementation."""
 
+    def connect_ssh(self, host, command, username=None, port=None):
+        import warnings
+        warnings.warn(
+            "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
+            DeprecationWarning)
+        return self.run_command(host, command, username=username, port=port)
+
     def run_command(self, host, command, username=None, port=None):
         """Connect to an SSH server.
 

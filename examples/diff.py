@@ -1,6 +1,9 @@
 #!/usr/bin/python
 # This trivial script demonstrates how to extract the unified diff for a single
 # commit in a local repository.
+#
+# Example usage:
+#  python examples/diff.py
 
 from dulwich.repo import Repo
 from dulwich.patch import write_tree_diff

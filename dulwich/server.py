@@ -780,13 +780,22 @@ class TCPGitServer(SocketServer.TCPServer):
 
 def main(argv=sys.argv):
     """Entry point for starting a TCP git server."""
-    if len(argv) > 1:
-        gitdir = argv[1]
-    else:
-        gitdir = '.'
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-b", "--backend", dest="backend",
+                      help="Select backend to use.",
+                      choices=["file"], default="file")
+    options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    backend = DictBackend({'/': Repo(gitdir)})
+    if options.backend == "file":
+        if len(argv) > 1:
+            gitdir = args[1]
+        else:
+            gitdir = '.'
+        backend = DictBackend({'/': Repo(gitdir)})
+    else:
+        raise Exception("No such backend %s." % backend)
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
 

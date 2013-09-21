@@ -792,6 +792,27 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
             f.write('^%s\n' % peeled_refs[refname])
 
 
+def parse_graftpoints(graft_lines=[]):
+    """Convert a list of graftpoints into a dict
+
+    Each line is formatted as:
+        <commit sha1> <parent sha1> [<parent sha1>]*
+
+    https://git.wiki.kernel.org/index.php/GraftPoint
+    """
+    grafts = {}
+    for l in graft_lines:
+        raw_graft = l.split(None, 1)
+
+        sha = raw_graft[0]
+        if len(raw_graft) == 2:
+            parents = raw_graft[1].split()
+        else:
+            parents = []
+        grafts[sha] = parents
+    return grafts
+
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -1298,6 +1319,11 @@ class Repo(BaseRepo):
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
+        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        if graft_file:
+            grafts = parse_graftpoints(graft_file.read().splitlines())
+            self.object_store.add_grafts(grafts)
+
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
@@ -1318,6 +1344,10 @@ class Repo(BaseRepo):
             f.write(contents)
         finally:
             f.close()
+
+        if path == os.path.join("info", "grafts"):
+            grafts = parse_graftpoints(contents.splitlines())
+            self.object_store.add_grafts(grafts)
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -1531,6 +1561,10 @@ class MemoryRepo(BaseRepo):
         :param contents: A string to write to the file.
         """
         self._named_files[path] = contents
+
+        if path == os.path.join("info", "grafts"):
+            grafts = parse_graftpoints(contents.splitlines())
+            self.object_store.add_grafts(grafts)
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.

@@ -69,6 +69,9 @@ PACKDIR = 'pack'
 class BaseObjectStore(object):
     """Object store interface."""
 
+    def __init__(self):
+        self._grafts = None
+
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
                 if not sha in self and not ref.endswith("^{}") and
@@ -110,10 +113,42 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.get_raw)
 
+    @property
+    def grafts(self):
+        """Graftpoints are commits with parents "rewritten"
+
+        https://git.wiki.kernel.org/index.php/GraftPoint
+        """
+        if self._grafts is None:
+            self._grafts = {}
+        return self._grafts
+
+    def add_grafts(self, grafts={}):
+        self.grafts.update(grafts)
+
+    def remove_grafts(self, shas=[]):
+        for sha in shas:
+            del self.grafts[sha]
+
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type_num, uncomp)
+        return self._shafile_from_raw_string(type_num, uncomp)
+
+    def _shafile_from_raw_string(self, type_num, uncomp):
+        """Instantiate a generic ShaFile from the raw string
+
+        Sometimes, a specific object must be returned,
+        such as a GraftedCommit instead of a Commit
+        """
+        shafile = ShaFile.from_raw_string(type_num, uncomp)
+
+        # Special Cases
+        if shafile.id in self.grafts.keys():
+            from dulwich.objects import GraftedCommit
+            return GraftedCommit(shafile, self._grafts[shafile.id])
+        else:
+            return shafile
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
@@ -255,6 +290,7 @@ class BaseObjectStore(object):
 class PackBasedObjectStore(BaseObjectStore):
 
     def __init__(self):
+        super(PackBasedObjectStore, self).__init__()
         self._pack_cache = None
 
     @property
@@ -727,7 +763,14 @@ class MemoryObjectStore(BaseObjectStore):
         return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
-        return self._data[self._to_hexsha(name)]
+        return self._obj_from_data(self._data[self._to_hexsha(name)])
+
+    def _obj_from_data(self, obj):
+        if obj.id in self.grafts.keys():
+            from dulwich.objects import GraftedCommit
+            return GraftedCommit(obj, self._grafts[obj.id])
+        else:
+            return obj
 
     def __delitem__(self, name):
         """Delete an object from this store, for testing only."""

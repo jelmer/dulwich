@@ -2,6 +2,6 @@ include NEWS
 include README
 include Makefile
 include COPYING
-include docs/*
-include docs/tutorial/*
-include examples/*.py
+recursive-include docs conf.py *.txt Makefile make.bat
+recursive-include examples *.py
+graft dulwich/tests/data

@@ -71,7 +71,7 @@ setup(name='dulwich',
       All functionality is available in pure Python, but (optional)
       C extensions are also available for better performance.
       """,
-      packages=['dulwich', 'dulwich.tests'],
+      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],

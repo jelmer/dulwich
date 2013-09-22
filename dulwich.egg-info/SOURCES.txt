@@ -3,6 +3,7 @@ MANIFEST.in
 Makefile
 NEWS
 README
+setup.cfg
 setup.py
 bin/dul-daemon
 bin/dul-receive-pack

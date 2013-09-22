@@ -1,4 +1,4 @@
-dulwich (0.9.1-1) UNRELEASED; urgency=low
+dulwich (0.9.1-1) unstable; urgency=low
 
   * Bump standards version to 3.9.4.
   * Add Vcs-Browser header.

@@ -58,8 +58,6 @@ setup(name='dulwich',
       keywords='git',
       version=dulwich_version_string,
       url='http://samba.org/~jelmer/dulwich',
-      download_url='http://samba.org/~jelmer/dulwich/'
-                   'dulwich-%s.tar.gz' % dulwich_version_string,
       license='GPLv2 or later',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',

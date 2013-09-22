@@ -10,3 +10,4 @@ apidocs
 *~
 *.swp
 docs/tutorial/index.html
+dulwich.egg-info/

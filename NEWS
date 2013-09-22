@@ -36,6 +36,9 @@
 
   * Add ObjectStore.close(). (Jelmer Vernooij)
 
+  * Raise appropriate NotImplementedError when encountering dumb HTTP servers.
+    (Jelmer Vernooij)
+
  API CHANGES
 
   * SSHVendor.connect_ssh has been renamed to SSHVendor.run_command.

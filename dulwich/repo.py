@@ -86,14 +86,6 @@ BASE_DIRECTORIES = [
     ]
 
 
-def read_info_refs(f):
-    ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
-        ret[name] = sha
-    return ret
-
-
 def check_ref_format(refname):
     """Check if a refname is correctly formatted.
 

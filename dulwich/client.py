@@ -137,6 +137,31 @@ class ReportStatusParser(object):
                 self._ref_status_ok = False
 
 
+def read_pkt_refs(proto):
+    server_capabilities = None
+    refs = {}
+    # Receive refs from server
+    for pkt in proto.read_pkt_seq():
+        (sha, ref) = pkt.rstrip('\n').split(None, 1)
+        if sha == 'ERR':
+            raise GitProtocolError(ref)
+        if server_capabilities is None:
+            (ref, server_capabilities) = extract_capabilities(ref)
+        refs[ref] = sha
+
+    if len(refs) == 0:
+        return None, set([])
+    return refs, set(server_capabilities)
+
+
+def read_info_refs(f):
+    ret = {}
+    for l in f.readlines():
+        (sha, name) = l.rstrip("\r\n").split("\t", 1)
+        ret[name] = sha
+    return ret
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
@@ -158,22 +183,6 @@ class GitClient(object):
         self._send_capabilities = set(SEND_CAPABILITIES)
         if not thin_packs:
             self._fetch_capabilities.remove('thin-pack')
-
-    def _read_refs(self, proto):
-        server_capabilities = None
-        refs = {}
-        # Receive refs from server
-        for pkt in proto.read_pkt_seq():
-            (sha, ref) = pkt.rstrip('\n').split(' ', 1)
-            if sha == 'ERR':
-                raise GitProtocolError(ref)
-            if server_capabilities is None:
-                (ref, server_capabilities) = extract_capabilities(ref)
-            refs[ref] = sha
-
-        if len(refs) == 0:
-            return None, set([])
-        return refs, set(server_capabilities)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None):
@@ -443,7 +452,7 @@ class TraditionalGitClient(GitClient):
                                  and rejects ref updates
         """
         proto, unused_can_read = self._connect('receive-pack', path)
-        old_refs, server_capabilities = self._read_refs(proto)
+        old_refs, server_capabilities = read_pkt_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
         if 'report-status' in negotiated_capabilities:
@@ -515,7 +524,7 @@ class TraditionalGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         """
         proto, can_read = self._connect('upload-pack', path)
-        refs, server_capabilities = self._read_refs(proto)
+        refs, server_capabilities = read_pkt_refs(proto)
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
 
         if refs is None:
@@ -852,14 +861,16 @@ class HttpGitClient(GitClient):
             headers["Content-Type"] = "application/x-%s-request" % service
         resp = self._http_request(url, headers)
         self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
-        proto = Protocol(resp.read, None)
         if not self.dumb:
+            proto = Protocol(resp.read, None)
             # The first line should mention the service
             pkts = list(proto.read_pkt_seq())
             if pkts != [('# service=%s\n' % service)]:
                 raise GitProtocolError(
                     "unexpected first line %r from smart server" % pkts)
-        return self._read_refs(proto)
+            return read_pkt_refs(proto)
+        else:
+            return read_info_refs(resp), set()
 
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"

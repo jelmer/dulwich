@@ -2,4 +2,6 @@ include NEWS
 include README
 include Makefile
 include COPYING
-include docs/protocol.txt
+include docs/*
+include docs/tutorial/*
+include examples/*.py

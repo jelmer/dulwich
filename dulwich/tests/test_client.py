@@ -39,6 +39,13 @@ from dulwich.protocol import (
     TCP_GIT_PORT,
     Protocol,
     )
+from dulwich.pack import (
+    write_pack_objects,
+    )
+from dulwich.objects import (
+    Commit,
+    Tree
+    )
 
 
 class DummyClient(TraditionalGitClient):
@@ -207,7 +214,8 @@ class GitClientTests(TestCase):
     def test_send_pack_no_sideband64k_with_update_ref_error(self):
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data
-        pkts = ['55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 capabilities^{}\x00 report-status ofs-delta\n',
+        pkts = ['55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 capabilities^{}'
+                '\x00 report-status delete-refs ofs-delta\n',
                 '',
                 "unpack ok",
                 "ng refs/foo/bar pre-receive hook declined",
@@ -218,8 +226,156 @@ class GitClientTests(TestCase):
             else:
                 self.rin.write("%04x%s" % (len(pkt)+4, pkt))
         self.rin.seek(0)
+
+        tree = Tree()
+        commit = Commit()
+        commit.tree = tree
+        commit.parents = []
+        commit.author = commit.committer = 'test user'
+        commit.commit_time = commit.author_time = 1174773719
+        commit.commit_timezone = commit.author_timezone = 0
+        commit.encoding = 'UTF-8'
+        commit.message = 'test message'
+
+        def determine_wants(refs):
+            return {'refs/foo/bar': commit.id, }
+
+        def generate_pack_contents(have, want):
+            return [(commit, None), (tree, ''), ]
+
         self.assertRaises(UpdateRefsError,
-            self.client.send_pack, "blah", lambda x: {}, lambda h,w: [])
+                          self.client.send_pack, "blah",
+                          determine_wants, generate_pack_contents)
+
+    def test_send_pack_none(self):
+        self.rin.write(
+            '0078310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            'refs/heads/master\x00 report-status delete-refs '
+            'side-band-64k quiet ofs-delta\n'
+            '0000')
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {
+                'refs/heads/master': '310ca9477129b8586fa2afc779c1f57cf64bba6c'
+            }
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        self.client.send_pack('/', determine_wants, generate_pack_contents)
+        self.assertEqual(self.rout.getvalue(), '0000')
+
+    def test_send_pack_delete_only(self):
+        self.rin.write(
+            '0063310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            'refs/heads/master\x00report-status delete-refs ofs-delta\n'
+            '0000000eunpack ok\n'
+            '0019ok refs/heads/master\n'
+            '0000')
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {'refs/heads/master': '0' * 40}
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        self.client.send_pack('/', determine_wants, generate_pack_contents)
+        self.assertEqual(
+            self.rout.getvalue(),
+            '007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            '0000000000000000000000000000000000000000 '
+            'refs/heads/master\x00report-status ofs-delta0000')
+
+    def test_send_pack_new_ref_only(self):
+        self.rin.write(
+            '0063310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            'refs/heads/master\x00report-status delete-refs ofs-delta\n'
+            '0000000eunpack ok\n'
+            '0019ok refs/heads/blah12\n'
+            '0000')
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {
+                'refs/heads/blah12':
+                '310ca9477129b8586fa2afc779c1f57cf64bba6c',
+                'refs/heads/master': '310ca9477129b8586fa2afc779c1f57cf64bba6c'
+            }
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        f = StringIO()
+        empty_pack = write_pack_objects(f, {})
+        self.client.send_pack('/', determine_wants, generate_pack_contents)
+        self.assertEqual(
+            self.rout.getvalue(),
+            '007f0000000000000000000000000000000000000000 '
+            '310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            'refs/heads/blah12\x00report-status ofs-delta0000%s'
+            % f.getvalue())
+
+    def test_send_pack_new_ref(self):
+        self.rin.write(
+            '0064310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            'refs/heads/master\x00 report-status delete-refs ofs-delta\n'
+            '0000000eunpack ok\n'
+            '0019ok refs/heads/blah12\n'
+            '0000')
+        self.rin.seek(0)
+
+        tree = Tree()
+        commit = Commit()
+        commit.tree = tree
+        commit.parents = []
+        commit.author = commit.committer = 'test user'
+        commit.commit_time = commit.author_time = 1174773719
+        commit.commit_timezone = commit.author_timezone = 0
+        commit.encoding = 'UTF-8'
+        commit.message = 'test message'
+
+        def determine_wants(refs):
+            return {
+                'refs/heads/blah12': commit.id,
+                'refs/heads/master': '310ca9477129b8586fa2afc779c1f57cf64bba6c'
+            }
+
+        def generate_pack_contents(have, want):
+            return [(commit, None), (tree, ''), ]
+
+        f = StringIO()
+        pack = write_pack_objects(f, generate_pack_contents(None, None))
+        self.client.send_pack('/', determine_wants, generate_pack_contents)
+        self.assertEqual(
+            self.rout.getvalue(),
+            '007f0000000000000000000000000000000000000000 %s '
+            'refs/heads/blah12\x00report-status ofs-delta0000%s'
+            % (commit.id, f.getvalue()))
+
+    def test_send_pack_no_deleteref_delete_only(self):
+        pkts = ['310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'
+                '\x00 report-status ofs-delta\n',
+                '',
+                '']
+        for pkt in pkts:
+            if pkt == '':
+                self.rin.write("0000")
+            else:
+                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {'refs/heads/master': '0' * 40}
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        self.assertRaises(UpdateRefsError,
+                          self.client.send_pack, "/",
+                          determine_wants, generate_pack_contents)
+        self.assertEqual(self.rout.getvalue(), '0000')
 
 
 class TestSSHVendor(object):
@@ -230,7 +386,7 @@ class TestSSHVendor(object):
         self.username = None
         self.port = None
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None):
         self.host = host
         self.command = command
         self.username = username

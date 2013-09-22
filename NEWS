@@ -1,3 +1,53 @@
+0.9.1	2013-09-22
+
+ BUG FIXES
+
+  * Support lookups of 40-character refs in BaseRepo.__getitem__. (Chow Loong Jin, Jelmer Vernooij)
+
+  * Fix fetching packs with side-band-64k capability disabled. (David Keijser, Jelmer Vernooij)
+
+  * Several fixes in send-pack protocol behaviour - handling of empty pack files and deletes.
+    (milki, #1063087)
+
+  * Fix capability negotiation when fetching packs over HTTP.
+    (#1072461, William Grant)
+
+  * Enforce determine_wants returning an empty list rather than None. (Fabien Boucher, Jelmer Vernooij)
+
+  * In the server, support pushes just removing refs. (Fabien Boucher, Jelmer Vernooij)
+
+ IMPROVEMENTS
+
+  * Support passing a single revision to BaseRepo.get_walker() rather than a list of revisions. 
+    (Alberto Ruiz)
+
+  * Add `Repo.get_description` method. (Jelmer Vernooij)
+
+  * Support thin packs in Pack.iterobjects() and Pack.get_raw().
+    (William Grant)
+
+  * Add `MemoryObjectStore.add_pack` and `MemoryObjectStore.add_thin_pack` methods.
+    (David Bennett)
+
+  * Add paramiko-based SSH vendor. (Aaron O'Mullan)
+
+  * Support running 'dulwich.server' and 'dulwich.web' using 'python -m'.
+    (Jelmer Vernooij)
+
+  * Add ObjectStore.close(). (Jelmer Vernooij)
+
+  * Raise appropriate NotImplementedError when encountering dumb HTTP servers.
+    (Jelmer Vernooij)
+
+ API CHANGES
+
+  * SSHVendor.connect_ssh has been renamed to SSHVendor.run_command.
+    (Jelmer Vernooij)
+
+  * ObjectStore.add_pack() now returns a 3-tuple. The last element will be an
+    abort() method that can be used to cancel the pack operation.
+    (Jelmer Vernooij)
+
 0.9.0	2013-05-31
 
  BUG FIXES

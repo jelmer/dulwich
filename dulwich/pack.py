@@ -1023,10 +1023,16 @@ class PackData(object):
         # TODO: cache these results
         if self.pack is None:
             raise KeyError(sha)
-        offset = self.pack.index.object_index(sha)
-        if not offset:
+        try:
+            offset = self.pack.index.object_index(sha)
+        except KeyError:
+            offset = None
+        if offset:
+            type, obj = self.get_object_at(offset)
+        elif self.pack is not None and self.pack.resolve_ext_ref:
+            type, obj = self.pack.resolve_ext_ref(sha)
+        else:
             raise KeyError(sha)
-        type, obj = self.get_object_at(offset)
         return offset, type, obj
 
     def resolve_object(self, offset, type, obj, get_ref=None):
@@ -1094,7 +1100,11 @@ class PackData(object):
         :return: iterator of tuples with (sha, offset, crc32)
         """
         num_objects = self._num_objects
-        for i, result in enumerate(PackIndexer.for_pack_data(self)):
+        resolve_ext_ref = (
+            self.pack.resolve_ext_ref if self.pack is not None else None)
+        indexer = PackIndexer.for_pack_data(
+            self, resolve_ext_ref=resolve_ext_ref)
+        for i, result in enumerate(indexer):
             if progress is not None:
                 progress(i, num_objects)
             yield result
@@ -1739,7 +1749,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
 class Pack(object):
     """A Git pack object."""
 
-    def __init__(self, basename):
+    def __init__(self, basename, resolve_ext_ref=None):
         self._basename = basename
         self._data = None
         self._idx = None
@@ -1747,6 +1757,7 @@ class Pack(object):
         self._data_path = self._basename + '.pack'
         self._data_load = lambda: PackData(self._data_path)
         self._idx_load = lambda: load_pack_index(self._idx_path)
+        self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
     def from_lazy_objects(self, data_fn, idx_fn):
@@ -1851,7 +1862,8 @@ class Pack(object):
 
     def iterobjects(self):
         """Iterate over the objects in this pack."""
-        return iter(PackInflater.for_pack_data(self.data))
+        return iter(PackInflater.for_pack_data(
+            self.data, resolve_ext_ref=self.resolve_ext_ref))
 
     def pack_tuples(self):
         """Provide an iterable for use with write_pack_objects.

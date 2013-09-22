@@ -21,6 +21,7 @@
 """Git object store interfaces and implementation."""
 
 
+from cStringIO import StringIO
 import errno
 import itertools
 import os
@@ -50,6 +51,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     Pack,
     PackData,
+    PackInflater,
     iter_sha1,
     write_pack_header,
     write_pack_index_v2,
@@ -245,6 +247,10 @@ class BaseObjectStore(object):
                 queue.extend(cmt.parents)
         return (commits, bases)
 
+    def close(self):
+        """Close any files opened by this object store."""
+        # Default implementation is a NO-OP
+
 
 class PackBasedObjectStore(BaseObjectStore):
 
@@ -290,6 +296,13 @@ class PackBasedObjectStore(BaseObjectStore):
         """
         if self._pack_cache is not None:
             self._pack_cache.append(pack)
+
+    def close(self):
+        pack_cache = self._pack_cache
+        self._pack_cache = None
+        while pack_cache:
+            pack = pack_cache.pop()
+            pack.close()
 
     @property
     def packs(self):
@@ -379,9 +392,14 @@ class PackBasedObjectStore(BaseObjectStore):
         if len(objects) == 0:
             # Don't bother writing an empty pack file
             return
-        f, commit = self.add_pack()
-        write_pack_objects(f, objects)
-        return commit()
+        f, commit, abort = self.add_pack()
+        try:
+            write_pack_objects(f, objects)
+        except:
+            abort()
+            raise
+        else:
+            return commit()
 
 
 class DiskObjectStore(PackBasedObjectStore):
@@ -616,8 +634,9 @@ class DiskObjectStore(PackBasedObjectStore):
     def add_pack(self):
         """Add a new pack to this object store.
 
-        :return: Fileobject to write to and a commit function to
-            call when the pack is finished.
+        :return: Fileobject to write to, a commit function to
+            call when the pack is finished and an abort
+            function.
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
@@ -629,7 +648,10 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 os.remove(path)
                 return None
-        return f, commit
+        def abort():
+            f.close()
+            os.remove(path)
+        return f, commit, abort
 
     def add_object(self, obj):
         """Add a single object to this object store.
@@ -724,6 +746,72 @@ class MemoryObjectStore(BaseObjectStore):
         """
         for obj, path in objects:
             self._data[obj.id] = obj
+
+    def add_pack(self):
+        """Add a new pack to this object store.
+
+        Because this object store doesn't support packs, we extract and add the
+        individual objects.
+
+        :return: Fileobject to write to and a commit function to
+            call when the pack is finished.
+        """
+        f = StringIO()
+        def commit():
+            p = PackData.from_file(StringIO(f.getvalue()), f.tell())
+            f.close()
+            for obj in PackInflater.for_pack_data(p):
+                self._data[obj.id] = obj
+        def abort():
+            pass
+        return f, commit, abort
+
+    def _complete_thin_pack(self, f, indexer):
+        """Complete a thin pack by adding external references.
+
+        :param f: Open file object for the pack.
+        :param indexer: A PackIndexer for indexing the pack.
+        """
+        entries = list(indexer)
+
+        # Update the header with the new number of objects.
+        f.seek(0)
+        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+
+        # Rescan the rest of the pack, computing the SHA with the new header.
+        new_sha = compute_file_sha(f, end_ofs=-20)
+
+        # Complete the pack.
+        for ext_sha in indexer.ext_refs():
+            assert len(ext_sha) == 20
+            type_num, data = self.get_raw(ext_sha)
+            write_pack_object(f, type_num, data, sha=new_sha)
+        pack_sha = new_sha.digest()
+        f.write(pack_sha)
+
+    def add_thin_pack(self, read_all, read_some):
+        """Add a new thin pack to this object store.
+
+        Thin packs are packs that contain deltas with parents that exist outside
+        the pack. Because this object store doesn't support packs, we extract
+        and add the individual objects.
+
+        :param read_all: Read function that blocks until the number of requested
+            bytes are read.
+        :param read_some: Read function that returns at least one byte, but may
+            not return the number of bytes requested.
+        """
+        f, commit, abort = self.add_pack()
+        try:
+            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
+            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier.verify()
+            self._complete_thin_pack(f, indexer)
+        except:
+            abort()
+            raise
+        else:
+            commit()
 
 
 class ObjectImporter(object):

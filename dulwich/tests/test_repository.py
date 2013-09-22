@@ -165,6 +165,19 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('a.git')
         self.assertTrue("HEAD" in r)
 
+    def test_get_no_description(self):
+        r = self._repo = open_repo('a.git')
+        self.assertIs(None, r.get_description())
+
+    def test_get_description(self):
+        r = self._repo = open_repo('a.git')
+        f = open(os.path.join(r.path, 'description'), 'w')
+        try:
+            f.write("Some description")
+        finally:
+            f.close()
+        self.assertEquals("Some description", r.get_description())
+
     def test_contains_missing(self):
         r = self._repo = open_repo('a.git')
         self.assertFalse("bar" in r)
@@ -259,6 +272,9 @@ class RepositoryTests(TestCase):
                          [r.head(), '2a72d929692c41d8554c07f6301757ba18a65d91'])
         self.assertEqual(
             [e.commit.id for e in r.get_walker(['2a72d929692c41d8554c07f6301757ba18a65d91'])],
+            ['2a72d929692c41d8554c07f6301757ba18a65d91'])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker('2a72d929692c41d8554c07f6301757ba18a65d91')],
             ['2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_linear_history(self):
@@ -829,6 +845,7 @@ class PackedRefsFileTests(TestCase):
 # Dict of refs that we expect all RefsContainerTests subclasses to define.
 _TEST_REFS = {
   'HEAD': '42d06bd4b77fed026b154d16493e5deab78f02ec',
+  'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/master': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/heads/packed': '42d06bd4b77fed026b154d16493e5deab78f02ec',
   'refs/tags/refs-0.1': 'df6800012397fb85c56e7418dd4eb9405dee075c',
@@ -847,7 +864,9 @@ class RefsContainerTests(object):
 
         actual_keys = self._refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(self._refs.keys('refs/tags')))
 
@@ -1111,6 +1130,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
 
 _TEST_REFS_SERIALIZED = (
+'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/master\n'
 '42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/packed\n'
 'df6800012397fb85c56e7418dd4eb9405dee075c\trefs/tags/refs-0.1\n'
@@ -1139,7 +1159,9 @@ class InfoRefsContainerTests(TestCase):
 
         actual_keys = refs.keys('refs/heads')
         actual_keys.discard('loop')
-        self.assertEqual(['master', 'packed'], sorted(actual_keys))
+        self.assertEqual(
+            ['40-char-ref-aaaaaaaaaaaaaaaaaa', 'master', 'packed'],
+            sorted(actual_keys))
         self.assertEqual(['refs-0.1', 'refs-0.2'],
                          sorted(refs.keys('refs/tags')))
 

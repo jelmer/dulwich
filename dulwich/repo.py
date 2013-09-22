@@ -86,14 +86,6 @@ BASE_DIRECTORIES = [
     ]
 
 
-def read_info_refs(f):
-    ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
-        ret[name] = sha
-    return ret
-
-
 def check_ref_format(refname):
     """Check if a refname is correctly formatted.
 
@@ -896,10 +888,12 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if wants is None:
+        if type(wants) is not list:
+            raise TypeError("determine_wants() did not return a list")
+        if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
-            return None
+            return []
         haves = self.object_store.find_common_revisions(graph_walker)
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(haves, wants, progress,
@@ -978,6 +972,14 @@ class BaseRepo(object):
         :return: `ConfigFile` object for the ``.git/config`` file.
         """
         raise NotImplementedError(self.get_config)
+
+    def get_description(self):
+        """Retrieve the description for this repository.
+
+        :return: String with the description of the repository
+            as set by the user.
+        """
+        raise NotImplementedError(self.get_description)
 
     def get_config_stack(self):
         """Return a config stack for this repository.
@@ -1081,6 +1083,8 @@ class BaseRepo(object):
         from dulwich.walk import Walker
         if include is None:
             include = [self.head()]
+        if isinstance(include, str):
+            include = [include]
         return Walker(self.object_store, include, *args, **kwargs)
 
     def revision_history(self, head):
@@ -1107,7 +1111,7 @@ class BaseRepo(object):
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
-            except KeyError:
+            except (KeyError, ValueError):
                 pass
         try:
             return self.object_store[self.refs[name]]
@@ -1449,6 +1453,23 @@ class Repo(BaseRepo):
             ret.path = path
             return ret
 
+    def get_description(self):
+        """Retrieve the description of this repository.
+
+        :return: A string describing the repository or None.
+        """
+        path = os.path.join(self._controldir, 'description')
+        try:
+            f = GitFile(path, 'rb')
+            try:
+                return f.read()
+            finally:
+                f.close()
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None
+
     def __repr__(self):
         return "<Repo at %r>" % self.path
 
@@ -1540,6 +1561,13 @@ class MemoryRepo(BaseRepo):
         """
         from dulwich.config import ConfigFile
         return ConfigFile()
+
+    def get_description(self):
+        """Retrieve the repository description.
+
+        This defaults to None, for no description.
+        """
+        return None
 
     @classmethod
     def init_bare(cls, objects, refs):

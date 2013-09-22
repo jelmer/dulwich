@@ -188,12 +188,43 @@ class ObjectStoreTests(object):
         self.assertEqual((Blob.type_num, 'yummy data'),
                          self.store.get_raw(testobject.id))
 
+    def test_close(self):
+        # For now, just check that close doesn't barf.
+        self.store.add_object(testobject)
+        self.store.close()
+
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
+
+    def test_add_pack(self):
+        o = MemoryObjectStore()
+        f, commit, abort = o.add_pack()
+        try:
+            b = make_object(Blob, data="more yummy data")
+            write_pack_objects(f, [(b, None)])
+        except:
+            abort()
+            raise
+        else:
+            commit()
+
+    def test_add_thin_pack(self):
+        o = MemoryObjectStore()
+        blob = make_object(Blob, data='yummy data')
+        o.add_object(blob)
+
+        f = StringIO()
+        entries = build_pack(f, [
+          (REF_DELTA, (blob.id, 'more yummy data')),
+          ], store=o)
+        o.add_thin_pack(f.read, None)
+        packed_blob_sha = sha_to_hex(entries[0][3])
+        self.assertEqual((Blob.type_num, 'more yummy data'),
+                         o.get_raw(packed_blob_sha))
 
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
@@ -269,10 +300,15 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_add_pack(self):
         o = DiskObjectStore(self.store_dir)
-        f, commit = o.add_pack()
-        b = make_object(Blob, data="more yummy data")
-        write_pack_objects(f, [(b, None)])
-        commit()
+        f, commit, abort = o.add_pack()
+        try:
+            b = make_object(Blob, data="more yummy data")
+            write_pack_objects(f, [(b, None)])
+        except:
+            abort()
+            raise
+        else:
+            commit()
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)

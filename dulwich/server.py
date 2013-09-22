@@ -359,7 +359,7 @@ class ProtocolGraphWalker(object):
         if not heads:
             # The repo is empty, so short-circuit the whole process.
             self.proto.write_pkt_line(None)
-            return None
+            return []
         values = set(heads.itervalues())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.iteritems())):
@@ -402,7 +402,7 @@ class ProtocolGraphWalker(object):
             # The client may close the socket at this point, expecting a
             # flush-pkt from the server. We might be ready to send a packfile at
             # this point, so we need to explicitly short-circuit in this case.
-            return None
+            return []
 
         return want_revs
 
@@ -617,15 +617,26 @@ class ReceivePackHandler(Handler):
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
         status = []
-        # TODO: more informative error messages than just the exception string
-        try:
-            recv = getattr(self.proto, "recv", None)
-            p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+        will_send_pack = False
+
+        for command in refs:
+            if command[1] != ZERO_SHA:
+                will_send_pack = True
+
+        if will_send_pack:
+            # TODO: more informative error messages than just the exception string
+            try:
+                recv = getattr(self.proto, "recv", None)
+                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                status.append(('unpack', 'ok'))
+            except all_exceptions, e:
+                status.append(('unpack', str(e).replace('\n', '')))
+                # The pack may still have been moved in, but it may contain broken
+                # objects. We trust a later GC to clean it up.
+        else:
+            # The git protocol want to find a status entry related to unpack process
+            # even if no pack data has been sent.
             status.append(('unpack', 'ok'))
-        except all_exceptions, e:
-            status.append(('unpack', str(e).replace('\n', '')))
-            # The pack may still have been moved in, but it may contain broken
-            # objects. We trust a later GC to clean it up.
 
         for oldsha, sha, ref in refs:
             ref_status = 'ok'
@@ -769,13 +780,22 @@ class TCPGitServer(SocketServer.TCPServer):
 
 def main(argv=sys.argv):
     """Entry point for starting a TCP git server."""
-    if len(argv) > 1:
-        gitdir = argv[1]
-    else:
-        gitdir = '.'
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-b", "--backend", dest="backend",
+                      help="Select backend to use.",
+                      choices=["file"], default="file")
+    options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    backend = DictBackend({'/': Repo(gitdir)})
+    if options.backend == "file":
+        if len(argv) > 1:
+            gitdir = args[1]
+        else:
+            gitdir = '.'
+        backend = DictBackend({'/': Repo(gitdir)})
+    else:
+        raise Exception("No such backend %s." % backend)
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
 
@@ -840,3 +860,7 @@ def update_server_info(repo):
 
     repo._put_named_file(os.path.join('objects', 'info', 'packs'),
         "".join(generate_objects_info_packs(repo)))
+
+
+if __name__ == '__main__':
+    main()

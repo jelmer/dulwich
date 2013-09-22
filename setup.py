@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.0'
+dulwich_version_string = '0.9.1'
 
 include_dirs = []
 # Windows MSVC support
@@ -58,8 +58,6 @@ setup(name='dulwich',
       keywords='git',
       version=dulwich_version_string,
       url='http://samba.org/~jelmer/dulwich',
-      download_url='http://samba.org/~jelmer/dulwich/'
-                   'dulwich-%s.tar.gz' % dulwich_version_string,
       license='GPLv2 or later',
       author='Jelmer Vernooij',
       author_email='jelmer@samba.org',
@@ -71,8 +69,8 @@ setup(name='dulwich',
       All functionality is available in pure Python, but (optional)
       C extensions are also available for better performance.
       """,
-      packages=['dulwich', 'dulwich.tests'],
-      scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web'],
+      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat'],
+      scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),

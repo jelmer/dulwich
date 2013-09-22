@@ -63,11 +63,13 @@ setup(name='dulwich',
       author_email='jelmer@samba.org',
       long_description="""
       Simple Python implementation of the Git file formats and
-      protocols. Dulwich is the place where Mr. and Mrs. Git live
-      in one of the Monty Python sketches.
+      protocols.
 
-      All functionality is available in pure Python, but (optional)
-      C extensions are also available for better performance.
+      All functionality is available in pure Python. Optional
+      C extensions can be built for improved performance.
+
+      Dulwich takes its name from the area in London where the friendly
+      Mr. and Mrs. Git once attended a cocktail party.
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],

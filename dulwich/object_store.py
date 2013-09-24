@@ -492,7 +492,15 @@ class DiskObjectStore(PackBasedObjectStore):
             raise
         pack_files.sort(reverse=True)
         suffix_len = len(".pack")
-        return [Pack(f[:-suffix_len]) for _, f in pack_files]
+        result = []
+        try:
+            for _, f in pack_files:
+                result.append(Pack(f[:-suffix_len]))
+        except:
+            for p in result:
+                p.close()
+            raise
+        return result
 
     def _pack_cache_stale(self):
         try:

@@ -1802,7 +1802,8 @@ class Pack(object):
     def close(self):
         if self._data is not None:
             self._data.close()
-        self.index.close()
+        if self._idx is not None:
+            self._idx.close()
 
     def __eq__(self, other):
         return type(self) == type(other) and self.index == other.index

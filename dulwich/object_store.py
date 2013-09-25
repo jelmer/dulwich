@@ -625,15 +625,17 @@ class DiskObjectStore(PackBasedObjectStore):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        entries = p.sorted_entries()
-        basename = os.path.join(self.pack_dir,
-            "pack-%s" % iter_sha1(entry[0] for entry in entries))
-        f = GitFile(basename+".idx", "wb")
         try:
-            write_pack_index_v2(f, entries, p.get_stored_checksum())
+            entries = p.sorted_entries()
+            basename = os.path.join(self.pack_dir,
+                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            f = GitFile(basename+".idx", "wb")
+            try:
+                write_pack_index_v2(f, entries, p.get_stored_checksum())
+            finally:
+                f.close()
         finally:
-            f.close()
-        p.close()
+            p.close()
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
         self._add_known_pack(final_pack)

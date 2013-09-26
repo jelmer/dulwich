@@ -1,5 +1,9 @@
 0.9.2	UNRELEASED
 
+ BUG FIXES
+
+  * Include stdint.h in MANIFEST.IN (Mark Mikofski)
+
 0.9.1	2013-09-22
 
  BUG FIXES

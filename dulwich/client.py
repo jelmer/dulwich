@@ -779,6 +779,11 @@ else:
 
         def run_command(self, host, command, username=None, port=None,
                 progress_stderr=None, **kwargs):
+
+            # Paramiko needs an explicit port. None is not valid
+            if port is None:
+                port = 22
+
             client = paramiko.SSHClient()
 
             policy = paramiko.client.MissingHostKeyPolicy()

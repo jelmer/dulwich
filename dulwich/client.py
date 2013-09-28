@@ -777,8 +777,11 @@ else:
 
     class ParamikoSSHVendor(object):
 
+        def __init__(self):
+            self.ssh_kwargs = {}
+
         def run_command(self, host, command, username=None, port=None,
-                progress_stderr=None, **kwargs):
+                progress_stderr=None):
 
             # Paramiko needs an explicit port. None is not valid
             if port is None:
@@ -788,7 +791,8 @@ else:
 
             policy = paramiko.client.MissingHostKeyPolicy()
             client.set_missing_host_key_policy(policy)
-            client.connect(host, username=username, port=port, **kwargs)
+            client.connect(host, username=username, port=port,
+                           **self.ssh_kwargs)
 
             # Open SSH session
             channel = client.get_transport().open_session()

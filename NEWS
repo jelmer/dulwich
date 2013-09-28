@@ -1,5 +1,9 @@
 0.9.4	UNRELEASED
 
+ IMPROVEMENTS
+
+ * Add ssh_kwargs attribute to ParamikoSSHVendor. (milki)
+
 0.9.3	2013-09-27
 
  BUG FIXES

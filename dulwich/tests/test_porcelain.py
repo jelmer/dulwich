@@ -141,3 +141,14 @@ class LogTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+
+class ShowTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))

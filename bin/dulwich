@@ -184,6 +184,11 @@ def cmd_update_server_info(args):
     porcelain.update_server_info(".")
 
 
+def cmd_show(args):
+    opts, args = getopt(args, "", [])
+    porcelain.show(".")
+
+
 commands = {
     "commit": cmd_commit,
     "fetch-pack": cmd_fetch_pack,
@@ -197,7 +202,8 @@ commands = {
     "update-server-info": cmd_update_server_info,
     "diff": cmd_diff,
     "add": cmd_add,
-    "rm": cmd_rm
+    "rm": cmd_rm,
+    "show": cmd_show,
     }
 
 if len(sys.argv) < 2:

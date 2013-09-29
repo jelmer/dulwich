@@ -19,12 +19,14 @@
 """Tests for dulwich.porcelain."""
 
 from cStringIO import StringIO
+import os
 import shutil
 import tarfile
 import tempfile
 
 from dulwich.porcelain import (
     archive,
+    update_server_info,
     )
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
@@ -39,14 +41,17 @@ from dulwich.tests.utils import (
     )
 
 
-class ArchiveTests(TestCase):
-    """Tests for the archive command."""
+class PorcelainTestCase(TestCase):
 
     def setUp(self):
         super(TestCase, self).setUp()
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         self.repo = Repo.init_bare(repo_dir)
+
+
+class ArchiveTests(PorcelainTestCase):
+    """Tests for the archive command."""
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
@@ -58,3 +63,12 @@ class ArchiveTests(TestCase):
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
         self.assertEquals([], tf.getnames())
+
+
+class UpdateServerInfoTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs["refs/heads/foo"] = c3.id
+        update_server_info(self.repo.path)
+        self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(), 'info', 'refs')))

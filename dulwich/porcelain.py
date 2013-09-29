@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import os
 import sys
 
 from dulwich.client import get_transport_and_path
@@ -67,3 +68,18 @@ def commit(path=".", message=None):
     # FIXME: Support --signoff argument
     r = Repo(path)
     r.do_commit(message=message)
+
+
+def init(path=".", bare=False):
+    """Create a new git repository.
+
+    :param path: Path to repository.
+    :param bare: Whether to create a bare repository.
+    """
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    if bare:
+        Repo.init_bare(path)
+    else:
+        Repo.init(path)

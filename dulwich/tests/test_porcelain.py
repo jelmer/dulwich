@@ -27,6 +27,7 @@ import tempfile
 from dulwich.porcelain import (
     archive,
     commit,
+    init,
     update_server_info,
     )
 from dulwich.repo import Repo
@@ -81,3 +82,16 @@ class CommitTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
         commit(self.repo.path, message="Some message")
+
+
+class CommitTests(TestCase):
+
+    def test_non_bare(self):
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        init(repo_dir)
+
+    def test_bare(self):
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        init(repo_dir, bare=True)

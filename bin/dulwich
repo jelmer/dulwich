@@ -36,6 +36,7 @@ from dulwich.index import Index
 from dulwich.porcelain import (
     archive,
     commit,
+    init,
     update_server_info,
     )
 from dulwich.pack import Pack, sha_to_hex
@@ -164,13 +165,7 @@ def cmd_init(args):
     else:
         path = args[0]
 
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    if "--bare" in opts:
-        Repo.init_bare(path)
-    else:
-        Repo.init(path)
+    init(path, bare=("--bare" in opts))
 
 
 def cmd_clone(args):

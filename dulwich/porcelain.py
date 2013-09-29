@@ -20,6 +20,7 @@ import os
 import sys
 
 from dulwich.client import get_transport_and_path
+from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 
@@ -176,3 +177,19 @@ def log(repo=".", outstream=sys.stdout):
     walker = r.get_walker()
     for entry in walker:
         print_commit(entry.commit, outstream)
+
+
+def show(repo=".", committish=None, outstream=sys.stdout):
+    """Print the changes in a commit.
+
+    :param repo: Path to repository
+    :param committish: Commit to write
+    :param outstream: Stream to write to
+    """
+    if committish is None:
+        committish = "HEAD"
+    r = open_repo(repo)
+    commit = r[committish]
+    parent_commit = r[commit.parents[0]]
+    print_commit(commit, outstream)
+    write_tree_diff(outstream, r.object_store, parent_commit.tree, commit.tree)

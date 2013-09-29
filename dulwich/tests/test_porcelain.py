@@ -26,6 +26,7 @@ import tempfile
 
 from dulwich.porcelain import (
     archive,
+    clone,
     commit,
     init,
     update_server_info,
@@ -84,7 +85,19 @@ class CommitTests(PorcelainTestCase):
         commit(self.repo.path, message="Some message")
 
 
-class CommitTests(TestCase):
+class CloneTests(PorcelainTestCase):
+
+    def test_simple_local(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs["refs/heads/master"] = c3.id
+        target_path = tempfile.mkdtemp()
+        outstream = StringIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        clone(self.repo.path, target_path, outstream=outstream)
+        self.assertEquals(Repo(target_path).head(), c3.id)
+
+
+class InitTests(TestCase):
 
     def test_non_bare(self):
         repo_dir = tempfile.mkdtemp()

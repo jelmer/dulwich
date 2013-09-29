@@ -35,6 +35,7 @@ from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.porcelain import (
     archive,
+    clone,
     commit,
     init,
     update_server_info,
@@ -169,26 +170,20 @@ def cmd_init(args):
 
 
 def cmd_clone(args):
-    opts, args = getopt(args, "", [])
+    opts, args = getopt(args, "", ["bare"])
     opts = dict(opts)
 
     if args == []:
         print "usage: dulwich clone host:path [PATH]"
         sys.exit(1)
-    client, host_path = get_transport_and_path(args.pop(0))
 
+    source = args.pop(0)
     if len(args) > 0:
-        path = args.pop(0)
+        target = args.pop(0)
     else:
-        path = host_path.split("/")[-1]
+        target = None
 
-    if not os.path.exists(path):
-        os.mkdir(path)
-    r = Repo.init(path)
-    remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=sys.stdout.write)
-    r["HEAD"] = remote_refs["HEAD"]
+    clone(source, target, bare=("--bare" in opts))
 
 
 def cmd_commit(args):

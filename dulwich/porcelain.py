@@ -27,7 +27,15 @@ from dulwich.server import update_server_info as server_update_server_info
 
 Currently implemented:
  * archive
+ * add
+ * clone
+ * commit
+ * init
+ * remove
+ * update-server-info
 
+These functions are meant to behave similarly to the git subcommands.
+Differences in behaviour are considered bugs.
 """
 
 __docformat__ = 'restructuredText'

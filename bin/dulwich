@@ -54,6 +54,12 @@ def cmd_add(args):
     porcelain.add(".", paths=args)
 
 
+def cmd_rm(args):
+    opts, args = getopt(args, "", [])
+
+    porcelain.rm(".", paths=args)
+
+
 def cmd_fetch_pack(args):
     opts, args = getopt(args, "", ["all"])
     opts = dict(opts)
@@ -209,6 +215,8 @@ commands = {
     "archive": cmd_archive,
     "update-server-info": cmd_update_server_info,
     "diff": cmd_diff,
+    "add": cmd_add,
+    "rm": cmd_rm
     }
 
 if len(sys.argv) < 2:

@@ -126,3 +126,16 @@ def add(repo=".", paths=None):
     # FIXME: Support patterns, directories, no argument.
     r = open_repo(repo)
     r.stage(paths)
+
+
+def rm(repo=".", paths=None):
+    """Remove files from the staging area.
+
+    :param repo: Repository for the files
+    :param paths: Paths to remove
+    """
+    r = open_repo(repo)
+    index = r.open_index()
+    for p in paths:
+        del index[p]
+    index.write()

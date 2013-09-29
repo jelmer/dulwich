@@ -25,9 +25,6 @@ import tarfile
 import tempfile
 
 from dulwich import porcelain
-from dulwich.porcelain import (
-    update_server_info,
-    )
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
     make_object,
@@ -120,4 +117,16 @@ class AddTests(PorcelainTestCase):
             f.write("BAR")
         finally:
             f.close()
-        porcelain.add(".", paths=["foo"])
+        porcelain.add(self.repo.path, paths=["foo"])
+
+
+class RemoveTests(PorcelainTestCase):
+
+    def test_remove_file(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.rm(self.repo.path, paths=["foo"])

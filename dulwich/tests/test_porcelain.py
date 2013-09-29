@@ -24,11 +24,8 @@ import shutil
 import tarfile
 import tempfile
 
+from dulwich import porcelain
 from dulwich.porcelain import (
-    archive,
-    clone,
-    commit,
-    init,
     update_server_info,
     )
 from dulwich.repo import Repo
@@ -61,7 +58,8 @@ class ArchiveTests(PorcelainTestCase):
         self.repo.refs["refs/heads/master"] = c3.id
         out = StringIO()
         err = StringIO()
-        archive(self.repo.path, "refs/heads/master", outstream=out, errstream=err)
+        porcelain.archive(self.repo.path, "refs/heads/master", outstream=out,
+            errstream=err)
         self.assertEquals("", err.getvalue())
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
@@ -71,29 +69,33 @@ class ArchiveTests(PorcelainTestCase):
 class UpdateServerInfoTests(PorcelainTestCase):
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
-        update_server_info(self.repo.path)
-        self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(), 'info', 'refs')))
+        porcelain.update_server_info(self.repo.path)
+        self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(),
+            'info', 'refs')))
 
 
 class CommitTests(PorcelainTestCase):
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
-        commit(self.repo.path, message="Some message")
+        porcelain.commit(self.repo.path, message="Some message")
 
 
 class CloneTests(PorcelainTestCase):
 
     def test_simple_local(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
         outstream = StringIO()
         self.addCleanup(shutil.rmtree, target_path)
-        clone(self.repo.path, target_path, outstream=outstream)
+        porcelain.clone(self.repo.path, target_path, outstream=outstream)
         self.assertEquals(Repo(target_path).head(), c3.id)
 
 
@@ -102,9 +104,20 @@ class InitTests(TestCase):
     def test_non_bare(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        init(repo_dir)
+        porcelain.init(repo_dir)
 
     def test_bare(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        init(repo_dir, bare=True)
+        porcelain.init(repo_dir, bare=True)
+
+
+class AddTests(PorcelainTestCase):
+
+    def test_add_file(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(".", paths=["foo"])

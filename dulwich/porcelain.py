@@ -115,3 +115,14 @@ def clone(source, target=None, bare=False, outstream=sys.stdout):
         determine_wants=r.object_store.determine_wants_all,
         progress=outstream.write)
     r["HEAD"] = remote_refs["HEAD"]
+
+
+def add(repo=".", paths=None):
+    """Add files to the staging area.
+
+    :param repo: Repository for the files
+    :param paths: Paths to add
+    """
+    # FIXME: Support patterns, directories, no argument.
+    r = open_repo(repo)
+    r.stage(paths)

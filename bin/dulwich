@@ -37,7 +37,6 @@ from dulwich.porcelain import archive
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
-from dulwich.server import update_server_info
 
 
 def cmd_archive(args):
@@ -205,8 +204,7 @@ def cmd_commit(args):
 
 
 def cmd_update_server_info(args):
-    r = Repo(".")
-    update_server_info(r)
+    update_server_info(".")
 
 
 commands = {

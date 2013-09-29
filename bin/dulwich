@@ -33,6 +33,7 @@ from getopt import getopt
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
+from dulwich.porcelain import archive
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
@@ -42,8 +43,9 @@ from dulwich.server import update_server_info
 def cmd_archive(args):
     opts, args = getopt(args, "", [])
     client, path = get_transport_and_path(args.pop(0))
+    location = args.pop(0)
     committish = args.pop(0)
-    client.archive(path, committish, sys.stdout.write, sys.stderr.write)
+    archive(location, committish, outstream=sys.stdout, errstream=sys.stderr)
 
 
 def cmd_fetch_pack(args):

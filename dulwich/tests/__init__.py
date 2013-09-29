@@ -125,6 +125,7 @@ def self_test_suite():
         'missing_obj_finder',
         'pack',
         'patch',
+        'porcelain',
         'protocol',
         'repository',
         'server',

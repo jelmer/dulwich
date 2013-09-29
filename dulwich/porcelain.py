@@ -83,3 +83,28 @@ def init(path=".", bare=False):
         Repo.init_bare(path)
     else:
         Repo.init(path)
+
+
+def clone(source, target=None, bare=False, outstream=sys.stdout):
+    """Clone a local or remote git repository.
+
+    :param source: Path or URL for source repository
+    :param target: Path to target repository (optional)
+    :param bare: Whether or not to create a bare repository
+    :param outstream: Optional stream to write progress to
+    """
+    client, host_path = get_transport_and_path(source)
+
+    if target is None:
+        target = host_path.split("/")[-1]
+
+    if not os.path.exists(target):
+        os.mkdir(target)
+    if bare:
+        r = Repo.init_bare(target)
+    else:
+        r = Repo.init(target)
+    remote_refs = client.fetch(host_path, r,
+        determine_wants=r.object_store.determine_wants_all,
+        progress=outstream.write)
+    r["HEAD"] = remote_refs["HEAD"]

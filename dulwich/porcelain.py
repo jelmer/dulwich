@@ -55,3 +55,15 @@ def update_server_info(path="."):
     """
     r = Repo(path)
     server_update_server_info(r)
+
+
+def commit(path=".", message=None):
+    """Create a new commit.
+
+    :param path: Path to repository
+    :param message: Optional commit message
+    """
+    # FIXME: Support --all argument
+    # FIXME: Support --signoff argument
+    r = Repo(path)
+    r.do_commit(message=message)

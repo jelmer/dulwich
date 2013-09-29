@@ -26,6 +26,7 @@ import tempfile
 
 from dulwich.porcelain import (
     archive,
+    commit,
     update_server_info,
     )
 from dulwich.repo import Repo
@@ -47,7 +48,7 @@ class PorcelainTestCase(TestCase):
         super(TestCase, self).setUp()
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        self.repo = Repo.init_bare(repo_dir)
+        self.repo = Repo.init(repo_dir)
 
 
 class ArchiveTests(PorcelainTestCase):
@@ -72,3 +73,11 @@ class UpdateServerInfoTests(PorcelainTestCase):
         self.repo.refs["refs/heads/foo"] = c3.id
         update_server_info(self.repo.path)
         self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(), 'info', 'refs')))
+
+
+class CommitTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs["refs/heads/foo"] = c3.id
+        commit(self.repo.path, message="Some message")

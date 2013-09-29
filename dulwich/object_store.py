@@ -27,6 +27,7 @@ import itertools
 import os
 import stat
 import tempfile
+import warnings
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -113,8 +114,7 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.get_raw)
 
-    @property
-    def grafts(self):
+    def _get_grafts(self):
         """Graftpoints are commits with parents "rewritten"
 
         https://git.wiki.kernel.org/index.php/GraftPoint
@@ -123,12 +123,20 @@ class BaseObjectStore(object):
             self._grafts = {}
         return self._grafts
 
-    def add_grafts(self, grafts={}):
-        self.grafts.update(grafts)
+    def _set_grafts(self, value):
+        grafts = {}
+        for commit, parents in value.iteritems():
+            shas = [commit] + parents
 
-    def remove_grafts(self, shas=[]):
-        for sha in shas:
-            del self.grafts[sha]
+            if reduce(lambda x, y: x and y, [sha in self for sha in shas]):
+                grafts[commit] = parents
+            else:
+                warnings.warn(
+                    'object_store._set_grafts - Skipping invalid graft:'
+                    ' %s %s' % (commit, ' '.join(parents)))
+        self._grafts = grafts
+
+    grafts = property(_get_grafts, _set_grafts)
 
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""

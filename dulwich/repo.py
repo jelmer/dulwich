@@ -798,6 +798,9 @@ def parse_graftpoints(graft_lines=[]):
     Each line is formatted as:
         <commit sha1> <parent sha1> [<parent sha1>]*
 
+    Resulting dictionary is:
+        <commit sha1>: [<parent sha1>*]
+
     https://git.wiki.kernel.org/index.php/GraftPoint
     """
     grafts = {}
@@ -811,6 +814,24 @@ def parse_graftpoints(graft_lines=[]):
             parents = []
         grafts[sha] = parents
     return grafts
+
+
+def serialize_graftpoints(grafts):
+    """Convert a dictionary of grafts into string
+
+    The graft dictionary is:
+        <commit sha1>: [<parent sha1>*]
+
+    Each line is formatted as:
+        <commit sha1> <parent sha1> [<parent sha1>]*
+
+    https://git.wiki.kernel.org/index.php/GraftPoint
+
+    """
+    graft_lines = ""
+    for commit, parents in grafts.iteritems():
+        graft_lines += "%s %s\n" % (commit, ' '.join(parents))
+    return graft_lines
 
 
 class BaseRepo(object):
@@ -834,6 +855,7 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+        self.graftpoints = {}
         self.hooks = {}
 
     def _init_files(self, bare):
@@ -1183,6 +1205,30 @@ class BaseRepo(object):
             config.get(("user", ), "name"),
             config.get(("user", ), "email"))
 
+    def add_grafts(self, updated_grafts):
+        self.graftpoints.update(updated_grafts)
+        self.refresh_graftpoints()
+
+    def remove_grafts(self, to_remove=[]):
+        for sha in to_remove:
+            del self.graftpoints[sha]
+        self.refresh_graftpoints()
+
+    def serialize_grafts(self):
+        """Get the string representation of the graftpoints
+
+        This format is writable to a graftpoint file.
+        """
+        return serialize_graftpoints(self.graftpoints)
+
+    def refresh_graftpoints(self):
+        """Set all the known graftpoints in the object store
+
+        This method must be called before GraftedCommits can
+        be retrieved from the repo.
+        """
+        self.object_store.grafts = self.graftpoints
+
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
@@ -1321,8 +1367,9 @@ class Repo(BaseRepo):
 
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            grafts = parse_graftpoints(graft_file.read().splitlines())
-            self.object_store.add_grafts(grafts)
+            self.graftpoints = \
+                parse_graftpoints(graft_file.read().splitlines())
+            self.refresh_graftpoints()
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
@@ -1347,7 +1394,8 @@ class Repo(BaseRepo):
 
         if path == os.path.join("info", "grafts"):
             grafts = parse_graftpoints(contents.splitlines())
-            self.object_store.add_grafts(grafts)
+            self.add_grafts(grafts)
+            self.refresh_graftpoints()
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -1564,7 +1612,8 @@ class MemoryRepo(BaseRepo):
 
         if path == os.path.join("info", "grafts"):
             grafts = parse_graftpoints(contents.splitlines())
-            self.object_store.add_grafts(grafts)
+            self.add_grafts(grafts)
+            self.refresh_graftpoints()
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.

@@ -20,7 +20,7 @@ import os
 import sys
 
 from dulwich.client import get_transport_and_path
-from dulwich.repo import Repo
+from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
@@ -31,6 +31,13 @@ Currently implemented:
 """
 
 __docformat__ = 'restructuredText'
+
+
+def open_repo(path_or_repo):
+    """Open an argument that can be a repository or a path for a repository."""
+    if isinstance(path_or_repo, BaseRepo):
+        return path_or_repo
+    return Repo(path_or_repo)
 
 
 def archive(location, committish=None, outstream=sys.stdout,
@@ -49,24 +56,24 @@ def archive(location, committish=None, outstream=sys.stdout,
     client.archive(path, committish, outstream.write, errstream.write)
 
 
-def update_server_info(path="."):
+def update_server_info(repo="."):
     """Update server info files for a repository.
 
-    :param path: path to the repository
+    :param repo: path to the repository
     """
-    r = Repo(path)
+    r = open_repo(repo)
     server_update_server_info(r)
 
 
-def commit(path=".", message=None):
+def commit(repo=".", message=None):
     """Create a new commit.
 
-    :param path: Path to repository
+    :param repo: Path to repository
     :param message: Optional commit message
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
-    r = Repo(path)
+    r = open_repo(repo)
     r.do_commit(message=message)
 
 

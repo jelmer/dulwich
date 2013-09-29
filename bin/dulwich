@@ -33,7 +33,11 @@ from getopt import getopt
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
-from dulwich.porcelain import archive
+from dulwich.porcelain import (
+    archive,
+    commit,
+    update_server_info,
+    )
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
@@ -195,12 +199,7 @@ def cmd_clone(args):
 def cmd_commit(args):
     opts, args = getopt(args, "", ["message"])
     opts = dict(opts)
-    r = Repo(".")
-    committer = "%s <%s>" % (os.getenv("GIT_COMMITTER_NAME"), 
-                             os.getenv("GIT_COMMITTER_EMAIL"))
-    author = "%s <%s>" % (os.getenv("GIT_AUTHOR_NAME"), 
-                          os.getenv("GIT_AUTHOR_EMAIL"))
-    r.do_commit(committer=committer, author=author, message=opts["--message"])
+    commit(".", message=opts["--message"])
 
 
 def cmd_update_server_info(args):

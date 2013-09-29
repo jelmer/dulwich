@@ -91,26 +91,7 @@ def cmd_log(args):
         path = args.pop(0)
     else:
         path = "."
-    r = Repo(path)
-    todo = [r.head()]
-    done = set()
-    while todo:
-        sha = todo.pop()
-        assert isinstance(sha, str)
-        if sha in done:
-            continue
-        done.add(sha)
-        commit = r[sha]
-        print "-" * 50
-        print "commit: %s" % sha
-        if len(commit.parents) > 1:
-            print "merge: %s" % "...".join(commit.parents[1:])
-        print "author: %s" % commit.author
-        print "committer: %s" % commit.committer
-        print ""
-        print commit.message
-        print ""
-        todo.extend([p for p in commit.parents if p not in done])
+    porcelain.log(repo=path, outstream=sys.stdout)
 
 
 def cmd_diff(args):

@@ -147,3 +147,32 @@ def rm(repo=".", paths=None):
     for p in paths:
         del index[p]
     index.write()
+
+
+def print_commit(commit, outstream):
+    """Write a human-readable commit log entry.
+
+    :param commit: A `Commit` object
+    :param outstream: A stream file to write to
+    """
+    outstream.write("-" * 50 + "\n")
+    outstream.write("commit: %s\n" % commit.id)
+    if len(commit.parents) > 1:
+        outstream.write("merge: %s\n" % "...".join(commit.parents[1:]))
+    outstream.write("author: %s\n" % commit.author)
+    outstream.write("committer: %s\n" % commit.committer)
+    outstream.write("\n")
+    outstream.write(commit.message + "\n")
+    outstream.write("\n")
+
+
+def log(repo=".", outstream=sys.stdout):
+    """Write commit logs.
+
+    :param repo: Path to repository
+    :param outstream: Stream to write log output to
+    """
+    r = open_repo(repo)
+    walker = r.get_walker()
+    for entry in walker:
+        print_commit(entry.commit, outstream)

@@ -1205,9 +1205,12 @@ class BaseRepo(object):
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
         if committer is None:
+            # FIXME: Support GIT_COMMITTER_NAME/GIT_COMMITTER_EMAIL environment
+            # variables
             committer = self._get_user_identity()
         c.committer = committer
         if commit_timestamp is None:
+            # FIXME: Support GIT_COMMITTER_DATE environment variable
             commit_timestamp = time.time()
         c.commit_time = int(commit_timestamp)
         if commit_timezone is None:
@@ -1215,9 +1218,12 @@ class BaseRepo(object):
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
+            # FIXME: Support GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL environment
+            # variables
             author = committer
         c.author = author
         if author_timestamp is None:
+            # FIXME: Support GIT_AUTHOR_DATE environment variable
             author_timestamp = commit_timestamp
         c.author_time = int(author_timestamp)
         if author_timezone is None:

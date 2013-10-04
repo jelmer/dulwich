@@ -26,10 +26,6 @@ import tempfile
 
 from dulwich import porcelain
 from dulwich.repo import Repo
-from dulwich.tests.utils import (
-    make_object,
-    make_commit,
-    )
 from dulwich.tests import (
     TestCase,
     )
@@ -80,7 +76,18 @@ class CommitTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
-        porcelain.commit(self.repo.path, message="Some message")
+        sha = porcelain.commit(self.repo.path, message="Some message")
+        self.assertTrue(type(sha) is str)
+        self.assertEquals(len(sha), 40)
+
+    def test_custom_author(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["refs/heads/foo"] = c3.id
+        sha = porcelain.commit(self.repo.path, message="Some message",
+                author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
+        self.assertTrue(type(sha) is str)
+        self.assertEquals(len(sha), 40)
 
 
 class CloneTests(PorcelainTestCase):

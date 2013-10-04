@@ -74,16 +74,20 @@ def update_server_info(repo="."):
     server_update_server_info(r)
 
 
-def commit(repo=".", message=None):
+def commit(repo=".", message=None, author=None, committer=None):
     """Create a new commit.
 
     :param repo: Path to repository
     :param message: Optional commit message
+    :param author: Optional author name and email
+    :param committer: Optional committer name and email
+    :return: SHA1 of the new commit
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
     r = open_repo(repo)
-    r.do_commit(message=message)
+    return r.do_commit(message=message, author=author,
+        committer=committer)
 
 
 def init(path=".", bare=False):
@@ -91,14 +95,15 @@ def init(path=".", bare=False):
 
     :param path: Path to repository.
     :param bare: Whether to create a bare repository.
+    :return: A Repo instance
     """
     if not os.path.exists(path):
         os.mkdir(path)
 
     if bare:
-        Repo.init_bare(path)
+        return Repo.init_bare(path)
     else:
-        Repo.init(path)
+        return Repo.init(path)
 
 
 def clone(source, target=None, bare=False, outstream=sys.stdout):

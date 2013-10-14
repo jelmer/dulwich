@@ -1,4 +1,4 @@
-# swift.py -- Utility module for requesting Swift.
+# test_swift.py -- Unittests for the Swift backend.
 # Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
 #
 # Author: Fabien Boucher <fabien.boucher@enovance.com>

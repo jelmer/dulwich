@@ -91,10 +91,11 @@ CONF.read("etc/swift.conf")
 
 
 def catch(func):
-    """ Use as decorator to handle missing object
-        reported by a 404 error status from Swift.
-        An exception is raised when an other error
-        occured.
+    """Decorator to handle http errors
+
+    This decorator handles missing object reported by a 404
+    error status from Swift. An exception is raised when an
+    other error occured.
 
     :raise: `SwiftException` when receiving a code
              other than 20x or 404.
@@ -111,7 +112,7 @@ def catch(func):
 
 
 def swift_load_pack_index(scon, filename):
-    """ Read a pack index file from Swift
+    """Read a pack index file from Swift
 
     :param scon: a `SwiftConnector` instance
     :param filename: Path to the index file objectise
@@ -125,7 +126,7 @@ def swift_load_pack_index(scon, filename):
 
 
 def read_info_refs(scon, filename):
-    """ Read info/refs file from Swift
+    """Read info/refs file from Swift
 
     :param scon: a `SwiftConnector` instance
     :param filename: Path to the index file object
@@ -138,7 +139,7 @@ def read_info_refs(scon, filename):
 
 
 def put_info_refs(scon, filename, refs):
-    """ Write info/refs file to Swift
+    """Write info/refs file to Swift
 
     :param scon: a `SwiftConnector` instance
     :param filename: Path to the index file object
@@ -150,7 +151,7 @@ def put_info_refs(scon, filename, refs):
 
 
 def parse_info_refs(scon, filename):
-    """ Parse info/refs file
+    """Parse info/refs file
 
     :param scon: a `SwiftConnector` instance
     :param filename: Path to the index file object
@@ -166,7 +167,7 @@ def parse_info_refs(scon, filename):
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
-    """ Split object id list into two list with commit SHA1s and tag SHA1s.
+    """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags
     except we use eventlet to parallelize object retrieval.
@@ -200,7 +201,7 @@ class SwiftException(Exception):
 
 
 class SwiftConnector():
-    """ A Connector to swift that manage authentication and errors catching
+    """A Connector to swift that manage authentication and errors catching
     """
     def __init__(self, root):
         """ Initialize a SwiftConnector
@@ -234,7 +235,7 @@ class SwiftConnector():
 
     @catch
     def test_root_exists(self):
-        """ Check that Swift container exist
+        """Check that Swift container exist
 
         :return: True if exist or None it not
         """
@@ -247,7 +248,7 @@ class SwiftConnector():
 
     @catch
     def create_root(self):
-        """ Create the Swift container
+        """Create the Swift container
 
         :raise: `SwiftException` if unable to create
         """
@@ -263,7 +264,7 @@ class SwiftConnector():
 
     @catch
     def get_container_objects(self):
-        """ Retrieve objects list in a container
+        """Retrieve objects list in a container
 
         :return: A list of dict that describe objects
                  or None if container does not exist
@@ -277,7 +278,7 @@ class SwiftConnector():
 
     @catch
     def get_object_stat(self, name):
-        """ Retrieve object stat
+        """Retrieve object stat
 
         :param name: The object name
         :return: A dict that describe the object
@@ -292,7 +293,7 @@ class SwiftConnector():
 
     @catch
     def put_object(self, name, content):
-        """ Put an object
+        """Put an object
 
         :param name: The object name
         :param content: A file object or a bytestring
@@ -314,7 +315,7 @@ class SwiftConnector():
 
     @catch
     def get_object(self, name, range=None):
-        """ Retrieve an object
+        """Retrieve an object
 
         :param name: The object name
         :param range: A string range like "0-10" to
@@ -338,7 +339,7 @@ class SwiftConnector():
 
     @catch
     def del_object(self, name):
-        """ Delete an object
+        """Delete an object
 
         :param name: The object name
         :raise: `SwiftException` if unable to delete
@@ -349,8 +350,7 @@ class SwiftConnector():
 
     @catch
     def del_root(self):
-        """ Delete the root container by removing
-            container content
+        """Delete the root container by removing container content
 
         :raise: `SwiftException` if unable to delete
         """
@@ -362,7 +362,7 @@ class SwiftConnector():
 
 
 class SwiftPackReader(object):
-    """ A SwiftPackReader that mimic read and sync method
+    """A SwiftPackReader that mimic read and sync method
 
     The reader allows to read a specified amount of bytes from
     a given offset of a Swift object. A read offset is kept internaly.
@@ -371,7 +371,7 @@ class SwiftPackReader(object):
     to read from Swift.
     """
     def __init__(self, scon, filename, pack_length):
-        """ Initialize a SwiftPackReader
+        """Initialize a SwiftPackReader
 
         :param scon: a `SwiftConnector` instance
         :param filename: the pack filename
@@ -396,7 +396,7 @@ class SwiftPackReader(object):
         self.buff = ret
 
     def read(self, length):
-        """ Read a specified amount of Bytes form the pack object
+        """Read a specified amount of Bytes form the pack object
 
         :param length: amount of bytes to read
         :return: bytestring
@@ -417,7 +417,7 @@ class SwiftPackReader(object):
         return "".join(data)
 
     def seek(self, offset):
-        """ Seek to a specified offset
+        """Seek to a specified offset
 
         :param offset: the offset to seek to
         """
@@ -426,7 +426,7 @@ class SwiftPackReader(object):
         self.offset = 0
 
     def read_checksum(self):
-        """ Read the checksum from the pack
+        """Read the checksum from the pack
 
         :return: the checksum bytestring
         """
@@ -434,7 +434,7 @@ class SwiftPackReader(object):
 
 
 class SwiftMissingObjectFinder(MissingObjectFinder):
-    """ Find the objects missing from another object store.
+    """Find the objects missing from another object store.
 
     Same implementation as object_store.MissingObjectFinder
     except we use eventlet to parallelize object retrieval.
@@ -475,7 +475,7 @@ class SwiftMissingObjectFinder(MissingObjectFinder):
 
 
 class SwiftObjectStoreIterator(ObjectStoreIterator):
-    """ ObjectIterator that works on top of an ObjectStore.
+    """ObjectIterator that works on top of an ObjectStore.
 
     Same implementation as object_store.ObjectStoreIterator
     except we use eventlet to parallelize object retrieval.
@@ -509,7 +509,7 @@ class SwiftObjectStoreIterator(ObjectStoreIterator):
 
 
 class SwiftPackData(PackData):
-    """ The data contained in a packfile.
+    """The data contained in a packfile.
 
     We use the SwiftPackReader to read bytes from packs stored in Swift
     using the Range header feature of Swift.
@@ -568,12 +568,13 @@ class SwiftPack(Pack):
 
 
 class SwiftObjectStore(PackBasedObjectStore):
-    """ A Swift Object Store that allow to manage
-    a bare Git repository from Openstack Swift. This object
-    store only supports pack files and not loose objects.
+    """A Swift Object Store
+
+    Allow to manage a bare Git repository from Openstack Swift.
+    This object store only supports pack files and not loose objects.
     """
     def __init__(self, scon):
-        """ Open a Swift object store.
+        """Open a Swift object store.
 
         :param scon: A `SwiftConnector` instance
         """
@@ -584,7 +585,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         self._alternates = None
 
     def iter_shas(self, finder):
-        """ An iterator over pack's ObjectStore
+        """An iterator over pack's ObjectStore
 
         :return: a `SwiftObjectStoreIterator` instance
                  that parallelize requests to Swift
@@ -596,7 +597,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         return SwiftMissingObjectFinder(*args, **kwargs)
 
     def _load_packs(self):
-        """ Load all packs from Swift
+        """Load all packs from Swift
 
         :return: a list of `SwiftPack` instances
         """
@@ -612,9 +613,10 @@ class SwiftObjectStore(PackBasedObjectStore):
         return None
 
     def add_thin_pack(self, read_all, read_some):
-        """ Read a thin pack from a stream and complete
-            it in a temporary file. Then the pack and the
-            corresponding index file are uploaded to Swift.
+        """Read a thin pack
+
+        Read it from a stream and complete it in a temporary file.
+        Then the pack and the corresponding index file are uploaded to Swift.
         """
         fd, path = tempfile.mkstemp(prefix='tmp_pack_')
         f = os.fdopen(fd, 'w+b')
@@ -675,7 +677,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
 
 class SwiftInfoRefsContainer(InfoRefsContainer):
-    """ Manage references in info/refs object.
+    """Manage references in info/refs object.
     """
 
     def __init__(self, scon):
@@ -693,7 +695,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         return refs
 
     def set_if_equals(self, name, old_ref, new_ref):
-        """ Set a refname to new_ref only if it currently equals old_ref.
+        """Set a refname to new_ref only if it currently equals old_ref.
         """
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -704,7 +706,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         return True
 
     def remove_if_equals(self, name, old_ref):
-        """ Remove a refname only if it currently equals old_ref.
+        """Remove a refname only if it currently equals old_ref.
         """
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -717,11 +719,11 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 class SwiftRepo(BaseRepo):
     def __init__(self, root):
-        """ Init an Git bare Repository on top of a Swift container.
+        """Init a Git bare Repository on top of a Swift container.
+
         References are managed in info/refs objects by
-        `SwiftInfoRefsContainer`.
-        The root attribute is the Swift container that contain the Git bare
-        repository.
+        `SwiftInfoRefsContainer`. The root attribute is the Swift
+        container that contain the Git bare repository.
 
         :param root: The container which contains the bare repo
         """
@@ -740,7 +742,7 @@ class SwiftRepo(BaseRepo):
         BaseRepo.__init__(self, object_store, refs)
 
     def _put_named_file(self, filename, contents):
-        """ Put an object in a Swift container
+        """Put an object in a Swift container
 
         :param filename: the path to the object to put on Swift
         :param contents: the content as bytestring
@@ -754,7 +756,7 @@ class SwiftRepo(BaseRepo):
 
     @classmethod
     def init_bare(cls, scon):
-        """ Create a new bare repository
+        """Create a new bare repository
 
         :param scon: a `SwiftConnector``instance
         :return: a `SwiftRepo` instance

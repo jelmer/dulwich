@@ -194,7 +194,7 @@ class TestSwiftObjectStore(TestCase):
         packs = sos._load_packs()
         self.assertEqual(len(packs), 2)
         for pack in packs:
-            assert isinstance(pack, swift.SwiftPack)
+            self.assertTrue(isinstance(pack, swift.SwiftPack))
 
     def test_add_thin_pack(self):
         fsc = FakeSwiftConnector('fakerepo')

@@ -31,6 +31,9 @@ from dulwich import swift
 from dulwich.tests import (
     TestCase,
     )
+from dulwich.tests.test_object_store import (
+    ObjectStoreTests,
+    )
 from dulwich.tests.utils import (
     build_pack,
     )
@@ -543,3 +546,14 @@ class TestSwiftConnector(TestCase):
                patch('swiftclient.client.delete_object')]
         with nested(*ctx):
             self.assertEqual(conn.del_root(), None)
+
+
+class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        conf = config_file % def_config_file
+        swift.CONF = ConfigParser.ConfigParser()
+        swift.CONF.readfp(StringIO(conf))
+        fsc = FakeSwiftConnector('fakerepo')
+        self.store = swift.SwiftObjectStore(fsc)

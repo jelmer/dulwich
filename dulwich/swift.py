@@ -48,6 +48,7 @@ from dulwich.pack import (
     _compute_object_size,
     unpack_object,
     write_pack_object,
+    write_pack_objects,
     )
 from lru_cache import LRUSizeCache
 from dulwich.object_store import (
@@ -495,6 +496,11 @@ class SwiftObjectStore(PackBasedObjectStore):
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
         self._alternates = None
 
+    def _iter_loose_objects(self):
+        """Loose objects are not supported by this repository
+        """
+        return []
+
     def iter_shas(self, finder):
         """An iterator over pack's ObjectStore
 
@@ -522,6 +528,35 @@ class SwiftObjectStore(PackBasedObjectStore):
         pack_files = [o['name'].replace(".pack", "")
                       for o in objects if o['name'].endswith(".pack")]
         return [SwiftPack(pack, scon=self.scon) for pack in pack_files]
+
+    def add_objects(self, objs):
+        """Add a set of objects to this object store.
+
+        :param objects: Iterable over objects.
+        :return: Pack object of the objects written.
+        """
+        for obj, path in objs:
+            self.add_object(obj, path)
+
+    def add_object(self, obj, path=None):
+        """Add a single object to the repository
+
+        As this repo does not support loose object we
+        create a pack to store that object.
+
+        :param obj: A tag, commit, tree or blob
+        """
+        pack = StringIO()
+        entries, sha = write_pack_objects(pack, ((obj, path),))
+        entries = [(k, v[0], v[1]) for k, v in entries.iteritems()]
+        pack_filename = posixpath.join(
+            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+        index = StringIO()
+        write_pack_index_v2(index, entries, sha)
+        index_filename = pack_filename + '.idx'
+        pack_filename = pack_filename + '.pack'
+        self.scon.put_object(pack_filename, pack)
+        self.scon.put_object(index_filename, index)
 
     def _pack_cache_stale(self):
         return False

@@ -142,12 +142,6 @@ class FakeSwiftConnector(object):
 
 class TestSwiftObjectStore(TestCase):
 
-    def setUp(self):
-        super(TestSwiftObjectStore, self).setUp()
-
-    def tearDown(self):
-        super(TestSwiftObjectStore, self).tearDown()
-
     def _create_commit(self, data, marker='Default', blob=None):
         if not blob:
             blob = Blob.from_string('The blob content %s' % marker)
@@ -298,12 +292,6 @@ class TestSwiftObjectStore(TestCase):
 
 class TestSwiftRepo(TestCase):
 
-    def setUp(self):
-        super(TestSwiftRepo, self).setUp()
-
-    def tearDown(self):
-        super(TestSwiftRepo, self).tearDown()
-
     def test_init(self):
         store = {'fakerepo/objects/pack': ''}
         with patch('dulwich.swift.SwiftConnector',
@@ -354,9 +342,6 @@ class TestSwiftInfoRefsContainer(TestCase):
             "cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         self.store = {'fakerepo/info/refs': content}
 
-    def tearDown(self):
-        super(TestSwiftInfoRefsContainer, self).tearDown()
-
     def test_init(self):
         """ info/refs does not exists"""
         fsc = FakeSwiftConnector('fakerepo')
@@ -392,9 +377,6 @@ class TestSwiftConnector(TestCase):
         conf = config_file % def_config_file
         swift.CONF = ConfigParser.ConfigParser()
         swift.CONF.readfp(StringIO(conf))
-
-    def tearDown(self):
-        super(TestSwiftConnector, self).tearDown()
 
     def test_init_connector(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):

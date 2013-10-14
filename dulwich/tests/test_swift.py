@@ -85,8 +85,8 @@ def fake_get_object(*args, **kwargs):
 
 
 def create_swift_connector(store={}):
-    return lambda root: FakeSwiftConnector(root,
-                                           store=store)
+    return lambda root, confpath: FakeSwiftConnector(root,
+                                                     store=store)
 
 
 class FakeSwiftConnector(object):
@@ -380,7 +380,8 @@ class TestSwiftConnector(TestCase):
 
     def test_init_connector(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         self.assertEqual(conn.auth_ver, '1')
         self.assertEqual(conn.auth_url,
                          'http://127.0.0.1:8080/auth/v1.0')
@@ -393,13 +394,15 @@ class TestSwiftConnector(TestCase):
         swift.CONF.set('swift', 'auth_ver', '2')
         swift.CONF.set('swift', 'auth_url', 'http://127.0.0.1:8080/auth/v2.0')
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         self.assertEqual(conn.user, 'tester')
         self.assertEqual(conn.tenant, 'test')
 
     def test_root_exists(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container')]
         with nested(*ctx):
@@ -407,7 +410,8 @@ class TestSwiftConnector(TestCase):
 
     def test_root_not_exists(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container',
                      raise_client_exception_404)]
@@ -416,7 +420,8 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container'),
                patch('swiftclient.client.put_container')]
@@ -425,7 +430,8 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root_fails(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container'),
                patch('swiftclient.client.put_container',
@@ -436,7 +442,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_container_objects(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      fake_get_container)]
@@ -445,7 +452,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_container_objects_fails(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      raise_client_exception_404)]
@@ -454,7 +462,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_object_stat(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_object',
                      lambda *args, **kwargs: {})]
@@ -463,7 +472,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_object_stat_fails(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_object',
                      raise_client_exception_404)]
@@ -472,7 +482,8 @@ class TestSwiftConnector(TestCase):
 
     def test_put_object(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.put_object')]
         with nested(*ctx):
@@ -480,7 +491,8 @@ class TestSwiftConnector(TestCase):
 
     def test_put_object_fails(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.put_object',
                      raise_client_exception)]
@@ -490,7 +502,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_object(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_object', fake_get_object)]
         with nested(*ctx):
@@ -502,7 +515,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_object_fails(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_object',
                      raise_client_exception_404)]
@@ -511,7 +525,8 @@ class TestSwiftConnector(TestCase):
 
     def test_del_object(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.delete_object')]
         with nested(*ctx):
@@ -519,7 +534,8 @@ class TestSwiftConnector(TestCase):
 
     def test_del_root(self):
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            conn = swift.SwiftConnector('fakerepo')
+            with patch('dulwich.swift.load_conf'):
+                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      lambda *args, **kwargs: (None, ({'name': None},))),

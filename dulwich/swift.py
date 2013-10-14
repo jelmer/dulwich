@@ -80,14 +80,26 @@ chunk_length = 12228
 cache_length = 20
 """
 
-try:
-    confpath = os.environ['DULWICH_SWIFT_CFG']
-except KeyError:
-    confpath = "etc/swift.conf"
-if not os.path.isfile(confpath):
-    raise Exception("Unable to read configuration file %s" % confpath)
-CONF = ConfigParser()
-CONF.read("etc/swift.conf")
+CONF = None
+
+
+def load_conf(path=None):
+    """Load configuration in global var CONF
+
+    :param path: The path to the configuration file
+    """
+    confpath = None
+    if not path:
+        try:
+            confpath = os.environ['DULWICH_SWIFT_CFG']
+        except KeyError:
+            raise Exception("You need to specify a configuration file")
+    else:
+        confpath = path
+    if not os.path.isfile(confpath):
+        raise Exception("Unable to read configuration file %s" % confpath)
+    globals()['CONF'] = ConfigParser()
+    CONF.read(confpath)
 
 
 def catch(func):
@@ -203,11 +215,13 @@ class SwiftException(Exception):
 class SwiftConnector():
     """A Connector to swift that manage authentication and errors catching
     """
-    def __init__(self, root):
+    def __init__(self, root, confpath=None):
         """ Initialize a SwiftConnector
 
         :param root: The swift container that will act as Git bare repository
+        :param confpath: Path to the configuration file
         """
+        load_conf(confpath)
         self.auth_ver = CONF.get("swift", "auth_ver", "")
         if self.auth_ver not in ["1", "2"]:
             raise NotImplementedError("Wrong authentication version \
@@ -718,7 +732,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 
 class SwiftRepo(BaseRepo):
-    def __init__(self, root):
+    def __init__(self, root, confpath=None):
         """Init a Git bare Repository on top of a Swift container.
 
         References are managed in info/refs objects by
@@ -726,9 +740,11 @@ class SwiftRepo(BaseRepo):
         container that contain the Git bare repository.
 
         :param root: The container which contains the bare repo
+        :param path: Path to the configuration file
         """
         self.root = root.lstrip('/')
-        self.scon = SwiftConnector(self.root)
+        self.confpath = confpath
+        self.scon = SwiftConnector(self.root, self.confpath)
         objects = self.scon.get_container_objects()
         if not objects:
             raise Exception('There is not any GIT repo here : %s' % self.root)
@@ -755,7 +771,7 @@ class SwiftRepo(BaseRepo):
         return "<SwiftBareRepo at %r/%r>" % (self.scon.auth_url, self.root)
 
     @classmethod
-    def init_bare(cls, scon):
+    def init_bare(cls, scon, confpath=None):
         """Create a new bare repository
 
         :param scon: a `SwiftConnector``instance
@@ -765,6 +781,6 @@ class SwiftRepo(BaseRepo):
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),
                     posixpath.join(INFODIR, 'refs')]:
             scon.put_object(obj, '')
-        ret = cls(scon.root)
+        ret = cls(scon.root, confpath)
         ret._init_files(True)
         return ret

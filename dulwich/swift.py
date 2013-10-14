@@ -263,7 +263,7 @@ class SwiftConnector():
 
     @catch
     def get_container_objects(self):
-        """ Retreive objects list in a container
+        """ Retrieve objects list in a container
 
         :return: A list of dict that describe objects
                  or None if container does not exist
@@ -277,7 +277,7 @@ class SwiftConnector():
 
     @catch
     def get_object_stat(self, name):
-        """ Retreive object stat
+        """ Retrieve object stat
 
         :param name: The object name
         :return: A dict that describe the object
@@ -314,11 +314,11 @@ class SwiftConnector():
 
     @catch
     def get_object(self, name, range=None):
-        """ Retreive an object
+        """ Retrieve an object
 
         :param name: The object name
         :param range: A string range like "0-10" to
-                      retreive specified bytes in object content
+                      retrieve specified bytes in object content
         :return: A file like instance
                  or bytestring if range is specified
         """
@@ -486,12 +486,12 @@ class SwiftObjectStoreIterator(ObjectStoreIterator):
         self.pool = eventlet.GreenPool(size=concurrency)
         super(SwiftObjectStoreIterator, self).__init__(store, shas)
 
-    def retreive(self, args):
+    def retrieve(self, args):
         sha, path = args
         return self.store[sha], path
 
     def __iter__(self):
-        for sha, path in self.pool.imap(self.retreive,
+        for sha, path in self.pool.imap(self.retrieve,
                                         self.itershas()):
             yield sha, path
 

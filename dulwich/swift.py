@@ -298,15 +298,19 @@ class SwiftConnector():
         :param content: A file object or a bytestring
         :raise: `SwiftException` if unable to create
         """
-        if hasattr(content, 'seek'):
-            content.seek(0)
+        try:
+            getattr(content, 'seek')(0)
+        except AttributeError:
+            pass
         conn = client.http_connection(self.storage_url)
         client.put_object(self.storage_url,
                           self.token,
                           self.root, name, content,
                           http_conn=conn)
-        if hasattr(content, 'seek'):
-            content.close()
+        try:
+            getattr(content, 'close')()
+        except AttributeError:
+            pass
 
     @catch
     def get_object(self, name, range=None):

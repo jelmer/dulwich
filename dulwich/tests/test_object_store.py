@@ -167,10 +167,10 @@ class ObjectStoreTests(object):
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
 
-    def make_tag(self, name, obj):
+    def make_tag(self, name, obj, tagger='Test Tagger <test@example.com>'):
         tag = make_object(Tag, name=name, message='',
                           tag_time=12345, tag_timezone=0,
-                          tagger='Test Tagger <test@example.com>',
+                          tagger=tagger,
                           object=(object_class(obj.type_name), obj.id))
         self.store.add_object(tag)
         return tag
@@ -182,6 +182,15 @@ class ObjectStoreTests(object):
         tag3 = self.make_tag('3', testobject)
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual(testobject, self.store.peel_sha(obj.id))
+
+    def test_non_ascii_characters(self):
+        self.store.add_object(testobject)
+        tag1 = self.make_tag(u'\xe5\xe4\xf6\xe9', testobject)
+        tag2 = self.make_tag('test non-ascii tagger', testobject,
+                             tagger=u'caf\xe9 <cafe@example.com>')
+        for obj in [testobject, tag1, tag2]:
+            self.assertEqual(testobject, self.store.peel_sha(obj.id))
+
 
     def test_get_raw(self):
         self.store.add_object(testobject)

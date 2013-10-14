@@ -64,8 +64,6 @@ from dulwich.objects import (
     Tag,
     )
 
-eventlet.monkey_patch(all=False, socket=True)
-
 
 """
 # Configuration file sample

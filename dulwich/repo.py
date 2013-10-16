@@ -981,6 +981,13 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.get_description)
 
+    def set_description(self, description):
+        """Set the description for this repository.
+
+        :param description: Text to set as description for this repository.
+        """
+        raise NotImplementedError(self.set_description)
+
     def get_config_stack(self):
         """Return a config stack for this repository.
 
@@ -1472,6 +1479,23 @@ class Repo(BaseRepo):
 
     def __repr__(self):
         return "<Repo at %r>" % self.path
+
+    def set_description(self, description):
+        """Set the description for this repository.
+
+        :param description: Text to set as description for this repository.
+        """
+
+        path = os.path.join(self._controldir, 'description')
+        try:
+            f = open(path, 'w')
+            try:
+                f.write(description)
+            finally:
+                f.close()
+        except (IOError, OSError), e:
+            if e.errno != errno.ENOENT:
+                raise
 
     @classmethod
     def _init_maybe_bare(cls, path, bare):

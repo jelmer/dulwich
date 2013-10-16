@@ -1488,8 +1488,11 @@ class Repo(BaseRepo):
 
         path = os.path.join(self._controldir, 'description')
         try:
-            with open(path, 'w') as f:
+            f = open(path, 'w')
+            try:
                 f.write(description)
+            finally:
+                f.close()
         except (IOError, OSError), e:
             if e.errno != errno.ENOENT:
                 raise

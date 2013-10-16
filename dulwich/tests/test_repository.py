@@ -178,6 +178,13 @@ class RepositoryTests(TestCase):
             f.close()
         self.assertEquals("Some description", r.get_description())
 
+    def test_set_description(self):
+        r = self._repo = open_repo('a.git')
+        f = open(os.path.join(r.path, 'description'), 'w')
+        description = "Some description"
+        r.set_description(description)
+        self.assertEquals(description, r.get_description())
+
     def test_contains_missing(self):
         r = self._repo = open_repo('a.git')
         self.assertFalse("bar" in r)

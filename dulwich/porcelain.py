@@ -113,6 +113,7 @@ def clone(source, target=None, bare=False, outstream=sys.stdout):
     :param target: Path to target repository (optional)
     :param bare: Whether or not to create a bare repository
     :param outstream: Optional stream to write progress to
+    :return: The new repository
     """
     client, host_path = get_transport_and_path(source)
 
@@ -129,6 +130,7 @@ def clone(source, target=None, bare=False, outstream=sys.stdout):
         determine_wants=r.object_store.determine_wants_all,
         progress=outstream.write)
     r["HEAD"] = remote_refs["HEAD"]
+    return r
 
 
 def add(repo=".", paths=None):

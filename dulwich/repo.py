@@ -864,6 +864,7 @@ class BaseRepo(object):
         :param determine_wants: Optional function to determine what refs to
             fetch.
         :param progress: Optional progress function
+        :return: The local refs
         """
         if determine_wants is None:
             determine_wants = lambda heads: heads.values()

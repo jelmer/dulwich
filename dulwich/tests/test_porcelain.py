@@ -99,7 +99,8 @@ class CloneTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         outstream = StringIO()
         self.addCleanup(shutil.rmtree, target_path)
-        porcelain.clone(self.repo.path, target_path, outstream=outstream)
+        r = porcelain.clone(self.repo.path, target_path, outstream=outstream)
+        self.assertEquals(r.path, target_path)
         self.assertEquals(Repo(target_path).head(), c3.id)
 
 

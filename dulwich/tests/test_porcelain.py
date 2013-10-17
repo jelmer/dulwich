@@ -160,3 +160,44 @@ class ShowTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+
+class SymbolicRefTests(PorcelainTestCase):
+
+    def test_set_wrong_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        outstream = StringIO()
+        self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path, 'foobar')
+
+    def test_set_force_wrong_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        porcelain.symbolic_ref(self.repo.path, 'force_foobar', force=True)
+
+        #test if we actually changed the file
+        new_ref = self.repo.get_named_file('HEAD').read()
+        self.assertEqual(new_ref, 'ref: refs/heads/force_foobar\n')
+
+    def test_set_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        porcelain.symbolic_ref(self.repo.path, 'master')
+
+    def test_set_symbolic_ref_other_than_master(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]], attrs=dict(refs='develop'))
+        self.repo.refs["HEAD"] = c3.id
+        self.repo.refs["refs/heads/develop"] = c3.id
+
+        porcelain.symbolic_ref(self.repo.path, 'develop')
+
+        #test if we actually changed the file
+        new_ref = self.repo.get_named_file('HEAD').read()
+        self.assertEqual(new_ref, 'ref: refs/heads/develop\n')

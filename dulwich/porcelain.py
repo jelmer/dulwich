@@ -34,6 +34,7 @@ Currently implemented:
  * init
  * remove
  * update-server-info
+ * symbolic-ref
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
@@ -72,6 +73,20 @@ def update_server_info(repo="."):
     """
     r = open_repo(repo)
     server_update_server_info(r)
+
+
+def symbolic_ref(repo, ref_name, force=False):
+    """Set git symbolic ref into HEAD.
+
+    :param repo: path to the repository
+    :param ref_name: short name of the new ref
+    :param force: force settings without checking if it exists in refs/heads
+    """
+    repo_obj = open_repo(repo)
+    ref_path = 'refs/heads/%s' % ref_name
+    if not force and ref_path not in repo_obj.refs.keys():
+        raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
+    repo_obj.refs.set_symbolic_ref('HEAD', ref_path)
 
 
 def commit(repo=".", message=None, author=None, committer=None):

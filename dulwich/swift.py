@@ -671,6 +671,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 
 class SwiftRepo(BaseRepo):
+
     def __init__(self, root, conf):
         """Init a Git bare Repository on top of a Swift container.
 
@@ -705,9 +706,6 @@ class SwiftRepo(BaseRepo):
         f = StringIO()
         f.write(contents)
         self.scon.put_object(filename, f)
-
-    def __repr__(self):
-        return "<SwiftBareRepo at %r/%r>" % (self.scon.auth_url, self.root)
 
     @classmethod
     def init_bare(cls, scon, conf):

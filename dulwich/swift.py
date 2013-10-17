@@ -48,7 +48,6 @@ from dulwich.pack import (
     _compute_object_size,
     unpack_object,
     write_pack_object,
-    write_pack_objects,
     )
 from lru_cache import LRUSizeCache
 from dulwich.object_store import (
@@ -530,34 +529,40 @@ class SwiftObjectStore(PackBasedObjectStore):
                       for o in objects if o['name'].endswith(".pack")]
         return [SwiftPack(pack, scon=self.scon) for pack in pack_files]
 
-    def add_objects(self, objs):
-        """Add a set of objects to this object store.
+    def add_pack(self):
+        """Add a new pack to this object store.
 
-        :param objects: Iterable over objects.
-        :return: Pack object of the objects written.
+        :return: Fileobject to write to and a commit function to
+            call when the pack is finished.
         """
-        for obj, path in objs:
-            self.add_object(obj, path)
+        f = StringIO()
 
-    def add_object(self, obj, path=None):
-        """Add a single object to the repository
+        def commit():
+            f.seek(0)
+            pack = PackData(file=f, filename="")
+            entries = pack.sorted_entries()
+            if len(entries):
+                basename = posixpath.join(self.pack_dir,
+                                          "pack-%s" %
+                                          iter_sha1(entry[0] for
+                                                    entry in entries))
+                index = StringIO()
+                write_pack_index_v2(index, entries, pack.get_stored_checksum())
+                self.scon.put_object(basename + ".pack", f)
+                self.scon.put_object(basename + ".idx", index)
+                final_pack = SwiftPack(basename, scon=self.scon)
+                final_pack.check_length_and_checksum()
+                self._add_known_pack(final_pack)
+                return final_pack
+            else:
+                return None
 
-        As this repo does not support loose object we
-        create a pack to store that object.
+        def abort():
+            pass
+        return f, commit, abort
 
-        :param obj: A tag, commit, tree or blob
-        """
-        pack = StringIO()
-        entries, sha = write_pack_objects(pack, ((obj, path),))
-        entries = [(k, v[0], v[1]) for k, v in entries.iteritems()]
-        pack_filename = posixpath.join(
-            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
-        index = StringIO()
-        write_pack_index_v2(index, entries, sha)
-        index_filename = pack_filename + '.idx'
-        pack_filename = pack_filename + '.pack'
-        self.scon.put_object(pack_filename, pack)
-        self.scon.put_object(index_filename, index)
+    def add_object(self, obj):
+        self.add_objects([(obj, None), ])
 
     def _pack_cache_stale(self):
         return False

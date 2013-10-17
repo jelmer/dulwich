@@ -127,6 +127,8 @@ def serializable_property(name, docstring=None):
     """
     def set(obj, value):
         obj._ensure_parsed()
+        if isinstance(value, unicode):
+            value = value.encode("UTF8")
         setattr(obj, "_"+name, value)
         obj._needs_serialization = True
     def get(obj):

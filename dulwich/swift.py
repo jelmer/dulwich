@@ -75,8 +75,6 @@ chunk_length = 12228
 cache_length = 20
 """
 
-CONF = None
-
 try:
     import eventlet
     from dulwich.swift_eventlet import SwiftMissingObjectFinder
@@ -86,11 +84,16 @@ except:
     eventlet_support = None
 
 
-def load_conf(path=None):
+def load_conf(path=None, file=None):
     """Load configuration in global var CONF
 
     :param path: The path to the configuration file
+    :param file: If provided read instead the file like object
     """
+    conf = ConfigParser()
+    if file:
+        conf.readfp(file)
+        return conf
     confpath = None
     if not path:
         try:
@@ -101,8 +104,8 @@ def load_conf(path=None):
         confpath = path
     if not os.path.isfile(confpath):
         raise Exception("Unable to read configuration file %s" % confpath)
-    globals()['CONF'] = ConfigParser()
-    CONF.read(confpath)
+    conf.read(confpath)
+    return conf
 
 
 def catch(func):
@@ -188,20 +191,20 @@ class SwiftException(Exception):
 class SwiftConnector():
     """A Connector to swift that manage authentication and errors catching
     """
-    def __init__(self, root, confpath=None):
+    def __init__(self, root, conf):
         """ Initialize a SwiftConnector
 
         :param root: The swift container that will act as Git bare repository
-        :param confpath: Path to the configuration file
+        :param conf: A ConfigParser Object
         """
-        load_conf(confpath)
-        self.auth_ver = CONF.get("swift", "auth_ver", "")
+        self.conf = conf
+        self.auth_ver = self.conf.get("swift", "auth_ver", "")
         if self.auth_ver not in ["1", "2"]:
             raise NotImplementedError("Wrong authentication version \
                     use either 1 or 2")
-        self.auth_url = CONF.get("swift", "auth_url")
-        self.user = CONF.get("swift", "username")
-        self.password = CONF.get("swift", "password")
+        self.auth_url = self.conf.get("swift", "auth_url")
+        self.user = self.conf.get("swift", "username")
+        self.password = self.conf.get("swift", "password")
         self.root = root
         # TODO can refector
         if self.auth_ver == "1":
@@ -370,7 +373,7 @@ class SwiftPackReader(object):
         self.offset = 0
         self.base_offset = 0
         self.buff = ''
-        self.buff_length = int(CONF.get("swift", "chunk_length"))
+        self.buff_length = int(self.scon.conf.get("swift", "chunk_length"))
 
     def _read(self, more=False):
         if more:
@@ -440,7 +443,7 @@ class SwiftPackData(PackData):
         pack_reader = SwiftPackReader(self.scon, self._filename,
                                       self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
-        LRUCache_length = int(CONF.get("swift", "cache_length"))
+        LRUCache_length = int(self.scon.conf.get("swift", "cache_length"))
         self._offset_cache = LRUSizeCache(1024*1024*LRUCache_length,
                                           compute_size=_compute_object_size)
         self.pack = None
@@ -509,15 +512,19 @@ class SwiftObjectStore(PackBasedObjectStore):
         """
         shas = iter(finder.next, None)
         if eventlet_support:
-            return SwiftObjectStoreIterator(self, shas, finder)
+            concurrency = self.scon.conf.get('swift', 'concurrency')
+            return SwiftObjectStoreIterator(self, shas, finder,
+                                            concurrency)
         else:
             return ObjectStoreIterator(self, shas)
 
-    def find_missing_objects(*args, **kwargs):
+    def find_missing_objects(self, *args, **kwargs):
         if eventlet_support:
-            return SwiftMissingObjectFinder(*args, **kwargs)
+            kwargs['concurrency'] = self.scon.conf.get('swift',
+                                                       'concurrency')
+            return SwiftMissingObjectFinder(self, *args, **kwargs)
         else:
-            return MissingObjectFinder(*args, **kwargs)
+            return MissingObjectFinder(self, *args, **kwargs)
 
     def _load_packs(self):
         """Load all packs from Swift
@@ -670,7 +677,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 
 class SwiftRepo(BaseRepo):
-    def __init__(self, root, confpath=None):
+    def __init__(self, root, conf):
         """Init a Git bare Repository on top of a Swift container.
 
         References are managed in info/refs objects by
@@ -678,11 +685,11 @@ class SwiftRepo(BaseRepo):
         container that contain the Git bare repository.
 
         :param root: The container which contains the bare repo
-        :param path: Path to the configuration file
+        :param conf: A ConfigParser object
         """
         self.root = root.lstrip('/')
-        self.confpath = confpath
-        self.scon = SwiftConnector(self.root, self.confpath)
+        self.conf = conf
+        self.scon = SwiftConnector(self.root, self.conf)
         objects = self.scon.get_container_objects()
         if not objects:
             raise Exception('There is not any GIT repo here : %s' % self.root)
@@ -709,16 +716,17 @@ class SwiftRepo(BaseRepo):
         return "<SwiftBareRepo at %r/%r>" % (self.scon.auth_url, self.root)
 
     @classmethod
-    def init_bare(cls, scon, confpath=None):
+    def init_bare(cls, scon, conf):
         """Create a new bare repository
 
         :param scon: a `SwiftConnector``instance
+        :param conf: a ConfigParser object
         :return: a `SwiftRepo` instance
         """
         scon.create_root()
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),
                     posixpath.join(INFODIR, 'refs')]:
             scon.put_object(obj, '')
-        ret = cls(scon.root, confpath)
+        ret = cls(scon.root, conf)
         ret._init_files(True)
         return ret

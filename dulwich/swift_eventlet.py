@@ -25,9 +25,6 @@ from dulwich.object import (
     Commit,
     Tag,
     )
-from dulwich.swift import (
-    CONF,
-    )
 from dulwich.object_store import (
     MissingObjectFinder,
     _collect_filetree_revs,
@@ -35,7 +32,8 @@ from dulwich.object_store import (
     )
 
 
-def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
+def _split_commits_and_tags(obj_store, lst, concurrency=1,
+                            ignore_unknown=False):
     """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags
@@ -43,7 +41,6 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     """
     commits = set()
     tags = set()
-    concurrency = int(CONF.get("swift", "concurrency"))
     pool = eventlet.GreenPool(size=concurrency)
 
     def find_commit_type(sha):
@@ -71,8 +68,8 @@ class SwiftMissingObjectFinder(MissingObjectFinder):
     Same implementation as object_store.MissingObjectFinder
     except we use eventlet to parallelize object retrieval.
     """
-    def __init__(self, object_store, haves, wants, progress=None,
-                 get_tagged=None):
+    def __init__(self, object_store, haves, wants, concurrency=1,
+                 progress=None, get_tagged=None):
 
         def collect_tree_sha(sha):
             self.sha_done.add(sha)
@@ -80,7 +77,6 @@ class SwiftMissingObjectFinder(MissingObjectFinder):
             _collect_filetree_revs(object_store, cmt.tree, self.sha_done)
 
         self.object_store = object_store
-        concurrency = int(CONF.get("swift", "concurrency"))
         pool = eventlet.GreenPool(size=concurrency)
 
         have_commits, have_tags = \
@@ -112,8 +108,7 @@ class SwiftObjectStoreIterator(ObjectStoreIterator):
     Same implementation as object_store.ObjectStoreIterator
     except we use eventlet to parallelize object retrieval.
     """
-    def __init__(self, store, shas, finder):
-        concurrency = int(CONF.get("swift", "concurrency"))
+    def __init__(self, store, shas, finder, concurrency=1):
         self.finder = finder
         self.pool = eventlet.GreenPool(size=concurrency)
         super(SwiftObjectStoreIterator, self).__init__(store, shas)

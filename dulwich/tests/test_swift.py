@@ -19,7 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import ConfigParser
 import posixpath
 
 from time import time
@@ -88,17 +87,19 @@ def fake_get_object(*args, **kwargs):
 
 
 def create_swift_connector(store={}):
-    return lambda root, confpath: FakeSwiftConnector(root,
-                                                     store=store)
+    return lambda root, conf: FakeSwiftConnector(root,
+                                                 conf=conf,
+                                                 store=store)
 
 
 class FakeSwiftConnector(object):
 
-    def __init__(self, root, store=None):
+    def __init__(self, root, conf, store=None):
         if store:
             self.store = store
         else:
             self.store = {}
+        self.conf = conf
         self.root = root
 
     def put_object(self, name, content):
@@ -144,6 +145,12 @@ class FakeSwiftConnector(object):
 
 
 class TestSwiftObjectStore(TestCase):
+
+    def setUp(self):
+        super(TestSwiftObjectStore, self).setUp()
+        self.conf = swift.load_conf(file=StringIO(config_file %
+                                                  def_config_file))
+        self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
 
     def _create_commit(self, data, marker='Default', blob=None):
         if not blob:
@@ -192,7 +199,7 @@ class TestSwiftObjectStore(TestCase):
                  'fakerepo/objects/pack/pack-'+'1'*40+'.pack': '',
                  'fakerepo/objects/pack/pack-'+'2'*40+'.idx': '',
                  'fakerepo/objects/pack/pack-'+'2'*40+'.pack': ''}
-        fsc = FakeSwiftConnector('fakerepo', store=store)
+        fsc = FakeSwiftConnector('fakerepo', conf=self.conf, store=store)
         sos = swift.SwiftObjectStore(fsc)
         packs = sos._load_packs()
         self.assertEqual(len(packs), 2)
@@ -200,15 +207,13 @@ class TestSwiftObjectStore(TestCase):
             self.assertTrue(isinstance(pack, swift.SwiftPack))
 
     def test_add_thin_pack(self):
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         self._put_pack(sos, 1, 'Default')
-        self.assertEqual(len(fsc.store), 2)
+        self.assertEqual(len(self.fsc.store), 2)
 
     def test_find_missing_objects(self):
         commit_amount = 3
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         odata = self._put_pack(sos, commit_amount, 'Default')
         head = odata[-1].id
         i = sos.iter_shas(sos.find_missing_objects([],
@@ -222,8 +227,7 @@ class TestSwiftObjectStore(TestCase):
 
     def test_find_missing_objects_with_tag(self):
         commit_amount = 3
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         odata = self._put_pack(sos, commit_amount, 'Default')
         head = odata[-1].id
         peeled_sha = dict([(sha.object[1], sha.id)
@@ -240,8 +244,7 @@ class TestSwiftObjectStore(TestCase):
 
     def test_find_missing_objects_with_common(self):
         commit_amount = 3
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         odata = self._put_pack(sos, commit_amount, 'Default')
         head = odata[-1].id
         have = odata[7].id
@@ -252,8 +255,7 @@ class TestSwiftObjectStore(TestCase):
         self.assertEqual(len(i), 3)
 
     def test_find_missing_objects_multiple_packs(self):
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         commit_amount_a = 3
         odataa = self._put_pack(sos, commit_amount_a, 'Default1')
         heada = odataa[-1].id
@@ -264,7 +266,7 @@ class TestSwiftObjectStore(TestCase):
                                                    [heada, headb],
                                                    progress=None,
                                                    get_tagged=None))
-        self.assertEqual(len(fsc.store), 4)
+        self.assertEqual(len(self.fsc.store), 4)
         self.assertEqual(len(i),
                          commit_amount_a * 3 +
                          commit_amount_b * 3)
@@ -274,8 +276,7 @@ class TestSwiftObjectStore(TestCase):
             self.assertIn(sha.id, shas)
 
     def test_add_thin_pack_ext_ref(self):
-        fsc = FakeSwiftConnector('fakerepo')
-        sos = swift.SwiftObjectStore(fsc)
+        sos = swift.SwiftObjectStore(self.fsc)
         odata = self._put_pack(sos, 1, 'Default1')
         ref_blob_content = odata[0].as_raw_string()
         ref_blob_id = odata[0].id
@@ -290,47 +291,54 @@ class TestSwiftObjectStore(TestCase):
         f = StringIO()
         build_pack(f, data, store=sos)
         sos.add_thin_pack(f.read, None)
-        self.assertEqual(len(fsc.store), 4)
+        self.assertEqual(len(self.fsc.store), 4)
 
 
 class TestSwiftRepo(TestCase):
+
+    def setUp(self):
+        super(TestSwiftRepo, self).setUp()
+        self.conf = swift.load_conf(file=StringIO(config_file %
+                                                  def_config_file))
 
     def test_init(self):
         store = {'fakerepo/objects/pack': ''}
         with patch('dulwich.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
-            swift.SwiftRepo('fakerepo')
+            swift.SwiftRepo('fakerepo', conf=self.conf)
 
     def test_init_no_data(self):
         with patch('dulwich.swift.SwiftConnector',
                    new_callable=create_swift_connector):
-            self.assertRaises(Exception, swift.SwiftRepo, 'fakerepo')
+            self.assertRaises(Exception, swift.SwiftRepo,
+                              'fakerepo', self.conf)
 
     def test_init_bad_data(self):
         store = {'fakerepo/.git/objects/pack': ''}
         with patch('dulwich.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
-            self.assertRaises(Exception, swift.SwiftRepo, 'fakerepo')
+            self.assertRaises(Exception, swift.SwiftRepo,
+                              'fakerepo', self.conf)
 
     def test_put_named_file(self):
         store = {'fakerepo/objects/pack': ''}
         with patch('dulwich.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
-            repo = swift.SwiftRepo('fakerepo')
+            repo = swift.SwiftRepo('fakerepo', conf=self.conf)
             desc = 'Fake repo'
             repo._put_named_file('description', desc)
         self.assertEqual(repo.scon.store['fakerepo/description'],
                          desc)
 
     def test_init_bare(self):
-        fsc = FakeSwiftConnector('fakeroot')
+        fsc = FakeSwiftConnector('fakeroot', conf=self.conf)
         with patch('dulwich.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=fsc.store):
-            swift.SwiftRepo.init_bare(fsc)
+            swift.SwiftRepo.init_bare(fsc, conf=self.conf)
         self.assertIn('fakeroot/objects/pack', fsc.store)
         self.assertIn('fakeroot/info/refs', fsc.store)
         self.assertIn('fakeroot/description', fsc.store)
@@ -344,30 +352,29 @@ class TestSwiftInfoRefsContainer(TestCase):
             "22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
             "cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         self.store = {'fakerepo/info/refs': content}
+        self.conf = swift.load_conf(file=StringIO(config_file %
+                                                  def_config_file))
+        self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
 
     def test_init(self):
         """ info/refs does not exists"""
-        fsc = FakeSwiftConnector('fakerepo')
-        irc = swift.SwiftInfoRefsContainer(fsc)
+        irc = swift.SwiftInfoRefsContainer(self.fsc)
         self.assertEqual(len(irc._refs), 0)
-        fsc = FakeSwiftConnector('fakerepo')
-        fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(fsc)
+        self.fsc.store = self.store
+        irc = swift.SwiftInfoRefsContainer(self.fsc)
         self.assertIn('refs/heads/dev', irc.allkeys())
         self.assertIn('refs/heads/master', irc.allkeys())
 
     def test_set_if_equals(self):
-        fsc = FakeSwiftConnector('fakerepo')
-        fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(fsc)
+        self.fsc.store = self.store
+        irc = swift.SwiftInfoRefsContainer(self.fsc)
         irc.set_if_equals('refs/heads/dev',
                           "cca703b0e1399008b53a1a236d6b4584737649e4", '1'*40)
         self.assertEqual(irc['refs/heads/dev'], '1'*40)
 
     def test_remove_if_equals(self):
-        fsc = FakeSwiftConnector('fakerepo')
-        fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(fsc)
+        self.fsc.store = self.store
+        irc = swift.SwiftInfoRefsContainer(self.fsc)
         irc.remove_if_equals('refs/heads/dev',
                              "cca703b0e1399008b53a1a236d6b4584737649e4")
         self.assertNotIn('refs/heads/dev', irc.allkeys())
@@ -377,183 +384,137 @@ class TestSwiftConnector(TestCase):
 
     def setUp(self):
         super(TestSwiftConnector, self).setUp()
-        conf = config_file % def_config_file
-        swift.CONF = ConfigParser.ConfigParser()
-        swift.CONF.readfp(StringIO(conf))
+        self.conf = swift.load_conf(file=StringIO(config_file %
+                                                  def_config_file))
+        with patch('swiftclient.client.get_auth', fake_get_auth):
+            self.conn = swift.SwiftConnector('fakerepo', conf=self.conf)
 
     def test_init_connector(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
-        self.assertEqual(conn.auth_ver, '1')
-        self.assertEqual(conn.auth_url,
+        self.assertEqual(self.conn.auth_ver, '1')
+        self.assertEqual(self.conn.auth_url,
                          'http://127.0.0.1:8080/auth/v1.0')
-        self.assertEqual(conn.user, 'test:tester')
-        self.assertEqual(conn.password, 'testing')
-        self.assertEqual(conn.root, 'fakerepo')
-        self.assertEqual(conn.storage_url,
+        self.assertEqual(self.conn.user, 'test:tester')
+        self.assertEqual(self.conn.password, 'testing')
+        self.assertEqual(self.conn.root, 'fakerepo')
+        self.assertEqual(self.conn.storage_url,
                          'http://127.0.0.1:8080/v1.0/AUTH_fakeuser')
-        self.assertEqual(conn.token, '12' * 10)
-        swift.CONF.set('swift', 'auth_ver', '2')
-        swift.CONF.set('swift', 'auth_url', 'http://127.0.0.1:8080/auth/v2.0')
+        self.assertEqual(self.conn.token, '12' * 10)
+        self.conf.set('swift', 'auth_ver', '2')
+        self.conf.set('swift', 'auth_url', 'http://127.0.0.1:8080/auth/v2.0')
         with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
+            conn = swift.SwiftConnector('fakerepo', conf=self.conf)
         self.assertEqual(conn.user, 'tester')
         self.assertEqual(conn.tenant, 'test')
 
     def test_root_exists(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container')]
         with nested(*ctx):
-            self.assertEqual(conn.test_root_exists(), True)
+            self.assertEqual(self.conn.test_root_exists(), True)
 
     def test_root_not_exists(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container',
                      raise_client_exception_404)]
         with nested(*ctx):
-            self.assertEqual(conn.test_root_exists(), None)
+            self.assertEqual(self.conn.test_root_exists(), None)
 
     def test_create_root(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container'),
                patch('swiftclient.client.put_container')]
         with nested(*ctx):
-            self.assertEqual(conn.create_root(), None)
+            self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_container'),
                patch('swiftclient.client.put_container',
                      raise_client_exception)]
         with nested(*ctx):
             self.assertRaises(swift.SwiftException,
-                              lambda: conn.create_root())
+                              lambda: self.conn.create_root())
 
     def test_get_container_objects(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      fake_get_container)]
         with nested(*ctx):
-            self.assertEqual(len(conn.get_container_objects()), 2)
+            self.assertEqual(len(self.conn.get_container_objects()), 2)
 
     def test_get_container_objects_fails(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      raise_client_exception_404)]
         with nested(*ctx):
-            self.assertEqual(conn.get_container_objects(), None)
+            self.assertEqual(self.conn.get_container_objects(), None)
 
     def test_get_object_stat(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_object',
                      lambda *args, **kwargs: {})]
         with nested(*ctx):
-            self.assertEqual(conn.get_object_stat('a'), {})
+            self.assertEqual(self.conn.get_object_stat('a'), {})
 
     def test_get_object_stat_fails(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.head_object',
                      raise_client_exception_404)]
         with nested(*ctx):
-            self.assertEqual(conn.get_object_stat('a'), None)
+            self.assertEqual(self.conn.get_object_stat('a'), None)
 
     def test_put_object(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.put_object')]
         with nested(*ctx):
-            self.assertEqual(conn.put_object('a', 'content'), None)
+            self.assertEqual(self.conn.put_object('a', 'content'), None)
 
     def test_put_object_fails(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.put_object',
                      raise_client_exception)]
         with nested(*ctx):
             self.assertRaises(swift.SwiftException,
-                              lambda: conn.put_object('a', 'content'))
+                              lambda: self.conn.put_object('a', 'content'))
 
     def test_get_object(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_object', fake_get_object)]
         with nested(*ctx):
-            self.assertEqual(conn.get_object('a').read(), 'content')
+            self.assertEqual(self.conn.get_object('a').read(), 'content')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_object', fake_get_object)]
         with nested(*ctx):
-            self.assertEqual(conn.get_object('a', range='0-6'), 'content')
+            self.assertEqual(self.conn.get_object('a', range='0-6'), 'content')
 
     def test_get_object_fails(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_object',
                      raise_client_exception_404)]
         with nested(*ctx):
-            self.assertEqual(conn.get_object('a'), None)
+            self.assertEqual(self.conn.get_object('a'), None)
 
     def test_del_object(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.delete_object')]
         with nested(*ctx):
-            self.assertEqual(conn.del_object('a'), None)
+            self.assertEqual(self.conn.del_object('a'), None)
 
     def test_del_root(self):
-        with patch('swiftclient.client.get_auth', fake_get_auth):
-            with patch('dulwich.swift.load_conf'):
-                conn = swift.SwiftConnector('fakerepo')
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.get_container',
                      lambda *args, **kwargs: (None, ({'name': None},))),
                patch('swiftclient.client.delete_container'),
                patch('swiftclient.client.delete_object')]
         with nested(*ctx):
-            self.assertEqual(conn.del_root(), None)
+            self.assertEqual(self.conn.del_root(), None)
 
 
 class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        conf = config_file % def_config_file
-        swift.CONF = ConfigParser.ConfigParser()
-        swift.CONF.readfp(StringIO(conf))
-        fsc = FakeSwiftConnector('fakerepo')
+        conf = swift.load_conf(file=StringIO(config_file %
+                               def_config_file))
+        fsc = FakeSwiftConnector('fakerepo', conf=conf)
         self.store = swift.SwiftObjectStore(fsc)

@@ -65,7 +65,7 @@ class DulwichServer(threading.Thread):
 class SwiftSystemBackend(server.Backend):
 
     def open_repository(self, path):
-        return swift.SwiftRepo(path)
+        return swift.SwiftRepo(path, conf=swift.load_conf())
 
 
 class SwiftRepoSmokeTest(unittest.TestCase):
@@ -78,6 +78,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         cls.fakerepo = 'fakerepo'
         cls.th_server = DulwichServer(cls.backend, cls.port)
         cls.th_server.start()
+        cls.conf = swift.load_conf()
 
     @classmethod
     def tearDownClass(cls):
@@ -85,7 +86,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         cls.th_server.join()
 
     def setUp(self):
-        self.scon = swift.SwiftConnector(self.fakerepo)
+        self.scon = swift.SwiftConnector(self.fakerepo, self.conf)
         if self.scon.test_root_exists():
             self.scon.del_root()
         self.temp_d = tempfile.mkdtemp()
@@ -99,7 +100,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
             shutil.rmtree(self.temp_d)
 
     def test_init_bare(self):
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         self.assertTrue(self.scon.test_root_exists())
         obj = self.scon.get_container_objects()
         filtered = [o for o in obj if o['name'] == 'info/refs'
@@ -108,7 +109,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
 
     def test_clone_bare(self):
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         remote_refs = tcp_client.fetch(self.fakerepo, local_repo)
@@ -123,13 +124,13 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         # Nothing in the staging area
         local_repo.do_commit('Test commit', 'fbo@localhost')
         sha = local_repo.refs.read_loose_ref('refs/heads/master')
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         tcp_client.send_pack(self.fakerepo,
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo("fakerepo")
+        swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         remote_sha = swift_repo.refs.read_loose_ref('refs/heads/master')
         self.assertEqual(sha, remote_sha)
 
@@ -143,13 +144,13 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         local_repo.do_commit('Test commit', 'fbo@localhost',
                              ref='refs/heads/mybranch')
         sha = local_repo.refs.read_loose_ref('refs/heads/mybranch')
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         tcp_client.send_pack("/fakerepo",
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo(self.fakerepo)
+        swift_repo = swift.SwiftRepo(self.fakerepo, self.conf)
         remote_sha = swift_repo.refs.read_loose_ref('refs/heads/mybranch')
         self.assertEqual(sha, remote_sha)
 
@@ -170,13 +171,13 @@ class SwiftRepoSmokeTest(unittest.TestCase):
             local_shas[branch] = local_repo.do_commit(
                 'Test commit %s' % branch, 'fbo@localhost',
                 ref='refs/heads/%s' % branch)
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         tcp_client.send_pack(self.fakerepo,
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo("fakerepo")
+        swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         for branch in ('master', 'mybranch', 'pullr-108'):
             remote_shas[branch] = swift_repo.refs.read_loose_ref(
                 'refs/heads/%s' % branch)
@@ -195,13 +196,13 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         local_repo.stage(files)
         local_repo.do_commit('Test commit', 'fbo@localhost',
                              ref='refs/heads/master')
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         tcp_client.send_pack(self.fakerepo,
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo("fakerepo")
+        swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         commit_sha = swift_repo.refs.read_loose_ref('refs/heads/master')
         otype, data = swift_repo.object_store.get_raw(commit_sha)
         commit = objects.ShaFile.from_raw_string(otype, data)
@@ -264,7 +265,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         tcp_client.send_pack(self.fakerepo,
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo("fakerepo")
+        swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         self.assertNotIn('refs/heads/pullr-108', swift_repo.refs.allkeys())
 
     def test_push_annotated_tag(self):
@@ -285,13 +286,13 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         tag.name = "v0.1"
         local_repo.object_store.add_object(tag)
         local_repo.refs['refs/tags/v1.0'] = tag.id
-        swift.SwiftRepo.init_bare(self.scon)
+        swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address,
                                          port=self.port)
         tcp_client.send_pack(self.fakerepo,
                              determine_wants,
                              local_repo.object_store.generate_pack_contents)
-        swift_repo = swift.SwiftRepo(self.fakerepo)
+        swift_repo = swift.SwiftRepo(self.fakerepo, self.conf)
         tag_sha = swift_repo.refs.read_loose_ref('refs/tags/v1.0')
         otype, data = swift_repo.object_store.get_raw(tag_sha)
         rtag = objects.ShaFile.from_raw_string(otype, data)

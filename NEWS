@@ -4,6 +4,8 @@
 
  * Add ssh_kwargs attribute to ParamikoSSHVendor. (milki)
 
+ * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
+
 0.9.3	2013-09-27
 
  BUG FIXES

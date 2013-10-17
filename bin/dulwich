@@ -30,20 +30,34 @@ import os
 import sys
 from getopt import getopt
 
+from dulwich import porcelain
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
-from dulwich.server import update_server_info
 
 
 def cmd_archive(args):
     opts, args = getopt(args, "", [])
     client, path = get_transport_and_path(args.pop(0))
+    location = args.pop(0)
     committish = args.pop(0)
-    client.archive(path, committish, sys.stdout.write, sys.stderr.write)
+    porcelain.archive(location, committish, outstream=sys.stdout,
+        errstream=sys.stderr)
+
+
+def cmd_add(args):
+    opts, args = getopt(args, "", [])
+
+    porcelain.add(".", paths=args)
+
+
+def cmd_rm(args):
+    opts, args = getopt(args, "", [])
+
+    porcelain.rm(".", paths=args)
 
 
 def cmd_fetch_pack(args):
@@ -77,26 +91,7 @@ def cmd_log(args):
         path = args.pop(0)
     else:
         path = "."
-    r = Repo(path)
-    todo = [r.head()]
-    done = set()
-    while todo:
-        sha = todo.pop()
-        assert isinstance(sha, str)
-        if sha in done:
-            continue
-        done.add(sha)
-        commit = r[sha]
-        print "-" * 50
-        print "commit: %s" % sha
-        if len(commit.parents) > 1:
-            print "merge: %s" % "...".join(commit.parents[1:])
-        print "author: %s" % commit.author
-        print "committer: %s" % commit.committer
-        print ""
-        print commit.message
-        print ""
-        todo.extend([p for p in commit.parents if p not in done])
+    porcelain.log(repo=path, outstream=sys.stdout)
 
 
 def cmd_diff(args):
@@ -159,52 +154,39 @@ def cmd_init(args):
     else:
         path = args[0]
 
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    if "--bare" in opts:
-        Repo.init_bare(path)
-    else:
-        Repo.init(path)
+    porcelain.init(path, bare=("--bare" in opts))
 
 
 def cmd_clone(args):
-    opts, args = getopt(args, "", [])
+    opts, args = getopt(args, "", ["bare"])
     opts = dict(opts)
 
     if args == []:
         print "usage: dulwich clone host:path [PATH]"
         sys.exit(1)
-    client, host_path = get_transport_and_path(args.pop(0))
 
+    source = args.pop(0)
     if len(args) > 0:
-        path = args.pop(0)
+        target = args.pop(0)
     else:
-        path = host_path.split("/")[-1]
+        target = None
 
-    if not os.path.exists(path):
-        os.mkdir(path)
-    r = Repo.init(path)
-    remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=sys.stdout.write)
-    r["HEAD"] = remote_refs["HEAD"]
+    porcelain.clone(source, target, bare=("--bare" in opts))
 
 
 def cmd_commit(args):
     opts, args = getopt(args, "", ["message"])
     opts = dict(opts)
-    r = Repo(".")
-    committer = "%s <%s>" % (os.getenv("GIT_COMMITTER_NAME"), 
-                             os.getenv("GIT_COMMITTER_EMAIL"))
-    author = "%s <%s>" % (os.getenv("GIT_AUTHOR_NAME"), 
-                          os.getenv("GIT_AUTHOR_EMAIL"))
-    r.do_commit(committer=committer, author=author, message=opts["--message"])
+    porcelain.commit(".", message=opts["--message"])
 
 
 def cmd_update_server_info(args):
-    r = Repo(".")
-    update_server_info(r)
+    porcelain.update_server_info(".")
+
+
+def cmd_show(args):
+    opts, args = getopt(args, "", [])
+    porcelain.show(".")
 
 
 commands = {
@@ -219,6 +201,9 @@ commands = {
     "archive": cmd_archive,
     "update-server-info": cmd_update_server_info,
     "diff": cmd_diff,
+    "add": cmd_add,
+    "rm": cmd_rm,
+    "show": cmd_show,
     }
 
 if len(sys.argv) < 2:

@@ -507,8 +507,8 @@ class SwiftObjectStore(PackBasedObjectStore):
     def iter_shas(self, finder):
         """An iterator over pack's ObjectStore
 
-        :return: a `SwiftObjectStoreIterator` instance
-                 that parallelize requests to Swift
+        :return: a `ObjectStoreIterator` or `SwiftObjectStoreIterator` instance
+                 if eventlet is enabled
         """
         shas = iter(finder.next, None)
         if eventlet_support:

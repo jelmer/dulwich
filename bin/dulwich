@@ -184,6 +184,16 @@ def cmd_update_server_info(args):
     porcelain.update_server_info(".")
 
 
+def cmd_symbolic_ref(args):
+    opts, args = getopt(args, "", ["ref-name", "force"])
+    if not args:
+        print "Usage: dulwich symbolic-ref REF_NAME [--force]"
+        sys.exit(1)
+
+    ref_name = args.pop(0)
+    porcelain.symbolic_ref(".", ref_name=ref_name, force='--force' in args)
+
+
 def cmd_show(args):
     opts, args = getopt(args, "", [])
     porcelain.show(".")
@@ -200,6 +210,7 @@ commands = {
     "clone": cmd_clone,
     "archive": cmd_archive,
     "update-server-info": cmd_update_server_info,
+    "symbolic-ref": cmd_symbolic_ref,
     "diff": cmd_diff,
     "add": cmd_add,
     "rm": cmd_rm,

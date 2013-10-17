@@ -160,3 +160,53 @@ class ShowTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+
+class SymbolicRefTests(PorcelainTestCase):
+
+    def test_set_wrong_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        outstream = StringIO()
+        porcelain.symbolic_ref(self.repo.path, 'foobar', errstream=outstream)
+        err = 'fatal: ref `%s` is not a symbolic ref' % 'foobar'
+        self.assertTrue(err in outstream.getvalue())
+
+    def test_set_force_wrong_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        outstream = StringIO()
+        porcelain.symbolic_ref(self.repo.path, 'force_foobar', force=True,
+                               outstream=outstream)
+        self.assertTrue('new symbolic ref' in outstream.getvalue())
+
+        #test if we actually changed the file
+        new_ref = self.repo.get_named_file('HEAD').read()
+        self.assertEqual(new_ref, 'ref: refs/heads/force_foobar\n')
+
+    def test_set_symbolic_ref(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        outstream = StringIO()
+        porcelain.symbolic_ref(self.repo.path, 'master', outstream=outstream)
+        self.assertTrue('new symbolic ref' in outstream.getvalue())
+
+    def test_set_symbolic_ref_other_than_master(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]], attrs=dict(refs='develop'))
+        self.repo.refs["HEAD"] = c3.id
+        self.repo.refs["refs/heads/develop"] = c3.id
+
+        outstream = StringIO()
+        porcelain.symbolic_ref(self.repo.path, 'develop', outstream=outstream)
+        self.assertTrue('new symbolic ref' in outstream.getvalue())
+
+        #test if we actually changed the file
+        new_ref = self.repo.get_named_file('HEAD').read()
+        self.assertEqual(new_ref, 'ref: refs/heads/develop\n')

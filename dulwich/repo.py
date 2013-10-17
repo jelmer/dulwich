@@ -1487,15 +1487,11 @@ class Repo(BaseRepo):
         """
 
         path = os.path.join(self._controldir, 'description')
+        f = open(path, 'w')
         try:
-            f = open(path, 'w')
-            try:
-                f.write(description)
-            finally:
-                f.close()
-        except (IOError, OSError), e:
-            if e.errno != errno.ENOENT:
-                raise
+            f.write(description)
+        finally:
+            f.close()
 
     @classmethod
     def _init_maybe_bare(cls, path, bare):

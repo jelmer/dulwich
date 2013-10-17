@@ -81,7 +81,7 @@ try:
     from dulwich.eventlet import EventletObjectStoreIterator
     eventlet_support = True
 except ImportError:
-    eventlet_support = None
+    eventlet_support = False
 
 
 def load_conf(path=None, file=None):

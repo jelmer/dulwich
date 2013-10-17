@@ -80,7 +80,7 @@ try:
     from dulwich.eventlet import EventletMissingObjectFinder
     from dulwich.eventlet import EventletObjectStoreIterator
     eventlet_support = True
-except:
+except ImportError:
     eventlet_support = None
 
 

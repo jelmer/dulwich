@@ -1,4 +1,4 @@
-# swift_eventlet.py -- Utility module for requesting Swift with eventlet
+# swift_eventlet.py -- Utility module for querying an ObjectStore with eventlet
 # Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
 #
 # Author: Fabien Boucher <fabien.boucher@enovance.com>
@@ -62,7 +62,7 @@ def _split_commits_and_tags(obj_store, lst, concurrency=1,
     return (commits, tags)
 
 
-class SwiftMissingObjectFinder(MissingObjectFinder):
+class EventletMissingObjectFinder(MissingObjectFinder):
     """Find the objects missing from another object store.
 
     Same implementation as object_store.MissingObjectFinder
@@ -102,7 +102,7 @@ class SwiftMissingObjectFinder(MissingObjectFinder):
         self._tagged = get_tagged and get_tagged() or {}
 
 
-class SwiftObjectStoreIterator(ObjectStoreIterator):
+class EventletObjectStoreIterator(ObjectStoreIterator):
     """ObjectIterator that works on top of an ObjectStore.
 
     Same implementation as object_store.ObjectStoreIterator
@@ -111,7 +111,7 @@ class SwiftObjectStoreIterator(ObjectStoreIterator):
     def __init__(self, store, shas, finder, concurrency=1):
         self.finder = finder
         self.pool = eventlet.GreenPool(size=concurrency)
-        super(SwiftObjectStoreIterator, self).__init__(store, shas)
+        super(EventletObjectStoreIterator, self).__init__(store, shas)
 
     def retrieve(self, args):
         sha, path = args

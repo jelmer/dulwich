@@ -77,8 +77,8 @@ cache_length = 20
 
 try:
     import eventlet
-    from dulwich.swift_eventlet import SwiftMissingObjectFinder
-    from dulwich.swift_eventlet import SwiftObjectStoreIterator
+    from dulwich.eventlet import EventletMissingObjectFinder
+    from dulwich.eventlet import EventletObjectStoreIterator
     eventlet_support = True
 except:
     eventlet_support = None
@@ -513,8 +513,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         shas = iter(finder.next, None)
         if eventlet_support:
             concurrency = self.scon.conf.get('swift', 'concurrency')
-            return SwiftObjectStoreIterator(self, shas, finder,
-                                            concurrency)
+            return EventletObjectStoreIterator(self, shas, finder,
+                                               concurrency)
         else:
             return ObjectStoreIterator(self, shas)
 
@@ -522,7 +522,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         if eventlet_support:
             kwargs['concurrency'] = self.scon.conf.get('swift',
                                                        'concurrency')
-            return SwiftMissingObjectFinder(self, *args, **kwargs)
+            return EventletMissingObjectFinder(self, *args, **kwargs)
         else:
             return MissingObjectFinder(self, *args, **kwargs)
 

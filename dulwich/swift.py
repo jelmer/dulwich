@@ -286,22 +286,16 @@ class SwiftConnector():
         """Put an object
 
         :param name: The object name
-        :param content: A file object or a bytestring
+        :param content: A file object
         :raise: `SwiftException` if unable to create
         """
-        try:
-            getattr(content, 'seek')(0)
-        except AttributeError:
-            pass
+        content.seek(0)
         conn = client.http_connection(self.storage_url)
         client.put_object(self.storage_url,
                           self.token,
                           self.root, name, content,
                           http_conn=conn)
-        try:
-            getattr(content, 'close')()
-        except AttributeError:
-            pass
+        content.close()
 
     @catch
     def get_object(self, name, range=None):
@@ -726,7 +720,7 @@ class SwiftRepo(BaseRepo):
         scon.create_root()
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),
                     posixpath.join(INFODIR, 'refs')]:
-            scon.put_object(obj, '')
+            scon.put_object(obj, StringIO(''))
         ret = cls(scon.root, conf)
         ret._init_files(True)
         return ret

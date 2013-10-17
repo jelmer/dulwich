@@ -467,7 +467,8 @@ class TestSwiftConnector(TestCase):
         ctx = [patch('swiftclient.client.http_connection'),
                patch('swiftclient.client.put_object')]
         with nested(*ctx):
-            self.assertEqual(self.conn.put_object('a', 'content'), None)
+            self.assertEqual(self.conn.put_object('a', StringIO('content')),
+                             None)
 
     def test_put_object_fails(self):
         ctx = [patch('swiftclient.client.http_connection'),
@@ -475,7 +476,8 @@ class TestSwiftConnector(TestCase):
                      raise_client_exception)]
         with nested(*ctx):
             self.assertRaises(swift.SwiftException,
-                              lambda: self.conn.put_object('a', 'content'))
+                              lambda: self.conn.put_object('a',
+                                                           StringIO('content')))
 
     def test_get_object(self):
         ctx = [patch('swiftclient.client.http_connection'),

@@ -37,13 +37,13 @@ from dulwich import objects
 
 A Swift installation must be available before
 starting those tests. The account and authentication method used
-during this functional can be changed in the configuration file
+during this functional tests must be changed in the configuration file
 passed as environment variable.
 The container used to create a fake repository is defined
 in cls.fakerepo and will be deleted after the tests.
 
 DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
-    dulwich.tests.functional_swift_tests.test_smoke
+    dulwich.tests_swift.test_smoke
 """
 
 

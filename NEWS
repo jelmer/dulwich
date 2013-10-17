@@ -6,6 +6,8 @@
 
  * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
 
+ * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij)
+
 0.9.3	2013-09-27
 
  BUG FIXES

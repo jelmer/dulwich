@@ -1,4 +1,4 @@
-# swift_eventlet.py -- Utility module for querying an ObjectStore with eventlet
+# eventlet.py -- Utility module for querying an ObjectStore with eventlet
 # Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
 #
 # Author: Fabien Boucher <fabien.boucher@enovance.com>

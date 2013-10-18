@@ -21,7 +21,7 @@
 
 import eventlet
 
-from dulwich.object import (
+from dulwich.objects import (
     Commit,
     Tag,
     )
@@ -32,8 +32,8 @@ from dulwich.object_store import (
     )
 
 
-def _split_commits_and_tags(obj_store, lst, concurrency=1,
-                            ignore_unknown=False):
+def _split_commits_and_tags(obj_store, lst,
+                            ignore_unknown=False, pool=None):
     """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags
@@ -41,7 +41,6 @@ def _split_commits_and_tags(obj_store, lst, concurrency=1,
     """
     commits = set()
     tags = set()
-    pool = eventlet.GreenPool(size=concurrency)
 
     def find_commit_type(sha):
         try:
@@ -80,16 +79,18 @@ class EventletMissingObjectFinder(MissingObjectFinder):
         pool = eventlet.GreenPool(size=concurrency)
 
         have_commits, have_tags = \
-            _split_commits_and_tags(object_store, haves, True)
+            _split_commits_and_tags(object_store, haves,
+                                    True, pool)
         want_commits, want_tags = \
-            _split_commits_and_tags(object_store, wants, False)
+            _split_commits_and_tags(object_store, wants,
+                                    False, pool)
         all_ancestors = object_store._collect_ancestors(have_commits)[0]
         missing_commits, common_commits = \
             object_store._collect_ancestors(want_commits, all_ancestors)
 
         self.sha_done = set()
-        for cmt in common_commits:
-            pool.spawn_n(collect_tree_sha, cmt)
+        for _ in pool.imap(collect_tree_sha, common_commits):
+            pass
         for t in have_tags:
             self.sha_done.add(t)
         missing_tags = want_tags.difference(have_tags)

@@ -16,7 +16,7 @@
 # MA  02110-1301, USA.
 
 """Access to hooks."""
-
+from __future__ import with_statement
 import os
 import subprocess
 import tempfile

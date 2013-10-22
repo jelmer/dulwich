@@ -171,7 +171,7 @@ class SymbolicRefTests(PorcelainTestCase):
 
         outstream = StringIO()
         porcelain.symbolic_ref(self.repo.path, 'foobar', errstream=outstream)
-        err = 'fatal: ref `%s` is not a symbolic ref' % 'foobar'
+        err = 'fatal: ref `%s` is not a ref' % 'foobar'
         self.assertTrue(err in outstream.getvalue())
 
     def test_set_force_wrong_symbolic_ref(self):

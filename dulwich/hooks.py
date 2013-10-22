@@ -137,8 +137,11 @@ class CommitMsgShellHook(ShellHook):
 
         def clean_msg(success, *args):
             if success:
-                with open(args[0], 'rb') as f:
+                f = open(args[0], 'rb')
+                try:
                     new_msg = f.read()
+                finally:
+                    f.close()
                 os.unlink(args[0])
                 return new_msg
             os.unlink(args[0])

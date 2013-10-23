@@ -436,12 +436,16 @@ class TestThinPack(PackTests):
         self.pack_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.pack_dir)
         self.pack_prefix = os.path.join(self.pack_dir, 'pack')
-        with open(self.pack_prefix + '.pack', 'wb') as f:
+
+        f = open(self.pack_prefix + '.pack', 'wb')
+        try:
             build_pack(f, [
                 (REF_DELTA, (self.blobs['foo'].id, 'foo1234')),
                 (Blob.type_num, 'bar'),
                 (REF_DELTA, (self.blobs['bar'].id, 'bar2468'))],
                 store=self.store)
+        finally:
+            f.close()
 
         # Index the new pack.
         pack = self.make_pack(True)

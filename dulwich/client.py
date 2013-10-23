@@ -844,7 +844,7 @@ class HttpGitClient(GitClient):
         req = urllib2.Request(url, headers=headers, data=data)
         try:
             resp = self._perform(req)
-        except urllib2.HTTPError as e:
+        except urllib2.HTTPError, e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:

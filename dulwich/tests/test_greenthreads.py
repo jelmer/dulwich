@@ -1,4 +1,4 @@
-# test_venetlet.py -- Unittests for eventlet.
+# test_greenthreads.py -- Unittests for eventlet.
 # Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
 #
 # Author: Fabien Boucher <fabien.boucher@enovance.com>

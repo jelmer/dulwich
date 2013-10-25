@@ -67,8 +67,8 @@ class EventletMissingObjectFinder(MissingObjectFinder):
     Same implementation as object_store.MissingObjectFinder
     except we use eventlet to parallelize object retrieval.
     """
-    def __init__(self, object_store, haves, wants, concurrency=1,
-                 progress=None, get_tagged=None):
+    def __init__(self, object_store, haves, wants, 
+                 progress=None, get_tagged=None, concurrency=1):
 
         def collect_tree_sha(sha):
             self.sha_done.add(sha)

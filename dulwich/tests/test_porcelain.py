@@ -201,3 +201,14 @@ class SymbolicRefTests(PorcelainTestCase):
         #test if we actually changed the file
         new_ref = self.repo.get_named_file('HEAD').read()
         self.assertEqual(new_ref, 'ref: refs/heads/develop\n')
+
+
+class DiffTreeTests(PorcelainTestCase):
+
+    def test_empty(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.diff_tree(self.repo.path, c2.tree, c3.tree, outstream=outstream)
+        self.assertEquals(outstream.getvalue(), "")

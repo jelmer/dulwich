@@ -215,3 +215,15 @@ def show(repo=".", committish=None, outstream=sys.stdout):
     parent_commit = r[commit.parents[0]]
     print_commit(commit, outstream)
     write_tree_diff(outstream, r.object_store, parent_commit.tree, commit.tree)
+
+
+def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
+    """Compares the content and mode of blobs found via two tree objects.
+
+    :param repo: Path to repository
+    :param old_tree: Id of old tree
+    :param new_tree: Id of new tree
+    :param outstream: Stream to write to
+    """
+    r = open_repo(repo)
+    write_tree_diff(outstream, r.object_store, old_tree, new_tree)

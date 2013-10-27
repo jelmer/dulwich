@@ -1214,6 +1214,61 @@ class Commit(ShaFile):
         "Associated signed tag.")
 
 
+class GraftedCommit(Commit):
+    """A git commit object with fake parents
+
+    A GraftedCommit looks exactly like a regular Commit except
+    its parents value does not affect the commit sha/serialization.
+    """
+
+    def __init__(self, commit=None, fake_parents=None):
+        super(GraftedCommit, self).__init__()
+
+        self._fake_parents = None
+        if commit is not None:
+            self._deserialize(commit._serialize())
+        self._fake_parents = fake_parents
+
+    def _get_parents(self):
+        if self._fake_parents is not None:
+            return self._fake_parents
+        return self._parents
+
+    def _set_parents(self, value):
+        if self._fake_parents is not None:
+            self._fake_parents = value
+        else:
+            self._parents = value
+
+    def _get_fake_parents(self):
+        """Return a list of parents of this commit."""
+        return self._fake_parents
+
+    def _set_fake_parents(self, value):
+        """Set a list of parents of this commit."""
+        self._fake_parents = value
+
+    def _get_real_parents(self):
+        """Return a list of parents of this commit."""
+        self._ensure_parsed()
+        return self._parents
+
+    def _set_real_parents(self, value):
+        """Set a list of parents of this commit."""
+        self._ensure_parsed()
+        self._parents = value
+
+    parents = property(_get_parents, _set_parents)
+    fake_parents = property(_get_fake_parents, _set_fake_parents)
+    real_parents = property(_get_real_parents, _set_real_parents)
+
+    def check(self):
+        super(GraftedCommit, self).check()
+
+        for parent in self._fake_parents:
+            check_hexsha(parent, "invalid fake parent sha")
+
+
 OBJECT_CLASSES = (
     Commit,
     Tree,

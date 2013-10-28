@@ -198,6 +198,14 @@ class ConfigDictTests(TestCase):
         self.assertEqual([],
             list(cd.iteritems(("core", ))))
 
+    def test_itersections(self):
+        cd = ConfigDict()
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual([("core2", )],
+            list(cd.itersections()))
+
+
 
 class StackedConfigTests(TestCase):
 

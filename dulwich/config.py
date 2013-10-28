@@ -73,11 +73,20 @@ class Config(object):
     def set(self, section, name, value):
         """Set a configuration value.
 
+        :param section: Tuple with section name and optional subsection namee
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
         """
         raise NotImplementedError(self.set)
+
+    def iteritems(self, section):
+        """Iterate over the configuration pairs for a specific section.
+
+        :param section: Tuple with section name and optional subsection namee
+        :return: Iterator over (name, value) pairs
+        """
+        raise NotImplementedError(self.iteritems)
 
 
 class ConfigDict(Config, DictMixin):
@@ -128,6 +137,9 @@ class ConfigDict(Config, DictMixin):
         if isinstance(section, basestring):
             section = (section, )
         self._values.setdefault(section, OrderedDict())[name] = value
+
+    def iteritems(self, section):
+        return self._values.setdefault(section, OrderedDict()).iteritems()
 
 
 def _format_string(value):

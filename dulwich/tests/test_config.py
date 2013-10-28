@@ -187,10 +187,16 @@ class ConfigDictTests(TestCase):
         cd.set(("core", ), "foo", "bla")
         cd.set(("core2", ), "foo", "bloe")
 
-        self.assertEqual([
-            (('core',), OrderedDict([('foo', 'bla')])),
-            (('core2',), OrderedDict([('foo', 'bloe')]))],
-            list(cd.iteritems()))
+        self.assertEqual(
+            [('foo', 'bla')],
+            list(cd.iteritems(("core", ))))
+
+    def test_iteritems_nonexistant(self):
+        cd = ConfigDict()
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual([],
+            list(cd.iteritems(("core", ))))
 
 
 class StackedConfigTests(TestCase):

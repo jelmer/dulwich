@@ -88,6 +88,14 @@ class Config(object):
         """
         raise NotImplementedError(self.iteritems)
 
+    def itersections(self):
+        """Iterate over the sections.
+
+        :return: Iterator over section tuples
+        """
+        raise NotImplementedError(self.itersections)
+
+
 
 class ConfigDict(Config, DictMixin):
     """Git configuration stored in a dictionary."""
@@ -139,7 +147,10 @@ class ConfigDict(Config, DictMixin):
         self._values.setdefault(section, OrderedDict())[name] = value
 
     def iteritems(self, section):
-        return self._values.setdefault(section, OrderedDict()).iteritems()
+        return self._values.get(section, OrderedDict()).iteritems()
+
+    def itersections(self):
+        return self._values.keys()
 
 
 def _format_string(value):

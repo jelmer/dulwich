@@ -180,6 +180,15 @@ def cmd_commit(args):
     porcelain.commit(".", message=opts["--message"])
 
 
+def cmd_commit(args):
+    opts, args = getopt(args, "", ["message"])
+    if args == []:
+        print "usage: dulwich commit-tree tree"
+        sys.exit(1)
+    opts = dict(opts)
+    porcelain.commit_tree(".", tree=args[0], message=opts["--message"])
+
+
 def cmd_update_server_info(args):
     porcelain.update_server_info(".")
 
@@ -209,6 +218,8 @@ def cmd_diff_tree(args):
 
 commands = {
     "commit": cmd_commit,
+    "commit-tree": cmd_commit_tree,
+    "diff-tree": cmd_diff_tree,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
     "dump-pack": cmd_dump_pack,
@@ -223,7 +234,6 @@ commands = {
     "add": cmd_add,
     "rm": cmd_rm,
     "show": cmd_show,
-    "diff-tree": cmd_diff_tree,
     }
 
 if len(sys.argv) < 2:

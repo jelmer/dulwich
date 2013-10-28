@@ -31,6 +31,8 @@ Currently implemented:
  * add
  * clone
  * commit
+ * commit-tree
+ * diff-tree
  * init
  * remove
  * update-server-info
@@ -103,6 +105,16 @@ def commit(repo=".", message=None, author=None, committer=None):
     r = open_repo(repo)
     return r.do_commit(message=message, author=author,
         committer=committer)
+
+
+def commit_tree(repo, tree, message=None):
+    """Create a new commit object.
+
+    :param repo: Path to repository
+    :param tree: An existing tree object
+    """
+    r = open_repo(repo)
+    return r.do_commit(message=message, tree=tree)
 
 
 def init(path=".", bare=False):

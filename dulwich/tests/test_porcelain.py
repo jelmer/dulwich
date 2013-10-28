@@ -25,6 +25,10 @@ import tarfile
 import tempfile
 
 from dulwich import porcelain
+from dulwich.objects import (
+    Blob,
+    Tree,
+    )
 from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
@@ -212,3 +216,19 @@ class DiffTreeTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.diff_tree(self.repo.path, c2.tree, c3.tree, outstream=outstream)
         self.assertEquals(outstream.getvalue(), "")
+
+
+class CommitTreeTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        b = Blob()
+        b.data = "foo the bar"
+        t = Tree()
+        t.add("somename", 0100644, b.id)
+        self.repo.object_store.add_object(t)
+        self.repo.object_store.add_object(b)
+        sha = porcelain.commit_tree(self.repo.path, t.id, message="Withcommit.")
+        self.assertTrue(type(sha) is str)
+        self.assertEquals(len(sha), 40)

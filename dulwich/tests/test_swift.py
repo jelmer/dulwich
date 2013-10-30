@@ -52,6 +52,8 @@ auth_url = http://127.0.0.1:8080/auth/%(version_str)s
 auth_ver = %(version_int)s
 username = test;tester
 password = testing
+region_name = %(region_name)s
+endpoint_type = %(endpoint_type)s
 concurrency = %(concurrency)s
 chunk_length = %(chunk_length)s
 cache_length = %(cache_length)s
@@ -61,7 +63,9 @@ def_config_file = {'version_str': 'v1.0',
                    'version_int': 1,
                    'concurrency': 1,
                    'chunk_length': 12228,
-                   'cache_length': 1}
+                   'cache_length': 1,
+                   'region_name': 'test',
+                   'endpoint_type': 'internalURL'}
 
 
 def fake_get_auth(*args, **kwargs):

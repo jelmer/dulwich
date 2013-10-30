@@ -66,6 +66,8 @@ auth_url = http://127.0.0.1:5000/v2.0
 auth_ver = 2
 username = admin;admin
 password = pass
+region_name =
+enpoint_type = internalURL
 # Concurrency worker
 concurrency = 20
 # Chunk size to read from pack (Bytes)
@@ -204,6 +206,8 @@ class SwiftConnector():
         self.auth_url = self.conf.get("swift", "auth_url")
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
+        self.region_name = self.conf.get("swift", "region_name")
+        self.endpoint_type = self.conf.get("swift", "endpoint_type")
         self.root = root
         # TODO can refector
         if self.auth_ver == "1":
@@ -215,11 +219,14 @@ class SwiftConnector():
                                 auth_version=int(self.auth_ver))
         else:
             self.tenant, self.user = self.user.split(';')
+            os_options = {'region_name': self.region_name,
+                          'endpoint_type': self.endpoint_type}
             self.storage_url, self.token = \
                 client.get_auth(self.auth_url,
                                 self.user,
                                 self.password,
-                                tenant_name=self.tenant,
+                                os_options=os_options,
+                                tenant_name=self.tenant or " ",
                                 auth_version=int(self.auth_ver))
 
     @catch

@@ -28,6 +28,7 @@ from ConfigParser import ConfigParser
 
 from swiftclient import client
 from swiftclient import ClientException
+from geventhttpclient import HTTPClient
 
 from dulwich.repo import (
     InfoRefsContainer,
@@ -77,12 +78,12 @@ cache_length = 20
 """
 
 try:
-    import eventlet
+    import gevent
     from dulwich.greenthreads import EventletMissingObjectFinder
     from dulwich.greenthreads import EventletObjectStoreIterator
-    eventlet_support = True
+    gevent_support = True
 except ImportError:
-    eventlet_support = False
+    gevent_support = False
 
 
 def load_conf(path=None, file=None):
@@ -208,6 +209,7 @@ class SwiftConnector():
         self.password = self.conf.get("swift", "password")
         self.region_name = self.conf.get("swift", "region_name")
         self.endpoint_type = self.conf.get("swift", "endpoint_type")
+        self.concurrency = int(self.conf.get('swift', 'concurrency'))
         self.root = root
         # TODO can refector
         if self.auth_ver == "1":
@@ -228,6 +230,9 @@ class SwiftConnector():
                                 os_options=os_options,
                                 tenant_name=self.tenant or " ",
                                 auth_version=int(self.auth_ver))
+        self.httpclient = HTTPClient.from_url(self.storage_url,
+                                              concurrency=self.concurrency)
+        self.prefix_uri = "/".join(self.storage_url.split('/')[-2:])
 
     @catch
     def test_root_exists(self):
@@ -313,16 +318,19 @@ class SwiftConnector():
         :return: A file like instance
                  or bytestring if range is specified
         """
-        headers = {}
+        headers = {'X-Auth-Token': self.token}
         if range:
-            headers = {'Range': 'bytes=%s' % range}
+            headers['Range'] = 'bytes=%s' % range
+        path = self.prefix_uri + '/' + self.root + '/' + name
+        ret = self.httpclient.request('GET',
+                                path,
+                                headers=headers)
+        if ret.status_code == 404:
+            excep = ClientException("bouh")
+            excep.http_status = ret.status_code
+            raise excep
+        content = ret.read()
 
-        conn = client.http_connection(self.storage_url)
-        _, content = client.get_object(self.storage_url,
-                                       self.token,
-                                       self.root, name,
-                                       headers=headers,
-                                       http_conn=conn)
         if range:
             return content
         return StringIO(content)
@@ -511,7 +519,7 @@ class SwiftObjectStore(PackBasedObjectStore):
                  if eventlet is enabled
         """
         shas = iter(finder.next, None)
-        if eventlet_support:
+        if gevent_support:
             concurrency = int(self.scon.conf.get('swift', 'concurrency'))
             return EventletObjectStoreIterator(self, shas, finder,
                                                concurrency)
@@ -519,7 +527,7 @@ class SwiftObjectStore(PackBasedObjectStore):
             return ObjectStoreIterator(self, shas)
 
     def find_missing_objects(self, *args, **kwargs):
-        if eventlet_support:
+        if gevent_support:
             kwargs['concurrency'] = int(self.scon.conf.get('swift',
                                                            'concurrency'))
             return EventletMissingObjectFinder(self, *args, **kwargs)

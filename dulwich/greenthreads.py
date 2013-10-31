@@ -120,8 +120,8 @@ class EventletObjectStoreIterator(ObjectStoreIterator):
         return self.store[sha], path
 
     def __iter__(self):
-        for sha, path in self.p.imap(self.retrieve,
-                                        self.itershas()):
+        for sha, path in self.p.imap_unordered(self.retrieve,
+                                               self.itershas()):
             yield sha, path
 
     def __len__(self):

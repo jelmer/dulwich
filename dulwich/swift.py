@@ -20,14 +20,12 @@
 # MA  02110-1301, USA.
 
 import os
-import tempfile
 import posixpath
+import tempfile
 
 from cStringIO import StringIO
 from ConfigParser import ConfigParser
 
-from swiftclient import client
-from swiftclient import ClientException
 from geventhttpclient import HTTPClient
 
 from dulwich.repo import (
@@ -58,6 +56,13 @@ from dulwich.object_store import (
     ObjectStoreIterator,
     MissingObjectFinder,
     )
+
+try:
+    from simplejson import loads as json_loads
+    from simplejson import dumps as json_dumps
+except ImportError:
+    from json import loads as json_loads
+    from json import dumps as json_dumps
 
 
 """
@@ -108,27 +113,6 @@ def load_conf(path=None, file=None):
         raise Exception("Unable to read configuration file %s" % confpath)
     conf.read(confpath)
     return conf
-
-
-def catch(func):
-    """Decorator to handle http errors
-
-    This decorator handles missing object reported by a 404
-    error status from Swift. An exception is raised when an
-    other error occured.
-
-    :raise: `SwiftException` when receiving a code
-             other than 20x or 404.
-    :return: None whether an object is missing
-    """
-    def inner(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except ClientException, e:
-            if e.http_status == 404:
-                return None
-            raise SwiftException(e)
-    return inner
 
 
 def swift_load_pack_index(scon, filename):
@@ -208,76 +192,120 @@ class SwiftConnector():
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
         self.region_name = self.conf.get("swift", "region_name")
-        self.endpoint_type = self.conf.get("swift", "endpoint_type")
         self.concurrency = int(self.conf.get('swift', 'concurrency'))
+        self.endpoint_type = self.conf.get("swift", "endpoint_type") or "internalURL"
         self.root = root
-        # TODO can refector
+        block_size = 1024 * 12 # 12KB
+        
         if self.auth_ver == "1":
-            self.user = self.user.replace(";", ":")
-            self.storage_url, self.token = \
-                client.get_auth(self.auth_url,
-                                self.user,
-                                self.password,
-                                auth_version=int(self.auth_ver))
+            self.storage_url, self.token = self.swift_auth_v1()
         else:
-            self.tenant, self.user = self.user.split(';')
-            os_options = {'region_name': self.region_name,
-                          'endpoint_type': self.endpoint_type}
-            self.storage_url, self.token = \
-                client.get_auth(self.auth_url,
-                                self.user,
-                                self.password,
-                                os_options=os_options,
-                                tenant_name=self.tenant or " ",
-                                auth_version=int(self.auth_ver))
-        self.httpclient = HTTPClient.from_url(self.storage_url,
-                                              concurrency=self.concurrency)
-        self.prefix_uri = "/".join(self.storage_url.split('/')[-2:])
+            self.storage_url, self.token = self.swift_auth_v2()
 
-    @catch
+        token_header = {'X-Auth-Token': self.token}
+        self.httpclient = HTTPClient.from_url(self.storage_url,
+                                              concurrency=self.http_pool_length,
+                                              block_size=block_size,
+                                              headers=token_header)
+        self.prefix_uri = '/'.join(self.storage_url.split('/')[-2:])
+        self.base_path = '/' + self.prefix_uri + '/' + self.root
+    
+    def swift_auth_v1(self):
+        self.user = self.user.replace(";", ":")
+        auth_httpclient = HTTPClient.from_url(self.auth_url)
+        headers = {'X-Auth-User': self.user,
+                   'X-Auth-Key': self.password}
+        prefix_uri = '/'.join(self.auth_url.split('/')[-2:])
+        prefix_uri = '/' + prefix_uri
+        ret = auth_httpclient.request('GET',
+                                      prefix_uri,
+                                      headers=headers)
+
+        if ret.status_code != 200:
+            raise SwiftException('AUTH v1.0 request failed on %s with error code %s (%s)'
+                                 % (ret.status_code,
+                                    str(auth_httpclient.get_base_url()) + prefix_uri,
+                                    str(ret.items())))
+        storage_url = ret['X-Storage-Url']
+        token = ret['X-Auth-Token']
+        return storage_url, token
+
+    def swift_auth_v2(self):
+        self.tenant, self.user = self.user.split(';')
+        auth_dict = {}
+        auth_dict['auth'] = {'passwordCredentials': {
+                                 'username': self.user,
+                                 'password': self.password,
+                             },
+                             'tenantName': self.tenant}
+        auth_json = json_dumps(str(auth_dict))
+        headers = {'Content-Type': 'application/json'}
+        prefix_uri = '/'.join(self.auth_url.split('/')[-2:])
+        prefix_uri = '/' + prefix_uri
+        auth_httpclient = HTTPClient.from_url(self.auth_url)
+        ret = auth_httpclient.request('POST',
+                                      prefix_uri,
+                                      body=auth_json,
+                                      headers=headers)
+
+        if ret.status_code != 200 or ret.status_code != 203:
+            raise SwiftException('AUTH v2.0 request failed on %s with error code %s (%s)'
+                                 % (ret.status_code,
+                                    str(auth_httpclient.get_base_url()) + prefix_uri,
+                                    str(ret.items())))
+        auth_ret_json = json_dumps(ret.read())
+        token = auth_ret_json['access']['token']['id']
+        catalogs = auth_ret_json['access']['serviceCatalog']
+        object_store = [o_store for o_store in catalogs if
+                            o_store['type'] == 'object-store']
+        endpoints = object_store['endpoints']
+        endpoint = [endp for endp in endpoints if endp["region"] == self.region]
+        return endpoint[self.endpoint_type], token
+
     def test_root_exists(self):
         """Check that Swift container exist
 
         :return: True if exist or None it not
         """
-        conn = client.http_connection(self.storage_url)
-        client.head_container(self.storage_url,
-                              self.token,
-                              self.root,
-                              http_conn=conn)
+        ret = self.httpclient.request('HEAD',
+                                      self.base_path)
+        if ret.status_code == 404:
+            return None
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('HEAD request failed with error code %s'
+                                 % ret.status_code)
         return True
 
-    @catch
     def create_root(self):
         """Create the Swift container
 
         :raise: `SwiftException` if unable to create
         """
-        try:
-            self.test_root_exists()
-        except SwiftException:
-            pass
-        conn = client.http_connection(self.storage_url)
-        client.put_container(self.storage_url,
-                             self.token,
-                             self.root,
-                             http_conn=conn)
+        if not self.test_root_exists():
+            ret = self.httpclient.request('PUT',
+                                        self.base_path)
+            if ret.status_code < 200 or ret.status_code > 300:
+                raise SwiftException('PUT request failed with error code %s'
+                                    % ret.status_code)
 
-    @catch
     def get_container_objects(self):
         """Retrieve objects list in a container
 
         :return: A list of dict that describe objects
                  or None if container does not exist
         """
-        conn = client.http_connection(self.storage_url)
-        _, objects = client.get_container(self.storage_url,
-                                          self.token,
-                                          self.root,
-                                          http_conn=conn)
-        return objects
+        qs = '?format=json'
+        path = self.base_path + qs
+        ret = self.httpclient.request('GET',
+                                      path)
+        if ret.status_code == 404:
+            raise None
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('GET request failed with error code %s'
+                                 % ret.status_code)
+        content = ret.read()
+        return json_loads(content)
 
-    @catch
     def get_object_stat(self, name):
         """Retrieve object stat
 
@@ -285,14 +313,19 @@ class SwiftConnector():
         :return: A dict that describe the object
                  or None if object does not exist
         """
-        conn = client.http_connection(self.storage_url)
-        headers = client.head_object(self.storage_url,
-                                     self.token,
-                                     self.root, name,
-                                     http_conn=conn)
-        return headers
+        path = self.base_path + '/' + name
+        ret = self.httpclient.request('HEAD',
+                                      path)
+        if ret.status_code == 404:
+            raise None
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('HEAD request failed with error code %s'
+                                 % ret.status_code)
+        resp_headers = {}
+        for header, value in ret.iteritems():
+            resp_headers[header.lower()] = value
+        return resp_headers
 
-    @catch
     def put_object(self, name, content):
         """Put an object
 
@@ -301,14 +334,18 @@ class SwiftConnector():
         :raise: `SwiftException` if unable to create
         """
         content.seek(0)
-        conn = client.http_connection(self.storage_url)
-        client.put_object(self.storage_url,
-                          self.token,
-                          self.root, name, content,
-                          http_conn=conn)
+        data = content.read()
         content.close()
+        path = self.base_path + '/' + name
+        headers = {'Content-Length': str(len(data))}
+        ret = self.httpclient.request('PUT',
+                                      path,
+                                      body=data,
+                                      headers=headers)
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('PUT request failed with error code %s'
+                                 % ret.status_code)
 
-    @catch
     def get_object(self, name, range=None):
         """Retrieve an object
 
@@ -318,35 +355,37 @@ class SwiftConnector():
         :return: A file like instance
                  or bytestring if range is specified
         """
-        headers = {'X-Auth-Token': self.token}
+        headers = {}
         if range:
             headers['Range'] = 'bytes=%s' % range
-        path = self.prefix_uri + '/' + self.root + '/' + name
+        path = self.base_path + '/' + name
         ret = self.httpclient.request('GET',
-                                path,
-                                headers=headers)
+                                      path,
+                                      headers=headers)
         if ret.status_code == 404:
-            excep = ClientException("bouh")
-            excep.http_status = ret.status_code
-            raise excep
+            raise None
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('GET request failed with error code %s'
+                                 % ret.status_code)
         content = ret.read()
 
         if range:
             return content
         return StringIO(content)
 
-    @catch
     def del_object(self, name):
         """Delete an object
 
         :param name: The object name
         :raise: `SwiftException` if unable to delete
         """
-        conn = client.http_connection(self.storage_url)
-        client.delete_object(self.storage_url, self.token,
-                             self.root, name, http_conn=conn)
+        path = self.base_path + '/' + name
+        ret = self.httpclient.request('DELETE',
+                                      path)
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('DELETE request failed with error code %s'
+                                 % ret.status_code)
 
-    @catch
     def del_root(self):
         """Delete the root container by removing container content
 
@@ -354,9 +393,11 @@ class SwiftConnector():
         """
         for obj in self.get_container_objects():
             self.del_object(obj['name'])
-        conn = client.http_connection(self.storage_url)
-        client.delete_container(self.storage_url, self.token,
-                                self.root, http_conn=conn)
+        ret = self.httpclient.request('DELETE',
+                                      self.base_path)
+        if ret.status_code < 200 or ret.status_code > 300:
+            raise SwiftException('DELETE request failed with error code %s'
+                                 % ret.status_code)
 
 
 class SwiftPackReader(object):

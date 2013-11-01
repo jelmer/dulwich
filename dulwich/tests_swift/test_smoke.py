@@ -25,6 +25,10 @@ import threading
 import tempfile
 import shutil
 
+import gevent
+from gevent import monkey
+monkey.patch_all()
+
 from dulwich import server
 from dulwich import swift
 from dulwich import repo
@@ -47,19 +51,22 @@ DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
 """
 
 
-class DulwichServer(threading.Thread):
+class DulwichServer():
     """Start the TCPGitServer with Swift backend
     """
     def __init__(self, backend, port):
         self.port = port
         self.backend = backend
-        super(DulwichServer, self).__init__()
 
     def run(self):
         self.server = server.TCPGitServer(self.backend,
                                           'localhost',
                                           port=self.port)
-        self.server.serve_forever()
+        self.job = gevent.spawn(self.server.serve_forever)
+
+    def stop(self):
+        self.server.shutdown()
+        gevent.joinall((self.job,))
 
 
 class SwiftSystemBackend(server.Backend):
@@ -77,13 +84,12 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         cls.server_address = 'localhost'
         cls.fakerepo = 'fakerepo'
         cls.th_server = DulwichServer(cls.backend, cls.port)
-        cls.th_server.start()
+        cls.th_server.run()
         cls.conf = swift.load_conf()
 
     @classmethod
     def tearDownClass(cls):
-        cls.th_server.server.shutdown()
-        cls.th_server.join()
+        cls.th_server.stop()
 
     def setUp(self):
         self.scon = swift.SwiftConnector(self.fakerepo, self.conf)

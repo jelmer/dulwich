@@ -77,6 +77,9 @@ from dulwich.protocol import (
     extract_capabilities,
     extract_want_line_capabilities,
     )
+from dulwich.refs import (
+    write_info_refs,
+    )
 from dulwich.repo import (
     Repo,
     )
@@ -101,8 +104,8 @@ class Backend(object):
 class BackendRepo(object):
     """Repository abstraction used by the Git server.
 
-    Please note that the methods required here are a
-    subset of those provided by dulwich.repo.Repo.
+    The methods required here are a subset of those provided by
+    dulwich.repo.Repo.
     """
 
     object_store = None
@@ -829,19 +832,7 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
 def generate_info_refs(repo):
     """Generate an info refs file."""
     refs = repo.get_refs()
-    for name in sorted(refs.iterkeys()):
-        # get_refs() includes HEAD as a special case, but we don't want to
-        # advertise it
-        if name == 'HEAD':
-            continue
-        sha = refs[name]
-        o = repo.object_store[sha]
-        if not o:
-            continue
-        yield '%s\t%s\n' % (sha, name)
-        peeled_sha = repo.get_peeled(name)
-        if peeled_sha != sha:
-            yield '%s\t%s^{}\n' % (peeled_sha, name)
+    return write_info_refs(repo.get_refs(), repo.object_store)
 
 
 def generate_objects_info_packs(repo):

@@ -748,4 +748,18 @@ def read_info_refs(f):
     return ret
 
 
-
+def write_info_refs(refs, store):
+    """Generate info refs."""
+    for name, sha in sorted(refs.items()):
+        # get_refs() includes HEAD as a special case, but we don't want to
+        # advertise it
+        if name == 'HEAD':
+            continue
+        try:
+            o = store[sha]
+        except KeyError:
+            continue
+        peeled = store.peel_sha(sha)
+        yield '%s\t%s\n' % (o.id, name)
+        if o.id != peeled.id:
+            yield '%s\t%s^{}\n' % (peeled.id, name)

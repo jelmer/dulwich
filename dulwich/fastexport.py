@@ -1,5 +1,5 @@
 # __init__.py -- Fast export/import functionality
-# Copyright (C) 2010 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2010-2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

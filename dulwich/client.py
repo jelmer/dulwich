@@ -1,5 +1,5 @@
 # client.py -- Implementation of the server side git protocols
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 # Copyright (C) 2008 John Carr
 #
 # This program is free software; you can redistribute it and/or

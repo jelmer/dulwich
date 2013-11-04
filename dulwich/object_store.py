@@ -1,5 +1,5 @@
 # object_store.py -- Object store for git objects
-# Copyright (C) 2008-2012 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #                         and others
 #
 # This program is free software; you can redistribute it and/or

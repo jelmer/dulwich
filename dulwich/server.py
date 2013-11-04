@@ -1,5 +1,6 @@
 # server.py -- Implementation of the server side git protocols
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# Coprygith (C) 2011-2012 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

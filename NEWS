@@ -8,6 +8,16 @@
 
  * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij)
 
+ CHANGES
+
+  * Ref handling has been moved to dulwich.refs.
+    (Jelmer Vernooij)
+
+ API CHANGES
+
+  * Remove long deprecated RefsContainer.set_ref().
+    (Jelmer Vernooij)
+
 0.9.3	2013-09-27
 
  BUG FIXES

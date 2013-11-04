@@ -19,6 +19,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Utility module for querying an ObjectStore with gevent."""
+
 import gevent
 from gevent import pool
 
@@ -38,7 +40,7 @@ def _split_commits_and_tags(obj_store, lst,
     """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags
-    except we use eventlet to parallelize object retrieval.
+    except we use gevent to parallelize object retrieval.
     """
     commits = set()
     tags = set()
@@ -66,7 +68,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
     """Find the objects missing from another object store.
 
     Same implementation as object_store.MissingObjectFinder
-    except we use eventlet to parallelize object retrieval.
+    except we use gevent to parallelize object retrieval.
     """
     def __init__(self, object_store, haves, wants,
                  progress=None, get_tagged=None, concurrency=1):
@@ -108,7 +110,7 @@ class GreenThreadsObjectStoreIterator(ObjectStoreIterator):
     """ObjectIterator that works on top of an ObjectStore.
 
     Same implementation as object_store.ObjectStoreIterator
-    except we use eventlet to parallelize object retrieval.
+    except we use gevent to parallelize object retrieval.
     """
     def __init__(self, store, shas, finder, concurrency=1):
         self.finder = finder

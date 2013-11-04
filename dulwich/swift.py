@@ -21,6 +21,8 @@
 
 """Repo implementation atop OpenStack SWIFT."""
 
+# TODO: Refactor to share more code with dulwich/repo.py.
+
 import os
 import posixpath
 import tempfile

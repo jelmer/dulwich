@@ -1,6 +1,6 @@
 # protocol.py -- Shared parts of the git protocols
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2012 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

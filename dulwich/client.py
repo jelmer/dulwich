@@ -62,6 +62,9 @@ from dulwich.protocol import (
 from dulwich.pack import (
     write_pack_objects,
     )
+from dulwich.refs import (
+    read_info_refs,
+    )
 
 
 # Python 2.6.6 included these in urlparse.uses_netloc upstream. Do
@@ -152,14 +155,6 @@ def read_pkt_refs(proto):
     if len(refs) == 0:
         return None, set([])
     return refs, set(server_capabilities)
-
-
-def read_info_refs(f):
-    ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
-        ret[name] = sha
-    return ret
 
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't

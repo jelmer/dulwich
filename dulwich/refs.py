@@ -738,3 +738,14 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
         f.write('%s %s\n' % (packed_refs[refname], refname))
         if refname in peeled_refs:
             f.write('^%s\n' % peeled_refs[refname])
+
+
+def read_info_refs(f):
+    ret = {}
+    for l in f.readlines():
+        (sha, name) = l.rstrip("\r\n").split("\t", 1)
+        ret[name] = sha
+    return ret
+
+
+

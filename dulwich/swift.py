@@ -1,4 +1,4 @@
-# swift.py -- Utility module for requesting Swift.
+# swift.py -- Repo implementation atop OpenStack SWIFT
 # Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
 #
 # Author: Fabien Boucher <fabien.boucher@enovance.com>
@@ -18,6 +18,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
+"""Repo implementation atop OpenStack SWIFT."""
 
 import os
 import posixpath
@@ -178,9 +180,10 @@ class SwiftException(Exception):
     pass
 
 
-class SwiftConnector():
+class SwiftConnector(object):
     """A Connector to swift that manage authentication and errors catching
     """
+
     def __init__(self, root, conf):
         """ Initialize a SwiftConnector
 
@@ -418,6 +421,7 @@ class SwiftPackReader(object):
     its internal buffer. chunk_length specifiy the amount of data
     to read from Swift.
     """
+
     def __init__(self, scon, filename, pack_length):
         """Initialize a SwiftPackReader
 
@@ -487,6 +491,7 @@ class SwiftPackData(PackData):
     We use the SwiftPackReader to read bytes from packs stored in Swift
     using the Range header feature of Swift.
     """
+
     def __init__(self, scon, filename):
         """ Initialize a SwiftPackReader
 
@@ -531,6 +536,7 @@ class SwiftPack(Pack):
     _data_load are bounded to Swift version of load_pack_index and
     PackData.
     """
+
     def __init__(self, *args, **kwargs):
         self.scon = kwargs['scon']
         del kwargs['scon']

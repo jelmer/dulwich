@@ -62,6 +62,9 @@ from dulwich.object_store import (
     ObjectStoreIterator,
     MissingObjectFinder,
     )
+from dulwich.refs import (
+    read_info_refs,
+    )
 
 try:
     from simplejson import loads as json_loads
@@ -137,19 +140,6 @@ def swift_load_pack_index(scon, filename):
         f.close()
 
 
-def read_info_refs(scon, filename):
-    """Read info/refs file from Swift
-
-    :param scon: a `SwiftConnector` instance
-    :param filename: Path to the index file object
-    :return: a File instance with info/refs content
-    """
-    ret = scon.get_object(filename)
-    if not ret:
-        return StringIO('')
-    return ret
-
-
 def put_info_refs(scon, filename, refs):
     """Write info/refs file to Swift
 
@@ -169,13 +159,10 @@ def parse_info_refs(scon, filename):
     :param filename: Path to the index file object
     :return: A dict with refname -> sha
     """
-    f = read_info_refs(scon, filename)
-    refs = {}
-    for l in f.readlines():
-        sha, refname = l.rstrip("\n").split("\t")
-        refs[refname] = sha
-    f.close()
-    return refs
+    f = scon.get_object(filename)
+    if not f:
+        return {}
+    return read_info_refs(f)
 
 
 class SwiftException(Exception):
@@ -714,7 +701,9 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     def __init__(self, scon):
         self.scon = scon
         self.filename = 'info/refs'
-        f = read_info_refs(self.scon, self.filename)
+        f = self.scon.get_object(self.filename)
+        if not f:
+            f = StringIO('')
         super(SwiftInfoRefsContainer, self).__init__(f)
 
     def _load_check_ref(self, name, old_ref):

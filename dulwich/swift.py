@@ -152,19 +152,6 @@ def put_info_refs(scon, filename, refs):
     scon.put_object(filename, f)
 
 
-def parse_info_refs(scon, filename):
-    """Parse info/refs file
-
-    :param scon: a `SwiftConnector` instance
-    :param filename: Path to the index file object
-    :return: A dict with refname -> sha
-    """
-    f = scon.get_object(filename)
-    if not f:
-        return {}
-    return read_info_refs(f)
-
-
 class SwiftException(Exception):
     pass
 
@@ -708,7 +695,10 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
     def _load_check_ref(self, name, old_ref):
         self._check_refname(name)
-        refs = parse_info_refs(self.scon, self.filename)
+        f = self.scon.get_object(self.filename)
+        if not f:
+            return {}
+        refs = read_info_refs(f)
         if old_ref is not None:
             if refs[name] != old_ref:
                 return False

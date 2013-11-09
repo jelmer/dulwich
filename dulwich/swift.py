@@ -768,7 +768,8 @@ class SwiftRepo(BaseRepo):
         :return: a `SwiftRepo` instance
         """
         scon.create_root()
-        for obj in [posixpath.join(OBJECTDIR, PACKDIR)]:
+        for obj in [posixpath.join(OBJECTDIR, PACKDIR),
+                    posixpath.join(INFODIR, 'refs')]:
             scon.put_object(obj, StringIO(''))
         ret = cls(scon.root, conf)
         ret._init_files(True)

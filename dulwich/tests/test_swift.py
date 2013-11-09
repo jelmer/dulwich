@@ -19,6 +19,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Tests for dulwich.swift."""
+
 import posixpath
 
 from time import time
@@ -387,26 +389,27 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
+        self.object_store = {}
 
     def test_init(self):
-        """ info/refs does not exists"""
-        irc = swift.SwiftInfoRefsContainer(self.fsc)
+        """info/refs does not exists"""
+        irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         self.assertEqual(len(irc._refs), 0)
         self.fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(self.fsc)
+        irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         self.assertIn('refs/heads/dev', irc.allkeys())
         self.assertIn('refs/heads/master', irc.allkeys())
 
     def test_set_if_equals(self):
         self.fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(self.fsc)
+        irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         irc.set_if_equals('refs/heads/dev',
                           "cca703b0e1399008b53a1a236d6b4584737649e4", '1'*40)
         self.assertEqual(irc['refs/heads/dev'], '1'*40)
 
     def test_remove_if_equals(self):
         self.fsc.store = self.store
-        irc = swift.SwiftInfoRefsContainer(self.fsc)
+        irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         irc.remove_if_equals('refs/heads/dev',
                              "cca703b0e1399008b53a1a236d6b4584737649e4")
         self.assertNotIn('refs/heads/dev', irc.allkeys())

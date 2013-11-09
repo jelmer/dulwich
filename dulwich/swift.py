@@ -534,10 +534,10 @@ class SwiftObjectStore(PackBasedObjectStore):
         return []
 
     def iter_shas(self, finder):
-        """An iterator over pack's ObjectStore
+        """An iterator over pack's ObjectStore.
 
-        :return: a `ObjectStoreIterator` or `SwiftObjectStoreIterator` instance
-                 if eventlet is enabled
+        :return: a `ObjectStoreIterator` or `EventletObjectStoreIterator`
+                 instance if eventlet is enabled
         """
         shas = iter(finder.next, None)
         if gevent_support:
@@ -761,9 +761,9 @@ class SwiftRepo(BaseRepo):
 
     @classmethod
     def init_bare(cls, scon, conf):
-        """Create a new bare repository
+        """Create a new bare repository.
 
-        :param scon: a `SwiftConnector``instance
+        :param scon: a `SwiftConnector` instance
         :param conf: a ConfigParser object
         :return: a `SwiftRepo` instance
         """

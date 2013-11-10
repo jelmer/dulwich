@@ -117,6 +117,7 @@ class RepositoryTests(TestCase):
 
     def test_ref(self):
         r = self._repo = open_repo('a.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 

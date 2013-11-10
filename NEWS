@@ -18,6 +18,9 @@
   * Remove long deprecated RefsContainer.set_ref().
     (Jelmer Vernooij)
 
+  * Repo.ref() is now deprecated in favour of Repo.refs[].
+    (Jelmer Vernooij)
+
 0.9.3	2013-09-27
 
  BUG FIXES

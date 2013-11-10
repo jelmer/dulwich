@@ -735,9 +735,6 @@ class Repo(BaseRepo):
         finally:
             f.close()
 
-        if path == os.path.join("info", "grafts"):
-            self.graftpoints = parse_graftpoints(iter(contents.splitlines()))
-
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
@@ -963,9 +960,6 @@ class MemoryRepo(BaseRepo):
         :param contents: A string to write to the file.
         """
         self._named_files[path] = contents
-
-        if path == os.path.join("info", "grafts"):
-            self.graftpoints = parse_graftpoints(contents.splitlines())
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.

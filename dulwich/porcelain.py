@@ -107,14 +107,17 @@ def commit(repo=".", message=None, author=None, committer=None):
         committer=committer)
 
 
-def commit_tree(repo, tree, message=None):
+def commit_tree(repo, tree, message=None, author=None, committer=None):
     """Create a new commit object.
 
     :param repo: Path to repository
     :param tree: An existing tree object
+    :param author: Optional author name and email
+    :param committer: Optional committer name and email
     """
     r = open_repo(repo)
-    return r.do_commit(message=message, tree=tree)
+    return r.do_commit(message=message, tree=tree, committer=committer,
+            author=author)
 
 
 def init(path=".", bare=False):

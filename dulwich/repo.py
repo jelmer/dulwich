@@ -97,7 +97,7 @@ BASE_DIRECTORIES = [
     ]
 
 
-def parse_graftpoints(graftpoints=iter([])):
+def parse_graftpoints(graftpoints):
     """Convert a list of graftpoints into a dict
 
     :param graftpoints: Iterator of graftpoint lines
@@ -127,7 +127,7 @@ def parse_graftpoints(graftpoints=iter([])):
     return grafts
 
 
-def serialize_graftpoints(graftpoints={}):
+def serialize_graftpoints(graftpoints):
     """Convert a dictionary of grafts into string
 
     The graft dictionary is:

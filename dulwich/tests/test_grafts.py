@@ -105,54 +105,38 @@ class GraftsInRepositoryBase(object):
     def tearDown(self):
         super(GraftsInRepositoryBase, self).tearDown()
 
-    def test_no_grafts(self):
+    def get_repo_with_grafts(self, grafts):
         r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), '')
+        r.add_graftpoints(grafts)
+        return r
+
+    def test_no_grafts(self):
+        r = self.get_repo_with_grafts({})
 
         shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, self._shas[::-1])
 
     def test_no_parents_graft(self):
-        r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), r.head())
+        r = self.get_repo_with_grafts({self._repo.head(): []})
 
         self.assertEqual([e.commit.id for e in r.get_walker()],
                          [r.head()])
 
     def test_existing_parent_graft(self):
-        r = self._repo
-        r._put_named_file(
-            os.path.join('info', 'grafts'),
-            "%s %s" % (self._shas[-1], self._shas[0]))
-
-        self.assertEqual([e.commit.id for e in r.get_walker()],
-                         [self._shas[-1], self._shas[0]])
-
-    def test_add_no_parents_graft(self):
-        r = self._repo
-        r.add_graftpoints({r.head(): []})
-
-        self.assertEqual([e.commit.id for e in r.get_walker()],
-                         [r.head()])
-
-    def test_add_existing_parent_graft(self):
-        r = self._repo
-        r.add_graftpoints({self._shas[-1]: [self._shas[0]]})
+        r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
 
         self.assertEqual([e.commit.id for e in r.get_walker()],
                          [self._shas[-1], self._shas[0]])
 
     def test_remove_graft(self):
-        r = self._repo
-        r.add_graftpoints({r.head(): []})
-        r.remove_graftpoints([r.head()])
+        r = self.get_repo_with_grafts({self._repo.head(): []})
+        r.remove_graftpoints([self._repo.head()])
 
         self.assertEqual([e.commit.id for e in r.get_walker()],
                          self._shas[::-1])
 
     def test_seralize_grafts(self):
-        r = self._repo
-        r.add_graftpoints({self._shas[-1]: [self._shas[0]]})
+        r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
 
         grafts = r.serialize_graftpoints()
         self.assertEqual(["%s %s" % (self._shas[-1], self._shas[0])],
@@ -195,9 +179,19 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
     def test_init_with_empty_info_grafts(self):
         r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), r.head())
+        r._put_named_file(os.path.join('info', 'grafts'), '')
 
         r = Repo(self._repo_dir)
+        self.assertEqual({}, r.graftpoints)
+
+    def test_init_with_info_grafts(self):
+        r = self._repo
+        r._put_named_file(
+            os.path.join('info', 'grafts'),
+            "%s %s" % (self._shas[-1], self._shas[0]))
+
+        r = Repo(self._repo_dir)
+        self.assertEqual({self._shas[-1]: [self._shas[0]]}, r.graftpoints)
 
 
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):

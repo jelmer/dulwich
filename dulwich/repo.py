@@ -224,6 +224,9 @@ class BaseRepo(object):
         :raise KeyError: when the ref (or the one it points to) does not exist
         :return: SHA1 it is pointing at
         """
+        warnings.warn(
+            "Repo.ref(name) is deprecated. Use Repo.refs[name] instead.",
+            category=DeprecationWarning, stacklevel=2)
         return self.refs[name]
 
     def get_refs(self):

@@ -48,6 +48,7 @@ from dulwich.file import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    ObjectStoreGraphWalker,
     )
 from dulwich.objects import (
     Blob,
@@ -214,7 +215,8 @@ class BaseRepo(object):
         """
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
-        return self.object_store.get_graph_walker(heads)
+        return ObjectStoreGraphWalker(
+            heads, lambda sha: self.object_store[sha].parents)
 
     def ref(self, name):
         """Return the SHA1 a ref is pointing to.

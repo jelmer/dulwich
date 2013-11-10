@@ -191,14 +191,6 @@ class BaseObjectStore(object):
             sha = graphwalker.next()
         return haves
 
-    def get_graph_walker(self, heads):
-        """Obtain a graph walker for this object store.
-
-        :param heads: Local heads to start search with
-        :return: GraphWalker object
-        """
-        return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
-
     def generate_pack_contents(self, have, want, progress=None):
         """Iterate over the contents of a pack file.
 

@@ -215,8 +215,7 @@ class BaseRepo(object):
         """
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
-        return ObjectStoreGraphWalker(
-            heads, lambda sha: self.object_store[sha].parents)
+        return ObjectStoreGraphWalker(heads, self.get_parents)
 
     def ref(self, name):
         """Return the SHA1 a ref is pointing to.
@@ -270,7 +269,8 @@ class BaseRepo(object):
         :param sha: SHA of the commit for which to retrieve the parents
         :return: List of parents
         """
-        return self.commit(sha).parents
+        # TODO: Lookup grafts as well
+        return self.object_store[sha].parents
 
     def get_config(self):
         """Retrieve the config object.

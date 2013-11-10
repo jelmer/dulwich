@@ -76,14 +76,6 @@ class UpdateServerInfoTests(PorcelainTestCase):
 
 class CommitTests(PorcelainTestCase):
 
-    def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
-        self.repo.refs["refs/heads/foo"] = c3.id
-        sha = porcelain.commit(self.repo.path, message="Some message")
-        self.assertTrue(type(sha) is str)
-        self.assertEquals(len(sha), 40)
-
     def test_custom_author(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
@@ -229,6 +221,9 @@ class CommitTreeTests(PorcelainTestCase):
         t.add("somename", 0100644, b.id)
         self.repo.object_store.add_object(t)
         self.repo.object_store.add_object(b)
-        sha = porcelain.commit_tree(self.repo.path, t.id, message="Withcommit.")
+        sha = porcelain.commit_tree(
+            self.repo.path, t.id, message="Withcommit.",
+            author="Joe <joe@example.com>",
+            committer="Jane <jane@example.com>")
         self.assertTrue(type(sha) is str)
         self.assertEquals(len(sha), 40)

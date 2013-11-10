@@ -329,10 +329,10 @@ class BaseRepo(object):
         :return: List of parents
         """
 
-        if sha in self.graftpoints:
+        try:
             return self.graftpoints[sha]
-        else:
-            return self.commit(sha).parents
+        except KeyError:
+            return self[sha].parents
 
     def get_config(self):
         """Retrieve the config object.

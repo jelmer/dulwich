@@ -135,13 +135,6 @@ class GraftsInRepositoryBase(object):
         self.assertEqual([e.commit.id for e in r.get_walker()],
                          self._shas[::-1])
 
-    def test_seralize_grafts(self):
-        r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
-
-        grafts = r.serialize_graftpoints()
-        self.assertEqual(["%s %s" % (self._shas[-1], self._shas[0])],
-                         grafts.splitlines())
-
     def test_object_store_fail_invalid_parents(self):
         r = self._repo
 

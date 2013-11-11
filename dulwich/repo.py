@@ -561,13 +561,6 @@ class BaseRepo(object):
         for sha in to_remove:
             del self.graftpoints[sha]
 
-    def serialize_graftpoints(self):
-        """Get the string representation of the graftpoints
-
-        This format is writable to a graftpoint file.
-        """
-        return serialize_graftpoints(self.graftpoints)
-
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,

@@ -346,6 +346,7 @@ def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     order, e.g. in commit time order.
 
     :param entries: An iterable of WalkEntry objects.
+    :param get_parents: Optional function for getting the parents of a commit.
     :return: iterator over WalkEntry objects from entries in FIFO order, except
         where a parent would be yielded before any of its children.
     """

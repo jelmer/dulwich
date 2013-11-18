@@ -47,6 +47,11 @@ from dulwich.pack import (
     REF_DELTA,
     )
 
+try:
+    from simplejson import dumps as json_dumps
+except ImportError:
+    from json import dumps as json_dumps
+
 config_file = """[swift]
 auth_url = http://127.0.0.1:8080/auth/%(version_str)s
 auth_ver = %(version_int)s
@@ -57,6 +62,7 @@ endpoint_type = %(endpoint_type)s
 concurrency = %(concurrency)s
 chunk_length = %(chunk_length)s
 cache_length = %(cache_length)s
+http_pool_length = %(http_pool_length)s
 """
 
 def_config_file = {'version_str': 'v1.0',
@@ -65,35 +71,57 @@ def_config_file = {'version_str': 'v1.0',
                    'chunk_length': 12228,
                    'cache_length': 1,
                    'region_name': 'test',
-                   'endpoint_type': 'internalURL'}
-
-
-def fake_get_auth(*args, **kwargs):
-    url = 'http://127.0.0.1:8080/v1.0/AUTH_fakeuser'
-    token = '12' * 10
-    return url, token
-
-
-def raise_client_exception_404(*args, **kwargs):
-    raise swift.ClientException('', http_status=404)
-
-
-def raise_client_exception(*args, **kwargs):
-    raise swift.ClientException('')
-
-
-def fake_get_container(*args, **kwargs):
-    return ({}, ('a', 'b'))
-
-
-def fake_get_object(*args, **kwargs):
-    return ({}, 'content')
+                   'endpoint_type': 'internalURL',
+                   'http_pool_length': 1}
 
 
 def create_swift_connector(store={}):
     return lambda root, conf: FakeSwiftConnector(root,
                                                  conf=conf,
                                                  store=store)
+
+
+class Response(object):
+    def __init__(self, headers={}, status=200, content=None):
+        self.headers = headers
+        self.status_code = status
+        self.content = content
+
+    def __getitem__(self, key):
+        return self.headers[key]
+
+    def iteritems(self):
+        for k, v in self.headers.iteritems():
+            yield k, v
+
+    def read(self):
+        return self.content
+
+
+def fake_auth_request_v1(*args, **kwargs):
+    ret = Response({'X-Storage-Url':
+                    'http://127.0.0.1:8080/v1.0/AUTH_fakeuser',
+                    'X-Auth-Token': '12' * 10},
+                   200)
+    return ret
+
+
+def fake_auth_request_v2(*args, **kwargs):
+    s_url = 'http://127.0.0.1:8080/v1.0/AUTH_fakeuser'
+    resp = {'access': {'token': {'id': '12' * 10},
+                       'serviceCatalog':
+                       [
+                           {'type': 'object-store',
+                            'endpoints': [{'region': 'test',
+                                          'internalURL': s_url,
+                                           },
+                                          ]
+                            },
+                       ]
+                       }
+            }
+    ret = Response(status=200, content=json_dumps(resp))
+    return ret
 
 
 class FakeSwiftConnector(object):
@@ -390,7 +418,8 @@ class TestSwiftConnector(TestCase):
         super(TestSwiftConnector, self).setUp()
         self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
-        with patch('swiftclient.client.get_auth', fake_get_auth):
+        with patch('geventhttpclient.HTTPClient.request',
+                   fake_auth_request_v1):
             self.conn = swift.SwiftConnector('fakerepo', conf=self.conf)
 
     def test_init_connector(self):
@@ -405,113 +434,99 @@ class TestSwiftConnector(TestCase):
         self.assertEqual(self.conn.token, '12' * 10)
         self.conf.set('swift', 'auth_ver', '2')
         self.conf.set('swift', 'auth_url', 'http://127.0.0.1:8080/auth/v2.0')
-        with patch('swiftclient.client.get_auth', fake_get_auth):
+        with patch('geventhttpclient.HTTPClient.request',
+                   fake_auth_request_v2):
             conn = swift.SwiftConnector('fakerepo', conf=self.conf)
         self.assertEqual(conn.user, 'tester')
         self.assertEqual(conn.tenant, 'test')
 
     def test_root_exists(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_container')]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response()):
             self.assertEqual(self.conn.test_root_exists(), True)
 
     def test_root_not_exists(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_container',
-                     raise_client_exception_404)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(status=404)):
             self.assertEqual(self.conn.test_root_exists(), None)
 
     def test_create_root(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_container'),
-               patch('swiftclient.client.put_container')]
+        ctx = [patch('dulwich.swift.SwiftConnector.test_root_exists',
+                     lambda *args: None),
+               patch('geventhttpclient.HTTPClient.request',
+                     lambda *args: Response())]
         with nested(*ctx):
             self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_container'),
-               patch('swiftclient.client.put_container',
-                     raise_client_exception)]
+        ctx = [patch('dulwich.swift.SwiftConnector.test_root_exists',
+                     lambda *args: None),
+               patch('geventhttpclient.HTTPClient.request',
+                     lambda *args: Response(status=404))]
         with nested(*ctx):
             self.assertRaises(swift.SwiftException,
                               lambda: self.conn.create_root())
 
     def test_get_container_objects(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_container',
-                     fake_get_container)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(content=json_dumps(
+                    (({'name': 'a'}, {'name': 'b'}))))):
             self.assertEqual(len(self.conn.get_container_objects()), 2)
 
     def test_get_container_objects_fails(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_container',
-                     raise_client_exception_404)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(status=404)):
             self.assertEqual(self.conn.get_container_objects(), None)
 
     def test_get_object_stat(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_object',
-                     lambda *args, **kwargs: {})]
-        with nested(*ctx):
-            self.assertEqual(self.conn.get_object_stat('a'), {})
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(headers={'content-length': '10'})):
+            self.assertEqual(self.conn.get_object_stat('a')['content-length'],
+                             '10')
 
     def test_get_object_stat_fails(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.head_object',
-                     raise_client_exception_404)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(status=404)):
             self.assertEqual(self.conn.get_object_stat('a'), None)
 
     def test_put_object(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.put_object')]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args, **kwargs: Response()):
             self.assertEqual(self.conn.put_object('a', StringIO('content')),
                              None)
 
     def test_put_object_fails(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.put_object',
-                     raise_client_exception)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args, **kwargs: Response(status=400)):
             self.assertRaises(swift.SwiftException,
                               lambda: self.conn.put_object('a',
                                                            StringIO('content')))
 
     def test_get_object(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_object', fake_get_object)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args, **kwargs: Response(content='content')):
             self.assertEqual(self.conn.get_object('a').read(), 'content')
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_object', fake_get_object)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args, **kwargs: Response(content='content')):
             self.assertEqual(self.conn.get_object('a', range='0-6'), 'content')
 
     def test_get_object_fails(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_object',
-                     raise_client_exception_404)]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args, **kwargs: Response(status=404)):
             self.assertEqual(self.conn.get_object('a'), None)
 
     def test_del_object(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.delete_object')]
-        with nested(*ctx):
+        with patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response()):
             self.assertEqual(self.conn.del_object('a'), None)
 
     def test_del_root(self):
-        ctx = [patch('swiftclient.client.http_connection'),
-               patch('swiftclient.client.get_container',
-                     lambda *args, **kwargs: (None, ({'name': None},))),
-               patch('swiftclient.client.delete_container'),
-               patch('swiftclient.client.delete_object')]
+        ctx = [patch('dulwich.swift.SwiftConnector.del_object',
+                     lambda *args: None),
+               patch('dulwich.swift.SwiftConnector.get_container_objects',
+                     lambda *args: ({'name': 'a'}, {'name': 'b'})),
+               patch('geventhttpclient.HTTPClient.request',
+                     lambda *args: Response())]
         with nested(*ctx):
             self.assertEqual(self.conn.del_root(), None)
 

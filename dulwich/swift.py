@@ -191,12 +191,12 @@ class SwiftConnector():
         self.auth_url = self.conf.get("swift", "auth_url")
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
-        self.region_name = self.conf.get("swift", "region_name")
-        self.concurrency = int(self.conf.get('swift', 'concurrency'))
-        self.endpoint_type = self.conf.get("swift", "endpoint_type") or "internalURL"
+        self.concurrency = int(self.conf.get('swift', 'concurrency', '10'))
+        self.http_pool_length = int(self.conf.get('swift', 'http_pool_length', '10'))
+        self.region_name = self.conf.get("swift", "region_name", "regionOne")
+        self.endpoint_type = self.conf.get("swift", "endpoint_type", "internalURL")
         self.root = root
-        block_size = 1024 * 12 # 12KB
-        
+        block_size = 1024 * 12  # 12KB
         if self.auth_ver == "1":
             self.storage_url, self.token = self.swift_auth_v1()
         else:
@@ -209,7 +209,7 @@ class SwiftConnector():
                                               headers=token_header)
         self.prefix_uri = '/'.join(self.storage_url.split('/')[-2:])
         self.base_path = '/' + self.prefix_uri + '/' + self.root
-    
+
     def swift_auth_v1(self):
         self.user = self.user.replace(";", ":")
         auth_httpclient = HTTPClient.from_url(self.auth_url)
@@ -233,7 +233,8 @@ class SwiftConnector():
     def swift_auth_v2(self):
         self.tenant, self.user = self.user.split(';')
         auth_dict = {}
-        auth_dict['auth'] = {'passwordCredentials': {
+        auth_dict['auth'] = {'passwordCredentials':
+                             {
                                  'username': self.user,
                                  'password': self.password,
                              },
@@ -248,18 +249,19 @@ class SwiftConnector():
                                       body=auth_json,
                                       headers=headers)
 
-        if ret.status_code != 200 or ret.status_code != 203:
+        if ret.status_code != 200 and ret.status_code != 203:
             raise SwiftException('AUTH v2.0 request failed on %s with error code %s (%s)'
                                  % (ret.status_code,
                                     str(auth_httpclient.get_base_url()) + prefix_uri,
                                     str(ret.items())))
-        auth_ret_json = json_dumps(ret.read())
+        auth_ret_json = json_loads(ret.read())
         token = auth_ret_json['access']['token']['id']
         catalogs = auth_ret_json['access']['serviceCatalog']
         object_store = [o_store for o_store in catalogs if
-                            o_store['type'] == 'object-store']
+                        o_store['type'] == 'object-store'][0]
         endpoints = object_store['endpoints']
-        endpoint = [endp for endp in endpoints if endp["region"] == self.region]
+        endpoint = [endp for endp in endpoints if
+                    endp["region"] == self.region_name][0]
         return endpoint[self.endpoint_type], token
 
     def test_root_exists(self):
@@ -283,10 +285,10 @@ class SwiftConnector():
         """
         if not self.test_root_exists():
             ret = self.httpclient.request('PUT',
-                                        self.base_path)
+                                          self.base_path)
             if ret.status_code < 200 or ret.status_code > 300:
                 raise SwiftException('PUT request failed with error code %s'
-                                    % ret.status_code)
+                                     % ret.status_code)
 
     def get_container_objects(self):
         """Retrieve objects list in a container
@@ -299,7 +301,7 @@ class SwiftConnector():
         ret = self.httpclient.request('GET',
                                       path)
         if ret.status_code == 404:
-            raise None
+            return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('GET request failed with error code %s'
                                  % ret.status_code)
@@ -317,7 +319,7 @@ class SwiftConnector():
         ret = self.httpclient.request('HEAD',
                                       path)
         if ret.status_code == 404:
-            raise None
+            return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('HEAD request failed with error code %s'
                                  % ret.status_code)
@@ -363,7 +365,7 @@ class SwiftConnector():
                                       path,
                                       headers=headers)
         if ret.status_code == 404:
-            raise None
+            return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('GET request failed with error code %s'
                                  % ret.status_code)

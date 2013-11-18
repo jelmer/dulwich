@@ -349,8 +349,7 @@ class StackedConfig(Config):
     def default_backends(cls):
         """Retrieve the default configuration.
 
-        This will look in the repository configuration (if for_path is
-        specified), the users' home directory and the system
+        This will look in the users' home directory and the system
         configuration.
         """
         paths = []

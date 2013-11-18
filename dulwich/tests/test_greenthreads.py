@@ -22,8 +22,8 @@
 import time
 
 from dulwich.greenthreads import (
-    EventletObjectStoreIterator,
-    EventletMissingObjectFinder,
+    GreenThreadsObjectStoreIterator,
+    GreenThreadsMissingObjectFinder,
     )
 
 from dulwich.tests import (
@@ -65,10 +65,10 @@ def init_store(store, count=1):
     return ret
 
 
-class TestEventletObjectStoreIterator(TestCase):
+class TestGreenThreadsObjectStoreIterator(TestCase):
 
     def setUp(self):
-        super(TestEventletObjectStoreIterator, self).setUp()
+        super(TestGreenThreadsObjectStoreIterator, self).setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)
@@ -76,14 +76,14 @@ class TestEventletObjectStoreIterator(TestCase):
     def test_len(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
-        iterator = EventletObjectStoreIterator(self.store,
+        iterator = GreenThreadsObjectStoreIterator(self.store,
                                                iter(finder.next, None),
                                                finder)
         # One commit refers one tree and one blob
         self.assertEqual(len(iterator), self.cmt_amount * 3)
         haves = wants[0:self.cmt_amount-1]
         finder = MissingObjectFinder(self.store, haves, wants)
-        iterator = EventletObjectStoreIterator(self.store,
+        iterator = GreenThreadsObjectStoreIterator(self.store,
                                                iter(finder.next, None),
                                                finder)
         self.assertEqual(len(iterator), 3)
@@ -91,7 +91,7 @@ class TestEventletObjectStoreIterator(TestCase):
     def test_iter(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
-        iterator = EventletObjectStoreIterator(self.store,
+        iterator = GreenThreadsObjectStoreIterator(self.store,
                                                iter(finder.next, None),
                                                finder)
         objs = []
@@ -101,21 +101,21 @@ class TestEventletObjectStoreIterator(TestCase):
         self.assertEqual(len(objs), len(self.objs))
 
 
-class TestEventletMissingObjectFinder(TestCase):
+class TestGreenThreadsMissingObjectFinder(TestCase):
 
     def setUp(self):
-        super(TestEventletMissingObjectFinder, self).setUp()
+        super(TestGreenThreadsMissingObjectFinder, self).setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)
 
     def test_finder(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
-        finder = EventletMissingObjectFinder(self.store, (), wants)
+        finder = GreenThreadsMissingObjectFinder(self.store, (), wants)
         self.assertEqual(len(finder.sha_done), 0)
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount)
 
-        finder = EventletMissingObjectFinder(self.store,
+        finder = GreenThreadsMissingObjectFinder(self.store,
                                              wants[0:self.cmt_amount/2],
                                              wants)
         # sha_done will contains commit id and sha of blob refered in tree

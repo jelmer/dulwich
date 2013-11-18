@@ -62,13 +62,13 @@ def _split_commits_and_tags(obj_store, lst,
     return (commits, tags)
 
 
-class EventletMissingObjectFinder(MissingObjectFinder):
+class GreenThreadsMissingObjectFinder(MissingObjectFinder):
     """Find the objects missing from another object store.
 
     Same implementation as object_store.MissingObjectFinder
     except we use eventlet to parallelize object retrieval.
     """
-    def __init__(self, object_store, haves, wants, 
+    def __init__(self, object_store, haves, wants,
                  progress=None, get_tagged=None, concurrency=1):
 
         def collect_tree_sha(sha):
@@ -104,7 +104,7 @@ class EventletMissingObjectFinder(MissingObjectFinder):
         self._tagged = get_tagged and get_tagged() or {}
 
 
-class EventletObjectStoreIterator(ObjectStoreIterator):
+class GreenThreadsObjectStoreIterator(ObjectStoreIterator):
     """ObjectIterator that works on top of an ObjectStore.
 
     Same implementation as object_store.ObjectStoreIterator
@@ -113,7 +113,7 @@ class EventletObjectStoreIterator(ObjectStoreIterator):
     def __init__(self, store, shas, finder, concurrency=1):
         self.finder = finder
         self.p = pool.Pool(size=concurrency)
-        super(EventletObjectStoreIterator, self).__init__(store, shas)
+        super(GreenThreadsObjectStoreIterator, self).__init__(store, shas)
 
     def retrieve(self, args):
         sha, path = args

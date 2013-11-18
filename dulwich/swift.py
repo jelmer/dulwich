@@ -84,8 +84,8 @@ cache_length = 20
 
 try:
     import gevent
-    from dulwich.greenthreads import EventletMissingObjectFinder
-    from dulwich.greenthreads import EventletObjectStoreIterator
+    from dulwich.greenthreads import GreenThreadsMissingObjectFinder
+    from dulwich.greenthreads import GreenThreadsObjectStoreIterator
     gevent_support = True
 except ImportError:
     gevent_support = False
@@ -564,7 +564,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         shas = iter(finder.next, None)
         if gevent_support:
             concurrency = int(self.scon.conf.get('swift', 'concurrency'))
-            return EventletObjectStoreIterator(self, shas, finder,
+            return GreenThreadsObjectStoreIterator(self, shas, finder,
                                                concurrency)
         else:
             return ObjectStoreIterator(self, shas)
@@ -573,7 +573,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         if gevent_support:
             kwargs['concurrency'] = int(self.scon.conf.get('swift',
                                                            'concurrency'))
-            return EventletMissingObjectFinder(self, *args, **kwargs)
+            return GreenThreadsMissingObjectFinder(self, *args, **kwargs)
         else:
             return MissingObjectFinder(self, *args, **kwargs)
 

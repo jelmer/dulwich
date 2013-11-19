@@ -23,6 +23,8 @@ import os
 import posixpath
 import tempfile
 
+from urlparse import urlparse
+
 from cStringIO import StringIO
 from ConfigParser import ConfigParser
 
@@ -97,7 +99,7 @@ def load_conf(path=None, file=None):
     :param path: The path to the configuration file
     :param file: If provided read instead the file like object
     """
-    conf = ConfigParser()
+    conf = ConfigParser(allow_no_value=True)
     if file:
         conf.readfp(file)
         return conf
@@ -184,17 +186,19 @@ class SwiftConnector():
         :param conf: A ConfigParser Object
         """
         self.conf = conf
-        self.auth_ver = self.conf.get("swift", "auth_ver", "")
+        self.auth_ver = self.conf.get("swift", "auth_ver")
         if self.auth_ver not in ["1", "2"]:
             raise NotImplementedError("Wrong authentication version \
                     use either 1 or 2")
         self.auth_url = self.conf.get("swift", "auth_url")
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
-        self.concurrency = int(self.conf.get('swift', 'concurrency', '10'))
-        self.http_pool_length = int(self.conf.get('swift', 'http_pool_length', '10'))
-        self.region_name = self.conf.get("swift", "region_name", "regionOne")
-        self.endpoint_type = self.conf.get("swift", "endpoint_type", "internalURL")
+        self.concurrency = self.conf.getint('swift', 'concurrency') or 10
+        self.http_pool_length = \
+            self.conf.getint('swift', 'http_pool_length') or 10
+        self.region_name = self.conf.get("swift", "region_name") or "RegionOne"
+        self.endpoint_type = \
+            self.conf.get("swift", "endpoint_type") or "internalURL"
         self.root = root
         block_size = 1024 * 12  # 12KB
         if self.auth_ver == "1":
@@ -203,20 +207,20 @@ class SwiftConnector():
             self.storage_url, self.token = self.swift_auth_v2()
 
         token_header = {'X-Auth-Token': self.token}
-        self.httpclient = HTTPClient.from_url(self.storage_url,
-                                              concurrency=self.http_pool_length,
-                                              block_size=block_size,
-                                              headers=token_header)
-        self.prefix_uri = '/'.join(self.storage_url.split('/')[-2:])
-        self.base_path = '/' + self.prefix_uri + '/' + self.root
+        self.httpclient = \
+            HTTPClient.from_url(self.storage_url,
+                                concurrency=self.http_pool_length,
+                                block_size=block_size,
+                                headers=token_header)
+        self.base_path = posixpath.join(urlparse(self.storage_url).path,
+                                        self.root)
 
     def swift_auth_v1(self):
         self.user = self.user.replace(";", ":")
         auth_httpclient = HTTPClient.from_url(self.auth_url)
         headers = {'X-Auth-User': self.user,
                    'X-Auth-Key': self.password}
-        prefix_uri = '/'.join(self.auth_url.split('/')[-2:])
-        prefix_uri = '/' + prefix_uri
+        prefix_uri = urlparse(self.auth_url).path.lstrip('/')
         ret = auth_httpclient.request('GET',
                                       prefix_uri,
                                       headers=headers)
@@ -239,11 +243,12 @@ class SwiftConnector():
                                  'password': self.password,
                              },
                              'tenantName': self.tenant}
-        auth_json = json_dumps(str(auth_dict))
+        auth_json = json_dumps(auth_dict)
         headers = {'Content-Type': 'application/json'}
-        prefix_uri = '/'.join(self.auth_url.split('/')[-2:])
-        prefix_uri = '/' + prefix_uri
         auth_httpclient = HTTPClient.from_url(self.auth_url)
+        prefix_uri = urlparse(self.auth_url).path.lstrip('/')
+        if not prefix_uri.endswith('tokens'):
+            prefix_uri += '/tokens'
         ret = auth_httpclient.request('POST',
                                       prefix_uri,
                                       body=auth_json,
@@ -565,7 +570,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         if gevent_support:
             concurrency = int(self.scon.conf.get('swift', 'concurrency'))
             return GreenThreadsObjectStoreIterator(self, shas, finder,
-                                               concurrency)
+                                                   concurrency)
         else:
             return ObjectStoreIterator(self, shas)
 

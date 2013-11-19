@@ -69,7 +69,7 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 		*n = 0;
 		result = PyMem_New(PyObject*, 0);
 		if (!result) {
-			PyErr_SetNone(PyExc_MemoryError);
+			PyErr_NoMemory();
 			return NULL;
 		}
 		return result;
@@ -80,7 +80,7 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 		return NULL;
 	items = PyObject_CallFunctionObjArgs(iteritems, Py_True, NULL);
 	Py_DECREF(iteritems);
-	if (!items) {
+	if (items == NULL) {
 		return NULL;
 	}
 	/* The C implementation of iteritems returns a list, so depend on that. */
@@ -93,7 +93,7 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 	*n = PyList_Size(items);
 	result = PyMem_New(PyObject*, *n);
 	if (!result) {
-		PyErr_SetNone(PyExc_MemoryError);
+		PyErr_NoMemory();
 		goto error;
 	}
 	for (i = 0; i < *n; i++) {
@@ -113,7 +113,7 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 			new_path_len += path_len + 1;
 		new_path = PyMem_Malloc(new_path_len);
 		if (!new_path) {
-			PyErr_SetNone(PyExc_MemoryError);
+			PyErr_NoMemory();
 			goto error;
 		}
 		if (path_len) {
@@ -175,25 +175,20 @@ done:
 
 static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 {
-	PyObject *path, *tree1, *tree2, **entries1 = NULL, **entries2 = NULL;
+	PyObject *tree1, *tree2, **entries1 = NULL, **entries2 = NULL;
 	PyObject *e1, *e2, *pair, *result = NULL;
-	Py_ssize_t path_len, n1 = 0, n2 = 0, i1 = 0, i2 = 0;
+	Py_ssize_t n1 = 0, n2 = 0, i1 = 0, i2 = 0;
+	int path_len;
 	char *path_str;
 	int cmp;
 
-	if (!PyArg_ParseTuple(args, "OOO", &path, &tree1, &tree2))
+	if (!PyArg_ParseTuple(args, "s#OO", &path_str, &path_len, &tree1, &tree2))
 		return NULL;
-
-	path_str = PyString_AsString(path);
-	if (!path_str) {
-		PyErr_SetString(PyExc_TypeError, "path is not a string");
-		return NULL;
-	}
-	path_len = PyString_GET_SIZE(path);
 
 	entries1 = tree_entries(path_str, path_len, tree1, &n1);
 	if (!entries1)
 		goto error;
+
 	entries2 = tree_entries(path_str, path_len, tree2, &n2);
 	if (!entries2)
 		goto error;
@@ -347,7 +342,7 @@ static PyObject *py_count_blocks(PyObject *self, PyObject *args)
 	num_chunks = PyList_GET_SIZE(chunks);
 	block = PyMem_New(char, block_size);
 	if (!block) {
-		PyErr_SetNone(PyExc_MemoryError);
+		PyErr_NoMemory();
 		goto error;
 	}
 

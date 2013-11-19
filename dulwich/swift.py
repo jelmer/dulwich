@@ -74,10 +74,12 @@ auth_url = http://127.0.0.1:5000/v2.0
 auth_ver = 2
 username = admin;admin
 password = pass
-region_name =
+region_name = RegionOne
 enpoint_type = internalURL
 # Concurrency worker
 concurrency = 20
+# Amount of HTTP client connections
+http_pool_length = 10
 # Chunk size to read from pack (Bytes)
 chunk_length = 12228
 # Cache size (MBytes)

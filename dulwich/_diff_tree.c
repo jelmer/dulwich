@@ -260,6 +260,7 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 
 	if (mode == Py_None) {
 		result = Py_False;
+		Py_INCREF(result);
 	} else {
 		lmode = PyInt_AsLong(mode);
 		if (lmode == -1 && PyErr_Occurred()) {
@@ -268,7 +269,6 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 		}
 		result = PyBool_FromLong(S_ISDIR((mode_t)lmode));
 	}
-	Py_INCREF(result);
 	Py_DECREF(mode);
 	return result;
 }

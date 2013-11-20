@@ -26,6 +26,7 @@
 import os
 import posixpath
 import tempfile
+import cPickle as pickle
 
 from urlparse import urlparse
 
@@ -65,6 +66,16 @@ from dulwich.refs import (
     InfoRefsContainer,
     read_info_refs,
     write_info_refs,
+    )
+
+from dulwich.objects import (
+    Commit,
+    Tree,
+    Blob,
+    Tag,
+    S_ISGITLINK,
+    ShaFile,
+    sha_to_hex,
     )
 
 try:
@@ -137,6 +148,41 @@ def swift_load_pack_index(scon, filename):
     f = scon.get_object(filename)
     try:
         return load_pack_index_file(filename, f)
+    finally:
+        f.close()
+
+
+def pack_info_create(pack_fd):
+    pack_fd.seek(0)
+    pack = PackData(filename="", file=pack_fd)
+    info = {}
+    for _, type, obj, _ in pack.iterobjects():
+        # Must not be used against a thin pack
+        if type not in [Commit.type_num, Tree.type_num,
+                        Blob.type_num]:
+            continue
+        obj = ShaFile.from_raw_chunks(type, obj)
+        if type == Commit.type_num:
+            info[obj.id] = {'type': type,
+                            'parents_shas': obj.parents,
+                            'tree_sha': obj._tree}
+        elif type == Tree.type_num:
+            shas = [s for _, m, s in obj.iteritems()
+                    if not S_ISGITLINK(m)]
+            info[obj.id] = {'type': type,
+                            'shas': shas}
+        elif type == Blob.type_num:
+            info[obj.id] = {'type': type}
+#        elif type == Tag.type_num:
+#            info[obj.id] = {'type': type,
+#                            'sha': obj._object_sha}
+    pickled_info = pickle.dumps(info)
+    return pickled_info
+
+def load_pack_info(scon, filename):
+    f = scon.get_object(filename)
+    try:
+        return pickle.loads(f.read())
     finally:
         f.close()
 
@@ -312,7 +358,6 @@ class SwiftConnector(object):
         """
         content.seek(0)
         data = content.read()
-        content.close()
         path = self.base_path + '/' + name
         headers = {'Content-Length': str(len(data))}
         ret = self.httpclient.request('PUT',
@@ -506,9 +551,20 @@ class SwiftPack(Pack):
         self.scon = kwargs['scon']
         del kwargs['scon']
         super(SwiftPack, self).__init__(*args, **kwargs)
+        self._pack_info_path = self._basename + '.info'
+        self._pack_info = None
+        self._pack_info_load = lambda: load_pack_info(self.scon,
+                                                      self._pack_info_path)
         self._idx_load = lambda: swift_load_pack_index(self.scon,
                                                        self._idx_path)
         self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
+
+    @property
+    def pack_info(self):
+        """The pack data object being used."""
+        if self._pack_info is None:
+            self._pack_info = self._pack_info_load()
+        return self._pack_info
 
 
 class SwiftObjectStore(PackBasedObjectStore):
@@ -565,6 +621,30 @@ class SwiftObjectStore(PackBasedObjectStore):
                       for o in objects if o['name'].endswith(".pack")]
         return [SwiftPack(pack, scon=self.scon) for pack in pack_files]
 
+    def _collect_ancestors(self, heads, common=set()):
+        def _find_parents(commit):
+            for pack in self._pack_cache:
+                if commit in pack:
+                    try:
+                        parents = pack.pack_info[commit]['parents_shas']
+                    except KeyError:
+                        # Seems to have no parents
+                        return []
+                    return parents
+        bases = set()
+        commits = set()
+        queue = []
+        queue.extend(heads)
+        while queue:
+            e = queue.pop(0)
+            if e in common:
+                bases.add(e)
+            elif e not in commits:
+                commits.add(e)
+                parents = _find_parents(e)
+                queue.extend(parents)
+        return (commits, bases)
+
     def add_pack(self):
         """Add a new pack to this object store.
 
@@ -585,7 +665,9 @@ class SwiftObjectStore(PackBasedObjectStore):
                 index = StringIO()
                 write_pack_index_v2(index, entries, pack.get_stored_checksum())
                 self.scon.put_object(basename + ".pack", f)
+                f.close()
                 self.scon.put_object(basename + ".idx", index)
+                index.close()
                 final_pack = SwiftPack(basename, scon=self.scon)
                 final_pack.check_length_and_checksum()
                 self._add_known_pack(final_pack)
@@ -657,11 +739,20 @@ class SwiftObjectStore(PackBasedObjectStore):
             self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         self.scon.put_object(pack_base_name + '.pack', f)
 
+        # Write pack info..
+        serialized_pack_info = pack_info_create(f)
+        f.close()
+        pack_info_file = StringIO(serialized_pack_info)
+        filename = pack_base_name + '.info'
+        self.scon.put_object(filename, pack_info_file)
+        pack_info_file.close()
+
         # Write the index.
         filename = pack_base_name + '.idx'
         index_file = StringIO()
         write_pack_index_v2(index_file, entries, pack_sha)
         self.scon.put_object(filename, index_file)
+        index_file.close()
 
         # Add the pack to the store and return it.
         final_pack = SwiftPack(pack_base_name, scon=self.scon)
@@ -758,6 +849,7 @@ class SwiftRepo(BaseRepo):
         f = StringIO()
         f.write(contents)
         self.scon.put_object(filename, f)
+        f.close()
 
     @classmethod
     def init_bare(cls, scon, conf):

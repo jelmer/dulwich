@@ -243,7 +243,7 @@ class TestSwiftObjectStore(TestCase):
     def test_add_thin_pack(self):
         sos = swift.SwiftObjectStore(self.fsc)
         self._put_pack(sos, 1, 'Default')
-        self.assertEqual(len(self.fsc.store), 2)
+        self.assertEqual(len(self.fsc.store), 3)
 
     def test_find_missing_objects(self):
         commit_amount = 3
@@ -300,7 +300,7 @@ class TestSwiftObjectStore(TestCase):
                                                    [heada, headb],
                                                    progress=None,
                                                    get_tagged=None))
-        self.assertEqual(len(self.fsc.store), 4)
+        self.assertEqual(len(self.fsc.store), 6)
         self.assertEqual(len(i),
                          commit_amount_a * 3 +
                          commit_amount_b * 3)
@@ -321,11 +321,11 @@ class TestSwiftObjectStore(TestCase):
         data = [(REF_DELTA, (ref_blob_id, blob.as_raw_string())),
                 (tree.type_num, tree.as_raw_string()),
                 (cmt.type_num, cmt.as_raw_string()),
-                (tag.type_num, cmt.as_raw_string())]
+                (tag.type_num, tag.as_raw_string())]
         f = StringIO()
         build_pack(f, data, store=sos)
         sos.add_thin_pack(f.read, None)
-        self.assertEqual(len(self.fsc.store), 4)
+        self.assertEqual(len(self.fsc.store), 6)
 
 
 class TestSwiftRepo(TestCase):

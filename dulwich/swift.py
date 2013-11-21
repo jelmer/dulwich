@@ -24,6 +24,7 @@
 # TODO: Refactor to share more code with dulwich/repo.py.
 
 import os
+import stat
 import posixpath
 import tempfile
 import cPickle as pickle
@@ -114,6 +115,47 @@ except ImportError:
     gevent_support = False
 
 
+class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
+    def __init__(self, *args, **kwargs):
+        super(PackInfoObjectStoreIterator, self).__init__(*args, **kwargs)
+
+    def __len__(self):
+        while len(self.finder.objects_to_send):
+            for _ in xrange(0, len(self.finder.objects_to_send)):
+                sha = self.finder.next()
+                self._shas.append(sha)
+        return len(self._shas)
+
+class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
+    def __init__(self, *args, **kwargs):
+        super(PackInfoMissingObjectFinder, self).__init__(*args, **kwargs)
+
+    def next(self):
+        while True:
+            if not self.objects_to_send:
+                return None
+            (sha, name, leaf) = self.objects_to_send.pop()
+            if sha not in self.sha_done:
+                break
+        if not leaf:
+            info = self.object_store.pack_info_get(sha)
+            if info['type'] == Commit.type_num:
+                self.add_todo([(info['tree_sha'], "", False)])
+            elif info['type'] == Tree.type_num:
+                self.add_todo(info['shas'])
+            elif info['type'] == Tag.type_num:
+                self.add_todo([(info['sha'], None, False)])
+            if sha in self._tagged:
+                self.add_todo([(self._tagged[sha], None, True)])
+        self.sha_done.add(sha)
+        self.progress("counting objects: %d\r" % len(self.sha_done))
+        return (sha, name)
+
+# Need to use only when PackInfo is present or activated ?
+if gevent_support:
+    GreenThreadsObjectStoreIterator = PackInfoObjectStoreIterator
+    GreenThreadsMissingObjectFinder = PackInfoMissingObjectFinder
+
 def load_conf(path=None, file=None):
     """Load configuration in global var CONF
 
@@ -159,7 +201,7 @@ def pack_info_create(pack_fd):
     for _, type, obj, _ in pack.iterobjects():
         # Must not be used against a thin pack
         if type not in [Commit.type_num, Tree.type_num,
-                        Blob.type_num]:
+                        Blob.type_num, Tag.type_num]:
             continue
         obj = ShaFile.from_raw_chunks(type, obj)
         if type == Commit.type_num:
@@ -167,15 +209,15 @@ def pack_info_create(pack_fd):
                             'parents_shas': obj.parents,
                             'tree_sha': obj._tree}
         elif type == Tree.type_num:
-            shas = [s for _, m, s in obj.iteritems()
+            shas = [(s, n, not stat.S_ISDIR(m)) for n, m, s in obj.iteritems()
                     if not S_ISGITLINK(m)]
             info[obj.id] = {'type': type,
                             'shas': shas}
         elif type == Blob.type_num:
             info[obj.id] = {'type': type}
-#        elif type == Tag.type_num:
-#            info[obj.id] = {'type': type,
-#                            'sha': obj._object_sha}
+        elif type == Tag.type_num:
+            info[obj.id] = {'type': type,
+                            'sha': obj._object_sha}
     pickled_info = pickle.dumps(info)
     return pickled_info
 
@@ -620,6 +662,12 @@ class SwiftObjectStore(PackBasedObjectStore):
         pack_files = [o['name'].replace(".pack", "")
                       for o in objects if o['name'].endswith(".pack")]
         return [SwiftPack(pack, scon=self.scon) for pack in pack_files]
+
+    def pack_info_get(self, sha):
+        for pack in self._pack_cache:
+            if sha in pack:
+                return pack.pack_info[sha]
+        raise Exception('Sha not found in pack info files')
 
     def _collect_ancestors(self, heads, common=set()):
         def _find_parents(commit):

@@ -75,8 +75,6 @@ from dulwich.objects import (
     Blob,
     Tag,
     S_ISGITLINK,
-    ShaFile,
-    sha_to_hex,
     )
 
 try:
@@ -126,6 +124,7 @@ class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
                 self._shas.append(sha)
         return len(self._shas)
 
+
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
     def __init__(self, *args, **kwargs):
         super(PackInfoMissingObjectFinder, self).__init__(*args, **kwargs)
@@ -155,6 +154,7 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
 if gevent_support:
     GreenThreadsObjectStoreIterator = PackInfoObjectStoreIterator
     GreenThreadsMissingObjectFinder = PackInfoMissingObjectFinder
+
 
 def load_conf(path=None, file=None):
     """Load configuration in global var CONF
@@ -194,35 +194,32 @@ def swift_load_pack_index(scon, filename):
         f.close()
 
 
-def pack_info_create(pack_fd):
-    pack_fd.seek(0)
-    pack = PackData(filename="", file=pack_fd)
+def pack_info_create(pack_data, pack_index):
+    pack = Pack.from_objects(pack_data, pack_index)
     info = {}
-    for _, type, obj, _ in pack.iterobjects():
-        # Must not be used against a thin pack
-        if type not in [Commit.type_num, Tree.type_num,
-                        Blob.type_num, Tag.type_num]:
-            continue
-        obj = ShaFile.from_raw_chunks(type, obj)
-        if type == Commit.type_num:
-            info[obj.id] = {'type': type,
+    for obj in pack.iterobjects():
+        if isinstance(obj, Commit):
+            info[obj.id] = {'type': obj.type_num,
                             'parents_shas': obj.parents,
-                            'tree_sha': obj._tree}
-        elif type == Tree.type_num:
+                            'tree_sha': obj.tree}
+        elif isinstance(obj, Tree):
             shas = [(s, n, not stat.S_ISDIR(m)) for n, m, s in obj.iteritems()
                     if not S_ISGITLINK(m)]
-            info[obj.id] = {'type': type,
+            info[obj.id] = {'type': obj.type_num,
                             'shas': shas}
-        elif type == Blob.type_num:
-            info[obj.id] = {'type': type}
-        elif type == Tag.type_num:
-            info[obj.id] = {'type': type,
+        elif isinstance(obj, Blob):
+            info[obj.id] = {'type': obj.type_num}
+        elif isinstance(obj, Tag):
+            info[obj.id] = {'type': obj.type_num,
                             'sha': obj._object_sha}
     pickled_info = pickle.dumps(info)
     return pickled_info
 
+
 def load_pack_info(scon, filename):
     f = scon.get_object(filename)
+    if not f:
+        return None
     try:
         return pickle.loads(f.read())
     finally:
@@ -667,7 +664,6 @@ class SwiftObjectStore(PackBasedObjectStore):
         for pack in self._pack_cache:
             if sha in pack:
                 return pack.pack_info[sha]
-        raise Exception('Sha not found in pack info files')
 
     def _collect_ancestors(self, heads, common=set()):
         def _find_parents(commit):
@@ -787,20 +783,24 @@ class SwiftObjectStore(PackBasedObjectStore):
             self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         self.scon.put_object(pack_base_name + '.pack', f)
 
-        # Write pack info..
-        serialized_pack_info = pack_info_create(f)
-        f.close()
-        pack_info_file = StringIO(serialized_pack_info)
-        filename = pack_base_name + '.info'
-        self.scon.put_object(filename, pack_info_file)
-        pack_info_file.close()
-
         # Write the index.
         filename = pack_base_name + '.idx'
         index_file = StringIO()
         write_pack_index_v2(index_file, entries, pack_sha)
         self.scon.put_object(filename, index_file)
+
+        # Write pack info.
+        f.seek(0)
+        pack_data = PackData(filename="", file=f)
+        index_file.seek(0)
+        pack_index = load_pack_index_file('', index_file)
+        serialized_pack_info = pack_info_create(pack_data, pack_index)
+        f.close()
         index_file.close()
+        pack_info_file = StringIO(serialized_pack_info)
+        filename = pack_base_name + '.info'
+        self.scon.put_object(filename, pack_info_file)
+        pack_info_file.close()
 
         # Add the pack to the store and return it.
         final_pack = SwiftPack(pack_base_name, scon=self.scon)

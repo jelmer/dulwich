@@ -51,6 +51,7 @@ from dulwich.object_store import (
     ObjectStoreGraphWalker,
     )
 from dulwich.objects import (
+    check_hexsha,
     Blob,
     Commit,
     ShaFile,
@@ -96,6 +97,57 @@ BASE_DIRECTORIES = [
     ]
 
 
+def parse_graftpoints(graftpoints):
+    """Convert a list of graftpoints into a dict
+
+    :param graftpoints: Iterator of graftpoint lines
+
+    Each line is formatted as:
+        <commit sha1> <parent sha1> [<parent sha1>]*
+
+    Resulting dictionary is:
+        <commit sha1>: [<parent sha1>*]
+
+    https://git.wiki.kernel.org/index.php/GraftPoint
+    """
+    grafts = {}
+    for l in graftpoints:
+        raw_graft = l.split(None, 1)
+
+        commit = raw_graft[0]
+        if len(raw_graft) == 2:
+            parents = raw_graft[1].split()
+        else:
+            parents = []
+
+        for sha in [commit] + parents:
+            check_hexsha(sha, 'Invalid graftpoint')
+
+        grafts[commit] = parents
+    return grafts
+
+
+def serialize_graftpoints(graftpoints):
+    """Convert a dictionary of grafts into string
+
+    The graft dictionary is:
+        <commit sha1>: [<parent sha1>*]
+
+    Each line is formatted as:
+        <commit sha1> <parent sha1> [<parent sha1>]*
+
+    https://git.wiki.kernel.org/index.php/GraftPoint
+
+    """
+    graft_lines = []
+    for commit, parents in graftpoints.iteritems():
+        if parents:
+            graft_lines.append('%s %s' % (commit, ' '.join(parents)))
+        else:
+            graft_lines.append(commit)
+    return '\n'.join(graft_lines)
+
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -117,6 +169,7 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
+        self.graftpoints = {}
         self.hooks = {}
 
     def _init_files(self, bare):
@@ -269,11 +322,17 @@ class BaseRepo(object):
     def get_parents(self, sha):
         """Retrieve the parents of a specific commit.
 
+        If the specific commit is a graftpoint, the graft parents
+        will be returned instead.
+
         :param sha: SHA of the commit for which to retrieve the parents
         :return: List of parents
         """
-        # TODO: Lookup grafts as well
-        return self.object_store[sha].parents
+
+        try:
+            return self.graftpoints[sha]
+        except KeyError:
+            return self[sha].parents
 
     def get_config(self):
         """Retrieve the config object.
@@ -401,6 +460,9 @@ class BaseRepo(object):
             include = [self.head()]
         if isinstance(include, str):
             include = [include]
+
+        kwargs['get_parents'] = lambda commit: self.get_parents(commit.id)
+
         return Walker(self.object_store, include, *args, **kwargs)
 
     def revision_history(self, head):
@@ -477,6 +539,27 @@ class BaseRepo(object):
         return "%s <%s>" % (
             config.get(("user", ), "name"),
             config.get(("user", ), "email"))
+
+    def add_graftpoints(self, updated_graftpoints):
+        """Add or modify graftpoints
+
+        :param updated_graftpoints: Dict of commit shas to list of parent shas
+        """
+
+        # Simple validation
+        for commit, parents in updated_graftpoints.iteritems():
+            for sha in [commit] + parents:
+                check_hexsha(sha, 'Invalid graftpoint')
+
+        self.graftpoints.update(updated_graftpoints)
+
+    def remove_graftpoints(self, to_remove=[]):
+        """Remove graftpoints
+
+        :param to_remove: List of commit shas
+        """
+        for sha in to_remove:
+            del self.graftpoints[sha]
 
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
@@ -619,6 +702,10 @@ class Repo(BaseRepo):
                                                     OBJECTDIR))
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
+
+        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        if graft_file:
+            self.graftpoints = parse_graftpoints(graft_file)
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

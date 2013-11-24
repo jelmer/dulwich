@@ -21,6 +21,10 @@
   * Repo.ref() is now deprecated in favour of Repo.refs[].
     (Jelmer Vernooij)
 
+FEATURES
+
+  * Add support for graftpoints. (milki)
+
 0.9.3	2013-09-27
 
  BUG FIXES

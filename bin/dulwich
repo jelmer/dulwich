@@ -216,6 +216,11 @@ def cmd_diff_tree(args):
     porcelain.diff_tree(".", args[0], args[1])
 
 
+def cmd_rev_list(args):
+    opts, args = getopt(args, "", [])
+    porcelain.rev_list(".", args)
+
+
 commands = {
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
@@ -234,6 +239,7 @@ commands = {
     "add": cmd_add,
     "rm": cmd_rm,
     "show": cmd_show,
+    "rev-list": cmd_rev_list,
     }
 
 if len(sys.argv) < 2:

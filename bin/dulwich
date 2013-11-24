@@ -180,7 +180,7 @@ def cmd_commit(args):
     porcelain.commit(".", message=opts["--message"])
 
 
-def cmd_commit(args):
+def cmd_commit_tree(args):
     opts, args = getopt(args, "", ["message"])
     if args == []:
         print "usage: dulwich commit-tree tree"

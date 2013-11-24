@@ -20,26 +20,17 @@
 import os
 import tempfile
 import shutil
-import warnings
 
 from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
 from dulwich.objects import (
-    Commit,
     Tree,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
+    )
 from dulwich.repo import (
     parse_graftpoints,
     serialize_graftpoints,
     MemoryRepo,
     Repo,
-)
-from dulwich.tests.utils import (
-    make_commit,
-    setup_warning_catcher
 )
 
 
@@ -107,7 +98,7 @@ class GraftsInRepositoryBase(object):
 
     def get_repo_with_grafts(self, grafts):
         r = self._repo
-        r.add_graftpoints(grafts)
+        r._add_graftpoints(grafts)
         return r
 
     def test_no_grafts(self):
@@ -130,7 +121,7 @@ class GraftsInRepositoryBase(object):
 
     def test_remove_graft(self):
         r = self.get_repo_with_grafts({self._repo.head(): []})
-        r.remove_graftpoints([self._repo.head()])
+        r._remove_graftpoints([self._repo.head()])
 
         self.assertEqual([e.commit.id for e in r.get_walker()],
                          self._shas[::-1])
@@ -140,7 +131,7 @@ class GraftsInRepositoryBase(object):
 
         self.assertRaises(
             ObjectFormatException,
-            r.add_graftpoints,
+            r._add_graftpoints,
             {self._shas[-1]: ['1']})
 
 
@@ -175,7 +166,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         r._put_named_file(os.path.join('info', 'grafts'), '')
 
         r = Repo(self._repo_dir)
-        self.assertEqual({}, r.graftpoints)
+        self.assertEqual({}, r._graftpoints)
 
     def test_init_with_info_grafts(self):
         r = self._repo
@@ -184,7 +175,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
             "%s %s" % (self._shas[-1], self._shas[0]))
 
         r = Repo(self._repo_dir)
-        self.assertEqual({self._shas[-1]: [self._shas[0]]}, r.graftpoints)
+        self.assertEqual({self._shas[-1]: [self._shas[0]]}, r._graftpoints)
 
 
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):

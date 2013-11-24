@@ -227,3 +227,16 @@ class CommitTreeTests(PorcelainTestCase):
             committer="Jane <jane@example.com>")
         self.assertTrue(type(sha) is str)
         self.assertEquals(len(sha), 40)
+
+
+class RevListTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        outstream = StringIO()
+        porcelain.rev_list(
+            self.repo.path, [c3.id], outstream=outstream)
+        self.assertEquals(
+            "%s\n%s\n%s\n" % (c3.id, c2.id, c1.id),
+            outstream.getvalue())

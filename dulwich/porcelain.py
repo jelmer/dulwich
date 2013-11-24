@@ -35,6 +35,7 @@ Currently implemented:
  * diff-tree
  * init
  * remove
+ * rev-list
  * update-server-info
  * symbolic-ref
 
@@ -242,3 +243,15 @@ def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
     """
     r = open_repo(repo)
     write_tree_diff(outstream, r.object_store, old_tree, new_tree)
+
+
+def rev_list(repo, commits, outstream=sys.stdout):
+    """Lists commit objects in reverse chronological order.
+
+    :param repo: Path to repository
+    :param commits: Commits over which to iterate
+    :param outstream: Stream to write to
+    """
+    r = open_repo(repo)
+    for entry in r.get_walker(include=[r[c].id for c in commits]):
+        outstream.write("%s\n" % entry.commit.id)

@@ -169,7 +169,7 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
-        self.graftpoints = {}
+        self._graftpoints = {}
         self.hooks = {}
 
     def _init_files(self, bare):
@@ -330,7 +330,7 @@ class BaseRepo(object):
         """
 
         try:
-            return self.graftpoints[sha]
+            return self._graftpoints[sha]
         except KeyError:
             return self[sha].parents
 
@@ -540,7 +540,7 @@ class BaseRepo(object):
             config.get(("user", ), "name"),
             config.get(("user", ), "email"))
 
-    def add_graftpoints(self, updated_graftpoints):
+    def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
 
         :param updated_graftpoints: Dict of commit shas to list of parent shas
@@ -551,15 +551,15 @@ class BaseRepo(object):
             for sha in [commit] + parents:
                 check_hexsha(sha, 'Invalid graftpoint')
 
-        self.graftpoints.update(updated_graftpoints)
+        self._graftpoints.update(updated_graftpoints)
 
-    def remove_graftpoints(self, to_remove=[]):
+    def _remove_graftpoints(self, to_remove=[]):
         """Remove graftpoints
 
         :param to_remove: List of commit shas
         """
         for sha in to_remove:
-            del self.graftpoints[sha]
+            del self._graftpoints[sha]
 
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
@@ -705,7 +705,7 @@ class Repo(BaseRepo):
 
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self.graftpoints = parse_graftpoints(graft_file)
+            self._graftpoints = parse_graftpoints(graft_file)
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

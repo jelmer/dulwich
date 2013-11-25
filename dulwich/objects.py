@@ -1030,6 +1030,47 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 
+def parse_commit(chunks):
+    """Parse a commit object from chunks.
+
+    :param chunks: Chunks to parse
+    :return: Tuple of (tree, parents, author_info, commit_info,
+        encoding, mergetag, message, extra)
+    """
+    parents = []
+    extra = []
+    tree = None
+    author_info = (None, None, (None, None))
+    commit_info = (None, None, (None, None))
+    encoding = None
+    mergetag = []
+    message = None
+
+    for field, value in _parse_message(chunks):
+        if field == _TREE_HEADER:
+            tree = value
+        elif field == _PARENT_HEADER:
+            parents.append(value)
+        elif field == _AUTHOR_HEADER:
+            author, timetext, timezonetext = value.rsplit(" ", 2)
+            author_time = int(timetext)
+            author_info = (author, author_time, parse_timezone(timezonetext))
+        elif field == _COMMITTER_HEADER:
+            committer, timetext, timezonetext = value.rsplit(" ", 2)
+            commit_time = int(timetext)
+            commit_info = (committer, commit_time, parse_timezone(timezonetext))
+        elif field == _ENCODING_HEADER:
+            encoding = value
+        elif field == _MERGETAG_HEADER:
+            mergetag.append(Tag.from_string(value + "\n"))
+        elif field is None:
+            message = value
+        else:
+            extra.append((field, value))
+    return (tree, parents, author_info, commit_info, encoding, mergetag,
+            message, extra)
+
+
 class Commit(ShaFile):
     """A git commit object"""
 
@@ -1059,31 +1100,13 @@ class Commit(ShaFile):
         return commit
 
     def _deserialize(self, chunks):
-        self._parents = []
-        self._extra = []
-        for field, value in _parse_message(chunks):
-            if field == _TREE_HEADER:
-                self._tree = value
-            elif field == _PARENT_HEADER:
-                self._parents.append(value)
-            elif field == _AUTHOR_HEADER:
-                self._author, timetext, timezonetext = value.rsplit(" ", 2)
-                self._author_time = int(timetext)
-                self._author_timezone, self._author_timezone_neg_utc =\
-                    parse_timezone(timezonetext)
-            elif field == _COMMITTER_HEADER:
-                self._committer, timetext, timezonetext = value.rsplit(" ", 2)
-                self._commit_time = int(timetext)
-                self._commit_timezone, self._commit_timezone_neg_utc =\
-                    parse_timezone(timezonetext)
-            elif field == _ENCODING_HEADER:
-                self._encoding = value
-            elif field == _MERGETAG_HEADER:
-                self._mergetag.append(Tag.from_string(value + "\n"))
-            elif field is None:
-                self._message = value
-            else:
-                self._extra.append((field, value))
+        (self._tree, self._parents, author_info, commit_info, self._encoding,
+                self._mergetag, self._message, self._extra) = \
+                        parse_commit(chunks)
+        (self._author, self._author_time, (self._author_timezone,
+            self._author_timezone_neg_utc)) = author_info
+        (self._committer, self._commit_time, (self._commit_timezone,
+            self._commit_timezone_neg_utc)) = commit_info
 
     def check(self):
         """Check this object for internal consistency.

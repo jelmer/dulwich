@@ -281,8 +281,10 @@ class BaseRepo(object):
             haves = []  # TODO: filter haves from iter_shas
 
             shas = self.object_store.iter_shas(
-              self.object_store.find_missing_objects(haves, wants, progress,
-                                                     get_tagged))
+              self.object_store.find_missing_objects(
+                  haves, wants, progress,
+                  get_tagged,
+                  get_parents=lambda commit: self.get_parents(commit.id)))
             self._remove_graftpoints(shallow_grafts)
             return shas
 

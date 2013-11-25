@@ -222,7 +222,7 @@ class SwiftConnector():
         auth_httpclient = HTTPClient.from_url(self.auth_url)
         headers = {'X-Auth-User': self.user,
                    'X-Auth-Key': self.password}
-        prefix_uri = urlparse(self.auth_url).path.lstrip('/')
+        prefix_uri = urlparse(self.auth_url).path
         ret = auth_httpclient.request('GET',
                                       prefix_uri,
                                       headers=headers)
@@ -248,9 +248,9 @@ class SwiftConnector():
         auth_json = json_dumps(auth_dict)
         headers = {'Content-Type': 'application/json'}
         auth_httpclient = HTTPClient.from_url(self.auth_url)
-        prefix_uri = urlparse(self.auth_url).path.lstrip('/')
+        prefix_uri = urlparse(self.auth_url).path
         if not prefix_uri.endswith('tokens'):
-            prefix_uri += '/tokens'
+            prefix_uri = posixpath.join(prefix_uri, '/tokens')
         ret = auth_httpclient.request('POST',
                                       prefix_uri,
                                       body=auth_json,

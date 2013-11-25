@@ -579,8 +579,8 @@ class Blob(ShaFile):
         super(Blob, self).check()
 
 
-def _parse_tag_or_commit(chunks):
-    """Parse tag or commit chunks.
+def _parse_message(chunks):
+    """Parse a message with a list of fields and a body.
 
     :param chunks: the raw chunks of the tag or commit object.
     :return: iterator of tuples of (field, value), one per header line, in the
@@ -602,11 +602,6 @@ def _parse_tag_or_commit(chunks):
             (k, v) = l.split(" ", 1)
     yield (None, f.read())
     f.close()
-
-
-def parse_tag(chunks):
-    """Parse a tag object."""
-    return _parse_tag_or_commit(chunks)
 
 
 class Tag(ShaFile):
@@ -649,7 +644,7 @@ class Tag(ShaFile):
             check_identity(self._tagger, "invalid tagger")
 
         last = None
-        for field, _ in parse_tag(self._chunked_text):
+        for field, _ in _parse_message(self._chunked_text):
             if field == _OBJECT_HEADER and last is not None:
                 raise ObjectFormatException("unexpected object")
             elif field == _TYPE_HEADER and last != _OBJECT_HEADER:
@@ -680,7 +675,7 @@ class Tag(ShaFile):
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
-        for field, value in parse_tag(chunks):
+        for field, value in _parse_message(chunks):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
             elif field == _TYPE_HEADER:
@@ -1035,10 +1030,6 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 
-def parse_commit(chunks):
-    return _parse_tag_or_commit(chunks)
-
-
 class Commit(ShaFile):
     """A git commit object"""
 
@@ -1070,8 +1061,7 @@ class Commit(ShaFile):
     def _deserialize(self, chunks):
         self._parents = []
         self._extra = []
-        self._author = None
-        for field, value in parse_commit(chunks):
+        for field, value in _parse_message(chunks):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:
@@ -1088,10 +1078,10 @@ class Commit(ShaFile):
                     parse_timezone(timezonetext)
             elif field == _ENCODING_HEADER:
                 self._encoding = value
-            elif field is None:
-                self._message = value
             elif field == _MERGETAG_HEADER:
                 self._mergetag.append(Tag.from_string(value + "\n"))
+            elif field is None:
+                self._message = value
             else:
                 self._extra.append((field, value))
 
@@ -1114,7 +1104,7 @@ class Commit(ShaFile):
         check_identity(self._committer, "invalid committer")
 
         last = None
-        for field, _ in parse_commit(self._chunked_text):
+        for field, _ in _parse_message(self._chunked_text):
             if field == _TREE_HEADER and last is not None:
                 raise ObjectFormatException("unexpected tree")
             elif field == _PARENT_HEADER and last not in (_PARENT_HEADER,

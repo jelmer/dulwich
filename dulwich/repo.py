@@ -319,20 +319,23 @@ class BaseRepo(object):
         """
         return self.object_store[sha]
 
-    def get_parents(self, sha):
+    def get_parents(self, sha, commit=None):
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
         will be returned instead.
 
         :param sha: SHA of the commit for which to retrieve the parents
+        :param commit: Optional commit matching the sha
         :return: List of parents
         """
 
         try:
             return self._graftpoints[sha]
         except KeyError:
-            return self[sha].parents
+            if commit is None:
+                commit = self[sha]
+            return commit.parents
 
     def get_config(self):
         """Retrieve the config object.
@@ -461,7 +464,7 @@ class BaseRepo(object):
         if isinstance(include, str):
             include = [include]
 
-        kwargs['get_parents'] = lambda commit: self.get_parents(commit.id)
+        kwargs['get_parents'] = lambda commit: self.get_parents(commit.id, commit)
 
         return Walker(self.object_store, include, *args, **kwargs)
 

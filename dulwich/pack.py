@@ -1859,7 +1859,7 @@ class Pack(object):
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
         type, uncomp = self.get_raw(sha1)
-        return ShaFile.from_raw_string(type, uncomp)
+        return ShaFile.from_raw_string(type, uncomp, sha=sha1)
 
     def iterobjects(self):
         """Iterate over the objects in this pack."""

@@ -968,7 +968,7 @@ class HttpGitClient(GitClient):
 def get_transport_and_path_from_url(url, **kwargs):
     """Obtain a git client from a URL.
 
-    :param uri: URI or path
+    :param url: URL to open
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.

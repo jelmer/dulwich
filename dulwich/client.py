@@ -645,6 +645,9 @@ class SubprocessGitClient(TraditionalGitClient):
                         report_activity=self._report_activity), p.can_read
 
 
+# What Git client to use for local access
+default_local_git_client_cls = SubprocessGitClient
+
 class SSHVendor(object):
     """A client side SSH implementation."""
 
@@ -984,7 +987,7 @@ def get_transport_and_path_from_url(url, **kwargs):
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
     elif parsed.scheme == 'file':
-        return SubprocessGitClient(**kwargs), parsed.path
+        return default_local_git_client_cls(**kwargs), parsed.path
 
     raise ValueError("unknown scheme '%s'" % parsed.scheme)
 
@@ -1015,4 +1018,4 @@ def get_transport_and_path(location, **kwargs):
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.
-    return SubprocessGitClient(**kwargs), location
+    return default_local_git_client_cls(**kwargs), location

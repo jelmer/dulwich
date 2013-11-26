@@ -113,7 +113,7 @@ class BaseObjectStore(object):
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type_num, uncomp)
+        return ShaFile.from_raw_string(type_num, uncomp, sha=sha)
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""

@@ -31,6 +31,7 @@ from dulwich.client import (
     SendPackError,
     UpdateRefsError,
     get_transport_and_path,
+    get_transport_and_path_from_url,
     )
 from dulwich.tests import (
     TestCase,
@@ -202,8 +203,8 @@ class GitClientTests(TestCase):
     def test_get_transport_and_path_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
-        self.assertRaises(ValueError, get_transport_and_path,
-        'prospero://bar/baz')
+        client, path = get_transport_and_path('prospero://bar/baz')
+        self.assertTrue(isinstance(client, SSHGitClient))
 
     def test_get_transport_and_path_http(self):
         url = 'https://github.com/jelmer/dulwich'
@@ -376,6 +377,84 @@ class GitClientTests(TestCase):
                           self.client.send_pack, "/",
                           determine_wants, generate_pack_contents)
         self.assertEqual(self.rout.getvalue(), '0000')
+
+
+class TestGetTransportAndPathFromUrl(TestCase):
+
+    def test_tcp(self):
+        c, path = get_transport_and_path_from_url('git://foo.com/bar/baz')
+        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertEqual('foo.com', c._host)
+        self.assertEqual(TCP_GIT_PORT, c._port)
+        self.assertEqual('/bar/baz', path)
+
+    def test_tcp_port(self):
+        c, path = get_transport_and_path_from_url('git://foo.com:1234/bar/baz')
+        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertEqual('foo.com', c._host)
+        self.assertEqual(1234, c._port)
+        self.assertEqual('/bar/baz', path)
+
+    def test_ssh_explicit(self):
+        c, path = get_transport_and_path_from_url('git+ssh://foo.com/bar/baz')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('foo.com', c.host)
+        self.assertEqual(None, c.port)
+        self.assertEqual(None, c.username)
+        self.assertEqual('bar/baz', path)
+
+    def test_ssh_port_explicit(self):
+        c, path = get_transport_and_path_from_url(
+            'git+ssh://foo.com:1234/bar/baz')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('foo.com', c.host)
+        self.assertEqual(1234, c.port)
+        self.assertEqual('bar/baz', path)
+
+    def test_ssh_abspath_explicit(self):
+        c, path = get_transport_and_path_from_url('git+ssh://foo.com//bar/baz')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('foo.com', c.host)
+        self.assertEqual(None, c.port)
+        self.assertEqual(None, c.username)
+        self.assertEqual('/bar/baz', path)
+
+    def test_ssh_port_abspath_explicit(self):
+        c, path = get_transport_and_path_from_url(
+            'git+ssh://foo.com:1234//bar/baz')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('foo.com', c.host)
+        self.assertEqual(1234, c.port)
+        self.assertEqual('/bar/baz', path)
+
+    def test_ssh_host_relpath(self):
+        self.assertRaises(ValueError, get_transport_and_path_from_url,
+            'foo.com:bar/baz')
+
+    def test_ssh_user_host_relpath(self):
+        self.assertRaises(ValueError, get_transport_and_path_from_url,
+            'user@foo.com:bar/baz')
+
+    def test_local_path(self):
+        self.assertRaises(ValueError, get_transport_and_path_from_url,
+            'foo.bar/baz')
+
+    def test_error(self):
+        # Need to use a known urlparse.uses_netloc URL scheme to get the
+        # expected parsing of the URL on Python versions less than 2.6.5
+        self.assertRaises(ValueError, get_transport_and_path_from_url,
+            'prospero://bar/baz')
+
+    def test_http(self):
+        url = 'https://github.com/jelmer/dulwich'
+        c, path = get_transport_and_path_from_url(url)
+        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('/jelmer/dulwich', path)
+
+    def test_file(self):
+        c, path = get_transport_and_path_from_url('file:///home/jelmer/foo')
+        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertEqual('/home/jelmer/foo', path)
 
 
 class TestSSHVendor(object):

@@ -291,17 +291,20 @@ class ShaFile(object):
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
-    def set_raw_string(self, text):
+    def set_raw_string(self, text, sha=None):
         """Set the contents of this object from a serialized string."""
         if type(text) != str:
             raise TypeError(text)
-        self.set_raw_chunks([text])
+        self.set_raw_chunks([text], sha)
 
-    def set_raw_chunks(self, chunks):
+    def set_raw_chunks(self, chunks, sha=None):
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
         self._deserialize(chunks)
-        self._sha = None
+        if sha is None:
+            self._sha = None
+        else:
+            self._sha = FixedSha(sha)
         self._needs_parsing = False
         self._needs_serialization = False
 
@@ -403,25 +406,27 @@ class ShaFile(object):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
-    def from_raw_string(type_num, string):
+    def from_raw_string(type_num, string, sha=None):
         """Creates an object of the indicated type from the raw string given.
 
         :param type_num: The numeric type of the object.
         :param string: The raw uncompressed contents.
+        :param sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
-        obj.set_raw_string(string)
+        obj.set_raw_string(string, sha)
         return obj
 
     @staticmethod
-    def from_raw_chunks(type_num, chunks):
+    def from_raw_chunks(type_num, chunks, sha=None):
         """Creates an object of the indicated type from the raw chunks given.
 
         :param type_num: The numeric type of the object.
         :param chunks: An iterable of the raw uncompressed contents.
+        :param sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
-        obj.set_raw_chunks(chunks)
+        obj.set_raw_chunks(chunks, sha)
         return obj
 
     @classmethod

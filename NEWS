@@ -8,6 +8,9 @@
 
  * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij)
 
+ * Various performance improvements for object access.
+   (Jelmer Vernooij)
+
  CHANGES
 
   * Ref handling has been moved to dulwich.refs.

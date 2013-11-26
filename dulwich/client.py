@@ -962,8 +962,8 @@ class HttpGitClient(GitClient):
         return refs
 
 
-def get_transport_and_path(uri, **kwargs):
-    """Obtain a git client from a URI or path.
+def get_transport_and_path_from_url(url, **kwargs):
+    """Obtain a git client from a URL.
 
     :param uri: URI or path
     :param thin_packs: Whether or not thin packs should be retrieved
@@ -971,7 +971,7 @@ def get_transport_and_path(uri, **kwargs):
         activity.
     :return: Tuple with client instance and relative path.
     """
-    parsed = urlparse.urlparse(uri)
+    parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
                 parsed.path)
@@ -983,17 +983,36 @@ def get_transport_and_path(uri, **kwargs):
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
+    elif parsed.scheme == 'file':
+        return SubprocessGitClient(**kwargs), parsed.path
 
-    if parsed.scheme and not parsed.netloc:
+    raise ValueError("unknown scheme '%s'" % parsed.scheme)
+
+
+def get_transport_and_path(location, **kwargs):
+    """Obtain a git client from a URL.
+
+    :param location: URL or path
+    :param thin_packs: Whether or not thin packs should be retrieved
+    :param report_activity: Optional callback for reporting transport
+        activity.
+    :return: Tuple with client instance and relative path.
+    """
+    # First, try to parse it as a URL
+    try:
+        return get_transport_and_path_from_url(location, **kwargs)
+    except ValueError:
+        pass
+
+    if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.
-        return SSHGitClient(parsed.scheme, **kwargs), parsed.path
-    elif parsed.scheme:
-        raise ValueError('Unknown git protocol scheme: %s' % parsed.scheme)
-    elif '@' in parsed.path and ':' in parsed.path:
+        (hostname, path) = location.split(':')
+        return SSHGitClient(hostname, **kwargs), path
+    elif '@' in location and ':' in location:
         # SSH with user@host:foo.
-        user_host, path = parsed.path.split(':')
+        user_host, path = location.split(':')
         user, host = user_host.rsplit('@')
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.
-    return SubprocessGitClient(**kwargs), uri
+    return SubprocessGitClient(**kwargs), location

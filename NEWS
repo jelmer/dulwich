@@ -11,6 +11,14 @@
  * Various performance improvements for object access.
    (Jelmer Vernooij)
 
+ * New function `get_transport_and_path_from_url`,
+   similar to `get_transport_and_path` but only
+   supports URLs.
+   (Jelmer Vernooij)
+
+ * Add support for file:// URLs in `get_transport_and_path_from_url`.
+   (Jelmer Vernooij)
+
  CHANGES
 
   * Ref handling has been moved to dulwich.refs.

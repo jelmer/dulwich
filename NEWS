@@ -19,6 +19,9 @@
  * Add support for file:// URLs in `get_transport_and_path_from_url`.
    (Jelmer Vernooij)
 
+ * Add LocalGitClient implementation.
+   (Jelmer Vernooij)
+
  CHANGES
 
   * Ref handling has been moved to dulwich.refs.

@@ -224,7 +224,7 @@ class BaseRepo(object):
         :return: The local refs
         """
         if determine_wants is None:
-            determine_wants = lambda heads: heads.values()
+            determine_wants = target.object_store.determine_wants_all
         target.object_store.add_objects(
           self.fetch_objects(determine_wants, target.get_graph_walker(),
                              progress))

@@ -22,6 +22,7 @@ from dulwich import (
     client,
     )
 from dulwich.client import (
+    LocalGitClient,
     TraditionalGitClient,
     TCPGitClient,
     SubprocessGitClient,
@@ -46,6 +47,10 @@ from dulwich.pack import (
 from dulwich.objects import (
     Commit,
     Tree
+    )
+from dulwich.repo import MemoryRepo
+from dulwich.tests.utils import (
+    open_repo,
     )
 
 
@@ -522,6 +527,7 @@ class SSHGitClientTests(TestCase):
         self.assertEquals(["git-relative-command '~/path/to/repo'"],
                           server.command)
 
+
 class ReportStatusParserTests(TestCase):
 
     def test_invalid_pack(self):
@@ -544,3 +550,12 @@ class ReportStatusParserTests(TestCase):
         parser.handle_packet("ok refs/foo/bar")
         parser.handle_packet(None)
         parser.check()
+
+
+class LocalGitClientTests(TestCase):
+
+    def test_fetch_into_empty(self):
+        c = LocalGitClient()
+        t = MemoryRepo()
+        s = open_repo('a.git')
+        self.assertEquals(s.get_refs(), c.fetch(s.path, t))

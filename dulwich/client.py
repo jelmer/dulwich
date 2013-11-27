@@ -645,6 +645,61 @@ class SubprocessGitClient(TraditionalGitClient):
                         report_activity=self._report_activity), p.can_read
 
 
+class LocalGitClient(GitClient):
+    """Git Client that just uses a local Repo."""
+
+    def __init__(self, thin_packs=True, report_activity=None):
+        """Create a new LocalGitClient instance.
+
+        :param path: Path to the local repository
+        :param thin_packs: Whether or not thin packs should be retrieved
+        :param report_activity: Optional callback for reporting transport
+            activity.
+        """
+        self._report_activity = report_activity
+        # Ignore the thin_packs argument
+
+    def send_pack(self, path, determine_wants, generate_pack_contents,
+                  progress=None):
+        """Upload a pack to a remote repository.
+
+        :param path: Repository path
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
+        :param progress: Optional progress function
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
+        """
+        raise NotImplementedError(self.send_pack)
+
+    def fetch(self, path, target, determine_wants=None, progress=None):
+        """Fetch into a target repository.
+
+        :param path: Path to fetch from
+        :param target: Target repository to fetch into
+        :param determine_wants: Optional function to determine what refs
+            to fetch
+        :param progress: Optional progress function
+        :return: remote refs as dictionary
+        """
+        from dulwich.repo import Repo
+        r = Repo(path)
+        return r.fetch(target, determine_wants=determine_wants, progress=progress)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+                   progress=None):
+        """Retrieve a pack from a git smart server.
+
+        :param determine_wants: Callback that returns list of commits to fetch
+        :param graph_walker: Object with next() and ack().
+        :param pack_data: Callback called for each bit of data in the pack
+        :param progress: Callback for progress reports (strings)
+        """
+        raise NotImplementedError(self.fetch_pack)
+
+
 # What Git client to use for local access
 default_local_git_client_cls = SubprocessGitClient
 

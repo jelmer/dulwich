@@ -28,6 +28,7 @@ import stat
 import posixpath
 import tempfile
 import cPickle as pickle
+import time
 
 from urlparse import urlparse
 
@@ -265,7 +266,7 @@ class SwiftConnector(object):
         self.httpclient = \
             HTTPClient.from_url(self.storage_url,
                                 concurrency=self.http_pool_length,
-                                block_size=block_size,
+                                #block_size=block_size,
                                 headers=token_header)
         self.base_path = posixpath.join(urlparse(self.storage_url).path,
                                         self.root)
@@ -399,10 +400,22 @@ class SwiftConnector(object):
         data = content.read()
         path = self.base_path + '/' + name
         headers = {'Content-Length': str(len(data))}
-        ret = self.httpclient.request('PUT',
-                                      path,
-                                      body=data,
-                                      headers=headers)
+
+        def _send():
+            ret = self.httpclient.request('PUT',
+                                          path,
+                                          body=data,
+                                          headers=headers)
+            return ret
+
+        try:
+            # Sometime got Broken Pipe (seen on cloudfiles)
+            # Dirty workaround
+            ret = _send()
+        except Exception, e:
+            print "Second attempt for a PUT on %s" % str(e)
+            ret = _send()
+
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('PUT request failed with error code %s'
                                  % ret.status_code)
@@ -781,6 +794,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = posixpath.join(
             self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+        #self.scon.put_object(pack_base_name + '.pack', StringIO('b'*25000))
         self.scon.put_object(pack_base_name + '.pack', f)
 
         # Write the index.

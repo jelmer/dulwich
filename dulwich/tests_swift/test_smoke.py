@@ -95,7 +95,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.scon = swift.SwiftConnector(self.fakerepo, self.conf)
         if self.scon.test_root_exists():
             try:
-            	self.scon.del_root()
+                self.scon.del_root()
             except swift.SwiftException:
                 pass
         self.temp_d = tempfile.mkdtemp()
@@ -105,7 +105,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
     def tearDown(self):
         if self.scon.test_root_exists():
             try:
-            	self.scon.del_root()
+                self.scon.del_root()
             except swift.SwiftException:
                 pass
         if os.path.isdir(self.temp_d):

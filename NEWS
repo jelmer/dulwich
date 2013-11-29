@@ -6,7 +6,7 @@
 
  * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
 
- * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij)
+ * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij, Marcin Kuzminski)
 
  * Various performance improvements for object access.
    (Jelmer Vernooij)

@@ -110,7 +110,6 @@ class CloneTests(PorcelainTestCase):
         self.assertTrue('f2' not in os.listdir(target_path))
 
     def test_simple_local_with_checkout(self):
-
         f1_1 = make_object(Blob, data='f1')
         commit_spec = [[1], [2, 1], [3, 1, 2]]
         trees = {1: [('f1', f1_1), ('f2', f1_1)],
@@ -129,6 +128,39 @@ class CloneTests(PorcelainTestCase):
         self.assertEquals(Repo(target_path).head(), c3.id)
         self.assertTrue('f1' in os.listdir(target_path))
         self.assertTrue('f2' in os.listdir(target_path))
+
+    def test_bare_local_with_checkout(self):
+        f1_1 = make_object(Blob, data='f1')
+        commit_spec = [[1], [2, 1], [3, 1, 2]]
+        trees = {1: [('f1', f1_1), ('f2', f1_1)],
+                 2: [('f1', f1_1), ('f2', f1_1)],
+                 3: [('f1', f1_1), ('f2', f1_1)], }
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+                                        commit_spec, trees)
+        self.repo.refs["refs/heads/master"] = c3.id
+        target_path = tempfile.mkdtemp()
+        outstream = StringIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        r = porcelain.clone(self.repo.path, target_path,
+                            bare=True, outstream=outstream)
+        self.assertEquals(r.path, target_path)
+        self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertFalse('f1' in os.listdir(target_path))
+        self.assertFalse('f2' in os.listdir(target_path))
+
+    def test_no_checkout_with_bare(self):
+        f1_1 = make_object(Blob, data='f1')
+        commit_spec = [[1]]
+        trees = {1: [('f1', f1_1), ('f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs["refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        outstream = StringIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        self.assertRaises(ValueError, porcelain.clone, self.repo.path,
+            target_path, checkout=True, bare=True, outstream=outstream)
 
 
 class InitTests(TestCase):

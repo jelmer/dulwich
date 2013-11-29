@@ -138,7 +138,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=True, outstream=sys.stdout):
+def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -147,6 +147,10 @@ def clone(source, target=None, bare=False, checkout=True, outstream=sys.stdout):
     :param outstream: Optional stream to write progress to
     :return: The new repository
     """
+    if checkout is None:
+        checkout = (not bare)
+    if checkout and bare:
+        raise ValueError("checkout and bare are incompatible")
     client, host_path = get_transport_and_path(source)
 
     if target is None:

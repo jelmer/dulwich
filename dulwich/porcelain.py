@@ -19,6 +19,7 @@
 import os
 import sys
 
+from dulwich import index
 from dulwich.client import get_transport_and_path
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
@@ -137,7 +138,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, outstream=sys.stdout):
+def clone(source, target=None, bare=False, checkout=True, outstream=sys.stdout):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -161,6 +162,11 @@ def clone(source, target=None, bare=False, outstream=sys.stdout):
         determine_wants=r.object_store.determine_wants_all,
         progress=outstream.write)
     r["HEAD"] = remote_refs["HEAD"]
+    if checkout:
+        outstream.write('Checking out HEAD')
+        index.build_index_from_tree(r.path, r.index_path(),
+                                    r.object_store, r["HEAD"].tree)
+
     return r
 
 

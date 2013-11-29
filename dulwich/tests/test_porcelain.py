@@ -35,6 +35,7 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
+    make_object,
     )
 
 
@@ -89,15 +90,45 @@ class CommitTests(PorcelainTestCase):
 class CloneTests(PorcelainTestCase):
 
     def test_simple_local(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+        f1_1 = make_object(Blob, data='f1')
+        commit_spec = [[1], [2, 1], [3, 1, 2]]
+        trees = {1: [('f1', f1_1), ('f2', f1_1)],
+                 2: [('f1', f1_1), ('f2', f1_1)],
+                 3: [('f1', f1_1), ('f2', f1_1)], }
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+                                        commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
         outstream = StringIO()
         self.addCleanup(shutil.rmtree, target_path)
-        r = porcelain.clone(self.repo.path, target_path, outstream=outstream)
+        r = porcelain.clone(self.repo.path, target_path,
+                            checkout=False, outstream=outstream)
         self.assertEquals(r.path, target_path)
         self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertTrue('f1' not in os.listdir(target_path))
+        self.assertTrue('f2' not in os.listdir(target_path))
+
+    def test_simple_local_with_checkout(self):
+
+        f1_1 = make_object(Blob, data='f1')
+        commit_spec = [[1], [2, 1], [3, 1, 2]]
+        trees = {1: [('f1', f1_1), ('f2', f1_1)],
+                 2: [('f1', f1_1), ('f2', f1_1)],
+                 3: [('f1', f1_1), ('f2', f1_1)], }
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+                                        commit_spec, trees)
+        self.repo.refs["refs/heads/master"] = c3.id
+        target_path = tempfile.mkdtemp()
+        outstream = StringIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        r = porcelain.clone(self.repo.path, target_path,
+                            checkout=True, outstream=outstream)
+        self.assertEquals(r.path, target_path)
+        self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertTrue('f1' in os.listdir(target_path))
+        self.assertTrue('f2' in os.listdir(target_path))
 
 
 class InitTests(TestCase):

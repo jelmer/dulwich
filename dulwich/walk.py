@@ -143,7 +143,7 @@ class _CommitTimeQueue(object):
             self._pq_set.remove(sha)
             if sha in self._done:
                 continue
-            self._done.add(commit.id)
+            self._done.add(sha)
 
             for parent_id in self._get_parents(commit):
                 self._push(parent_id)

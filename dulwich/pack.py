@@ -1182,8 +1182,10 @@ class PackData(object):
         and then the packfile can be asked directly for that object using this
         function.
         """
-        if offset in self._offset_cache:
+        try:
             return self._offset_cache[offset]
+        except KeyError:
+            pass
         assert isinstance(offset, long) or isinstance(offset, int),\
                 'offset was %r' % offset
         assert offset >= self._header_size

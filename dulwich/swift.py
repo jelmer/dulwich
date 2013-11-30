@@ -536,8 +536,8 @@ class SwiftObjectStore(PackBasedObjectStore):
     def iter_shas(self, finder):
         """An iterator over pack's ObjectStore.
 
-        :return: a `ObjectStoreIterator` or `EventletObjectStoreIterator`
-                 instance if eventlet is enabled
+        :return: a `ObjectStoreIterator` or `GreenThreadsObjectStoreIterator`
+                 instance if gevent is enabled
         """
         shas = iter(finder.next, None)
         if gevent_support:

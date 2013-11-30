@@ -1,5 +1,5 @@
 # index.py -- File parser/writer for the git index file
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -114,7 +114,7 @@ def write_cache_entry(f, entry):
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
     flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev, ino, mode, uid, gid, size, hex_to_sha(sha), flags))
+    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     f.write("\0" * ((beginoffset + real_size) - f.tell()))

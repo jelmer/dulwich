@@ -35,6 +35,9 @@ from dulwich.object_store import (
     )
 from dulwich import objects
 from dulwich.config import Config
+from dulwich.refs import (
+    _split_ref_line,
+    )
 from dulwich.repo import (
     check_ref_format,
     DictRefsContainer,
@@ -44,7 +47,6 @@ from dulwich.repo import (
     read_packed_refs,
     read_packed_refs_with_peeled,
     write_packed_refs,
-    _split_ref_line,
     )
 from dulwich.tests import (
     TestCase,
@@ -115,6 +117,7 @@ class RepositoryTests(TestCase):
 
     def test_ref(self):
         r = self._repo = open_repo('a.git')
+        warnings.simplefilter("ignore", DeprecationWarning)
         self.assertEqual(r.ref('refs/heads/master'),
                          'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
@@ -177,6 +180,12 @@ class RepositoryTests(TestCase):
         finally:
             f.close()
         self.assertEquals("Some description", r.get_description())
+
+    def test_set_description(self):
+        r = self._repo = open_repo('a.git')
+        description = "Some description"
+        r.set_description(description)
+        self.assertEquals(description, r.get_description())
 
     def test_contains_missing(self):
         r = self._repo = open_repo('a.git')

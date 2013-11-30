@@ -1,6 +1,6 @@
 # objects.py -- Access to base git objects
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -291,17 +291,20 @@ class ShaFile(object):
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
-    def set_raw_string(self, text):
+    def set_raw_string(self, text, sha=None):
         """Set the contents of this object from a serialized string."""
         if type(text) != str:
             raise TypeError(text)
-        self.set_raw_chunks([text])
+        self.set_raw_chunks([text], sha)
 
-    def set_raw_chunks(self, chunks):
+    def set_raw_chunks(self, chunks, sha=None):
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
         self._deserialize(chunks)
-        self._sha = None
+        if sha is None:
+            self._sha = None
+        else:
+            self._sha = FixedSha(sha)
         self._needs_parsing = False
         self._needs_serialization = False
 
@@ -403,25 +406,27 @@ class ShaFile(object):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
-    def from_raw_string(type_num, string):
+    def from_raw_string(type_num, string, sha=None):
         """Creates an object of the indicated type from the raw string given.
 
         :param type_num: The numeric type of the object.
         :param string: The raw uncompressed contents.
+        :param sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
-        obj.set_raw_string(string)
+        obj.set_raw_string(string, sha)
         return obj
 
     @staticmethod
-    def from_raw_chunks(type_num, chunks):
+    def from_raw_chunks(type_num, chunks, sha=None):
         """Creates an object of the indicated type from the raw chunks given.
 
         :param type_num: The numeric type of the object.
         :param chunks: An iterable of the raw uncompressed contents.
+        :param sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
-        obj.set_raw_chunks(chunks)
+        obj.set_raw_chunks(chunks, sha)
         return obj
 
     @classmethod
@@ -579,15 +584,15 @@ class Blob(ShaFile):
         super(Blob, self).check()
 
 
-def _parse_tag_or_commit(text):
-    """Parse tag or commit text.
+def _parse_message(chunks):
+    """Parse a message with a list of fields and a body.
 
-    :param text: the raw text of the tag or commit object.
+    :param chunks: the raw chunks of the tag or commit object.
     :return: iterator of tuples of (field, value), one per header line, in the
         order read from the text, possibly including duplicates. Includes a
         field named None for the freeform tag/commit text.
     """
-    f = StringIO(text)
+    f = StringIO("".join(chunks))
     k = None
     v = ""
     for l in f:
@@ -602,11 +607,6 @@ def _parse_tag_or_commit(text):
             (k, v) = l.split(" ", 1)
     yield (None, f.read())
     f.close()
-
-
-def parse_tag(text):
-    """Parse a tag object."""
-    return _parse_tag_or_commit(text)
 
 
 class Tag(ShaFile):
@@ -649,7 +649,7 @@ class Tag(ShaFile):
             check_identity(self._tagger, "invalid tagger")
 
         last = None
-        for field, _ in parse_tag("".join(self._chunked_text)):
+        for field, _ in _parse_message(self._chunked_text):
             if field == _OBJECT_HEADER and last is not None:
                 raise ObjectFormatException("unexpected object")
             elif field == _TYPE_HEADER and last != _OBJECT_HEADER:
@@ -680,7 +680,7 @@ class Tag(ShaFile):
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
-        for field, value in parse_tag("".join(chunks)):
+        for field, value in _parse_message(chunks):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
             elif field == _TYPE_HEADER:
@@ -1035,8 +1035,45 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
     return '%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)
 
 
-def parse_commit(text):
-    return _parse_tag_or_commit(text)
+def parse_commit(chunks):
+    """Parse a commit object from chunks.
+
+    :param chunks: Chunks to parse
+    :return: Tuple of (tree, parents, author_info, commit_info,
+        encoding, mergetag, message, extra)
+    """
+    parents = []
+    extra = []
+    tree = None
+    author_info = (None, None, (None, None))
+    commit_info = (None, None, (None, None))
+    encoding = None
+    mergetag = []
+    message = None
+
+    for field, value in _parse_message(chunks):
+        if field == _TREE_HEADER:
+            tree = value
+        elif field == _PARENT_HEADER:
+            parents.append(value)
+        elif field == _AUTHOR_HEADER:
+            author, timetext, timezonetext = value.rsplit(" ", 2)
+            author_time = int(timetext)
+            author_info = (author, author_time, parse_timezone(timezonetext))
+        elif field == _COMMITTER_HEADER:
+            committer, timetext, timezonetext = value.rsplit(" ", 2)
+            commit_time = int(timetext)
+            commit_info = (committer, commit_time, parse_timezone(timezonetext))
+        elif field == _ENCODING_HEADER:
+            encoding = value
+        elif field == _MERGETAG_HEADER:
+            mergetag.append(Tag.from_string(value + "\n"))
+        elif field is None:
+            message = value
+        else:
+            extra.append((field, value))
+    return (tree, parents, author_info, commit_info, encoding, mergetag,
+            message, extra)
 
 
 class Commit(ShaFile):
@@ -1068,32 +1105,13 @@ class Commit(ShaFile):
         return commit
 
     def _deserialize(self, chunks):
-        self._parents = []
-        self._extra = []
-        self._author = None
-        for field, value in parse_commit(''.join(chunks)):
-            if field == _TREE_HEADER:
-                self._tree = value
-            elif field == _PARENT_HEADER:
-                self._parents.append(value)
-            elif field == _AUTHOR_HEADER:
-                self._author, timetext, timezonetext = value.rsplit(" ", 2)
-                self._author_time = int(timetext)
-                self._author_timezone, self._author_timezone_neg_utc =\
-                    parse_timezone(timezonetext)
-            elif field == _COMMITTER_HEADER:
-                self._committer, timetext, timezonetext = value.rsplit(" ", 2)
-                self._commit_time = int(timetext)
-                self._commit_timezone, self._commit_timezone_neg_utc =\
-                    parse_timezone(timezonetext)
-            elif field == _ENCODING_HEADER:
-                self._encoding = value
-            elif field is None:
-                self._message = value
-            elif field == _MERGETAG_HEADER:
-                self._mergetag.append(Tag.from_string(value + "\n"))
-            else:
-                self._extra.append((field, value))
+        (self._tree, self._parents, author_info, commit_info, self._encoding,
+                self._mergetag, self._message, self._extra) = \
+                        parse_commit(chunks)
+        (self._author, self._author_time, (self._author_timezone,
+            self._author_timezone_neg_utc)) = author_info
+        (self._committer, self._commit_time, (self._commit_timezone,
+            self._commit_timezone_neg_utc)) = commit_info
 
     def check(self):
         """Check this object for internal consistency.
@@ -1114,7 +1132,7 @@ class Commit(ShaFile):
         check_identity(self._committer, "invalid committer")
 
         last = None
-        for field, _ in parse_commit("".join(self._chunked_text)):
+        for field, _ in _parse_message(self._chunked_text):
             if field == _TREE_HEADER and last is not None:
                 raise ObjectFormatException("unexpected tree")
             elif field == _PARENT_HEADER and last not in (_PARENT_HEADER,

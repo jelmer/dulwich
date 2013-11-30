@@ -1,4 +1,5 @@
 # hooks.py -- for dealing with git hooks
+# Copyright (C) 2012-2013 Jelmer Vernooij and others.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,7 +21,6 @@
 import os
 import subprocess
 import tempfile
-import warnings
 
 from dulwich.errors import (
     HookError,
@@ -30,7 +30,7 @@ from dulwich.errors import (
 class Hook(object):
     """Generic hook object."""
 
-    def execute(elf, *args):
+    def execute(self, *args):
         """Execute the hook with the given args
 
         :param args: argument list to hook
@@ -137,8 +137,11 @@ class CommitMsgShellHook(ShellHook):
 
         def clean_msg(success, *args):
             if success:
-                with open(args[0], 'rb') as f:
+                f = open(args[0], 'rb')
+                try:
                     new_msg = f.read()
+                finally:
+                    f.close()
                 os.unlink(args[0])
                 return new_msg
             os.unlink(args[0])

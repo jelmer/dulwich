@@ -56,6 +56,7 @@ class WalkEntry(object):
     def __init__(self, walker, commit):
         self.commit = commit
         self._store = walker.store
+        self._get_parents = walker.get_parents
         self._changes = None
         self._rename_detector = walker.rename_detector
 
@@ -69,15 +70,15 @@ class WalkEntry(object):
         """
         if self._changes is None:
             commit = self.commit
-            if not commit.parents:
+            if not self._get_parents(commit):
                 changes_func = tree_changes
                 parent = None
-            elif len(commit.parents) == 1:
+            elif len(self._get_parents(commit)) == 1:
                 changes_func = tree_changes
-                parent = self._store[commit.parents[0]].tree
+                parent = self._store[self._get_parents(commit)[0]].tree
             else:
                 changes_func = tree_changes_for_merge
-                parent = [self._store[p].tree for p in commit.parents]
+                parent = [self._store[p].tree for p in self._get_parents(commit)]
             self._changes = list(changes_func(
               self._store, parent, commit.tree,
               rename_detector=self._rename_detector))
@@ -94,6 +95,7 @@ class _CommitTimeQueue(object):
     def __init__(self, walker):
         self._walker = walker
         self._store = walker.store
+        self._get_parents = walker.get_parents
         self._excluded = walker.excluded
         self._pq = []
         self._pq_set = set()
@@ -123,7 +125,7 @@ class _CommitTimeQueue(object):
         todo = [commit]
         while todo:
             commit = todo.pop()
-            for parent in commit.parents:
+            for parent in self._get_parents(commit):
                 if parent not in excluded and parent in seen:
                     # TODO: This is inefficient unless the object store does
                     # some caching (which DiskObjectStore currently does not).
@@ -141,9 +143,9 @@ class _CommitTimeQueue(object):
             self._pq_set.remove(sha)
             if sha in self._done:
                 continue
-            self._done.add(commit.id)
+            self._done.add(sha)
 
-            for parent_id in commit.parents:
+            for parent_id in self._get_parents(commit):
                 self._push(parent_id)
 
             reset_extra_commits = True
@@ -196,6 +198,7 @@ class Walker(object):
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
                  reverse=False, max_entries=None, paths=None,
                  rename_detector=None, follow=False, since=None, until=None,
+                 get_parents=lambda commit: commit.parents,
                  queue_cls=_CommitTimeQueue):
         """Constructor.
 
@@ -217,6 +220,7 @@ class Walker(object):
             default rename_detector.
         :param since: Timestamp to list commits after.
         :param until: Timestamp to list commits before.
+        :param get_parents: Method to retrieve the parents of a commit
         :param queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
@@ -235,6 +239,7 @@ class Walker(object):
         if follow and not rename_detector:
             rename_detector = RenameDetector(store)
         self.rename_detector = rename_detector
+        self.get_parents = get_parents
         self.follow = follow
         self.since = since
         self.until = until
@@ -287,7 +292,7 @@ class Walker(object):
         if self.paths is None:
             return True
 
-        if len(commit.parents) > 1:
+        if len(self.get_parents(commit)) > 1:
             for path_changes in entry.changes():
                 # For merge commits, only include changes with conflicts for
                 # this path. Since a rename conflict may include different
@@ -325,7 +330,7 @@ class Walker(object):
             by the Walker.
         """
         if self.order == ORDER_TOPO:
-            results = _topo_reorder(results)
+            results = _topo_reorder(results, self.get_parents)
         if self.reverse:
             results = reversed(list(results))
         return results
@@ -334,13 +339,14 @@ class Walker(object):
         return iter(self._reorder(iter(self._next, None)))
 
 
-def _topo_reorder(entries):
+def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     """Reorder an iterable of entries topologically.
 
     This works best assuming the entries are already in almost-topological
     order, e.g. in commit time order.
 
     :param entries: An iterable of WalkEntry objects.
+    :param get_parents: Optional function for getting the parents of a commit.
     :return: iterator over WalkEntry objects from entries in FIFO order, except
         where a parent would be yielded before any of its children.
     """
@@ -349,7 +355,7 @@ def _topo_reorder(entries):
     num_children = defaultdict(int)
     for entry in entries:
         todo.append(entry)
-        for p in entry.commit.parents:
+        for p in get_parents(entry.commit):
             num_children[p] += 1
 
     while todo:
@@ -359,7 +365,7 @@ def _topo_reorder(entries):
         if num_children[commit_id]:
             pending[commit_id] = entry
             continue
-        for parent_id in commit.parents:
+        for parent_id in get_parents(commit):
             num_children[parent_id] -= 1
             if not num_children[parent_id]:
                 parent_entry = pending.pop(parent_id, None)

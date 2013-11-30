@@ -1,3 +1,61 @@
+0.9.4	2013-11-30
+
+ IMPROVEMENTS
+
+ * Add ssh_kwargs attribute to ParamikoSSHVendor. (milki)
+
+ * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
+
+ * Add a basic `dulwich.porcelain` module. (Jelmer Vernooij, Marcin Kuzminski)
+
+ * Various performance improvements for object access.
+   (Jelmer Vernooij)
+
+ * New function `get_transport_and_path_from_url`,
+   similar to `get_transport_and_path` but only
+   supports URLs.
+   (Jelmer Vernooij)
+
+ * Add support for file:// URLs in `get_transport_and_path_from_url`.
+   (Jelmer Vernooij)
+
+ * Add LocalGitClient implementation.
+   (Jelmer Vernooij)
+
+ BUG FIXES
+
+  * Support filesystems with 64bit inode and device numbers.
+    (André Roth)
+
+ CHANGES
+
+  * Ref handling has been moved to dulwich.refs.
+    (Jelmer Vernooij)
+
+ API CHANGES
+
+  * Remove long deprecated RefsContainer.set_ref().
+    (Jelmer Vernooij)
+
+  * Repo.ref() is now deprecated in favour of Repo.refs[].
+    (Jelmer Vernooij)
+
+FEATURES
+
+  * Add support for graftpoints. (milki)
+
+0.9.3	2013-09-27
+
+ BUG FIXES
+
+  * Fix path for stdint.h in MANIFEST.in. (Jelmer Vernooij)
+
+0.9.2	2013-09-26
+
+ BUG FIXES
+
+  * Include stdint.h in MANIFEST.in (Mark Mikofski)
+
 0.9.1	2013-09-22
 
  BUG FIXES

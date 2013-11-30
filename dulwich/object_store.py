@@ -1,5 +1,5 @@
 # object_store.py -- Object store for git objects
-# Copyright (C) 2008-2012 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #                         and others
 #
 # This program is free software; you can redistribute it and/or
@@ -113,7 +113,7 @@ class BaseObjectStore(object):
     def __getitem__(self, sha):
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha)
-        return ShaFile.from_raw_string(type_num, uncomp)
+        return ShaFile.from_raw_string(type_num, uncomp, sha=sha)
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
@@ -190,14 +190,6 @@ class BaseObjectStore(object):
                 graphwalker.ack(sha)
             sha = graphwalker.next()
         return haves
-
-    def get_graph_walker(self, heads):
-        """Obtain a graph walker for this object store.
-
-        :param heads: Local heads to start search with
-        :return: GraphWalker object
-        """
-        return ObjectStoreGraphWalker(heads, lambda sha: self[sha].parents)
 
     def generate_pack_contents(self, have, want, progress=None):
         """Iterate over the contents of a pack file.
@@ -492,7 +484,15 @@ class DiskObjectStore(PackBasedObjectStore):
             raise
         pack_files.sort(reverse=True)
         suffix_len = len(".pack")
-        return [Pack(f[:-suffix_len]) for _, f in pack_files]
+        result = []
+        try:
+            for _, f in pack_files:
+                result.append(Pack(f[:-suffix_len]))
+        except:
+            for p in result:
+                p.close()
+            raise
+        return result
 
     def _pack_cache_stale(self):
         try:
@@ -617,15 +617,17 @@ class DiskObjectStore(PackBasedObjectStore):
         :param path: Path to the pack file.
         """
         p = PackData(path)
-        entries = p.sorted_entries()
-        basename = os.path.join(self.pack_dir,
-            "pack-%s" % iter_sha1(entry[0] for entry in entries))
-        f = GitFile(basename+".idx", "wb")
         try:
-            write_pack_index_v2(f, entries, p.get_stored_checksum())
+            entries = p.sorted_entries()
+            basename = os.path.join(self.pack_dir,
+                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            f = GitFile(basename+".idx", "wb")
+            try:
+                write_pack_index_v2(f, entries, p.get_stored_checksum())
+            finally:
+                f.close()
         finally:
-            f.close()
-        p.close()
+            p.close()
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
         self._add_known_pack(final_pack)

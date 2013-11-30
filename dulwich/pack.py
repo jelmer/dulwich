@@ -1,6 +1,6 @@
 # pack.py -- For dealing with packed git objects.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -1182,8 +1182,10 @@ class PackData(object):
         and then the packfile can be asked directly for that object using this
         function.
         """
-        if offset in self._offset_cache:
+        try:
             return self._offset_cache[offset]
+        except KeyError:
+            pass
         assert isinstance(offset, long) or isinstance(offset, int),\
                 'offset was %r' % offset
         assert offset >= self._header_size
@@ -1802,7 +1804,8 @@ class Pack(object):
     def close(self):
         if self._data is not None:
             self._data.close()
-        self.index.close()
+        if self._idx is not None:
+            self._idx.close()
 
     def __eq__(self, other):
         return type(self) == type(other) and self.index == other.index
@@ -1858,7 +1861,7 @@ class Pack(object):
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""
         type, uncomp = self.get_raw(sha1)
-        return ShaFile.from_raw_string(type, uncomp)
+        return ShaFile.from_raw_string(type, uncomp, sha=sha1)
 
     def iterobjects(self):
         """Iterate over the objects in this pack."""

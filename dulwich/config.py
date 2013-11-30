@@ -1,5 +1,5 @@
 # config.py - Reading and writing Git config files
-# Copyright (C) 2011 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2011-2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -73,11 +73,28 @@ class Config(object):
     def set(self, section, name, value):
         """Set a configuration value.
 
+        :param section: Tuple with section name and optional subsection namee
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
         """
         raise NotImplementedError(self.set)
+
+    def iteritems(self, section):
+        """Iterate over the configuration pairs for a specific section.
+
+        :param section: Tuple with section name and optional subsection namee
+        :return: Iterator over (name, value) pairs
+        """
+        raise NotImplementedError(self.iteritems)
+
+    def itersections(self):
+        """Iterate over the sections.
+
+        :return: Iterator over section tuples
+        """
+        raise NotImplementedError(self.itersections)
+
 
 
 class ConfigDict(Config, DictMixin):
@@ -128,6 +145,12 @@ class ConfigDict(Config, DictMixin):
         if isinstance(section, basestring):
             section = (section, )
         self._values.setdefault(section, OrderedDict())[name] = value
+
+    def iteritems(self, section):
+        return self._values.get(section, OrderedDict()).iteritems()
+
+    def itersections(self):
+        return self._values.keys()
 
 
 def _format_string(value):
@@ -326,8 +349,7 @@ class StackedConfig(Config):
     def default_backends(cls):
         """Retrieve the default configuration.
 
-        This will look in the repository configuration (if for_path is
-        specified), the users' home directory and the system
+        This will look in the users' home directory and the system
         configuration.
         """
         paths = []

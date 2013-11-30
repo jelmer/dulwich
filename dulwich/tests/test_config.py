@@ -22,6 +22,7 @@ from cStringIO import StringIO
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
+    OrderedDict,
     StackedConfig,
     _check_section_name,
     _check_variable_name,
@@ -180,6 +181,30 @@ class ConfigDictTests(TestCase):
 
         cd['a'] = 'b'
         self.assertEqual(cd['a'], 'b')
+
+    def test_iteritems(self):
+        cd = ConfigDict()
+        cd.set(("core", ), "foo", "bla")
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual(
+            [('foo', 'bla')],
+            list(cd.iteritems(("core", ))))
+
+    def test_iteritems_nonexistant(self):
+        cd = ConfigDict()
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual([],
+            list(cd.iteritems(("core", ))))
+
+    def test_itersections(self):
+        cd = ConfigDict()
+        cd.set(("core2", ), "foo", "bloe")
+
+        self.assertEqual([("core2", )],
+            list(cd.itersections()))
+
 
 
 class StackedConfigTests(TestCase):

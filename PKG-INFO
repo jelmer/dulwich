@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: dulwich
-Version: 0.9.1
+Version: 0.9.4
 Summary: Python Git Library
 Home-page: http://samba.org/~jelmer/dulwich
 Author: Jelmer Vernooij
@@ -8,11 +8,13 @@ Author-email: jelmer@samba.org
 License: GPLv2 or later
 Description: 
               Simple Python implementation of the Git file formats and
-              protocols. Dulwich is the place where Mr. and Mrs. Git live
-              in one of the Monty Python sketches.
+              protocols.
         
-              All functionality is available in pure Python, but (optional)
-              C extensions are also available for better performance.
+              All functionality is available in pure Python. Optional
+              C extensions can be built for improved performance.
+        
+              Dulwich takes its name from the area in London where the friendly
+              Mr. and Mrs. Git once attended a cocktail party.
               
 Keywords: git
 Platform: UNKNOWN

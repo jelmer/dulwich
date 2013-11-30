@@ -1,5 +1,5 @@
 # client.py -- Implementation of the server side git protocols
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 # Copyright (C) 2008 John Carr
 #
 # This program is free software; you can redistribute it and/or
@@ -61,6 +61,9 @@ from dulwich.protocol import (
     )
 from dulwich.pack import (
     write_pack_objects,
+    )
+from dulwich.refs import (
+    read_info_refs,
     )
 
 
@@ -152,14 +155,6 @@ def read_pkt_refs(proto):
     if len(refs) == 0:
         return None, set([])
     return refs, set(server_capabilities)
-
-
-def read_info_refs(f):
-    ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
-        ret[name] = sha
-    return ret
 
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
@@ -650,6 +645,64 @@ class SubprocessGitClient(TraditionalGitClient):
                         report_activity=self._report_activity), p.can_read
 
 
+class LocalGitClient(GitClient):
+    """Git Client that just uses a local Repo."""
+
+    def __init__(self, thin_packs=True, report_activity=None):
+        """Create a new LocalGitClient instance.
+
+        :param path: Path to the local repository
+        :param thin_packs: Whether or not thin packs should be retrieved
+        :param report_activity: Optional callback for reporting transport
+            activity.
+        """
+        self._report_activity = report_activity
+        # Ignore the thin_packs argument
+
+    def send_pack(self, path, determine_wants, generate_pack_contents,
+                  progress=None):
+        """Upload a pack to a remote repository.
+
+        :param path: Repository path
+        :param generate_pack_contents: Function that can return a sequence of the
+            shas of the objects to upload.
+        :param progress: Optional progress function
+
+        :raises SendPackError: if server rejects the pack data
+        :raises UpdateRefsError: if the server supports report-status
+                                 and rejects ref updates
+        """
+        raise NotImplementedError(self.send_pack)
+
+    def fetch(self, path, target, determine_wants=None, progress=None):
+        """Fetch into a target repository.
+
+        :param path: Path to fetch from
+        :param target: Target repository to fetch into
+        :param determine_wants: Optional function to determine what refs
+            to fetch
+        :param progress: Optional progress function
+        :return: remote refs as dictionary
+        """
+        from dulwich.repo import Repo
+        r = Repo(path)
+        return r.fetch(target, determine_wants=determine_wants, progress=progress)
+
+    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
+                   progress=None):
+        """Retrieve a pack from a git smart server.
+
+        :param determine_wants: Callback that returns list of commits to fetch
+        :param graph_walker: Object with next() and ack().
+        :param pack_data: Callback called for each bit of data in the pack
+        :param progress: Callback for progress reports (strings)
+        """
+        raise NotImplementedError(self.fetch_pack)
+
+
+# What Git client to use for local access
+default_local_git_client_cls = SubprocessGitClient
+
 class SSHVendor(object):
     """A client side SSH implementation."""
 
@@ -777,13 +830,22 @@ else:
 
     class ParamikoSSHVendor(object):
 
+        def __init__(self):
+            self.ssh_kwargs = {}
+
         def run_command(self, host, command, username=None, port=None,
-                progress_stderr=None, **kwargs):
+                progress_stderr=None):
+
+            # Paramiko needs an explicit port. None is not valid
+            if port is None:
+                port = 22
+
             client = paramiko.SSHClient()
 
             policy = paramiko.client.MissingHostKeyPolicy()
             client.set_missing_host_key_policy(policy)
-            client.connect(host, username=username, port=port, **kwargs)
+            client.connect(host, username=username, port=port,
+                           **self.ssh_kwargs)
 
             # Open SSH session
             channel = client.get_transport().open_session()
@@ -835,7 +897,7 @@ class HttpGitClient(GitClient):
         req = urllib2.Request(url, headers=headers, data=data)
         try:
             resp = self._perform(req)
-        except urllib2.HTTPError as e:
+        except urllib2.HTTPError, e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:
@@ -958,16 +1020,16 @@ class HttpGitClient(GitClient):
         return refs
 
 
-def get_transport_and_path(uri, **kwargs):
-    """Obtain a git client from a URI or path.
+def get_transport_and_path_from_url(url, **kwargs):
+    """Obtain a git client from a URL.
 
-    :param uri: URI or path
+    :param url: URL to open
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.
     :return: Tuple with client instance and relative path.
     """
-    parsed = urlparse.urlparse(uri)
+    parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
                 parsed.path)
@@ -979,17 +1041,36 @@ def get_transport_and_path(uri, **kwargs):
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
+    elif parsed.scheme == 'file':
+        return default_local_git_client_cls(**kwargs), parsed.path
 
-    if parsed.scheme and not parsed.netloc:
+    raise ValueError("unknown scheme '%s'" % parsed.scheme)
+
+
+def get_transport_and_path(location, **kwargs):
+    """Obtain a git client from a URL.
+
+    :param location: URL or path
+    :param thin_packs: Whether or not thin packs should be retrieved
+    :param report_activity: Optional callback for reporting transport
+        activity.
+    :return: Tuple with client instance and relative path.
+    """
+    # First, try to parse it as a URL
+    try:
+        return get_transport_and_path_from_url(location, **kwargs)
+    except ValueError:
+        pass
+
+    if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.
-        return SSHGitClient(parsed.scheme, **kwargs), parsed.path
-    elif parsed.scheme:
-        raise ValueError('Unknown git protocol scheme: %s' % parsed.scheme)
-    elif '@' in parsed.path and ':' in parsed.path:
+        (hostname, path) = location.split(':')
+        return SSHGitClient(hostname, **kwargs), path
+    elif '@' in location and ':' in location:
         # SSH with user@host:foo.
-        user_host, path = parsed.path.split(':')
+        user_host, path = location.split(':')
         user, host = user_host.rsplit('@')
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.
-    return SubprocessGitClient(**kwargs), uri
+    return default_local_git_client_cls(**kwargs), location

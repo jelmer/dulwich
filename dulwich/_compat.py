@@ -411,13 +411,12 @@ class OrderedDict(dict):
             yield (k, self[k])
 
     def update(*args, **kwds):
-        """od.update(E, **F) -> None.  Update od from dict/iterable E and F.
+        """od.update(E, F) -> None.  Update od from dict/iterable E and F.
 
         If E is a dict instance, does:           for k in E: od[k] = E[k]
         If E has a .keys() method, does:         for k in E.keys(): od[k] = E[k]
         Or if E is an iterable of items, does:   for k, v in E: od[k] = v
         In either case, this is followed by:     for k, v in F.items(): od[k] = v
-
         """
         if len(args) > 2:
             raise TypeError('update() takes at most 2 positional '

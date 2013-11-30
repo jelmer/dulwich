@@ -35,7 +35,6 @@ from ConfigParser import ConfigParser
 from geventhttpclient import HTTPClient
 
 from dulwich.repo import (
-    InfoRefsContainer,
     BaseRepo,
     OBJECTDIR,
     )
@@ -63,6 +62,7 @@ from dulwich.object_store import (
     MissingObjectFinder,
     )
 from dulwich.refs import (
+    InfoRefsContainer,
     read_info_refs,
     write_info_refs,
     )

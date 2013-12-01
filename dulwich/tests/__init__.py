@@ -128,6 +128,7 @@ def self_test_suite():
         'patch',
         'porcelain',
         'protocol',
+        'refs',
         'repository',
         'server',
         'walk',

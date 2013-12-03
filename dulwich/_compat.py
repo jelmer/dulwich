@@ -37,8 +37,6 @@ except ImportError:
     SEEK_CUR = 1
     SEEK_END = 2
 
-import struct
-
 
 def make_sha(source=''):
     """A python2.4 workaround for the sha/hashlib module fiasco."""
@@ -47,15 +45,6 @@ def make_sha(source=''):
     except NameError:
         sha1 = sha.sha(source)
         return sha1
-
-
-def unpack_from(fmt, buf, offset=0):
-    """A python2.4 workaround for struct missing unpack_from."""
-    try:
-        return struct.unpack_from(fmt, buf, offset)
-    except AttributeError:
-        b = buf[offset:offset+struct.calcsize(fmt)]
-        return struct.unpack(fmt, b)
 
 
 try:

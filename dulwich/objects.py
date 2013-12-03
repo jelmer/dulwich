@@ -39,9 +39,7 @@ from dulwich.errors import (
     ObjectFormatException,
     )
 from dulwich.file import GitFile
-from dulwich._compat import (
-    make_sha,
-    )
+from hashlib import sha1
 
 ZERO_SHA = "0" * 40
 
@@ -479,7 +477,7 @@ class ShaFile(object):
         return ret
 
     def _make_sha(self):
-        ret = make_sha()
+        ret = sha1()
         ret.update(self._header())
         for chunk in self.as_raw_chunks():
             ret.update(chunk)
@@ -489,7 +487,7 @@ class ShaFile(object):
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
-            new_sha = make_sha()
+            new_sha = sha1()
             new_sha.update(self._header())
             for chunk in self.as_raw_chunks():
                 new_sha.update(chunk)

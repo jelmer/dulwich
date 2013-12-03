@@ -25,9 +25,6 @@ import collections
 import heapq
 import itertools
 
-from dulwich._compat import (
-    all,
-    )
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
     tree_changes,

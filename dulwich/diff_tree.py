@@ -18,15 +18,15 @@
 
 """Utilities for diffing files and trees."""
 
-from collections import defaultdict
+from collections import (
+    defaultdict,
+    namedtuple,
+    )
 
 from cStringIO import StringIO
 import itertools
 import stat
 
-from dulwich._compat import (
-    namedtuple,
-    )
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,

@@ -21,10 +21,6 @@
 These utilities can all be deleted when dulwich decides it wants to stop
 support for python <2.6.
 """
-try:
-    import hashlib
-except ImportError:
-    import sha
 
 try:
     from urlparse import parse_qs
@@ -36,15 +32,6 @@ try:
 except ImportError:
     SEEK_CUR = 1
     SEEK_END = 2
-
-
-def make_sha(source=''):
-    """A python2.4 workaround for the sha/hashlib module fiasco."""
-    try:
-        return hashlib.sha1(source)
-    except NameError:
-        sha1 = sha.sha(source)
-        return sha1
 
 
 # Backport of OrderedDict() class that runs on Python 2.4, 2.5, 2.6, 2.7 and pypy.

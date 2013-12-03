@@ -23,11 +23,6 @@ support for python <2.6.
 """
 
 try:
-    from urlparse import parse_qs
-except ImportError:
-    from cgi import parse_qs
-
-try:
     from os import SEEK_CUR, SEEK_END
 except ImportError:
     SEEK_CUR = 1

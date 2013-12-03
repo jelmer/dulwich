@@ -23,6 +23,7 @@ import binascii
 from cStringIO import (
     StringIO,
     )
+from collections import namedtuple
 import os
 import posixpath
 import stat
@@ -40,7 +41,6 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich._compat import (
     make_sha,
-    namedtuple,
     )
 
 ZERO_SHA = "0" * 40

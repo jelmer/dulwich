@@ -53,6 +53,10 @@ else:
     has_mmap = True
 from hashlib import sha1
 import os
+from os import (
+    SEEK_CUR,
+    SEEK_END,
+    )
 import struct
 from struct import unpack_from
 import sys
@@ -66,10 +70,6 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
-    )
-from dulwich._compat import (
-    SEEK_CUR,
-    SEEK_END,
     )
 from dulwich.objects import (
     ShaFile,

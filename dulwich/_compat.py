@@ -16,18 +16,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Misc utilities to work with python <2.6.
+"""Misc utilities to work with python <2.7.
 
 These utilities can all be deleted when dulwich decides it wants to stop
-support for python <2.6.
+support for python <2.7.
 """
-
-try:
-    from os import SEEK_CUR, SEEK_END
-except ImportError:
-    SEEK_CUR = 1
-    SEEK_END = 2
-
 
 # Backport of OrderedDict() class that runs on Python 2.4, 2.5, 2.6, 2.7 and pypy.
 # Passes Python2.7's test suite and incorporates all the latest updates.

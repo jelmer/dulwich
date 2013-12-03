@@ -20,14 +20,14 @@
 """Generic functions for talking the git smart server protocol."""
 
 from cStringIO import StringIO
+from os import (
+    SEEK_END,
+    )
 import socket
 
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
-    )
-from dulwich._compat import (
-    SEEK_END,
     )
 
 TCP_GIT_PORT = 9418

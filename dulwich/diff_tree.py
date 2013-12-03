@@ -18,10 +18,7 @@
 
 """Utilities for diffing files and trees."""
 
-try:
-    from collections import defaultdict
-except ImportError:
-    from dulwich._compat import defaultdict
+from collections import defaultdict
 
 from cStringIO import StringIO
 import itertools

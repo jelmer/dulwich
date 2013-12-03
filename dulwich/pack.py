@@ -30,10 +30,7 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
-try:
-    from collections import defaultdict
-except ImportError:
-    from dulwich._compat import defaultdict
+from collections import defaultdict
 
 import binascii
 from cStringIO import (

@@ -53,10 +53,7 @@ else:
     has_mmap = True
 import os
 import struct
-try:
-    from struct import unpack_from
-except ImportError:
-    from dulwich._compat import unpack_from
+from struct import unpack_from
 import sys
 import warnings
 import zlib

@@ -8,6 +8,7 @@ Tutorial
    :maxdepth: 2
 
    introduction
+   file-format
    repo
    object-store
    remote

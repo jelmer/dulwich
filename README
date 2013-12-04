@@ -1,16 +1,23 @@
 This is the Dulwich project.
 
-It aims to give an interface to git repos (both local and remote) that doesn't
+It aims to provide an interface to git repos (both local and remote) that doesn't
 call out to git directly but instead uses pure Python.
 
-The project is named after the part of London that Mr. and Mrs. Git live in 
-in the particular Monty Python sketch. It is based on the Python-Git module 
-that James Westby <jw+debian@jameswestby.net> released in 2007 and now 
-maintained by Jelmer Vernooij et al.
+Homepage: http://samba.org/~jelmer/dulwich/
+Author: Jelmer Vernooij <jelmer@samba.org>
 
-Please file bugs in the Dulwich project on Launchpad: 
+The project is named after the part of London that Mr. and Mrs. Git live in
+in the particular Monty Python sketch.
+
+Bugs
+----
+
+Please file bugs in the Dulwich project on Launchpad:
 
 https://bugs.launchpad.net/dulwich/+filebug
+
+Further documentation
+---------------------
 
 The dulwich documentation can be found in doc/ and on the web:
 
@@ -19,3 +26,9 @@ http://www.samba.org/~jelmer/dulwich/docs/
 The API reference can be generated using pydoctor, by running "make pydoctor", or on the web:
 
 http://www.samba.org/~jelmer/dulwich/apidocs
+
+Help
+----
+
+There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
+https://launchpad.net/~dulwich-users.

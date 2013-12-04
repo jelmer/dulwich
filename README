@@ -1,7 +1,7 @@
 This is the Dulwich project.
 
-It aims to provide an interface to git repos (both local and remote) that doesn't
-call out to git directly but instead uses pure Python.
+It aims to provide an interface to git repos (both local and remote) that
+doesn't call out to git directly but instead uses pure Python.
 
 Homepage: http://samba.org/~jelmer/dulwich/
 Author: Jelmer Vernooij <jelmer@samba.org>

@@ -372,54 +372,6 @@ class BaseRepo(object):
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
 
-    def commit(self, sha):
-        """Retrieve the commit with a particular SHA.
-
-        :param sha: SHA of the commit to retrieve
-        :raise NotCommitError: If the SHA provided doesn't point at a Commit
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Commit` object
-        """
-        warnings.warn("Repo.commit(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Commit)
-
-    def tree(self, sha):
-        """Retrieve the tree with a particular SHA.
-
-        :param sha: SHA of the tree to retrieve
-        :raise NotTreeError: If the SHA provided doesn't point at a Tree
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Tree` object
-        """
-        warnings.warn("Repo.tree(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Tree)
-
-    def tag(self, sha):
-        """Retrieve the tag with a particular SHA.
-
-        :param sha: SHA of the tag to retrieve
-        :raise NotTagError: If the SHA provided doesn't point at a Tag
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Tag` object
-        """
-        warnings.warn("Repo.tag(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Tag)
-
-    def get_blob(self, sha):
-        """Retrieve the blob with a particular SHA.
-
-        :param sha: SHA of the blob to retrieve
-        :raise NotBlobError: If the SHA provided doesn't point at a Blob
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Blob` object
-        """
-        warnings.warn("Repo.get_blob(sha) is deprecated. Use Repo[sha] "
-            "instead.", category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Blob)
-
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 

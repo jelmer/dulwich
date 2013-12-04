@@ -270,18 +270,6 @@ class BaseRepo(object):
             heads = self.refs.as_dict('refs/heads').values()
         return ObjectStoreGraphWalker(heads, self.get_parents)
 
-    def ref(self, name):
-        """Return the SHA1 a ref is pointing to.
-
-        :param name: Name of the ref to look up
-        :raise KeyError: when the ref (or the one it points to) does not exist
-        :return: SHA1 it is pointing at
-        """
-        warnings.warn(
-            "Repo.ref(name) is deprecated. Use Repo.refs[name] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self.refs[name]
-
     def get_refs(self):
         """Get dictionary with all refs.
 
@@ -419,20 +407,6 @@ class BaseRepo(object):
         kwargs['get_parents'] = lambda commit: self.get_parents(commit.id, commit)
 
         return Walker(self.object_store, include, *args, **kwargs)
-
-    def revision_history(self, head):
-        """Returns a list of the commits reachable from head.
-
-        :param head: The SHA of the head to list revision history for.
-        :return: A list of commit objects reachable from head, starting with
-            head itself, in descending commit time order.
-        :raise MissingCommitError: if any missing commits are referenced,
-            including if the head parameter isn't the SHA of a commit.
-        """
-        warnings.warn("Repo.revision_history() is deprecated."
-            "Use dulwich.walker.Walker(repo) instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return [e.commit for e in self.get_walker(include=[head])]
 
     def __getitem__(self, name):
         """Retrieve a Git object by SHA1 or ref.

@@ -88,7 +88,7 @@ def hex_to_sha(hex):
     assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
     try:
         return binascii.unhexlify(hex)
-    except TypeError, exc:
+    except TypeError as exc:
         if not isinstance(hex, str):
             raise
         raise ValueError(exc.message)
@@ -400,7 +400,7 @@ class ShaFile(object):
             obj._needs_serialization = True
             obj._file = f
             return obj
-        except (IndexError, ValueError), e:
+        except (IndexError, ValueError) as e:
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
@@ -461,7 +461,7 @@ class ShaFile(object):
             self._deserialize(self.as_raw_chunks())
             self._sha = None
             new_sha = self.id
-        except Exception, e:
+        except Exception as e:
             raise ObjectFormatException(e)
         if old_sha != new_sha:
             raise ChecksumMismatch(new_sha, old_sha)
@@ -703,7 +703,7 @@ class Tag(ShaFile):
                         self._tag_time = int(timetext)
                         self._tag_timezone, self._tag_timezone_neg_utc = \
                                 parse_timezone(timezonetext)
-                    except ValueError, e:
+                    except ValueError as e:
                         raise ObjectFormatException(e)
             elif field is None:
                 self._message = value
@@ -887,22 +887,6 @@ class Tree(ShaFile):
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
-    def entries(self):
-        """Return a list of tuples describing the tree entries.
-
-        :note: The order of the tuples that are returned is different from that
-            returned by the items and iteritems methods. This function will be
-            deprecated in the future.
-        """
-        warnings.warn("Tree.entries() is deprecated. Use Tree.items() or"
-            " Tree.iteritems() instead.", category=DeprecationWarning,
-            stacklevel=2)
-        self._ensure_parsed()
-        # The order of this is different from iteritems() for historical
-        # reasons
-        return [
-            (mode, name, hexsha) for (name, mode, hexsha) in self.iteritems()]
-
     def iteritems(self, name_order=False):
         """Iterate over entries.
 
@@ -923,7 +907,7 @@ class Tree(ShaFile):
         """Grab the entries in the tree"""
         try:
             parsed_entries = parse_tree("".join(chunks))
-        except ValueError, e:
+        except ValueError as e:
             raise ObjectFormatException(e)
         # TODO: list comprehension is for efficiency in the common (small) case;
         # if memory efficiency in the large case is a concern, use a genexp.

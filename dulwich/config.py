@@ -359,7 +359,7 @@ class StackedConfig(Config):
         for path in paths:
             try:
                 cf = ConfigFile.from_path(path)
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 if e.errno != errno.ENOENT:
                     raise
                 else:

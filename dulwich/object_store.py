@@ -421,7 +421,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
                     'rb')
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
             raise
@@ -444,7 +444,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         try:
             os.mkdir(os.path.join(self.path, "info"))
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         alternates_path = os.path.join(self.path, "info/alternates")
@@ -452,7 +452,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             try:
                 orig_f = open(alternates_path, 'rb')
-            except (OSError, IOError), e:
+            except (OSError, IOError) as e:
                 if e.errno != errno.ENOENT:
                     raise
             else:
@@ -478,7 +478,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 if name.startswith("pack-") and name.endswith(".pack"):
                     filename = os.path.join(self.pack_dir, name)
                     pack_files.append((os.stat(filename).st_mtime, filename))
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 return []
             raise
@@ -497,7 +497,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _pack_cache_stale(self):
         try:
             return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 return True
             raise
@@ -517,7 +517,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -663,7 +663,7 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.join(self.path, obj.id[:2])
         try:
             os.mkdir(dir)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         path = os.path.join(dir, obj.id[2:])
@@ -679,7 +679,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def init(cls, path):
         try:
             os.mkdir(path)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         os.mkdir(os.path.join(path, "info"))

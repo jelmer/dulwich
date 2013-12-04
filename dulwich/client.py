@@ -582,7 +582,7 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error, err:
+            except socket.error as err:
                 if s is not None:
                     s.close()
                 s = None
@@ -897,7 +897,7 @@ class HttpGitClient(GitClient):
         req = urllib2.Request(url, headers=headers, data=data)
         try:
             resp = self._perform(req)
-        except urllib2.HTTPError, e:
+        except urllib2.HTTPError as e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:

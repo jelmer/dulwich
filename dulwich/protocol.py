@@ -109,7 +109,7 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, 'read')
             return read(size-4)
-        except socket.error, e:
+        except socket.error as e:
             raise GitProtocolError(e)
 
     def eof(self):
@@ -160,7 +160,7 @@ class Protocol(object):
             self.write(line)
             if self.report_activity:
                 self.report_activity(len(line), 'write')
-        except socket.error, e:
+        except socket.error as e:
             raise GitProtocolError(e)
 
     def write_file(self):

@@ -19,7 +19,6 @@
 
 """Tests for the repository."""
 
-from cStringIO import StringIO
 import os
 import stat
 import shutil
@@ -102,12 +101,6 @@ class RepositoryTests(TestCase):
     def test_simple_props(self):
         r = self._repo = open_repo('a.git')
         self.assertEqual(r.controldir(), r.path)
-
-    def test_ref(self):
-        r = self._repo = open_repo('a.git')
-        warnings.simplefilter("ignore", DeprecationWarning)
-        self.assertEqual(r.ref('refs/heads/master'),
-                         'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_setitem(self):
         r = self._repo = open_repo('a.git')
@@ -210,15 +203,6 @@ class RepositoryTests(TestCase):
             [e.commit.id for e in r.get_walker('2a72d929692c41d8554c07f6301757ba18a65d91')],
             ['2a72d929692c41d8554c07f6301757ba18a65d91'])
 
-    def test_linear_history(self):
-        r = self._repo = open_repo('a.git')
-        warnings.simplefilter("ignore", DeprecationWarning)
-        self.addCleanup(warnings.resetwarnings)
-        history = r.revision_history(r.head())
-        shas = [c.sha().hexdigest() for c in history]
-        self.assertEqual(shas, [r.head(),
-                                '2a72d929692c41d8554c07f6301757ba18a65d91'])
-
     def test_clone(self):
         r = self._repo = open_repo('a.git')
         tmp_dir = tempfile.mkdtemp()
@@ -275,13 +259,6 @@ class RepositoryTests(TestCase):
                                 '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6',
                                 '60dacdc733de308bb77bb76ce0fb0f9b44c9769e',
                                 '0d89f20333fbb1d2f3a94da77f4981373d8f4310'])
-
-    def test_revision_history_missing_commit(self):
-        r = self._repo = open_repo('simple_merge.git')
-        warnings.simplefilter("ignore", DeprecationWarning)
-        self.addCleanup(warnings.resetwarnings)
-        self.assertRaises(errors.MissingCommitError, r.revision_history,
-                          missing_sha)
 
     def test_out_of_order_merge(self):
         """Test that revision history is ordered by date, not parent order."""

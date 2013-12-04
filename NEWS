@@ -9,6 +9,9 @@
  * Remove long deprecated ``Repo.commit``, ``Repo.get_blob``,
    ``Repo.tree`` and ``Repo.tag``. (Jelmer Vernooij)
 
+ * Remove long deprecated ``Repo.revision_history`` and ``Repo.ref``.
+   (Jelmer Vernooij)
+
 0.9.4	2013-11-30
 
  IMPROVEMENTS

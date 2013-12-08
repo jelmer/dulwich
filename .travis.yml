@@ -5,4 +5,4 @@ python:
 script: make check
 install:
   - pip install unittest2
-  - apt-get install -qq git
+  - sudo apt-get install -qq git

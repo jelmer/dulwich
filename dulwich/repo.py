@@ -415,7 +415,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if len(name) in (20, 40):
+        if len(name) in (20, 40) and isinstance(name, str):
             try:
                 return self.object_store[name]
             except (KeyError, ValueError):

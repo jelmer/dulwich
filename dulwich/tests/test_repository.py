@@ -108,6 +108,12 @@ class RepositoryTests(TestCase):
         self.assertEqual('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                           r["refs/tags/foo"].id)
 
+    def test_getitem_notfound_unicode(self):
+        r = self._repo = open_repo('a.git')
+        # In the future, this might raise a TypeError since we don't
+        # handle unicode strings properly (what encoding?) for refs.
+        self.assertRaises(KeyError, r.__getitem__, u"11" * 19 + "--")
+
     def test_delitem(self):
         r = self._repo = open_repo('a.git')
 

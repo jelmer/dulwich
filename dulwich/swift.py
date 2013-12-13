@@ -96,6 +96,8 @@ enpoint_type = internalURL
 concurrency = 20
 # Amount of HTTP client connections
 http_pool_length = 10
+# HTTP timeout delay
+http_timeout = 20
 # Chunk size to read from pack (Bytes)
 chunk_length = 12228
 # Cache size (MBytes)
@@ -259,6 +261,7 @@ class SwiftConnector(object):
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
         self.concurrency = self.conf.getint('swift', 'concurrency') or 10
+        self.http_timeout = self.conf.getint('swift', 'http_timeout') or 20
         self.http_pool_length = \
             self.conf.getint('swift', 'http_pool_length') or 10
         self.region_name = self.conf.get("swift", "region_name") or "RegionOne"
@@ -276,13 +279,19 @@ class SwiftConnector(object):
             HTTPClient.from_url(self.storage_url,
                                 concurrency=self.http_pool_length,
                                 block_size=block_size,
+                                connection_timeout=self.http_timeout,
+                                network_timeout=self.http_timeout,
                                 headers=token_header)
         self.base_path = posixpath.join(urlparse(self.storage_url).path,
                                         self.root)
 
     def swift_auth_v1(self):
         self.user = self.user.replace(";", ":")
-        auth_httpclient = HTTPClient.from_url(self.auth_url)
+        auth_httpclient = HTTPClient.from_url(
+            self.auth_url,
+            connection_timeout=self.http_timeout,
+            network_timeout=self.http_timeout,
+            )
         headers = {'X-Auth-User': self.user,
                    'X-Auth-Key': self.password}
         prefix_uri = urlparse(self.auth_url).path
@@ -312,7 +321,11 @@ class SwiftConnector(object):
                              'tenantName': self.tenant}
         auth_json = json_dumps(auth_dict)
         headers = {'Content-Type': 'application/json'}
-        auth_httpclient = HTTPClient.from_url(self.auth_url)
+        auth_httpclient = HTTPClient.from_url(
+            self.auth_url,
+            connection_timeout=self.http_timeout,
+            network_timeout=self.http_timeout,
+            )
         prefix_uri = urlparse(self.auth_url).path
         if not prefix_uri.endswith('tokens'):
             prefix_uri = posixpath.join(prefix_uri, '/tokens')

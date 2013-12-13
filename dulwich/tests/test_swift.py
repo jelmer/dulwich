@@ -68,6 +68,7 @@ concurrency = %(concurrency)s
 chunk_length = %(chunk_length)s
 cache_length = %(cache_length)s
 http_pool_length = %(http_pool_length)s
+http_timeout = %(http_timeout)s
 """
 
 def_config_file = {'version_str': 'v1.0',
@@ -77,7 +78,8 @@ def_config_file = {'version_str': 'v1.0',
                    'cache_length': 1,
                    'region_name': 'test',
                    'endpoint_type': 'internalURL',
-                   'http_pool_length': 1}
+                   'http_pool_length': 1,
+                   'http_timeout': 1}
 
 
 def create_swift_connector(store={}):
@@ -483,6 +485,9 @@ class TestSwiftConnector(TestCase):
         self.assertEqual(self.conn.storage_url,
                          'http://127.0.0.1:8080/v1.0/AUTH_fakeuser')
         self.assertEqual(self.conn.token, '12' * 10)
+        self.assertEqual(self.conn.http_timeout, 1)
+        self.assertEqual(self.conn.http_pool_length, 1)
+        self.assertEqual(self.conn.concurrency, 1)
         self.conf.set('swift', 'auth_ver', '2')
         self.conf.set('swift', 'auth_url', 'http://127.0.0.1:8080/auth/v2.0')
         with patch('geventhttpclient.HTTPClient.request',

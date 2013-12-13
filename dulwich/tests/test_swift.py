@@ -47,6 +47,9 @@ from dulwich.objects import (
     )
 from dulwich.pack import (
     REF_DELTA,
+    write_pack_index_v2,
+    PackData,
+    load_pack_index_file,
     )
 
 try:
@@ -126,6 +129,42 @@ def fake_auth_request_v2(*args, **kwargs):
     return ret
 
 
+def create_commit(data, marker='Default', blob=None):
+    if not blob:
+        blob = Blob.from_string('The blob content %s' % marker)
+    tree = Tree()
+    tree.add("thefile_%s" % marker, 0100644, blob.id)
+    cmt = Commit()
+    if data:
+        assert isinstance(data[-1], Commit)
+        cmt.parents = [data[-1].id]
+    cmt.tree = tree.id
+    author = "John Doe %s <john@doe.net>" % marker
+    cmt.author = cmt.committer = author
+    tz = parse_timezone('-0200')[0]
+    cmt.commit_time = cmt.author_time = int(time())
+    cmt.commit_timezone = cmt.author_timezone = tz
+    cmt.encoding = "UTF-8"
+    cmt.message = "The commit message %s" % marker
+    tag = Tag()
+    tag.tagger = "john@doe.net"
+    tag.message = "Annotated tag"
+    tag.tag_timezone = parse_timezone('-0200')[0]
+    tag.tag_time = cmt.author_time
+    tag.object = (Commit, cmt.id)
+    tag.name = "v_%s_0.1" % marker
+    return blob, tree, tag, cmt
+
+
+def create_commits(length=1, marker='Default'):
+    data = []
+    for i in xrange(0, length):
+        _marker = "%s_%s" % (marker, i)
+        blob, tree, tag, cmt = create_commit(data, _marker)
+        data.extend([blob, tree, tag, cmt])
+    return data
+
+
 class FakeSwiftConnector(object):
 
     def __init__(self, root, conf, store=None):
@@ -186,42 +225,8 @@ class TestSwiftObjectStore(TestCase):
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
 
-    def _create_commit(self, data, marker='Default', blob=None):
-        if not blob:
-            blob = Blob.from_string('The blob content %s' % marker)
-        tree = Tree()
-        tree.add("thefile_%s" % marker, 0100644, blob.id)
-        cmt = Commit()
-        if data:
-            assert isinstance(data[-1], Commit)
-            cmt.parents = [data[-1].id]
-        cmt.tree = tree.id
-        author = "John Doe %s <john@doe.net>" % marker
-        cmt.author = cmt.committer = author
-        tz = parse_timezone('-0200')[0]
-        cmt.commit_time = cmt.author_time = int(time())
-        cmt.commit_timezone = cmt.author_timezone = tz
-        cmt.encoding = "UTF-8"
-        cmt.message = "The commit message %s" % marker
-        tag = Tag()
-        tag.tagger = "john@doe.net"
-        tag.message = "Annotated tag"
-        tag.tag_timezone = parse_timezone('-0200')[0]
-        tag.tag_time = cmt.author_time
-        tag.object = (Commit, cmt.id)
-        tag.name = "v_%s_0.1" % marker
-        return blob, tree, tag, cmt
-
-    def _create_commits(self, length=1, marker='Default'):
-        data = []
-        for i in xrange(0, length):
-            _marker = "%s_%s" % (marker, i)
-            blob, tree, tag, cmt = self._create_commit(data, _marker)
-            data.extend([blob, tree, tag, cmt])
-        return data
-
     def _put_pack(self, sos, commit_amount=1, marker='Default'):
-        odata = self._create_commits(length=commit_amount, marker=marker)
+        odata = create_commits(length=commit_amount, marker=marker)
         data = [(d.type_num, d.as_raw_string()) for d in odata]
         f = StringIO()
         build_pack(f, data, store=sos)
@@ -231,8 +236,10 @@ class TestSwiftObjectStore(TestCase):
     def test_load_packs(self):
         store = {'fakerepo/objects/pack/pack-'+'1'*40+'.idx': '',
                  'fakerepo/objects/pack/pack-'+'1'*40+'.pack': '',
+                 'fakerepo/objects/pack/pack-'+'1'*40+'.info': '',
                  'fakerepo/objects/pack/pack-'+'2'*40+'.idx': '',
-                 'fakerepo/objects/pack/pack-'+'2'*40+'.pack': ''}
+                 'fakerepo/objects/pack/pack-'+'2'*40+'.pack': '',
+                 'fakerepo/objects/pack/pack-'+'2'*40+'.info': ''}
         fsc = FakeSwiftConnector('fakerepo', conf=self.conf, store=store)
         sos = swift.SwiftObjectStore(fsc)
         packs = sos._load_packs()
@@ -317,7 +324,7 @@ class TestSwiftObjectStore(TestCase):
         new_blob = Blob.from_string(ref_blob_content.replace('blob',
                                                              'yummy blob'))
         blob, tree, tag, cmt = \
-            self._create_commit([], marker='Default2', blob=new_blob)
+            create_commit([], marker='Default2', blob=new_blob)
         data = [(REF_DELTA, (ref_blob_id, blob.as_raw_string())),
                 (tree.type_num, tree.as_raw_string()),
                 (cmt.type_num, cmt.as_raw_string()),
@@ -376,6 +383,47 @@ class TestSwiftRepo(TestCase):
         self.assertIn('fakeroot/objects/pack', fsc.store)
         self.assertIn('fakeroot/info/refs', fsc.store)
         self.assertIn('fakeroot/description', fsc.store)
+
+
+class TestPackInfoLoadDump(TestCase):
+    def setUp(self):
+        conf = swift.load_conf(file=StringIO(config_file %
+                                             def_config_file))
+        sos = swift.SwiftObjectStore(
+            FakeSwiftConnector('fakerepo', conf=conf))
+        commit_amount = 10
+        self.commits = create_commits(length=commit_amount, marker="m")
+        data = [(d.type_num, d.as_raw_string()) for d in self.commits]
+        f = StringIO()
+        fi = StringIO()
+        expected = build_pack(f, data, store=sos)
+        entries = [(sha, ofs, checksum) for
+                   ofs, _, _, sha, checksum in expected]
+        self.pack_data = PackData.from_file(file=f, size=None)
+        write_pack_index_v2(
+            fi, entries, self.pack_data.calculate_checksum())
+        fi.seek(0)
+        self.pack_index = load_pack_index_file('', fi)
+
+#    def test_pack_info_perf(self):
+#        dump_time = []
+#        load_time = []
+#        for i in xrange(0, 100):
+#            start = time()
+#            dumps = swift.pack_info_create(self.pack_data, self.pack_index)
+#            dump_time.append(time() - start)
+#        for i in xrange(0, 100):
+#            start = time()
+#            pack_infos = swift.load_pack_info('', file=StringIO(dumps))
+#            load_time.append(time() - start)
+#        print sum(dump_time) / float(len(dump_time))
+#        print sum(load_time) / float(len(load_time))
+
+    def test_pack_info(self):
+        dumps = swift.pack_info_create(self.pack_data, self.pack_index)
+        pack_infos = swift.load_pack_info('', file=StringIO(dumps))
+        for obj in self.commits:
+            self.assertIn(obj.id, pack_infos)
 
 
 class TestSwiftInfoRefsContainer(TestCase):
@@ -473,7 +521,7 @@ class TestSwiftConnector(TestCase):
     def test_get_container_objects(self):
         with patch('geventhttpclient.HTTPClient.request',
                    lambda *args: Response(content=json_dumps(
-                    (({'name': 'a'}, {'name': 'b'}))))):
+                       (({'name': 'a'}, {'name': 'b'}))))):
             self.assertEqual(len(self.conn.get_container_objects()), 2)
 
     def test_get_container_objects_fails(self):
@@ -502,8 +550,8 @@ class TestSwiftConnector(TestCase):
         with patch('geventhttpclient.HTTPClient.request',
                    lambda *args, **kwargs: Response(status=400)):
             self.assertRaises(swift.SwiftException,
-                              lambda: self.conn.put_object('a',
-                                                           StringIO('content')))
+                              lambda: self.conn.put_object(
+                                  'a', StringIO('content')))
 
     def test_get_object(self):
         with patch('geventhttpclient.HTTPClient.request',

@@ -27,8 +27,6 @@ import os
 import stat
 import posixpath
 import tempfile
-import cPickle as pickle
-import time
 
 from urlparse import urlparse
 
@@ -61,8 +59,6 @@ from dulwich.object_store import (
     PackBasedObjectStore,
     PACKDIR,
     INFODIR,
-    ObjectStoreIterator,
-    MissingObjectFinder,
     )
 from dulwich.refs import (
     InfoRefsContainer,
@@ -73,7 +69,6 @@ from dulwich.refs import (
 from dulwich.objects import (
     Commit,
     Tree,
-    Blob,
     Tag,
     S_ISGITLINK,
     )
@@ -85,6 +80,8 @@ except ImportError:
     from json import loads as json_loads
     from json import dumps as json_dumps
 
+#TODO(fbo)  - Second attempt to _send() must be notified via real log
+#           - More logs for operations
 
 """
 # Configuration file sample
@@ -106,17 +103,32 @@ cache_length = 20
 """
 
 try:
+    try:
+        os.environ['NO_GEVENT']
+        raise ImportError
+    except KeyError:
+        pass
     import gevent
-    from dulwich.greenthreads import GreenThreadsMissingObjectFinder
-    from dulwich.greenthreads import GreenThreadsObjectStoreIterator
+    from dulwich.greenthreads import \
+        GreenThreadsMissingObjectFinder as MissingObjectFinder
+    from dulwich.greenthreads import \
+        GreenThreadsObjectStoreIterator as ObjectStoreIterator
     gevent_support = True
 except ImportError:
+    from dulwich.object_store import MissingObjectFinder
+    from dulwich.object_store import ObjectStoreIterator
     gevent_support = False
 
 
-class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
-    def __init__(self, *args, **kwargs):
-        super(PackInfoObjectStoreIterator, self).__init__(*args, **kwargs)
+class PackInfoObjectStoreIterator(ObjectStoreIterator):
+    def __init__(self, store, shas, finder, concurrency):
+        self.finder = finder
+        if gevent_support:
+            super(PackInfoObjectStoreIterator, self).__init__(store, shas,
+                                                              finder,
+                                                              concurrency)
+        else:
+            super(PackInfoObjectStoreIterator, self).__init__(store, shas)
 
     def __len__(self):
         while len(self.finder.objects_to_send):
@@ -126,7 +138,7 @@ class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
         return len(self._shas)
 
 
-class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
+class PackInfoMissingObjectFinder(MissingObjectFinder):
     def __init__(self, *args, **kwargs):
         super(PackInfoMissingObjectFinder, self).__init__(*args, **kwargs)
 
@@ -139,22 +151,17 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
                 break
         if not leaf:
             info = self.object_store.pack_info_get(sha)
-            if info['type'] == Commit.type_num:
-                self.add_todo([(info['tree_sha'], "", False)])
-            elif info['type'] == Tree.type_num:
-                self.add_todo(info['shas'])
-            elif info['type'] == Tag.type_num:
-                self.add_todo([(info['sha'], None, False)])
+            if info[0] == Commit.type_num:
+                self.add_todo([(info[2], "", False)])
+            elif info[0] == Tree.type_num:
+                self.add_todo([tuple(i) for i in info[1]])
+            elif info[0] == Tag.type_num:
+                self.add_todo([(info[1], None, False)])
             if sha in self._tagged:
                 self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)
-
-# Need to use only when PackInfo is present or activated ?
-if gevent_support:
-    GreenThreadsObjectStoreIterator = PackInfoObjectStoreIterator
-    GreenThreadsMissingObjectFinder = PackInfoMissingObjectFinder
 
 
 def load_conf(path=None, file=None):
@@ -199,30 +206,32 @@ def pack_info_create(pack_data, pack_index):
     pack = Pack.from_objects(pack_data, pack_index)
     info = {}
     for obj in pack.iterobjects():
-        if isinstance(obj, Commit):
-            info[obj.id] = {'type': obj.type_num,
-                            'parents_shas': obj.parents,
-                            'tree_sha': obj.tree}
-        elif isinstance(obj, Tree):
-            shas = [(s, n, not stat.S_ISDIR(m)) for n, m, s in obj.iteritems()
-                    if not S_ISGITLINK(m)]
-            info[obj.id] = {'type': obj.type_num,
-                            'shas': shas}
-        elif isinstance(obj, Blob):
-            info[obj.id] = {'type': obj.type_num}
-        elif isinstance(obj, Tag):
-            info[obj.id] = {'type': obj.type_num,
-                            'sha': obj._object_sha}
-    pickled_info = pickle.dumps(info)
-    return pickled_info
+        # Commit
+        if obj.type_num == 1:
+            info[obj.id] = (obj.type_num, obj.parents, obj.tree)
+        # Tree
+        elif obj.type_num == 2:
+            shas = [(s, n, not stat.S_ISDIR(m)) for
+                    n, m, s in obj.iteritems() if not S_ISGITLINK(m)]
+            info[obj.id] = (obj.type_num, shas)
+        # Blob
+        elif obj.type_num == 3:
+            info[obj.id] = None
+        # Tag
+        elif obj.type_num == 4:
+            info[obj.id] = (obj.type_num, obj._object_sha)
+    return json_dumps(info)
 
 
-def load_pack_info(scon, filename):
-    f = scon.get_object(filename)
+def load_pack_info(filename, scon=None, file=None):
+    if not file:
+        f = scon.get_object(filename)
+    else:
+        f = file
     if not f:
         return None
     try:
-        return pickle.loads(f.read())
+        return json_loads(f.read())
     finally:
         f.close()
 
@@ -266,7 +275,7 @@ class SwiftConnector(object):
         self.httpclient = \
             HTTPClient.from_url(self.storage_url,
                                 concurrency=self.http_pool_length,
-                                #block_size=block_size,
+                                block_size=block_size,
                                 headers=token_header)
         self.base_path = posixpath.join(urlparse(self.storage_url).path,
                                         self.root)
@@ -282,9 +291,11 @@ class SwiftConnector(object):
                                       headers=headers)
 
         if ret.status_code != 200:
-            raise SwiftException('AUTH v1.0 request failed on %s with error code %s (%s)'
+            raise SwiftException('AUTH v1.0 request failed on %s' +
+                                 ' with error code %s (%s)'
                                  % (ret.status_code,
-                                    str(auth_httpclient.get_base_url()) + prefix_uri,
+                                    str(auth_httpclient.get_base_url()) +
+                                    prefix_uri,
                                     str(ret.items())))
         storage_url = ret['X-Storage-Url']
         token = ret['X-Auth-Token']
@@ -311,9 +322,11 @@ class SwiftConnector(object):
                                       headers=headers)
 
         if ret.status_code != 200 and ret.status_code != 203:
-            raise SwiftException('AUTH v2.0 request failed on %s with error code %s (%s)'
+            raise SwiftException('AUTH v2.0 request failed on %s' +
+                                 ' with error code %s (%s)'
                                  % (ret.status_code,
-                                    str(auth_httpclient.get_base_url()) + prefix_uri,
+                                    str(auth_httpclient.get_base_url()) +
+                                    prefix_uri,
                                     str(ret.items())))
         auth_ret_json = json_loads(ret.read())
         token = auth_ret_json['access']['token']['id']
@@ -605,8 +618,8 @@ class SwiftPack(Pack):
         super(SwiftPack, self).__init__(*args, **kwargs)
         self._pack_info_path = self._basename + '.info'
         self._pack_info = None
-        self._pack_info_load = lambda: load_pack_info(self.scon,
-                                                      self._pack_info_path)
+        self._pack_info_load = lambda: load_pack_info(self._pack_info_path,
+                                                      self.scon)
         self._idx_load = lambda: swift_load_pack_index(self.scon,
                                                        self._idx_path)
         self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
@@ -648,20 +661,16 @@ class SwiftObjectStore(PackBasedObjectStore):
                  instance if gevent is enabled
         """
         shas = iter(finder.next, None)
+        concurrency = None
         if gevent_support:
             concurrency = int(self.scon.conf.get('swift', 'concurrency'))
-            return GreenThreadsObjectStoreIterator(self, shas, finder,
-                                                   concurrency)
-        else:
-            return ObjectStoreIterator(self, shas)
+        return PackInfoObjectStoreIterator(self, shas, finder, concurrency)
 
     def find_missing_objects(self, *args, **kwargs):
         if gevent_support:
             kwargs['concurrency'] = int(self.scon.conf.get('swift',
                                                            'concurrency'))
-            return GreenThreadsMissingObjectFinder(self, *args, **kwargs)
-        else:
-            return MissingObjectFinder(self, *args, **kwargs)
+        return PackInfoMissingObjectFinder(self, *args, **kwargs)
 
     def _load_packs(self):
         """Load all packs from Swift
@@ -683,7 +692,7 @@ class SwiftObjectStore(PackBasedObjectStore):
             for pack in self._pack_cache:
                 if commit in pack:
                     try:
-                        parents = pack.pack_info[commit]['parents_shas']
+                        parents = pack.pack_info[commit][1]
                     except KeyError:
                         # Seems to have no parents
                         return []
@@ -794,7 +803,6 @@ class SwiftObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = posixpath.join(
             self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
-        #self.scon.put_object(pack_base_name + '.pack', StringIO('b'*25000))
         self.scon.put_object(pack_base_name + '.pack', f)
 
         # Write the index.

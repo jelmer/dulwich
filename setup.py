@@ -73,6 +73,7 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat'],
       scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      install_requires=["mock", "gevent", "geventhttpclient"],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),

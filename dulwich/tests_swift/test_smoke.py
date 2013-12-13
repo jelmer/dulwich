@@ -21,7 +21,6 @@
 
 import os
 import unittest
-import threading
 import tempfile
 import shutil
 

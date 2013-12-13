@@ -22,6 +22,8 @@
 """Repo implementation atop OpenStack SWIFT."""
 
 # TODO: Refactor to share more code with dulwich/repo.py.
+# TODO(fbo): Second attempt to _send() must be notified via real log
+# TODO(fbo): More logs for operations
 
 import os
 import stat
@@ -80,8 +82,6 @@ except ImportError:
     from json import loads as json_loads
     from json import dumps as json_dumps
 
-#TODO(fbo)  - Second attempt to _send() must be notified via real log
-#           - More logs for operations
 
 """
 # Configuration file sample
@@ -435,11 +435,10 @@ class SwiftConnector(object):
             return ret
 
         try:
-            # Sometime got Broken Pipe (seen on cloudfiles)
-            # Dirty workaround
+            # Sometime got Broken Pipe - Dirty workaround
             ret = _send()
-        except Exception, e:
-            print "Second attempt for a PUT on %s" % str(e)
+        except Exception:
+            # Second attempt work
             ret = _send()
 
         if ret.status_code < 200 or ret.status_code > 300:

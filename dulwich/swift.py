@@ -27,14 +27,12 @@
 
 import os
 import stat
-import posixpath
 import tempfile
+import posixpath
 
 from urlparse import urlparse
-
 from cStringIO import StringIO
 from ConfigParser import ConfigParser
-
 from geventhttpclient import HTTPClient
 
 from dulwich.repo import (
@@ -67,12 +65,15 @@ from dulwich.refs import (
     read_info_refs,
     write_info_refs,
     )
-
 from dulwich.objects import (
     Commit,
     Tree,
     Tag,
     S_ISGITLINK,
+    )
+from dulwich.greenthreads import (
+    GreenThreadsMissingObjectFinder,
+    GreenThreadsObjectStoreIterator,
     )
 
 try:
@@ -104,34 +105,8 @@ chunk_length = 12228
 cache_length = 20
 """
 
-try:
-    try:
-        os.environ['NO_GEVENT']
-        raise ImportError
-    except KeyError:
-        pass
-    import gevent
-    from dulwich.greenthreads import \
-        GreenThreadsMissingObjectFinder as MissingObjectFinder
-    from dulwich.greenthreads import \
-        GreenThreadsObjectStoreIterator as ObjectStoreIterator
-    gevent_support = True
-except ImportError:
-    from dulwich.object_store import MissingObjectFinder
-    from dulwich.object_store import ObjectStoreIterator
-    gevent_support = False
 
-
-class PackInfoObjectStoreIterator(ObjectStoreIterator):
-    def __init__(self, store, shas, finder, concurrency):
-        self.finder = finder
-        if gevent_support:
-            super(PackInfoObjectStoreIterator, self).__init__(store, shas,
-                                                              finder,
-                                                              concurrency)
-        else:
-            super(PackInfoObjectStoreIterator, self).__init__(store, shas)
-
+class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
     def __len__(self):
         while len(self.finder.objects_to_send):
             for _ in xrange(0, len(self.finder.objects_to_send)):
@@ -140,10 +115,7 @@ class PackInfoObjectStoreIterator(ObjectStoreIterator):
         return len(self._shas)
 
 
-class PackInfoMissingObjectFinder(MissingObjectFinder):
-    def __init__(self, *args, **kwargs):
-        super(PackInfoMissingObjectFinder, self).__init__(*args, **kwargs)
-
+class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
     def next(self):
         while True:
             if not self.objects_to_send:
@@ -673,15 +645,11 @@ class SwiftObjectStore(PackBasedObjectStore):
                  instance if gevent is enabled
         """
         shas = iter(finder.next, None)
-        concurrency = None
-        if gevent_support:
-            concurrency = int(self.scon.conf.get('swift', 'concurrency'))
-        return PackInfoObjectStoreIterator(self, shas, finder, concurrency)
+        return PackInfoObjectStoreIterator(
+            self, shas, finder, self.scon.concurrency)
 
     def find_missing_objects(self, *args, **kwargs):
-        if gevent_support:
-            kwargs['concurrency'] = int(self.scon.conf.get('swift',
-                                                           'concurrency'))
+        kwargs['concurrency'] = self.scon.concurrency
         return PackInfoMissingObjectFinder(self, *args, **kwargs)
 
     def _load_packs(self):

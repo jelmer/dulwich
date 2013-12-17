@@ -28,6 +28,7 @@
 
 import os
 import stat
+import zlib
 import tempfile
 import posixpath
 
@@ -195,7 +196,7 @@ def pack_info_create(pack_data, pack_index):
         # Tag
         elif obj.type_num == 4:
             info[obj.id] = (obj.type_num, obj._object_sha)
-    return json_dumps(info)
+    return zlib.compress(json_dumps(info))
 
 
 def load_pack_info(filename, scon=None, file=None):
@@ -206,7 +207,7 @@ def load_pack_info(filename, scon=None, file=None):
     if not f:
         return None
     try:
-        return json_loads(f.read())
+        return json_loads(zlib.decompress(f.read()))
     finally:
         f.close()
 

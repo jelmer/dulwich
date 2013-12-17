@@ -1,0 +1,89 @@
+#!/usr/bin/python
+# swift-dul-daemon - Simple git-daemon-like server
+# Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
+#
+# Author: Fabien Boucher <fabien.boucher@enovance.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# or (at your option) a later version of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+import sys
+import logging
+import argparse
+import gevent.monkey
+gevent.monkey.patch_socket()
+
+from dulwich import log_utils
+from dulwich.protocol import TCP_GIT_PORT
+from dulwich.server import (
+    TCPGitServer,
+    Backend,
+    )
+from dulwich.swift import (
+    SwiftRepo,
+    load_conf,
+    )
+
+
+class SwiftSystemBackend(Backend):
+    def __init__(self, logger, conf):
+        self.conf = conf
+        self.logger = logger
+
+    def open_repository(self, path):
+        self.logger.info('opening repository at %s', path)
+        return SwiftRepo(path, self.conf)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Start Dulwich GIT server with Swift as backend')
+    parser.add_argument(
+        '-c', '--config', action="store",
+        default="",
+        help="Path to the configuration file")
+    parser.add_argument(
+        '-l', '--listen_address', action="store",
+        default="0.0.0.0",
+        help="Binding IP address")
+    parser.add_argument(
+        '-p', '--port', action="store",
+        default=TCP_GIT_PORT, type=int,
+        help="Binding TCP port")
+    parser.add_argument(
+        '-d', '--debug', action="store_true",
+        default=False,
+        help="Will print debug logs")
+    ns = parser.parse_args()
+
+    if len(sys.argv) < 2:
+        parser.print_help()
+        sys.exit(1)
+
+    log_utils.default_logging_config()
+    if ns.debug:
+        log_utils.getLogger().setLevel(logging.DEBUG)
+    else:
+        log_utils.getLogger().setLevel(logging.INFO)
+
+    logger = log_utils.getLogger()
+    if not ns.config:
+        logger.info("Please provide the configuration file")
+        sys.exit(1)
+    else:
+        conf = load_conf(ns.config)
+
+    backend = SwiftSystemBackend(logger, conf)
+    server = TCPGitServer(backend, ns.listen_address, port=ns.port)
+    server.serve_forever()

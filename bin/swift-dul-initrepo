@@ -1,0 +1,68 @@
+#!/usr/bin/python
+# swift-init-repo - Simple script to create an empty bare repo
+# Copyright (C) 2013 eNovance SAS <licensing@enovance.com>
+#
+# Author: Fabien Boucher <fabien.boucher@enovance.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 2
+# or (at your option) a later version of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
+
+import sys
+import logging
+import argparse
+
+from dulwich import log_utils
+from dulwich.swift import (
+    SwiftRepo,
+    SwiftConnector,
+    load_conf,
+    )
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Create an empty bare repository on Swift')
+    parser.add_argument(
+        '-c', '--config', action="store",
+        default="",
+        help="Path to the configuration file")
+    parser.add_argument(
+        '-r', '--repo', action="store",
+        help="The repository's name")
+    parser.add_argument(
+        '-d', '--debug', action="store_true",
+        default=False,
+        help="Will print debug logs")
+    ns = parser.parse_args()
+
+    if len(sys.argv) < 2:
+        sys.exit(1)
+
+    log_utils.default_logging_config()
+    if ns.debug:
+        log_utils.getLogger().setLevel(logging.DEBUG)
+    else:
+        log_utils.getLogger().setLevel(logging.INFO)
+
+    if not ns.config:
+        print "Please provide the configuration file"
+        sys.exit(1)
+    else:
+        conf = load_conf(ns.config)
+    if not ns.repo:
+        print "Please provide the repository name to init"
+        sys.exit(1)
+
+    scon = SwiftConnector(ns.repo, conf)
+    SwiftRepo.init_bare(scon, conf)

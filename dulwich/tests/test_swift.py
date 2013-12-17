@@ -177,6 +177,8 @@ class FakeSwiftConnector(object):
         self.conf = conf
         self.root = root
         self.concurrency = 1
+        self.chunk_length = 12228
+        self.cache_length = 1
 
     def put_object(self, name, content):
         name = posixpath.join(self.root, name)

@@ -247,6 +247,8 @@ class SwiftConnector(object):
         self.region_name = self.conf.get("swift", "region_name") or "RegionOne"
         self.endpoint_type = \
             self.conf.get("swift", "endpoint_type") or "internalURL"
+        self.cache_length = self.conf.getint("swift", "cache_length") or 20
+        self.chunk_length = self.conf.getint("swift", "chunk_length") or 12228
         self.root = root
         block_size = 1024 * 12  # 12KB
         if self.auth_ver == "1":
@@ -502,7 +504,7 @@ class SwiftPackReader(object):
         self.offset = 0
         self.base_offset = 0
         self.buff = ''
-        self.buff_length = int(self.scon.conf.get("swift", "chunk_length"))
+        self.buff_length = self.scon.chunk_length
 
     def _read(self, more=False):
         if more:
@@ -573,8 +575,7 @@ class SwiftPackData(PackData):
         pack_reader = SwiftPackReader(self.scon, self._filename,
                                       self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
-        LRUCache_length = int(self.scon.conf.get("swift", "cache_length"))
-        self._offset_cache = LRUSizeCache(1024*1024*LRUCache_length,
+        self._offset_cache = LRUSizeCache(1024*1024*self.scon.cache_length,
                                           compute_size=_compute_object_size)
         self.pack = None
 

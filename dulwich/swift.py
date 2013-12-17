@@ -24,6 +24,7 @@
 # TODO: Refactor to share more code with dulwich/repo.py.
 # TODO(fbo): Second attempt to _send() must be notified via real log
 # TODO(fbo): More logs for operations
+# TODO(fbo): ls-remote not fails but exception is raised
 
 import os
 import stat
@@ -843,6 +844,8 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.
         """
+        if name == 'HEAD':
+            return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
             return False
@@ -854,6 +857,8 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     def remove_if_equals(self, name, old_ref):
         """Remove a refname only if it currently equals old_ref.
         """
+        if name == 'HEAD':
+            return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
             return False
@@ -861,6 +866,13 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self._write_refs(refs)
         del self._refs[name]
         return True
+    
+    def allkeys(self):
+        try:
+            self._refs['HEAD'] = self._refs['refs/heads/master']
+        except KeyError:
+            pass
+        return self._refs.keys()
 
 
 class SwiftRepo(BaseRepo):

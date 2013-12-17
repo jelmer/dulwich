@@ -89,21 +89,27 @@ except ImportError:
 """
 # Configuration file sample
 [swift]
+# Authentication URL (Keystone or Swift)
 auth_url = http://127.0.0.1:5000/v2.0
+# Authentication version to use
 auth_ver = 2
+# The tenant and username separated by a semicolon
 username = admin;admin
+# The user password
 password = pass
+# The Object storage region to use (auth v2) (Default RegionOne)
 region_name = RegionOne
+# The Object storage endpoint URL to use (auth v2) (Default internalURL)
 enpoint_type = internalURL
-# Concurrency worker
-concurrency = 20
-# Amount of HTTP client connections
+# Concurrency to use for parallel tasks (Default 10)
+concurrency = 10
+# Size of the HTTP pool (Default 10)
 http_pool_length = 10
-# HTTP timeout delay
+# Timeout delay for HTTP connections (Default 20)
 http_timeout = 20
-# Chunk size to read from pack (Bytes)
+# Chunk size to read from pack (Bytes) (Default 12228)
 chunk_length = 12228
-# Cache size (MBytes)
+# Cache size (MBytes) (Default 20)
 cache_length = 20
 """
 

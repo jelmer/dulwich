@@ -55,6 +55,7 @@ from dulwich.protocol import (
     _RBUFSIZE,
     PktLineParser,
     Protocol,
+    ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -697,7 +698,15 @@ class LocalGitClient(GitClient):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
-        raise NotImplementedError(self.fetch_pack)
+        from dulwich.repo import Repo
+        r = Repo(path)
+        objects_iter = r.fetch_objects(determine_wants, graph_walker, progress)
+
+        # Did the process short-circuit (e.g. in a stateless RPC call)? Note
+        # that the client still expects a 0-object pack in most cases.
+        if objects_iter is None:
+            return
+        write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
 
 
 # What Git client to use for local access

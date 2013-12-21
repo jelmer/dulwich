@@ -3,11 +3,11 @@ Openstack Swift as backend for Dulwich
 
 The module dulwich/swift.py implements dulwich.repo.BaseRepo
 in order to being compatible with Openstack Swift.
-We can then use Dulwich as server (GIT server) and instead using
+We can then use Dulwich as server (Git server) and instead of using
 a regular POSIX file system to store repository objects we use the
 object storage Swift via its own API.
 
-cGIT client <---> Dulwich server <---> Openstack Swift API
+c Git client <---> Dulwich server <---> Openstack Swift API
 
 This implementation is still a work in progress and we can say that
 is a Beta version so you need to be prepared to find bugs.
@@ -81,17 +81,22 @@ Start the server using the following command:
 
     $ swift-dul-daemon -c /etc/swift-dul.conf -l 127.0.0.1
 
+Note that a lot of request will be performed against the Swift
+cluster so it is better to start the Dulwich server as close
+as possible of the Swift proxy. The best solution is to run
+the server on the Swift proxy node to reduce the latency.
+
 How to use
 ----------
 
 Once you have validated that the functional tests is working as expected and
-the server is running we can init a bare repository. Run the this
+the server is running we can init a bare repository. Run this
 command with the name of the repository to create:
 
     $ swift-dul-initrepo -c /etc/swift-dul.conf -r edeploy
 
-The repository name will be container that will contain all the GIT
-objects for the repository. Then standard cGIT client can be use to
+The repository name will be container that will contain all the Git
+objects for the repository. Then standard c Git client can be used to
 perform operations againt this repository.
 
 As an example we can clone the previously empty bare repository:
@@ -108,13 +113,13 @@ Then push an existing project in it:
     9dc50a9a9bff1e232a74e365707f22a62492183e        HEAD
     9dc50a9a9bff1e232a74e365707f22a62492183e        refs/heads/master
 
-The other GIT commands can be used the way you do usually against
+The other Git commands can be used the way you do usually against
 a regular repository.
 
-Note the swift-dul-daemon start a GIT server listening for the
-GIT protocol. Therefor there ins't any authentication or encryption
+Note the swift-dul-daemon start a Git server listening for the
+Git protocol. Therefor there ins't any authentication or encryption
 at all between the cGIT client and the GIT server (Dulwich).
--> Complete here
+
 
 How to report a bug
 -------------------

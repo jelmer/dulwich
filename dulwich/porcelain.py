@@ -342,3 +342,18 @@ def return_tags(repo):
     ordered_tags = OrderedDict(sorted(ordered_tags.items(),
                                       key=lambda t: (t[1].commit_time, t)))
     return ordered_tags
+
+
+def reset_hard_head(repo):
+    """ Perform 'git checkout .' - syncs staged changes.  This is a useful way
+    to 'git reset --hard  HEAD'
+
+    :param repo: Path to repository
+    """
+
+    r = Repo(repo)
+
+    indexfile = r.index_path()
+    tree = r["HEAD"].tree
+    index.build_index_from_tree(r.path, indexfile,
+                                r.object_store, tree)

@@ -18,7 +18,9 @@
 
 import os
 import sys
+
 from time import time
+from re import search
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
@@ -305,3 +307,18 @@ def status(repo):
     index = r.open_index()
     return list(tree_changes(r, index.commit(r.object_store),
                              r['HEAD'].tree))
+
+def stage_files(repo):
+        """Stage modified files in the repo
+
+        :param repo: Path to repository
+        """
+        r = Repo(repo)
+
+        # Iterate through files, those modified will be staged
+        for elem in os.walk(r):
+            relative_path = elem[0].split('./')[-1]
+            if not search(r'\.git', elem[0]):
+                files = [relative_path + '/' +
+                         filename for filename in elem[2]]
+                r.stage(files)

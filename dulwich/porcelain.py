@@ -45,6 +45,11 @@ Currently implemented:
  * rev-list
  * update-server-info
  * symbolic-ref
+ * tag
+ * status
+ * stage-files
+ * return-tags
+ * reset-hard-head
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.

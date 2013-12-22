@@ -21,6 +21,7 @@ import sys
 
 from time import time
 from re import search
+from collections import OrderedDict
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
@@ -309,16 +310,35 @@ def status(repo):
                              r['HEAD'].tree))
 
 def stage_files(repo):
-        """Stage modified files in the repo
+    """Stage modified files in the repo
 
-        :param repo: Path to repository
-        """
-        r = Repo(repo)
+    :param repo: Path to repository
+    """
+    r = Repo(repo)
 
-        # Iterate through files, those modified will be staged
-        for elem in os.walk(r):
-            relative_path = elem[0].split('./')[-1]
-            if not search(r'\.git', elem[0]):
-                files = [relative_path + '/' +
-                         filename for filename in elem[2]]
-                r.stage(files)
+    # Iterate through files, those modified will be staged
+    for elem in os.walk(r):
+        relative_path = elem[0].split('./')[-1]
+        if not search(r'\.git', elem[0]):
+            files = [relative_path + '/' +
+                     filename for filename in elem[2]]
+            r.stage(files)
+
+
+def return_tags(repo):
+    """Get all tags & correspondin commit shas
+
+    :param repo: Path to repository
+    """
+    r = Repo(repo)
+    tags = r.refs.as_dict("refs/tags")
+    ordered_tags = {}
+    # Get the commit hashes associated with the tags
+    for tag, tag_commit in tags.items():
+        if tag not in ordered_tags:
+            ordered_tags[tag] = r.object_store.peel_sha(tag_commit)
+    # Sort by commit_time, then by tag name, as multiple tags can have
+    # the same commit_time for their commits
+    ordered_tags = OrderedDict(sorted(ordered_tags.items(),
+                                      key=lambda t: (t[1].commit_time, t)))
+    return ordered_tags

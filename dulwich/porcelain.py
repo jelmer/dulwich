@@ -24,6 +24,7 @@ from dulwich.client import get_transport_and_path
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
+from dulwich.objects import Tag, Commit, parse_timezone
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -265,3 +266,26 @@ def rev_list(repo, commits, outstream=sys.stdout):
     r = open_repo(repo)
     for entry in r.get_walker(include=[r[c].id for c in commits]):
         outstream.write("%s\n" % entry.commit.id)
+
+
+def tag(repo, tag, author, message):
+    """
+    Creates a tag in git via dulwich calls:
+
+    Parameters:
+        tag - string :: "<project>-[start|sync]-<timestamp>"
+        author - string :: "Your Name <your.email@example.com>"
+    """
+
+    # Create the tag object
+    tag_obj = Tag()
+    tag_obj.tagger = author
+    tag_obj.message = message
+    tag_obj.name = tag
+    tag_obj.object = (Commit, repo.refs['HEAD'])
+    tag_obj.tag_time = int(time())
+    tag_obj.tag_timezone = parse_timezone('-0200')[0]
+
+    # Add tag to the object store
+    repo.object_store.add_object(tag_obj)
+    repo['refs/tags/' + tag] = tag_obj.id

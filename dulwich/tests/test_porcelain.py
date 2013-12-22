@@ -303,3 +303,33 @@ class RevListTests(PorcelainTestCase):
         self.assertEquals(
             "%s\n%s\n%s\n" % (c3.id, c2.id, c1.id),
             outstream.getvalue())
+
+
+class TagTests(PorcelainTestCase):
+
+    def test_simple(self):
+        return False
+
+
+class StatusTests(PorcelainTestCase):
+
+    def test_simple(self):
+        return False
+
+
+class StageFilesTests(PorcelainTestCase):
+
+    def test_simple(self):
+        return False
+
+
+class ReturnTagsTests(PorcelainTestCase):
+
+    def test_simple(self):
+        return False
+
+
+class ResetHardHeadTests(PorcelainTestCase):
+
+    def test_simple(self):
+        return False

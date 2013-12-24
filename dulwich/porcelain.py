@@ -303,7 +303,7 @@ def tag(repo, tag, author, message):
     r['refs/tags/' + tag] = tag_obj.id
 
 
-def status(repo):
+def status(repo, outstream=sys.stdout):
     """Return the git status
 
     :param repo: Path to repository
@@ -311,8 +311,14 @@ def status(repo):
     r = open_repo(repo)
 
     index = r.open_index()
-    return list(tree_changes(r, index.commit(r.object_store),
-                             r['HEAD'].tree))
+    changes = list(tree_changes(r, index.commit(r.object_store),
+                                r['HEAD'].tree))
+
+    for change in changes:
+        outstream.write("%s\n" % change.__str__())
+
+    return changes
+
 
 def stage_files(repo):
     """Stage modified files in the repo
@@ -330,14 +336,15 @@ def stage_files(repo):
             r.stage(files)
 
 
-def return_tags(repo):
-    """Get all tags & correspondin commit shas
+def return_tags(repo, outstream=sys.stdout):
+    """Get all tags & corresponding commit shas
 
     :param repo: Path to repository
     """
     r = Repo(repo)
     tags = r.refs.as_dict("refs/tags")
     ordered_tags = {}
+
     # Get the commit hashes associated with the tags
     for tag, tag_commit in tags.items():
         if tag not in ordered_tags:
@@ -346,6 +353,11 @@ def return_tags(repo):
     # the same commit_time for their commits
     ordered_tags = OrderedDict(sorted(ordered_tags.items(),
                                       key=lambda t: (t[1].commit_time, t)))
+
+    # TODO - ensure that the tags write in order
+    for key in ordered_tags.keys():
+        outstream.write("%s\n" % key)
+
     return ordered_tags
 
 
@@ -360,5 +372,4 @@ def reset_hard_head(repo):
 
     indexfile = r.index_path()
     tree = r["HEAD"].tree
-    index.build_index_from_tree(r.path, indexfile,
-                                r.object_store, tree)
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

@@ -23,7 +23,9 @@ import os
 import shutil
 import tarfile
 import tempfile
+import subprocess
 
+from dulwich.diff_tree import tree_changes
 from dulwich import porcelain
 from dulwich.objects import (
     Blob,
@@ -308,28 +310,58 @@ class RevListTests(PorcelainTestCase):
 class TagTests(PorcelainTestCase):
 
     def test_simple(self):
-        return False
 
+        tag = 'tryme'
+        author = 'foo'
+        message = 'bar'
 
-class StatusTests(PorcelainTestCase):
+        porcelain.tag(self.repo.path, tag, author, message)
 
-    def test_simple(self):
-        return False
+        tags = self.repo.refs.as_dict("refs/tags")
+        for key, _ in tags.iteritems():
+            if key == tag:
+                assert True
+        assert False
 
 
 class StageFilesTests(PorcelainTestCase):
 
     def test_simple(self):
-        return False
+        porcelain.stage_files(self.repo.path)
 
 
 class ReturnTagsTests(PorcelainTestCase):
 
     def test_simple(self):
-        return False
+        tags = porcelain.return_tags(self.repo.path)
+
+        cmd = "git --git-dir={0}/.git --work-tree={0}/ tag".format(
+            self.repo.path,
+        )
+        proc = subprocess.Popen(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        tags_true = proc.communicate()[0].split('\n')
+
+        # return code should be 0
+        if proc.returncode:
+            assert False
+
+        # compare
+        for tag in tags_true:
+            if not tag in tags:
+                assert False
+        assert True
 
 
 class ResetHardHeadTests(PorcelainTestCase):
 
     def test_simple(self):
-        return False
+        porcelain.reset_hard_head(self.repo.path)
+
+        index = self.repo.open_index()
+        changes = list(tree_changes(self.repo,
+                                 index.commit(self.repo.object_store),
+                                 self.repo['HEAD'].tree))
+        # no staged changes
+        assert not changes

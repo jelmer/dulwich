@@ -334,18 +334,7 @@ class ReturnTagsTests(PorcelainTestCase):
 
     def test_simple(self):
         tags = porcelain.return_tags(self.repo.path)
-
-        cmd = "git --git-dir={0}/.git --work-tree={0}/ tag".format(
-            self.repo.path,
-        )
-        proc = subprocess.Popen(cmd,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        tags_true = proc.communicate()[0].split('\n')
-
-        # return code should be 0
-        if proc.returncode:
-            assert False
+        tags_true = self.repo.refs.as_dict("refs/tags")
 
         # compare
         for tag in tags_true:
@@ -357,6 +346,11 @@ class ReturnTagsTests(PorcelainTestCase):
 class ResetHardHeadTests(PorcelainTestCase):
 
     def test_simple(self):
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
         porcelain.reset_hard_head(self.repo.path)
 
         index = self.repo.open_index()

@@ -293,7 +293,7 @@ def tag(repo, tag, author, message):
     tag_obj.tagger = author
     tag_obj.message = message
     tag_obj.name = tag
-    tag_obj.object = (Commit, repo.refs['HEAD'])
+    tag_obj.object = (Commit, r.refs['HEAD'])
     tag_obj.tag_time = int(time())
     tag_obj.tag_timezone = parse_timezone('-0200')[0]
 

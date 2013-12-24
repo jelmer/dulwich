@@ -315,6 +315,10 @@ class TagTests(PorcelainTestCase):
         author = 'foo'
         message = 'bar'
 
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        
         porcelain.tag(self.repo.path, tag, author, message)
 
         tags = self.repo.refs.as_dict("refs/tags")

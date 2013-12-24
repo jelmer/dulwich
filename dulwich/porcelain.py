@@ -29,7 +29,6 @@ from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 from dulwich.objects import Tag, Commit, parse_timezone
-from dulwich.diff_tree import tree_changes
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -303,23 +302,6 @@ def tag(repo, tag, author, message):
     r['refs/tags/' + tag] = tag_obj.id
 
 
-def status(repo, outstream=sys.stdout):
-    """Return the git status
-
-    :param repo: Path to repository
-    """
-    r = open_repo(repo)
-
-    index = r.open_index()
-    changes = list(tree_changes(r, index.commit(r.object_store),
-                                r['HEAD'].tree))
-
-    for change in changes:
-        outstream.write("%s\n" % change.__str__())
-
-    return changes
-
-
 def stage_files(repo):
     """Stage modified files in the repo
 
@@ -328,7 +310,7 @@ def stage_files(repo):
     r = Repo(repo)
 
     # Iterate through files, those modified will be staged
-    for elem in os.walk(r):
+    for elem in os.walk(repo):
         relative_path = elem[0].split('./')[-1]
         if not search(r'\.git', elem[0]):
             files = [relative_path + '/' +

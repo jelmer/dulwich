@@ -278,13 +278,15 @@ class BaseRepo(object):
                 shallow_grafts[shallow] = []
             self._add_graftpoints(shallow_grafts)
 
-            haves = []  # TODO: filter haves from iter_shas
+            haves = []  # TODO: filter the haves commits from iter_shas.
+                        # the specific commits aren't missing.
 
             shas = self.object_store.iter_shas(
               self.object_store.find_missing_objects(
                   haves, wants, progress,
                   get_tagged,
                   get_parents=lambda commit: self.get_parents(commit.id)))
+            # Unset the shallow commits in the object_store to prevent pollution
             self._remove_graftpoints(shallow_grafts)
             return shas
 
@@ -667,9 +669,13 @@ class Repo(BaseRepo):
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
+        self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints = parse_graftpoints(graft_file)
+            self._graftpoints.update(parse_graftpoints(graft_file))
+        graft_file = self.get_named_file("shallow")
+        if graft_file:
+            self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

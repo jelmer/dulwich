@@ -69,7 +69,7 @@ configuration file. The tests can be run as follow:
 How to install
 --------------
 
-Install the Dulwich library via the setup.py.Tthe dependencies will be
+Install the Dulwich library via the setup.py. The dependencies will be
 automatically retrieved from pypi:
 
     $ python ./setup.py install
@@ -120,6 +120,16 @@ Note the swift-dul-daemon start a Git server listening for the
 Git protocol. Therefor there ins't any authentication or encryption
 at all between the cGIT client and the GIT server (Dulwich).
 
+Note on the .info file for pack object
+--------------------------------------
+
+The Swift interface of Dulwich relies only on the pack format
+to store Git objects. Instead of using only an index (pack-sha.idx)
+along with the pack, we add a third file (pack-sha.info). This file
+is automatically created when a client pushes some references on the
+repository. The purpose of this file is to speed up pack creation
+server side when a client fetches some references. Currently this
+.info format is not optimized and may change in futur.
 
 How to report a bug
 -------------------

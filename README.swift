@@ -95,7 +95,7 @@ command with the name of the repository to create:
 
     $ swift-dul-initrepo -c /etc/swift-dul.conf -r edeploy
 
-The repository name will be container that will contain all the Git
+The repository name will be the container that will contain all the Git
 objects for the repository. Then standard c Git client can be used to
 perform operations againt this repository.
 

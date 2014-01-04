@@ -130,11 +130,3 @@ is automatically created when a client pushes some references on the
 repository. The purpose of this file is to speed up pack creation
 server side when a client fetches some references. Currently this
 .info format is not optimized and may change in futur.
-
-How to report a bug
--------------------
-
-For now the Swift backend implementation for Dulwich is only hosted
-in a branch of a forked repository of Dulwich
-https://github.com/enovance/dulwich/tree/swift. So please open your bug
-reports in the bug tracker of the forked project.

@@ -29,6 +29,7 @@ from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 from dulwich.objects import Tag, Commit, parse_timezone
+from dulwich.client import get_transport_and_path
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -49,6 +50,8 @@ Currently implemented:
  * stage-files
  * return-tags
  * reset-hard-head
+ * pull
+ * push
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
@@ -355,3 +358,42 @@ def reset_hard_head(repo):
     indexfile = r.index_path()
     tree = r["HEAD"].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def push(repo, remote_url, branch):
+    """Remote push with dulwich via dulwich.client
+
+    :param repo: Path to repository
+    """
+
+    # Open the repo
+    _repo = Repo(repo)
+
+    # Get the client and path
+    client, path = get_transport_and_path(remote_url)
+
+    def update_refs(refs):
+        new_refs = _repo.get_refs()
+        new_refs['refs/remotes/origin/' + branch] = new_refs['HEAD']
+        del new_refs['HEAD']
+        return new_refs
+
+    client.send_pack(path, update_refs,
+                     _repo.object_store.generate_pack_contents)
+
+
+def pull(repo, remote_url, branch):
+    """ Pull from remote via dulwich.client """
+
+    # Open the repo
+    _repo = Repo(repo)
+
+    client, path = get_transport_and_path(remote_url)
+    remote_refs = client.fetch(path, _repo)
+    _repo['HEAD'] = remote_refs['refs/heads/' + branch]
+
+    # Perform 'git checkout .' - syncs staged changes
+    indexfile = _repo.index_path()
+    tree = _repo["HEAD"].tree
+    index.build_index_from_tree(_repo.path, indexfile,
+                                _repo.object_store, tree)

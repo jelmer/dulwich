@@ -23,7 +23,6 @@ import os
 import shutil
 import tarfile
 import tempfile
-import subprocess
 
 from dulwich.diff_tree import tree_changes
 from dulwich import porcelain

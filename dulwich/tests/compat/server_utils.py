@@ -98,7 +98,9 @@ class ServerTests(object):
 
     def test_push_to_dulwich_no_op(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -108,7 +110,9 @@ class ServerTests(object):
 
     def test_push_to_dulwich_remove_branch(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -131,7 +135,9 @@ class ServerTests(object):
 
     def test_fetch_from_dulwich_no_op(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
@@ -145,6 +151,7 @@ class ServerTests(object):
         old_repo_dir = os.path.join(tempfile.mkdtemp(), 'empty_old')
         run_git_or_fail(['init', '--quiet', '--bare', old_repo_dir])
         self._old_repo = Repo(old_repo_dir)
+        self.addCleanup(tear_down_repo, self._old_repo)
         port = self._start_server(self._old_repo)
 
         new_repo_base_dir = tempfile.mkdtemp()

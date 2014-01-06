@@ -29,7 +29,6 @@ from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 from dulwich.objects import Tag, Commit, parse_timezone
-from dulwich.client import get_transport_and_path
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -360,7 +359,7 @@ def reset_hard_head(repo):
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def push(repo, remote_url, branch):
+def push(repo, remote_url, branch, outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -382,7 +381,7 @@ def push(repo, remote_url, branch):
                      _repo.object_store.generate_pack_contents)
 
 
-def pull(repo, remote_url, branch):
+def pull(repo, remote_url, branch, outstream=sys.stdout, errstream=sys.stderr):
     """ Pull from remote via dulwich.client """
 
     # Open the repo

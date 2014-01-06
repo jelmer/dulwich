@@ -361,3 +361,47 @@ class ResetHardHeadTests(PorcelainTestCase):
                                  self.repo['HEAD'].tree))
         # no staged changes
         assert not changes
+
+
+class PushTests(PorcelainTestCase):
+
+    def test_simple(self):
+
+        outstream = StringIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = fullpath.split('/')[-1]
+
+        # perform commit
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+                         author='test', committer='test')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
+
+        porcelain.push(self.repo.path, target_path, 'master', outstream=outstream)
+
+
+class PullTests(PorcelainTestCase):
+
+    def test_simple(self):
+
+        outstream = StringIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = fullpath.split('/')[-1]
+
+        # perform commit
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+                         author='test', committer='test')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
+
+        porcelain.pull(self.repo.path, target_path, 'master', outstream=outstream)

@@ -21,13 +21,9 @@
 
 import time
 
-from dulwich.greenthreads import (
-    GreenThreadsObjectStoreIterator,
-    GreenThreadsMissingObjectFinder,
-    )
-
 from dulwich.tests import (
     TestCase,
+    skipIf,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -40,6 +36,19 @@ from dulwich.objects import (
     parse_timezone,
     )
 
+try:
+    import gevent
+    gevent_support = True
+except ImportError:
+    gevent_support = False
+
+if gevent_support:
+    from dulwich.greenthreads import (
+        GreenThreadsObjectStoreIterator,
+        GreenThreadsMissingObjectFinder,
+    )
+
+skipmsg = "Gevent library is not installed"
 
 def create_commit(marker=None):
     blob = Blob.from_string('The blob content %s' % marker)
@@ -65,6 +74,7 @@ def init_store(store, count=1):
     return ret
 
 
+@skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsObjectStoreIterator(TestCase):
 
     def setUp(self):
@@ -101,6 +111,7 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
         self.assertEqual(len(objs), len(self.objs))
 
 
+@skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsMissingObjectFinder(TestCase):
 
     def setUp(self):

@@ -302,6 +302,10 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._repo.refs._update(heads)
         self.assertEqual([ONE, TWO], self._walker.determine_wants(heads))
 
+        self._walker.advertise_refs = True
+        self.assertEqual([], self._walker.determine_wants(heads))
+        self._walker.advertise_refs = False
+
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 

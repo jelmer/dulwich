@@ -380,7 +380,7 @@ class ProtocolGraphWalker(object):
             self.proto.write_pkt_line(None)
 
             if self.advertise_refs:
-                return None
+                return []
 
         # Now client will sending want want want commands
         want = self.proto.read_pkt_line()

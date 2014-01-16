@@ -18,9 +18,15 @@
 
 import os
 import sys
+import time
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
+from dulwich.objects import (
+    Commit,
+    Tag,
+    parse_timezone,
+    )
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
@@ -37,6 +43,7 @@ Currently implemented:
  * init
  * remove
  * rev-list
+ * tag
  * update-server-info
  * symbolic-ref
 
@@ -265,3 +272,28 @@ def rev_list(repo, commits, outstream=sys.stdout):
     r = open_repo(repo)
     for entry in r.get_walker(include=[r[c].id for c in commits]):
         outstream.write("%s\n" % entry.commit.id)
+
+
+def tag(repo, tag, author, message):
+    """Creates a tag in git via dulwich calls:
+
+    :param repo: Path to repository
+    :param tag: tag string
+    :param author: tag author
+    :param repo: tag message
+    """
+
+    r = open_repo(repo)
+
+    # Create the tag object
+    tag_obj = Tag()
+    tag_obj.tagger = author
+    tag_obj.message = message
+    tag_obj.name = tag
+    tag_obj.object = (Commit, r.refs['HEAD'])
+    tag_obj.tag_time = int(time.time())
+    tag_obj.tag_timezone = parse_timezone('-0200')[0]
+
+    # Add tag to the object store
+    r.object_store.add_object(tag_obj)
+    r.refs['refs/tags/' + tag] = tag_obj.id

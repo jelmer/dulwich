@@ -26,7 +26,6 @@ import posixpath
 from time import time
 from cStringIO import StringIO
 from contextlib import nested
-from mock import patch
 
 from dulwich.tests import (
     TestCase,
@@ -60,12 +59,13 @@ except ImportError:
 try:
     import gevent
     import geventhttpclient
-    gevent_support = True
+    from mock import patch
+    lib_support = True
     from dulwich import swift
 except ImportError:
-    gevent_support = False
+    lib_support = False
 
-skipmsg = "Gevent or Geventhttpclient library is not installed"
+skipmsg = "Required libraries are not installed (gevent, geventhttpclient, mock)"
 
 config_file = """[swift]
 auth_url = http://127.0.0.1:8080/auth/%(version_str)s
@@ -176,7 +176,7 @@ def create_commits(length=1, marker='Default'):
         data.extend([blob, tree, tag, cmt])
     return data
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class FakeSwiftConnector(object):
 
     def __init__(self, root, conf, store=None):
@@ -232,7 +232,7 @@ class FakeSwiftConnector(object):
         return {'content-length': len(self.store[name])}
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class TestSwiftObjectStore(TestCase):
 
     def setUp(self):
@@ -351,7 +351,7 @@ class TestSwiftObjectStore(TestCase):
         self.assertEqual(len(self.fsc.store), 6)
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class TestSwiftRepo(TestCase):
 
     def setUp(self):
@@ -402,7 +402,7 @@ class TestSwiftRepo(TestCase):
         self.assertIn('fakeroot/description', fsc.store)
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class TestPackInfoLoadDump(TestCase):
     def setUp(self):
         conf = swift.load_conf(file=StringIO(config_file %
@@ -444,7 +444,7 @@ class TestPackInfoLoadDump(TestCase):
             self.assertIn(obj.id, pack_infos)
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class TestSwiftInfoRefsContainer(TestCase):
 
     def setUp(self):
@@ -482,7 +482,7 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.assertNotIn('refs/heads/dev', irc.allkeys())
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class TestSwiftConnector(TestCase):
 
     def setUp(self):
@@ -605,7 +605,7 @@ class TestSwiftConnector(TestCase):
             self.assertEqual(self.conn.del_root(), None)
 
 
-@skipIf(not gevent_support, skipmsg)
+@skipIf(not lib_support, skipmsg)
 class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):

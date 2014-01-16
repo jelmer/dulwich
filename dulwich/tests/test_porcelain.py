@@ -303,3 +303,20 @@ class RevListTests(PorcelainTestCase):
         self.assertEquals(
             "%s\n%s\n%s\n" % (c3.id, c2.id, c1.id),
             outstream.getvalue())
+
+
+class TagTests(PorcelainTestCase):
+
+    def test_simple(self):
+        tag = 'tryme'
+        author = 'foo'
+        message = 'bar'
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        porcelain.tag(self.repo.path, tag, author, message)
+
+        tags = self.repo.refs.as_dict("refs/tags")
+        self.assertEquals(tags.keys()[0], tag)

@@ -91,7 +91,7 @@ def hex_to_sha(hex):
     except TypeError as exc:
         if not isinstance(hex, str):
             raise
-        raise ValueError(exc.message)
+        raise ValueError(exc.args[0])
 
 
 def hex_to_filename(path, hex):

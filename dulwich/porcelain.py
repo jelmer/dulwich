@@ -222,6 +222,72 @@ def print_commit(commit, outstream):
     outstream.write("\n")
 
 
+def print_tag(tag, outstream):
+    """Write a human-readable tag.
+
+    :param tag: A `Tag` object
+    :param outstream: A stream to write to
+    """
+    outstream.write("Tagger: %s\n" % tag.tagger)
+    outstream.write("Date:   %s\n" % tag.tag_time)
+    outstream.write("\n")
+    outstream.write("%s\n" % tag.message)
+    outstream.write("\n")
+
+
+def show_blob(repo, blob, outstream):
+    """Write a blob to a stream.
+
+    :param repo: A `Repo` object
+    :param blob: A `Blob` object
+    :param outstream: A stream file to write to
+    """
+    outstream.write(blob.data)
+
+
+def show_commit(repo, commit, outstream):
+    """Show a commit to a stream.
+
+    :param repo: A `Repo` object
+    :param commit: A `Commit` object
+    :param outstream: Stream to write to
+    """
+    print_commit(commit, outstream)
+    parent_commit = repo[commit.parents[0]]
+    write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
+
+
+def show_tree(repo, tree, outstream):
+    """Print a tree to a stream.
+
+    :param repo: A `Repo` object
+    :param tree: A `Tree` object
+    :param outstream: Stream to write to
+    """
+    for n in tree:
+        outstream.write("%s\n" % n)
+
+
+def show_tag(repo, tag, outstream):
+    """Print a tag to a stream.
+
+    :param repo: A `Repo` object
+    :param tag: A `Tag` object
+    :param outstream: Stream to write to
+    """
+    print_tag(tag, outstream)
+    show_object(repo, repo[tag.object[1]], outstream)
+
+
+def show_object(repo, obj, outstream):
+    return {
+        "tree": show_tree,
+        "blob": show_blob,
+        "commit": show_commit,
+        "tag": show_tag,
+            }[obj.type_name](repo, obj, outstream)
+
+
 def log(repo=".", outstream=sys.stdout):
     """Write commit logs.
 
@@ -234,20 +300,20 @@ def log(repo=".", outstream=sys.stdout):
         print_commit(entry.commit, outstream)
 
 
-def show(repo=".", committish=None, outstream=sys.stdout):
+def show(repo=".", objects=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
     :param repo: Path to repository
-    :param committish: Commit to show (defaults to HEAD)
+    :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
     """
-    if committish is None:
-        committish = "HEAD"
+    if objects is None:
+        objects = ["HEAD"]
+    if not isinstance(objects, list):
+        objects = [objects]
     r = open_repo(repo)
-    commit = r[committish]
-    parent_commit = r[commit.parents[0]]
-    print_commit(commit, outstream)
-    write_tree_diff(outstream, r.object_store, parent_commit.tree, commit.tree)
+    for obj in objects:
+        show_object(r, r[obj], outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):

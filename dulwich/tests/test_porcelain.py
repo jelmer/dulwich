@@ -212,13 +212,28 @@ class LogTests(PorcelainTestCase):
 
 class ShowTests(PorcelainTestCase):
 
+    def test_nolist(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
-        porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
+        porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+    def test_blob(self):
+        b = Blob.from_string("The Foo\n")
+        self.repo.object_store.add_object(b)
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
+        self.assertEquals(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):

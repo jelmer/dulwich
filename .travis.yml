@@ -4,6 +4,6 @@ python:
   - "2.6"
 script: make check
 install:
-  - pip install unittest2
+  - pip install unittest2 fastimport
   - sudo apt-get update
   - sudo apt-get install -qq git

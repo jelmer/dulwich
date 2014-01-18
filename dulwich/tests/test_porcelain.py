@@ -207,7 +207,15 @@ class LogTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith("-" * 50))
+        self.assertEquals(3, outstream.getvalue().count("-" * 50))
+
+    def test_max_entries(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
+        self.assertEquals(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):

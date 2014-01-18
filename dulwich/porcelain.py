@@ -27,6 +27,7 @@ from dulwich.objects import (
     Tag,
     parse_timezone,
     )
+from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
@@ -288,14 +289,15 @@ def show_object(repo, obj, outstream):
             }[obj.type_name](repo, obj, outstream)
 
 
-def log(repo=".", outstream=sys.stdout):
+def log(repo=".", outstream=sys.stdout, max_entries=None):
     """Write commit logs.
 
     :param repo: Path to repository
     :param outstream: Stream to write log output to
+    :param max_entries: Optional maximum number of entries to display
     """
     r = open_repo(repo)
-    walker = r.get_walker()
+    walker = r.get_walker(max_entries=max_entries)
     for entry in walker:
         print_commit(entry.commit, outstream)
 
@@ -312,8 +314,8 @@ def show(repo=".", objects=None, outstream=sys.stdout):
     if not isinstance(objects, list):
         objects = [objects]
     r = open_repo(repo)
-    for obj in objects:
-        show_object(r, r[obj], outstream)
+    for objectish in objects:
+        show_object(r, parse_object(r, objectish), outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):

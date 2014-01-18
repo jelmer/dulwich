@@ -238,7 +238,7 @@ def show(repo=".", committish=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
     :param repo: Path to repository
-    :param committish: Commit to write
+    :param committish: Commit to show (defaults to HEAD)
     :param outstream: Stream to write to
     """
     if committish is None:

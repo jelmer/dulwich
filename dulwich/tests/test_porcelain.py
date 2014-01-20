@@ -325,12 +325,6 @@ class TagTests(PorcelainTestCase):
             assert False
 
 
-class StageFilesTests(PorcelainTestCase):
-
-    def test_simple(self):
-        porcelain.stage_files(self.repo.path)
-
-
 class ReturnTagsTests(PorcelainTestCase):
 
     def test_simple(self):

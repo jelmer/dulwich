@@ -46,7 +46,6 @@ Currently implemented:
  * symbolic-ref
  * tag
  * status
- * stage-files
  * return-tags
  * reset-hard-head
  * pull
@@ -302,22 +301,6 @@ def tag(repo, tag, author, message):
     # Add tag to the object store
     r.object_store.add_object(tag_obj)
     r['refs/tags/' + tag] = tag_obj.id
-
-
-def stage_files(repo):
-    """Stage modified files in the repo
-
-    :param repo: Path to repository
-    """
-    r = Repo(repo)
-
-    # Iterate through files, those modified will be staged
-    for elem in os.walk(repo):
-        relative_path = elem[0].split('./')[-1]
-        if not search(r'\.git', elem[0]):
-            files = [relative_path + '/' +
-                     filename for filename in elem[2]]
-            r.stage(files)
 
 
 def return_tags(repo, outstream=sys.stdout):

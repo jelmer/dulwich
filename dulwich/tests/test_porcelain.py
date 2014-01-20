@@ -179,6 +179,14 @@ class InitTests(TestCase):
 
 class AddTests(PorcelainTestCase):
 
+    def test_add_default_paths(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(self.repo.path)
+
     def test_add_file(self):
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
         try:

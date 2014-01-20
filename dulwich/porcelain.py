@@ -189,9 +189,17 @@ def add(repo=".", paths=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add
+    :param paths: Paths to add.  No value passed stages all modified files.
     """
-    # FIXME: Support patterns, directories, no argument.
+    # FIXME: Support patterns, directories.
+    # Handle the default case where paths is None or an empty list
+    if not paths:
+        paths = []
+        for elem in os.walk(repo):
+            relative_path = elem[0].split('./')[-1]
+            if not search(r'\.git', elem[0]):
+                for filename in elem[2]:
+                    paths.append(relative_path + '/' + filename)
     r = open_repo(repo)
     r.stage(paths)
 

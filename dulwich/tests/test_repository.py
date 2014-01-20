@@ -677,8 +677,3 @@ class BuildRepoTests(TestCase):
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
 
-    def test_stage_default_simple(self):
-        r = self._repo
-        r.stage()
-
-

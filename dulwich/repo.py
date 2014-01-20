@@ -30,7 +30,6 @@ local disk (Repo).
 from cStringIO import StringIO
 import errno
 import os
-from re import search
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -699,7 +698,7 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, paths=None):
+    def stage(self, paths):
         """Stage a set of paths.
 
         :param paths: List of paths, relative to the repository path
@@ -708,16 +707,6 @@ class Repo(BaseRepo):
             paths = [paths]
         from dulwich.index import index_entry_from_stat
         index = self.open_index()
-
-        # Handle the default case where paths is None or an empty list
-        if not paths:
-            paths = []
-            for elem in os.walk(self.path):
-                relative_path = elem[0].split('./')[-1]
-                if not search(r'\.git', elem[0]):
-                    for filename in elem[2]:
-                        paths.append(relative_path + '/' + filename)
-
         for path in paths:
             full_path = os.path.join(self.path, path)
             try:

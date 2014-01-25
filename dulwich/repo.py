@@ -249,13 +249,8 @@ class BaseRepo(object):
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
 
-        try:
-            has_shallows = getattr(graph_walker, 'shallow')
-            has_unshallows = getattr(graph_walker, 'unshallow')
-        except AttributeError:
-            # Walker doesn't support shallows
-            has_shallows = False
-            has_unshallows = False
+        has_shallows = getattr(graph_walker, 'shallow', False)
+        has_unshallows = getattr(graph_walker, 'unshallow', False)
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -289,10 +284,10 @@ class BaseRepo(object):
             # Unset the shallow commits in the object_store to prevent pollution
             self._remove_graftpoints(shallow_grafts)
             return shas
-
-        return self.object_store.iter_shas(
-          self.object_store.find_missing_objects(haves, wants, progress,
-                                                 get_tagged))
+        else:
+            return self.object_store.iter_shas(
+              self.object_store.find_missing_objects(haves, wants, progress,
+                                                     get_tagged))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.

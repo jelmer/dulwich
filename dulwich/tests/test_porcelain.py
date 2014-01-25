@@ -25,6 +25,7 @@ import tarfile
 import tempfile
 
 from dulwich import porcelain
+from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
     Blob,
     Tree,
@@ -343,3 +344,30 @@ class TagTests(PorcelainTestCase):
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEquals(tags.keys()[0], tag)
+
+
+class ResetTests(PorcelainTestCase):
+
+    def test_hard_head(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.commit(self.repo.path, message="Some message")
+
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("OOH")
+        finally:
+            f.close()
+
+        porcelain.reset(self.repo, "hard", "HEAD")
+
+        index = self.repo.open_index()
+        changes = list(tree_changes(self.repo,
+                       index.commit(self.repo.object_store),
+                       self.repo['HEAD'].tree))
+
+        self.assertEquals([], changes)

@@ -43,6 +43,7 @@ Currently implemented:
  * diff-tree
  * init
  * remove
+ * reset
  * rev-list
  * tag
  * update-server-info
@@ -365,3 +366,20 @@ def tag(repo, tag, author, message):
     # Add tag to the object store
     r.object_store.add_object(tag_obj)
     r.refs['refs/tags/' + tag] = tag_obj.id
+
+
+def reset(repo, mode, committish="HEAD"):
+    """Reset current HEAD to the specified state.
+
+    :param repo: Path to repository
+    :param mode: Mode ("hard", "soft", "mixed")
+    """
+
+    if mode != "hard":
+        raise ValueError("hard is the only mode currently supported")
+
+    r = open_repo(repo)
+
+    indexfile = r.index_path()
+    tree = r[committish].tree
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

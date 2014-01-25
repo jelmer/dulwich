@@ -280,7 +280,7 @@ class BaseRepo(object):
               self.object_store.find_missing_objects(
                   haves, wants, progress,
                   get_tagged,
-                  get_parents=lambda commit: self.get_parents(commit.id)))
+                  get_parents=lambda commit: self.get_parents(commit.id, commit)))
             # Unset the shallow commits in the object_store to prevent pollution
             self._remove_graftpoints(shallow_grafts)
             return shas

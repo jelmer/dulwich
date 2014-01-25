@@ -248,11 +248,48 @@ class BaseRepo(object):
         wants = determine_wants(self.get_refs())
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
+
+        try:
+            has_shallows = getattr(graph_walker, 'shallow')
+            has_unshallows = getattr(graph_walker, 'unshallow')
+        except AttributeError:
+            # Walker doesn't support shallows
+            has_shallows = False
+            has_unshallows = False
+
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
+
+            if has_shallows or has_unshallows:
+                # Do not send a pack in shallow short-circuit path
+                return None
+
             return []
+
         haves = self.object_store.find_common_revisions(graph_walker)
+
+        # Deal with shallow requests separately because the haves do
+        # not reflect what objects are missing
+        if has_shallows or has_unshallows:
+            # Set the shallow commits in the object_store
+            shallow_grafts = {}
+            for shallow in graph_walker.shallow:
+                shallow_grafts[shallow] = []
+            self._add_graftpoints(shallow_grafts)
+
+            haves = []  # TODO: filter the haves commits from iter_shas.
+                        # the specific commits aren't missing.
+
+            shas = self.object_store.iter_shas(
+              self.object_store.find_missing_objects(
+                  haves, wants, progress,
+                  get_tagged,
+                  get_parents=lambda commit: self.get_parents(commit.id)))
+            # Unset the shallow commits in the object_store to prevent pollution
+            self._remove_graftpoints(shallow_grafts)
+            return shas
+
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(haves, wants, progress,
                                                  get_tagged))
@@ -632,9 +669,13 @@ class Repo(BaseRepo):
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
+        self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints = parse_graftpoints(graft_file)
+            self._graftpoints.update(parse_graftpoints(graft_file))
+        graft_file = self.get_named_file("shallow")
+        if graft_file:
+            self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

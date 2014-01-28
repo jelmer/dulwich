@@ -249,8 +249,8 @@ class BaseRepo(object):
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
 
-        shallows = getattr(graph_walker, 'shallow', [])
-        unshallows = getattr(graph_walker, 'unshallow', [])
+        shallows = getattr(graph_walker, 'shallow', frozenset())
+        unshallows = getattr(graph_walker, 'unshallow', frozenset())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -267,27 +267,19 @@ class BaseRepo(object):
         # Deal with shallow requests separately because the haves do
         # not reflect what objects are missing
         if shallows or unshallows:
-            # Set the shallow commits in the object_store
-            shallow_grafts = {}
-            for shallow in shallows:
-                shallow_grafts[shallow] = []
-            self._add_graftpoints(shallow_grafts)
-
             haves = []  # TODO: filter the haves commits from iter_shas.
                         # the specific commits aren't missing.
 
-            shas = self.object_store.iter_shas(
-              self.object_store.find_missing_objects(
-                  haves, wants, progress,
-                  get_tagged,
-                  get_parents=lambda commit: self.get_parents(commit.id, commit)))
-            # Unset the shallow commits in the object_store to prevent pollution
-            self._remove_graftpoints(shallow_grafts)
-            return shas
-        else:
-            return self.object_store.iter_shas(
-              self.object_store.find_missing_objects(haves, wants, progress,
-                                                     get_tagged))
+        def get_parents(commit):
+            if commit.id in shallows:
+                return []
+            return self.get_parents(commit.id, commit)
+
+        return self.object_store.iter_shas(
+          self.object_store.find_missing_objects(
+              haves, wants, progress,
+              get_tagged,
+              get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.

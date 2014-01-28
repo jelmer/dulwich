@@ -249,14 +249,14 @@ class BaseRepo(object):
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
 
-        has_shallows = getattr(graph_walker, 'shallow', False)
-        has_unshallows = getattr(graph_walker, 'unshallow', False)
+        shallows = getattr(graph_walker, 'shallow', [])
+        unshallows = getattr(graph_walker, 'unshallow', [])
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
 
-            if has_shallows or has_unshallows:
+            if shallows or unshallows:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
@@ -266,10 +266,10 @@ class BaseRepo(object):
 
         # Deal with shallow requests separately because the haves do
         # not reflect what objects are missing
-        if has_shallows or has_unshallows:
+        if shallows or unshallows:
             # Set the shallow commits in the object_store
             shallow_grafts = {}
-            for shallow in graph_walker.shallow:
+            for shallow in shallows:
                 shallow_grafts[shallow] = []
             self._add_graftpoints(shallow_grafts)
 

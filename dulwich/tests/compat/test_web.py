@@ -134,9 +134,24 @@ class DumbWebTestCase(WebTests, CompatTestCase):
         return make_wsgi_chain(backend, dumb=True)
 
     def test_push_to_dulwich(self):
-        # Note: remove this if dumb pushing is supported
+        # Note: remove this if dulwich implements dumb web pushing.
         raise SkipTest('Dumb web pushing not supported.')
 
     def test_push_to_dulwich_remove_branch(self):
         # Note: remove this if dumb pushing is supported
         raise SkipTest('Dumb web pushing not supported.')
+
+    def test_new_shallow_clone_from_dulwich(self):
+        # Note: remove this if C git and dulwich implement dumb web shallow
+        # clones.
+        raise SkipTest('Dumb web shallow cloning not supported.')
+
+    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
+        # Note: remove this if C git and dulwich implement dumb web shallow
+        # clones.
+        raise SkipTest('Dumb web shallow cloning not supported.')
+
+    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
+        # Note: remove this if C git and dulwich implement dumb web shallow
+        # clones.
+        raise SkipTest('Dumb web shallow cloning not supported.')

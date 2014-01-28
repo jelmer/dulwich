@@ -28,6 +28,7 @@ import tempfile
 import threading
 
 from dulwich.repo import Repo
+from dulwich.objects import hex_to_sha
 from dulwich.server import (
     ReceivePackHandler,
     )
@@ -38,6 +39,32 @@ from dulwich.tests.compat.utils import (
     import_repo,
     run_git_or_fail,
     )
+
+
+class _StubRepo(object):
+    """A stub repo that just contains a path to tear down."""
+
+    def __init__(self, name):
+        temp_dir = tempfile.mkdtemp()
+        self.path = os.path.join(temp_dir, name)
+        os.mkdir(self.path)
+
+
+def _get_shallow(repo):
+    shallow_file = repo.get_named_file('shallow')
+    if not shallow_file:
+        return []
+    shallows = []
+    try:
+        for line in shallow_file:
+            sha = line.strip()
+            if not sha:
+                continue
+            hex_to_sha(sha)
+            shallows.append(sha)
+    finally:
+        shallow_file.close()
+    return shallows
 
 
 class ServerTests(object):
@@ -71,7 +98,9 @@ class ServerTests(object):
 
     def test_push_to_dulwich_no_op(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -81,7 +110,9 @@ class ServerTests(object):
 
     def test_push_to_dulwich_remove_branch(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -104,7 +135,9 @@ class ServerTests(object):
 
     def test_fetch_from_dulwich_no_op(self):
         self._old_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._old_repo)
         self._new_repo = import_repo('server_old.export')
+        self.addCleanup(tear_down_repo, self._new_repo)
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
@@ -118,6 +151,7 @@ class ServerTests(object):
         old_repo_dir = os.path.join(tempfile.mkdtemp(), 'empty_old')
         run_git_or_fail(['init', '--quiet', '--bare', old_repo_dir])
         self._old_repo = Repo(old_repo_dir)
+        self.addCleanup(tear_down_repo, self._old_repo)
         port = self._start_server(self._old_repo)
 
         new_repo_base_dir = tempfile.mkdtemp()
@@ -137,6 +171,67 @@ class ServerTests(object):
         port = self._start_server(self._repo)
         o = run_git_or_fail(['ls-remote', self.url(port)])
         self.assertEqual(len(o.split('\n')), 4)
+
+    def test_new_shallow_clone_from_dulwich(self):
+        self._source_repo = import_repo('server_new.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._stub_repo = _StubRepo('shallow')
+        self.addCleanup(tear_down_repo, self._stub_repo)
+        port = self._start_server(self._source_repo)
+
+        # Fetch at depth 1
+        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+                        self.url(port), self._stub_repo.path])
+        clone = self._stub_repo = Repo(self._stub_repo.path)
+        expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
+                            'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
+        self.assertEqual(expected_shallow, _get_shallow(clone))
+        self.assertReposNotEqual(clone, self._source_repo)
+
+    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
+        self._source_repo = import_repo('server_new.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._stub_repo = _StubRepo('shallow')
+        self.addCleanup(tear_down_repo, self._stub_repo)
+        port = self._start_server(self._source_repo)
+
+        # Fetch at depth 1
+        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+                        self.url(port), self._stub_repo.path])
+        clone = self._stub_repo = Repo(self._stub_repo.path)
+
+        # Fetching at the same depth is a no-op.
+        run_git_or_fail(
+          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+          cwd=self._stub_repo.path)
+        expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
+                            'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
+        self.assertEqual(expected_shallow, _get_shallow(clone))
+        self.assertReposNotEqual(clone, self._source_repo)
+
+    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
+        self._source_repo = import_repo('server_new.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._stub_repo = _StubRepo('shallow')
+        self.addCleanup(tear_down_repo, self._stub_repo)
+        port = self._start_server(self._source_repo)
+
+        # Fetch at depth 1
+        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+                        self.url(port), self._stub_repo.path])
+        clone = self._stub_repo = Repo(self._stub_repo.path)
+
+        # Fetching at the same depth is a no-op.
+        run_git_or_fail(
+          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+          cwd=self._stub_repo.path)
+
+        # The whole repo only has depth 3, so it should equal server_new.
+        run_git_or_fail(
+          ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
+          cwd=self._stub_repo.path)
+        self.assertEqual([], _get_shallow(clone))
+        self.assertReposEqual(clone, self._source_repo)
 
 
 class ShutdownServerMixIn:

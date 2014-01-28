@@ -7,6 +7,8 @@
  * New module `dulwich.objectspec` for parsing strings referencing
    objects and commit ranges. (Jelmer Vernooij)
 
+ * Add shallow branch support. (milki)
+
  CHANGES
 
  * Drop support for Python 2.4 and 2.5. (Jelmer Vernooij)

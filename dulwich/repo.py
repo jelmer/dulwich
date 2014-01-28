@@ -248,14 +248,38 @@ class BaseRepo(object):
         wants = determine_wants(self.get_refs())
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
+
+        shallows = getattr(graph_walker, 'shallow', frozenset())
+        unshallows = getattr(graph_walker, 'unshallow', frozenset())
+
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
+
+            if shallows or unshallows:
+                # Do not send a pack in shallow short-circuit path
+                return None
+
             return []
+
         haves = self.object_store.find_common_revisions(graph_walker)
+
+        # Deal with shallow requests separately because the haves do
+        # not reflect what objects are missing
+        if shallows or unshallows:
+            haves = []  # TODO: filter the haves commits from iter_shas.
+                        # the specific commits aren't missing.
+
+        def get_parents(commit):
+            if commit.id in shallows:
+                return []
+            return self.get_parents(commit.id, commit)
+
         return self.object_store.iter_shas(
-          self.object_store.find_missing_objects(haves, wants, progress,
-                                                 get_tagged))
+          self.object_store.find_missing_objects(
+              haves, wants, progress,
+              get_tagged,
+              get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.
@@ -632,9 +656,13 @@ class Repo(BaseRepo):
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
+        self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints = parse_graftpoints(graft_file)
+            self._graftpoints.update(parse_graftpoints(graft_file))
+        graft_file = self.get_named_file("shallow")
+        if graft_file:
+            self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

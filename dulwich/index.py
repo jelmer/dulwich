@@ -412,7 +412,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     index = Index(index_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
-        full_path = os.path.join(prefix, entry.path)
+        full_path = unicode(os.path.join(prefix, entry.path), "utf-8")
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))

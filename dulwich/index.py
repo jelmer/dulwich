@@ -30,11 +30,11 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     sha_to_hex,
-    )
+)
 from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
-    )
+)
 
 
 def pathsplit(path):
@@ -113,8 +113,17 @@ def write_cache_entry(f, entry):
     (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    flags = len(name) | (flags & ~ 0x0fff)
+    f.write(
+        struct.pack(">LLLLLL20sH",
+                    dev & 0xFFFFFFFF,
+                    ino & 0xFFFFFFFF,
+                    mode,
+                    uid,
+                    gid,
+                    size,
+                    hex_to_sha(sha),
+                    flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     f.write("\0" * ((beginoffset + real_size) - f.tell()))
@@ -177,12 +186,13 @@ def cleanup_mode(mode):
         return stat.S_IFDIR
     elif S_ISGITLINK(mode):
         return S_IFGITLINK
-    ret = stat.S_IFREG | 0644
-    ret |= (mode & 0111)
+    ret = stat.S_IFREG | 0o644
+    ret |= (mode & 0o111)
     return ret
 
 
 class Index(object):
+
     """A Git Index file."""
 
     def __init__(self, filename):
@@ -216,7 +226,7 @@ class Index(object):
             for x in read_index(f):
                 self[x[0]] = tuple(x[1:])
             # FIXME: Additional data?
-            f.read(os.path.getsize(self._filename)-f.tell()-20)
+            f.read(os.path.getsize(self._filename) - f.tell() - 20)
             f.check_sha()
         finally:
             f.close()
@@ -283,8 +293,8 @@ class Index(object):
             entry = self[path]
             return entry[-2], entry[-6]
         for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
-                want_unchanged=want_unchanged):
+                                                   lookup_entry, object_store, tree,
+                                                   want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
     def commit(self, object_store):
@@ -325,7 +335,7 @@ def commit_tree(object_store, blobs):
     def build_tree(path):
         tree = Tree()
         for basename, entry in trees[path].iteritems():
-            if type(entry) == dict:
+            if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))
             else:
@@ -348,7 +358,7 @@ def commit_index(object_store, index):
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
+                      want_unchanged=False):
     """Find the differences between the contents of a tree and
     a working copy.
 

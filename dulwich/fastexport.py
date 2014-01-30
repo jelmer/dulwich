@@ -22,18 +22,18 @@
 
 from dulwich.index import (
     commit_tree,
-    )
+)
 from dulwich.objects import (
     Blob,
     Commit,
     Tag,
-    )
+)
 from fastimport import (
     commands,
     errors as fastimport_errors,
     parser,
     processor,
-    )
+)
 
 import stat
 
@@ -44,6 +44,7 @@ def split_email(text):
 
 
 class GitFastExporter(object):
+
     """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf, store):
@@ -56,7 +57,7 @@ class GitFastExporter(object):
         self.outf.write("%r\n" % cmd)
 
     def _allocate_marker(self):
-        self._marker_idx+=1
+        self._marker_idx += 1
         return str(self._marker_idx)
 
     def _export_blob(self, blob):
@@ -95,9 +96,11 @@ class GitFastExporter(object):
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
         cmd = commands.CommitCommand(ref, marker,
-            (author, author_email, commit.author_time, commit.author_timezone),
-            (committer, committer_email, commit.commit_time, commit.commit_timezone),
-            commit.message, from_, merges, file_cmds)
+                                     (author, author_email, commit.author_time,
+                                      commit.author_timezone),
+                                     (committer, committer_email,
+                                      commit.commit_time, commit.commit_timezone),
+                                     commit.message, from_, merges, file_cmds)
         return (cmd, marker)
 
     def emit_commit(self, commit, ref, base_tree=None):
@@ -107,6 +110,7 @@ class GitFastExporter(object):
 
 
 class GitImportProcessor(processor.ImportProcessor):
+
     """An import processor that imports into a Git repository using Dulwich.
 
     """
@@ -143,7 +147,8 @@ class GitImportProcessor(processor.ImportProcessor):
         else:
             author = cmd.committer
         (author_name, author_email, author_timestamp, author_timezone) = author
-        (committer_name, committer_email, commit_timestamp, commit_timezone) = cmd.committer
+        (committer_name, committer_email,
+         commit_timestamp, commit_timezone) = cmd.committer
         commit.author = "%s <%s>" % (author_name, author_email)
         commit.author_timezone = author_timezone
         commit.author_time = int(author_timestamp)
@@ -161,23 +166,28 @@ class GitImportProcessor(processor.ImportProcessor):
                     self.repo.object_store.add(blob)
                     blob_id = blob.id
                 else:
-                    assert filecmd.dataref[0] == ":", "non-marker refs not supported yet"
+                    assert filecmd.dataref[
+                        0] == ":", "non-marker refs not supported yet"
                     blob_id = self.markers[filecmd.dataref[1:]]
                 self._contents[filecmd.path] = (filecmd.mode, blob_id)
             elif filecmd.name == "filedelete":
                 del self._contents[filecmd.path]
             elif filecmd.name == "filecopy":
-                self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
+                self._contents[
+                    filecmd.dest_path] = self._contents[
+                    filecmd.src_path]
             elif filecmd.name == "filerename":
-                self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
+                self._contents[
+                    filecmd.new_path] = self._contents[
+                    filecmd.old_path]
                 del self._contents[filecmd.old_path]
             elif filecmd.name == "filedeleteall":
                 self._contents = {}
             else:
                 raise Exception("Command %s not supported" % filecmd.name)
         commit.tree = commit_tree(self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in
-                self._contents.iteritems()))
+                                  ((path, hexsha, mode) for (path, (mode, hexsha)) in
+                                   self._contents.iteritems()))
         if self.last_commit is not None:
             commit.parents.append(self.last_commit)
         commit.parents += cmd.merges

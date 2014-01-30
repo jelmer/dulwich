@@ -29,21 +29,22 @@ import threading
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
-    )
+)
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
-    )
+)
 from dulwich.tests.compat.utils import (
     CompatTestCase,
-    )
+)
 
 
 if not getattr(TCPGitServer, 'shutdown', None):
     _TCPGitServer = TCPGitServer
 
     class TCPGitServer(ShutdownServerMixIn, TCPGitServer):
+
         """Subclass of TCPGitServer that can be shut down."""
 
         def __init__(self, *args, **kwargs):
@@ -55,6 +56,7 @@ if not getattr(TCPGitServer, 'shutdown', None):
 
 
 class GitServerTestCase(ServerTests, CompatTestCase):
+
     """Tests for client/server compatibility.
 
     This server test case does not use side-band-64k in git-receive-pack.
@@ -83,6 +85,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
 
 class GitServerSideBand64kTestCase(GitServerTestCase):
+
     """Tests for client/server compatibility with side-band-64k support."""
 
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2

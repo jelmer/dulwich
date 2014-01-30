@@ -22,6 +22,7 @@ import errno
 import os
 import tempfile
 
+
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
     try:
@@ -42,7 +43,7 @@ def fancy_rename(oldname, newname):
 
     # destination file exists
     try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname + ".", dir=".")
         os.close(fd)
         os.remove(tmpfile)
     except OSError as e:
@@ -86,6 +87,7 @@ def GitFile(filename, mode='rb', bufsize=-1):
 
 
 class _GitFile(object):
+
     """File that follows the git locking protocol for writes.
 
     All writes to a file foo will be written into foo.lock in the same
@@ -101,11 +103,12 @@ class _GitFile(object):
     PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'next', 'read',
                      'readline', 'readlines', 'xreadlines', 'seek', 'tell',
                      'truncate', 'write', 'writelines')
+
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
         fd = os.open(self._lockfilename,
-            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+                     os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 

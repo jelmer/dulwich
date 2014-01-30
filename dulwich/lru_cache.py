@@ -19,7 +19,9 @@
 
 _null_key = object()
 
+
 class _LRUNode(object):
+
     """This maintains the linked-list which is the lru internals."""
 
     __slots__ = ('prev', 'next_key', 'key', 'value', 'cleanup', 'size')
@@ -52,6 +54,7 @@ class _LRUNode(object):
 
 
 class LRUCache(object):
+
     """A class which manages a cache of entries, removing unused ones."""
 
     def __init__(self, max_cache=100, after_cleanup_count=None):
@@ -271,6 +274,7 @@ class LRUCache(object):
 
 
 class LRUSizeCache(LRUCache):
+
     """An LRUCache that removes things based on the size of the values.
 
     This differs in that it doesn't care how many actual items there are,
@@ -280,7 +284,7 @@ class LRUSizeCache(LRUCache):
     defaults to len() if not supplied.
     """
 
-    def __init__(self, max_size=1024*1024, after_cleanup_size=None,
+    def __init__(self, max_size=1024 * 1024, after_cleanup_size=None,
                  compute_size=None):
         """Create a new LRUSizeCache.
 
@@ -300,7 +304,7 @@ class LRUSizeCache(LRUCache):
         if compute_size is None:
             self._compute_size = len
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)
-        LRUCache.__init__(self, max_cache=max(int(max_size/512), 1))
+        LRUCache.__init__(self, max_cache=max(int(max_size / 512), 1))
 
     def add(self, key, value, cleanup=None):
         """Add a new value to the cache.
@@ -356,7 +360,7 @@ class LRUSizeCache(LRUCache):
     def resize(self, max_size, after_cleanup_size=None):
         """Change the number of bytes that will be cached."""
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)
-        max_cache = max(int(max_size/512), 1)
+        max_cache = max(int(max_size / 512), 1)
         self._update_max_cache(max_cache)
 
     def _update_max_size(self, max_size, after_cleanup_size=None):

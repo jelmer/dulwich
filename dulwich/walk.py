@@ -30,10 +30,10 @@ from dulwich.diff_tree import (
     tree_changes,
     tree_changes_for_merge,
     RenameDetector,
-    )
+)
 from dulwich.errors import (
     MissingCommitError,
-    )
+)
 
 ORDER_DATE = 'date'
 ORDER_TOPO = 'topo'
@@ -45,6 +45,7 @@ _MAX_EXTRA_COMMITS = 5
 
 
 class WalkEntry(object):
+
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker, commit):
@@ -72,18 +73,20 @@ class WalkEntry(object):
                 parent = self._store[self._get_parents(commit)[0]].tree
             else:
                 changes_func = tree_changes_for_merge
-                parent = [self._store[p].tree for p in self._get_parents(commit)]
+                parent = [self._store[p]
+                          .tree for p in self._get_parents(commit)]
             self._changes = list(changes_func(
-              self._store, parent, commit.tree,
-              rename_detector=self._rename_detector))
+                self._store, parent, commit.tree,
+                rename_detector=self._rename_detector))
         return self._changes
 
     def __repr__(self):
         return '<WalkEntry commit=%s, changes=%r>' % (
-          self.commit.id, self.changes())
+            self.commit.id, self.changes())
 
 
 class _CommitTimeQueue(object):
+
     """Priority queue of WalkEntry objects by commit time."""
 
     def __init__(self, walker):
@@ -160,7 +163,7 @@ class _CommitTimeQueue(object):
                         reset_extra_commits = False
 
             if (self._min_time is not None and
-                commit.commit_time < self._min_time):
+                    commit.commit_time < self._min_time):
                 # We want to stop walking at min_time, but commits at the
                 # boundary may be out of order with respect to their parents. So
                 # we walk _MAX_EXTRA_COMMITS more commits once we hit this
@@ -183,6 +186,7 @@ class _CommitTimeQueue(object):
 
 
 class Walker(object):
+
     """Object for performing a walk of commits in a store.
 
     Walker objects are initialized with a store and other options and can then
@@ -249,7 +253,7 @@ class Walker(object):
             if changed_path == followed_path:
                 return True
             if (changed_path.startswith(followed_path) and
-                changed_path[len(followed_path)] == '/'):
+                    changed_path[len(followed_path)] == '/'):
                 return True
         return False
 

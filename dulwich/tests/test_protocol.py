@@ -23,7 +23,7 @@ from StringIO import StringIO
 
 from dulwich.errors import (
     HangupException,
-    )
+)
 from dulwich.protocol import (
     PktLineParser,
     Protocol,
@@ -35,7 +35,7 @@ from dulwich.protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     BufferedPktLineWriter,
-    )
+)
 from dulwich.tests import TestCase
 
 
@@ -111,6 +111,7 @@ class ProtocolTests(BaseProtocolTests, TestCase):
 
 
 class ReceivableStringIO(StringIO):
+
     """StringIO with socket-like recv semantics for testing."""
 
     def __init__(self):
@@ -207,25 +208,34 @@ class CapabilitiesTestCase(TestCase):
     def test_caps(self):
         self.assertEqual(('bla', ['la']), extract_capabilities('bla\0la'))
         self.assertEqual(('bla', ['la']), extract_capabilities('bla\0la\n'))
-        self.assertEqual(('bla', ['la', 'la']), extract_capabilities('bla\0la la'))
+        self.assertEqual(
+            ('bla', ['la', 'la']), extract_capabilities('bla\0la la'))
 
     def test_plain_want_line(self):
-        self.assertEqual(('want bla', []), extract_want_line_capabilities('want bla'))
+        self.assertEqual(
+            ('want bla', []), extract_want_line_capabilities('want bla'))
 
     def test_caps_want_line(self):
-        self.assertEqual(('want bla', ['la']), extract_want_line_capabilities('want bla la'))
-        self.assertEqual(('want bla', ['la']), extract_want_line_capabilities('want bla la\n'))
-        self.assertEqual(('want bla', ['la', 'la']), extract_want_line_capabilities('want bla la la'))
+        self.assertEqual(
+            ('want bla',
+             ['la']),
+            extract_want_line_capabilities('want bla la'))
+        self.assertEqual(
+            ('want bla',
+             ['la']),
+            extract_want_line_capabilities('want bla la\n'))
+        self.assertEqual(
+            ('want bla', ['la', 'la']), extract_want_line_capabilities('want bla la la'))
 
     def test_ack_type(self):
         self.assertEqual(SINGLE_ACK, ack_type(['foo', 'bar']))
         self.assertEqual(MULTI_ACK, ack_type(['foo', 'bar', 'multi_ack']))
         self.assertEqual(MULTI_ACK_DETAILED,
-                          ack_type(['foo', 'bar', 'multi_ack_detailed']))
+                         ack_type(['foo', 'bar', 'multi_ack_detailed']))
         # choose detailed when both present
         self.assertEqual(MULTI_ACK_DETAILED,
-                          ack_type(['foo', 'bar', 'multi_ack',
-                                    'multi_ack_detailed']))
+                         ack_type(['foo', 'bar', 'multi_ack',
+                                   'multi_ack_detailed']))
 
 
 class BufferedPktLineWriterTests(TestCase):

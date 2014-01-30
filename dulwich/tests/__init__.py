@@ -60,6 +60,7 @@ class TestCase(_TestCase):
         files in their home directory.
         """
         old_env = os.environ
+
         def restore():
             os.environ = old_env
         self.addCleanup(restore)
@@ -74,10 +75,11 @@ class TestCase(_TestCase):
 
 
 class BlackboxTestCase(TestCase):
+
     """Blackbox testing."""
 
     bin_directory = os.path.abspath(os.path.join(os.path.dirname(__file__),
-        "..", "..", "bin"))
+                                                 "..", "..", "bin"))
 
     def bin_path(self, name):
         """Determine the full path of a binary.
@@ -103,10 +105,10 @@ class BlackboxTestCase(TestCase):
         # Save us from all that headache and call python with the bin script.
         argv = [sys.executable, self.bin_path(name)] + args
         return subprocess.Popen(argv,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True,
-            env=env)
+                                stdout=subprocess.PIPE,
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True,
+                                env=env)
 
 
 def self_test_suite():
@@ -134,7 +136,7 @@ def self_test_suite():
         'server',
         'walk',
         'web',
-        ]
+    ]
     module_names = ['dulwich.tests.test_' + name for name in names]
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)
@@ -148,17 +150,19 @@ def tutorial_test_suite():
         'object-store',
         'remote',
         'conclusion',
-        ]
+    ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+
     def setup(test):
         test.__old_cwd = os.getcwd()
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)
+
     def teardown(test):
         os.chdir(test.__old_cwd)
         shutil.rmtree(test.__dulwich_tempdir)
     return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
-        *tutorial_files)
+                                *tutorial_files)
 
 
 def nocompat_test_suite():

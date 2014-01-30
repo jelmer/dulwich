@@ -29,7 +29,7 @@ import time
 from dulwich.objects import (
     Commit,
     S_ISGITLINK,
-    )
+)
 
 FIRST_FEW_BYTES = 8000
 
@@ -53,7 +53,7 @@ def write_commit_patch(f, commit, contents, progress, version=None):
         p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
                              stdin=subprocess.PIPE)
     except (ImportError, OSError):
-        pass # diffstat not available?
+        pass  # diffstat not available?
     else:
         (diffstat, _) = p.communicate(contents)
         f.write(diffstat)
@@ -88,7 +88,7 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
             yield '+++ %s\n' % tofile
             started = True
         i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        yield "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        yield "@@ -%d,%d +%d,%d @@\n" % (i1 + 1, i2 - i1, j1 + 1, j2 - j1)
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
@@ -114,9 +114,8 @@ def is_binary(content):
     return '\0' in content[:FIRST_FEW_BYTES]
 
 
-def write_object_diff(f, store, (old_path, old_mode, old_id),
-                                (new_path, new_mode, new_id),
-                                diff_binary=False):
+def write_object_diff(f, store, xxx_todo_changeme, xxx_todo_changeme1,
+                      diff_binary=False):
     """Write the diff for an object.
 
     :param f: File-like object to write to
@@ -128,6 +127,9 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
 
     :note: the tuple elements should be None for nonexistant files
     """
+    (old_path, old_mode, old_id) = xxx_todo_changeme
+    (new_path, new_mode, new_id) = xxx_todo_changeme1
+
     def shortid(hexsha):
         if hexsha is None:
             return "0" * 7
@@ -174,11 +176,10 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
         f.write("Binary files %s and %s differ\n" % (old_path, new_path))
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
-            old_path, new_path))
+                                  old_path, new_path))
 
 
-def write_blob_diff(f, (old_path, old_mode, old_blob),
-                       (new_path, new_mode, new_blob)):
+def write_blob_diff(f, xxx_todo_changeme2, xxx_todo_changeme3):
     """Write diff file header.
 
     :param f: File-like object to write to
@@ -187,11 +188,15 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
 
     :note: The use of write_object_diff is recommended over this function.
     """
+    (old_path, old_mode, old_blob) = xxx_todo_changeme2
+    (new_path, new_mode, new_blob) = xxx_todo_changeme3
+
     def blob_id(blob):
         if blob is None:
             return "0" * 7
         else:
             return blob.id[:7]
+
     def lines(blob):
         if blob is not None:
             return blob.data.splitlines(True)
@@ -220,7 +225,7 @@ def write_blob_diff(f, (old_path, old_mode, old_blob),
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
-        old_path, new_path))
+                              old_path, new_path))
 
 
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
@@ -235,8 +240,8 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
         write_object_diff(f, store, (oldpath, oldmode, oldsha),
-                                    (newpath, newmode, newsha),
-                                    diff_binary=diff_binary)
+                          (newpath, newmode, newsha),
+                          diff_binary=diff_binary)
 
 
 def git_am_patch_split(f):
@@ -255,7 +260,7 @@ def git_am_patch_split(f):
         subject = msg["subject"]
     else:
         close = msg["subject"].index("] ", patch_tag_start)
-        subject = msg["subject"][close+2:]
+        subject = msg["subject"][close + 2:]
     c.message = subject.replace("\n", "") + "\n"
     first = True
     for l in f:

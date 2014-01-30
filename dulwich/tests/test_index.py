@@ -21,7 +21,7 @@
 
 from cStringIO import (
     StringIO,
-    )
+)
 import os
 import shutil
 import stat
@@ -37,14 +37,14 @@ from dulwich.index import (
     read_index,
     write_cache_time,
     write_index,
-    )
+)
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
     Tree,
-    )
+)
 from dulwich.repo import Repo
 from dulwich.tests import TestCase
 
@@ -67,9 +67,9 @@ class SimpleIndexTestCase(IndexTestCase):
 
     def test_getitem(self):
         self.assertEqual(((1230680220, 0), (1230680220, 0), 2050, 3761020,
-                           33188, 1000, 1000, 0,
-                           'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
-                          self.get_simple_index("index")["bla"])
+                          33188, 1000, 1000, 0,
+                          'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
+                         self.get_simple_index("index")["bla"])
 
     def test_empty(self):
         i = self.get_simple_index("notanindex")
@@ -83,6 +83,7 @@ class SimpleIndexTestCase(IndexTestCase):
         (oldname, newname), (oldmode, newmode), (oldsha, newsha) = changes[0]
         self.assertEqual('bla', newname)
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
+
 
 class SimpleIndexWriterTestCase(IndexTestCase):
 
@@ -139,25 +140,25 @@ class CommitTreeTests(TestCase):
         self.assertEqual((stat.S_IFDIR, dirid), self.store[rootid]["bla"])
         self.assertEqual((stat.S_IFREG, blob.id), self.store[dirid]["bar"])
         self.assertEqual(set([rootid, dirid, blob.id]),
-                          set(self.store._data.keys()))
+                         set(self.store._data.keys()))
 
 
 class CleanupModeTests(TestCase):
 
     def test_file(self):
-        self.assertEqual(0100644, cleanup_mode(0100000))
+        self.assertEqual(0o100644, cleanup_mode(0o100000))
 
     def test_executable(self):
-        self.assertEqual(0100755, cleanup_mode(0100711))
+        self.assertEqual(0o100755, cleanup_mode(0o100711))
 
     def test_symlink(self):
-        self.assertEqual(0120000, cleanup_mode(0120711))
+        self.assertEqual(0o120000, cleanup_mode(0o120711))
 
     def test_dir(self):
-        self.assertEqual(0040000, cleanup_mode(040531))
+        self.assertEqual(0o040000, cleanup_mode(0o40531))
 
     def test_submodule(self):
-        self.assertEqual(0160000, cleanup_mode(0160744))
+        self.assertEqual(0o160000, cleanup_mode(0o160744))
 
 
 class WriteCacheTimeTests(TestCase):
@@ -185,14 +186,14 @@ class WriteCacheTimeTests(TestCase):
 class IndexEntryFromStatTests(TestCase):
 
     def test_simple(self):
-        st = os.stat_result((16877, 131078, 64769L,
-                154, 1000, 1000, 12288,
-                1323629595, 1324180496, 1324180496))
+        st = os.stat_result((16877, 131078, 64769,
+                             154, 1000, 1000, 12288,
+                             1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(st, "22" * 20, 0)
         self.assertEqual(entry, (
             1324180496,
             1324180496,
-            64769L,
+            64769,
             131078,
             16384,
             1000,
@@ -202,15 +203,15 @@ class IndexEntryFromStatTests(TestCase):
             0))
 
     def test_override_mode(self):
-        st = os.stat_result((stat.S_IFREG + 0644, 131078, 64769L,
-                154, 1000, 1000, 12288,
-                1323629595, 1324180496, 1324180496))
+        st = os.stat_result((stat.S_IFREG + 0o644, 131078, 64769,
+                             154, 1000, 1000, 12288,
+                             1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(st, "22" * 20, 0,
-                mode=stat.S_IFREG + 0755)
+                                      mode=stat.S_IFREG + 0o755)
         self.assertEqual(entry, (
             1324180496,
             1324180496,
-            64769L,
+            64769,
             131078,
             33261,
             1000,
@@ -246,7 +247,7 @@ class BuildIndexTests(TestCase):
         repo.object_store.add_object(tree)
 
         build_index_from_tree(repo.path, repo.index_path(),
-                repo.object_store, tree.id)
+                              repo.object_store, tree.id)
 
         # Verify index entries
         index = repo.open_index()
@@ -270,16 +271,16 @@ class BuildIndexTests(TestCase):
         filee = Blob.from_string('d')
 
         tree = Tree()
-        tree['a'] = (stat.S_IFREG | 0644, filea.id)
-        tree['b'] = (stat.S_IFREG | 0644, fileb.id)
-        tree['c/d'] = (stat.S_IFREG | 0644, filed.id)
+        tree['a'] = (stat.S_IFREG | 0o644, filea.id)
+        tree['b'] = (stat.S_IFREG | 0o644, fileb.id)
+        tree['c/d'] = (stat.S_IFREG | 0o644, filed.id)
         tree['c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
         repo.object_store.add_objects([(o, None)
-            for o in [filea, fileb, filed, filee, tree]])
+                                       for o in [filea, fileb, filed, filee, tree]])
 
         build_index_from_tree(repo.path, repo.index_path(),
-                repo.object_store, tree.id)
+                              repo.object_store, tree.id)
 
         # Verify index entries
         index = repo.open_index()
@@ -289,32 +290,32 @@ class BuildIndexTests(TestCase):
         apath = os.path.join(repo.path, 'a')
         self.assertTrue(os.path.exists(apath))
         self.assertReasonableIndexEntry(index['a'],
-            stat.S_IFREG | 0644, 6, filea.id)
+                                        stat.S_IFREG | 0o644, 6, filea.id)
         self.assertFileContents(apath, 'file a')
 
         # fileb
         bpath = os.path.join(repo.path, 'b')
         self.assertTrue(os.path.exists(bpath))
         self.assertReasonableIndexEntry(index['b'],
-            stat.S_IFREG | 0644, 6, fileb.id)
+                                        stat.S_IFREG | 0o644, 6, fileb.id)
         self.assertFileContents(bpath, 'file b')
 
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
-        self.assertReasonableIndexEntry(index['c/d'], 
-            stat.S_IFREG | 0644, 6, filed.id)
+        self.assertReasonableIndexEntry(index['c/d'],
+                                        stat.S_IFREG | 0o644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d
         epath = os.path.join(repo.path, 'c', 'e')
         self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index['c/e'], 
-            stat.S_IFLNK, 1, filee.id)
+        self.assertReasonableIndexEntry(index['c/e'],
+                                        stat.S_IFLNK, 1, filee.id)
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files
         self.assertEquals(['.git', 'a', 'b', 'c'],
-            sorted(os.listdir(repo.path)))
-        self.assertEquals(['d', 'e'], 
-            sorted(os.listdir(os.path.join(repo.path, 'c'))))
+                          sorted(os.listdir(repo.path)))
+        self.assertEquals(['d', 'e'],
+                          sorted(os.listdir(os.path.join(repo.path, 'c'))))

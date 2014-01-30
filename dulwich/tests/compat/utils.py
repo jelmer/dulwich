@@ -33,7 +33,7 @@ from dulwich.tests import (
     get_safe_env,
     SkipTest,
     TestCase,
-    )
+)
 
 _DEFAULT_GIT = 'git'
 _VERSION_LEN = 4
@@ -195,7 +195,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
             s.connect(('localhost', port))
             s.close()
             return True
-        except socket.error, e:
+        except socket.error as e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
@@ -204,6 +204,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
 
 
 class CompatTestCase(TestCase):
+
     """Test case that requires git for compatibility checks.
 
     Subclasses can change the git version required by overriding

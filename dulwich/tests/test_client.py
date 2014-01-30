@@ -20,7 +20,7 @@ from cStringIO import StringIO
 
 from dulwich import (
     client,
-    )
+)
 from dulwich.client import (
     LocalGitClient,
     TraditionalGitClient,
@@ -33,25 +33,25 @@ from dulwich.client import (
     UpdateRefsError,
     get_transport_and_path,
     get_transport_and_path_from_url,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.protocol import (
     TCP_GIT_PORT,
     Protocol,
-    )
+)
 from dulwich.pack import (
     write_pack_objects,
-    )
+)
 from dulwich.objects import (
     Commit,
     Tree
-    )
+)
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import (
     open_repo,
-    )
+)
 
 
 class DummyClient(TraditionalGitClient):
@@ -78,10 +78,10 @@ class GitClientTests(TestCase):
 
     def test_caps(self):
         self.assertEqual(set(['multi_ack', 'side-band-64k', 'ofs-delta',
-                               'thin-pack', 'multi_ack_detailed']),
-                          set(self.client._fetch_capabilities))
+                              'thin-pack', 'multi_ack_detailed']),
+                         set(self.client._fetch_capabilities))
         self.assertEqual(set(['ofs-delta', 'report-status', 'side-band-64k']),
-                          set(self.client._send_capabilities))
+                         set(self.client._send_capabilities))
 
     def test_archive_ack(self):
         self.rin.write(
@@ -119,7 +119,7 @@ class GitClientTests(TestCase):
             if pkt == '':
                 self.rin.write("0000")
             else:
-                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
+                self.rin.write("%04x%s" % (len(pkt) + 4, pkt))
         self.rin.seek(0)
 
         tree = Tree()
@@ -258,7 +258,7 @@ class GitClientTests(TestCase):
             if pkt == '':
                 self.rin.write("0000")
             else:
-                self.rin.write("%04x%s" % (len(pkt)+4, pkt))
+                self.rin.write("%04x%s" % (len(pkt) + 4, pkt))
         self.rin.seek(0)
 
         def determine_wants(refs):
@@ -437,21 +437,21 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_ssh_host_relpath(self):
         self.assertRaises(ValueError, get_transport_and_path_from_url,
-            'foo.com:bar/baz')
+                          'foo.com:bar/baz')
 
     def test_ssh_user_host_relpath(self):
         self.assertRaises(ValueError, get_transport_and_path_from_url,
-            'user@foo.com:bar/baz')
+                          'user@foo.com:bar/baz')
 
     def test_local_path(self):
         self.assertRaises(ValueError, get_transport_and_path_from_url,
-            'foo.bar/baz')
+                          'foo.bar/baz')
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
         self.assertRaises(ValueError, get_transport_and_path_from_url,
-            'prospero://bar/baz')
+                          'prospero://bar/baz')
 
     def test_http(self):
         url = 'https://github.com/jelmer/dulwich'
@@ -479,7 +479,8 @@ class TestSSHVendor(object):
         self.username = username
         self.port = port
 
-        class Subprocess: pass
+        class Subprocess:
+            pass
         setattr(Subprocess, 'read', lambda: None)
         setattr(Subprocess, 'write', lambda: None)
         setattr(Subprocess, 'can_read', lambda: None)
@@ -503,13 +504,13 @@ class SSHGitClientTests(TestCase):
 
     def test_default_command(self):
         self.assertEqual('git-upload-pack',
-                self.client._get_cmd_path('upload-pack'))
+                         self.client._get_cmd_path('upload-pack'))
 
     def test_alternative_command_path(self):
         self.client.alternative_paths['upload-pack'] = (
             '/usr/lib/git/git-upload-pack')
         self.assertEqual('/usr/lib/git/git-upload-pack',
-            self.client._get_cmd_path('upload-pack'))
+                         self.client._get_cmd_path('upload-pack'))
 
     def test_connect(self):
         server = self.server
@@ -566,9 +567,9 @@ class LocalGitClientTests(TestCase):
         out = StringIO()
         walker = {}
         c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
-            pack_data=out.write)
+                     pack_data=out.write)
         self.assertEquals("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
-            "\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
+                          "\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
     def test_fetch_pack_none(self):
         c = LocalGitClient()
@@ -576,7 +577,11 @@ class LocalGitClientTests(TestCase):
         out = StringIO()
         walker = MemoryRepo().get_graph_walker()
         c.fetch_pack(s.path,
-            lambda heads: ["a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
-            graph_walker=walker, pack_data=out.write)
+                     lambda heads: [
+                         "a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+                     graph_walker=walker, pack_data=out.write)
         # Hardcoding is not ideal, but we'll fix that some other day..
-        self.assertTrue(out.getvalue().startswith('PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
+        self.assertTrue(
+            out.getvalue(
+            ).startswith(
+                'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))

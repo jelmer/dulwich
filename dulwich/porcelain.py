@@ -26,7 +26,7 @@ from dulwich.objects import (
     Commit,
     Tag,
     parse_timezone,
-    )
+)
 from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
@@ -115,7 +115,7 @@ def commit(repo=".", message=None, author=None, committer=None):
     # FIXME: Support --signoff argument
     r = open_repo(repo)
     return r.do_commit(message=message, author=author,
-        committer=committer)
+                       committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -128,7 +128,7 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     """
     r = open_repo(repo)
     return r.do_commit(message=message, tree=tree, committer=committer,
-            author=author)
+                       author=author)
 
 
 def init(path=".", bare=False):
@@ -147,7 +147,8 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
+def clone(source, target=None, bare=False,
+          checkout=None, outstream=sys.stdout):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -172,8 +173,8 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     else:
         r = Repo.init(target)
     remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=outstream.write)
+                               determine_wants=r.object_store.determine_wants_all,
+                               progress=outstream.write)
     r["HEAD"] = remote_refs["HEAD"]
     if checkout:
         outstream.write('Checking out HEAD')
@@ -256,7 +257,11 @@ def show_commit(repo, commit, outstream):
     """
     print_commit(commit, outstream)
     parent_commit = repo[commit.parents[0]]
-    write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
+    write_tree_diff(
+        outstream,
+        repo.object_store,
+        parent_commit.tree,
+        commit.tree)
 
 
 def show_tree(repo, tree, outstream):
@@ -287,7 +292,7 @@ def show_object(repo, obj, outstream):
         "blob": show_blob,
         "commit": show_commit,
         "tag": show_tag,
-            }[obj.type_name](repo, obj, outstream)
+    }[obj.type_name](repo, obj, outstream)
 
 
 def log(repo=".", outstream=sys.stdout, max_entries=None):

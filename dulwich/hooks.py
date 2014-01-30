@@ -28,6 +28,7 @@ from dulwich.errors import (
 
 
 class Hook(object):
+
     """Generic hook object."""
 
     def execute(self, *args):
@@ -41,6 +42,7 @@ class Hook(object):
 
 
 class ShellHook(Hook):
+
     """Hook by executable file
 
     Implements standard githooks(5) [0]:
@@ -97,6 +99,7 @@ class ShellHook(Hook):
 
 
 class PreCommitShellHook(ShellHook):
+
     """pre-commit shell hook"""
 
     def __init__(self, controldir):
@@ -106,6 +109,7 @@ class PreCommitShellHook(ShellHook):
 
 
 class PostCommitShellHook(ShellHook):
+
     """post-commit shell hook"""
 
     def __init__(self, controldir):
@@ -115,6 +119,7 @@ class PostCommitShellHook(ShellHook):
 
 
 class CommitMsgShellHook(ShellHook):
+
     """commit-msg shell hook
 
     :param args[0]: commit message

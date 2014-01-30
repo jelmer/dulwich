@@ -27,14 +27,14 @@ import os
 from dulwich.errors import (
     PackedRefsException,
     RefFormatError,
-    )
+)
 from dulwich.objects import (
     hex_to_sha,
-    )
+)
 from dulwich.file import (
     GitFile,
     ensure_dir_exists,
-    )
+)
 
 
 SYMREF = 'ref: '
@@ -59,7 +59,7 @@ def check_ref_format(refname):
     if '..' in refname:
         return False
     for c in refname:
-        if ord(c) < 040 or c in '\177 ~^:?*[':
+        if ord(c) < 0o40 or c in '\177 ~^:?*[':
             return False
     if refname[-1] in '/.':
         return False
@@ -73,6 +73,7 @@ def check_ref_format(refname):
 
 
 class RefsContainer(object):
+
     """A container for refs."""
 
     def set_symbolic_ref(self, name, other):
@@ -286,6 +287,7 @@ class RefsContainer(object):
 
 
 class DictRefsContainer(RefsContainer):
+
     """RefsContainer backed by a simple dict.
 
     This container does not support symbolic or packed references and is not
@@ -343,6 +345,7 @@ class DictRefsContainer(RefsContainer):
 
 
 class InfoRefsContainer(RefsContainer):
+
     """Refs container that reads refs from a info/refs file."""
 
     def __init__(self, f):
@@ -377,6 +380,7 @@ class InfoRefsContainer(RefsContainer):
 
 
 class DiskRefsContainer(RefsContainer):
+
     """Refs container that reads refs from disk."""
 
     def __init__(self, path):
@@ -649,7 +653,7 @@ class DiskRefsContainer(RefsContainer):
             # may only be packed
             try:
                 os.remove(filename)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
             self._remove_packed_ref(name)
@@ -667,7 +671,7 @@ def _split_ref_line(line):
     sha, name = fields
     try:
         hex_to_sha(sha)
-    except (AssertionError, TypeError), e:
+    except (AssertionError, TypeError) as e:
         raise PackedRefsException(e)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name '%s'" % name)
@@ -686,7 +690,7 @@ def read_packed_refs(f):
             continue
         if l[0] == "^":
             raise PackedRefsException(
-              "found peeled ref in packed-refs without peeled")
+                "found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 
@@ -708,7 +712,7 @@ def read_packed_refs_with_peeled(f):
                 raise PackedRefsException("unexpected peeled ref line")
             try:
                 hex_to_sha(l[1:])
-            except (AssertionError, TypeError), e:
+            except (AssertionError, TypeError) as e:
                 raise PackedRefsException(e)
             sha, name = _split_ref_line(last)
             last = None

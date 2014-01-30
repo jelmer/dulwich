@@ -35,16 +35,16 @@ from collections import defaultdict
 import binascii
 from cStringIO import (
     StringIO,
-    )
+)
 from collections import (
     deque,
-    )
+)
 import difflib
 from itertools import (
     chain,
     imap,
     izip,
-    )
+)
 try:
     import mmap
 except ImportError:
@@ -56,7 +56,7 @@ import os
 from os import (
     SEEK_CUR,
     SEEK_END,
-    )
+)
 import struct
 from struct import unpack_from
 import sys
@@ -66,20 +66,20 @@ import zlib
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
-    )
+)
 from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
-    )
+)
 from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,
     object_header,
-    )
+)
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
-        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
+                        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
 OFS_DELTA = 6
@@ -103,6 +103,7 @@ def take_msb_bytes(read, crc32=None):
 
 
 class UnpackedObject(object):
+
     """Class encapsulating an object unpacked from a pack file.
 
     These objects should only be created from within unpack_object. Most
@@ -114,17 +115,17 @@ class UnpackedObject(object):
     """
 
     __slots__ = [
-      'offset',         # Offset in its pack.
-      '_sha',           # Cached binary SHA.
-      'obj_type_num',   # Type of this object.
-      'obj_chunks',     # Decompressed and delta-resolved chunks.
-      'pack_type_num',  # Type of this object in the pack (may be a delta).
-      'delta_base',     # Delta base offset or SHA.
-      'comp_chunks',    # Compressed object chunks.
-      'decomp_chunks',  # Decompressed object chunks.
-      'decomp_len',     # Decompressed length of this object.
-      'crc32',          # CRC32.
-      ]
+        'offset',         # Offset in its pack.
+        '_sha',           # Cached binary SHA.
+        'obj_type_num',   # Type of this object.
+        'obj_chunks',     # Decompressed and delta-resolved chunks.
+        'pack_type_num',  # Type of this object in the pack (may be a delta).
+        'delta_base',     # Delta base offset or SHA.
+        'comp_chunks',    # Compressed object chunks.
+        'decomp_chunks',  # Decompressed object chunks.
+        'decomp_len',     # Decompressed length of this object.
+        'crc32',          # CRC32.
+    ]
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
@@ -302,7 +303,7 @@ def load_pack_index_file(path, f):
         version = struct.unpack('>L', contents[4:8])[0]
         if version == 2:
             return PackIndex2(path, file=f, contents=contents,
-                size=size)
+                              size=size)
         else:
             raise KeyError('Unknown pack index format %d' % version)
     else:
@@ -320,7 +321,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
     """
     assert start <= end
     while start <= end:
-        i = (start + end)/2
+        i = (start + end) / 2
         file_sha = unpack_name(i)
         x = cmp(file_sha, sha)
         if x < 0:
@@ -333,6 +334,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
 
 
 class PackIndex(object):
+
     """An index in to a packfile.
 
     Given a sha id of an object a pack index can tell you the location in the
@@ -406,6 +408,7 @@ class PackIndex(object):
 
 
 class MemoryPackIndex(PackIndex):
+
     """Pack index that is stored entirely in memory."""
 
     def __init__(self, entries, pack_checksum=None):
@@ -437,6 +440,7 @@ class MemoryPackIndex(PackIndex):
 
 
 class FilePackIndex(PackIndex):
+
     """Pack index that is based on a file.
 
     To do the loop it opens the file, and indexes first 256 4 byte groups
@@ -468,7 +472,7 @@ class FilePackIndex(PackIndex):
     def __eq__(self, other):
         # Quick optimization:
         if (isinstance(other, FilePackIndex) and
-            self._fan_out_table != other._fan_out_table):
+                self._fan_out_table != other._fan_out_table):
             return False
 
         return super(FilePackIndex, self).__eq__(other)
@@ -518,7 +522,8 @@ class FilePackIndex(PackIndex):
     def _read_fan_out_table(self, start_offset):
         ret = []
         for i in range(0x100):
-            fanout_entry = self._contents[start_offset+i*4:start_offset+(i+1)*4]
+            fanout_entry = self._contents[
+                start_offset + i * 4:start_offset + (i + 1) * 4]
             ret.append(struct.unpack('>L', fanout_entry)[0])
         return ret
 
@@ -560,7 +565,7 @@ class FilePackIndex(PackIndex):
         if idx == 0:
             start = 0
         else:
-            start = self._fan_out_table[idx-1]
+            start = self._fan_out_table[idx - 1]
         end = self._fan_out_table[idx]
         i = bisect_find_sha(start, end, sha, self._unpack_name)
         if i is None:
@@ -569,6 +574,7 @@ class FilePackIndex(PackIndex):
 
 
 class PackIndex1(FilePackIndex):
+
     """Version 1 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
@@ -583,7 +589,7 @@ class PackIndex1(FilePackIndex):
 
     def _unpack_name(self, i):
         offset = (0x100 * 4) + (i * 24) + 4
-        return self._contents[offset:offset+20]
+        return self._contents[offset:offset + 20]
 
     def _unpack_offset(self, i):
         offset = (0x100 * 4) + (i * 24)
@@ -595,6 +601,7 @@ class PackIndex1(FilePackIndex):
 
 
 class PackIndex2(FilePackIndex):
+
     """Version 2 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
@@ -610,7 +617,7 @@ class PackIndex2(FilePackIndex):
         self._pack_offset_table_offset = (self._crc32_table_offset +
                                           4 * len(self))
         self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
-                                          4 * len(self))
+                                               4 * len(self))
 
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
@@ -618,19 +625,20 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_name(self, i):
         offset = self._name_table_offset + i * 20
-        return self._contents[offset:offset+20]
+        return self._contents[offset:offset + 20]
 
     def _unpack_offset(self, i):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
-        if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
+        if offset & (2 ** 31):
+            offset = self._pack_offset_largetable_offset + \
+                (offset & (2 ** 31 - 1)) * 8
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from('>L', self._contents,
-                          self._crc32_table_offset + i * 4)[0]
+                           self._crc32_table_offset + i * 4)[0]
 
 
 def read_pack_header(read):
@@ -719,14 +727,16 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
     return unpacked, unused
 
 
-def _compute_object_size((num, obj)):
+def _compute_object_size(xxx_todo_changeme):
     """Compute the size of a unresolved object for use with LRUSizeCache."""
+    (num, obj) = xxx_todo_changeme
     if num in DELTA_TYPES:
         return chunks_length(obj[1])
     return chunks_length(obj)
 
 
 class PackStreamReader(object):
+
     """Class to read a pack stream.
 
     The pack is read from a ReceivableProtocol using read() or recv() as
@@ -835,8 +845,8 @@ class PackStreamReader(object):
         for i in xrange(self._num_objects):
             offset = self.offset
             unpacked, unused = unpack_object(
-              self.read, read_some=self.recv, compute_crc32=compute_crc32,
-              zlib_bufsize=self._zlib_bufsize)
+                self.read, read_some=self.recv, compute_crc32=compute_crc32,
+                zlib_bufsize=self._zlib_bufsize)
             unpacked.offset = offset
 
             # prepend any unused data to current read buffer
@@ -861,6 +871,7 @@ class PackStreamReader(object):
 
 
 class PackStreamCopier(PackStreamReader):
+
     """Class to verify a pack stream as it is being read.
 
     The pack is read from a ReceivableProtocol using read() or recv() as
@@ -911,7 +922,7 @@ def obj_sha(type, chunks):
     return sha.digest()
 
 
-def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
+def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
     """Hash a portion of a file into a new SHA.
 
     :param f: A file-like object to read from that supports seek().
@@ -933,6 +944,7 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
 
 
 class PackData(object):
+
     """The data contained in a packfile.
 
     Pack files can be accessed both sequentially for exploding a pack, and
@@ -976,8 +988,8 @@ class PackData(object):
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
-        self._offset_cache = LRUSizeCache(1024*1024*20,
-            compute_size=_compute_object_size)
+        self._offset_cache = LRUSizeCache(1024 * 1024 * 20,
+                                          compute_size=_compute_object_size)
         self.pack = None
 
     @classmethod
@@ -1044,7 +1056,7 @@ class PackData(object):
             # TODO: clean up asserts and replace with nicer error messages
             assert isinstance(offset, int) or isinstance(offset, long)
             assert isinstance(delta_offset, int) or isinstance(offset, long)
-            base_offset = offset-delta_offset
+            base_offset = offset - delta_offset
             type, base_obj = self.get_object_at(base_offset)
             assert isinstance(type, int)
         elif type == REF_DELTA:
@@ -1067,12 +1079,13 @@ class PackData(object):
         for i in xrange(1, self._num_objects + 1):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
-              self._file.read, compute_crc32=compute_crc32)
+                self._file.read, compute_crc32=compute_crc32)
             if progress is not None:
                 progress(i, self._num_objects)
             yield (offset, unpacked.pack_type_num, unpacked._obj(),
                    unpacked.crc32)
-            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
+            # Back up over unused data.
+            self._file.seek(-len(unused), SEEK_CUR)
 
     def _iter_unpacked(self):
         # TODO(dborowitz): Merge this with iterobjects, if we can change its
@@ -1081,10 +1094,11 @@ class PackData(object):
         for _ in xrange(self._num_objects):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
-              self._file.read, compute_crc32=False)
+                self._file.read, compute_crc32=False)
             unpacked.offset = offset
             yield unpacked
-            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
+            # Back up over unused data.
+            self._file.seek(-len(unused), SEEK_CUR)
 
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
@@ -1110,8 +1124,7 @@ class PackData(object):
             object count
         :return: List of tuples with (sha, offset, crc32)
         """
-        ret = list(self.iterentries(progress=progress))
-        ret.sort()
+        ret = sorted(self.iterentries(progress=progress))
         return ret
 
     def create_index_v1(self, filename, progress=None):
@@ -1181,7 +1194,7 @@ class PackData(object):
         except KeyError:
             pass
         assert isinstance(offset, long) or isinstance(offset, int),\
-                'offset was %r' % offset
+            'offset was %r' % offset
         assert offset >= self._header_size
         self._file.seek(offset)
         unpacked, _ = unpack_object(self._file.read)
@@ -1189,6 +1202,7 @@ class PackData(object):
 
 
 class DeltaChainIterator(object):
+
     """Abstract iterator over pack data based on delta chains.
 
     Each object in the pack is guaranteed to be inflated exactly once,
@@ -1282,8 +1296,8 @@ class DeltaChainIterator(object):
     def _resolve_object(self, offset, obj_type_num, base_chunks):
         self._file.seek(offset)
         unpacked, _ = unpack_object(
-          self._file.read, include_comp=self._include_comp,
-          compute_crc32=self._compute_crc32)
+            self._file.read, include_comp=self._include_comp,
+            compute_crc32=self._compute_crc32)
         unpacked.offset = offset
         if base_chunks is None:
             assert unpacked.pack_type_num == obj_type_num
@@ -1304,7 +1318,7 @@ class DeltaChainIterator(object):
                         self._pending_ref.pop(unpacked.sha(), []))
         for new_offset in pending:
             for new_result in self._follow_chain(
-              new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
+                    new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
                 yield new_result
 
     def __iter__(self):
@@ -1315,6 +1329,7 @@ class DeltaChainIterator(object):
 
 
 class PackIndexer(DeltaChainIterator):
+
     """Delta chain iterator that yields index entries."""
 
     _compute_crc32 = True
@@ -1324,6 +1339,7 @@ class PackIndexer(DeltaChainIterator):
 
 
 class PackInflater(DeltaChainIterator):
+
     """Delta chain iterator that yields ShaFile objects."""
 
     def _result(self, unpacked):
@@ -1331,6 +1347,7 @@ class PackInflater(DeltaChainIterator):
 
 
 class SHA1Reader(object):
+
     """Wrapper around a file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
@@ -1355,6 +1372,7 @@ class SHA1Reader(object):
 
 
 class SHA1Writer(object):
+
     """Wrapper around a file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
@@ -1453,11 +1471,10 @@ def write_pack(filename, objects, num_objects=None):
     f = GitFile(filename + '.pack', 'wb')
     try:
         entries, data_sum = write_pack_objects(f, objects,
-            num_objects=num_objects)
+                                               num_objects=num_objects)
     finally:
         f.close()
-    entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
-    entries.sort()
+    entries = sorted([(k, v[0], v[1]) for (k, v) in entries.iteritems()])
     f = GitFile(filename + '.idx', 'wb')
     try:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
@@ -1570,7 +1587,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
     # Fan-out table
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
-        fan_out_table[i+1] += fan_out_table[i]
+        fan_out_table[i + 1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
         if not (offset <= 0xffffffff):
             raise TypeError("pack format 1 only supports offsets < 2Gb")
@@ -1590,6 +1607,7 @@ def create_delta(base_buf, target_buf):
     assert isinstance(target_buf, str)
     out_buf = ''
     # write delta header
+
     def encode_size(size):
         ret = ''
         c = size & 0x7f
@@ -1606,7 +1624,7 @@ def create_delta(base_buf, target_buf):
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
-        #if opcode == 'replace' or opcode == 'delete':
+        # if opcode == 'replace' or opcode == 'delete':
         #    pass
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
@@ -1615,14 +1633,14 @@ def create_delta(base_buf, target_buf):
             op = 0x80
             o = i1
             for i in range(4):
-                if o & 0xff << i*8:
-                    scratch += chr((o >> i*8) & 0xff)
+                if o & 0xff << i * 8:
+                    scratch += chr((o >> i * 8) & 0xff)
                     op |= 1 << i
             s = i2 - i1
             for i in range(2):
-                if s & 0xff << i*8:
-                    scratch += chr((s >> i*8) & 0xff)
-                    op |= 1 << (4+i)
+                if s & 0xff << i * 8:
+                    scratch += chr((s >> i * 8) & 0xff)
+                    op |= 1 << (4 + i)
             out_buf += chr(op)
             out_buf += scratch
         if opcode == 'replace' or opcode == 'insert':
@@ -1632,11 +1650,11 @@ def create_delta(base_buf, target_buf):
             o = j1
             while s > 127:
                 out_buf += chr(127)
-                out_buf += target_buf[o:o+127]
+                out_buf += target_buf[o:o + 127]
                 s -= 127
                 o += 127
             out_buf += chr(s)
-            out_buf += target_buf[o:o+s]
+            out_buf += target_buf[o:o + s]
     return out_buf
 
 
@@ -1646,13 +1664,14 @@ def apply_delta(src_buf, delta):
     :param src_buf: Source buffer
     :param delta: Delta instructions
     """
-    if type(src_buf) != str:
+    if not isinstance(src_buf, str):
         src_buf = ''.join(src_buf)
-    if type(delta) != str:
+    if not isinstance(delta, str):
         delta = ''.join(delta)
     out = []
     index = 0
     delta_length = len(delta)
+
     def get_delta_header_size(delta, index):
         size = 0
         i = 0
@@ -1679,19 +1698,19 @@ def apply_delta(src_buf, delta):
                     cp_off |= x << (i * 8)
             cp_size = 0
             for i in range(3):
-                if cmd & (1 << (4+i)):
+                if cmd & (1 << (4 + i)):
                     x = ord(delta[index])
                     index += 1
                     cp_size |= x << (i * 8)
             if cp_size == 0:
                 cp_size = 0x10000
             if (cp_off + cp_size < cp_size or
-                cp_off + cp_size > src_size or
-                cp_size > dest_size):
+                    cp_off + cp_size > src_size or
+                    cp_size > dest_size):
                 break
-            out.append(src_buf[cp_off:cp_off+cp_size])
+            out.append(src_buf[cp_off:cp_off + cp_size])
         elif cmd != 0:
-            out.append(delta[index:index+cmd])
+            out.append(delta[index:index + cmd])
             index += cmd
         else:
             raise ApplyDeltaError('Invalid opcode 0')
@@ -1715,7 +1734,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
     :return: The SHA of the index file written
     """
     f = SHA1Writer(f)
-    f.write('\377tOc') # Magic!
+    f.write('\377tOc')  # Magic!
     f.write(struct.pack('>L', 2))
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
@@ -1724,16 +1743,16 @@ def write_pack_index_v2(f, entries, pack_checksum):
     largetable = []
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
-        fan_out_table[i+1] += fan_out_table[i]
+        fan_out_table[i + 1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
         f.write(name)
     for (name, offset, entry_checksum) in entries:
         f.write(struct.pack('>L', entry_checksum))
     for (name, offset, entry_checksum) in entries:
-        if offset < 2**31:
+        if offset < 2 ** 31:
             f.write(struct.pack('>L', offset))
         else:
-            f.write(struct.pack('>L', 2**31 + len(largetable)))
+            f.write(struct.pack('>L', 2 ** 31 + len(largetable)))
             largetable.append(offset)
     for offset in largetable:
         f.write(struct.pack('>Q', offset))
@@ -1743,6 +1762,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
 
 
 class Pack(object):
+
     """A Git pack object."""
 
     def __init__(self, basename, resolve_ext_ref=None):
@@ -1802,7 +1822,7 @@ class Pack(object):
             self._idx.close()
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.index == other.index
+        return isinstance(self, type(other)) and self.index == other.index
 
     def __len__(self):
         """Number of entries in this pack."""

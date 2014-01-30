@@ -22,13 +22,14 @@ import tempfile
 
 from dulwich.repo import (
     Repo,
-    )
+)
 from dulwich.tests import (
     BlackboxTestCase,
-    )
+)
 
 
 class GitReceivePackTests(BlackboxTestCase):
+
     """Blackbox tests for dul-receive-pack."""
 
     def setUp(self):
@@ -52,6 +53,7 @@ class GitReceivePackTests(BlackboxTestCase):
 
 
 class GitUploadPackTests(BlackboxTestCase):
+
     """Blackbox tests for dul-upload-pack."""
 
     def setUp(self):

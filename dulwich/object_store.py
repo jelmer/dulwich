@@ -31,10 +31,10 @@ import tempfile
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
-    )
+)
 from dulwich.errors import (
     NotTreeError,
-    )
+)
 from dulwich.file import GitFile
 from dulwich.objects import (
     Commit,
@@ -47,7 +47,7 @@ from dulwich.objects import (
     hex_to_filename,
     S_ISGITLINK,
     object_class,
-    )
+)
 from dulwich.pack import (
     Pack,
     PackData,
@@ -60,19 +60,20 @@ from dulwich.pack import (
     compute_file_sha,
     PackIndexer,
     PackStreamCopier,
-    )
+)
 
 INFODIR = 'info'
 PACKDIR = 'pack'
 
 
 class BaseObjectStore(object):
+
     """Object store interface."""
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
                 if not sha in self and not ref.endswith("^{}") and
-                   not sha == ZERO_SHA]
+                not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.
@@ -175,7 +176,13 @@ class BaseObjectStore(object):
         :param get_parents: Optional function for getting the parents of a commit.
         :return: Iterator over (sha, path) pairs.
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged, get_parents=get_parents)
+        finder = MissingObjectFinder(
+            self,
+            haves,
+            wants,
+            progress,
+            get_tagged,
+            get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -338,7 +345,8 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
+        iterables = self.packs + \
+            [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return itertools.chain(*iterables)
 
     def contains_loose(self, sha):
@@ -399,6 +407,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
 
 class DiskObjectStore(PackBasedObjectStore):
+
     """Git-style object store that exists on disk."""
 
     def __init__(self, path):
@@ -424,7 +433,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
-                    'rb')
+                        'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
@@ -515,7 +524,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield base+rest
+                yield base + rest
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -569,7 +578,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -624,8 +633,8 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
-            f = GitFile(basename+".idx", "wb")
+                                    "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            f = GitFile(basename + ".idx", "wb")
             try:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
             finally:
@@ -646,6 +655,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
+
         def commit():
             os.fsync(fd)
             f.close()
@@ -654,6 +664,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 os.remove(path)
                 return None
+
         def abort():
             f.close()
             os.remove(path)
@@ -672,7 +683,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 raise
         path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
-            return # Already there, no need to write again
+            return  # Already there, no need to write again
         f = GitFile(path, 'wb')
         try:
             f.write(obj.as_legacy_object())
@@ -692,6 +703,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
 
 class MemoryObjectStore(BaseObjectStore):
+
     """Object store that keeps all objects in memory."""
 
     def __init__(self):
@@ -763,11 +775,13 @@ class MemoryObjectStore(BaseObjectStore):
             call when the pack is finished.
         """
         f = StringIO()
+
         def commit():
             p = PackData.from_file(StringIO(f.getvalue()), f.tell())
             f.close()
             for obj in PackInflater.for_pack_data(p):
                 self._data[obj.id] = obj
+
         def abort():
             pass
         return f, commit, abort
@@ -810,7 +824,11 @@ class MemoryObjectStore(BaseObjectStore):
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(
+                read_all,
+                read_some,
+                f,
+                delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except:
@@ -821,6 +839,7 @@ class MemoryObjectStore(BaseObjectStore):
 
 
 class ObjectImporter(object):
+
     """Interface for importing objects."""
 
     def __init__(self, count):
@@ -840,6 +859,7 @@ class ObjectImporter(object):
 
 
 class ObjectIterator(object):
+
     """Interface for iterating over objects."""
 
     def iterobjects(self):
@@ -847,6 +867,7 @@ class ObjectIterator(object):
 
 
 class ObjectStoreIterator(ObjectIterator):
+
     """ObjectIterator that works on top of an ObjectStore."""
 
     def __init__(self, store, sha_iter):
@@ -925,10 +946,10 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     """
     filetree = obj_store[tree_sha]
     for name, mode, sha in filetree.iteritems():
-       if not S_ISGITLINK(mode) and sha not in kset:
-           kset.add(sha)
-           if stat.S_ISDIR(mode):
-               _collect_filetree_revs(obj_store, sha, kset)
+        if not S_ISGITLINK(mode) and sha not in kset:
+            kset.add(sha)
+            if stat.S_ISDIR(mode):
+                _collect_filetree_revs(obj_store, sha, kset)
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
@@ -965,6 +986,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
 
 
 class MissingObjectFinder(object):
+
     """Find the objects missing from another object store.
 
     :param object_store: Object store containing at least all objects to be
@@ -979,7 +1001,7 @@ class MissingObjectFinder(object):
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-            get_tagged=None, get_parents=lambda commit: commit.parents):
+                 get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
         self._get_parents = get_parents
         # process Commits and Tags differently
@@ -988,21 +1010,21 @@ class MissingObjectFinder(object):
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
         have_commits, have_tags = \
-                _split_commits_and_tags(object_store, haves, True)
+            _split_commits_and_tags(object_store, haves, True)
         want_commits, want_tags = \
-                _split_commits_and_tags(object_store, wants, False)
+            _split_commits_and_tags(object_store, wants, False)
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-                have_commits,
-                get_parents=self._get_parents)[0]
+            have_commits,
+            get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
             want_commits,
             all_ancestors,
-            get_parents=self._get_parents);
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -1058,6 +1080,7 @@ class MissingObjectFinder(object):
 
 
 class ObjectStoreGraphWalker(object):
+
     """Graph walker that finds what commits are missing from an object store.
 
     :ivar heads: Revisions without descendants in the local repo

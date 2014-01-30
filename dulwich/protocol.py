@@ -22,13 +22,13 @@
 from cStringIO import StringIO
 from os import (
     SEEK_END,
-    )
+)
 import socket
 
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
-    )
+)
 
 TCP_GIT_PORT = 9418
 
@@ -40,6 +40,7 @@ MULTI_ACK_DETAILED = 2
 
 
 class ProtocolFile(object):
+
     """A dummy file for network ops that expect file-like objects."""
 
     def __init__(self, read, write):
@@ -66,6 +67,7 @@ def pkt_line(data):
 
 
 class Protocol(object):
+
     """Class for interacting with a remote git process over the wire.
 
     Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
@@ -108,7 +110,7 @@ class Protocol(object):
                 return None
             if self.report_activity:
                 self.report_activity(size, 'read')
-            return read(size-4)
+            return read(size - 4)
         except socket.error as e:
             raise GitProtocolError(e)
 
@@ -205,7 +207,8 @@ class Protocol(object):
         :param cmd: The remote service to access.
         :param args: List of arguments to send to remove service.
         """
-        self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
+        self.write_pkt_line("%s %s" %
+                            (cmd, "".join(["%s\0" % a for a in args])))
 
     def read_cmd(self):
         """Read a command and some arguments from the git client
@@ -216,7 +219,7 @@ class Protocol(object):
         """
         line = self.read_pkt_line()
         splice_at = line.find(" ")
-        cmd, args = line[:splice_at], line[splice_at+1:]
+        cmd, args = line[:splice_at], line[splice_at + 1:]
         assert args[-1] == "\x00"
         return cmd, args[:-1].split(chr(0))
 
@@ -225,6 +228,7 @@ _RBUFSIZE = 8192  # Default read buffer size.
 
 
 class ReceivableProtocol(Protocol):
+
     """Variant of Protocol that allows reading up to a size without blocking.
 
     This class has a recv() method that behaves like socket.recv() in addition
@@ -366,6 +370,7 @@ def ack_type(capabilities):
 
 
 class BufferedPktLineWriter(object):
+
     """Writer that wraps its data in pkt-lines and has an independent buffer.
 
     Consecutive calls to write() wrap the data in a pkt-line and then buffers it
@@ -409,6 +414,7 @@ class BufferedPktLineWriter(object):
 
 
 class PktLineParser(object):
+
     """Packet line parser that hands completed packets off to a callback.
     """
 

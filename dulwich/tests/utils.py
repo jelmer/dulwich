@@ -30,11 +30,11 @@ import warnings
 
 from dulwich.index import (
     commit_tree,
-    )
+)
 from dulwich.objects import (
     FixedSha,
     Commit,
-    )
+)
 from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
@@ -44,14 +44,14 @@ from dulwich.pack import (
     write_pack_header,
     write_pack_object,
     create_delta,
-    )
+)
 from dulwich.repo import Repo
 from dulwich.tests import (
     SkipTest,
-    )
+)
 
 # Plain files are very frequently used in tests, so let the mode be very short.
-F = 0100644  # Shorthand mode for Files.
+F = 0o100644  # Shorthand mode for Files.
 
 
 def open_repo(name):
@@ -89,6 +89,7 @@ def make_object(cls, **attrs):
     """
 
     class TestObject(cls):
+
         """Class that inherits from the given class, but without __slots__.
 
         Note that classes with __slots__ can't have arbitrary attributes monkey-
@@ -280,7 +281,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         commit_num = commit[0]
         try:
             parent_ids = [nums[pn] for pn in commit[1:]]
-        except KeyError, e:
+        except KeyError as e:
             missing_parent, = e.args
             raise ValueError('Unknown parent %i' % missing_parent)
 
@@ -299,7 +300,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
             'parents': parent_ids,
             'tree': tree_id,
             'commit_time': commit_time,
-            }
+        }
         commit_attrs.update(attrs.get(commit_num, {}))
         commit_obj = make_commit(**commit_attrs)
 
@@ -319,7 +320,7 @@ def setup_warning_catcher():
     caught_warnings = []
     original_showwarning = warnings.showwarning
 
-    def custom_showwarning(*args,  **kwargs):
+    def custom_showwarning(*args, **kwargs):
         caught_warnings.append(args[0])
 
     warnings.showwarning = custom_showwarning

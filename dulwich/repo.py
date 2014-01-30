@@ -41,15 +41,15 @@ from dulwich.errors import (
     CommitError,
     RefFormatError,
     HookError,
-    )
+)
 from dulwich.file import (
     GitFile,
-    )
+)
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     ObjectStoreGraphWalker,
-    )
+)
 from dulwich.objects import (
     check_hexsha,
     Blob,
@@ -57,13 +57,13 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
-    )
+)
 
 from dulwich.hooks import (
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
-    )
+)
 
 from dulwich.refs import (
     check_ref_format,
@@ -75,7 +75,7 @@ from dulwich.refs import (
     read_packed_refs_with_peeled,
     write_packed_refs,
     SYMREF,
-    )
+)
 
 
 import warnings
@@ -94,7 +94,7 @@ BASE_DIRECTORIES = [
     [REFSDIR, REFSDIR_HEADS],
     ["hooks"],
     ["info"]
-    ]
+]
 
 
 def parse_graftpoints(graftpoints):
@@ -149,6 +149,7 @@ def serialize_graftpoints(graftpoints):
 
 
 class BaseRepo(object):
+
     """Base class for a git repository.
 
     :ivar object_store: Dictionary-like object for accessing
@@ -226,8 +227,8 @@ class BaseRepo(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         target.object_store.add_objects(
-          self.fetch_objects(determine_wants, target.get_graph_walker(),
-                             progress))
+            self.fetch_objects(determine_wants, target.get_graph_walker(),
+                               progress))
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
@@ -246,7 +247,7 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if type(wants) is not list:
+        if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
         shallows = getattr(graph_walker, 'shallow', frozenset())
@@ -276,10 +277,10 @@ class BaseRepo(object):
             return self.get_parents(commit.id, commit)
 
         return self.object_store.iter_shas(
-          self.object_store.find_missing_objects(
-              haves, wants, progress,
-              get_tagged,
-              get_parents=get_parents))
+            self.object_store.find_missing_objects(
+                haves, wants, progress,
+                get_tagged,
+                get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.
@@ -319,7 +320,7 @@ class BaseRepo(object):
                 raise NotTagError(ret)
             else:
                 raise Exception("Type invalid: %r != %r" % (
-                  ret.type_name, cls.type_name))
+                    ret.type_name, cls.type_name))
         return ret
 
     def get_object(self, sha):
@@ -428,7 +429,9 @@ class BaseRepo(object):
         if isinstance(include, str):
             include = [include]
 
-        kwargs['get_parents'] = lambda commit: self.get_parents(commit.id, commit)
+        kwargs['get_parents'] = lambda commit: self.get_parents(
+            commit.id,
+            commit)
 
         return Walker(self.object_store, include, *args, **kwargs)
 
@@ -548,7 +551,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['pre-commit'].execute()
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -591,7 +594,7 @@ class BaseRepo(object):
             c.message = self.hooks['commit-msg'].execute(message)
             if c.message is None:
                 c.message = message
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, message not modified
             c.message = message
@@ -612,7 +615,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['post-commit'].execute()
-        except HookError, e:  # silent failure
+        except HookError as e:  # silent failure
             warnings.warn("post-commit hook failed: %s" % e, UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -621,6 +624,7 @@ class BaseRepo(object):
 
 
 class Repo(BaseRepo):
+
     """A git repository backed by local disk.
 
     To open an existing repository, call the contructor with
@@ -700,7 +704,7 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
         try:
             return open(os.path.join(self.controldir(), path), 'rb')
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -757,7 +761,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin="origin"):
+              origin="origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -798,10 +802,13 @@ class Repo(BaseRepo):
     def _build_tree(self):
         from dulwich.index import build_index_from_tree
         config = self.get_config()
-        honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        honor_filemode = config.get_boolean(
+            'core',
+            'filemode',
+            os.name != "nt")
         return build_index_from_tree(self.path, self.index_path(),
-                self.object_store, self['HEAD'].tree,
-                honor_filemode=honor_filemode)
+                                     self.object_store, self['HEAD'].tree,
+                                     honor_filemode=honor_filemode)
 
     def get_config(self):
         """Retrieve the config object.
@@ -812,7 +819,7 @@ class Repo(BaseRepo):
         path = os.path.join(self._controldir, 'config')
         try:
             return ConfigFile.from_path(path)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             ret = ConfigFile()
@@ -831,7 +838,7 @@ class Repo(BaseRepo):
                 return f.read()
             finally:
                 f.close()
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             return None
@@ -892,6 +899,7 @@ class Repo(BaseRepo):
 
 
 class MemoryRepo(BaseRepo):
+
     """Repo that stores refs, objects, and named files in memory.
 
     MemoryRepos are always bare: they have no working tree and no index, since

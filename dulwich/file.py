@@ -22,6 +22,7 @@ import errno
 import os
 import tempfile
 
+
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
     try:
@@ -32,7 +33,7 @@ def ensure_dir_exists(dirname):
 
 
 def fancy_rename(oldname, newname):
-    """Rename file with temporary backup file to rollback if rename fails"""
+    """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         try:
             os.rename(oldname, newname)
@@ -42,7 +43,7 @@ def fancy_rename(oldname, newname):
 
     # destination file exists
     try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname + ".", dir=".")
         os.close(fd)
         os.remove(tmpfile)
     except OSError as e:
@@ -72,6 +73,7 @@ def GitFile(filename, mode='rb', bufsize=-1):
     are not.  To read and write from the same file, you can take advantage of
     the fact that opening a file for write does not actually open the file you
     request.
+
     """
     if 'a' in mode:
         raise IOError('append mode not supported for Git files')
@@ -86,6 +88,7 @@ def GitFile(filename, mode='rb', bufsize=-1):
 
 
 class _GitFile(object):
+
     """File that follows the git locking protocol for writes.
 
     All writes to a file foo will be written into foo.lock in the same
@@ -94,6 +97,7 @@ class _GitFile(object):
 
     :note: You *must* call close() or abort() on a _GitFile for the lock to be
         released. Typically this will happen in a finally block.
+
     """
 
     PROXY_PROPERTIES = set(['closed', 'encoding', 'errors', 'mode', 'name',
@@ -101,11 +105,12 @@ class _GitFile(object):
     PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'next', 'read',
                      'readline', 'readlines', 'xreadlines', 'seek', 'tell',
                      'truncate', 'write', 'writelines')
+
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
         fd = os.open(self._lockfilename,
-            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+                     os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 
@@ -116,6 +121,7 @@ class _GitFile(object):
         """Close and discard the lockfile without overwriting the target.
 
         If the file is already closed, this is a no-op.
+
         """
         if self._closed:
             return
@@ -139,6 +145,7 @@ class _GitFile(object):
         :raises OSError: if the original file could not be overwritten. The lock
             file is still closed, so further attempts to write to the same file
             object will raise ValueError.
+
         """
         if self._closed:
             return

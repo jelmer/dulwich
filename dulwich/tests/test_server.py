@@ -26,18 +26,18 @@ from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
     UnexpectedCommandError,
-    )
+)
 from dulwich.objects import (
     Commit,
     Tag,
-    )
+)
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.repo import (
     MemoryRepo,
     Repo,
-    )
+)
 from dulwich.server import (
     Backend,
     DictBackend,
@@ -53,15 +53,15 @@ from dulwich.server import (
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
     update_server_info,
-    )
+)
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_commit,
     make_object,
-    )
+)
 from dulwich.protocol import (
     ZERO_SHA,
-    )
+)
 
 ONE = '1' * 40
 TWO = '2' * 40
@@ -120,7 +120,7 @@ class HandlerTestCase(TestCase):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except GitProtocolError, e:
+        except GitProtocolError as e:
             self.fail(e)
 
     def test_capability_line(self):
@@ -145,7 +145,10 @@ class HandlerTestCase(TestCase):
         self.assertSucceeds(set_caps, ['cap2', 'ignoreme'])
 
     def test_has_capability(self):
-        self.assertRaises(GitProtocolError, self._handler.has_capability, 'cap')
+        self.assertRaises(
+            GitProtocolError,
+            self._handler.has_capability,
+            'cap')
         caps = self._handler.capabilities()
         self._handler.set_client_capabilities(caps)
         for cap in caps:
@@ -160,7 +163,7 @@ class UploadPackHandlerTestCase(TestCase):
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': self._repo})
         self._handler = UploadPackHandler(
-          backend, ['/', 'host=lolcathost'], TestProto())
+            backend, ['/', 'host=lolcathost'], TestProto())
 
     def test_progress(self):
         caps = self._handler.required_capabilities()
@@ -185,20 +188,20 @@ class UploadPackHandlerTestCase(TestCase):
             'refs/tags/tag1': ONE,
             'refs/tags/tag2': TWO,
             'refs/heads/master': FOUR,  # not a tag, no peeled value
-            }
+        }
         # repo needs to peel this object
         self._repo.object_store.add_object(make_commit(id=FOUR))
         self._repo.refs._update(refs)
         peeled = {
             'refs/tags/tag1': '1234' * 10,
             'refs/tags/tag2': '5678' * 10,
-            }
+        }
         self._repo.refs._update_peeled(peeled)
 
         caps = list(self._handler.required_capabilities()) + ['include-tag']
         self._handler.set_client_capabilities(caps)
         self.assertEqual({'1234' * 10: ONE, '5678' * 10: TWO},
-                          self._handler.get_tagged(refs, repo=self._repo))
+                         self._handler.get_tagged(refs, repo=self._repo))
 
         # non-include-tag case
         caps = self._handler.required_capabilities()
@@ -282,9 +285,11 @@ class FindShallowTests(TestCase):
 
 
 class TestUploadPackHandler(UploadPackHandler):
+
     @classmethod
     def required_capabilities(self):
         return ()
+
 
 class ReceivePackHandlerTestCase(TestCase):
 
@@ -293,7 +298,7 @@ class ReceivePackHandlerTestCase(TestCase):
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': self._repo})
         self._handler = ReceivePackHandler(
-          backend, ['/', 'host=lolcathost'], TestProto())
+            backend, ['/', 'host=lolcathost'], TestProto())
 
     def test_apply_pack_del_ref(self):
         refs = {
@@ -317,12 +322,12 @@ class ProtocolGraphWalkerTestCase(TestCase):
         #  /
         # 1---2---4
         commits = [
-          make_commit(id=ONE, parents=[], commit_time=111),
-          make_commit(id=TWO, parents=[ONE], commit_time=222),
-          make_commit(id=THREE, parents=[ONE], commit_time=333),
-          make_commit(id=FOUR, parents=[TWO], commit_time=444),
-          make_commit(id=FIVE, parents=[THREE], commit_time=555),
-          ]
+            make_commit(id=ONE, parents=[], commit_time=111),
+            make_commit(id=TWO, parents=[ONE], commit_time=222),
+            make_commit(id=THREE, parents=[ONE], commit_time=333),
+            make_commit(id=FOUR, parents=[TWO], commit_time=444),
+            make_commit(id=FIVE, parents=[THREE], commit_time=555),
+        ]
         self._repo = MemoryRepo.init_bare(commits, {})
         backend = DictBackend({'/': self._repo})
         self._walker = ProtocolGraphWalker(
@@ -357,9 +362,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
     def test_split_proto_line(self):
         allowed = ('want', 'done', None)
         self.assertEqual(('want', ONE),
-                          _split_proto_line('want %s\n' % ONE, allowed))
+                         _split_proto_line('want %s\n' % ONE, allowed))
         self.assertEqual(('want', TWO),
-                          _split_proto_line('want %s\n' % TWO, allowed))
+                         _split_proto_line('want %s\n' % TWO, allowed))
         self.assertRaises(GitProtocolError, _split_proto_line,
                           'want xxxx\n', allowed)
         self.assertRaises(UnexpectedCommandError, _split_proto_line,
@@ -375,14 +380,14 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEqual(None, self._walker.proto.get_received_line())
 
         self._walker.proto.set_output([
-          'want %s multi_ack' % ONE,
-          'want %s' % TWO,
-          ])
+            'want %s multi_ack' % ONE,
+            'want %s' % TWO,
+        ])
         heads = {
-          'refs/heads/ref1': ONE,
-          'refs/heads/ref2': TWO,
-          'refs/heads/ref3': THREE,
-          }
+            'refs/heads/ref1': ONE,
+            'refs/heads/ref2': TWO,
+            'refs/heads/ref3': THREE,
+        }
         self._repo.refs._update(heads)
         self.assertEqual([ONE, TWO], self._walker.determine_wants(heads))
 
@@ -391,25 +396,34 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.advertise_refs = False
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
         self._walker.proto.set_output([])
         self.assertEqual([], self._walker.determine_wants(heads))
 
         self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo'])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
     def test_determine_wants_advertisement(self):
         self._walker.proto.set_output([])
         # advertise branch tips plus tag
         heads = {
-          'refs/heads/ref4': FOUR,
-          'refs/heads/ref5': FIVE,
-          'refs/heads/tag6': SIX,
-          }
+            'refs/heads/ref4': FOUR,
+            'refs/heads/ref5': FIVE,
+            'refs/heads/tag6': SIX,
+        }
         self._repo.refs._update(heads)
         self._repo.refs._update_peeled(heads)
         self._repo.refs._update_peeled({'refs/heads/tag6': FIVE})
@@ -425,16 +439,16 @@ class ProtocolGraphWalkerTestCase(TestCase):
             lines.append(line.rstrip())
 
         self.assertEqual([
-          '%s refs/heads/ref4' % FOUR,
-          '%s refs/heads/ref5' % FIVE,
-          '%s refs/heads/tag6^{}' % FIVE,
-          '%s refs/heads/tag6' % SIX,
-          ], sorted(lines))
+            '%s refs/heads/ref4' % FOUR,
+            '%s refs/heads/ref5' % FIVE,
+            '%s refs/heads/tag6^{}' % FIVE,
+            '%s refs/heads/tag6' % SIX,
+        ], sorted(lines))
 
         # ensure peeled tag was advertised immediately following tag
         for i, line in enumerate(lines):
             if line.endswith(' refs/heads/tag6'):
-                self.assertEqual('%s refs/heads/tag6^{}' % FIVE, lines[i+1])
+                self.assertEqual('%s refs/heads/tag6^{}' % FIVE, lines[i + 1])
 
     # TODO: test commit time cutoff
 
@@ -444,38 +458,38 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def assertReceived(self, expected):
         self.assertEquals(
-          expected, list(iter(self._walker.proto.get_received_line, None)))
+            expected, list(iter(self._walker.proto.get_received_line, None)))
 
     def test_handle_shallow_request_no_client_shallows(self):
         self._handle_shallow_request(['deepen 1\n'], [FOUR, FIVE])
         self.assertEquals(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([
-          'shallow %s' % TWO,
-          'shallow %s' % THREE,
-          ])
+            'shallow %s' % TWO,
+            'shallow %s' % THREE,
+        ])
 
     def test_handle_shallow_request_no_new_shallows(self):
         lines = [
-          'shallow %s\n' % TWO,
-          'shallow %s\n' % THREE,
-          'deepen 1\n',
-          ]
+            'shallow %s\n' % TWO,
+            'shallow %s\n' % THREE,
+            'deepen 1\n',
+        ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
         self.assertEquals(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([])
 
     def test_handle_shallow_request_unshallows(self):
         lines = [
-          'shallow %s\n' % TWO,
-          'deepen 2\n',
-          ]
+            'shallow %s\n' % TWO,
+            'deepen 2\n',
+        ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
         self.assertEquals(set([ONE]), self._walker.shallow)
         self.assertReceived([
-          'shallow %s' % ONE,
-          'unshallow %s' % TWO,
-          # THREE is unshallow but was is not shallow in the client
-          ])
+            'shallow %s' % ONE,
+            'unshallow %s' % TWO,
+            # THREE is unshallow but was is not shallow in the client
+        ])
 
 
 class TestProtocolGraphWalker(object):
@@ -509,17 +523,18 @@ class TestProtocolGraphWalker(object):
 
 
 class AckGraphWalkerImplTestCase(TestCase):
+
     """Base setup and asserts for AckGraphWalker tests."""
 
     def setUp(self):
         super(AckGraphWalkerImplTestCase, self).setUp()
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
-          ('have', TWO),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self._impl = self.impl_cls(self._walker)
 
     def assertNoAck(self):
@@ -645,12 +660,12 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     def test_multi_ack_flush(self):
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -720,12 +735,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_flush(self):
         # same as ack test but contains a flush-pkt in the middle
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -759,12 +774,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_nak_flush(self):
         # same as nak test but contains a flush-pkt in the middle
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -796,6 +811,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
 
 class FileSystemBackendTests(TestCase):
+
     """Tests for FileSystemBackend."""
 
     def setUp(self):
@@ -806,7 +822,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_nonexistant(self):
         self.assertRaises(NotGitRepository,
-            self.backend.open_repository, "/does/not/exist/unless/foo")
+                          self.backend.open_repository, "/does/not/exist/unless/foo")
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
@@ -814,7 +830,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_child(self):
         self.assertRaises(NotGitRepository,
-            self.backend.open_repository, os.path.join(self.path, "foo"))
+                          self.backend.open_repository, os.path.join(self.path, "foo"))
 
     def test_bad_repo_path(self):
         repo = MemoryRepo.init_bare([], {})
@@ -825,6 +841,7 @@ class FileSystemBackendTests(TestCase):
 
 
 class ServeCommandTests(TestCase):
+
     """Tests for serve_command."""
 
     def setUp(self):
@@ -832,7 +849,8 @@ class ServeCommandTests(TestCase):
         self.backend = DictBackend({})
 
     def serve_command(self, handler_cls, args, inf, outf):
-        return serve_command(handler_cls, ["test"] + args, backend=self.backend,
+        return serve_command(
+            handler_cls, ["test"] + args, backend=self.backend,
             inf=inf, outf=outf)
 
     def test_receive_pack(self):
@@ -840,16 +858,22 @@ class ServeCommandTests(TestCase):
         self.backend.repos["/"] = MemoryRepo.init_bare(
             [commit], {"refs/heads/master": commit.id})
         outf = StringIO()
-        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        exitcode = self.serve_command(
+            ReceivePackHandler,
+            ["/"],
+            StringIO("0000"),
+            outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
-        self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",
+        self.assertEqual(
+            "1111111111111111111111111111111111111111 refs/heads/master",
             outlines[0][4:].split("\x00")[0])
         self.assertEqual("0000", outlines[-1])
         self.assertEqual(0, exitcode)
 
 
 class UpdateServerInfoTests(TestCase):
+
     """Tests for update_server_info."""
 
     def setUp(self):
@@ -860,9 +884,9 @@ class UpdateServerInfoTests(TestCase):
     def test_empty(self):
         update_server_info(self.repo)
         self.assertEqual("",
-            open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
+                         open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
         self.assertEqual("",
-            open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
+                         open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
 
     def test_simple(self):
         commit_id = self.repo.do_commit(
@@ -870,7 +894,22 @@ class UpdateServerInfoTests(TestCase):
             committer="Joe Example <joe@example.com>",
             ref="refs/heads/foo")
         update_server_info(self.repo)
-        ref_text = open(os.path.join(self.path, ".git", "info", "refs"), 'r').read()
+        ref_text = open(
+            os.path.join(
+                self.path,
+                ".git",
+                "info",
+                "refs"),
+            'r').read(
+        )
         self.assertEqual(ref_text, "%s\trefs/heads/foo\n" % commit_id)
-        packs_text = open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read()
+        packs_text = open(
+            os.path.join(
+                self.path,
+                ".git",
+                "objects",
+                "info",
+                "packs"),
+            'r').read(
+        )
         self.assertEqual(packs_text, "")

@@ -25,8 +25,8 @@ r = Repo.init(path, mkdir=True)
 
 # Fetch the remote objects
 remote_refs = client.fetch(host_path, r,
-    determine_wants=r.object_store.determine_wants_all,
-    progress=sys.stdout.write)
+                           determine_wants=r.object_store.determine_wants_all,
+                           progress=sys.stdout.write)
 
 # Update the local head to point at the right object
 r["HEAD"] = remote_refs["HEAD"]

@@ -41,24 +41,25 @@ from dulwich import (
     protocol,
     objects,
     repo,
-    )
+)
 from dulwich.tests import (
     get_safe_env,
     SkipTest,
-    )
+)
 
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
     import_repo_to_dir,
     run_git_or_fail,
-    )
+)
 from dulwich.tests.compat.server_utils import (
     ShutdownServerMixIn,
-    )
+)
 
 
 class DulwichClientTestBase(object):
+
     """Tests for client/server compatibility."""
 
     def setUp(self):
@@ -114,7 +115,7 @@ class DulwichClientTestBase(object):
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
-        t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
+        t = index.commit_tree(dest.object_store, [('hi', b.id, 0o100644)])
         c = objects.Commit()
         c.author = c.committer = 'Foo Bar <foo@example.com>'
         c.author_time = c.commit_time = 0
@@ -145,8 +146,11 @@ class DulwichClientTestBase(object):
         sendrefs, gen_pack = self.compute_send()
         c = self._client()
         try:
-            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+            c.send_pack(
+                self._build_path('/dest'),
+                lambda _: sendrefs,
+                gen_pack)
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/master failed to update', str(e))
             self.assertEqual({'refs/heads/branch': 'ok',
                               'refs/heads/master': 'non-fast-forward'},
@@ -159,8 +163,11 @@ class DulwichClientTestBase(object):
         sendrefs, gen_pack = self.compute_send()
         c = self._client()
         try:
-            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+            c.send_pack(
+                self._build_path('/dest'),
+                lambda _: sendrefs,
+                gen_pack)
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/branch, refs/heads/master failed to '
                              'update', str(e))
             self.assertEqual({'refs/heads/branch': 'non-fast-forward',
@@ -206,7 +213,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest,
-            lambda refs: [protocol.ZERO_SHA])
+                       lambda refs: [protocol.ZERO_SHA])
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
 
     def test_send_remove_branch(self):
@@ -231,7 +238,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
-                              protocol.TCP_GIT_PORT)
+                           protocol.TCP_GIT_PORT)
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
@@ -260,12 +267,14 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
 
 class TestSSHVendor(object):
+
     @staticmethod
     def run_command(host, command, username=None, port=None):
         cmd, path = command[0].replace("'", '').split(' ')
         cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 
 
@@ -307,6 +316,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
 
 class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+
     """HTTP Request handler that calls out to 'git http-backend'."""
 
     # Make rfile unbuffered -- we need to read one line and then pass
@@ -335,7 +345,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         # find an explicit query string, if present.
         i = rest.rfind('?')
         if i >= 0:
-            rest, query = rest[:i], rest[i+1:]
+            rest, query = rest[:i], rest[i + 1:]
         else:
             query = ''
 
@@ -361,7 +371,8 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         if authorization:
             authorization = authorization.split()
             if len(authorization) == 2:
-                import base64, binascii
+                import base64
+                import binascii
                 env['AUTH_TYPE'] = authorization[0]
                 if authorization[0].lower() == "basic":
                     try:
@@ -422,7 +433,11 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         args = ['http-backend']
         if '=' not in decoded_query:
             args.append(decoded_query)
-        stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
+        stdout = run_git_or_fail(
+            args,
+            input=data,
+            env=env,
+            stderr=subprocess.PIPE)
         self.wfile.write(stdout)
 
 
@@ -431,7 +446,10 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path):
-        BaseHTTPServer.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
+        BaseHTTPServer.HTTPServer.__init__(
+            self,
+            server_address,
+            GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"
 
@@ -443,6 +461,7 @@ if not getattr(HTTPGitServer, 'shutdown', None):
     _HTTPGitServer = HTTPGitServer
 
     class TCPGitServer(ShutdownServerMixIn, HTTPGitServer):
+
         """Subclass of HTTPGitServer that can be shut down."""
 
         def __init__(self, *args, **kwargs):

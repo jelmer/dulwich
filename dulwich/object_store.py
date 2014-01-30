@@ -31,10 +31,10 @@ import tempfile
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
-    )
+)
 from dulwich.errors import (
     NotTreeError,
-    )
+)
 from dulwich.file import GitFile
 from dulwich.objects import (
     Commit,
@@ -47,7 +47,7 @@ from dulwich.objects import (
     hex_to_filename,
     S_ISGITLINK,
     object_class,
-    )
+)
 from dulwich.pack import (
     Pack,
     PackData,
@@ -60,25 +60,27 @@ from dulwich.pack import (
     compute_file_sha,
     PackIndexer,
     PackStreamCopier,
-    )
+)
 
 INFODIR = 'info'
 PACKDIR = 'pack'
 
 
 class BaseObjectStore(object):
+
     """Object store interface."""
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
                 if not sha in self and not ref.endswith("^{}") and
-                   not sha == ZERO_SHA]
+                not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.
 
         :param shas: Iterable object with SHAs
         :return: Object iterator
+
         """
         return ObjectStoreIterator(self, shas)
 
@@ -107,6 +109,7 @@ class BaseObjectStore(object):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         raise NotImplementedError(self.get_raw)
 
@@ -120,26 +123,26 @@ class BaseObjectStore(object):
         raise NotImplementedError(self.__iter__)
 
     def add_object(self, obj):
-        """Add a single object to this object store.
-
-        """
+        """Add a single object to this object store."""
         raise NotImplementedError(self.add_object)
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of objects.
+
         """
         raise NotImplementedError(self.add_objects)
 
     def tree_changes(self, source, target, want_unchanged=False):
-        """Find the differences between the contents of two trees
+        """Find the differences between the contents of two trees.
 
         :param source: SHA1 of the source tree
         :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+
         """
         for change in tree_changes(self, source, target,
                                    want_unchanged=want_unchanged):
@@ -156,6 +159,7 @@ class BaseObjectStore(object):
         :param include_trees: If True, include tree objects in the iteration.
         :return: Iterator over TreeEntry namedtuples for all the objects in a
             tree.
+
         """
         for entry, _ in walk_trees(self, tree_id, None):
             if not stat.S_ISDIR(entry.mode) or include_trees:
@@ -174,8 +178,15 @@ class BaseObjectStore(object):
             sha for including tags.
         :param get_parents: Optional function for getting the parents of a commit.
         :return: Iterator over (sha, path) pairs.
+
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged, get_parents=get_parents)
+        finder = MissingObjectFinder(
+            self,
+            haves,
+            wants,
+            progress,
+            get_tagged,
+            get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -183,6 +194,7 @@ class BaseObjectStore(object):
 
         :param graphwalker: A graphwalker object.
         :return: List of SHAs that are in common
+
         """
         haves = []
         sha = graphwalker.next()
@@ -199,6 +211,7 @@ class BaseObjectStore(object):
         :param have: List of SHA1s of objects that should not be sent
         :param want: List of SHA1s of objects that should be sent
         :param progress: Optional progress reporting method
+
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
 
@@ -209,6 +222,7 @@ class BaseObjectStore(object):
         :return: The fully-peeled SHA1 of a tag object, after peeling all
             intermediate tags; if the original ref does not point to a tag, this
             will equal the original SHA1.
+
         """
         obj = self[sha]
         obj_class = object_class(obj.type_name)
@@ -228,6 +242,7 @@ class BaseObjectStore(object):
         :return: a tuple (A, B) where A - all commits reachable
             from heads but not present in common, B - common (shared) elements
             that are directly reachable from heads
+
         """
         bases = set()
         commits = set()
@@ -261,6 +276,7 @@ class PackBasedObjectStore(BaseObjectStore):
         """Check if a particular object is present by SHA1 and is packed.
 
         This does not check alternates.
+
         """
         for pack in self.packs:
             if sha in pack:
@@ -287,9 +303,7 @@ class PackBasedObjectStore(BaseObjectStore):
         raise NotImplementedError(self._pack_cache_stale)
 
     def _add_known_pack(self, pack):
-        """Add a newly appeared pack to the cache by path.
-
-        """
+        """Add a newly appeared pack to the cache by path."""
         if self._pack_cache is not None:
             self._pack_cache.append(pack)
 
@@ -327,6 +341,7 @@ class PackBasedObjectStore(BaseObjectStore):
         """Pack loose objects.
 
         :return: Number of objects packed
+
         """
         objects = set()
         for sha in self._iter_loose_objects():
@@ -338,13 +353,15 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
+        iterables = self.packs + \
+            [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return itertools.chain(*iterables)
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose.
 
         This does not check alternates.
+
         """
         return self._get_loose_object(sha) is not None
 
@@ -353,6 +370,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         if len(name) == 40:
             sha = hex_to_sha(name)
@@ -384,6 +402,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
         :param objects: Iterable over objects, should support __len__.
         :return: Pack object of the objects written.
+
         """
         if len(objects) == 0:
             # Don't bother writing an empty pack file
@@ -399,12 +418,14 @@ class PackBasedObjectStore(BaseObjectStore):
 
 
 class DiskObjectStore(PackBasedObjectStore):
+
     """Git-style object store that exists on disk."""
 
     def __init__(self, path):
         """Open an object store.
 
         :param path: Path of the object store.
+
         """
         super(DiskObjectStore, self).__init__()
         self.path = path
@@ -424,7 +445,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
-                    'rb')
+                        'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
@@ -444,8 +465,7 @@ class DiskObjectStore(PackBasedObjectStore):
             f.close()
 
     def add_alternate_path(self, path):
-        """Add an alternate path to this object store.
-        """
+        """Add an alternate path to this object store."""
         try:
             os.mkdir(os.path.join(self.path, "info"))
         except OSError as e:
@@ -515,7 +535,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield base+rest
+                yield base + rest
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -539,6 +559,7 @@ class DiskObjectStore(PackBasedObjectStore):
         :param path: Path to the pack file.
         :param copier: A PackStreamCopier to use for writing pack data.
         :param indexer: A PackIndexer for indexing the pack.
+
         """
         entries = list(indexer)
 
@@ -569,7 +590,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -599,6 +620,7 @@ class DiskObjectStore(PackBasedObjectStore):
             not return the number of bytes requested.
         :return: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
+
         """
         fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
         f = os.fdopen(fd, 'w+b')
@@ -619,13 +641,14 @@ class DiskObjectStore(PackBasedObjectStore):
             packs directory.
 
         :param path: Path to the pack file.
+
         """
         p = PackData(path)
         try:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
-            f = GitFile(basename+".idx", "wb")
+                                    "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            f = GitFile(basename + ".idx", "wb")
             try:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
             finally:
@@ -643,9 +666,11 @@ class DiskObjectStore(PackBasedObjectStore):
         :return: Fileobject to write to, a commit function to
             call when the pack is finished and an abort
             function.
+
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
+
         def commit():
             os.fsync(fd)
             f.close()
@@ -654,6 +679,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 os.remove(path)
                 return None
+
         def abort():
             f.close()
             os.remove(path)
@@ -663,6 +689,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Add a single object to this object store.
 
         :param obj: Object to add
+
         """
         dir = os.path.join(self.path, obj.id[:2])
         try:
@@ -672,7 +699,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 raise
         path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
-            return # Already there, no need to write again
+            return  # Already there, no need to write again
         f = GitFile(path, 'wb')
         try:
             f.write(obj.as_legacy_object())
@@ -692,6 +719,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
 
 class MemoryObjectStore(BaseObjectStore):
+
     """Object store that keeps all objects in memory."""
 
     def __init__(self):
@@ -728,6 +756,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
@@ -740,15 +769,14 @@ class MemoryObjectStore(BaseObjectStore):
         del self._data[self._to_hexsha(name)]
 
     def add_object(self, obj):
-        """Add a single object to this object store.
-
-        """
+        """Add a single object to this object store."""
         self._data[obj.id] = obj
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of objects.
+
         """
         for obj, path in objects:
             self._data[obj.id] = obj
@@ -761,13 +789,16 @@ class MemoryObjectStore(BaseObjectStore):
 
         :return: Fileobject to write to and a commit function to
             call when the pack is finished.
+
         """
         f = StringIO()
+
         def commit():
             p = PackData.from_file(StringIO(f.getvalue()), f.tell())
             f.close()
             for obj in PackInflater.for_pack_data(p):
                 self._data[obj.id] = obj
+
         def abort():
             pass
         return f, commit, abort
@@ -777,6 +808,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param f: Open file object for the pack.
         :param indexer: A PackIndexer for indexing the pack.
+
         """
         entries = list(indexer)
 
@@ -806,11 +838,16 @@ class MemoryObjectStore(BaseObjectStore):
             bytes are read.
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
+
         """
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(
+                read_all,
+                read_some,
+                f,
+                delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except:
@@ -821,12 +858,14 @@ class MemoryObjectStore(BaseObjectStore):
 
 
 class ObjectImporter(object):
+
     """Interface for importing objects."""
 
     def __init__(self, count):
         """Create a new ObjectImporter.
 
         :param count: Number of objects that's going to be imported.
+
         """
         self.count = count
 
@@ -840,6 +879,7 @@ class ObjectImporter(object):
 
 
 class ObjectIterator(object):
+
     """Interface for iterating over objects."""
 
     def iterobjects(self):
@@ -847,6 +887,7 @@ class ObjectIterator(object):
 
 
 class ObjectStoreIterator(ObjectIterator):
+
     """ObjectIterator that works on top of an ObjectStore."""
 
     def __init__(self, store, sha_iter):
@@ -854,6 +895,7 @@ class ObjectStoreIterator(ObjectIterator):
 
         :param store: Object store to retrieve from
         :param sha_iter: Iterator over (sha, path) tuples
+
         """
         self.store = store
         self.sha_iter = sha_iter
@@ -885,6 +927,7 @@ class ObjectStoreIterator(ObjectIterator):
             be yielded by the iterator.
 
         :param needle: SHA1 of the object to check for
+
         """
         return needle in self.store
 
@@ -909,6 +952,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     :param root_sha: SHA1 of the root tree
     :param path: Path to lookup
     :return: A tuple of (mode, SHA) of the resulting path.
+
     """
     tree = lookup_obj(root_sha)
     if not isinstance(tree, Tree):
@@ -922,13 +966,14 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     :param obj_store: Object store to get objects by SHA from
     :param tree_sha: tree reference to walk
     :param kset: set to fill with references to files and directories
+
     """
     filetree = obj_store[tree_sha]
     for name, mode, sha in filetree.iteritems():
-       if not S_ISGITLINK(mode) and sha not in kset:
-           kset.add(sha)
-           if stat.S_ISDIR(mode):
-               _collect_filetree_revs(obj_store, sha, kset)
+        if not S_ISGITLINK(mode) and sha not in kset:
+            kset.add(sha)
+            if stat.S_ISDIR(mode):
+                _collect_filetree_revs(obj_store, sha, kset)
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
@@ -944,6 +989,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     :param ignore_unknown: True to skip SHA1 missing in the repository
         silently.
     :return: A tuple of (commits, tags) SHA1s
+
     """
     commits = set()
     tags = set()
@@ -965,6 +1011,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
 
 
 class MissingObjectFinder(object):
+
     """Find the objects missing from another object store.
 
     :param object_store: Object store containing at least all objects to be
@@ -976,10 +1023,11 @@ class MissingObjectFinder(object):
         sha for including tags.
     :param get_parents: Optional function for getting the parents of a commit.
     :param tagged: dict of pointed-to sha -> tag sha for including tags
+
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-            get_tagged=None, get_parents=lambda commit: commit.parents):
+                 get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
         self._get_parents = get_parents
         # process Commits and Tags differently
@@ -988,21 +1036,21 @@ class MissingObjectFinder(object):
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
         have_commits, have_tags = \
-                _split_commits_and_tags(object_store, haves, True)
+            _split_commits_and_tags(object_store, haves, True)
         want_commits, want_tags = \
-                _split_commits_and_tags(object_store, wants, False)
+            _split_commits_and_tags(object_store, wants, False)
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-                have_commits,
-                get_parents=self._get_parents)[0]
+            have_commits,
+            get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
             want_commits,
             all_ancestors,
-            get_parents=self._get_parents);
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -1058,10 +1106,12 @@ class MissingObjectFinder(object):
 
 
 class ObjectStoreGraphWalker(object):
+
     """Graph walker that finds what commits are missing from an object store.
 
     :ivar heads: Revisions without descendants in the local repo
     :ivar get_parents: Function to retrieve parents in the local repo
+
     """
 
     def __init__(self, local_heads, get_parents):
@@ -1069,6 +1119,7 @@ class ObjectStoreGraphWalker(object):
 
         :param local_heads: Heads to start search with
         :param get_parents: Function for finding the parents of a SHA1.
+
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents

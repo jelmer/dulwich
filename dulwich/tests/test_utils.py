@@ -21,17 +21,17 @@
 
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 from utils import (
     make_object,
     build_commit_graph,
-    )
+)
 
 
 class BuildCommitGraphTest(TestCase):
@@ -66,9 +66,9 @@ class BuildCommitGraphTest(TestCase):
         a2 = make_object(Blob, data='aaa2')
         c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],
                                     trees={1: [('a', a1)],
-                                           2: [('a', a2, 0100644)]})
-        self.assertEqual((0100644, a1.id), self.store[c1.tree]['a'])
-        self.assertEqual((0100644, a2.id), self.store[c2.tree]['a'])
+                                           2: [('a', a2, 0o100644)]})
+        self.assertEqual((0o100644, a1.id), self.store[c1.tree]['a'])
+        self.assertEqual((0o100644, a2.id), self.store[c2.tree]['a'])
 
     def test_attrs(self):
         c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],

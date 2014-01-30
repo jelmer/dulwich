@@ -25,7 +25,7 @@ from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
 from dulwich.objects import (
     Tree,
-    )
+)
 from dulwich.repo import (
     parse_graftpoints,
     serialize_graftpoints,

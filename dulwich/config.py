@@ -22,6 +22,7 @@ TODO:
  * preserve formatting when updating configuration files
  * treat subsection names as case-insensitive for [branch.foo] style
    subsections
+
 """
 
 import errno
@@ -39,6 +40,7 @@ from dulwich.file import GitFile
 
 
 class Config(object):
+
     """A Git configuration."""
 
     def get(self, section, name):
@@ -48,6 +50,7 @@ class Config(object):
         :param subsection: Subsection name
         :return: Contents of the setting
         :raise KeyError: if the value is not set
+
         """
         raise NotImplementedError(self.get)
 
@@ -59,6 +62,7 @@ class Config(object):
             subsection.
         :return: Contents of the setting
         :raise KeyError: if the value is not set
+
         """
         try:
             value = self.get(section, name)
@@ -77,6 +81,7 @@ class Config(object):
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
+
         """
         raise NotImplementedError(self.set)
 
@@ -85,6 +90,7 @@ class Config(object):
 
         :param section: Tuple with section name and optional subsection namee
         :return: Iterator over (name, value) pairs
+
         """
         raise NotImplementedError(self.iteritems)
 
@@ -92,12 +98,13 @@ class Config(object):
         """Iterate over the sections.
 
         :return: Iterator over section tuples
+
         """
         raise NotImplementedError(self.itersections)
 
 
-
 class ConfigDict(Config, DictMixin):
+
     """Git configuration stored in a dictionary."""
 
     def __init__(self, values=None):
@@ -155,9 +162,9 @@ class ConfigDict(Config, DictMixin):
 
 def _format_string(value):
     if (value.startswith(" ") or
-        value.startswith("\t") or
-        value.endswith(" ") or
-        value.endswith("\t")):
+            value.startswith("\t") or
+            value.endswith(" ") or
+            value.endswith("\t")):
         return '"%s"' % _escape_value(value)
     return _escape_value(value)
 
@@ -166,7 +173,7 @@ def _parse_string(value):
     value = value.strip()
     ret = []
     block = []
-    in_quotes  = False
+    in_quotes = False
     for c in value:
         if c == "\"":
             in_quotes = (not in_quotes)
@@ -195,13 +202,20 @@ def _unescape_value(value):
             "\\n": "\n",
             "\\t": "\t",
             "\\b": "\b",
-            }[c.group(0)]
+        }[c.group(0)]
     return re.sub(r"(\\.)", unescape, value)
 
 
 def _escape_value(value):
     """Escape a value."""
-    return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"")
+    return (
+        value.replace(
+            "\\",
+            "\\\\").replace("\n",
+                            "\\n").replace("\t",
+                                           "\\t").replace("\"",
+                                                          "\\\"")
+    )
 
 
 def _check_variable_name(name):
@@ -225,8 +239,8 @@ def _strip_comments(line):
 
 
 class ConfigFile(ConfigDict):
-    """A Git configuration file, like .git/config or ~/.gitconfig.
-    """
+
+    """A Git configuration file, like .git/config or ~/.gitconfig."""
 
     @classmethod
     def from_file(cls, f):
@@ -243,7 +257,7 @@ class ConfigFile(ConfigDict):
                     if last == -1:
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(" ", 1)
-                    line = line[last+1:]
+                    line = line[last + 1:]
                     pts[0] = pts[0].lower()
                     if len(pts) == 2:
                         if pts[1][0] != "\"" or pts[1][-1] != "\"":
@@ -258,7 +272,7 @@ class ConfigFile(ConfigDict):
                     else:
                         if not _check_section_name(pts[0]):
                             raise ValueError("invalid section name %s" %
-                                    pts[0])
+                                             pts[0])
                         pts = pts[0].split(".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])
@@ -286,7 +300,7 @@ class ConfigFile(ConfigDict):
                 ret._values[section][setting] = value
                 if not continuation:
                     setting = None
-            else: # continuation line
+            else:  # continuation line
                 if line.endswith("\\\n"):
                     line = line[:-2]
                     continuation = True
@@ -336,6 +350,7 @@ class ConfigFile(ConfigDict):
 
 
 class StackedConfig(Config):
+
     """Configuration which reads from multiple config files.."""
 
     def __init__(self, backends, writable=None):
@@ -351,6 +366,7 @@ class StackedConfig(Config):
 
         This will look in the users' home directory and the system
         configuration.
+
         """
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))

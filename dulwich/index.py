@@ -30,11 +30,11 @@ from dulwich.objects import (
     Tree,
     hex_to_sha,
     sha_to_hex,
-    )
+)
 from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
-    )
+)
 
 
 def pathsplit(path):
@@ -63,6 +63,7 @@ def read_cache_time(f):
 
     :param f: File-like object to read from
     :return: Tuple with seconds and nanoseconds
+
     """
     return struct.unpack(">LL", f.read(8))
 
@@ -72,6 +73,7 @@ def write_cache_time(f, t):
 
     :param f: File-like object to write to
     :param t: Time to write (as int, float or tuple with secs and nsecs)
+
     """
     if isinstance(t, int):
         t = (t, 0)
@@ -88,6 +90,7 @@ def read_cache_entry(f):
 
     :param f: File-like object to read from
     :return: tuple with: device, inode, mode, uid, gid, size, sha, flags
+
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
@@ -108,13 +111,23 @@ def write_cache_entry(f, entry):
     :param f: File object
     :param entry: Entry to write, tuple with:
         (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+
     """
     beginoffset = f.tell()
     (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    flags = len(name) | (flags & ~ 0x0fff)
+    f.write(
+        struct.pack(">LLLLLL20sH",
+                    dev & 0xFFFFFFFF,
+                    ino & 0xFFFFFFFF,
+                    mode,
+                    uid,
+                    gid,
+                    size,
+                    hex_to_sha(sha),
+                    flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     f.write("\0" * ((beginoffset + real_size) - f.tell()))
@@ -135,6 +148,7 @@ def read_index_dict(f):
     """Read an index file and return it as a dictionary.
 
     :param f: File object to read from
+
     """
     ret = {}
     for x in read_index(f):
@@ -147,6 +161,7 @@ def write_index(f, entries):
 
     :param f: File-like object to write to
     :param entries: Iterable over the entries to write
+
     """
     f.write("DIRC")
     f.write(struct.pack(">LL", 2, len(entries)))
@@ -155,9 +170,7 @@ def write_index(f, entries):
 
 
 def write_index_dict(f, entries):
-    """Write an index file based on the contents of a dictionary.
-
-    """
+    """Write an index file based on the contents of a dictionary."""
     entries_list = []
     for name in sorted(entries):
         entries_list.append((name,) + tuple(entries[name]))
@@ -170,6 +183,7 @@ def cleanup_mode(mode):
     This will return a mode that can be stored in a tree object.
 
     :param mode: Mode to clean up.
+
     """
     if stat.S_ISLNK(mode):
         return stat.S_IFLNK
@@ -177,18 +191,20 @@ def cleanup_mode(mode):
         return stat.S_IFDIR
     elif S_ISGITLINK(mode):
         return S_IFGITLINK
-    ret = stat.S_IFREG | 0644
-    ret |= (mode & 0111)
+    ret = stat.S_IFREG | 0o644
+    ret |= (mode & 0o111)
     return ret
 
 
 class Index(object):
+
     """A Git Index file."""
 
     def __init__(self, filename):
         """Open an index file.
 
         :param filename: Path to the index file
+
         """
         self._filename = filename
         self.clear()
@@ -216,7 +232,7 @@ class Index(object):
             for x in read_index(f):
                 self[x[0]] = tuple(x[1:])
             # FIXME: Additional data?
-            f.read(os.path.getsize(self._filename)-f.tell()-20)
+            f.read(os.path.getsize(self._filename) - f.tell() - 20)
             f.check_sha()
         finally:
             f.close()
@@ -229,6 +245,7 @@ class Index(object):
         """Retrieve entry by relative path.
 
         :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+
         """
         return self._byname[name]
 
@@ -278,13 +295,14 @@ class Index(object):
         :param tree: SHA1 of the root tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+
         """
         def lookup_entry(path):
             entry = self[path]
             return entry[-2], entry[-6]
         for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
-                want_unchanged=want_unchanged):
+                                                   lookup_entry, object_store, tree,
+                                                   want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
     def commit(self, object_store):
@@ -292,6 +310,7 @@ class Index(object):
 
         :param object_store: Object store to save the tree in
         :return: Root tree SHA
+
         """
         return commit_tree(object_store, self.iterblobs())
 
@@ -302,6 +321,7 @@ def commit_tree(object_store, blobs):
     :param object_store: Object store to add trees to
     :param blobs: Iterable over blob path, sha, mode entries
     :return: SHA1 of the created tree.
+
     """
 
     trees = {"": {}}
@@ -325,7 +345,7 @@ def commit_tree(object_store, blobs):
     def build_tree(path):
         tree = Tree()
         for basename, entry in trees[path].iteritems():
-            if type(entry) == dict:
+            if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))
             else:
@@ -343,14 +363,14 @@ def commit_index(object_store, index):
     :param index: Index file
     :note: This function is deprecated, use index.commit() instead.
     :return: Root tree sha.
+
     """
     return commit_tree(object_store, index.iterblobs())
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
-    """Find the differences between the contents of a tree and
-    a working copy.
+                      want_unchanged=False):
+    """Find the differences between the contents of a tree and a working copy.
 
     :param names: Iterable of names in the working copy
     :param lookup_entry: Function to lookup an entry in the working copy
@@ -359,6 +379,7 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
     :param want_unchanged: Whether unchanged files should be reported
     :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
         (oldsha, newsha)
+
     """
     other_names = set(names)
 
@@ -386,6 +407,7 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     :param stat_val: POSIX stat_result instance
     :param hex_sha: Hex sha of the object
     :param flags: Index flags
+
     """
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
@@ -396,7 +418,7 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
 
 def build_index_from_tree(prefix, index_path, object_store, tree_id,
                           honor_filemode=True):
-    """Generate and materialize index from a tree
+    """Generate and materialize index from a tree.
 
     :param tree_id: Tree to materialize
     :param prefix: Target dir for materialized index files
@@ -407,6 +429,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
+
     """
 
     index = Index(index_path)

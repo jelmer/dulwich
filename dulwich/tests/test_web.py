@@ -25,21 +25,21 @@ import os
 
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
     Tag,
-    )
+)
 from dulwich.repo import (
     BaseRepo,
     MemoryRepo,
-    )
+)
 from dulwich.server import (
     DictBackend,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.web import (
     HTTP_OK,
     HTTP_NOT_FOUND,
@@ -57,14 +57,15 @@ from dulwich.web import (
     _LengthLimitedFile,
     HTTPGitRequest,
     HTTPGitApplication,
-    )
+)
 
 from dulwich.tests.utils import (
     make_object,
-    )
+)
 
 
 class TestHTTPGitRequest(HTTPGitRequest):
+
     """HTTPGitRequest with overridden methods to help test caching."""
 
     def __init__(self, *args, **kwargs):
@@ -79,6 +80,7 @@ class TestHTTPGitRequest(HTTPGitRequest):
 
 
 class WebTestCase(TestCase):
+
     """Base TestCase with useful instance vars and utility functions."""
 
     _req_class = TestHTTPGitRequest
@@ -134,13 +136,14 @@ class DumbHandlersTestCase(WebTestCase):
         xs = 'x' * bufsize
         f = StringIO(2 * xs)
         self.assertEqual([xs, xs],
-                          list(send_file(self._req, f, 'some/thing')))
+                         list(send_file(self._req, f, 'some/thing')))
         self.assertEqual(HTTP_OK, self._status)
         self.assertContentTypeEquals('some/thing')
         self.assertTrue(f.closed)
 
     def test_send_file_error(self):
         class TestFile(object):
+
             def __init__(self, exc_class):
                 self.closed = False
                 self._exc_class = exc_class
@@ -201,7 +204,9 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEqual(HTTP_ERROR, self._status)
 
     def test_get_pack_file(self):
-        pack_name = os.path.join('objects', 'pack', 'pack-%s.pack' % ('1' * 40))
+        pack_name = os.path.join(
+            'objects', 'pack', 'pack-%s.pack' %
+            ('1' * 40))
         backend = _test_backend([], named_files={pack_name: 'pack contents'})
         mat = re.search('.*', pack_name)
         output = ''.join(get_pack_file(self._req, backend, mat))
@@ -236,25 +241,26 @@ class DumbHandlersTestCase(WebTestCase):
 
         objects = [blob1, blob2, blob3, tag1]
         refs = {
-          'HEAD': '000',
-          'refs/heads/master': blob1.id,
-          'refs/tags/tag-tag': tag1.id,
-          'refs/tags/blob-tag': blob3.id,
-          }
+            'HEAD': '000',
+            'refs/heads/master': blob1.id,
+            'refs/tags/tag-tag': tag1.id,
+            'refs/tags/blob-tag': blob3.id,
+        }
         backend = _test_backend(objects, refs=refs)
 
         mat = re.search('.*', '//info/refs')
         self.assertEqual(['%s\trefs/heads/master\n' % blob1.id,
-                           '%s\trefs/tags/blob-tag\n' % blob3.id,
-                           '%s\trefs/tags/tag-tag\n' % tag1.id,
-                           '%s\trefs/tags/tag-tag^{}\n' % blob2.id],
-                          list(get_info_refs(self._req, backend, mat)))
+                          '%s\trefs/tags/blob-tag\n' % blob3.id,
+                          '%s\trefs/tags/tag-tag\n' % tag1.id,
+                          '%s\trefs/tags/tag-tag^{}\n' % blob2.id],
+                         list(get_info_refs(self._req, backend, mat)))
         self.assertEqual(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
         self.assertFalse(self._req.cached)
 
     def test_get_info_packs(self):
         class TestPack(object):
+
             def __init__(self, sha):
                 self._sha = sha
 
@@ -265,6 +271,7 @@ class DumbHandlersTestCase(WebTestCase):
 
         class TestObjectStore(MemoryObjectStore):
             # property must be overridden, can't be assigned
+
             @property
             def packs(self):
                 return packs
@@ -285,6 +292,7 @@ class DumbHandlersTestCase(WebTestCase):
 class SmartHandlersTestCase(WebTestCase):
 
     class _TestUploadPackHandler(object):
+
         def __init__(self, backend, args, proto, http_req=None,
                      advertise_refs=False):
             self.args = args
@@ -314,7 +322,7 @@ class SmartHandlersTestCase(WebTestCase):
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
         handler_output = ''.join(
-          handle_service_request(self._req, 'backend', mat))
+            handle_service_request(self._req, 'backend', mat))
         write_output = self._output.getvalue()
         # Ensure all output was written via the write callback.
         self.assertEqual('', handler_output)
@@ -347,9 +355,9 @@ class SmartHandlersTestCase(WebTestCase):
         handler_output = ''.join(get_info_refs(self._req, 'backend', mat))
         write_output = self._output.getvalue()
         self.assertEqual(('001e# service=git-upload-pack\n'
-                           '0000'
-                           # input is ignored by the handler
-                           'handled input: '), write_output)
+                          '0000'
+                          # input is ignored by the handler
+                          'handled input: '), write_output)
         # Ensure all output was written via the write callback.
         self.assertEqual('', handler_output)
         self.assertTrue(self._handler.advertise_refs)
@@ -358,6 +366,7 @@ class SmartHandlersTestCase(WebTestCase):
 
 
 class LengthLimitedFileTestCase(TestCase):
+
     def test_no_cutoff(self):
         f = _LengthLimitedFile(StringIO('foobar'), 1024)
         self.assertEqual('foobar', f.read())
@@ -385,7 +394,7 @@ class HTTPGitRequestTestCase(WebTestCase):
         self.assertEqual(message, self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
-                          set(self._headers))
+                         set(self._headers))
 
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
@@ -393,7 +402,7 @@ class HTTPGitRequestTestCase(WebTestCase):
         self.assertEqual(message, self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
-                          set(self._headers))
+                         set(self._headers))
 
     def test_respond_ok(self):
         self._req.respond()
@@ -405,13 +414,13 @@ class HTTPGitRequestTestCase(WebTestCase):
         self._req.respond(status=402, content_type='some/type',
                           headers=[('X-Foo', 'foo'), ('X-Bar', 'bar')])
         self.assertEqual(set([
-          ('X-Foo', 'foo'),
-          ('X-Bar', 'bar'),
-          ('Content-Type', 'some/type'),
-          ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
-          ('Pragma', 'no-cache'),
-          ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
-          ]), set(self._headers))
+            ('X-Foo', 'foo'),
+            ('X-Bar', 'bar'),
+            ('Content-Type', 'some/type'),
+            ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
+            ('Pragma', 'no-cache'),
+            ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
+        ]), set(self._headers))
         self.assertEqual(402, self._status)
 
 
@@ -436,7 +445,7 @@ class HTTPGitApplicationTestCase(TestCase):
     def _add_handler(self, app):
         req = self._environ['REQUEST_METHOD']
         app.services = {
-          (req, re.compile('/foo$')): self._test_handler,
+            (req, re.compile('/foo$')): self._test_handler,
         }
 
     def test_call(self):
@@ -452,9 +461,9 @@ class HTTPGitApplicationTestCase(TestCase):
 
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
-    """TestCase for testing the GunzipFilter, ensuring the wsgi.input
-    is correctly decompressed and headers are corrected.
-    """
+
+    """TestCase for testing the GunzipFilter, ensuring the wsgi.input is
+    correctly decompressed and headers are corrected."""
 
     def setUp(self):
         super(GunzipTestCase, self).setUp()

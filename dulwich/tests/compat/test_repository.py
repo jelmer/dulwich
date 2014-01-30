@@ -26,22 +26,23 @@ import os
 
 from dulwich.objects import (
     hex_to_sha,
-    )
+)
 from dulwich.repo import (
     check_ref_format,
-    )
+)
 from dulwich.tests.utils import (
     tear_down_repo,
-    )
+)
 
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
     import_repo,
     CompatTestCase,
-    )
+)
 
 
 class ObjectStoreTestCase(CompatTestCase):
+
     """Tests for git repository compatibility."""
 
     def setUp(self):
@@ -78,7 +79,7 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def test_refs(self):
         output = self._run_git(
-          ['for-each-ref', '--format=%(refname) %(objecttype) %(objectname)'])
+            ['for-each-ref', '--format=%(refname) %(objecttype) %(objectname)'])
         expected_refs = self._parse_refs(output)
 
         actual_refs = {}
@@ -93,7 +94,11 @@ class ObjectStoreTestCase(CompatTestCase):
     # TODO(dborowitz): peeled ref tests
 
     def _get_loose_shas(self):
-        output = self._run_git(['rev-list', '--all', '--objects', '--unpacked'])
+        output = self._run_git(
+            ['rev-list',
+             '--all',
+             '--objects',
+             '--unpacked'])
         return self._parse_objects(output)
 
     def _get_all_shas(self):

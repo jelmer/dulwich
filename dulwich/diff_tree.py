@@ -21,7 +21,7 @@
 from collections import (
     defaultdict,
     namedtuple,
-    )
+)
 
 from cStringIO import StringIO
 import itertools
@@ -30,7 +30,7 @@ import stat
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,
-    )
+)
 
 # TreeChange type constants.
 CHANGE_ADD = 'add'
@@ -51,6 +51,7 @@ REWRITE_THRESHOLD = None
 
 
 class TreeChange(namedtuple('TreeChange', ['type', 'old', 'new'])):
+
     """Named tuple a single change between two trees."""
 
     @classmethod
@@ -81,6 +82,7 @@ def _merge_entries(path, tree1, tree2):
         the trees. If an entry exists in one tree but not the other, the other
         entry will have all attributes set to None. If neither entry's path is
         None, they are guaranteed to match.
+
     """
     entries1 = _tree_entries(path, tree1)
     entries2 = _tree_entries(path, tree2)
@@ -130,8 +132,10 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         tree but not the other, the other entry will have all attributes set
         to None. If neither entry's path is None, they are guaranteed to
         match.
+
     """
-    # This could be fairly easily generalized to >2 trees if we find a use case.
+    # This could be fairly easily generalized to >2 trees if we find a use
+    # case.
     mode1 = tree1_id and stat.S_IFDIR or None
     mode2 = tree2_id and stat.S_IFDIR or None
     todo = [(TreeEntry('', mode1, tree1_id), TreeEntry('', mode2, tree2_id))]
@@ -167,11 +171,12 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
     :param rename_detector: RenameDetector object for detecting renames.
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
+
     """
     if (rename_detector is not None and tree1_id is not None and
-        tree2_id is not None):
+            tree2_id is not None):
         for change in rename_detector.changes_with_renames(
-          tree1_id, tree2_id, want_unchanged=want_unchanged):
+                tree1_id, tree2_id, want_unchanged=want_unchanged):
             yield change
         return
 
@@ -235,6 +240,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
         A path is only included in the output if it is a conflict, i.e. its SHA
         in the merge tree is not found in any of the parents, or in the case of
         deletes, if not all of the old SHAs match.
+
     """
     all_parent_changes = [tree_changes(store, t, tree_id,
                                        rename_detector=rename_detector)
@@ -265,7 +271,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
             yield changes
         elif None not in changes:
             # If no change was found relative to one parent, that means the SHA
-            # must have matched the SHA in that parent, so it is not a conflict.
+            # must have matched the SHA in that parent, so it is not a
+            # conflict.
             yield changes
 
 
@@ -279,6 +286,7 @@ def _count_blocks(obj):
 
     :param obj: The object to count blocks for.
     :return: A dict of block hashcode -> total bytes occurring.
+
     """
     block_counts = defaultdict(int)
     block = StringIO()
@@ -312,6 +320,7 @@ def _common_bytes(blocks1, blocks2):
     :param block2: The second dict of block hashcode -> total bytes.
     :return: The number of bytes in common between blocks1 and blocks2. This is
         only approximate due to possible hash collisions.
+
     """
     # Iterate over the smaller of the two dicts, since this is symmetrical.
     if len(blocks1) > len(blocks2):
@@ -334,6 +343,7 @@ def _similarity_score(obj1, obj2, block_cache=None):
     :return: The similarity score between the two objects, defined as the number
         of bytes in common between the two objects divided by the maximum size,
         scaled to the range 0-100.
+
     """
     if block_cache is None:
         block_cache = {}
@@ -361,6 +371,7 @@ def _tree_change_key(entry):
 
 
 class RenameDetector(object):
+
     """Object for handling rename detection between two trees."""
 
     def __init__(self, store, rename_threshold=RENAME_THRESHOLD,
@@ -382,6 +393,7 @@ class RenameDetector(object):
             modifies; see _similarity_score.
         :param find_copies_harder: If True, consider unmodified files when
             detecting copies.
+
         """
         self._store = store
         self._rename_threshold = rename_threshold
@@ -397,7 +409,7 @@ class RenameDetector(object):
 
     def _should_split(self, change):
         if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or
-            change.old.sha == change.new.sha):
+                change.old.sha == change.new.sha):
             return False
         old_obj = self._store[change.old.sha]
         new_obj = self._store[change.new.sha]
@@ -475,7 +487,8 @@ class RenameDetector(object):
             return CHANGE_MODIFY
         elif delete.type != CHANGE_DELETE:
             # If it's in deletes but not marked as a delete, it must have been
-            # added due to find_copies_harder, and needs to be marked as a copy.
+            # added due to find_copies_harder, and needs to be marked as a
+            # copy.
             return CHANGE_COPY
         return CHANGE_RENAME
 
@@ -509,7 +522,8 @@ class RenameDetector(object):
                     candidates.append((-score, rename))
 
     def _choose_content_renames(self):
-        # Sort scores from highest to lowest, but keep names in ascending order.
+        # Sort scores from highest to lowest, but keep names in ascending
+        # order.
         self._candidates.sort()
 
         delete_paths = set()
@@ -541,11 +555,12 @@ class RenameDetector(object):
             path = add.new.path
             delete = delete_map.get(path)
             if (delete is not None and
-              stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+                    stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]
-        self._deletes = [a for a in self._deletes if a.new.path not in modifies]
+        self._deletes = [
+            a for a in self._deletes if a.new.path not in modifies]
         self._changes += modifies.values()
 
     def _sorted_changes(self):
@@ -559,7 +574,8 @@ class RenameDetector(object):
     def _prune_unchanged(self):
         if self._want_unchanged:
             return
-        self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
+        self._deletes = [
+            d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
     def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False):
         """Iterate TreeChanges between two tree SHAs, with rename detection."""

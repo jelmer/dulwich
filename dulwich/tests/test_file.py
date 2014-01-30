@@ -26,7 +26,7 @@ from dulwich.file import GitFile, fancy_rename
 from dulwich.tests import (
     SkipTest,
     TestCase,
-    )
+)
 
 
 class FancyRenameTests(TestCase):
@@ -58,7 +58,7 @@ class FancyRenameTests(TestCase):
         new_f = open(self.bar, 'rb')
         self.assertEqual('foo contents', new_f.read())
         new_f.close()
-         
+
     def test_dest_exists(self):
         self.create(self.bar, 'bar contents')
         fancy_rename(self.foo, self.bar)
@@ -155,7 +155,7 @@ class GitFileTests(TestCase):
         try:
             f2 = GitFile(foo, 'wb')
             self.fail()
-        except OSError, e:
+        except OSError as e:
             self.assertEqual(errno.EEXIST, e.errno)
         f1.write(' contents')
         f1.close()
@@ -204,7 +204,7 @@ class GitFileTests(TestCase):
         f = GitFile(foo, 'wb')
 
         f._file.close()
-        os.remove(foo+".lock")
+        os.remove(foo + ".lock")
 
         f.abort()
         self.assertTrue(f._closed)

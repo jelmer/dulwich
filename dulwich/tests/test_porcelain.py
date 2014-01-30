@@ -29,15 +29,15 @@ from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
     Blob,
     Tree,
-    )
+)
 from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.tests.utils import (
     build_commit_graph,
     make_object,
-    )
+)
 
 
 class PorcelainTestCase(TestCase):
@@ -50,15 +50,17 @@ class PorcelainTestCase(TestCase):
 
 
 class ArchiveTests(PorcelainTestCase):
+
     """Tests for the archive command."""
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs["refs/heads/master"] = c3.id
         out = StringIO()
         err = StringIO()
         porcelain.archive(self.repo.path, "refs/heads/master", outstream=out,
-            errstream=err)
+                          errstream=err)
         self.assertEquals("", err.getvalue())
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
@@ -69,22 +71,22 @@ class UpdateServerInfoTests(PorcelainTestCase):
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
         porcelain.update_server_info(self.repo.path)
         self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(),
-            'info', 'refs')))
+                                                    'info', 'refs')))
 
 
 class CommitTests(PorcelainTestCase):
 
     def test_custom_author(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
         sha = porcelain.commit(self.repo.path, message="Some message",
-                author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
-        self.assertTrue(type(sha) is str)
+                               author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 
@@ -161,7 +163,7 @@ class CloneTests(PorcelainTestCase):
         outstream = StringIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(ValueError, porcelain.clone, self.repo.path,
-            target_path, checkout=True, bare=True, outstream=outstream)
+                          target_path, checkout=True, bare=True, outstream=outstream)
 
 
 class InitTests(TestCase):
@@ -204,7 +206,7 @@ class LogTests(PorcelainTestCase):
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
@@ -212,7 +214,7 @@ class LogTests(PorcelainTestCase):
 
     def test_max_entries(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
@@ -223,7 +225,7 @@ class ShowTests(PorcelainTestCase):
 
     def test_nolist(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
@@ -231,7 +233,7 @@ class ShowTests(PorcelainTestCase):
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
@@ -249,39 +251,43 @@ class SymbolicRefTests(PorcelainTestCase):
 
     def test_set_wrong_symbolic_ref(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
         outstream = StringIO()
-        self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path, 'foobar')
+        self.assertRaises(
+            ValueError,
+            porcelain.symbolic_ref,
+            self.repo.path,
+            'foobar')
 
     def test_set_force_wrong_symbolic_ref(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
         porcelain.symbolic_ref(self.repo.path, 'force_foobar', force=True)
 
-        #test if we actually changed the file
+        # test if we actually changed the file
         new_ref = self.repo.get_named_file('HEAD').read()
         self.assertEqual(new_ref, 'ref: refs/heads/force_foobar\n')
 
     def test_set_symbolic_ref(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
         porcelain.symbolic_ref(self.repo.path, 'master')
 
     def test_set_symbolic_ref_other_than_master(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]], attrs=dict(refs='develop'))
+                                                                 [3, 1, 2]], attrs=dict(refs='develop'))
         self.repo.refs["HEAD"] = c3.id
         self.repo.refs["refs/heads/develop"] = c3.id
 
         porcelain.symbolic_ref(self.repo.path, 'develop')
 
-        #test if we actually changed the file
+        # test if we actually changed the file
         new_ref = self.repo.get_named_file('HEAD').read()
         self.assertEqual(new_ref, 'ref: refs/heads/develop\n')
 
@@ -290,10 +296,14 @@ class DiffTreeTests(PorcelainTestCase):
 
     def test_empty(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
-        porcelain.diff_tree(self.repo.path, c2.tree, c3.tree, outstream=outstream)
+        porcelain.diff_tree(
+            self.repo.path,
+            c2.tree,
+            c3.tree,
+            outstream=outstream)
         self.assertEquals(outstream.getvalue(), "")
 
 
@@ -301,18 +311,18 @@ class CommitTreeTests(PorcelainTestCase):
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         b = Blob()
         b.data = "foo the bar"
         t = Tree()
-        t.add("somename", 0100644, b.id)
+        t.add("somename", 0o100644, b.id)
         self.repo.object_store.add_object(t)
         self.repo.object_store.add_object(b)
         sha = porcelain.commit_tree(
             self.repo.path, t.id, message="Withcommit.",
             author="Joe <joe@example.com>",
             committer="Jane <jane@example.com>")
-        self.assertTrue(type(sha) is str)
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 
@@ -320,7 +330,7 @@ class RevListTests(PorcelainTestCase):
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         outstream = StringIO()
         porcelain.rev_list(
             self.repo.path, [c3.id], outstream=outstream)
@@ -337,7 +347,7 @@ class TagTests(PorcelainTestCase):
         message = 'bar'
 
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                                 [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
         porcelain.tag(self.repo.path, tag, author, message)

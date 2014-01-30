@@ -30,16 +30,16 @@ from urlparse import parse_qs
 from dulwich import log_utils
 from dulwich.protocol import (
     ReceivableProtocol,
-    )
+)
 from dulwich.repo import (
     Repo,
-    )
+)
 from dulwich.server import (
     DictBackend,
     DEFAULT_HANDLERS,
     generate_info_refs,
     generate_objects_info_packs,
-    )
+)
 
 
 logger = log_utils.getLogger(__name__)
@@ -67,7 +67,7 @@ def date_time_string(timestamp=None):
         timestamp = time.time()
     year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
     return '%s, %02d %3s %4d %02d:%02d:%02d GMD' % (
-            weekdays[wd], day, months[month], year, hh, mm, ss)
+        weekdays[wd], day, months[month], year, hh, mm, ss)
 
 
 def url_prefix(mat):
@@ -77,6 +77,7 @@ def url_prefix(mat):
     :returns: The URL prefix, defined as the text before the match in the
         original string. Normalized to start with one leading slash and end with
         zero.
+
     """
     return '/' + mat.string[:mat.start()].strip('/')
 
@@ -167,7 +168,10 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden('Unsupported service %s' % service)
             return
         req.nocache()
-        write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
+        write = req.respond(
+            HTTP_OK,
+            'application/x-%s-advertisement' %
+            service)
         proto = ReceivableProtocol(StringIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               http_req=req, advertise_refs=True)
@@ -193,6 +197,7 @@ def get_info_packs(req, backend, mat):
 
 
 class _LengthLimitedFile(object):
+
     """Wrapper class to limit the length of reads from a file-like object.
 
     This is used to ensure EOF is read from the wsgi.input object once
@@ -230,9 +235,11 @@ def handle_service_request(req, backend, mat):
 
 
 class HTTPGitRequest(object):
+
     """Class encapsulating the state of a single git HTTP request.
 
     :ivar environ: the WSGI environment for the request.
+
     """
 
     def __init__(self, environ, start_response, dumb=False, handlers=None):
@@ -281,39 +288,41 @@ class HTTPGitRequest(object):
     def nocache(self):
         """Set the response to never be cached by the client."""
         self._cache_headers = [
-          ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
-          ('Pragma', 'no-cache'),
-          ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
-          ]
+            ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
+            ('Pragma', 'no-cache'),
+            ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
+        ]
 
     def cache_forever(self):
         """Set the response to be cached forever by the client."""
         now = time.time()
         self._cache_headers = [
-          ('Date', date_time_string(now)),
-          ('Expires', date_time_string(now + 31536000)),
-          ('Cache-Control', 'public, max-age=31536000'),
-          ]
+            ('Date', date_time_string(now)),
+            ('Expires', date_time_string(now + 31536000)),
+            ('Cache-Control', 'public, max-age=31536000'),
+        ]
 
 
 class HTTPGitApplication(object):
+
     """Class encapsulating the state of a git WSGI application.
 
     :ivar backend: the Backend object backing this application
+
     """
 
     services = {
-      ('GET', re.compile('/HEAD$')): get_text_file,
-      ('GET', re.compile('/info/refs$')): get_info_refs,
-      ('GET', re.compile('/objects/info/alternates$')): get_text_file,
-      ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
-      ('GET', re.compile('/objects/info/packs$')): get_info_packs,
-      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
+        ('GET', re.compile('/HEAD$')): get_text_file,
+        ('GET', re.compile('/info/refs$')): get_info_refs,
+        ('GET', re.compile('/objects/info/alternates$')): get_text_file,
+        ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
+        ('GET', re.compile('/objects/info/packs$')): get_info_packs,
+        ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
+        ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
+        ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
 
-      ('POST', re.compile('/git-upload-pack$')): handle_service_request,
-      ('POST', re.compile('/git-receive-pack$')): handle_service_request,
+        ('POST', re.compile('/git-upload-pack$')): handle_service_request,
+        ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
     def __init__(self, backend, dumb=False, handlers=None, fallback_app=None):
@@ -349,6 +358,7 @@ class HTTPGitApplication(object):
 
 
 class GunzipFilter(object):
+
     """WSGI middleware that unzips gzip-encoded requests before
     passing on to the underlying application.
     """
@@ -362,11 +372,12 @@ class GunzipFilter(object):
             if 'CONTENT_LENGTH' in environ:
                 del environ['CONTENT_LENGTH']
             environ['wsgi.input'] = gzip.GzipFile(filename=None,
-                fileobj=environ['wsgi.input'], mode='r')
+                                                  fileobj=environ['wsgi.input'], mode='r')
         return self.app(environ, start_response)
 
 
 class LimitedInputFilter(object):
+
     """WSGI middleware that limits the input length of a request to that
     specified in Content-Length.
     """
@@ -387,9 +398,8 @@ class LimitedInputFilter(object):
 
 
 def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication,
-    correctly wrapped with needed middleware.
-    """
+    """Factory function to create an instance of HTTPGitApplication, correctly
+    wrapped with needed middleware."""
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = GunzipFilter(LimitedInputFilter(app))
     return wrapped_app
@@ -405,7 +415,9 @@ try:
         WSGIServer,
         make_server,
     )
+
     class ServerHandlerLogger(ServerHandler):
+
         """ServerHandler that uses dulwich's logger for logging exceptions."""
 
         def log_exception(self, exc_info):
@@ -419,7 +431,9 @@ try:
             logger.error(*args)
 
     class WSGIRequestHandlerLogger(WSGIRequestHandler):
-        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
+
+        """WSGIRequestHandler that uses dulwich's logger for logging
+        exceptions."""
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -432,10 +446,11 @@ try:
             logger.error(*args)
 
         def handle(self):
-            """Handle a single HTTP request"""
+            """Handle a single HTTP request."""
 
             self.raw_requestline = self.rfile.readline()
-            if not self.parse_request(): # An error code has been sent, just exit
+            # An error code has been sent, just exit
+            if not self.parse_request():
                 return
 
             handler = ServerHandlerLogger(
@@ -445,9 +460,12 @@ try:
             handler.run(self.server.get_app())
 
     class WSGIServerLogger(WSGIServer):
+
         def handle_error(self, request, client_address):
-            """Handle an error. """
-            logger.exception('Exception happened during processing of request from %s' % str(client_address))
+            """Handle an error."""
+            logger.exception(
+                'Exception happened during processing of request from %s' %
+                str(client_address))
 
     def main(argv=sys.argv):
         """Entry point for starting an HTTP git server."""

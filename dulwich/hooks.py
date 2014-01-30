@@ -28,29 +28,33 @@ from dulwich.errors import (
 
 
 class Hook(object):
+
     """Generic hook object."""
 
     def execute(self, *args):
-        """Execute the hook with the given args
+        """Execute the hook with the given args.
 
         :param args: argument list to hook
         :raise HookError: hook execution failure
         :return: a hook may return a useful value
+
         """
         raise NotImplementedError(self.execute)
 
 
 class ShellHook(Hook):
-    """Hook by executable file
+
+    """Hook by executable file.
 
     Implements standard githooks(5) [0]:
 
     [0] http://www.kernel.org/pub/software/scm/git/docs/githooks.html
+
     """
 
     def __init__(self, name, path, numparam,
                  pre_exec_callback=None, post_exec_callback=None):
-        """Setup shell hook definition
+        """Setup shell hook definition.
 
         :param name: name of hook for error messages
         :param path: absolute path to executable file
@@ -63,6 +67,7 @@ class ShellHook(Hook):
             Defaults to None. Takes in a boolean for hook success and the
             modified argument list and returns the final hook return value
             if applicable
+
         """
         self.name = name
         self.filepath = path
@@ -72,7 +77,7 @@ class ShellHook(Hook):
         self.post_exec_callback = post_exec_callback
 
     def execute(self, *args):
-        """Execute the hook with given args"""
+        """Execute the hook with given args."""
 
         if len(args) != self.numparam:
             raise HookError("Hook %s executed with wrong number of args. \
@@ -97,6 +102,7 @@ class ShellHook(Hook):
 
 
 class PreCommitShellHook(ShellHook):
+
     """pre-commit shell hook"""
 
     def __init__(self, controldir):
@@ -106,6 +112,7 @@ class PreCommitShellHook(ShellHook):
 
 
 class PostCommitShellHook(ShellHook):
+
     """post-commit shell hook"""
 
     def __init__(self, controldir):
@@ -115,6 +122,7 @@ class PostCommitShellHook(ShellHook):
 
 
 class CommitMsgShellHook(ShellHook):
+
     """commit-msg shell hook
 
     :param args[0]: commit message

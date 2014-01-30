@@ -22,6 +22,7 @@
 warning: these tests should be fairly stable, but when writing/debugging new
     tests, deadlocks may freeze the test process such that it cannot be
     Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
+
 """
 
 import threading
@@ -29,31 +30,32 @@ from wsgiref import simple_server
 
 from dulwich.server import (
     DictBackend,
-    )
+)
 from dulwich.tests import (
     SkipTest,
-    )
+)
 from dulwich.web import (
     make_wsgi_chain,
     HTTPGitApplication,
     WSGIRequestHandlerLogger,
     WSGIServerLogger,
-    )
+)
 
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
-    )
+)
 from dulwich.tests.compat.utils import (
     CompatTestCase,
-    )
+)
 
 
 if getattr(simple_server.WSGIServer, 'shutdown', None):
     WSGIServer = WSGIServerLogger
 else:
     class WSGIServer(ShutdownServerMixIn, WSGIServerLogger):
+
         """Subclass of WSGIServer that can be shut down."""
 
         def __init__(self, *args, **kwargs):
@@ -65,10 +67,12 @@ else:
 
 
 class WebTests(ServerTests):
+
     """Base tests for web server tests.
 
-    Contains utility and setUp/tearDown methods, but does non inherit from
-    TestCase so tests are not automatically run.
+    Contains utility and setUp/tearDown methods, but does non inherit
+    from TestCase so tests are not automatically run.
+
     """
 
     protocol = 'http'
@@ -77,8 +81,8 @@ class WebTests(ServerTests):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
-          'localhost', 0, app, server_class=WSGIServer,
-          handler_class=WSGIRequestHandlerLogger)
+            'localhost', 0, app, server_class=WSGIServer,
+            handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server
@@ -87,9 +91,11 @@ class WebTests(ServerTests):
 
 
 class SmartWebTestCase(WebTests, CompatTestCase):
+
     """Test cases for smart HTTP server.
 
     This server test case does not use side-band-64k in git-receive-pack.
+
     """
 
     min_git_version = (1, 6, 6)
@@ -113,6 +119,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
 
 
 class SmartWebSideBand64kTestCase(SmartWebTestCase):
+
     """Test cases for smart HTTP server with side-band-64k support."""
 
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
@@ -128,6 +135,7 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
 
 
 class DumbWebTestCase(WebTests, CompatTestCase):
+
     """Test cases for dumb HTTP server."""
 
     def _make_app(self, backend):

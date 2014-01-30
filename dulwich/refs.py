@@ -18,23 +18,21 @@
 # MA  02110-1301, USA.
 
 
-"""Ref handling.
-
-"""
+"""Ref handling."""
 import errno
 import os
 
 from dulwich.errors import (
     PackedRefsException,
     RefFormatError,
-    )
+)
 from dulwich.objects import (
     hex_to_sha,
-    )
+)
 from dulwich.file import (
     GitFile,
     ensure_dir_exists,
-    )
+)
 
 
 SYMREF = 'ref: '
@@ -49,6 +47,7 @@ def check_ref_format(refname):
 
     :param refname: The refname to check
     :return: True if refname is valid, False otherwise
+
     """
     # These could be combined into one big expression, but are listed separately
     # to parallel [1].
@@ -59,7 +58,7 @@ def check_ref_format(refname):
     if '..' in refname:
         return False
     for c in refname:
-        if ord(c) < 040 or c in '\177 ~^:?*[':
+        if ord(c) < 0o40 or c in '\177 ~^:?*[':
             return False
     if refname[-1] in '/.':
         return False
@@ -73,6 +72,7 @@ def check_ref_format(refname):
 
 
 class RefsContainer(object):
+
     """A container for refs."""
 
     def set_symbolic_ref(self, name, other):
@@ -80,6 +80,7 @@ class RefsContainer(object):
 
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
+
         """
         raise NotImplementedError(self.set_symbolic_ref)
 
@@ -100,6 +101,7 @@ class RefsContainer(object):
         :return: The peeled value of the ref. If the ref is known not point to a
             tag, this will be the SHA the ref refers to. If the ref may point to
             a tag, but no cached information is available, None is returned.
+
         """
         return None
 
@@ -117,6 +119,7 @@ class RefsContainer(object):
         :param base: An optional base to return refs under.
         :return: An unsorted set of valid refs in this container, including
             packed refs.
+
         """
         if base is not None:
             return self.subkeys(base)
@@ -129,6 +132,7 @@ class RefsContainer(object):
         :param base: The base to return refs under.
         :return: A set of valid refs in this container under the base; the base
             prefix is stripped from the ref names returned.
+
         """
         keys = set()
         base_len = len(base) + 1
@@ -138,9 +142,7 @@ class RefsContainer(object):
         return keys
 
     def as_dict(self, base=None):
-        """Return the contents of this container as a dictionary.
-
-        """
+        """Return the contents of this container as a dictionary."""
         ret = {}
         keys = self.keys(base)
         if base is None:
@@ -163,6 +165,7 @@ class RefsContainer(object):
 
         :param name: The name of the reference.
         :raises KeyError: if a refname is not HEAD or is otherwise not valid.
+
         """
         if name in ('HEAD', 'refs/stash'):
             return
@@ -175,6 +178,7 @@ class RefsContainer(object):
         :param refname: The name of the reference
         :return: The contents of the ref file, or None if it does
             not exist.
+
         """
         contents = self.read_loose_ref(refname)
         if not contents:
@@ -187,6 +191,7 @@ class RefsContainer(object):
         :param name: the refname to read
         :return: The contents of the ref file, or None if it does
             not exist.
+
         """
         raise NotImplementedError(self.read_loose_ref)
 
@@ -195,6 +200,7 @@ class RefsContainer(object):
 
         :return: a tuple of (refname, sha), where refname is the name of the
             last reference in the symbolic reference chain
+
         """
         contents = SYMREF + name
         depth = 0
@@ -217,6 +223,7 @@ class RefsContainer(object):
         """Get the SHA1 for a reference name.
 
         This method follows all symbolic references.
+
         """
         _, sha = self._follow(name)
         if sha is None:
@@ -235,6 +242,7 @@ class RefsContainer(object):
             unconditionally.
         :param new_ref: The new sha the refname will refer to.
         :return: True if the set was successful, False otherwise.
+
         """
         raise NotImplementedError(self.set_if_equals)
 
@@ -267,6 +275,7 @@ class RefsContainer(object):
         :param old_ref: The old sha the refname must refer to, or None to delete
             unconditionally.
         :return: True if the delete was successful, False otherwise.
+
         """
         raise NotImplementedError(self.remove_if_equals)
 
@@ -281,15 +290,18 @@ class RefsContainer(object):
             remove_if_equals().
 
         :param name: The refname to delete.
+
         """
         self.remove_if_equals(name, None)
 
 
 class DictRefsContainer(RefsContainer):
+
     """RefsContainer backed by a simple dict.
 
-    This container does not support symbolic or packed references and is not
-    threadsafe.
+    This container does not support symbolic or packed references and is
+    not threadsafe.
+
     """
 
     def __init__(self, refs):
@@ -343,6 +355,7 @@ class DictRefsContainer(RefsContainer):
 
 
 class InfoRefsContainer(RefsContainer):
+
     """Refs container that reads refs from a info/refs file."""
 
     def __init__(self, f):
@@ -377,6 +390,7 @@ class InfoRefsContainer(RefsContainer):
 
 
 class DiskRefsContainer(RefsContainer):
+
     """Refs container that reads refs from disk."""
 
     def __init__(self, path):
@@ -418,9 +432,7 @@ class DiskRefsContainer(RefsContainer):
         return keys
 
     def refpath(self, name):
-        """Return the disk path of a ref.
-
-        """
+        """Return the disk path of a ref."""
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
@@ -469,6 +481,7 @@ class DiskRefsContainer(RefsContainer):
         :return: The peeled value of the ref. If the ref is known not point to a
             tag, this will be the SHA the ref refers to. If the ref may point to
             a tag, but no cached information is available, None is returned.
+
         """
         self.get_packed_refs()
         if self._peeled_refs is None or name not in self._packed_refs:
@@ -490,6 +503,7 @@ class DiskRefsContainer(RefsContainer):
         :return: The contents of the ref file, or None if the file does not
             exist.
         :raises IOError: if any other error occurs
+
         """
         filename = self.refpath(name)
         try:
@@ -535,6 +549,7 @@ class DiskRefsContainer(RefsContainer):
 
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
+
         """
         self._check_refname(name)
         self._check_refname(other)
@@ -560,6 +575,7 @@ class DiskRefsContainer(RefsContainer):
             unconditionally.
         :param new_ref: The new sha the refname will refer to.
         :return: True if the set was successful, False otherwise.
+
         """
         self._check_refname(name)
         try:
@@ -600,6 +616,7 @@ class DiskRefsContainer(RefsContainer):
         :param name: The refname to set.
         :param ref: The new sha the refname will refer to.
         :return: True if the add was successful, False otherwise.
+
         """
         try:
             realname, contents = self._follow(name)
@@ -634,6 +651,7 @@ class DiskRefsContainer(RefsContainer):
         :param old_ref: The old sha the refname must refer to, or None to delete
             unconditionally.
         :return: True if the delete was successful, False otherwise.
+
         """
         self._check_refname(name)
         filename = self.refpath(name)
@@ -649,7 +667,7 @@ class DiskRefsContainer(RefsContainer):
             # may only be packed
             try:
                 os.remove(filename)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
             self._remove_packed_ref(name)
@@ -667,7 +685,7 @@ def _split_ref_line(line):
     sha, name = fields
     try:
         hex_to_sha(sha)
-    except (AssertionError, TypeError), e:
+    except (AssertionError, TypeError) as e:
         raise PackedRefsException(e)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name '%s'" % name)
@@ -679,6 +697,7 @@ def read_packed_refs(f):
 
     :param f: file-like object to read from
     :return: Iterator over tuples with SHA1s and ref names.
+
     """
     for l in f:
         if l[0] == "#":
@@ -686,7 +705,7 @@ def read_packed_refs(f):
             continue
         if l[0] == "^":
             raise PackedRefsException(
-              "found peeled ref in packed-refs without peeled")
+                "found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 
@@ -697,6 +716,7 @@ def read_packed_refs_with_peeled(f):
     with ref names, SHA1s, and peeled SHA1s (or None).
 
     :param f: file-like object to read from, seek'ed to the second line
+
     """
     last = None
     for l in f:
@@ -708,7 +728,7 @@ def read_packed_refs_with_peeled(f):
                 raise PackedRefsException("unexpected peeled ref line")
             try:
                 hex_to_sha(l[1:])
-            except (AssertionError, TypeError), e:
+            except (AssertionError, TypeError) as e:
                 raise PackedRefsException(e)
             sha, name = _split_ref_line(last)
             last = None
@@ -729,6 +749,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
     :param f: empty file-like object to write to
     :param packed_refs: dict of refname to sha of packed refs to write
     :param peeled_refs: dict of refname to peeled value of sha
+
     """
     if peeled_refs is None:
         peeled_refs = {}

@@ -31,17 +31,18 @@ from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha
 from dulwich.server import (
     ReceivePackHandler,
-    )
+)
 from dulwich.tests.utils import (
     tear_down_repo,
-    )
+)
 from dulwich.tests.compat.utils import (
     import_repo,
     run_git_or_fail,
-    )
+)
 
 
 class _StubRepo(object):
+
     """A stub repo that just contains a path to tear down."""
 
     def __init__(self, name):
@@ -68,9 +69,11 @@ def _get_shallow(repo):
 
 
 class ServerTests(object):
+
     """Base tests for testing servers.
 
     Does not inherit from TestCase so tests are not automatically run.
+
     """
 
     def import_repos(self):
@@ -165,7 +168,7 @@ class ServerTests(object):
             # We don't create a Repo from new_repo_dir until after some errors
             # may have occurred, so don't depend on tearDown to clean it up.
             shutil.rmtree(new_repo_base_dir)
-    
+
     def test_lsremote_from_dulwich(self):
         self._repo = import_repo('server_old.export')
         port = self._start_server(self._repo)
@@ -180,8 +183,9 @@ class ServerTests(object):
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
-        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+        run_git_or_fail(
+            ['clone', '--mirror', '--depth=1', '--no-single-branch',
+             self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
         expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
@@ -196,14 +200,15 @@ class ServerTests(object):
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
-        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+        run_git_or_fail(
+            ['clone', '--mirror', '--depth=1', '--no-single-branch',
+             self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
         expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
         self.assertEqual(expected_shallow, _get_shallow(clone))
@@ -217,29 +222,32 @@ class ServerTests(object):
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
-        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+        run_git_or_fail(
+            ['clone', '--mirror', '--depth=1', '--no-single-branch',
+             self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
 
         # The whole repo only has depth 3, so it should equal server_new.
         run_git_or_fail(
-          ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
 
 class ShutdownServerMixIn:
+
     """Mixin that allows serve_forever to be shut down.
 
     The methods in this mixin are backported from SocketServer.py in the Python
     2.6.4 standard library. The mixin is unnecessary in 2.6 and later, when
     BaseServer supports the shutdown method directly.
+
     """
 
     def __init__(self):
@@ -252,6 +260,7 @@ class ShutdownServerMixIn:
         Polls for shutdown every poll_interval seconds. Ignores
         self.timeout. If you need to do periodic tasks, do them in
         another thread.
+
         """
         self.__serving = True
         self.__is_shut_down.clear()
@@ -271,7 +280,9 @@ class ShutdownServerMixIn:
         """Stops the serve_forever loop.
 
         Blocks until the loop has finished. This must be called while
-        serve_forever() is running in another thread, or it will deadlock.
+        serve_forever() is running in another thread, or it will
+        deadlock.
+
         """
         self.__serving = False
         self.__is_shut_down.wait()
@@ -280,6 +291,7 @@ class ShutdownServerMixIn:
         """Handle one request, possibly blocking.
 
         Respects self.timeout.
+
         """
         # Support people who used socket.settimeout() to escape
         # handle_request before self.timeout was available.
@@ -298,8 +310,9 @@ class ShutdownServerMixIn:
         """Handle one request, without blocking.
 
         I assume that select.select has returned that the socket is
-        readable before this function was called, so there should be
-        no risk of blocking in get_request().
+        readable before this function was called, so there should be no
+        risk of blocking in get_request().
+
         """
         try:
             request, client_address = self.get_request()
@@ -317,6 +330,7 @@ class ShutdownServerMixIn:
 # capabilities. The only reason it is the way it is now is that side-band-64k
 # was only recently introduced into git-receive-pack.
 class NoSideBand64kReceivePackHandler(ReceivePackHandler):
+
     """ReceivePackHandler that does not support side-band-64k."""
 
     @classmethod
@@ -325,8 +339,8 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
                      if c != 'side-band-64k')
 
 
-def ignore_error((e_type, e_value, e_tb)):
+def ignore_error(xxx_todo_changeme):
     """Check whether this error is safe to ignore."""
+    (e_type, e_value, e_tb) = xxx_todo_changeme
     return (issubclass(e_type, socket.error) and
             e_value[0] in (errno.ECONNRESET, errno.EPIPE))
-

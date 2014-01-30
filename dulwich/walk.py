@@ -30,10 +30,10 @@ from dulwich.diff_tree import (
     tree_changes,
     tree_changes_for_merge,
     RenameDetector,
-    )
+)
 from dulwich.errors import (
     MissingCommitError,
-    )
+)
 
 ORDER_DATE = 'date'
 ORDER_TOPO = 'topo'
@@ -45,6 +45,7 @@ _MAX_EXTRA_COMMITS = 5
 
 
 class WalkEntry(object):
+
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker, commit):
@@ -61,6 +62,7 @@ class WalkEntry(object):
             objects; if the commit has no parents, these will be relative to the
             empty tree. For merge commits, a list of lists of TreeChange
             objects; see dulwich.diff.tree_changes_for_merge.
+
         """
         if self._changes is None:
             commit = self.commit
@@ -72,18 +74,20 @@ class WalkEntry(object):
                 parent = self._store[self._get_parents(commit)[0]].tree
             else:
                 changes_func = tree_changes_for_merge
-                parent = [self._store[p].tree for p in self._get_parents(commit)]
+                parent = [self._store[p]
+                          .tree for p in self._get_parents(commit)]
             self._changes = list(changes_func(
-              self._store, parent, commit.tree,
-              rename_detector=self._rename_detector))
+                self._store, parent, commit.tree,
+                rename_detector=self._rename_detector))
         return self._changes
 
     def __repr__(self):
         return '<WalkEntry commit=%s, changes=%r>' % (
-          self.commit.id, self.changes())
+            self.commit.id, self.changes())
 
 
 class _CommitTimeQueue(object):
+
     """Priority queue of WalkEntry objects by commit time."""
 
     def __init__(self, walker):
@@ -160,7 +164,7 @@ class _CommitTimeQueue(object):
                         reset_extra_commits = False
 
             if (self._min_time is not None and
-                commit.commit_time < self._min_time):
+                    commit.commit_time < self._min_time):
                 # We want to stop walking at min_time, but commits at the
                 # boundary may be out of order with respect to their parents. So
                 # we walk _MAX_EXTRA_COMMITS more commits once we hit this
@@ -183,10 +187,12 @@ class _CommitTimeQueue(object):
 
 
 class Walker(object):
+
     """Object for performing a walk of commits in a store.
 
-    Walker objects are initialized with a store and other options and can then
-    be treated as iterators of Commit objects.
+    Walker objects are initialized with a store and other options and
+    can then be treated as iterators of Commit objects.
+
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
@@ -218,6 +224,7 @@ class Walker(object):
         :param queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
+
         """
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
@@ -249,7 +256,7 @@ class Walker(object):
             if changed_path == followed_path:
                 return True
             if (changed_path.startswith(followed_path) and
-                changed_path[len(followed_path)] == '/'):
+                    changed_path[len(followed_path)] == '/'):
                 return True
         return False
 
@@ -274,6 +281,7 @@ class Walker(object):
         :param entry: The WalkEntry to consider.
         :return: True if the WalkEntry should be returned by this walk, or False
             otherwise (e.g. if it doesn't match any requested paths).
+
         """
         commit = entry.commit
         if self.since is not None and commit.commit_time < self.since:
@@ -322,6 +330,7 @@ class Walker(object):
             from the queue_cls.
         :return: An iterator or list of WalkEntry objects, in the order required
             by the Walker.
+
         """
         if self.order == ORDER_TOPO:
             results = _topo_reorder(results, self.get_parents)
@@ -343,6 +352,7 @@ def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     :param get_parents: Optional function for getting the parents of a commit.
     :return: iterator over WalkEntry objects from entries in FIFO order, except
         where a parent would be yielded before any of its children.
+
     """
     todo = collections.deque()
     pending = {}

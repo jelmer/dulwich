@@ -33,7 +33,7 @@ from dulwich.tests import (
     get_safe_env,
     SkipTest,
     TestCase,
-    )
+)
 
 _DEFAULT_GIT = 'git'
 _VERSION_LEN = 4
@@ -48,6 +48,7 @@ def git_version(git_path=_DEFAULT_GIT):
         the system path.
     :return: A tuple of ints of the form (major, minor, point, sub-point), or
         None if no git installation was found.
+
     """
     try:
         output = run_git_or_fail(['--version'], git_path=git_path)
@@ -117,6 +118,7 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
     :return: A tuple of (returncode, stdout contents). If capture_stdout is
         False, None will be returned as stdout contents.
     :raise OSError: if the git executable was not found.
+
     """
 
     env = get_safe_env(popen_kwargs.pop('env', None))
@@ -186,6 +188,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
     :param port: Port on which we expect the daemon to appear.
     :returns: A boolean, true if a daemon is running on the specified port,
         false if not.
+
     """
     for _ in xrange(limit):
         time.sleep(delay)
@@ -195,7 +198,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
             s.connect(('localhost', port))
             s.close()
             return True
-        except socket.error, e:
+        except socket.error as e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
@@ -204,10 +207,12 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
 
 
 class CompatTestCase(TestCase):
+
     """Test case that requires git for compatibility checks.
 
     Subclasses can change the git version required by overriding
     min_git_version.
+
     """
 
     min_git_version = (1, 5, 0)

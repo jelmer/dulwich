@@ -143,6 +143,7 @@ class LRUCache(object):
         :param value: The object to store
         :param cleanup: None or a function taking (key, value) to indicate
                         'value' should be cleaned up.
+
         """
         if key is _null_key:
             raise ValueError('cannot use _null_key as a key')
@@ -179,6 +180,7 @@ class LRUCache(object):
         state.
 
         :return: An unordered list of keys that are currently cached.
+
         """
         return self._cache.keys()
 
@@ -189,8 +191,9 @@ class LRUCache(object):
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.
 
-        This does not completely wipe the cache, just makes sure it is under
-        the after_cleanup_count.
+        This does not completely wipe the cache, just makes sure it is
+        under the after_cleanup_count.
+
         """
         # Make sure the cache is shrunk to the correct size
         while len(self._cache) > self._after_cleanup_count:
@@ -247,8 +250,9 @@ class LRUCache(object):
     def _remove_lru(self):
         """Remove one entry from the lru, and handle consequences.
 
-        If there are no more references to the lru, then this entry should be
-        removed from the cache.
+        If there are no more references to the lru, then this entry
+        should be removed from the cache.
+
         """
         self._remove_node(self._least_recently_used)
 
@@ -282,6 +286,7 @@ class LRUSizeCache(LRUCache):
 
     The size of items added will be computed using compute_size(value), which
     defaults to len() if not supplied.
+
     """
 
     def __init__(self, max_size=1024 * 1024, after_cleanup_size=None,
@@ -298,6 +303,7 @@ class LRUSizeCache(LRUCache):
             something like a list of strings, or even a custom object.
             The function should take the form "compute_size(value) => integer".
             If not supplied, it defaults to 'len()'
+
         """
         self._value_size = 0
         self._compute_size = compute_size
@@ -316,6 +322,7 @@ class LRUSizeCache(LRUCache):
         :param value: The object to store
         :param cleanup: None or a function taking (key, value) to indicate
                         'value' should be cleaned up.
+
         """
         if key is _null_key:
             raise ValueError('cannot use _null_key as a key')
@@ -346,8 +353,9 @@ class LRUSizeCache(LRUCache):
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.
 
-        This does not completely wipe the cache, just makes sure it is under
-        the after_cleanup_size.
+        This does not completely wipe the cache, just makes sure it is
+        under the after_cleanup_size.
+
         """
         # Make sure the cache is shrunk to the correct size
         while self._value_size > self._after_cleanup_size:

@@ -22,6 +22,7 @@
 warning: these tests should be fairly stable, but when writing/debugging new
     tests, deadlocks may freeze the test process such that it cannot be
     Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
+
 """
 
 import threading
@@ -69,8 +70,9 @@ class WebTests(ServerTests):
 
     """Base tests for web server tests.
 
-    Contains utility and setUp/tearDown methods, but does non inherit from
-    TestCase so tests are not automatically run.
+    Contains utility and setUp/tearDown methods, but does non inherit
+    from TestCase so tests are not automatically run.
+
     """
 
     protocol = 'http'
@@ -93,6 +95,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     """Test cases for smart HTTP server.
 
     This server test case does not use side-band-64k in git-receive-pack.
+
     """
 
     min_git_version = (1, 6, 6)

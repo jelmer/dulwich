@@ -40,6 +40,7 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     :param commit: Commit object
     :param progress: Tuple with current patch number and total.
     :return: tuple with filename and contents
+
     """
     (num, total) = progress
     f.write("From %s %s\n" % (commit.id, time.ctime(commit.commit_time)))
@@ -72,6 +73,7 @@ def get_summary(commit):
 
     :param commit: Commit
     :return: Summary string
+
     """
     return commit.message.splitlines()[0].replace(" ", "-")
 
@@ -80,6 +82,7 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
     """difflib.unified_diff that doesn't write any dates or trailing spaces.
 
     Based on the same function in Python2.6.5-rc2's difflib.py
+
     """
     started = False
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
@@ -110,6 +113,7 @@ def is_binary(content):
     """See if the first few bytes contain any null characters.
 
     :param content: Bytestring to check for binary content
+
     """
     return '\0' in content[:FIRST_FEW_BYTES]
 
@@ -126,6 +130,7 @@ def write_object_diff(f, store, xxx_todo_changeme, xxx_todo_changeme1,
         are considered binary files by is_binary().
 
     :note: the tuple elements should be None for nonexistant files
+
     """
     (old_path, old_mode, old_id) = xxx_todo_changeme
     (new_path, new_mode, new_id) = xxx_todo_changeme1
@@ -187,6 +192,7 @@ def write_blob_diff(f, xxx_todo_changeme2, xxx_todo_changeme3):
     :param (new_path, new_mode, new_blob): New file (None if nonexisting)
 
     :note: The use of write_object_diff is recommended over this function.
+
     """
     (old_path, old_mode, old_blob) = xxx_todo_changeme2
     (new_path, new_mode, new_blob) = xxx_todo_changeme3
@@ -236,6 +242,7 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     :param new_tree: New tree id
     :param diff_binary: Whether to diff files even if they
         are considered binary files by is_binary().
+
     """
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:

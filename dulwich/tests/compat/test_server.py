@@ -22,6 +22,7 @@
 Warning: these tests should be fairly stable, but when writing/debugging new
     tests, deadlocks may freeze the test process such that it cannot be
     Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
+
 """
 
 import threading
@@ -60,6 +61,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
     This server test case does not use side-band-64k in git-receive-pack.
+
     """
 
     protocol = 'git'

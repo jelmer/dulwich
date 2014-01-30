@@ -51,6 +51,7 @@ class WrongObjectException(Exception):
 
     Subclasses should define a type_name attribute that indicates what
     was expected if they were raised.
+
     """
 
     def __init__(self, sha, *args, **kwargs):
@@ -87,7 +88,7 @@ class NotBlobError(WrongObjectException):
 
 class MissingCommitError(Exception):
 
-    """Indicates that a commit was not found in the repository"""
+    """Indicates that a commit was not found in the repository."""
 
     def __init__(self, sha, *args, **kwargs):
         self.sha = sha

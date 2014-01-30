@@ -64,6 +64,7 @@ def open_repo(name):
     :param name: The name of the repository, relative to
         dulwich/tests/data/repos
     :returns: An initialized Repo object that lives in a temporary directory.
+
     """
     temp_dir = tempfile.mkdtemp()
     repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
@@ -86,6 +87,7 @@ def make_object(cls, **attrs):
 
     :param attrs: dict of attributes to set on the new object.
     :return: A newly initialized object of type cls.
+
     """
 
     class TestObject(cls):
@@ -95,6 +97,7 @@ def make_object(cls, **attrs):
         Note that classes with __slots__ can't have arbitrary attributes monkey-
         patched in, so this is a class that is exactly the same only with a
         __dict__ instead of __slots__.
+
         """
         pass
 
@@ -114,6 +117,7 @@ def make_commit(**attrs):
 
     :param attrs: dict of attributes to overwrite from the default values.
     :return: A newly initialized Commit object.
+
     """
     default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
     all_attrs = {'author': 'Test Author <test@nodomain.com>',
@@ -157,6 +161,7 @@ def ext_functest_builder(method, func):
     :param method: The method to run. It must must two parameters, self and the
         function implementation to test.
     :param func: The function implementation to pass to method.
+
     """
 
     def do_test(self):
@@ -184,6 +189,7 @@ def build_pack(f, objects_spec, store=None):
     :param store: An optional ObjectStore for looking up external refs.
     :return: A list of tuples in the order specified by objects_spec:
         (offset, type num, data, sha, CRC32)
+
     """
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
@@ -268,6 +274,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         assigning additional values to the commits.
     :return: The list of commit objects created.
     :raise ValueError: If an undefined commit identifier is listed as a parent.
+
     """
     if trees is None:
         trees = {}

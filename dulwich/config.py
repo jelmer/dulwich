@@ -22,6 +22,7 @@ TODO:
  * preserve formatting when updating configuration files
  * treat subsection names as case-insensitive for [branch.foo] style
    subsections
+
 """
 
 import errno
@@ -49,6 +50,7 @@ class Config(object):
         :param subsection: Subsection name
         :return: Contents of the setting
         :raise KeyError: if the value is not set
+
         """
         raise NotImplementedError(self.get)
 
@@ -60,6 +62,7 @@ class Config(object):
             subsection.
         :return: Contents of the setting
         :raise KeyError: if the value is not set
+
         """
         try:
             value = self.get(section, name)
@@ -78,6 +81,7 @@ class Config(object):
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
+
         """
         raise NotImplementedError(self.set)
 
@@ -86,6 +90,7 @@ class Config(object):
 
         :param section: Tuple with section name and optional subsection namee
         :return: Iterator over (name, value) pairs
+
         """
         raise NotImplementedError(self.iteritems)
 
@@ -93,6 +98,7 @@ class Config(object):
         """Iterate over the sections.
 
         :return: Iterator over section tuples
+
         """
         raise NotImplementedError(self.itersections)
 
@@ -234,8 +240,7 @@ def _strip_comments(line):
 
 class ConfigFile(ConfigDict):
 
-    """A Git configuration file, like .git/config or ~/.gitconfig.
-    """
+    """A Git configuration file, like .git/config or ~/.gitconfig."""
 
     @classmethod
     def from_file(cls, f):
@@ -361,6 +366,7 @@ class StackedConfig(Config):
 
         This will look in the users' home directory and the system
         configuration.
+
         """
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))

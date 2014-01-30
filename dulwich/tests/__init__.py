@@ -86,6 +86,7 @@ class BlackboxTestCase(TestCase):
 
         :param name: Name of the script
         :return: Full path
+
         """
         return os.path.join(self.bin_directory, name)
 
@@ -94,6 +95,7 @@ class BlackboxTestCase(TestCase):
 
         :param name: Name of the command, as it exists in bin/
         :param args: Arguments to the command
+
         """
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(sys.path)

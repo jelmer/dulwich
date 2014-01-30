@@ -21,9 +21,8 @@
 
 """Repository access.
 
-This module contains the base class for git repositories
-(BaseRepo) and an implementation which uses a repository on
-local disk (Repo).
+This module contains the base class for git repositories (BaseRepo) and
+an implementation which uses a repository on local disk (Repo).
 
 """
 
@@ -98,7 +97,7 @@ BASE_DIRECTORIES = [
 
 
 def parse_graftpoints(graftpoints):
-    """Convert a list of graftpoints into a dict
+    """Convert a list of graftpoints into a dict.
 
     :param graftpoints: Iterator of graftpoint lines
 
@@ -109,6 +108,7 @@ def parse_graftpoints(graftpoints):
         <commit sha1>: [<parent sha1>*]
 
     https://git.wiki.kernel.org/index.php/GraftPoint
+
     """
     grafts = {}
     for l in graftpoints:
@@ -128,7 +128,7 @@ def parse_graftpoints(graftpoints):
 
 
 def serialize_graftpoints(graftpoints):
-    """Convert a dictionary of grafts into string
+    """Convert a dictionary of grafts into string.
 
     The graft dictionary is:
         <commit sha1>: [<parent sha1>*]
@@ -156,6 +156,7 @@ class BaseRepo(object):
         the objects
     :ivar refs: Dictionary-like object with the refs in this
         repository
+
     """
 
     def __init__(self, object_store, refs):
@@ -166,6 +167,7 @@ class BaseRepo(object):
 
         :param object_store: Object store to use
         :param refs: Refs container to use
+
         """
         self.object_store = object_store
         self.refs = refs
@@ -196,6 +198,7 @@ class BaseRepo(object):
 
         :param path: The path to the file, relative to the control dir.
         :return: An open file object, or None if the file does not exist.
+
         """
         raise NotImplementedError(self.get_named_file)
 
@@ -204,6 +207,7 @@ class BaseRepo(object):
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
+
         """
         raise NotImplementedError(self._put_named_file)
 
@@ -212,6 +216,7 @@ class BaseRepo(object):
 
         :raise NoIndexPresent: If no index is present
         :return: The matching `Index`
+
         """
         raise NotImplementedError(self.open_index)
 
@@ -223,6 +228,7 @@ class BaseRepo(object):
             fetch.
         :param progress: Optional progress function
         :return: The local refs
+
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -245,6 +251,7 @@ class BaseRepo(object):
         :param get_tagged: Function that returns a dict of pointed-to sha -> tag
             sha for including tags.
         :return: iterator over objects, with __len__ implemented
+
         """
         wants = determine_wants(self.get_refs())
         if not isinstance(wants, list):
@@ -290,6 +297,7 @@ class BaseRepo(object):
 
         :param heads: Repository heads to use (optional)
         :return: A graph walker object
+
         """
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
@@ -299,6 +307,7 @@ class BaseRepo(object):
         """Get dictionary with all refs.
 
         :return: A ``dict`` mapping ref names to SHA1s
+
         """
         return self.refs.as_dict()
 
@@ -329,6 +338,7 @@ class BaseRepo(object):
         :param sha: SHA to retrieve
         :return: A ShaFile object
         :raise KeyError: when the object can not be found
+
         """
         return self.object_store[sha]
 
@@ -341,6 +351,7 @@ class BaseRepo(object):
         :param sha: SHA of the commit for which to retrieve the parents
         :param commit: Optional commit matching the sha
         :return: List of parents
+
         """
 
         try:
@@ -354,6 +365,7 @@ class BaseRepo(object):
         """Retrieve the config object.
 
         :return: `ConfigFile` object for the ``.git/config`` file.
+
         """
         raise NotImplementedError(self.get_config)
 
@@ -362,6 +374,7 @@ class BaseRepo(object):
 
         :return: String with the description of the repository
             as set by the user.
+
         """
         raise NotImplementedError(self.get_description)
 
@@ -369,6 +382,7 @@ class BaseRepo(object):
         """Set the description for this repository.
 
         :param description: Text to set as description for this repository.
+
         """
         raise NotImplementedError(self.set_description)
 
@@ -380,6 +394,7 @@ class BaseRepo(object):
         lives in ~/.gitconfig.
 
         :return: `Config` instance for this repository
+
         """
         from dulwich.config import StackedConfig
         backends = [self.get_config()] + StackedConfig.default_backends()
@@ -392,6 +407,7 @@ class BaseRepo(object):
         :return: The fully-peeled SHA1 of a tag object, after peeling all
             intermediate tags; if the original ref does not point to a tag, this
             will equal the original SHA1.
+
         """
         cached = self.refs.get_peeled(ref)
         if cached is not None:
@@ -422,6 +438,7 @@ class BaseRepo(object):
             iterator protocol. The constructor takes a single argument, the
             Walker.
         :return: A `Walker` object
+
         """
         from dulwich.walk import Walker
         if include is None:
@@ -441,6 +458,7 @@ class BaseRepo(object):
         :param name: A Git object SHA1 or a ref name
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
+
         """
         if len(name) in (20, 40) and isinstance(name, str):
             try:
@@ -456,6 +474,7 @@ class BaseRepo(object):
         """Check if a specific Git object or ref is present.
 
         :param name: Git object SHA1 or ref name
+
         """
         if len(name) in (20, 40):
             return name in self.object_store or name in self.refs
@@ -467,6 +486,7 @@ class BaseRepo(object):
 
         :param name: ref name
         :param value: Ref value - either a ShaFile object, or a hex sha
+
         """
         if name.startswith("refs/") or name == "HEAD":
             if isinstance(value, ShaFile):
@@ -482,6 +502,7 @@ class BaseRepo(object):
         """Remove a ref.
 
         :param name: Name of the ref to remove
+
         """
         if name.startswith("refs/") or name == "HEAD":
             del self.refs[name]
@@ -489,17 +510,17 @@ class BaseRepo(object):
             raise ValueError(name)
 
     def _get_user_identity(self):
-        """Determine the identity to use for new commits.
-        """
+        """Determine the identity to use for new commits."""
         config = self.get_config_stack()
         return "%s <%s>" % (
             config.get(("user", ), "name"),
             config.get(("user", ), "email"))
 
     def _add_graftpoints(self, updated_graftpoints):
-        """Add or modify graftpoints
+        """Add or modify graftpoints.
 
         :param updated_graftpoints: Dict of commit shas to list of parent shas
+
         """
 
         # Simple validation
@@ -510,9 +531,10 @@ class BaseRepo(object):
         self._graftpoints.update(updated_graftpoints)
 
     def _remove_graftpoints(self, to_remove=[]):
-        """Remove graftpoints
+        """Remove graftpoints.
 
         :param to_remove: List of commit shas
+
         """
         for sha in to_remove:
             del self._graftpoints[sha]
@@ -538,6 +560,7 @@ class BaseRepo(object):
         :param ref: Optional ref to commit to (defaults to current branch)
         :param merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
         :return: New commit SHA1
+
         """
         import time
         c = Commit()
@@ -631,6 +654,7 @@ class Repo(BaseRepo):
     the path of the repository.
 
     To create a new repository, use the Repo.init class method.
+
     """
 
     def __init__(self, root):
@@ -681,6 +705,7 @@ class Repo(BaseRepo):
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
+
         """
         path = path.lstrip(os.path.sep)
         f = GitFile(os.path.join(self.controldir(), path), 'wb')
@@ -698,6 +723,7 @@ class Repo(BaseRepo):
 
         :param path: The path to the file, relative to the control dir.
         :return: An open file object, or None if the file does not exist.
+
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
@@ -718,6 +744,7 @@ class Repo(BaseRepo):
 
         :raise NoIndexPresent: If no index is present
         :return: The matching `Index`
+
         """
         from dulwich.index import Index
         if not self.has_index():
@@ -734,6 +761,7 @@ class Repo(BaseRepo):
         """Stage a set of paths.
 
         :param paths: List of paths, relative to the repository path
+
         """
         if isinstance(paths, basestring):
             paths = [paths]
@@ -770,6 +798,7 @@ class Repo(BaseRepo):
         :param origin: Base name for refs in target repository
             cloned from this repository
         :return: Created repository as `Repo`
+
         """
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
@@ -814,6 +843,7 @@ class Repo(BaseRepo):
         """Retrieve the config object.
 
         :return: `ConfigFile` object for the ``.git/config`` file.
+
         """
         from dulwich.config import ConfigFile
         path = os.path.join(self._controldir, 'config')
@@ -830,6 +860,7 @@ class Repo(BaseRepo):
         """Retrieve the description of this repository.
 
         :return: A string describing the repository or None.
+
         """
         path = os.path.join(self._controldir, 'description')
         try:
@@ -850,6 +881,7 @@ class Repo(BaseRepo):
         """Set the description for this repository.
 
         :param description: Text to set as description for this repository.
+
         """
 
         path = os.path.join(self._controldir, 'description')
@@ -876,6 +908,7 @@ class Repo(BaseRepo):
         :param path: Path in which to create the repository
         :param mkdir: Whether to create the directory
         :return: `Repo` instance
+
         """
         if mkdir:
             os.mkdir(path)
@@ -892,6 +925,7 @@ class Repo(BaseRepo):
 
         :param path: Path to create bare repository in
         :return: a `Repo` instance
+
         """
         return cls._init_maybe_bare(path, True)
 
@@ -904,6 +938,7 @@ class MemoryRepo(BaseRepo):
 
     MemoryRepos are always bare: they have no working tree and no index, since
     those have a stronger dependency on the filesystem.
+
     """
 
     def __init__(self):
@@ -916,6 +951,7 @@ class MemoryRepo(BaseRepo):
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
+
         """
         self._named_files[path] = contents
 
@@ -928,6 +964,7 @@ class MemoryRepo(BaseRepo):
 
         :param path: The path to the file, relative to the control dir.
         :return: An open file object, or None if the file does not exist.
+
         """
         contents = self._named_files.get(path, None)
         if contents is None:
@@ -938,6 +975,7 @@ class MemoryRepo(BaseRepo):
         """Fail to open index for this repo, since it is bare.
 
         :raise NoIndexPresent: Raised when no index is present
+
         """
         raise NoIndexPresent()
 
@@ -945,6 +983,7 @@ class MemoryRepo(BaseRepo):
         """Retrieve the config object.
 
         :return: `ConfigFile` object.
+
         """
         from dulwich.config import ConfigFile
         return ConfigFile()
@@ -953,6 +992,7 @@ class MemoryRepo(BaseRepo):
         """Retrieve the repository description.
 
         This defaults to None, for no description.
+
         """
         return None
 
@@ -964,6 +1004,7 @@ class MemoryRepo(BaseRepo):
             as iterable
         :param refs: Refs as dictionary, mapping names
             to object SHA1s
+
         """
         ret = cls()
         for obj in objects:

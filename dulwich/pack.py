@@ -28,6 +28,7 @@ that tells you where the data is.
 To find an object you look in all of the index files 'til you find a
 match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
+
 """
 
 from collections import defaultdict
@@ -92,6 +93,7 @@ def take_msb_bytes(read, crc32=None):
     """Read bytes marked with most significant bit.
 
     :param read: Read function
+
     """
     ret = []
     while len(ret) == 0 or ret[-1] & 0x80:
@@ -112,6 +114,7 @@ class UnpackedObject(object):
 
     End users of this object should take care that the function they're getting
     this object from is guaranteed to set the members they need.
+
     """
 
     __slots__ = [
@@ -206,6 +209,7 @@ def read_zlib_chunks(read_some, unpacked, include_comp=False,
     :param buffer_size: Size of the read buffer.
     :return: Leftover unused data from the decompression.
     :raise zlib.error: if a decompression error occurred.
+
     """
     if unpacked.decomp_len <= -1:
         raise ValueError('non-negative zlib data stream size expected')
@@ -251,6 +255,7 @@ def iter_sha1(iter):
 
     :param iter: Iterator over string objects
     :return: 40-byte hex sha1 digest
+
     """
     sha = sha1()
     for name in iter:
@@ -263,6 +268,7 @@ def load_pack_index(path):
 
     :param filename: Path to the index file
     :return: A PackIndex loaded from the given path
+
     """
     f = GitFile(path, 'rb')
     try:
@@ -318,6 +324,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
     :param sha: Sha to find
     :param unpack_name: Callback to retrieve SHA by index
     :return: Index of the SHA, or None if it wasn't found
+
     """
     assert start <= end
     while start <= end:
@@ -337,8 +344,9 @@ class PackIndex(object):
 
     """An index in to a packfile.
 
-    Given a sha id of an object a pack index can tell you the location in the
-    packfile of that object if it has it.
+    Given a sha id of an object a pack index can tell you the location
+    in the packfile of that object if it has it.
+
     """
 
     def __eq__(self, other):
@@ -367,6 +375,7 @@ class PackIndex(object):
 
         :return: iterator over tuples with object name, offset in packfile and
             crc32 checksum.
+
         """
         raise NotImplementedError(self.iterentries)
 
@@ -374,15 +383,17 @@ class PackIndex(object):
         """Return the SHA1 checksum stored for the corresponding packfile.
 
         :return: 20-byte binary digest
+
         """
         raise NotImplementedError(self.get_pack_checksum)
 
     def object_index(self, sha):
         """Return the index in to the corresponding packfile for the object.
 
-        Given the name of an object it will return the offset that object
-        lives at within the corresponding pack file. If the pack file doesn't
-        have the object then None will be returned.
+        Given the name of an object it will return the offset that
+        object lives at within the corresponding pack file. If the pack
+        file doesn't have the object then None will be returned.
+
         """
         if len(sha) == 40:
             sha = hex_to_sha(sha)
@@ -392,6 +403,7 @@ class PackIndex(object):
         """See object_index.
 
         :param sha: A *binary* SHA string. (20 characters long)_
+
         """
         raise NotImplementedError(self._object_index)
 
@@ -399,6 +411,7 @@ class PackIndex(object):
         """Return the hex SHA1 over all the shas of all objects in this pack.
 
         :note: This is used for the filename of the pack.
+
         """
         return iter_sha1(self._itersha())
 
@@ -416,6 +429,7 @@ class MemoryPackIndex(PackIndex):
 
         :param entries: Sequence of name, idx, crc32 (sorted)
         :param pack_checksum: Optional pack checksum
+
         """
         self._by_sha = {}
         for name, idx, crc32 in entries:
@@ -443,19 +457,22 @@ class FilePackIndex(PackIndex):
 
     """Pack index that is based on a file.
 
-    To do the loop it opens the file, and indexes first 256 4 byte groups
-    with the first byte of the sha id. The value in the four byte group indexed
-    is the end of the group that shares the same starting byte. Subtract one
-    from the starting byte and index again to find the start of the group.
-    The values are sorted by sha id within the group, so do the math to find
-    the start and end offset and then bisect in to find if the value is present.
+    To do the loop it opens the file, and indexes first 256 4 byte
+    groups with the first byte of the sha id. The value in the four byte
+    group indexed is the end of the group that shares the same starting
+    byte. Subtract one from the starting byte and index again to find
+    the start of the group. The values are sorted by sha id within the
+    group, so do the math to find the start and end offset and then
+    bisect in to find if the value is present.
+
     """
 
     def __init__(self, filename, file=None, contents=None, size=None):
         """Create a pack index object.
 
-        Provide it with the name of the index file to consider, and it will map
-        it whenever required.
+        Provide it with the name of the index file to consider, and it
+        will map it whenever required.
+
         """
         self._filename = filename
         # Take the size now, so it can be checked each time we map the file to
@@ -515,6 +532,7 @@ class FilePackIndex(PackIndex):
 
         :return: iterator over tuples with object name, offset in packfile and
             crc32 checksum.
+
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
@@ -538,6 +556,7 @@ class FilePackIndex(PackIndex):
         """Calculate the SHA1 checksum over this pack index.
 
         :return: This is a 20-byte binary digest
+
         """
         return sha1(self._contents[:-20]).digest()
 
@@ -545,6 +564,7 @@ class FilePackIndex(PackIndex):
         """Return the SHA1 checksum stored for the corresponding packfile.
 
         :return: 20-byte binary digest
+
         """
         return str(self._contents[-40:-20])
 
@@ -552,6 +572,7 @@ class FilePackIndex(PackIndex):
         """Return the SHA1 checksum stored for this index.
 
         :return: 20-byte binary digest
+
         """
         return str(self._contents[-20:])
 
@@ -559,6 +580,7 @@ class FilePackIndex(PackIndex):
         """See object_index.
 
         :param sha: A *binary* SHA string. (20 characters long)_
+
         """
         assert len(sha) == 20
         idx = ord(sha[0])
@@ -647,6 +669,7 @@ def read_pack_header(read):
     :param read: Read function
     :return: Tuple of (pack version, number of objects). If no data is available
         to read, returns (None, None).
+
     """
     header = read(12)
     if not header:
@@ -687,6 +710,7 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
         * decomp_chunks
         * decomp_len
         * crc32          (if compute_crc32 is True)
+
     """
     if read_some is None:
         read_some = read_all
@@ -741,6 +765,7 @@ class PackStreamReader(object):
 
     The pack is read from a ReceivableProtocol using read() or recv() as
     appropriate.
+
     """
 
     def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE):
@@ -765,6 +790,7 @@ class PackStreamReader(object):
         :param read: The read callback to read from.
         :param size: The maximum number of bytes to read; the particular
             behavior is callback-specific.
+
         """
         data = read(size)
 
@@ -837,6 +863,7 @@ class PackStreamReader(object):
             match the checksum in the pack trailer.
         :raise zlib.error: if an error occurred during zlib decompression.
         :raise IOError: if an error occurred writing to the output file.
+
         """
         pack_version, self._num_objects = read_pack_header(self.read)
         if pack_version is None:
@@ -876,6 +903,7 @@ class PackStreamCopier(PackStreamReader):
 
     The pack is read from a ReceivableProtocol using read() or recv() as
     appropriate and written out to the given file-like object.
+
     """
 
     def __init__(self, read_all, read_some, outfile, delta_iter=None):
@@ -888,6 +916,7 @@ class PackStreamCopier(PackStreamReader):
         :param outfile: File-like object to write output through.
         :param delta_iter: Optional DeltaChainIterator to record deltas as we
             read them.
+
         """
         super(PackStreamCopier, self).__init__(read_all, read_some=read_some)
         self.outfile = outfile
@@ -902,8 +931,9 @@ class PackStreamCopier(PackStreamReader):
     def verify(self):
         """Verify a pack stream and write it to the output file.
 
-        See PackStreamReader.iterobjects for a list of exceptions this may
-        throw.
+        See PackStreamReader.iterobjects for a list of exceptions this
+        may throw.
+
         """
         if self._delta_iter:
             for unpacked in self.read_objects():
@@ -931,6 +961,7 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
         end of the file.
     :param buffer_size: A buffer size for reading.
     :return: A new SHA object updated with data read from the file.
+
     """
     sha = sha1()
     f.seek(0, SEEK_END)
@@ -969,16 +1000,19 @@ class PackData(object):
     Currently there are no integrity checks done. Also no attempt is made to
     try and detect the delta case, or a request for an object at the wrong
     position.  It will all just throw a zlib or KeyError.
+
     """
 
     def __init__(self, filename, file=None, size=None):
-        """Create a PackData object representing the pack in the given filename.
+        """Create a PackData object representing the pack in the given
+        filename.
 
         The file must exist and stay readable until the object is disposed of. It
         must also stay the same size. It will be mapped whenever needed.
 
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
+
         """
         self._filename = filename
         self._size = size
@@ -1021,6 +1055,7 @@ class PackData(object):
         """Calculate the checksum for this pack.
 
         :return: 20-byte binary SHA1 digest
+
         """
         return compute_file_sha(self._file, end_ofs=-20).digest()
 
@@ -1045,6 +1080,7 @@ class PackData(object):
         """Resolve an object, possibly resolving deltas when necessary.
 
         :return: Tuple with object type and contents.
+
         """
         if type not in DELTA_TYPES:
             return type, obj
@@ -1106,6 +1142,7 @@ class PackData(object):
         :param progress: Progress function, called with current and total
             object count.
         :return: iterator of tuples with (sha, offset, crc32)
+
         """
         num_objects = self._num_objects
         resolve_ext_ref = (
@@ -1123,6 +1160,7 @@ class PackData(object):
         :param progress: Progress function, called with current and total
             object count
         :return: List of tuples with (sha, offset, crc32)
+
         """
         ret = sorted(self.iterentries(progress=progress))
         return ret
@@ -1133,6 +1171,7 @@ class PackData(object):
         :param filename: Index filename.
         :param progress: Progress report function
         :return: Checksum of index file
+
         """
         entries = self.sorted_entries(progress=progress)
         f = GitFile(filename, 'wb')
@@ -1147,6 +1186,7 @@ class PackData(object):
         :param filename: Index filename.
         :param progress: Progress report function
         :return: Checksum of index file
+
         """
         entries = self.sorted_entries(progress=progress)
         f = GitFile(filename, 'wb')
@@ -1162,6 +1202,7 @@ class PackData(object):
         :param filename: Index filename.
         :param progress: Progress report function
         :return: Checksum of index file
+
         """
         if version == 1:
             return self.create_index_v1(filename, progress)
@@ -1185,9 +1226,10 @@ class PackData(object):
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
 
-        Using the associated index the location of an object can be looked up,
-        and then the packfile can be asked directly for that object using this
-        function.
+        Using the associated index the location of an object can be
+        looked up, and then the packfile can be asked directly for that
+        object using this function.
+
         """
         try:
             return self._offset_cache[offset]
@@ -1221,6 +1263,7 @@ class DeltaChainIterator(object):
     * decomp_chunks
     * decomp_len
     * crc32          (if _compute_crc32 is True)
+
     """
 
     _compute_crc32 = False
@@ -1411,6 +1454,7 @@ def pack_object_header(type_num, delta_base, size):
     :param delta_base: Delta base offset or ref, or None for whole objects.
     :param size: Uncompressed object size.
     :return: A header for a packed object.
+
     """
     header = ''
     c = (type_num << 4) | (size & 15)
@@ -1441,6 +1485,7 @@ def write_pack_object(f, type, object, sha=None):
     :param type: Numeric type of the object
     :param object: Object to write
     :return: Tuple with offset at which the object was written, and crc32
+
     """
     if type in DELTA_TYPES:
         delta_base, object = object
@@ -1464,6 +1509,7 @@ def write_pack(filename, objects, num_objects=None):
     :param objects: Iterable of (object, path) tuples to write.
         Should provide __len__
     :return: Tuple with checksum of pack file and index file
+
     """
     if num_objects is not None:
         warnings.warn('num_objects argument to write_pack is deprecated',
@@ -1496,6 +1542,7 @@ def deltify_pack_objects(objects, window=10):
     :param window: Window size
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
+
     """
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
@@ -1533,6 +1580,7 @@ def write_pack_objects(f, objects, window=10, num_objects=None):
                    unimplemented
     :param num_objects: Number of objects (do not use, deprecated)
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
+
     """
     if num_objects is None:
         num_objects = len(objects)
@@ -1550,6 +1598,7 @@ def write_pack_data(f, num_records, records):
     :param num_records: Number of records
     :param records: Iterator over type_num, object_id, delta_base, raw
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
+
     """
     # Write the pack
     entries = {}
@@ -1579,6 +1628,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
         and crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     :return: The SHA of the written index file
+
     """
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
@@ -1602,6 +1652,7 @@ def create_delta(base_buf, target_buf):
 
     :param base_buf: Base buffer
     :param target_buf: Target buffer
+
     """
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
@@ -1732,6 +1783,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
         crc32_checksum.
     :param pack_checksum: Checksum of the pack file.
     :return: The SHA of the index file written
+
     """
     f = SHA1Writer(f)
     f.write('\377tOc')  # Magic!
@@ -1777,8 +1829,8 @@ class Pack(object):
 
     @classmethod
     def from_lazy_objects(self, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and
-        index objects."""
+        """Create a new pack object from callables to load pack data and index
+        objects."""
         ret = Pack('')
         ret._data_load = data_fn
         ret._idx_load = idx_fn
@@ -1810,6 +1862,7 @@ class Pack(object):
         """The index being used.
 
         :note: This may be an in-memory index
+
         """
         if self._idx is None:
             self._idx = self._idx_load()
@@ -1848,6 +1901,7 @@ class Pack(object):
         """Check the integrity of this pack.
 
         :raise ChecksumMismatch: if a checksum for the index or data is wrong
+
         """
         self.index.check()
         self.data.check()
@@ -1887,6 +1941,7 @@ class Pack(object):
 
         :return: Object that can iterate over (object, path) tuples
             and provides __len__
+
         """
         class PackTupleIterable(object):
 
@@ -1902,11 +1957,13 @@ class Pack(object):
         return PackTupleIterable(self)
 
     def keep(self, msg=None):
-        """Add a .keep file for the pack, preventing git from garbage collecting it.
+        """Add a .keep file for the pack, preventing git from garbage
+        collecting it.
 
         :param msg: A message written inside the .keep file; can be used later to
                     determine whether or not a .keep file is obsolete.
         :return: The path of the .keep file, as a string.
+
         """
         keepfile_name = '%s.keep' % self._basename
         keepfile = GitFile(keepfile_name, 'wb')

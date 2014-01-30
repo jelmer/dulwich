@@ -34,6 +34,7 @@ Known capabilities that are not supported:
  * shallow
  * no-progress
  * include-tag
+
 """
 
 __docformat__ = 'restructuredText'
@@ -103,6 +104,7 @@ class ReportStatusParser(object):
 
         :raise SendPackError: Raised when the server could not unpack
         :raise UpdateRefsError: Raised when refs could not be updated
+
         """
         if self._pack_status not in ('unpack ok', None):
             raise SendPackError(self._pack_status)
@@ -131,6 +133,7 @@ class ReportStatusParser(object):
 
         :raise GitProtocolError: Raised when packets are received after a
             flush packet.
+
         """
         if self._done:
             raise GitProtocolError("received more data after status report")
@@ -168,9 +171,7 @@ def read_pkt_refs(proto):
 # that don't support multi_ack.
 class GitClient(object):
 
-    """Git smart server client.
-
-    """
+    """Git smart server client."""
 
     def __init__(self, thin_packs=True, report_activity=None):
         """Create a new GitClient instance.
@@ -178,6 +179,7 @@ class GitClient(object):
         :param thin_packs: Whether or not thin packs should be retrieved
         :param report_activity: Optional callback for reporting transport
             activity.
+
         """
         self._report_activity = report_activity
         self._report_status_parser = None
@@ -198,6 +200,7 @@ class GitClient(object):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+
         """
         raise NotImplementedError(self.send_pack)
 
@@ -210,6 +213,7 @@ class GitClient(object):
             to fetch
         :param progress: Optional progress function
         :return: remote refs as dictionary
+
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -232,6 +236,7 @@ class GitClient(object):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+
         """
         raise NotImplementedError(self.fetch_pack)
 
@@ -439,6 +444,7 @@ class TraditionalGitClient(GitClient):
 
         :param cmd: The git service name to which we should connect.
         :param path: The path we should pass to the service.
+
         """
         raise NotImplementedError()
 
@@ -454,6 +460,7 @@ class TraditionalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+
         """
         proto, unused_can_read = self._connect('receive-pack', path)
         old_refs, server_capabilities = read_pkt_refs(proto)
@@ -526,6 +533,7 @@ class TraditionalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+
         """
         proto, can_read = self._connect('upload-pack', path)
         refs, server_capabilities = read_pkt_refs(proto)
@@ -668,6 +676,7 @@ class LocalGitClient(GitClient):
         :param thin_packs: Whether or not thin packs should be retrieved
         :param report_activity: Optional callback for reporting transport
             activity.
+
         """
         self._report_activity = report_activity
         # Ignore the thin_packs argument
@@ -684,6 +693,7 @@ class LocalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+
         """
         raise NotImplementedError(self.send_pack)
 
@@ -696,6 +706,7 @@ class LocalGitClient(GitClient):
             to fetch
         :param progress: Optional progress function
         :return: remote refs as dictionary
+
         """
         from dulwich.repo import Repo
         r = Repo(path)
@@ -711,6 +722,7 @@ class LocalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+
         """
         from dulwich.repo import Repo
         r = Repo(path)
@@ -748,6 +760,7 @@ class SSHVendor(object):
         :param command: Command to run
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
+
         """
         raise NotImplementedError(self.run_command)
 
@@ -942,6 +955,7 @@ class HttpGitClient(GitClient):
 
         :param req: urllib2.Request instance
         :return: matching response
+
         """
         return urllib2.urlopen(req)
 
@@ -991,6 +1005,7 @@ class HttpGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+
         """
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
@@ -1030,6 +1045,7 @@ class HttpGitClient(GitClient):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         :return: Dictionary with the refs of the remote repository
+
         """
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
@@ -1063,6 +1079,7 @@ def get_transport_and_path_from_url(url, **kwargs):
     :param report_activity: Optional callback for reporting transport
         activity.
     :return: Tuple with client instance and relative path.
+
     """
     parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
@@ -1092,6 +1109,7 @@ def get_transport_and_path(location, **kwargs):
     :param report_activity: Optional callback for reporting transport
         activity.
     :return: Tuple with client instance and relative path.
+
     """
     # First, try to parse it as a URL
     try:

@@ -62,6 +62,7 @@ class WalkEntry(object):
             objects; if the commit has no parents, these will be relative to the
             empty tree. For merge commits, a list of lists of TreeChange
             objects; see dulwich.diff.tree_changes_for_merge.
+
         """
         if self._changes is None:
             commit = self.commit
@@ -189,8 +190,9 @@ class Walker(object):
 
     """Object for performing a walk of commits in a store.
 
-    Walker objects are initialized with a store and other options and can then
-    be treated as iterators of Commit objects.
+    Walker objects are initialized with a store and other options and
+    can then be treated as iterators of Commit objects.
+
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
@@ -222,6 +224,7 @@ class Walker(object):
         :param queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
+
         """
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
@@ -278,6 +281,7 @@ class Walker(object):
         :param entry: The WalkEntry to consider.
         :return: True if the WalkEntry should be returned by this walk, or False
             otherwise (e.g. if it doesn't match any requested paths).
+
         """
         commit = entry.commit
         if self.since is not None and commit.commit_time < self.since:
@@ -326,6 +330,7 @@ class Walker(object):
             from the queue_cls.
         :return: An iterator or list of WalkEntry objects, in the order required
             by the Walker.
+
         """
         if self.order == ORDER_TOPO:
             results = _topo_reorder(results, self.get_parents)
@@ -347,6 +352,7 @@ def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     :param get_parents: Optional function for getting the parents of a commit.
     :return: iterator over WalkEntry objects from entries in FIFO order, except
         where a parent would be yielded before any of its children.
+
     """
     todo = collections.deque()
     pending = {}

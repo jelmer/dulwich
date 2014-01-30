@@ -171,6 +171,7 @@ M 100644 :1 a
 
         :param file_cmds: File commands to run.
         :return: The created commit object
+
         """
         from fastimport import commands
         cmd = commands.CommitCommand("refs/heads/foo", "mrkr",

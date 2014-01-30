@@ -26,6 +26,7 @@ def parse_object(repo, objectish):
     :param objectish: A string referring to an object
     :return: A git object
     :raise KeyError: If the object can not be found
+
     """
     return repo[objectish]
 
@@ -38,5 +39,6 @@ def parse_commit_range(repo, committishs):
     :return: An iterator over `Commit` objects
     :raise KeyError: When the reference commits can not be found
     :raise ValueError: If the range can not be parsed
+
     """
     return iter([repo[committishs]])

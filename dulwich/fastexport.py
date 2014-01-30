@@ -111,9 +111,7 @@ class GitFastExporter(object):
 
 class GitImportProcessor(processor.ImportProcessor):
 
-    """An import processor that imports into a Git repository using Dulwich.
-
-    """
+    """An import processor that imports into a Git repository using Dulwich."""
     # FIXME: Batch creation of objects?
 
     def __init__(self, repo, params=None, verbose=False, outf=None):

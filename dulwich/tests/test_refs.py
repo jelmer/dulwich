@@ -53,6 +53,7 @@ class CheckRefFormatTests(TestCase):
     """Tests for the check_ref_format function.
 
     These are the same tests as in the git test suite.
+
     """
 
     def test_valid(self):

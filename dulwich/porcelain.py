@@ -71,6 +71,7 @@ def archive(location, committish=None, outstream=sys.stdout,
     :param committish: Commit SHA1 or ref to use
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
+
     """
 
     client, path = get_transport_and_path(location)
@@ -83,6 +84,7 @@ def update_server_info(repo="."):
     """Update server info files for a repository.
 
     :param repo: path to the repository
+
     """
     r = open_repo(repo)
     server_update_server_info(r)
@@ -94,6 +96,7 @@ def symbolic_ref(repo, ref_name, force=False):
     :param repo: path to the repository
     :param ref_name: short name of the new ref
     :param force: force settings without checking if it exists in refs/heads
+
     """
     repo_obj = open_repo(repo)
     ref_path = 'refs/heads/%s' % ref_name
@@ -110,6 +113,7 @@ def commit(repo=".", message=None, author=None, committer=None):
     :param author: Optional author name and email
     :param committer: Optional committer name and email
     :return: SHA1 of the new commit
+
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
@@ -125,6 +129,7 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     :param tree: An existing tree object
     :param author: Optional author name and email
     :param committer: Optional committer name and email
+
     """
     r = open_repo(repo)
     return r.do_commit(message=message, tree=tree, committer=committer,
@@ -137,6 +142,7 @@ def init(path=".", bare=False):
     :param path: Path to repository.
     :param bare: Whether to create a bare repository.
     :return: A Repo instance
+
     """
     if not os.path.exists(path):
         os.mkdir(path)
@@ -156,6 +162,7 @@ def clone(source, target=None, bare=False,
     :param bare: Whether or not to create a bare repository
     :param outstream: Optional stream to write progress to
     :return: The new repository
+
     """
     if checkout is None:
         checkout = (not bare)
@@ -189,6 +196,7 @@ def add(repo=".", paths=None):
 
     :param repo: Repository for the files
     :param paths: Paths to add
+
     """
     # FIXME: Support patterns, directories, no argument.
     r = open_repo(repo)
@@ -200,6 +208,7 @@ def rm(repo=".", paths=None):
 
     :param repo: Repository for the files
     :param paths: Paths to remove
+
     """
     r = open_repo(repo)
     index = r.open_index()
@@ -244,6 +253,7 @@ def show_blob(repo, blob, outstream):
     :param repo: A `Repo` object
     :param blob: A `Blob` object
     :param outstream: A stream file to write to
+
     """
     outstream.write(blob.data)
 
@@ -254,6 +264,7 @@ def show_commit(repo, commit, outstream):
     :param repo: A `Repo` object
     :param commit: A `Commit` object
     :param outstream: Stream to write to
+
     """
     print_commit(commit, outstream)
     parent_commit = repo[commit.parents[0]]
@@ -270,6 +281,7 @@ def show_tree(repo, tree, outstream):
     :param repo: A `Repo` object
     :param tree: A `Tree` object
     :param outstream: Stream to write to
+
     """
     for n in tree:
         outstream.write("%s\n" % n)
@@ -281,6 +293,7 @@ def show_tag(repo, tag, outstream):
     :param repo: A `Repo` object
     :param tag: A `Tag` object
     :param outstream: Stream to write to
+
     """
     print_tag(tag, outstream)
     show_object(repo, repo[tag.object[1]], outstream)
@@ -301,6 +314,7 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
     :param repo: Path to repository
     :param outstream: Stream to write log output to
     :param max_entries: Optional maximum number of entries to display
+
     """
     r = open_repo(repo)
     walker = r.get_walker(max_entries=max_entries)
@@ -314,6 +328,7 @@ def show(repo=".", objects=None, outstream=sys.stdout):
     :param repo: Path to repository
     :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
+
     """
     if objects is None:
         objects = ["HEAD"]
@@ -331,6 +346,7 @@ def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
     :param old_tree: Id of old tree
     :param new_tree: Id of new tree
     :param outstream: Stream to write to
+
     """
     r = open_repo(repo)
     write_tree_diff(outstream, r.object_store, old_tree, new_tree)
@@ -342,6 +358,7 @@ def rev_list(repo, commits, outstream=sys.stdout):
     :param repo: Path to repository
     :param commits: Commits over which to iterate
     :param outstream: Stream to write to
+
     """
     r = open_repo(repo)
     for entry in r.get_walker(include=[r[c].id for c in commits]):
@@ -378,6 +395,7 @@ def reset(repo, mode, committish="HEAD"):
 
     :param repo: Path to repository
     :param mode: Mode ("hard", "soft", "mixed")
+
     """
 
     if mode != "hard":

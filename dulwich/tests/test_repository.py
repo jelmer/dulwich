@@ -301,12 +301,10 @@ class RepositoryTests(TestCase):
         self.assertEqual(r.head(), 'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_common_revisions(self):
-        """
-        This test demonstrates that ``find_common_revisions()`` actually returns
-        common heads, not revisions; dulwich already uses
+        """This test demonstrates that ``find_common_revisions()`` actually
+        returns common heads, not revisions; dulwich already uses
         ``find_common_revisions()`` in such a manner (see
-        ``Repo.fetch_objects()``).
-        """
+        ``Repo.fetch_objects()``)."""
 
         expected_shas = set(['60dacdc733de308bb77bb76ce0fb0f9b44c9769e'])
 

@@ -462,9 +462,8 @@ class HTTPGitApplicationTestCase(TestCase):
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
 
-    """TestCase for testing the GunzipFilter, ensuring the wsgi.input
-    is correctly decompressed and headers are corrected.
-    """
+    """TestCase for testing the GunzipFilter, ensuring the wsgi.input is
+    correctly decompressed and headers are corrected."""
 
     def setUp(self):
         super(GunzipTestCase, self).setUp()

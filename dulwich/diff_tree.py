@@ -82,6 +82,7 @@ def _merge_entries(path, tree1, tree2):
         the trees. If an entry exists in one tree but not the other, the other
         entry will have all attributes set to None. If neither entry's path is
         None, they are guaranteed to match.
+
     """
     entries1 = _tree_entries(path, tree1)
     entries2 = _tree_entries(path, tree2)
@@ -131,6 +132,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         tree but not the other, the other entry will have all attributes set
         to None. If neither entry's path is None, they are guaranteed to
         match.
+
     """
     # This could be fairly easily generalized to >2 trees if we find a use
     # case.
@@ -169,6 +171,7 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
     :param rename_detector: RenameDetector object for detecting renames.
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
+
     """
     if (rename_detector is not None and tree1_id is not None and
             tree2_id is not None):
@@ -237,6 +240,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
         A path is only included in the output if it is a conflict, i.e. its SHA
         in the merge tree is not found in any of the parents, or in the case of
         deletes, if not all of the old SHAs match.
+
     """
     all_parent_changes = [tree_changes(store, t, tree_id,
                                        rename_detector=rename_detector)
@@ -282,6 +286,7 @@ def _count_blocks(obj):
 
     :param obj: The object to count blocks for.
     :return: A dict of block hashcode -> total bytes occurring.
+
     """
     block_counts = defaultdict(int)
     block = StringIO()
@@ -315,6 +320,7 @@ def _common_bytes(blocks1, blocks2):
     :param block2: The second dict of block hashcode -> total bytes.
     :return: The number of bytes in common between blocks1 and blocks2. This is
         only approximate due to possible hash collisions.
+
     """
     # Iterate over the smaller of the two dicts, since this is symmetrical.
     if len(blocks1) > len(blocks2):
@@ -337,6 +343,7 @@ def _similarity_score(obj1, obj2, block_cache=None):
     :return: The similarity score between the two objects, defined as the number
         of bytes in common between the two objects divided by the maximum size,
         scaled to the range 0-100.
+
     """
     if block_cache is None:
         block_cache = {}
@@ -386,6 +393,7 @@ class RenameDetector(object):
             modifies; see _similarity_score.
         :param find_copies_harder: If True, consider unmodified files when
             detecting copies.
+
         """
         self._store = store
         self._rename_threshold = rename_threshold

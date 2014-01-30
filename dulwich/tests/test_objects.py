@@ -81,14 +81,14 @@ class TestHexToSha(TestCase):
 
 class BlobReadTests(TestCase):
 
-    """Test decompression of blobs"""
+    """Test decompression of blobs."""
 
     def get_sha_file(self, cls, base, sha):
         dir = os.path.join(os.path.dirname(__file__), 'data', base)
         return cls.from_path(hex_to_filename(dir, sha))
 
     def get_blob(self, sha):
-        """Return the blob named sha from the test data dir"""
+        """Return the blob named sha from the test data dir."""
         return self.get_sha_file(Blob, 'blobs', sha)
 
     def get_tree(self, sha):

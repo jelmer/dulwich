@@ -85,7 +85,7 @@ commit_sha = 'f18faa16531ac570a3fdc8c7ca16682548dafd12'
 
 class PackTests(TestCase):
 
-    """Base class for testing packs"""
+    """Base class for testing packs."""
 
     def setUp(self):
         super(PackTests, self).setUp()
@@ -96,11 +96,11 @@ class PackTests(TestCase):
                                            'data/packs'))
 
     def get_pack_index(self, sha):
-        """Returns a PackIndex from the datadir with the given sha"""
+        """Returns a PackIndex from the datadir with the given sha."""
         return load_pack_index(os.path.join(self.datadir, 'pack-%s.idx' % sha))
 
     def get_pack_data(self, sha):
-        """Returns a PackData object from the datadir with the given sha"""
+        """Returns a PackData object from the datadir with the given sha."""
         return PackData(os.path.join(self.datadir, 'pack-%s.pack' % sha))
 
     def get_pack(self, sha):
@@ -115,7 +115,7 @@ class PackTests(TestCase):
 
 class PackIndexTests(PackTests):
 
-    """Class that tests the index of packfiles"""
+    """Class that tests the index of packfiles."""
 
     def test_object_index(self):
         """Tests that the correct object offset is returned from the index."""

@@ -33,7 +33,7 @@ def ensure_dir_exists(dirname):
 
 
 def fancy_rename(oldname, newname):
-    """Rename file with temporary backup file to rollback if rename fails"""
+    """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         try:
             os.rename(oldname, newname)
@@ -73,6 +73,7 @@ def GitFile(filename, mode='rb', bufsize=-1):
     are not.  To read and write from the same file, you can take advantage of
     the fact that opening a file for write does not actually open the file you
     request.
+
     """
     if 'a' in mode:
         raise IOError('append mode not supported for Git files')
@@ -96,6 +97,7 @@ class _GitFile(object):
 
     :note: You *must* call close() or abort() on a _GitFile for the lock to be
         released. Typically this will happen in a finally block.
+
     """
 
     PROXY_PROPERTIES = set(['closed', 'encoding', 'errors', 'mode', 'name',
@@ -119,6 +121,7 @@ class _GitFile(object):
         """Close and discard the lockfile without overwriting the target.
 
         If the file is already closed, this is a no-op.
+
         """
         if self._closed:
             return
@@ -142,6 +145,7 @@ class _GitFile(object):
         :raises OSError: if the original file could not be overwritten. The lock
             file is still closed, so further attempts to write to the same file
             object will raise ValueError.
+
         """
         if self._closed:
             return

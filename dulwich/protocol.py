@@ -77,6 +77,7 @@ class Protocol(object):
 
     For details on the pkt-line format, see the cgit distribution:
         Documentation/technical/protocol-common.txt
+
     """
 
     def __init__(self, read, write, report_activity=None):
@@ -120,6 +121,7 @@ class Protocol(object):
         Note that this refers to the actual stream EOF and not just a flush-pkt.
 
         :return: True if the stream is at EOF, False otherwise.
+
         """
         try:
             next_line = self.read_pkt_line()
@@ -136,6 +138,7 @@ class Protocol(object):
 
         :param data: The data to unread, without the length prefix.
         :raise ValueError: If more than one pkt-line is unread.
+
         """
         if self._readahead is not None:
             raise ValueError('Attempted to unread multiple pkt-lines.')
@@ -191,6 +194,7 @@ class Protocol(object):
 
         :param channel: An int specifying the channel to write to.
         :param blob: A blob of data (as a string) to send on this channel.
+
         """
         # a pktline can be a max of 65520. a sideband line can therefore be
         # 65520-5 = 65515
@@ -206,16 +210,18 @@ class Protocol(object):
 
         :param cmd: The remote service to access.
         :param args: List of arguments to send to remove service.
+
         """
         self.write_pkt_line("%s %s" %
                             (cmd, "".join(["%s\0" % a for a in args])))
 
     def read_cmd(self):
-        """Read a command and some arguments from the git client
+        """Read a command and some arguments from the git client.
 
         Only used for the TCP git protocol (git://).
 
         :return: A tuple of (command, [list of arguments]).
+
         """
         line = self.read_pkt_line()
         splice_at = line.find(" ")
@@ -238,6 +244,7 @@ class ReceivableProtocol(Protocol):
     (or EOF) are read, use read(n). If you want to read at most n bytes from the
     wire but don't care if you get less, use recv(n). Note that recv(n) will
     still block until at least one byte is read.
+
     """
 
     def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
@@ -336,6 +343,7 @@ def extract_capabilities(text):
 
     :param text: String to extract from
     :return: Tuple with text with capabilities removed and list of capabilities
+
     """
     if not "\0" in text:
         return text, []
@@ -353,6 +361,7 @@ def extract_want_line_capabilities(text):
 
     :param text: Want line to extract from
     :return: Tuple with text with capabilities removed and list of capabilities
+
     """
     split_text = text.rstrip().split(" ")
     if len(split_text) < 3:
@@ -383,6 +392,7 @@ class BufferedPktLineWriter(object):
 
         :param write: A write callback for the underlying writer.
         :param bufsize: The internal buffer size, including length prefixes.
+
         """
         self._write = write
         self._bufsize = bufsize
@@ -415,16 +425,14 @@ class BufferedPktLineWriter(object):
 
 class PktLineParser(object):
 
-    """Packet line parser that hands completed packets off to a callback.
-    """
+    """Packet line parser that hands completed packets off to a callback."""
 
     def __init__(self, handle_pkt):
         self.handle_pkt = handle_pkt
         self._readahead = StringIO()
 
     def parse(self, data):
-        """Parse a fragment of data and call back for any completed packets.
-        """
+        """Parse a fragment of data and call back for any completed packets."""
         self._readahead.write(data)
         buf = self._readahead.getvalue()
         if len(buf) < 4:

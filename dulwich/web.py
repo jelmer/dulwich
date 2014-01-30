@@ -77,6 +77,7 @@ def url_prefix(mat):
     :returns: The URL prefix, defined as the text before the match in the
         original string. Normalized to start with one leading slash and end with
         zero.
+
     """
     return '/' + mat.string[:mat.start()].strip('/')
 
@@ -238,6 +239,7 @@ class HTTPGitRequest(object):
     """Class encapsulating the state of a single git HTTP request.
 
     :ivar environ: the WSGI environment for the request.
+
     """
 
     def __init__(self, environ, start_response, dumb=False, handlers=None):
@@ -306,6 +308,7 @@ class HTTPGitApplication(object):
     """Class encapsulating the state of a git WSGI application.
 
     :ivar backend: the Backend object backing this application
+
     """
 
     services = {
@@ -395,9 +398,8 @@ class LimitedInputFilter(object):
 
 
 def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication,
-    correctly wrapped with needed middleware.
-    """
+    """Factory function to create an instance of HTTPGitApplication, correctly
+    wrapped with needed middleware."""
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = GunzipFilter(LimitedInputFilter(app))
     return wrapped_app
@@ -430,7 +432,8 @@ try:
 
     class WSGIRequestHandlerLogger(WSGIRequestHandler):
 
-        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
+        """WSGIRequestHandler that uses dulwich's logger for logging
+        exceptions."""
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -443,7 +446,7 @@ try:
             logger.error(*args)
 
         def handle(self):
-            """Handle a single HTTP request"""
+            """Handle a single HTTP request."""
 
             self.raw_requestline = self.rfile.readline()
             # An error code has been sent, just exit
@@ -459,7 +462,7 @@ try:
     class WSGIServerLogger(WSGIServer):
 
         def handle_error(self, request, client_address):
-            """Handle an error. """
+            """Handle an error."""
             logger.exception(
                 'Exception happened during processing of request from %s' %
                 str(client_address))

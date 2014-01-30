@@ -80,6 +80,7 @@ class BaseObjectStore(object):
 
         :param shas: Iterable object with SHAs
         :return: Object iterator
+
         """
         return ObjectStoreIterator(self, shas)
 
@@ -108,6 +109,7 @@ class BaseObjectStore(object):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         raise NotImplementedError(self.get_raw)
 
@@ -121,26 +123,26 @@ class BaseObjectStore(object):
         raise NotImplementedError(self.__iter__)
 
     def add_object(self, obj):
-        """Add a single object to this object store.
-
-        """
+        """Add a single object to this object store."""
         raise NotImplementedError(self.add_object)
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of objects.
+
         """
         raise NotImplementedError(self.add_objects)
 
     def tree_changes(self, source, target, want_unchanged=False):
-        """Find the differences between the contents of two trees
+        """Find the differences between the contents of two trees.
 
         :param source: SHA1 of the source tree
         :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+
         """
         for change in tree_changes(self, source, target,
                                    want_unchanged=want_unchanged):
@@ -157,6 +159,7 @@ class BaseObjectStore(object):
         :param include_trees: If True, include tree objects in the iteration.
         :return: Iterator over TreeEntry namedtuples for all the objects in a
             tree.
+
         """
         for entry, _ in walk_trees(self, tree_id, None):
             if not stat.S_ISDIR(entry.mode) or include_trees:
@@ -175,6 +178,7 @@ class BaseObjectStore(object):
             sha for including tags.
         :param get_parents: Optional function for getting the parents of a commit.
         :return: Iterator over (sha, path) pairs.
+
         """
         finder = MissingObjectFinder(
             self,
@@ -190,6 +194,7 @@ class BaseObjectStore(object):
 
         :param graphwalker: A graphwalker object.
         :return: List of SHAs that are in common
+
         """
         haves = []
         sha = graphwalker.next()
@@ -206,6 +211,7 @@ class BaseObjectStore(object):
         :param have: List of SHA1s of objects that should not be sent
         :param want: List of SHA1s of objects that should be sent
         :param progress: Optional progress reporting method
+
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
 
@@ -216,6 +222,7 @@ class BaseObjectStore(object):
         :return: The fully-peeled SHA1 of a tag object, after peeling all
             intermediate tags; if the original ref does not point to a tag, this
             will equal the original SHA1.
+
         """
         obj = self[sha]
         obj_class = object_class(obj.type_name)
@@ -235,6 +242,7 @@ class BaseObjectStore(object):
         :return: a tuple (A, B) where A - all commits reachable
             from heads but not present in common, B - common (shared) elements
             that are directly reachable from heads
+
         """
         bases = set()
         commits = set()
@@ -268,6 +276,7 @@ class PackBasedObjectStore(BaseObjectStore):
         """Check if a particular object is present by SHA1 and is packed.
 
         This does not check alternates.
+
         """
         for pack in self.packs:
             if sha in pack:
@@ -294,9 +303,7 @@ class PackBasedObjectStore(BaseObjectStore):
         raise NotImplementedError(self._pack_cache_stale)
 
     def _add_known_pack(self, pack):
-        """Add a newly appeared pack to the cache by path.
-
-        """
+        """Add a newly appeared pack to the cache by path."""
         if self._pack_cache is not None:
             self._pack_cache.append(pack)
 
@@ -334,6 +341,7 @@ class PackBasedObjectStore(BaseObjectStore):
         """Pack loose objects.
 
         :return: Number of objects packed
+
         """
         objects = set()
         for sha in self._iter_loose_objects():
@@ -353,6 +361,7 @@ class PackBasedObjectStore(BaseObjectStore):
         """Check if a particular object is present by SHA1 and is loose.
 
         This does not check alternates.
+
         """
         return self._get_loose_object(sha) is not None
 
@@ -361,6 +370,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         if len(name) == 40:
             sha = hex_to_sha(name)
@@ -392,6 +402,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
         :param objects: Iterable over objects, should support __len__.
         :return: Pack object of the objects written.
+
         """
         if len(objects) == 0:
             # Don't bother writing an empty pack file
@@ -414,6 +425,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Open an object store.
 
         :param path: Path of the object store.
+
         """
         super(DiskObjectStore, self).__init__()
         self.path = path
@@ -453,8 +465,7 @@ class DiskObjectStore(PackBasedObjectStore):
             f.close()
 
     def add_alternate_path(self, path):
-        """Add an alternate path to this object store.
-        """
+        """Add an alternate path to this object store."""
         try:
             os.mkdir(os.path.join(self.path, "info"))
         except OSError as e:
@@ -548,6 +559,7 @@ class DiskObjectStore(PackBasedObjectStore):
         :param path: Path to the pack file.
         :param copier: A PackStreamCopier to use for writing pack data.
         :param indexer: A PackIndexer for indexing the pack.
+
         """
         entries = list(indexer)
 
@@ -608,6 +620,7 @@ class DiskObjectStore(PackBasedObjectStore):
             not return the number of bytes requested.
         :return: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
+
         """
         fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
         f = os.fdopen(fd, 'w+b')
@@ -628,6 +641,7 @@ class DiskObjectStore(PackBasedObjectStore):
             packs directory.
 
         :param path: Path to the pack file.
+
         """
         p = PackData(path)
         try:
@@ -652,6 +666,7 @@ class DiskObjectStore(PackBasedObjectStore):
         :return: Fileobject to write to, a commit function to
             call when the pack is finished and an abort
             function.
+
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
@@ -674,6 +689,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Add a single object to this object store.
 
         :param obj: Object to add
+
         """
         dir = os.path.join(self.path, obj.id[:2])
         try:
@@ -740,6 +756,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
+
         """
         obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
@@ -752,15 +769,14 @@ class MemoryObjectStore(BaseObjectStore):
         del self._data[self._to_hexsha(name)]
 
     def add_object(self, obj):
-        """Add a single object to this object store.
-
-        """
+        """Add a single object to this object store."""
         self._data[obj.id] = obj
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of objects.
+
         """
         for obj, path in objects:
             self._data[obj.id] = obj
@@ -773,6 +789,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :return: Fileobject to write to and a commit function to
             call when the pack is finished.
+
         """
         f = StringIO()
 
@@ -791,6 +808,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param f: Open file object for the pack.
         :param indexer: A PackIndexer for indexing the pack.
+
         """
         entries = list(indexer)
 
@@ -820,6 +838,7 @@ class MemoryObjectStore(BaseObjectStore):
             bytes are read.
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
+
         """
         f, commit, abort = self.add_pack()
         try:
@@ -846,6 +865,7 @@ class ObjectImporter(object):
         """Create a new ObjectImporter.
 
         :param count: Number of objects that's going to be imported.
+
         """
         self.count = count
 
@@ -875,6 +895,7 @@ class ObjectStoreIterator(ObjectIterator):
 
         :param store: Object store to retrieve from
         :param sha_iter: Iterator over (sha, path) tuples
+
         """
         self.store = store
         self.sha_iter = sha_iter
@@ -906,6 +927,7 @@ class ObjectStoreIterator(ObjectIterator):
             be yielded by the iterator.
 
         :param needle: SHA1 of the object to check for
+
         """
         return needle in self.store
 
@@ -930,6 +952,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     :param root_sha: SHA1 of the root tree
     :param path: Path to lookup
     :return: A tuple of (mode, SHA) of the resulting path.
+
     """
     tree = lookup_obj(root_sha)
     if not isinstance(tree, Tree):
@@ -943,6 +966,7 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     :param obj_store: Object store to get objects by SHA from
     :param tree_sha: tree reference to walk
     :param kset: set to fill with references to files and directories
+
     """
     filetree = obj_store[tree_sha]
     for name, mode, sha in filetree.iteritems():
@@ -965,6 +989,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     :param ignore_unknown: True to skip SHA1 missing in the repository
         silently.
     :return: A tuple of (commits, tags) SHA1s
+
     """
     commits = set()
     tags = set()
@@ -998,6 +1023,7 @@ class MissingObjectFinder(object):
         sha for including tags.
     :param get_parents: Optional function for getting the parents of a commit.
     :param tagged: dict of pointed-to sha -> tag sha for including tags
+
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
@@ -1085,6 +1111,7 @@ class ObjectStoreGraphWalker(object):
 
     :ivar heads: Revisions without descendants in the local repo
     :ivar get_parents: Function to retrieve parents in the local repo
+
     """
 
     def __init__(self, local_heads, get_parents):
@@ -1092,6 +1119,7 @@ class ObjectStoreGraphWalker(object):
 
         :param local_heads: Heads to start search with
         :param get_parents: Function for finding the parents of a SHA1.
+
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents

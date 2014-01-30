@@ -73,6 +73,7 @@ class ServerTests(object):
     """Base tests for testing servers.
 
     Does not inherit from TestCase so tests are not automatically run.
+
     """
 
     def import_repos(self):
@@ -246,6 +247,7 @@ class ShutdownServerMixIn:
     The methods in this mixin are backported from SocketServer.py in the Python
     2.6.4 standard library. The mixin is unnecessary in 2.6 and later, when
     BaseServer supports the shutdown method directly.
+
     """
 
     def __init__(self):
@@ -258,6 +260,7 @@ class ShutdownServerMixIn:
         Polls for shutdown every poll_interval seconds. Ignores
         self.timeout. If you need to do periodic tasks, do them in
         another thread.
+
         """
         self.__serving = True
         self.__is_shut_down.clear()
@@ -277,7 +280,9 @@ class ShutdownServerMixIn:
         """Stops the serve_forever loop.
 
         Blocks until the loop has finished. This must be called while
-        serve_forever() is running in another thread, or it will deadlock.
+        serve_forever() is running in another thread, or it will
+        deadlock.
+
         """
         self.__serving = False
         self.__is_shut_down.wait()
@@ -286,6 +291,7 @@ class ShutdownServerMixIn:
         """Handle one request, possibly blocking.
 
         Respects self.timeout.
+
         """
         # Support people who used socket.settimeout() to escape
         # handle_request before self.timeout was available.
@@ -304,8 +310,9 @@ class ShutdownServerMixIn:
         """Handle one request, without blocking.
 
         I assume that select.select has returned that the socket is
-        readable before this function was called, so there should be
-        no risk of blocking in get_request().
+        readable before this function was called, so there should be no
+        risk of blocking in get_request().
+
         """
         try:
             request, client_address = self.get_request()

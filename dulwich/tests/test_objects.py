@@ -339,11 +339,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
-
+ 
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
-
+ 
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA
@@ -372,11 +372,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
-
+ 
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
-
+ 
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA
@@ -385,11 +385,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
-
+ 
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
-
+ 
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA

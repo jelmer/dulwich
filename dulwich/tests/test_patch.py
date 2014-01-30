@@ -86,7 +86,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
 
---
+-- 
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))
@@ -116,7 +116,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
 
---
+-- 
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))
@@ -141,7 +141,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
 
---
+-- 
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(StringIO(text))

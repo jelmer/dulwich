@@ -180,12 +180,31 @@ class InitTests(TestCase):
 class AddTests(PorcelainTestCase):
 
     def test_add_default_paths(self):
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+            author='test', committer='test')
+
+        # Add a second test file
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
         try:
             f.write("BAR")
         finally:
             f.close()
         porcelain.add(self.repo.path)
+
+        # Check that foo was added and nothing in .git was modified
+        index = self.repo.open_index()
+        changes = tree_changes(self.repo, index.commit(self.repo.object_store),
+            self.repo['HEAD'].tree)
+
+        changes = list(changes)
+
+        self.assertEquals(len(changes), 1)
+        self.assertEquals(changes[0].old.path, 'foo')
 
     def test_add_file(self):
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
@@ -370,20 +389,36 @@ class PushTests(PorcelainTestCase):
 
         outstream = StringIO()
 
-        # create a file for initial commit
-        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
-        filename = fullpath.split('/')[-1]
+        #source_path = '/var/tmp/repo1'
+        #target_path = '/var/tmp/repo2'
+        #Repo.init(source_path, mkdir=True)
 
-        # perform commit
+        # create a file for initial commit
+
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message='test',
-                         author='test', committer='test')
+            author='test', committer='test')
 
-        # Setup target repo
+        # Setup target repo cloned from temp test repo
         target_path = tempfile.mkdtemp()
         porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
 
-        porcelain.push(self.repo.path, target_path, 'master', outstream=outstream)
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=target_path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=target_path, paths=filename)
+        porcelain.commit(repo=target_path, message='test2',
+            author='test2', committer='test2')
+
+        # Push
+        porcelain.push(target_path, self.repo.path, 'refs/heads/master', outstream=outstream)
+
+        # Check the target repo for pushed changes
+        r = Repo(target_path)
+        r_s = Repo(self.repo.path)
+        self.assertTrue(r['HEAD'].id == r_s['HEAD'].id)
 
 
 class PullTests(PorcelainTestCase):
@@ -394,9 +429,7 @@ class PullTests(PorcelainTestCase):
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
-        filename = fullpath.split('/')[-1]
-
-        # perform commit
+        filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message='test',
                          author='test', committer='test')
@@ -405,4 +438,16 @@ class PullTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
 
-        porcelain.pull(self.repo.path, target_path, 'master', outstream=outstream)
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test2',
+            author='test2', committer='test2')
+
+        # Pull changes into the cloned repo
+        porcelain.pull(target_path, self.repo.path, 'refs/heads/master', outstream=outstream)
+
+        # Check the target repo for pushed changes
+        r = Repo(target_path)
+        self.assertTrue(r['HEAD'].id == self.repo['HEAD'].id)

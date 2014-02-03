@@ -18,6 +18,7 @@
 
 import os
 import sys
+import platform
 
 from time import time
 from re import search
@@ -196,10 +197,18 @@ def add(repo=".", paths=None):
     if not paths:
         paths = []
         for elem in os.walk(repo):
-            relative_path = elem[0].split('./')[-1]
-            if not search(r'\.git', elem[0]):
+
+            # Handle path dependecies based on OS
+            if platform.system() == 'Windows':
+                relative_path = elem[0].split('.\\')[-1]
+            else:
+                relative_path = elem[0].split('./')[-1]
+
+            if not (search(r'\.git', elem[0])):
                 for filename in elem[2]:
-                    paths.append(relative_path + '/' + filename)
+                    if not search(r'\.git$', filename):
+                        paths.append(os.path.join(relative_path, filename))
+
     r = open_repo(repo)
     r.stage(paths)
 

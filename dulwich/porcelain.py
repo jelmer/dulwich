@@ -196,19 +196,21 @@ def add(repo=".", paths=None):
     # Handle the default case where paths is None or an empty list
     if not paths:
         paths = []
-        for elem in os.walk(repo):
+        for dirpath, dirnames, filenames in os.walk(repo):
 
-            # Handle path dependecies based on OS
+            # Handle path dependecies based on OS & split off the path prefix
             if platform.system() == 'Windows':
-                relative_path = elem[0].split('.\\')[-1]
+                relative_path = dirpath.split(repo + '\\')[-1]
             else:
-                relative_path = elem[0].split('./')[-1]
+                relative_path = dirpath.split(repo + '/')[-1]
 
-            if not (search(r'\.git', elem[0])):
-                for filename in elem[2]:
+            if not (search(r'\.git', dirpath)):
+                for filename in filenames:
+                    # ignore *.git files
                     if not search(r'\.git$', filename):
                         paths.append(os.path.join(relative_path, filename))
 
+    paths = ['foo']
     r = open_repo(repo)
     r.stage(paths)
 
@@ -359,10 +361,15 @@ def reset_hard_head(repo):
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def push(repo, remote_url, branch, outstream=sys.stdout, errstream=sys.stderr):
+def push(repo, remote_url, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
-    :param repo: Path to repository
+    :param repo : Path to repository
+    :param remote_url: URI of the remote
+    :param refs_path: relative path to the refs to push to remote
+    :param outstream: A stream file to write to
+    :param outstream: A stream file to write to
     """
 
     # Open the repo
@@ -373,23 +380,30 @@ def push(repo, remote_url, branch, outstream=sys.stdout, errstream=sys.stderr):
 
     def update_refs(refs):
         new_refs = _repo.get_refs()
-        new_refs['refs/remotes/origin/' + branch] = new_refs['HEAD']
+        new_refs[refs_path] = new_refs['HEAD']
         del new_refs['HEAD']
         return new_refs
 
-    client.send_pack(path, update_refs,
-                     _repo.object_store.generate_pack_contents)
+    client.send_pack(path, update_refs, _repo.object_store.generate_pack_contents)
 
 
-def pull(repo, remote_url, branch, outstream=sys.stdout, errstream=sys.stderr):
-    """ Pull from remote via dulwich.client """
+def pull(repo, remote_url, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
+    """ Pull from remote via dulwich.client
+
+    :param repo: Path to repository
+    :param remote_url: URI of the remote
+    :param refs_path: relative path to the fetched refs
+    :param outstream: A stream file to write to
+    :param outstream: A stream file to write to
+    """
 
     # Open the repo
     _repo = Repo(repo)
 
     client, path = get_transport_and_path(remote_url)
     remote_refs = client.fetch(path, _repo)
-    _repo['HEAD'] = remote_refs['refs/heads/' + branch]
+    _repo['HEAD'] = remote_refs[refs_path]
 
     # Perform 'git checkout .' - syncs staged changes
     indexfile = _repo.index_path()

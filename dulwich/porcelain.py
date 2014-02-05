@@ -46,7 +46,6 @@ Currently implemented:
  * update-server-info
  * symbolic-ref
  * tag
- * status
  * return-tags
  * reset-hard-head
  * pull
@@ -380,9 +379,9 @@ def push(repo, remote_url, refs_path,
 
     def update_refs(refs):
         new_refs = _repo.get_refs()
-        new_refs[refs_path] = new_refs['HEAD']
+        refs[refs_path] = new_refs['HEAD']
         del new_refs['HEAD']
-        return new_refs
+        return refs
 
     client.send_pack(path, update_refs, _repo.object_store.generate_pack_contents)
 

@@ -386,39 +386,40 @@ class ResetHardHeadTests(PorcelainTestCase):
 class PushTests(PorcelainTestCase):
 
     def test_simple(self):
-
+        """
+        Basic test of porcelain push where self.repo is the remote.  First
+        clone the remote, commit a file to the clone, then push the changes
+        back to the remote.
+        """
         outstream = StringIO()
 
-        #source_path = '/var/tmp/repo1'
-        #target_path = '/var/tmp/repo2'
-        #Repo.init(source_path, mkdir=True)
-
         # create a file for initial commit
-
-        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
-        porcelain.commit(repo=self.repo.path, message='test',
-            author='test', committer='test')
+        porcelain.add(repo=self.repo.path, paths='.')
+        porcelain.commit(repo=self.repo.path, message='init',
+            author='', committer='')
 
         # Setup target repo cloned from temp test repo
-        target_path = tempfile.mkdtemp()
-        porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
+        source_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=source_path, outstream=outstream)
 
-        # create a second file to be pushed
-        handle, fullpath = tempfile.mkstemp(dir=target_path)
+        # create a second file to be pushed back to origin
+        handle, fullpath = tempfile.mkstemp(dir=source_path)
         filename = os.path.basename(fullpath)
-        porcelain.add(repo=target_path, paths=filename)
-        porcelain.commit(repo=target_path, message='test2',
-            author='test2', committer='test2')
+        porcelain.add(repo=source_path, paths=filename)
+        porcelain.commit(repo=source_path, message='push',
+            author='', committer='')
 
-        # Push
-        porcelain.push(target_path, self.repo.path, 'refs/heads/master', outstream=outstream)
-
-        # Check the target repo for pushed changes
-        r = Repo(target_path)
+        # Setup a non-checked out branch in the remote
+        refs_path = os.path.join('ref', 'heads', 'foo')
         r_s = Repo(self.repo.path)
-        self.assertTrue(r['HEAD'].id == r_s['HEAD'].id)
+        r_s[refs_path] = r_s['HEAD']
+
+        # Push to the remote
+        porcelain.push(source_path, self.repo.path, refs_path, outstream=outstream)
+
+        # Check that the target and source
+        r_t = Repo(source_path)
+        self.assertTrue(r_t['HEAD'].id == r_s[refs_path].id)
 
 
 class PullTests(PorcelainTestCase):

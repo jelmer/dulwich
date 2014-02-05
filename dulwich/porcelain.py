@@ -199,11 +199,10 @@ def add(repo=".", paths=None):
             # Handle path dependecies based on OS & split off the path prefix
             relative_path = dirpath.split(repo + os.path.sep)[-1]
 
-            if not (search(r'\.git', dirpath)):
+            # ignore *.git
+            if not '.git' in dirpath:
                 for filename in filenames:
-                    # ignore *.git files
-                    if not search(r'\.git$', filename):
-                        paths.append(os.path.join(relative_path, filename))
+                    paths.append(os.path.join(relative_path, filename))
 
     r = open_repo(repo)
     r.stage(paths)

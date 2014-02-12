@@ -894,15 +894,18 @@ class SSHGitClient(TraditionalGitClient):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, handlers=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
+        self.handlers = handlers or []
         GitClient.__init__(self, *args, **kwargs)
 
     def _get_url(self, path):
         return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers={}, data=None):
+        opener = urllib2.build_opener(*self.handlers)
+        urllib2.install_opener(opener)
         req = urllib2.Request(url, headers=headers, data=data)
         try:
             resp = self._perform(req)

@@ -894,36 +894,28 @@ class SSHGitClient(TraditionalGitClient):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, handlers=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
-        self.handlers = handlers or []
+        if opener is None:
+            self.opener = urllib2.build_opener()
+        else:
+            self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
 
     def _get_url(self, path):
         return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers={}, data=None):
-        opener = urllib2.build_opener(*self.handlers)
         req = urllib2.Request(url, headers=headers, data=data)
         try:
-            resp = self._perform(opener, req)
+            resp = self.opener.open(req)
         except urllib2.HTTPError as e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:
                 raise GitProtocolError("unexpected http response %d" % e.code)
         return resp
-
-    def _perform(self, opener, req):
-        """Perform a HTTP request.
-
-        This is provided so subclasses can provide their own version.
-
-        :param req: urllib2.Request instance
-        :return: matching response
-        """
-        return opener.open(req)
 
     def _discover_references(self, service, url):
         assert url[-1] == "/"

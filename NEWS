@@ -9,6 +9,9 @@
 
  * Add shallow branch support. (milki)
 
+ * Allow passing urllib2 `opener` into HttpGitClient.
+   (Dov Feldstern, #909037)
+
  CHANGES
 
  * Drop support for Python 2.4 and 2.5. (Jelmer Vernooij)

@@ -905,10 +905,9 @@ class HttpGitClient(GitClient):
 
     def _http_request(self, url, headers={}, data=None):
         opener = urllib2.build_opener(*self.handlers)
-        urllib2.install_opener(opener)
         req = urllib2.Request(url, headers=headers, data=data)
         try:
-            resp = self._perform(req)
+            resp = self._perform(opener, req)
         except urllib2.HTTPError as e:
             if e.code == 404:
                 raise NotGitRepository()
@@ -916,7 +915,7 @@ class HttpGitClient(GitClient):
                 raise GitProtocolError("unexpected http response %d" % e.code)
         return resp
 
-    def _perform(self, req):
+    def _perform(self, opener, req):
         """Perform a HTTP request.
 
         This is provided so subclasses can provide their own version.
@@ -924,7 +923,7 @@ class HttpGitClient(GitClient):
         :param req: urllib2.Request instance
         :return: matching response
         """
-        return urllib2.urlopen(req)
+        return opener.open(req)
 
     def _discover_references(self, service, url):
         assert url[-1] == "/"

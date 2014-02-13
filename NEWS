@@ -61,6 +61,11 @@
   * Support filesystems with 64bit inode and device numbers.
     (André Roth)
 
+ * Add experimental Repo implementation that backs onto
+   SWIFT. (Fabien Boucher)
+
+ * Add support for gevent. (Fabien Boucher)
+
  CHANGES
 
   * Ref handling has been moved to dulwich.refs.

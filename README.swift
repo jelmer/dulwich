@@ -79,7 +79,7 @@ How to run the server
 
 Start the server using the following command:
 
-    $ swift-dul-daemon -c /etc/swift-dul.conf -l 127.0.0.1
+    $ dul-daemon -c /etc/swift-dul.conf -l 127.0.0.1 --backend=swift
 
 Note that a lot of request will be performed against the Swift
 cluster so it is better to start the Dulwich server as close
@@ -93,7 +93,7 @@ Once you have validated that the functional tests is working as expected and
 the server is running we can init a bare repository. Run this
 command with the name of the repository to create:
 
-    $ swift-dul-initrepo -c /etc/swift-dul.conf -r edeploy
+    $ dulwich init_swift -c /etc/swift-dul.conf edeploy
 
 The repository name will be the container that will contain all the Git
 objects for the repository. Then standard c Git client can be used to

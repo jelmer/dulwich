@@ -411,10 +411,6 @@ class ProtocolGraphWalker(object):
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
         """
-        if not heads:
-            # The repo is empty, so short-circuit the whole process.
-            self.proto.write_pkt_line(None)
-            return []
         values = set(heads.itervalues())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.iteritems())):

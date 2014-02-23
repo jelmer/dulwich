@@ -11,3 +11,10 @@ Author: Jelmer Vernooij <jelmer@debian.org>
  setup.py
  bin/dul-daemon
  bin/dul-receive-pack
+@@ -170,4 +170,4 @@ dulwich/tests/data/trees/70/c190eb48fa8b
+ examples/clone.py
+ examples/config.py
+ examples/diff.py
+-examples/latest_change.py
+\ No newline at end of file
++examples/latest_change.py

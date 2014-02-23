@@ -348,8 +348,8 @@ class TagTests(PorcelainTestCase):
         porcelain.tag(self.repo.path, tag, author, message)
 
         tags = self.repo.refs.as_dict("refs/tags")
-        if not tags.keys()[0] == tag:
-            assert False
+        self.assertTrue(tags.keys()[0] == tag,
+                        'porcelain::tag -> Tag not successfully added.')
 
 
 class ReturnTagsTests(PorcelainTestCase):
@@ -360,9 +360,9 @@ class ReturnTagsTests(PorcelainTestCase):
 
         # compare
         for tag in tags_true:
-            if not tag in tags:
-                assert False
-        assert True
+            self.assertTrue(tag in tags,
+                            'porcelain::return_tags -> Returned tags do not '
+                            'match actual tags.')
 
 
 class ResetHardHeadTests(PorcelainTestCase):
@@ -380,7 +380,8 @@ class ResetHardHeadTests(PorcelainTestCase):
                                  index.commit(self.repo.object_store),
                                  self.repo['HEAD'].tree))
         # no staged changes
-        assert not changes
+        self.assertTrue(changes, 'porcelain::reset_hard_head -> Can\'t detect '
+                                 'changes from new tree from commit.')
 
 
 class PushTests(PorcelainTestCase):
@@ -419,7 +420,7 @@ class PushTests(PorcelainTestCase):
 
         # Check that the target and source
         r_t = Repo(source_path)
-        self.assertTrue(r_t['HEAD'].id == r_s[refs_path].id)
+        self.assertEquals(r_t['HEAD'].id, r_s[refs_path].id)
 
 
 class PullTests(PorcelainTestCase):
@@ -451,4 +452,4 @@ class PullTests(PorcelainTestCase):
 
         # Check the target repo for pushed changes
         r = Repo(target_path)
-        self.assertTrue(r['HEAD'].id == self.repo['HEAD'].id)
+        self.assertEquals(r['HEAD'].id, self.repo['HEAD'].id)

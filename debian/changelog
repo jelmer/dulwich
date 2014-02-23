@@ -1,7 +1,8 @@
-dulwich (0.9.4-2) UNRELEASED; urgency=medium
+dulwich (0.9.5-1) UNRELEASED; urgency=medium
 
   * Add upstream PGP signing key.
   * Enable autopkgtest.
+  * New upstream release.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Wed, 29 Jan 2014 00:30:26 +0000
 

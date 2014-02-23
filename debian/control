@@ -8,6 +8,7 @@ Standards-Version: 3.9.4
 X-Python-Version: >= 2.4
 Vcs-Git: git://git.debian.org/users/jelmer/dulwich.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=users/jelmer/dulwich.git
+XS-Testsuite: autopkgtest
 
 Package: python-dulwich
 Architecture: any

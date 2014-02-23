@@ -1,0 +1,2 @@
+Tests: testsuite
+Depends: python-dulwich, git

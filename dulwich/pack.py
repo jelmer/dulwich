@@ -980,6 +980,10 @@ class PackData(object):
             compute_size=_compute_object_size)
         self.pack = None
 
+    @property
+    def filename(self):
+        return os.path.basename(self._filename)
+
     @classmethod
     def from_file(cls, file, size):
         return cls(str(file), file=file, size=size)

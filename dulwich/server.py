@@ -919,7 +919,7 @@ def generate_info_refs(repo):
 def generate_objects_info_packs(repo):
     """Generate an index for for packs."""
     for pack in repo.object_store.packs:
-        yield 'P pack-%s.pack\n' % pack.name()
+        yield 'P %s\n' % pack.data.filename
 
 
 def update_server_info(repo):

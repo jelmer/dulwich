@@ -254,12 +254,14 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertFalse(self._req.cached)
 
     def test_get_info_packs(self):
+        class TestPackData(object):
+
+            def __init__(self, sha):
+                self.filename = "pack-%s.pack" % sha
+
         class TestPack(object):
             def __init__(self, sha):
-                self._sha = sha
-
-            def name(self):
-                return self._sha
+                self.data = TestPackData(sha)
 
         packs = [TestPack(str(i) * 40) for i in xrange(1, 4)]
 

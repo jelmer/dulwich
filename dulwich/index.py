@@ -423,7 +423,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
             src_path = object_store[entry.sha].as_raw_string()
             try:
                 os.symlink(src_path, full_path)
-            except OSError, e:
+            except OSError as e:
                 if e.errno == errno.EEXIST:
                     os.unlink(full_path)
                     os.symlink(src_path, full_path)

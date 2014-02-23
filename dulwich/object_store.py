@@ -162,7 +162,8 @@ class BaseObjectStore(object):
                 yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,
-                             get_tagged=None):
+                             get_tagged=None,
+                             get_parents=lambda commit: commit.parents):
         """Find the missing objects required for a set of revisions.
 
         :param haves: Iterable over SHAs already in common.
@@ -171,9 +172,10 @@ class BaseObjectStore(object):
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha -> tag
             sha for including tags.
+        :param get_parents: Optional function for getting the parents of a commit.
         :return: Iterator over (sha, path) pairs.
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged)
+        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged, get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -215,12 +217,14 @@ class BaseObjectStore(object):
             obj = self[sha]
         return obj
 
-    def _collect_ancestors(self, heads, common=set()):
+    def _collect_ancestors(self, heads, common=set(),
+                           get_parents=lambda commit: commit.parents):
         """Collect all ancestors of heads up to (excluding) those in common.
 
         :param heads: commits to start from
         :param common: commits to end at, or empty set to walk repository
             completely
+        :param get_parents: Optional function for getting the parents of a commit.
         :return: a tuple (A, B) where A - all commits reachable
             from heads but not present in common, B - common (shared) elements
             that are directly reachable from heads
@@ -236,7 +240,7 @@ class BaseObjectStore(object):
             elif e not in commits:
                 commits.add(e)
                 cmt = self[e]
-                queue.extend(cmt.parents)
+                queue.extend(get_parents(cmt))
         return (commits, bases)
 
     def close(self):
@@ -408,6 +412,9 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = 0
         self._alternates = None
 
+    def __repr__(self):
+        return "<%s(%r)>" % (self.__class__.__name__, self.path)
+
     @property
     def alternates(self):
         if self._alternates is not None:
@@ -421,7 +428,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
                     'rb')
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
             raise
@@ -444,7 +451,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         try:
             os.mkdir(os.path.join(self.path, "info"))
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         alternates_path = os.path.join(self.path, "info/alternates")
@@ -452,7 +459,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             try:
                 orig_f = open(alternates_path, 'rb')
-            except (OSError, IOError), e:
+            except (OSError, IOError) as e:
                 if e.errno != errno.ENOENT:
                     raise
             else:
@@ -478,7 +485,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 if name.startswith("pack-") and name.endswith(".pack"):
                     filename = os.path.join(self.pack_dir, name)
                     pack_files.append((os.stat(filename).st_mtime, filename))
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 return []
             raise
@@ -497,7 +504,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _pack_cache_stale(self):
         try:
             return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 return True
             raise
@@ -517,7 +524,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -663,7 +670,7 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.join(self.path, obj.id[:2])
         try:
             os.mkdir(dir)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         path = os.path.join(dir, obj.id[2:])
@@ -679,7 +686,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def init(cls, path):
         try:
             os.mkdir(path)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         os.mkdir(os.path.join(path, "info"))
@@ -970,12 +977,14 @@ class MissingObjectFinder(object):
     :param progress: Optional function to report progress to.
     :param get_tagged: Function that returns a dict of pointed-to sha -> tag
         sha for including tags.
+    :param get_parents: Optional function for getting the parents of a commit.
     :param tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-                 get_tagged=None):
+            get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
+        self._get_parents = get_parents
         # process Commits and Tags differently
         # Note, while haves may list commits/tags not available locally,
         # and such SHAs would get filtered out by _split_commits_and_tags,
@@ -987,12 +996,16 @@ class MissingObjectFinder(object):
                 _split_commits_and_tags(object_store, wants, False)
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
-        all_ancestors = object_store._collect_ancestors(have_commits)[0]
+        all_ancestors = object_store._collect_ancestors(
+                have_commits,
+                get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
-        missing_commits, common_commits = \
-            object_store._collect_ancestors(want_commits, all_ancestors)
+        missing_commits, common_commits = object_store._collect_ancestors(
+            want_commits,
+            all_ancestors,
+            get_parents=self._get_parents);
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally

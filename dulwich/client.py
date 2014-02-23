@@ -55,6 +55,7 @@ from dulwich.protocol import (
     _RBUFSIZE,
     PktLineParser,
     Protocol,
+    ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -582,7 +583,7 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error, err:
+            except socket.error as err:
                 if s is not None:
                     s.close()
                 s = None
@@ -697,7 +698,15 @@ class LocalGitClient(GitClient):
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
         """
-        raise NotImplementedError(self.fetch_pack)
+        from dulwich.repo import Repo
+        r = Repo(path)
+        objects_iter = r.fetch_objects(determine_wants, graph_walker, progress)
+
+        # Did the process short-circuit (e.g. in a stateless RPC call)? Note
+        # that the client still expects a 0-object pack in most cases.
+        if objects_iter is None:
+            return
+        write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
 
 
 # What Git client to use for local access
@@ -885,9 +894,13 @@ class SSHGitClient(TraditionalGitClient):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
+        if opener is None:
+            self.opener = urllib2.build_opener()
+        else:
+            self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
 
     def _get_url(self, path):
@@ -896,23 +909,13 @@ class HttpGitClient(GitClient):
     def _http_request(self, url, headers={}, data=None):
         req = urllib2.Request(url, headers=headers, data=data)
         try:
-            resp = self._perform(req)
-        except urllib2.HTTPError, e:
+            resp = self.opener.open(req)
+        except urllib2.HTTPError as e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:
                 raise GitProtocolError("unexpected http response %d" % e.code)
         return resp
-
-    def _perform(self, req):
-        """Perform a HTTP request.
-
-        This is provided so subclasses can provide their own version.
-
-        :param req: urllib2.Request instance
-        :return: matching response
-        """
-        return urllib2.urlopen(req)
 
     def _discover_references(self, service, url):
         assert url[-1] == "/"

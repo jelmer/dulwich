@@ -17,6 +17,7 @@ docs/performance.txt
 docs/protocol.txt
 docs/tutorial/Makefile
 docs/tutorial/conclusion.txt
+docs/tutorial/file-format.txt
 docs/tutorial/index.txt
 docs/tutorial/introduction.txt
 docs/tutorial/object-store.txt
@@ -40,6 +41,7 @@ dulwich/log_utils.py
 dulwich/lru_cache.py
 dulwich/object_store.py
 dulwich/objects.py
+dulwich/objectspec.py
 dulwich/pack.py
 dulwich/patch.py
 dulwich/porcelain.py
@@ -68,10 +70,12 @@ dulwich/tests/test_lru_cache.py
 dulwich/tests/test_missing_obj_finder.py
 dulwich/tests/test_object_store.py
 dulwich/tests/test_objects.py
+dulwich/tests/test_objectspec.py
 dulwich/tests/test_pack.py
 dulwich/tests/test_patch.py
 dulwich/tests/test_porcelain.py
 dulwich/tests/test_protocol.py
+dulwich/tests/test_refs.py
 dulwich/tests/test_repository.py
 dulwich/tests/test_server.py
 dulwich/tests/test_utils.py
@@ -165,3 +169,4 @@ dulwich/tests/data/trees/70/c190eb48fa8bbb50ddc692a17b44cb781af7f6
 examples/clone.py
 examples/config.py
 examples/diff.py
+examples/latest_change.py

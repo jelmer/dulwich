@@ -21,14 +21,12 @@
 
 
 from cStringIO import StringIO
+from hashlib import sha1
 import os
 import shutil
 import tempfile
 import zlib
 
-from dulwich._compat import (
-    make_sha,
-    )
 from dulwich.errors import (
     ChecksumMismatch,
     )
@@ -250,16 +248,16 @@ class TestPackData(PackTests):
 
     def test_compute_file_sha(self):
         f = StringIO('abcd1234wxyz')
-        self.assertEqual(make_sha('abcd1234wxyz').hexdigest(),
+        self.assertEqual(sha1('abcd1234wxyz').hexdigest(),
                          compute_file_sha(f).hexdigest())
-        self.assertEqual(make_sha('abcd1234wxyz').hexdigest(),
+        self.assertEqual(sha1('abcd1234wxyz').hexdigest(),
                          compute_file_sha(f, buffer_size=5).hexdigest())
-        self.assertEqual(make_sha('abcd1234').hexdigest(),
+        self.assertEqual(sha1('abcd1234').hexdigest(),
                          compute_file_sha(f, end_ofs=-4).hexdigest())
-        self.assertEqual(make_sha('1234wxyz').hexdigest(),
+        self.assertEqual(sha1('1234wxyz').hexdigest(),
                          compute_file_sha(f, start_ofs=4).hexdigest())
         self.assertEqual(
-          make_sha('1234').hexdigest(),
+          sha1('1234').hexdigest(),
           compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest())
 
 
@@ -504,7 +502,7 @@ class WritePackTests(TestCase):
         f = StringIO()
         f.write('header')
         offset = f.tell()
-        sha_a = make_sha('foo')
+        sha_a = sha1('foo')
         sha_b = sha_a.copy()
         write_pack_object(f, Blob.type_num, 'blob', sha=sha_a)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())

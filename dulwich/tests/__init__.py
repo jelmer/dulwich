@@ -122,12 +122,14 @@ def self_test_suite():
         'index',
         'lru_cache',
         'objects',
+        'objectspec',
         'object_store',
         'missing_obj_finder',
         'pack',
         'patch',
         'porcelain',
         'protocol',
+        'refs',
         'repository',
         'server',
         'walk',
@@ -141,6 +143,7 @@ def self_test_suite():
 def tutorial_test_suite():
     tutorial = [
         'introduction',
+        'file-format',
         'repo',
         'object-store',
         'remote',

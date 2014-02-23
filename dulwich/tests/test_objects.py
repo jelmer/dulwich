@@ -24,15 +24,15 @@
 
 from cStringIO import StringIO
 import datetime
+from itertools import (
+    permutations,
+    )
 import os
 import stat
 import warnings
 
 from dulwich.errors import (
     ObjectFormatException,
-    )
-from dulwich._compat import (
-    permutations,
     )
 from dulwich.objects import (
     Blob,

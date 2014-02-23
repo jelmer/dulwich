@@ -19,18 +19,12 @@
 """General implementation of walking commits and their contents."""
 
 
-try:
-    from collections import defaultdict
-except ImportError:
-    from _compat import defaultdict
+from collections import defaultdict
 
 import collections
 import heapq
 import itertools
 
-from dulwich._compat import (
-    all,
-    )
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
     tree_changes,

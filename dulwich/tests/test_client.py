@@ -559,3 +559,24 @@ class LocalGitClientTests(TestCase):
         t = MemoryRepo()
         s = open_repo('a.git')
         self.assertEquals(s.get_refs(), c.fetch(s.path, t))
+
+    def test_fetch_empty(self):
+        c = LocalGitClient()
+        s = open_repo('a.git')
+        out = StringIO()
+        walker = {}
+        c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
+            pack_data=out.write)
+        self.assertEquals("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
+            "\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
+
+    def test_fetch_pack_none(self):
+        c = LocalGitClient()
+        s = open_repo('a.git')
+        out = StringIO()
+        walker = MemoryRepo().get_graph_walker()
+        c.fetch_pack(s.path,
+            lambda heads: ["a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+            graph_walker=walker, pack_data=out.write)
+        # Hardcoding is not ideal, but we'll fix that some other day..
+        self.assertTrue(out.getvalue().startswith('PACK\x00\x00\x00\x02\x00\x00\x00\x07'))

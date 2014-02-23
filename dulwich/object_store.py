@@ -412,6 +412,9 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = 0
         self._alternates = None
 
+    def __repr__(self):
+        return "<%s(%r)>" % (self.__class__.__name__, self.path)
+
     @property
     def alternates(self):
         if self._alternates is not None:

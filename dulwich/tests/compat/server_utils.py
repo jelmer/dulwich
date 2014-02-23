@@ -165,7 +165,7 @@ class ServerTests(object):
             # We don't create a Repo from new_repo_dir until after some errors
             # may have occurred, so don't depend on tearDown to clean it up.
             shutil.rmtree(new_repo_base_dir)
-    
+
     def test_lsremote_from_dulwich(self):
         self._repo = import_repo('server_old.export')
         port = self._start_server(self._repo)

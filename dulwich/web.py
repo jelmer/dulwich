@@ -25,11 +25,8 @@ import os
 import re
 import sys
 import time
+from urlparse import parse_qs
 
-try:
-    from urlparse import parse_qs
-except ImportError:
-    from dulwich._compat import parse_qs
 from dulwich import log_utils
 from dulwich.protocol import (
     ReceivableProtocol,

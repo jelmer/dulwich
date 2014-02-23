@@ -20,14 +20,14 @@
 """Generic functions for talking the git smart server protocol."""
 
 from cStringIO import StringIO
+from os import (
+    SEEK_END,
+    )
 import socket
 
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
-    )
-from dulwich._compat import (
-    SEEK_END,
     )
 
 TCP_GIT_PORT = 9418
@@ -109,7 +109,7 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, 'read')
             return read(size-4)
-        except socket.error, e:
+        except socket.error as e:
             raise GitProtocolError(e)
 
     def eof(self):
@@ -160,7 +160,7 @@ class Protocol(object):
             self.write(line)
             if self.report_activity:
                 self.report_activity(len(line), 'write')
-        except socket.error, e:
+        except socket.error as e:
             raise GitProtocolError(e)
 
     def write_file(self):

@@ -54,7 +54,7 @@ which claims that the client doesn't have any objects::
    ...     def ack(self, sha): pass
    ...     def next(self): pass
 
-With the determine_wants function in place, we can now fetch a pack,
+With the ``determine_wants`` function in place, we can now fetch a pack,
 which we will write to a ``StringIO`` object::
 
    >>> from cStringIO import StringIO
@@ -70,14 +70,14 @@ which we will write to a ``StringIO`` object::
 Fetching objects into a local repository
 ----------------------------------------
 
-It also possible to fetch from a remote repository into a local repository,
-in which case dulwich takes care of providing the right graph walker, and
+It is also possible to fetch from a remote repository into a local repository,
+in which case Dulwich takes care of providing the right graph walker, and
 importing the received pack file into the local repository::
 
    >>> from dulwich.repo import Repo
    >>> local = Repo.init("local", mkdir=True)
    >>> remote_refs = client.fetch("/", local)
 
-Let's show down the server now that all tests have been run::
+Let's shut down the server now that all tests have been run::
 
    >>> dul_server.shutdown()

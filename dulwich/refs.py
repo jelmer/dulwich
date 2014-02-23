@@ -442,7 +442,7 @@ class DiskRefsContainer(RefsContainer):
             path = os.path.join(self.path, 'packed-refs')
             try:
                 f = GitFile(path, 'rb')
-            except IOError, e:
+            except IOError as e:
                 if e.errno == errno.ENOENT:
                     return {}
                 raise
@@ -504,7 +504,7 @@ class DiskRefsContainer(RefsContainer):
                     return header + f.read(40 - len(SYMREF))
             finally:
                 f.close()
-        except IOError, e:
+        except IOError as e:
             if e.errno == errno.ENOENT:
                 return None
             raise

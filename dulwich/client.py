@@ -583,7 +583,7 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error, err:
+            except socket.error as err:
                 if s is not None:
                     s.close()
                 s = None
@@ -894,9 +894,13 @@ class SSHGitClient(TraditionalGitClient):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
+        if opener is None:
+            self.opener = urllib2.build_opener()
+        else:
+            self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
 
     def _get_url(self, path):
@@ -905,23 +909,13 @@ class HttpGitClient(GitClient):
     def _http_request(self, url, headers={}, data=None):
         req = urllib2.Request(url, headers=headers, data=data)
         try:
-            resp = self._perform(req)
-        except urllib2.HTTPError, e:
+            resp = self.opener.open(req)
+        except urllib2.HTTPError as e:
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:
                 raise GitProtocolError("unexpected http response %d" % e.code)
         return resp
-
-    def _perform(self, req):
-        """Perform a HTTP request.
-
-        This is provided so subclasses can provide their own version.
-
-        :param req: urllib2.Request instance
-        :return: matching response
-        """
-        return urllib2.urlopen(req)
 
     def _discover_references(self, service, url):
         assert url[-1] == "/"

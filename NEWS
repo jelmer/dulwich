@@ -1,3 +1,37 @@
+0.9.5	2014-02-23
+
+ IMPROVEMENTS
+
+ * Add porcelain 'tag'. (Ryan Faulkner)
+
+ * New module `dulwich.objectspec` for parsing strings referencing
+   objects and commit ranges. (Jelmer Vernooij)
+
+ * Add shallow branch support. (milki)
+
+ * Allow passing urllib2 `opener` into HttpGitClient.
+   (Dov Feldstern, #909037)
+
+ CHANGES
+
+ * Drop support for Python 2.4 and 2.5. (Jelmer Vernooij)
+
+ API CHANGES
+
+ * Remove long deprecated ``Repo.commit``, ``Repo.get_blob``,
+   ``Repo.tree`` and ``Repo.tag``. (Jelmer Vernooij)
+
+ * Remove long deprecated ``Repo.revision_history`` and ``Repo.ref``.
+   (Jelmer Vernooij)
+
+ * Remove long deprecated ``Tree.entries``. (Jelmer Vernooij)
+
+ BUG FIXES
+
+ * Raise KeyError rather than TypeError when passing in
+   unicode object of length 20 or 40 to Repo.__getitem__.
+   (Jelmer Vernooij)
+
 0.9.4	2013-11-30
 
  IMPROVEMENTS

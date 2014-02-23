@@ -248,14 +248,38 @@ class BaseRepo(object):
         wants = determine_wants(self.get_refs())
         if type(wants) is not list:
             raise TypeError("determine_wants() did not return a list")
+
+        shallows = getattr(graph_walker, 'shallow', frozenset())
+        unshallows = getattr(graph_walker, 'unshallow', frozenset())
+
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
+
+            if shallows or unshallows:
+                # Do not send a pack in shallow short-circuit path
+                return None
+
             return []
+
         haves = self.object_store.find_common_revisions(graph_walker)
+
+        # Deal with shallow requests separately because the haves do
+        # not reflect what objects are missing
+        if shallows or unshallows:
+            haves = []  # TODO: filter the haves commits from iter_shas.
+                        # the specific commits aren't missing.
+
+        def get_parents(commit):
+            if commit.id in shallows:
+                return []
+            return self.get_parents(commit.id, commit)
+
         return self.object_store.iter_shas(
-          self.object_store.find_missing_objects(haves, wants, progress,
-                                                 get_tagged))
+          self.object_store.find_missing_objects(
+              haves, wants, progress,
+              get_tagged,
+              get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.
@@ -269,18 +293,6 @@ class BaseRepo(object):
         if heads is None:
             heads = self.refs.as_dict('refs/heads').values()
         return ObjectStoreGraphWalker(heads, self.get_parents)
-
-    def ref(self, name):
-        """Return the SHA1 a ref is pointing to.
-
-        :param name: Name of the ref to look up
-        :raise KeyError: when the ref (or the one it points to) does not exist
-        :return: SHA1 it is pointing at
-        """
-        warnings.warn(
-            "Repo.ref(name) is deprecated. Use Repo.refs[name] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self.refs[name]
 
     def get_refs(self):
         """Get dictionary with all refs.
@@ -372,54 +384,6 @@ class BaseRepo(object):
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
 
-    def commit(self, sha):
-        """Retrieve the commit with a particular SHA.
-
-        :param sha: SHA of the commit to retrieve
-        :raise NotCommitError: If the SHA provided doesn't point at a Commit
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Commit` object
-        """
-        warnings.warn("Repo.commit(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Commit)
-
-    def tree(self, sha):
-        """Retrieve the tree with a particular SHA.
-
-        :param sha: SHA of the tree to retrieve
-        :raise NotTreeError: If the SHA provided doesn't point at a Tree
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Tree` object
-        """
-        warnings.warn("Repo.tree(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Tree)
-
-    def tag(self, sha):
-        """Retrieve the tag with a particular SHA.
-
-        :param sha: SHA of the tag to retrieve
-        :raise NotTagError: If the SHA provided doesn't point at a Tag
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Tag` object
-        """
-        warnings.warn("Repo.tag(sha) is deprecated. Use Repo[sha] instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Tag)
-
-    def get_blob(self, sha):
-        """Retrieve the blob with a particular SHA.
-
-        :param sha: SHA of the blob to retrieve
-        :raise NotBlobError: If the SHA provided doesn't point at a Blob
-        :raise KeyError: If the SHA provided didn't exist
-        :return: A `Blob` object
-        """
-        warnings.warn("Repo.get_blob(sha) is deprecated. Use Repo[sha] "
-            "instead.", category=DeprecationWarning, stacklevel=2)
-        return self._get_object(sha, Blob)
-
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 
@@ -468,20 +432,6 @@ class BaseRepo(object):
 
         return Walker(self.object_store, include, *args, **kwargs)
 
-    def revision_history(self, head):
-        """Returns a list of the commits reachable from head.
-
-        :param head: The SHA of the head to list revision history for.
-        :return: A list of commit objects reachable from head, starting with
-            head itself, in descending commit time order.
-        :raise MissingCommitError: if any missing commits are referenced,
-            including if the head parameter isn't the SHA of a commit.
-        """
-        warnings.warn("Repo.revision_history() is deprecated."
-            "Use dulwich.walker.Walker(repo) instead.",
-            category=DeprecationWarning, stacklevel=2)
-        return [e.commit for e in self.get_walker(include=[head])]
-
     def __getitem__(self, name):
         """Retrieve a Git object by SHA1 or ref.
 
@@ -489,7 +439,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if len(name) in (20, 40):
+        if len(name) in (20, 40) and isinstance(name, str):
             try:
                 return self.object_store[name]
             except (KeyError, ValueError):
@@ -706,9 +656,13 @@ class Repo(BaseRepo):
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
+        self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints = parse_graftpoints(graft_file)
+            self._graftpoints.update(parse_graftpoints(graft_file))
+        graft_file = self.get_named_file("shallow")
+        if graft_file:
+            self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

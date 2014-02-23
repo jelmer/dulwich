@@ -30,10 +30,7 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
-try:
-    from collections import defaultdict
-except ImportError:
-    from dulwich._compat import defaultdict
+from collections import defaultdict
 
 import binascii
 from cStringIO import (
@@ -54,12 +51,14 @@ except ImportError:
     has_mmap = False
 else:
     has_mmap = True
+from hashlib import sha1
 import os
+from os import (
+    SEEK_CUR,
+    SEEK_END,
+    )
 import struct
-try:
-    from struct import unpack_from
-except ImportError:
-    from dulwich._compat import unpack_from
+from struct import unpack_from
 import sys
 import warnings
 import zlib
@@ -71,11 +70,6 @@ from dulwich.errors import (
 from dulwich.file import GitFile
 from dulwich.lru_cache import (
     LRUSizeCache,
-    )
-from dulwich._compat import (
-    make_sha,
-    SEEK_CUR,
-    SEEK_END,
     )
 from dulwich.objects import (
     ShaFile,
@@ -257,10 +251,10 @@ def iter_sha1(iter):
     :param iter: Iterator over string objects
     :return: 40-byte hex sha1 digest
     """
-    sha1 = make_sha()
+    sha = sha1()
     for name in iter:
-        sha1.update(name)
-    return sha1.hexdigest()
+        sha.update(name)
+    return sha.hexdigest()
 
 
 def load_pack_index(path):
@@ -540,7 +534,7 @@ class FilePackIndex(PackIndex):
 
         :return: This is a 20-byte binary digest
         """
-        return make_sha(self._contents[:-20]).digest()
+        return sha1(self._contents[:-20]).digest()
 
     def get_pack_checksum(self):
         """Return the SHA1 checksum stored for the corresponding packfile.
@@ -745,7 +739,7 @@ class PackStreamReader(object):
             self.read_some = read_all
         else:
             self.read_some = read_some
-        self.sha = make_sha()
+        self.sha = sha1()
         self._offset = 0
         self._rbuf = StringIO()
         # trailer is a deque to avoid memory allocation on small reads
@@ -910,7 +904,7 @@ class PackStreamCopier(PackStreamReader):
 
 def obj_sha(type, chunks):
     """Compute the SHA for a numeric type and object chunks."""
-    sha = make_sha()
+    sha = sha1()
     sha.update(object_header(type, chunks_length(chunks)))
     for chunk in chunks:
         sha.update(chunk)
@@ -927,7 +921,7 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
     :param buffer_size: A buffer size for reading.
     :return: A new SHA object updated with data read from the file.
     """
-    sha = make_sha()
+    sha = sha1()
     f.seek(0, SEEK_END)
     todo = f.tell() + end_ofs - start_ofs
     f.seek(start_ofs)
@@ -985,6 +979,10 @@ class PackData(object):
         self._offset_cache = LRUSizeCache(1024*1024*20,
             compute_size=_compute_object_size)
         self.pack = None
+
+    @property
+    def filename(self):
+        return os.path.basename(self._filename)
 
     @classmethod
     def from_file(cls, file, size):
@@ -1341,7 +1339,7 @@ class SHA1Reader(object):
 
     def __init__(self, f):
         self.f = f
-        self.sha1 = make_sha('')
+        self.sha1 = sha1('')
 
     def read(self, num=None):
         data = self.f.read(num)
@@ -1366,7 +1364,7 @@ class SHA1Writer(object):
     def __init__(self, f):
         self.f = f
         self.length = 0
-        self.sha1 = make_sha('')
+        self.sha1 = sha1('')
 
     def write(self, data):
         self.sha1.update(data)

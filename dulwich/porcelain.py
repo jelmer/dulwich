@@ -18,9 +18,16 @@
 
 import os
 import sys
+import time
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
+from dulwich.objects import (
+    Commit,
+    Tag,
+    parse_timezone,
+    )
+from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
@@ -36,7 +43,9 @@ Currently implemented:
  * diff-tree
  * init
  * remove
+ * reset
  * rev-list
+ * tag
  * update-server-info
  * symbolic-ref
 
@@ -215,32 +224,99 @@ def print_commit(commit, outstream):
     outstream.write("\n")
 
 
-def log(repo=".", outstream=sys.stdout):
+def print_tag(tag, outstream):
+    """Write a human-readable tag.
+
+    :param tag: A `Tag` object
+    :param outstream: A stream to write to
+    """
+    outstream.write("Tagger: %s\n" % tag.tagger)
+    outstream.write("Date:   %s\n" % tag.tag_time)
+    outstream.write("\n")
+    outstream.write("%s\n" % tag.message)
+    outstream.write("\n")
+
+
+def show_blob(repo, blob, outstream):
+    """Write a blob to a stream.
+
+    :param repo: A `Repo` object
+    :param blob: A `Blob` object
+    :param outstream: A stream file to write to
+    """
+    outstream.write(blob.data)
+
+
+def show_commit(repo, commit, outstream):
+    """Show a commit to a stream.
+
+    :param repo: A `Repo` object
+    :param commit: A `Commit` object
+    :param outstream: Stream to write to
+    """
+    print_commit(commit, outstream)
+    parent_commit = repo[commit.parents[0]]
+    write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
+
+
+def show_tree(repo, tree, outstream):
+    """Print a tree to a stream.
+
+    :param repo: A `Repo` object
+    :param tree: A `Tree` object
+    :param outstream: Stream to write to
+    """
+    for n in tree:
+        outstream.write("%s\n" % n)
+
+
+def show_tag(repo, tag, outstream):
+    """Print a tag to a stream.
+
+    :param repo: A `Repo` object
+    :param tag: A `Tag` object
+    :param outstream: Stream to write to
+    """
+    print_tag(tag, outstream)
+    show_object(repo, repo[tag.object[1]], outstream)
+
+
+def show_object(repo, obj, outstream):
+    return {
+        "tree": show_tree,
+        "blob": show_blob,
+        "commit": show_commit,
+        "tag": show_tag,
+            }[obj.type_name](repo, obj, outstream)
+
+
+def log(repo=".", outstream=sys.stdout, max_entries=None):
     """Write commit logs.
 
     :param repo: Path to repository
     :param outstream: Stream to write log output to
+    :param max_entries: Optional maximum number of entries to display
     """
     r = open_repo(repo)
-    walker = r.get_walker()
+    walker = r.get_walker(max_entries=max_entries)
     for entry in walker:
         print_commit(entry.commit, outstream)
 
 
-def show(repo=".", committish=None, outstream=sys.stdout):
+def show(repo=".", objects=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
     :param repo: Path to repository
-    :param committish: Commit to write
+    :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
     """
-    if committish is None:
-        committish = "HEAD"
+    if objects is None:
+        objects = ["HEAD"]
+    if not isinstance(objects, list):
+        objects = [objects]
     r = open_repo(repo)
-    commit = r[committish]
-    parent_commit = r[commit.parents[0]]
-    print_commit(commit, outstream)
-    write_tree_diff(outstream, r.object_store, parent_commit.tree, commit.tree)
+    for objectish in objects:
+        show_object(r, parse_object(r, objectish), outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
@@ -265,3 +341,45 @@ def rev_list(repo, commits, outstream=sys.stdout):
     r = open_repo(repo)
     for entry in r.get_walker(include=[r[c].id for c in commits]):
         outstream.write("%s\n" % entry.commit.id)
+
+
+def tag(repo, tag, author, message):
+    """Creates a tag in git via dulwich calls:
+
+    :param repo: Path to repository
+    :param tag: tag string
+    :param author: tag author
+    :param repo: tag message
+    """
+
+    r = open_repo(repo)
+
+    # Create the tag object
+    tag_obj = Tag()
+    tag_obj.tagger = author
+    tag_obj.message = message
+    tag_obj.name = tag
+    tag_obj.object = (Commit, r.refs['HEAD'])
+    tag_obj.tag_time = int(time.time())
+    tag_obj.tag_timezone = parse_timezone('-0200')[0]
+
+    # Add tag to the object store
+    r.object_store.add_object(tag_obj)
+    r.refs['refs/tags/' + tag] = tag_obj.id
+
+
+def reset(repo, mode, committish="HEAD"):
+    """Reset current HEAD to the specified state.
+
+    :param repo: Path to repository
+    :param mode: Mode ("hard", "soft", "mixed")
+    """
+
+    if mode != "hard":
+        raise ValueError("hard is the only mode currently supported")
+
+    r = open_repo(repo)
+
+    indexfile = r.index_path()
+    tree = r[committish].tree
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

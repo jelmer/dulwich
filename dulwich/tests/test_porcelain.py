@@ -25,6 +25,7 @@ import tarfile
 import tempfile
 
 from dulwich import porcelain
+from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
     Blob,
     Tree,
@@ -207,18 +208,41 @@ class LogTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith("-" * 50))
+        self.assertEquals(3, outstream.getvalue().count("-" * 50))
+
+    def test_max_entries(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
+        self.assertEquals(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):
+
+    def test_nolist(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
-        porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
+        porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+    def test_blob(self):
+        b = Blob.from_string("The Foo\n")
+        self.repo.object_store.add_object(b)
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
+        self.assertEquals(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):
@@ -303,3 +327,49 @@ class RevListTests(PorcelainTestCase):
         self.assertEquals(
             "%s\n%s\n%s\n" % (c3.id, c2.id, c1.id),
             outstream.getvalue())
+
+
+class TagTests(PorcelainTestCase):
+
+    def test_simple(self):
+        tag = 'tryme'
+        author = 'foo'
+        message = 'bar'
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        porcelain.tag(self.repo.path, tag, author, message)
+
+        tags = self.repo.refs.as_dict("refs/tags")
+        self.assertEquals(tags.keys()[0], tag)
+
+
+class ResetTests(PorcelainTestCase):
+
+    def test_hard_head(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.commit(self.repo.path, message="Some message",
+                committer="Jane <jane@example.com>",
+                author="John <john@example.com>")
+
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("OOH")
+        finally:
+            f.close()
+
+        porcelain.reset(self.repo, "hard", "HEAD")
+
+        index = self.repo.open_index()
+        changes = list(tree_changes(self.repo,
+                       index.commit(self.repo.object_store),
+                       self.repo['HEAD'].tree))
+
+        self.assertEquals([], changes)

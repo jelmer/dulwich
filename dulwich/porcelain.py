@@ -20,7 +20,6 @@ import os
 import sys
 
 from time import time
-from re import search
 from collections import OrderedDict
 
 from dulwich import index
@@ -29,6 +28,7 @@ from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
 from dulwich.objects import Tag, Commit, parse_timezone
+from dulwich.errors import SendPackError, UpdateRefsError
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -320,7 +320,7 @@ def return_tags(repo, outstream=sys.stdout):
 
     :param repo: Path to repository
     """
-    r = Repo(repo)
+    r = open_repo(repo)
     tags = r.refs.as_dict("refs/tags")
     ordered_tags = {}
 
@@ -347,7 +347,7 @@ def reset_hard_head(repo):
     :param repo: Path to repository
     """
 
-    r = Repo(repo)
+    r = open_repo(repo)
 
     indexfile = r.index_path()
     tree = r["HEAD"].tree
@@ -361,12 +361,12 @@ def push(repo, remote_url, refs_path,
     :param repo : Path to repository
     :param remote_url: URI of the remote
     :param refs_path: relative path to the refs to push to remote
-    :param outstream: A stream file to write to
-    :param outstream: A stream file to write to
+    :param outstream: A stream file to write output
+    :param outstream: A stream file to write errors
     """
 
     # Open the repo
-    _repo = Repo(repo)
+    _repo = open_repo(repo)
 
     # Get the client and path
     client, path = get_transport_and_path(remote_url)
@@ -377,7 +377,12 @@ def push(repo, remote_url, refs_path,
         del new_refs['HEAD']
         return refs
 
-    client.send_pack(path, update_refs, _repo.object_store.generate_pack_contents)
+    try:
+        client.send_pack(path, update_refs, _repo.object_store.generate_pack_contents)
+        outstream.write("Push to %s successful.\n" % remote_url)
+    except (UpdateRefsError, SendPackError) as e:
+        outstream.write("Push to %s failed.\n" % remote_url)
+        errstream.write("Push to %s failed -> '%s'\n" % e.message)
 
 
 def pull(repo, remote_url, refs_path,
@@ -387,12 +392,12 @@ def pull(repo, remote_url, refs_path,
     :param repo: Path to repository
     :param remote_url: URI of the remote
     :param refs_path: relative path to the fetched refs
-    :param outstream: A stream file to write to
-    :param outstream: A stream file to write to
+    :param outstream: A stream file to write to output
+    :param errstream: A stream file to write to errors
     """
 
     # Open the repo
-    _repo = Repo(repo)
+    _repo = open_repo(repo)
 
     client, path = get_transport_and_path(remote_url)
     remote_refs = client.fetch(path, _repo)

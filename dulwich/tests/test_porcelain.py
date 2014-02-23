@@ -355,7 +355,9 @@ class ResetTests(PorcelainTestCase):
         finally:
             f.close()
         porcelain.add(self.repo.path, paths=["foo"])
-        porcelain.commit(self.repo.path, message="Some message")
+        porcelain.commit(self.repo.path, message="Some message",
+                committer="Jane <jane@example.com>",
+                author="John <john@example.com>")
 
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
         try:

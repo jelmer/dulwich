@@ -189,11 +189,8 @@ class AddTests(PorcelainTestCase):
             author='test', committer='test')
 
         # Add a second test file
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
-            f.write("BAR")
-        finally:
-            f.close()
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
         porcelain.add(self.repo.path)
 
         # Check that foo was added and nothing in .git was modified
@@ -204,7 +201,7 @@ class AddTests(PorcelainTestCase):
         changes = list(changes)
 
         self.assertEquals(len(changes), 1)
-        self.assertEquals(changes[0].old.path, 'foo')
+        self.assertEquals(changes[0].old.path, filename)
 
     def test_add_file(self):
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
@@ -379,9 +376,10 @@ class ResetHardHeadTests(PorcelainTestCase):
         changes = list(tree_changes(self.repo,
                                  index.commit(self.repo.object_store),
                                  self.repo['HEAD'].tree))
-        # no staged changes
-        self.assertTrue(changes, 'porcelain::reset_hard_head -> Can\'t detect '
-                                 'changes from new tree from commit.')
+        # Assetr no staged changes
+        self.assertFalse(changes, 'porcelain::reset_hard_head -> Can\'t '
+                                  'detect changes from new tree from commit.')
+
 
 
 class PushTests(PorcelainTestCase):

@@ -197,7 +197,7 @@ def add(repo=".", paths=None):
         for dirpath, dirnames, filenames in os.walk(repo):
 
             # Handle path dependecies based on OS & split off the path prefix
-            relative_path = dirpath.split(repo + os.path.sep)[-1]
+            relative_path = dirpath.split(repo)[-1]
 
             # ignore *.git
             if not '.git' in dirpath:

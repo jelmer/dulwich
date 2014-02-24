@@ -393,32 +393,38 @@ class PushTests(PorcelainTestCase):
         outstream = StringIO()
 
         # create a file for initial commit
-        porcelain.add(repo=self.repo.path, paths='.')
+        porcelain.add(repo=self.repo.path)
         porcelain.commit(repo=self.repo.path, message='init',
             author='', committer='')
 
         # Setup target repo cloned from temp test repo
-        source_path = tempfile.mkdtemp()
-        porcelain.clone(self.repo.path, target=source_path, outstream=outstream)
+        clone_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=clone_path, outstream=outstream)
 
         # create a second file to be pushed back to origin
-        handle, fullpath = tempfile.mkstemp(dir=source_path)
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
         filename = os.path.basename(fullpath)
-        porcelain.add(repo=source_path, paths=filename)
-        porcelain.commit(repo=source_path, message='push',
+        porcelain.add(repo=clone_path, paths=filename)
+        porcelain.commit(repo=clone_path, message='push',
             author='', committer='')
 
         # Setup a non-checked out branch in the remote
-        refs_path = os.path.join('ref', 'heads', 'foo')
-        r_s = Repo(self.repo.path)
-        r_s[refs_path] = r_s['HEAD']
+        refs_path = os.path.join('refs', 'heads', 'foo')
+        self.repo[refs_path] = self.repo['HEAD']
 
         # Push to the remote
-        porcelain.push(source_path, self.repo.path, refs_path, outstream=outstream)
+        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream)
 
         # Check that the target and source
-        r_t = Repo(source_path)
-        self.assertEquals(r_t['HEAD'].id, r_s[refs_path].id)
+        r_clone = Repo(clone_path)
+
+        # Get the change in the target repo corresponding to the add
+        # this will be in the foo branch.
+        change = list(tree_changes(self.repo, self.repo['HEAD'].tree,
+                                   self.repo['refs/heads/foo'].tree))[0]
+
+        self.assertEquals(r_clone['HEAD'].id, self.repo[refs_path].id)
+        self.assertEquals(filename, change.new.path)
 
 
 class PullTests(PorcelainTestCase):

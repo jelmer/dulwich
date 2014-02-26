@@ -321,20 +321,17 @@ def return_tags(repo, outstream=sys.stdout):
     """
     r = open_repo(repo)
     tags = r.refs.as_dict("refs/tags")
-    ordered_tags = {}
+    ordered_tags = list()
 
     # Get the commit hashes associated with the tags
     for tag, tag_commit in tags.items():
         if tag not in ordered_tags:
-            ordered_tags[tag] = r.object_store.peel_sha(tag_commit)
-    # Sort by commit_time, then by tag name, as multiple tags can have
-    # the same commit_time for their commits
-    ordered_tags = OrderedDict(sorted(ordered_tags.items(),
-                                      key=lambda t: (t[1].commit_time, t)))
+            ordered_tags.append(tag)
+    ordered_tags.sort()
 
-    # TODO - ensure that the tags write in order
-    for key in ordered_tags.keys():
-        outstream.write("%s\n" % key)
+    # Write out the tags in alphabetical order
+    for tag in ordered_tags:
+        outstream.write("%s\n" % tag)
 
     return ordered_tags
 

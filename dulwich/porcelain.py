@@ -22,6 +22,10 @@ import time
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
+from dulwich.errors import (
+    SendPackError,
+    UpdateRefsError,
+    )
 from dulwich.objects import (
     Commit,
     Tag,
@@ -42,6 +46,7 @@ Currently implemented:
  * commit-tree
  * diff-tree
  * init
+ * push
  * remove
  * reset
  * rev-list
@@ -383,3 +388,35 @@ def reset(repo, mode, committish="HEAD"):
     indexfile = r.index_path()
     tree = r[committish].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def push(repo, remote_location, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
+    """Remote push with dulwich via dulwich.client
+
+    :param repo : Path to repository
+    :param remote_location: Location of the remote
+    :param refs_path: relative path to the refs to push to remote
+    :param outstream: A stream file to write output
+    :param outstream: A stream file to write errors
+    """
+
+    # Open the repo
+    r = open_repo(repo)
+
+    # Get the client and path
+    client, path = get_transport_and_path(remote_location)
+
+    def update_refs(refs):
+        new_refs = r.get_refs()
+        refs[refs_path] = new_refs['HEAD']
+        del new_refs['HEAD']
+        return refs
+
+    try:
+        client.send_pack(path, update_refs,
+            r.object_store.generate_pack_contents, progress=errstream.write)
+        outstream.write("Push to %s successful.\n" % remote_location)
+    except (UpdateRefsError, SendPackError) as e:
+        outstream.write("Push to %s failed.\n" % remote_location)
+        errstream.write("Push to %s failed -> '%s'\n" % e.message)

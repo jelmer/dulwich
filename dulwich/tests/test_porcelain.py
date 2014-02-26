@@ -373,3 +373,47 @@ class ResetTests(PorcelainTestCase):
                        self.repo['HEAD'].tree))
 
         self.assertEquals([], changes)
+
+
+class PushTests(PorcelainTestCase):
+
+    def test_simple(self):
+        """
+        Basic test of porcelain push where self.repo is the remote.  First
+        clone the remote, commit a file to the clone, then push the changes
+        back to the remote.
+        """
+        outstream = StringIO()
+        errstream = StringIO()
+
+        porcelain.commit(repo=self.repo.path, message='init',
+            author='', committer='')
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=clone_path, outstream=outstream)
+
+        # create a second file to be pushed back to origin
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
+        porcelain.commit(repo=clone_path, message='push',
+            author='', committer='')
+
+        # Setup a non-checked out branch in the remote
+        refs_path = os.path.join('refs', 'heads', 'foo')
+        self.repo[refs_path] = self.repo['HEAD']
+
+        # Push to the remote
+        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream,
+                errstream=errstream)
+
+        # Check that the target and source
+        r_clone = Repo(clone_path)
+
+        # Get the change in the target repo corresponding to the add
+        # this will be in the foo branch.
+        change = list(tree_changes(self.repo, self.repo['HEAD'].tree,
+                                   self.repo['refs/heads/foo'].tree))[0]
+
+        self.assertEquals(r_clone['HEAD'].id, self.repo[refs_path].id)
+        self.assertEquals(os.path.basename(fullpath), change.new.path)

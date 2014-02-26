@@ -192,19 +192,18 @@ def add(repo=".", paths=None):
     """
     # FIXME: Support patterns, directories.
     # Handle the default case where paths is None or an empty list
+    r = open_repo(repo)
     if not paths:
         paths = []
-        for dirpath, dirnames, filenames in os.walk(repo):
+        for dirpath, dirnames, filenames in os.walk(r.path):
 
             # Handle path dependecies based on OS & split off the path prefix
-            relative_path = dirpath.split(repo)[-1]
+            relative_path = dirpath.split(r.path)[-1]
 
             # ignore *.git
-            if not '.git' in dirpath:
+            if not '.git' == dirpath:
                 for filename in filenames:
                     paths.append(os.path.join(relative_path, filename))
-
-    r = open_repo(repo)
     r.stage(paths)
 
 

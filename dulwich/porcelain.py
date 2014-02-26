@@ -46,6 +46,7 @@ Currently implemented:
  * commit-tree
  * diff-tree
  * init
+ * pull
  * push
  * remove
  * reset
@@ -420,3 +421,27 @@ def push(repo, remote_location, refs_path,
     except (UpdateRefsError, SendPackError) as e:
         outstream.write("Push to %s failed.\n" % remote_location)
         errstream.write("Push to %s failed -> '%s'\n" % e.message)
+
+
+def pull(repo, remote_location, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
+    """ Pull from remote via dulwich.client
+
+    :param repo: Path to repository
+    :param remote_location: Location of the remote
+    :param refs_path: relative path to the fetched refs
+    :param outstream: A stream file to write to output
+    :param errstream: A stream file to write to errors
+    """
+
+    # Open the repo
+    r = open_repo(repo)
+
+    client, path = get_transport_and_path(remote_location)
+    remote_refs = client.fetch(path, r, progress=errstream.write)
+    r['HEAD'] = remote_refs[refs_path]
+
+    # Perform 'git checkout .' - syncs staged changes
+    indexfile = r.index_path()
+    tree = r["HEAD"].tree
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

@@ -417,3 +417,36 @@ class PushTests(PorcelainTestCase):
 
         self.assertEquals(r_clone['HEAD'].id, self.repo[refs_path].id)
         self.assertEquals(os.path.basename(fullpath), change.new.path)
+
+
+class PullTests(PorcelainTestCase):
+
+    def test_simple(self):
+        outstream = StringIO()
+        errstream = StringIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+                         author='test', committer='test')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
+
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test2',
+            author='test2', committer='test2')
+
+        # Pull changes into the cloned repo
+        porcelain.pull(target_path, self.repo.path, 'refs/heads/master',
+            outstream=outstream, errstream=errstream)
+
+        # Check the target repo for pushed changes
+        r = Repo(target_path)
+        self.assertEquals(r['HEAD'].id, self.repo['HEAD'].id)

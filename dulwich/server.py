@@ -59,6 +59,7 @@ from dulwich.errors import (
 from dulwich import log_utils
 from dulwich.objects import (
     hex_to_sha,
+    Commit,
     )
 from dulwich.pack import (
     write_pack_objects,
@@ -226,7 +227,7 @@ class UploadPackHandler(Handler):
     @classmethod
     def capabilities(cls):
         return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta", "no-progress", "include-tag")
+                "ofs-delta", "no-progress", "include-tag", "shallow")
 
     @classmethod
     def required_capabilities(cls):
@@ -277,7 +278,7 @@ class UploadPackHandler(Handler):
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
-        if objects_iter is None:
+        if len(objects_iter) == 0:
             return
 
         self.progress("dul-daemon says what\n")
@@ -315,12 +316,53 @@ def _split_proto_line(line, allowed):
     try:
         if len(fields) == 1 and command in ('done', None):
             return (command, None)
-        elif len(fields) == 2 and command in ('want', 'have'):
-            hex_to_sha(fields[1])
-            return tuple(fields)
+        elif len(fields) == 2:
+            if command in ('want', 'have', 'shallow', 'unshallow'):
+                hex_to_sha(fields[1])
+                return tuple(fields)
+            elif command == 'deepen':
+                return command, int(fields[1])
     except (TypeError, AssertionError), e:
         raise GitProtocolError(e)
     raise GitProtocolError('Received invalid line from client: %s' % line)
+
+
+def _find_shallow(store, heads, depth):
+    """Find shallow commits according to a given depth.
+
+    :param store: An ObjectStore for looking up objects.
+    :param heads: Iterable of head SHAs to start walking from.
+    :param depth: The depth of ancestors to include.
+    :return: A tuple of (shallow, not_shallow), sets of SHAs that should be
+        considered shallow and unshallow according to the arguments. Note that
+        these sets may overlap if a commit is reachable along multiple paths.
+    """
+    parents = {}
+    def get_parents(sha):
+        result = parents.get(sha, None)
+        if not result:
+            result = store[sha].parents
+            parents[sha] = result
+        return result
+
+    todo = []  # stack of (sha, depth)
+    for head_sha in heads:
+        obj = store.peel_sha(head_sha)
+        if isinstance(obj, Commit):
+            todo.append((obj.id, 0))
+
+    not_shallow = set()
+    shallow = set()
+    while todo:
+        sha, cur_depth = todo.pop()
+        if cur_depth < depth:
+            not_shallow.add(sha)
+            new_depth = cur_depth + 1
+            todo.extend((p, new_depth) for p in get_parents(sha))
+        else:
+            shallow.add(sha)
+
+    return shallow, not_shallow
 
 
 class ProtocolGraphWalker(object):
@@ -344,6 +386,9 @@ class ProtocolGraphWalker(object):
         self.http_req = handler.http_req
         self.advertise_refs = handler.advertise_refs
         self._wants = []
+        self.shallow = set()
+        self.client_shallow = set()
+        self.unshallow = set()
         self._cached = False
         self._cache = []
         self._cache_index = 0
@@ -356,6 +401,12 @@ class ProtocolGraphWalker(object):
         refs he wants using 'want' lines. This portion of the protocol is the
         same regardless of ack type, and in fact is used to set the ack type of
         the ProtocolGraphWalker.
+
+        If the client has the 'shallow' capability, this method also reads and
+        responds to the 'shallow' and 'deepen' lines from the client. These are
+        not part of the wants per se, but they set up necessary state for
+        walking the graph. Additionally, later code depends on this method
+        consuming everything up to the first 'have' line.
 
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
@@ -380,7 +431,7 @@ class ProtocolGraphWalker(object):
             self.proto.write_pkt_line(None)
 
             if self.advertise_refs:
-                return None
+                return []
 
         # Now client will sending want want want commands
         want = self.proto.read_pkt_line()
@@ -389,11 +440,11 @@ class ProtocolGraphWalker(object):
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        allowed = ('want', None)
+        allowed = ('want', 'shallow', 'deepen', None)
         command, sha = _split_proto_line(line, allowed)
 
         want_revs = []
-        while command != None:
+        while command == 'want':
             if sha not in values:
                 raise GitProtocolError(
                   'Client wants invalid object %s' % sha)
@@ -401,6 +452,9 @@ class ProtocolGraphWalker(object):
             command, sha = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
+        if command in ('shallow', 'deepen'):
+            self.unread_proto_line(command, sha)
+            self._handle_shallow_request(want_revs)
 
         if self.http_req and self.proto.eof():
             # The client may close the socket at this point, expecting a
@@ -409,6 +463,9 @@ class ProtocolGraphWalker(object):
             return []
 
         return want_revs
+
+    def unread_proto_line(self, command, value):
+        self.proto.unread_pkt_line('%s %s' % (command, value))
 
     def ack(self, have_ref):
         return self._impl.ack(have_ref)
@@ -432,9 +489,33 @@ class ProtocolGraphWalker(object):
 
         :param allowed: An iterable of command names that should be allowed.
         :return: A tuple of (command, value); see _split_proto_line.
-        :raise GitProtocolError: If an error occurred reading the line.
+        :raise UnexpectedCommandError: If an error occurred reading the line.
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
+
+    def _handle_shallow_request(self, wants):
+        while True:
+            command, val = self.read_proto_line(('deepen', 'shallow'))
+            if command == 'deepen':
+                depth = val
+                break
+            self.client_shallow.add(val)
+        self.read_proto_line((None,))  # consume client's flush-pkt
+
+        shallow, not_shallow = _find_shallow(self.store, wants, depth)
+
+        # Update self.shallow instead of reassigning it since we passed a
+        # reference to it before this method was called.
+        self.shallow.update(shallow - not_shallow)
+        new_shallow = self.shallow - self.client_shallow
+        unshallow = self.unshallow = not_shallow & self.client_shallow
+
+        for sha in sorted(new_shallow):
+            self.proto.write_pkt_line('shallow %s' % sha)
+        for sha in sorted(unshallow):
+            self.proto.write_pkt_line('unshallow %s' % sha)
+
+        self.proto.write_pkt_line(None)
 
     def send_ack(self, sha, ack_type=''):
         if ack_type:
@@ -838,7 +919,7 @@ def generate_info_refs(repo):
 def generate_objects_info_packs(repo):
     """Generate an index for for packs."""
     for pack in repo.object_store.packs:
-        yield 'P pack-%s.pack\n' % pack.name()
+        yield 'P %s\n' % pack.data.filename
 
 
 def update_server_info(repo):

@@ -26,6 +26,7 @@ import tempfile
 
 from dulwich.diff_tree import tree_changes
 from dulwich import porcelain
+from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
     Blob,
     Tree,
@@ -232,18 +233,41 @@ class LogTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith("-" * 50))
+        self.assertEquals(3, outstream.getvalue().count("-" * 50))
+
+    def test_max_entries(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
+        self.assertEquals(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):
+
+    def test_nolist(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = StringIO()
-        porcelain.show(self.repo.path, committish=c3.id, outstream=outstream)
+        porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
+
+    def test_blob(self):
+        b = Blob.from_string("The Foo\n")
+        self.repo.object_store.add_object(b)
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
+        self.assertEquals(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):
@@ -333,7 +357,6 @@ class RevListTests(PorcelainTestCase):
 class TagTests(PorcelainTestCase):
 
     def test_simple(self):
-
         tag = 'tryme'
         author = 'foo'
         message = 'bar'
@@ -345,8 +368,7 @@ class TagTests(PorcelainTestCase):
         porcelain.tag(self.repo.path, tag, author, message)
 
         tags = self.repo.refs.as_dict("refs/tags")
-        self.assertTrue(tags.keys()[0] == tag,
-                        'porcelain::tag -> Tag not successfully added.')
+        self.assertEquals(tags.keys()[0], tag)
 
 
 class ReturnTagsTests(PorcelainTestCase):
@@ -362,24 +384,33 @@ class ReturnTagsTests(PorcelainTestCase):
                             'match actual tags.')
 
 
-class ResetHardHeadTests(PorcelainTestCase):
+class ResetTests(PorcelainTestCase):
 
-    def test_simple(self):
+    def test_hard_head(self):
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("BAR")
+        finally:
+            f.close()
+        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.commit(self.repo.path, message="Some message",
+                committer="Jane <jane@example.com>",
+                author="John <john@example.com>")
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
-            [3, 1, 2]])
-        self.repo.refs["HEAD"] = c3.id
+        f = open(os.path.join(self.repo.path, 'foo'), 'w')
+        try:
+            f.write("OOH")
+        finally:
+            f.close()
 
-        porcelain.reset_hard_head(self.repo.path)
+        porcelain.reset(self.repo, "hard", "HEAD")
 
         index = self.repo.open_index()
         changes = list(tree_changes(self.repo,
-                                 index.commit(self.repo.object_store),
-                                 self.repo['HEAD'].tree))
-        # Assetr no staged changes
-        self.assertFalse(changes, 'porcelain::reset_hard_head -> Can\'t '
-                                  'detect changes from new tree from commit.')
+                       index.commit(self.repo.object_store),
+                       self.repo['HEAD'].tree))
 
+        self.assertEquals([], changes)
 
 
 class PushTests(PorcelainTestCase):
@@ -391,9 +422,8 @@ class PushTests(PorcelainTestCase):
         back to the remote.
         """
         outstream = StringIO()
+        errstream = StringIO()
 
-        # create a file for initial commit
-        porcelain.add(repo=self.repo.path)
         porcelain.commit(repo=self.repo.path, message='init',
             author='', committer='')
 
@@ -403,8 +433,7 @@ class PushTests(PorcelainTestCase):
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=clone_path, paths=filename)
+        porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
         porcelain.commit(repo=clone_path, message='push',
             author='', committer='')
 
@@ -413,7 +442,8 @@ class PushTests(PorcelainTestCase):
         self.repo[refs_path] = self.repo['HEAD']
 
         # Push to the remote
-        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream)
+        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream,
+                errstream=errstream)
 
         # Check that the target and source
         r_clone = Repo(clone_path)
@@ -424,14 +454,14 @@ class PushTests(PorcelainTestCase):
                                    self.repo['refs/heads/foo'].tree))[0]
 
         self.assertEquals(r_clone['HEAD'].id, self.repo[refs_path].id)
-        self.assertEquals(filename, change.new.path)
+        self.assertEquals(os.path.basename(fullpath), change.new.path)
 
 
 class PullTests(PorcelainTestCase):
 
     def test_simple(self):
-
         outstream = StringIO()
+        errstream = StringIO()
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
@@ -452,7 +482,8 @@ class PullTests(PorcelainTestCase):
             author='test2', committer='test2')
 
         # Pull changes into the cloned repo
-        porcelain.pull(target_path, self.repo.path, 'refs/heads/master', outstream=outstream)
+        porcelain.pull(target_path, self.repo.path, 'refs/heads/master',
+            outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
         r = Repo(target_path)

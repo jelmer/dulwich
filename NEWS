@@ -1,4 +1,24 @@
-0.9.5	UNRELEASED
+0.9.6	UNRELEASED
+
+ IMPROVEMENTS
+
+ * Add porcelain 'push'. (Ryan Faulkner)
+
+ * Add porcelain 'pull'. (Ryan Faulkner)
+
+0.9.5	2014-02-23
+
+ IMPROVEMENTS
+
+ * Add porcelain 'tag'. (Ryan Faulkner)
+
+ * New module `dulwich.objectspec` for parsing strings referencing
+   objects and commit ranges. (Jelmer Vernooij)
+
+ * Add shallow branch support. (milki)
+
+ * Allow passing urllib2 `opener` into HttpGitClient.
+   (Dov Feldstern, #909037)
 
  CHANGES
 

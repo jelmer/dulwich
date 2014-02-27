@@ -27,6 +27,13 @@ from dulwich.errors import (
     NotGitRepository,
     UnexpectedCommandError,
     )
+from dulwich.objects import (
+    Commit,
+    Tag,
+    )
+from dulwich.object_store import (
+    MemoryObjectStore,
+    )
 from dulwich.repo import (
     MemoryRepo,
     Repo,
@@ -40,6 +47,7 @@ from dulwich.server import (
     MultiAckDetailedGraphWalkerImpl,
     _split_proto_line,
     serve_command,
+    _find_shallow,
     ProtocolGraphWalker,
     ReceivePackHandler,
     SingleAckGraphWalkerImpl,
@@ -49,6 +57,7 @@ from dulwich.server import (
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_commit,
+    make_object,
     )
 from dulwich.protocol import (
     ZERO_SHA,
@@ -197,6 +206,81 @@ class UploadPackHandlerTestCase(TestCase):
         self.assertEqual({}, self._handler.get_tagged(refs, repo=self._repo))
 
 
+class FindShallowTests(TestCase):
+
+    def setUp(self):
+        self._store = MemoryObjectStore()
+
+    def make_commit(self, **attrs):
+        commit = make_commit(**attrs)
+        self._store.add_object(commit)
+        return commit
+
+    def make_linear_commits(self, n, message=''):
+        commits = []
+        parents = []
+        for _ in xrange(n):
+            commits.append(self.make_commit(parents=parents, message=message))
+            parents = [commits[-1].id]
+        return commits
+
+    def assertSameElements(self, expected, actual):
+        self.assertEqual(set(expected), set(actual))
+
+    def test_linear(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+
+        self.assertEqual((set([c3.id]), set([])),
+                         _find_shallow(self._store, [c3.id], 0))
+        self.assertEqual((set([c2.id]), set([c3.id])),
+                         _find_shallow(self._store, [c3.id], 1))
+        self.assertEqual((set([c1.id]), set([c2.id, c3.id])),
+                         _find_shallow(self._store, [c3.id], 2))
+        self.assertEqual((set([]), set([c1.id, c2.id, c3.id])),
+                         _find_shallow(self._store, [c3.id], 3))
+
+    def test_multiple_independent(self):
+        a = self.make_linear_commits(2, message='a')
+        b = self.make_linear_commits(2, message='b')
+        c = self.make_linear_commits(2, message='c')
+        heads = [a[1].id, b[1].id, c[1].id]
+
+        self.assertEqual((set([a[0].id, b[0].id, c[0].id]), set(heads)),
+                         _find_shallow(self._store, heads, 1))
+
+    def test_multiple_overlapping(self):
+        # Create the following commit tree:
+        # 1--2
+        #  \
+        #   3--4
+        c1, c2 = self.make_linear_commits(2)
+        c3 = self.make_commit(parents=[c1.id])
+        c4 = self.make_commit(parents=[c3.id])
+
+        # 1 is shallow along the path from 4, but not along the path from 2.
+        self.assertEqual((set([c1.id]), set([c1.id, c2.id, c3.id, c4.id])),
+                         _find_shallow(self._store, [c2.id, c4.id], 2))
+
+    def test_merge(self):
+        c1 = self.make_commit()
+        c2 = self.make_commit()
+        c3 = self.make_commit(parents=[c1.id, c2.id])
+
+        self.assertEqual((set([c1.id, c2.id]), set([c3.id])),
+                         _find_shallow(self._store, [c3.id], 1))
+
+    def test_tag(self):
+        c1, c2 = self.make_linear_commits(2)
+        tag = make_object(Tag, name='tag', message='',
+                          tagger='Tagger <test@example.com>',
+                          tag_time=12345, tag_timezone=0,
+                          object=(Commit, c2.id))
+        self._store.add_object(tag)
+
+        self.assertEqual((set([c1.id]), set([c2.id])),
+                         _find_shallow(self._store, [tag.id], 1))
+
+
 class TestUploadPackHandler(UploadPackHandler):
     @classmethod
     def required_capabilities(self):
@@ -302,6 +386,10 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._repo.refs._update(heads)
         self.assertEqual([ONE, TWO], self._walker.determine_wants(heads))
 
+        self._walker.advertise_refs = True
+        self.assertEqual([], self._walker.determine_wants(heads))
+        self._walker.advertise_refs = False
+
         self._walker.proto.set_output(['want %s multi_ack' % FOUR])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
@@ -349,6 +437,45 @@ class ProtocolGraphWalkerTestCase(TestCase):
                 self.assertEqual('%s refs/heads/tag6^{}' % FIVE, lines[i+1])
 
     # TODO: test commit time cutoff
+
+    def _handle_shallow_request(self, lines, heads):
+        self._walker.proto.set_output(lines)
+        self._walker._handle_shallow_request(heads)
+
+    def assertReceived(self, expected):
+        self.assertEquals(
+          expected, list(iter(self._walker.proto.get_received_line, None)))
+
+    def test_handle_shallow_request_no_client_shallows(self):
+        self._handle_shallow_request(['deepen 1\n'], [FOUR, FIVE])
+        self.assertEquals(set([TWO, THREE]), self._walker.shallow)
+        self.assertReceived([
+          'shallow %s' % TWO,
+          'shallow %s' % THREE,
+          ])
+
+    def test_handle_shallow_request_no_new_shallows(self):
+        lines = [
+          'shallow %s\n' % TWO,
+          'shallow %s\n' % THREE,
+          'deepen 1\n',
+          ]
+        self._handle_shallow_request(lines, [FOUR, FIVE])
+        self.assertEquals(set([TWO, THREE]), self._walker.shallow)
+        self.assertReceived([])
+
+    def test_handle_shallow_request_unshallows(self):
+        lines = [
+          'shallow %s\n' % TWO,
+          'deepen 2\n',
+          ]
+        self._handle_shallow_request(lines, [FOUR, FIVE])
+        self.assertEquals(set([ONE]), self._walker.shallow)
+        self.assertReceived([
+          'shallow %s' % ONE,
+          'unshallow %s' % TWO,
+          # THREE is unshallow but was is not shallow in the client
+          ])
 
 
 class TestProtocolGraphWalker(object):

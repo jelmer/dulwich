@@ -205,7 +205,7 @@ def cmd_symbolic_ref(args):
 
 def cmd_show(args):
     opts, args = getopt(args, "", [])
-    porcelain.show(".")
+    porcelain.show(".", args)
 
 
 def cmd_diff_tree(args):

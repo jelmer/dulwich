@@ -18,12 +18,23 @@
 
 import os
 import sys
+import time
 
 from time import time
 from collections import OrderedDict
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
+from dulwich.errors import (
+    SendPackError,
+    UpdateRefsError,
+    )
+from dulwich.objects import (
+    Commit,
+    Tag,
+    parse_timezone,
+    )
+from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
@@ -40,8 +51,12 @@ Currently implemented:
  * commit-tree
  * diff-tree
  * init
+ * pull
+ * push
  * remove
+ * reset
  * rev-list
+ * tag
  * update-server-info
  * symbolic-ref
  * tag
@@ -237,32 +252,99 @@ def print_commit(commit, outstream):
     outstream.write("\n")
 
 
-def log(repo=".", outstream=sys.stdout):
+def print_tag(tag, outstream):
+    """Write a human-readable tag.
+
+    :param tag: A `Tag` object
+    :param outstream: A stream to write to
+    """
+    outstream.write("Tagger: %s\n" % tag.tagger)
+    outstream.write("Date:   %s\n" % tag.tag_time)
+    outstream.write("\n")
+    outstream.write("%s\n" % tag.message)
+    outstream.write("\n")
+
+
+def show_blob(repo, blob, outstream):
+    """Write a blob to a stream.
+
+    :param repo: A `Repo` object
+    :param blob: A `Blob` object
+    :param outstream: A stream file to write to
+    """
+    outstream.write(blob.data)
+
+
+def show_commit(repo, commit, outstream):
+    """Show a commit to a stream.
+
+    :param repo: A `Repo` object
+    :param commit: A `Commit` object
+    :param outstream: Stream to write to
+    """
+    print_commit(commit, outstream)
+    parent_commit = repo[commit.parents[0]]
+    write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
+
+
+def show_tree(repo, tree, outstream):
+    """Print a tree to a stream.
+
+    :param repo: A `Repo` object
+    :param tree: A `Tree` object
+    :param outstream: Stream to write to
+    """
+    for n in tree:
+        outstream.write("%s\n" % n)
+
+
+def show_tag(repo, tag, outstream):
+    """Print a tag to a stream.
+
+    :param repo: A `Repo` object
+    :param tag: A `Tag` object
+    :param outstream: Stream to write to
+    """
+    print_tag(tag, outstream)
+    show_object(repo, repo[tag.object[1]], outstream)
+
+
+def show_object(repo, obj, outstream):
+    return {
+        "tree": show_tree,
+        "blob": show_blob,
+        "commit": show_commit,
+        "tag": show_tag,
+            }[obj.type_name](repo, obj, outstream)
+
+
+def log(repo=".", outstream=sys.stdout, max_entries=None):
     """Write commit logs.
 
     :param repo: Path to repository
     :param outstream: Stream to write log output to
+    :param max_entries: Optional maximum number of entries to display
     """
     r = open_repo(repo)
-    walker = r.get_walker()
+    walker = r.get_walker(max_entries=max_entries)
     for entry in walker:
         print_commit(entry.commit, outstream)
 
 
-def show(repo=".", committish=None, outstream=sys.stdout):
+def show(repo=".", objects=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
     :param repo: Path to repository
-    :param committish: Commit to write
+    :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
     """
-    if committish is None:
-        committish = "HEAD"
+    if objects is None:
+        objects = ["HEAD"]
+    if not isinstance(objects, list):
+        objects = [objects]
     r = open_repo(repo)
-    commit = r[committish]
-    parent_commit = r[commit.parents[0]]
-    print_commit(commit, outstream)
-    write_tree_diff(outstream, r.object_store, parent_commit.tree, commit.tree)
+    for objectish in objects:
+        show_object(r, parse_object(r, objectish), outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
@@ -306,12 +388,12 @@ def tag(repo, tag, author, message):
     tag_obj.message = message
     tag_obj.name = tag
     tag_obj.object = (Commit, r.refs['HEAD'])
-    tag_obj.tag_time = int(time())
+    tag_obj.tag_time = int(time.time())
     tag_obj.tag_timezone = parse_timezone('-0200')[0]
 
     # Add tag to the object store
     r.object_store.add_object(tag_obj)
-    r['refs/tags/' + tag] = tag_obj.id
+    r.refs['refs/tags/' + tag] = tag_obj.id
 
 
 def return_tags(repo, outstream=sys.stdout):
@@ -336,71 +418,74 @@ def return_tags(repo, outstream=sys.stdout):
     return ordered_tags
 
 
-def reset_hard_head(repo):
-    """ Perform 'git checkout .' - syncs staged changes.  This is a useful way
-    to 'git reset --hard  HEAD'
+def reset(repo, mode, committish="HEAD"):
+    """Reset current HEAD to the specified state.
 
     :param repo: Path to repository
+    :param mode: Mode ("hard", "soft", "mixed")
     """
+
+    if mode != "hard":
+        raise ValueError("hard is the only mode currently supported")
 
     r = open_repo(repo)
 
     indexfile = r.index_path()
-    tree = r["HEAD"].tree
+    tree = r[committish].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def push(repo, remote_url, refs_path,
+def push(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo : Path to repository
-    :param remote_url: URI of the remote
+    :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
     :param outstream: A stream file to write output
-    :param outstream: A stream file to write errors
+    :param errstream: A stream file to write errors
     """
 
     # Open the repo
-    _repo = open_repo(repo)
+    r = open_repo(repo)
 
     # Get the client and path
-    client, path = get_transport_and_path(remote_url)
+    client, path = get_transport_and_path(remote_location)
 
     def update_refs(refs):
-        new_refs = _repo.get_refs()
+        new_refs = r.get_refs()
         refs[refs_path] = new_refs['HEAD']
         del new_refs['HEAD']
         return refs
 
     try:
-        client.send_pack(path, update_refs, _repo.object_store.generate_pack_contents)
-        outstream.write("Push to %s successful.\n" % remote_url)
+        client.send_pack(path, update_refs,
+            r.object_store.generate_pack_contents, progress=errstream.write)
+        outstream.write("Push to %s successful.\n" % remote_location)
     except (UpdateRefsError, SendPackError) as e:
-        outstream.write("Push to %s failed.\n" % remote_url)
+        outstream.write("Push to %s failed.\n" % remote_location)
         errstream.write("Push to %s failed -> '%s'\n" % e.message)
 
 
-def pull(repo, remote_url, refs_path,
+def pull(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
     """ Pull from remote via dulwich.client
 
     :param repo: Path to repository
-    :param remote_url: URI of the remote
+    :param remote_location: Location of the remote
     :param refs_path: relative path to the fetched refs
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
     """
 
     # Open the repo
-    _repo = open_repo(repo)
+    r = open_repo(repo)
 
-    client, path = get_transport_and_path(remote_url)
-    remote_refs = client.fetch(path, _repo)
-    _repo['HEAD'] = remote_refs[refs_path]
+    client, path = get_transport_and_path(remote_location)
+    remote_refs = client.fetch(path, r, progress=errstream.write)
+    r['HEAD'] = remote_refs[refs_path]
 
     # Perform 'git checkout .' - syncs staged changes
-    indexfile = _repo.index_path()
-    tree = _repo["HEAD"].tree
-    index.build_index_from_tree(_repo.path, indexfile,
-                                _repo.object_store, tree)
+    indexfile = r.index_path()
+    tree = r["HEAD"].tree
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

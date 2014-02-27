@@ -20,9 +20,6 @@ import os
 import sys
 import time
 
-from time import time
-from collections import OrderedDict
-
 from dulwich import index
 from dulwich.client import get_transport_and_path
 from dulwich.errors import (
@@ -38,8 +35,6 @@ from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
-from dulwich.objects import Tag, Commit, parse_timezone
-from dulwich.errors import SendPackError, UpdateRefsError
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 

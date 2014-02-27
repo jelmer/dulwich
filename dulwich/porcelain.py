@@ -54,6 +54,11 @@ Currently implemented:
  * tag
  * update-server-info
  * symbolic-ref
+ * tag
+ * return-tags
+ * reset-hard-head
+ * pull
+ * push
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
@@ -193,10 +198,22 @@ def add(repo=".", paths=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add
+    :param paths: Paths to add.  No value passed stages all modified files.
     """
-    # FIXME: Support patterns, directories, no argument.
+    # FIXME: Support patterns, directories.
+    # Handle the default case where paths is None or an empty list
     r = open_repo(repo)
+    if not paths:
+        paths = []
+        for dirpath, dirnames, filenames in os.walk(r.path):
+
+            # Handle path dependecies based on OS & split off the path prefix
+            relative_path = dirpath.split(r.path)[-1]
+
+            # ignore *.git
+            if not '.git' == dirpath:
+                for filename in filenames:
+                    paths.append(os.path.join(relative_path, filename))
     r.stage(paths)
 
 
@@ -374,6 +391,28 @@ def tag(repo, tag, author, message):
     r.refs['refs/tags/' + tag] = tag_obj.id
 
 
+def return_tags(repo, outstream=sys.stdout):
+    """Get all tags & corresponding commit shas
+
+    :param repo: Path to repository
+    """
+    r = open_repo(repo)
+    tags = r.refs.as_dict("refs/tags")
+    ordered_tags = list()
+
+    # Get the commit hashes associated with the tags
+    for tag, tag_commit in tags.items():
+        if tag not in ordered_tags:
+            ordered_tags.append(tag)
+    ordered_tags.sort()
+
+    # Write out the tags in alphabetical order
+    for tag in ordered_tags:
+        outstream.write("%s\n" % tag)
+
+    return ordered_tags
+
+
 def reset(repo, mode, committish="HEAD"):
     """Reset current HEAD to the specified state.
 
@@ -399,7 +438,7 @@ def push(repo, remote_location, refs_path,
     :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
     :param outstream: A stream file to write output
-    :param outstream: A stream file to write errors
+    :param errstream: A stream file to write errors
     """
 
     # Open the repo

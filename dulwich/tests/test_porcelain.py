@@ -24,6 +24,7 @@ import shutil
 import tarfile
 import tempfile
 
+from dulwich.diff_tree import tree_changes
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
@@ -178,6 +179,30 @@ class InitTests(TestCase):
 
 
 class AddTests(PorcelainTestCase):
+
+    def test_add_default_paths(self):
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+            author='test', committer='test')
+
+        # Add a second test file
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(self.repo.path)
+
+        # Check that foo was added and nothing in .git was modified
+        index = self.repo.open_index()
+        changes = tree_changes(self.repo, index.commit(self.repo.object_store),
+            self.repo['HEAD'].tree)
+
+        changes = list(changes)
+
+        self.assertEquals(len(changes), 1)
+        self.assertEquals(changes[0].old.path, filename)
 
     def test_add_file(self):
         f = open(os.path.join(self.repo.path, 'foo'), 'w')
@@ -344,6 +369,19 @@ class TagTests(PorcelainTestCase):
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEquals(tags.keys()[0], tag)
+
+
+class ReturnTagsTests(PorcelainTestCase):
+
+    def test_simple(self):
+        tags = porcelain.return_tags(self.repo.path)
+        tags_true = self.repo.refs.as_dict("refs/tags")
+
+        # compare
+        for tag in tags_true:
+            self.assertTrue(tag in tags,
+                            'porcelain::return_tags -> Returned tags do not '
+                            'match actual tags.')
 
 
 class ResetTests(PorcelainTestCase):

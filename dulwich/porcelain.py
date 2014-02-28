@@ -412,7 +412,7 @@ def push(repo, remote_location, refs_path,
     :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
     :param outstream: A stream file to write output
-    :param outstream: A stream file to write errors
+    :param errstream: A stream file to write errors
     """
 
     # Open the repo

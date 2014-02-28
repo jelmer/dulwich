@@ -346,6 +346,20 @@ class TagTests(PorcelainTestCase):
         self.assertEquals(tags.keys()[0], tag)
 
 
+class ListTagsTests(PorcelainTestCase):
+
+    def test_empty(self):
+        tags = porcelain.list_tags(self.repo.path)
+        self.assertEquals([], tags)
+
+    def test_simple(self):
+        self.repo.refs["refs/tags/foo"] = "aa" * 20
+        self.repo.refs["refs/tags/bar/bla"] = "bb" * 20
+        tags = porcelain.list_tags(self.repo.path)
+
+        self.assertEquals(["bar/bla", "foo"], tags)
+
+
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):

@@ -46,6 +46,7 @@ Currently implemented:
  * commit-tree
  * diff-tree
  * init
+ * list-tags
  * pull
  * push
  * remove
@@ -372,6 +373,18 @@ def tag(repo, tag, author, message):
     # Add tag to the object store
     r.object_store.add_object(tag_obj)
     r.refs['refs/tags/' + tag] = tag_obj.id
+
+
+def list_tags(repo, outstream=sys.stdout):
+    """List all tags.
+
+    :param repo: Path to repository
+    :param outstream: Stream to write tags to
+    """
+    r = open_repo(repo)
+    tags = list(r.refs.as_dict("refs/tags"))
+    tags.sort()
+    return tags
 
 
 def reset(repo, mode, committish="HEAD"):

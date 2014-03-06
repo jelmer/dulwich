@@ -112,7 +112,8 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('a.git')
         # In the future, this might raise a TypeError since we don't
         # handle unicode strings properly (what encoding?) for refs.
-        self.assertRaises(KeyError, r.__getitem__, u"11" * 19 + "--")
+        self.assertRaisesRegexp(TypeError, "'name' must be bytestring, not unicode",
+                                r.__getitem__, u"11" * 19 + "--")
 
     def test_delitem(self):
         r = self._repo = open_repo('a.git')

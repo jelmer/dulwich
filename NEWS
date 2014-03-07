@@ -8,6 +8,15 @@
 
  * Add porcelain 'pull'. (Ryan Faulkner)
 
+ BUG FIXES
+
+ * Support unseekable 'wsgi.input' streams.
+   (Jonas Haag)
+
+ * Raise TypeError when passing unicode() object
+   to Repo.__getitem__.
+   (Jonas Haag)
+
 0.9.5	2014-02-23
 
  IMPROVEMENTS

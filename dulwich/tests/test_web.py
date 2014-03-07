@@ -454,7 +454,7 @@ class HTTPGitApplicationTestCase(TestCase):
 
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
-    """TestCase for testing the GunzipFilter, ensuring the wsgi.input
+    __doc__ = """TestCase for testing the GunzipFilter, ensuring the wsgi.input
     is correctly decompressed and headers are corrected.
     """
     example_text = __doc__
@@ -514,4 +514,5 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
                 return self.data[start:end]
 
         zstream, zlength = self._get_zstream(self.example_text)
-        self._test_call(self.example_text, MinimalistWSGIInputStream(zstream.read()), zlength)
+        self._test_call(self.example_text,
+            MinimalistWSGIInputStream(zstream.read()), zlength)

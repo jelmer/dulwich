@@ -457,6 +457,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
     """TestCase for testing the GunzipFilter, ensuring the wsgi.input
     is correctly decompressed and headers are corrected.
     """
+    example_text = __doc__
 
     def setUp(self):
         super(GunzipTestCase, self).setUp()
@@ -469,14 +470,12 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         zfile = gzip.GzipFile(fileobj=zstream, mode='w')
         zfile.write(text)
         zfile.close()
-        return zstream
-
-    def test_call(self):
-        self._add_handler(self._app.app)
-        orig = self.__class__.__doc__
-        zstream = self._get_zstream(orig)
         zlength = zstream.tell()
         zstream.seek(0)
+        return zstream, zlength
+
+    def _test_call(self, orig, zstream, zlength):
+        self._add_handler(self._app.app)
         self.assertLess(zlength, len(orig))
         self.assertEqual(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
         self._environ['CONTENT_LENGTH'] = zlength
@@ -488,3 +487,31 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self.assertEqual(orig, buf.read())
         self.assertIs(None, self._environ.get('CONTENT_LENGTH'))
         self.assertNotIn('HTTP_CONTENT_ENCODING', self._environ)
+
+    def test_call(self):
+        self._test_call(
+            self.example_text,
+            *self._get_zstream(self.example_text)
+        )
+
+    def test_call_no_seek(self):
+        """
+        This ensures that the gunzipping code doesn't require any methods on
+        'wsgi.input' except for '.read()'.  (In particular, it shouldn't
+        require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.)
+        """
+        class MinimalistWSGIInputStream(object):
+            def __init__(self, data):
+                self.data = data
+                self.pos = 0
+
+            def read(self, howmuch):
+                start = self.pos
+                end = self.pos + howmuch
+                if start >= len(self.data):
+                    return ''
+                self.pos = end
+                return self.data[start:end]
+
+        zstream, zlength = self._get_zstream(self.example_text)
+        self._test_call(self.example_text, MinimalistWSGIInputStream(zstream.read()), zlength)

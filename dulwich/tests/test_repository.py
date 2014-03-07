@@ -110,10 +110,21 @@ class RepositoryTests(TestCase):
 
     def test_getitem_notfound_unicode(self):
         r = self._repo = open_repo('a.git')
-        # In the future, this might raise a TypeError since we don't
-        # handle unicode strings properly (what encoding?) for refs.
-        self.assertRaisesRegexp(TypeError, "'name' must be bytestring, not unicode",
-                                r.__getitem__, u"11" * 19 + "--")
+
+        test_keys = [
+            ('refs/heads/master', True),
+            ('a90fa2d900a17e99b433217e988c4eb4a2e9a097', True),
+            ('11' * 19 + '--', False),
+        ]
+
+        for k, contained in test_keys:
+            self.assertEqual(k in r, contained)
+
+        for k, _ in test_keys:
+            self.assertRaisesRegexp(
+                TypeError, "'name' must be bytestring, not unicode",
+                r.__getitem__, unicode(k)
+            )
 
     def test_delitem(self):
         r = self._repo = open_repo('a.git')

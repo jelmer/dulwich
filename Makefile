@@ -1,4 +1,5 @@
 PYTHON = python
+PYLINT = pylint
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 ifeq ($(shell $(PYTHON) -c "import sys; print sys.version_info >= (2, 7)"),True)
@@ -47,3 +48,6 @@ check-all: check check-pypy check-noextensions
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
+
+lint::
+	$(PYLINT) --rcfile=.pylintrc --msg-template="{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}" dulwich

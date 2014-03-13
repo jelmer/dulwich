@@ -179,12 +179,30 @@ class InitTests(TestCase):
 
 class AddTests(PorcelainTestCase):
 
+    def test_add_default_paths(self):
+
+        # create a file for initial commit
+        with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
+            f.write("\n")
+        porcelain.add(repo=self.repo.path, paths=['blah'])
+        porcelain.commit(repo=self.repo.path, message='test',
+            author='test', committer='test')
+
+        # Add a second test file and a file in a directory
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("\n")
+        os.mkdir(os.path.join(self.repo.path, 'adir'))
+        with open(os.path.join(self.repo.path, 'adir', 'afile'), 'w') as f:
+            f.write("\n")
+        porcelain.add(self.repo.path)
+
+        # Check that foo was added and nothing in .git was modified
+        index = self.repo.open_index()
+        self.assertEquals(list(index), ['blah', 'foo', 'adir/afile'])
+
     def test_add_file(self):
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
-        finally:
-            f.close()
         porcelain.add(self.repo.path, paths=["foo"])
 
 

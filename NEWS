@@ -2,6 +2,9 @@
 
  IMPROVEMENTS
 
+ * Add support for recursive add in 'git add'.
+   (Ryan Faulkner, Jelmer Vernooij)
+
  * Add porcelain 'list_tags'. (Ryan Faulkner)
 
  * Add porcelain 'push'. (Ryan Faulkner)

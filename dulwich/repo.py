@@ -907,9 +907,11 @@ class MemoryRepo(BaseRepo):
     """
 
     def __init__(self):
+        from dulwich.config import ConfigFile
         BaseRepo.__init__(self, MemoryObjectStore(), DictRefsContainer({}))
         self._named_files = {}
         self.bare = True
+        self._config = ConfigFile()
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
@@ -946,8 +948,7 @@ class MemoryRepo(BaseRepo):
 
         :return: `ConfigFile` object.
         """
-        from dulwich.config import ConfigFile
-        return ConfigFile()
+        return self._config
 
     def get_description(self):
         """Retrieve the repository description.

@@ -599,19 +599,24 @@ class BaseRepo(object):
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
-        try:
-            old_head = self.refs[ref]
-            c.parents = [old_head] + merge_heads
-            self.object_store.add_object(c)
-            ok = self.refs.set_if_equals(ref, old_head, c.id)
-        except KeyError:
+        if ref is None:
+            # Create a dangling commit
             c.parents = merge_heads
             self.object_store.add_object(c)
-            ok = self.refs.add_if_new(ref, c.id)
-        if not ok:
-            # Fail if the atomic compare-and-swap failed, leaving the commit and
-            # all its objects as garbage.
-            raise CommitError("%s changed during commit" % (ref,))
+        else:
+            try:
+                old_head = self.refs[ref]
+                c.parents = [old_head] + merge_heads
+                self.object_store.add_object(c)
+                ok = self.refs.set_if_equals(ref, old_head, c.id)
+            except KeyError:
+                c.parents = merge_heads
+                self.object_store.add_object(c)
+                ok = self.refs.add_if_new(ref, c.id)
+            if not ok:
+                # Fail if the atomic compare-and-swap failed, leaving the commit and
+                # all its objects as garbage.
+                raise CommitError("%s changed during commit" % (ref,))
 
         try:
             self.hooks['post-commit'].execute()

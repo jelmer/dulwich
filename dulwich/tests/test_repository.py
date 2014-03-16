@@ -683,6 +683,46 @@ class BuildRepoTests(TestCase):
             [self._root_commit, merge_1],
             r[commit_sha].parents)
 
+    def test_commit_dangling_commit(self):
+        r = self._repo
+
+        old_shas = set(r.object_store)
+        old_refs = r.get_refs()
+        commit_sha = r.do_commit('commit with no ref',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=None)
+        new_shas = set(r.object_store) - old_shas
+
+        # New sha is added, but no new refs
+        self.assertEqual(1, len(new_shas))
+        new_commit = r[new_shas.pop()]
+        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
+        self.assertEqual([], r[commit_sha].parents)
+        self.assertEqual(old_refs, r.get_refs())
+
+    def test_commit_dangling_commit_with_parents(self):
+        r = self._repo
+
+        old_shas = set(r.object_store)
+        old_refs = r.get_refs()
+        commit_sha = r.do_commit('commit with no ref',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=None, merge_heads=[self._root_commit])
+        new_shas = set(r.object_store) - old_shas
+
+        # New sha is added, but no new refs
+        self.assertEqual(1, len(new_shas))
+        new_commit = r[new_shas.pop()]
+        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
+        self.assertEqual([self._root_commit], r[commit_sha].parents)
+        self.assertEqual(old_refs, r.get_refs())
+
     def test_stage_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))

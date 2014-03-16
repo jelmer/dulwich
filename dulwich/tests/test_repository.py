@@ -615,6 +615,21 @@ class BuildRepoTests(TestCase):
             "Jelmer <jelmer@apache.org>",
             r[commit_sha].committer)
 
+    def test_commit_config_identity_in_memoryrepo(self):
+        # commit falls back to the users' identity if it wasn't specified
+        r = MemoryRepo.init_bare([], {})
+        c = r.get_config()
+        c.set(("user", ), "name", "Jelmer")
+        c.set(("user", ), "email", "jelmer@apache.org")
+
+        commit_sha = r.do_commit('message', tree=objects.Tree().id)
+        self.assertEqual(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEqual(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].committer)
+
     def test_commit_fail_ref(self):
         r = self._repo
 

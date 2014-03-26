@@ -460,7 +460,7 @@ exit 0
 
         (fd, path) = tempfile.mkstemp(dir=repo_dir)
         post_commit_msg = """#!/bin/sh
-unlink %(file)s
+rm %(file)s
 """ % {'file': path}
 
         root_sha = r.do_commit(

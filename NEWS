@@ -54,6 +54,10 @@
    unicode object of length 20 or 40 to Repo.__getitem__.
    (Jelmer Vernooij)
 
+ * Use 'rm' rather than 'unlink' in tests, since the latter
+   does not exist on OpenBSD and other platforms.
+   (Dmitrij D. Czarkoff)
+
 0.9.4	2013-11-30
 
  IMPROVEMENTS

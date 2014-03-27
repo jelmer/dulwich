@@ -28,6 +28,7 @@ from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.objects import (
     Blob,
+    Tag,
     Tree,
     )
 from dulwich.repo import Repo
@@ -349,19 +350,32 @@ class RevListTests(PorcelainTestCase):
 
 class TagTests(PorcelainTestCase):
 
-    def test_simple(self):
-        tag = 'tryme'
-        author = 'foo'
-        message = 'bar'
-
+    def test_annotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        porcelain.tag(self.repo.path, tag, author, message)
+        porcelain.tag(self.repo.path, "tryme", 'foo <foo@bar.com>', 'bar',
+                annotated=True)
 
         tags = self.repo.refs.as_dict("refs/tags")
-        self.assertEquals(tags.keys()[0], tag)
+        self.assertEquals(tags.keys(), ["tryme"])
+        tag = self.repo['refs/tags/tryme']
+        self.assertTrue(isinstance(tag, Tag))
+        self.assertEquals("foo <foo@bar.com>", tag.tagger)
+        self.assertEquals("bar", tag.message)
+
+    def test_unannotated(self):
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+            [3, 1, 2]])
+        self.repo.refs["HEAD"] = c3.id
+
+        porcelain.tag(self.repo.path, "tryme", annotated=False)
+
+        tags = self.repo.refs.as_dict("refs/tags")
+        self.assertEquals(tags.keys(), ["tryme"])
+        tag = self.repo['refs/tags/tryme']
+        self.assertEquals(tags.values(), [self.repo.head()])
 
 
 class ListTagsTests(PorcelainTestCase):

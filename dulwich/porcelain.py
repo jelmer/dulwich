@@ -359,29 +359,36 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author, message):
+def tag(repo, tag, author=None, message=None, annotated=False):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
     :param tag: tag string
-    :param author: tag author
-    :param repo: tag message
+    :param author: tag author (optional, if annotated is set)
+    :param message: tag message (optional)
+    :param annotated: whether to create an annotated tag
     """
 
     r = open_repo(repo)
 
-    # Create the tag object
-    tag_obj = Tag()
-    tag_obj.tagger = author
-    tag_obj.message = message
-    tag_obj.name = tag
-    tag_obj.object = (Commit, r.refs['HEAD'])
-    tag_obj.tag_time = int(time.time())
-    tag_obj.tag_timezone = parse_timezone('-0200')[0]
+    if annotated:
+        # Create the tag object
+        tag_obj = Tag()
+        if author is None:
+            # TODO(jelmer): Don't use repo private method.
+            author = r._get_user_identity()
+        tag_obj.tagger = author
+        tag_obj.message = message
+        tag_obj.name = tag
+        tag_obj.object = (Commit, r.refs['HEAD'])
+        tag_obj.tag_time = int(time.time())
+        tag_obj.tag_timezone = parse_timezone('-0200')[0]
+        r.object_store.add_object(tag_obj)
+        tag_id = tag_obj.id
+    else:
+        tag_id = r.refs['HEAD']
 
-    # Add tag to the object store
-    r.object_store.add_object(tag_obj)
-    r.refs['refs/tags/' + tag] = tag_obj.id
+    r.refs['refs/tags/' + tag] = tag_id
 
 
 def list_tags(repo, outstream=sys.stdout):

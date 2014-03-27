@@ -358,7 +358,8 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author=None, message=None, annotated=False, objectish="HEAD"):
+def tag(repo, tag, author=None, message=None, annotated=False,
+        objectish="HEAD", tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
@@ -367,6 +368,8 @@ def tag(repo, tag, author=None, message=None, annotated=False, objectish="HEAD")
     :param message: tag message (optional)
     :param annotated: whether to create an annotated tag
     :param objectish: object the tag should point at, defaults to HEAD
+    :param tag_time: Optional time for annotated tag
+    :param tag_timezone: Optional timezone for annotated tag
     """
 
     r = open_repo(repo)
@@ -382,8 +385,13 @@ def tag(repo, tag, author=None, message=None, annotated=False, objectish="HEAD")
         tag_obj.message = message
         tag_obj.name = tag
         tag_obj.object = (type(object), object.id)
-        tag_obj.tag_time = int(time.time())
-        tag_obj.tag_timezone = parse_timezone('-0200')[0]
+        tag_obj.tag_time = tag_time
+        if tag_time is None:
+            tag_time = int(time.time())
+        if tag_timezone is None:
+            # TODO(jelmer) Use current user timezone rather than UTC
+            tag_timezone = 0
+        tag_obj.tag_timezone = tag_timezone
         r.object_store.add_object(tag_obj)
         tag_id = tag_obj.id
     else:

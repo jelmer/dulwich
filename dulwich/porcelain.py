@@ -27,7 +27,6 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.objects import (
-    Commit,
     Tag,
     parse_timezone,
     )
@@ -359,7 +358,7 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author=None, message=None, annotated=False):
+def tag(repo, tag, author=None, message=None, annotated=False, objectish="HEAD"):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
@@ -367,9 +366,11 @@ def tag(repo, tag, author=None, message=None, annotated=False):
     :param author: tag author (optional, if annotated is set)
     :param message: tag message (optional)
     :param annotated: whether to create an annotated tag
+    :param objectish: object the tag should point at, defaults to HEAD
     """
 
     r = open_repo(repo)
+    object = parse_object(r, objectish)
 
     if annotated:
         # Create the tag object
@@ -380,13 +381,13 @@ def tag(repo, tag, author=None, message=None, annotated=False):
         tag_obj.tagger = author
         tag_obj.message = message
         tag_obj.name = tag
-        tag_obj.object = (Commit, r.refs['HEAD'])
+        tag_obj.object = (type(object), object.id)
         tag_obj.tag_time = int(time.time())
         tag_obj.tag_timezone = parse_timezone('-0200')[0]
         r.object_store.add_object(tag_obj)
         tag_id = tag_obj.id
     else:
-        tag_id = r.refs['HEAD']
+        tag_id = object.id
 
     r.refs['refs/tags/' + tag] = tag_id
 

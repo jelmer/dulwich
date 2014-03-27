@@ -229,6 +229,18 @@ def cmd_tag(args):
     porcelain.tag(".", args[0])
 
 
+def cmd_reset(args):
+    opts, args = getopt(args, "", ["hard", "soft", "mixed"])
+    mode = ""
+    if "--hard" in opts:
+        mode = "hard"
+    elif "--soft" in opts:
+        mode = "soft"
+    elif "--mixed" in opts:
+        mode = "mixed"
+    porcelain.tag(".", mode=mode, *args)
+
+
 commands = {
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
@@ -247,6 +259,7 @@ commands = {
     "add": cmd_add,
     "rm": cmd_rm,
     "show": cmd_show,
+    "reset": cmd_reset,
     "rev-list": cmd_rev_list,
     "tag": cmd_tag,
     }

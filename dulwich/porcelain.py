@@ -48,7 +48,7 @@ Currently implemented:
  * list-tags
  * pull
  * push
- * remove
+ * rm
  * reset
  * rev-list
  * tag

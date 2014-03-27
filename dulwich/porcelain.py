@@ -391,6 +391,8 @@ def tag(repo, tag, author=None, message=None, annotated=False,
         if tag_timezone is None:
             # TODO(jelmer) Use current user timezone rather than UTC
             tag_timezone = 0
+        elif isinstance(tag_timezone, str):
+            tag_timezone = parse_timezone(tag_timezone)
         tag_obj.tag_timezone = tag_timezone
         r.object_store.add_object(tag_obj)
         tag_id = tag_obj.id

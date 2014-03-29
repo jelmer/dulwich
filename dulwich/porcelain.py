@@ -21,6 +21,7 @@ import sys
 import time
 
 from dulwich import index
+from dulwich.diff_tree import tree_changes
 from dulwich.client import get_transport_and_path
 from dulwich.errors import (
     SendPackError,
@@ -54,6 +55,7 @@ Currently implemented:
  * rev-list
  * tag
  * update-server-info
+ * status
  * symbolic-ref
 
 These functions are meant to behave similarly to the git subcommands.
@@ -61,6 +63,22 @@ Differences in behaviour are considered bugs.
 """
 
 __docformat__ = 'restructuredText'
+
+PORCELAIN_GIT_STATUS_HEADER_COMMITTED = '# Changes to be committed:\n#\t(' \
+                                        'use "git reset HEAD <file>..." to ' \
+                                        'unstage)\n#\n'
+
+PORCELAIN_GIT_STATUS_HEADER_UNSTAGED = '#\n# Changes not staged for commit:' \
+                                       '\n#\t(use "git add <file>..." to ' \
+                                       'update what will be committed)\n#\t(' \
+                                       'use "git checkout -- <file>..." to ' \
+                                       'discard changes in working directory' \
+                                       ')\n#\n'
+
+PORCELAIN_GIT_STATUS_HEADER_UNTRACKED = '#\n# Untracked files:\n#\t(use "' \
+                                        'git add <file>..." to include in ' \
+                                        'what will be committed)\n#\n'
+
 
 
 def open_repo(path_or_repo):
@@ -467,3 +485,120 @@ def pull(repo, remote_location, refs_path,
     indexfile = r.index_path()
     tree = r["HEAD"].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def status(repo, outstream=sys.stdout, errstream=sys.stderr):
+    """ git status
+
+    :param repo: Path to repository
+    :param outstream: A stream file to write to output
+    :param errstream: A stream file to write to errors
+    """
+
+    r = open_repo(repo)
+    index = r.open_index()
+
+    outstream.write(PORCELAIN_GIT_STATUS_HEADER_COMMITTED)
+
+    # Iterate through the tree changes and report add/delete/modify
+    tracked_changes = _get_tree_changes(repo)
+    for added in tracked_changes['add']:
+        outstream.write('#\tnew file:\t' + added + '\n')
+    for deleted in tracked_changes['delete']:
+        outstream.write('#\tdeleted:\t' + deleted + '\n')
+    for modified in tracked_changes['modify']:
+        outstream.write('#\tmodify:\t' + modified + '\n')
+
+    outstream.write(PORCELAIN_GIT_STATUS_HEADER_UNSTAGED)
+
+    # Walk through the index checking for yet to be staged modifications by
+    # checking the time of last modification
+    unstaged_changes = []
+    for i in index.iteritems():
+        statbuf = os.stat(i[0])
+        if statbuf.st_mtime > i[1][0][0] and not i[0] in tracked_changes:
+            unstaged_changes.append(i[0])
+            outstream.write('#\tmodified:\t' + i[0] + '\n')
+
+    outstream.write(PORCELAIN_GIT_STATUS_HEADER_UNTRACKED)
+
+    # Untracked files - omitted for now, need to process git ignore here also
+    untracked_changes = []
+
+    # Check each unignored item to see if it's not in the indexed or tree
+    # changes
+
+    # indexed_files = [i[0] for i in index.iteritems()]
+    # unignored = _get_non_ignored(repo, _get_git_ignore_rules(repo))
+    #
+    # for item in unignored:
+    #     if not item in indexed_files and not item in tracked_changes:
+    #         untracked_changes.append(item)
+    #         outstream.write('#\t\t' + item + '\n')
+
+    return {
+        'staged': tracked_changes,
+        'unstaged': unstaged_changes,
+        'untracked': untracked_changes,
+    }
+
+
+def _get_tree_changes(repo):
+    """
+    Returns the add/delete/modify changes to tree
+
+    :return:    dict with lists for each type of change
+    """
+
+    r = open_repo(repo)
+    index = r.open_index()
+
+    tracked_changes = {
+        'add': [],
+        'delete': [],
+        'modify': [],
+    }
+    for change in list(tree_changes(r, r['HEAD'].tree,
+                                     index.commit(r.object_store))):
+        if change.type == 'add':
+            tracked_changes['add'].append(change.new.path)
+        elif change.type == 'delete':
+            tracked_changes['delete'].append(change.old.path)
+        elif change.type == 'modify':
+            tracked_changes['modify'].append(change.old.path)
+    return tracked_changes
+
+
+def _get_git_ignore_rules(repo):
+    """
+    Obtain gitignored files
+
+    :param repo:
+
+    :return:
+    """
+    r = open_repo(repo)
+    ignore_rules = list()
+    if os.path.exists(r.path + '.gitignore'):
+        with open('.gitignore') as f:
+            ignore_rules.append(f.read().strip())
+    return ignore_rules
+
+
+def _get_non_ignored(repo, ignore_rules):
+    """
+    Handles extracting files that may be modified in the repo by parsing
+    the ignore rules
+
+    :param repo:
+    :param ignore_rules:
+
+    :return: list of valid repo paths
+    """
+    # TODO - implement
+    # r = open_repo(repo)
+    # for dirpath, dnames, fnames in os.walk(r.path):
+    #     # Determine if any of the rules filter the path
+    #     # Determine if any of the rules filter the file
+    #     pass
+    raise NotImplementedError()

@@ -20,6 +20,9 @@
    to Repo.__getitem__.
    (Jonas Haag)
 
+ * Fix handling of `reset` command in dulwich.fastexport.
+   (Jelmer Vernooij)
+
  API CHANGES
 
   * Drop support for Python 2.6. (Jelmer Vernooij)

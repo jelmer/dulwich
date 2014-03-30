@@ -892,13 +892,25 @@ class SSHGitClient(TraditionalGitClient):
                 con.can_read)
 
 
+def default_urllib2_handlers(config):
+    if config is not None:
+        proxy_server = config.get("http", "proxy")
+    else:
+        proxy_server = None
+    handlers = []
+    if proxy_server is not None:
+        handlers.append(urllib2.ProxyHandler({"http" : proxy_server}))
+    return handlers
+
+
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, config=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
-            self.opener = urllib2.build_opener()
+            handlers = default_urllib2_handlers(config)
+            self.opener = urllib2.build_opener(*handlers)
         else:
             self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
@@ -1023,10 +1035,11 @@ class HttpGitClient(GitClient):
         return refs
 
 
-def get_transport_and_path_from_url(url, **kwargs):
+def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
     :param url: URL to open
+    :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.
@@ -1043,7 +1056,8 @@ def get_transport_and_path_from_url(url, **kwargs):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
+        return HttpGitClient(urlparse.urlunparse(parsed), config=config,
+                **kwargs), parsed.path
     elif parsed.scheme == 'file':
         return default_local_git_client_cls(**kwargs), parsed.path
 
@@ -1054,6 +1068,7 @@ def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
     :param location: URL or path
+    :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.

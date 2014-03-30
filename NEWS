@@ -11,6 +11,9 @@
 
  * Add porcelain 'pull'. (Ryan Faulkner)
 
+ * Support 'http.proxy' in HttpGitClient.
+   (Jelmer Vernooij, #1096030)
+
  BUG FIXES
 
  * Support unseekable 'wsgi.input' streams.

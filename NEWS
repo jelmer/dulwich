@@ -20,6 +20,10 @@
    to Repo.__getitem__.
    (Jonas Haag)
 
+ API CHANGES
+
+  * Drop support for Python 2.6. (Jelmer Vernooij)
+
 0.9.5	2014-02-23
 
  IMPROVEMENTS

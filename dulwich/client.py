@@ -39,6 +39,7 @@ Known capabilities that are not supported:
 __docformat__ = 'restructuredText'
 
 from cStringIO import StringIO
+import dulwich
 import select
 import socket
 import subprocess
@@ -892,7 +893,11 @@ class SSHGitClient(TraditionalGitClient):
                 con.can_read)
 
 
-def default_urllib2_handlers(config):
+def default_user_agent_string():
+    return "dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
+
+
+def default_urllib2_opener(config):
     if config is not None:
         proxy_server = config.get("http", "proxy")
     else:
@@ -900,7 +905,15 @@ def default_urllib2_handlers(config):
     handlers = []
     if proxy_server is not None:
         handlers.append(urllib2.ProxyHandler({"http" : proxy_server}))
-    return handlers
+    opener = urllib2.build_opener(*handlers)
+    if config is not None:
+        user_agent = config.get("http", "useragent")
+    else:
+        user_agent = None
+    if user_agent is None:
+        user_agent = default_user_agent_string()
+    opener.addheaders = [('User-agent', user_agent)]
+    return opener
 
 
 class HttpGitClient(GitClient):
@@ -909,8 +922,7 @@ class HttpGitClient(GitClient):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
-            handlers = default_urllib2_handlers(config)
-            self.opener = urllib2.build_opener(*handlers)
+            self.opener = default_urllib2_opener(config)
         else:
             self.opener = opener
         GitClient.__init__(self, *args, **kwargs)

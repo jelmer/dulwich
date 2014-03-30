@@ -21,7 +21,7 @@
    (Jonas Haag)
 
  * Fix handling of `reset` command in dulwich.fastexport.
-   (Jelmer Vernooij)
+   (Jelmer Vernooij, #1249029)
 
  API CHANGES
 

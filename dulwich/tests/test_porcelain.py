@@ -496,3 +496,16 @@ class PullTests(PorcelainTestCase):
         # Check the target repo for pushed changes
         r = Repo(target_path)
         self.assertEquals(r['HEAD'].id, self.repo['HEAD'].id)
+
+
+class StatusTests(PorcelainTestCase):
+
+    def test_simple_newfile(self):
+        out = StringIO()
+        err = StringIO()
+
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        results = porcelain.status(self.repo, outstream=out, errstream=err)
+        self.assertEquals(results['staged'][0], filename)

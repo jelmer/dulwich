@@ -17,6 +17,10 @@
  * Support 'http.useragent' in HttpGitClient.
    (Jelmer Vernooij)
 
+ * In server, wait for clients to send empty list of
+   wants when talking to empty repository.
+   (Damien Tournoud)
+
  BUG FIXES
 
  * Support unseekable 'wsgi.input' streams.

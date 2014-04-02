@@ -1650,9 +1650,9 @@ def apply_delta(src_buf, delta):
     :param src_buf: Source buffer
     :param delta: Delta instructions
     """
-    if type(src_buf) != str:
+    if not isinstance(src_buf, str):
         src_buf = ''.join(src_buf)
-    if type(delta) != str:
+    if not isinstance(delta, str):
         delta = ''.join(delta)
     out = []
     index = 0
@@ -1806,7 +1806,7 @@ class Pack(object):
             self._idx.close()
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.index == other.index
+        return isinstance(self, type(other)) and self.index == other.index
 
     def __len__(self):
         """Number of entries in this pack."""

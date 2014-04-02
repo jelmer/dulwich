@@ -263,7 +263,7 @@ class DumbHandlersTestCase(WebTestCase):
             def __init__(self, sha):
                 self.data = TestPackData(sha)
 
-        packs = [TestPack(str(i) * 40) for i in xrange(1, 4)]
+        packs = [TestPack(str(i) * 40) for i in range(1, 4)]
 
         class TestObjectStore(MemoryObjectStore):
             # property must be overridden, can't be assigned

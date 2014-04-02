@@ -229,7 +229,7 @@ def build_pack(f, objects_spec, store=None):
         crc32s[i] = crc32
 
     expected = []
-    for i in xrange(num_objects):
+    for i in range(num_objects):
         type_num, data, sha = full_objects[i]
         assert len(sha) == 20
         expected.append((offsets[i], type_num, data, sha, crc32s[i]))

@@ -624,7 +624,7 @@ class PackIndex2(FilePackIndex):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
+            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 

@@ -58,7 +58,7 @@ _TAG_HEADER = "tag"
 _TAGGER_HEADER = "tagger"
 
 
-S_IFGITLINK = 0160000
+S_IFGITLINK = 0o160000
 
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
@@ -920,10 +920,10 @@ class Tree(ShaFile):
         """
         super(Tree, self).check()
         last = None
-        allowed_modes = (stat.S_IFREG | 0755, stat.S_IFREG | 0644,
+        allowed_modes = (stat.S_IFREG | 0o755, stat.S_IFREG | 0o644,
                          stat.S_IFLNK, stat.S_IFDIR, S_IFGITLINK,
                          # TODO: optionally exclude as in git fsck --strict
-                         stat.S_IFREG | 0664)
+                         stat.S_IFREG | 0o664)
         for name, mode, sha in parse_tree(''.join(self._chunked_text),
                                           True):
             check_hexsha(sha, 'invalid sha %s' % sha)

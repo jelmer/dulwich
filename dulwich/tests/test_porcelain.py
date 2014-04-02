@@ -324,7 +324,7 @@ class CommitTreeTests(PorcelainTestCase):
         b = Blob()
         b.data = "foo the bar"
         t = Tree()
-        t.add("somename", 0100644, b.id)
+        t.add("somename", 0o100644, b.id)
         self.repo.object_store.add_object(t)
         self.repo.object_store.add_object(b)
         sha = porcelain.commit_tree(

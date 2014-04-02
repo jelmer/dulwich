@@ -51,7 +51,7 @@ from dulwich.tests import (
     )
 
 # Plain files are very frequently used in tests, so let the mode be very short.
-F = 0100644  # Shorthand mode for Files.
+F = 0o100644  # Shorthand mode for Files.
 
 
 def open_repo(name):

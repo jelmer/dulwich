@@ -59,7 +59,7 @@ def check_ref_format(refname):
     if '..' in refname:
         return False
     for c in refname:
-        if ord(c) < 040 or c in '\177 ~^:?*[':
+        if ord(c) < 0o40 or c in '\177 ~^:?*[':
             return False
     if refname[-1] in '/.':
         return False

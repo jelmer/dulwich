@@ -921,20 +921,20 @@ class DeltaChainIteratorTests(TestCase):
     def test_long_chain(self):
         n = 100
         objects_spec = [(Blob.type_num, 'blob')]
-        for i in xrange(n):
+        for i in range(n):
             objects_spec.append((OFS_DELTA, (i, 'blob%i' % i)))
         f = StringIO()
         entries = build_pack(f, objects_spec)
-        self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
+        self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
 
     def test_branchy_chain(self):
         n = 100
         objects_spec = [(Blob.type_num, 'blob')]
-        for i in xrange(n):
+        for i in range(n):
             objects_spec.append((OFS_DELTA, (0, 'blob%i' % i)))
         f = StringIO()
         entries = build_pack(f, objects_spec)
-        self.assertEntriesMatch(xrange(n + 1), entries, self.make_pack_iter(f))
+        self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
 
     def test_ext_ref(self):
         blob, = self.store_blobs(['blob'])

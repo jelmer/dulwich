@@ -508,7 +508,7 @@ class CommitParseTests(ShaFileCheckTests):
 
     def test_check_duplicates(self):
         # duplicate each of the header fields
-        for i in xrange(5):
+        for i in range(5):
             lines = self.make_commit_lines(parents=[a_sha], encoding='UTF-8')
             lines.insert(i, lines[i])
             text = '\n'.join(lines)
@@ -785,7 +785,7 @@ class TagParseTests(ShaFileCheckTests):
 
     def test_check_duplicates(self):
         # duplicate each of the header fields
-        for i in xrange(4):
+        for i in range(4):
             lines = self.make_tag_lines()
             lines.insert(i, lines[i])
             self.assertCheckFails(Tag, '\n'.join(lines))

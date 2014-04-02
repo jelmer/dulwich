@@ -392,7 +392,7 @@ class TreeChangesTest(DiffTestCase):
         self.assertChangesForMergeEqual([], [has, doesnt_have], doesnt_have)
 
     def test_tree_changes_for_merge_octopus_no_conflict(self):
-        r = range(5)
+        r = list(range(5))
         blobs = [make_object(Blob, data=str(i)) for i in r]
         parents = [self.commit_tree([('a', blobs[i])]) for i in r]
         for i in r:
@@ -403,7 +403,7 @@ class TreeChangesTest(DiffTestCase):
         # Because the octopus merge strategy is limited, I doubt it's possible
         # to create this with the git command line. But the output is well-
         # defined, so test it anyway.
-        r = range(5)
+        r = list(range(5))
         parent_blobs = [make_object(Blob, data=str(i)) for i in r]
         merge_blob = make_object(Blob, data='merge')
         parents = [self.commit_tree([('a', parent_blobs[i])]) for i in r]

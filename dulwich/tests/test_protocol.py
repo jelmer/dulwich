@@ -151,7 +151,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         data = ''
         # We ask for 8 bytes each time and actually read 7, so it should take
         # exactly 10 iterations.
-        for _ in xrange(10):
+        for _ in range(10):
             data += self.proto.recv(10)
         # any more reads would block
         self.assertRaises(AssertionError, self.proto.recv, 10)
@@ -176,12 +176,12 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
 
     def test_mixed(self):
         # arbitrary non-repeating string
-        all_data = ','.join(str(i) for i in xrange(100))
+        all_data = ','.join(str(i) for i in range(100))
         self.rin.write(all_data)
         self.rin.seek(0)
         data = ''
 
-        for i in xrange(1, 100):
+        for i in range(1, 100):
             data += self.proto.recv(i)
             # if we get to the end, do a non-blocking read instead of blocking
             if len(data) + i > len(all_data):

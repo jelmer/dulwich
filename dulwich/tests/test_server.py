@@ -225,7 +225,7 @@ class FindShallowTests(TestCase):
     def make_linear_commits(self, n, message=''):
         commits = []
         parents = []
-        for _ in xrange(n):
+        for _ in range(n):
             commits.append(self.make_commit(parents=parents, message=message))
             parents = [commits[-1].id]
         return commits

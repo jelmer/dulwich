@@ -18,7 +18,7 @@
 
 """Tests for patch.py."""
 
-from cStringIO import StringIO
+from io import BytesIO
 
 from dulwich.objects import (
     Blob,
@@ -45,7 +45,7 @@ from dulwich.tests import (
 class WriteCommitPatchTests(TestCase):
 
     def test_simple(self):
-        f = StringIO()
+        f = BytesIO()
         c = Commit()
         c.committer = c.author = "Jelmer <jelmer@samba.org>"
         c.commit_time = c.author_time = 1271350201
@@ -88,7 +88,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(StringIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.author)
         self.assertEqual("Remove executable bit from prey.ico "
@@ -118,7 +118,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(StringIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
     def test_extract_pseudo_from_header(self):
@@ -141,7 +141,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(StringIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual("Jelmer Vernooy <jelmer@debian.org>", c.author)
         self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
@@ -160,7 +160,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
  mode change 100755 => 100644 pixmaps/prey.ico
 
 """
-        c, diff, version = git_am_patch_split(StringIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(None, version)
 
     def test_extract_mercurial(self):
@@ -171,7 +171,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
 @@ -158,7 +158,7 @@
  
  '''
-         c, diff, version = git_am_patch_split(StringIO(text))
+         c, diff, version = git_am_patch_split(BytesIO(text))
 -        self.assertIs(None, version)
 +        self.assertEqual(None, version)
  
@@ -196,7 +196,7 @@ Unsubscribe : https://launchpad.net/~dulwich-users
 More help   : https://help.launchpad.net/ListHelp
 
 """ % expected_diff
-        c, diff, version = git_am_patch_split(StringIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)
         self.assertEqual(None, version)
 
@@ -205,9 +205,9 @@ class DiffTests(TestCase):
     """Tests for write_blob_diff and write_tree_diff."""
 
     def test_blob_diff(self):
-        f = StringIO()
-        write_blob_diff(f, ("foo.txt", 0644, Blob.from_string("old\nsame\n")),
-                           ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
+        f = BytesIO()
+        write_blob_diff(f, ("foo.txt", 0o644, Blob.from_string("old\nsame\n")),
+                           ("bar.txt", 0o644, Blob.from_string("new\nsame\n")))
         self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
@@ -220,9 +220,9 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_blob_add(self):
-        f = StringIO()
+        f = BytesIO()
         write_blob_diff(f, (None, None, None),
-                           ("bar.txt", 0644, Blob.from_string("new\nsame\n")))
+                           ("bar.txt", 0o644, Blob.from_string("new\nsame\n")))
         self.assertEqual([
             'diff --git /dev/null b/bar.txt',
              'new mode 644',
@@ -235,8 +235,8 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_blob_remove(self):
-        f = StringIO()
-        write_blob_diff(f, ("bar.txt", 0644, Blob.from_string("new\nsame\n")),
+        f = BytesIO()
+        write_blob_diff(f, ("bar.txt", 0o644, Blob.from_string("new\nsame\n")),
                            (None, None, None))
         self.assertEqual([
             'diff --git a/bar.txt /dev/null',
@@ -250,7 +250,7 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_tree_diff(self):
-        f = StringIO()
+        f = BytesIO()
         store = MemoryObjectStore()
         added = Blob.from_string("add\n")
         removed = Blob.from_string("removed\n")
@@ -258,13 +258,13 @@ class DiffTests(TestCase):
         changed2 = Blob.from_string("unchanged\nadded\n")
         unchanged = Blob.from_string("unchanged\n")
         tree1 = Tree()
-        tree1.add("removed.txt", 0644, removed.id)
-        tree1.add("changed.txt", 0644, changed1.id)
-        tree1.add("unchanged.txt", 0644, changed1.id)
+        tree1.add("removed.txt", 0o644, removed.id)
+        tree1.add("changed.txt", 0o644, changed1.id)
+        tree1.add("unchanged.txt", 0o644, changed1.id)
         tree2 = Tree()
-        tree2.add("added.txt", 0644, added.id)
-        tree2.add("changed.txt", 0644, changed2.id)
-        tree2.add("unchanged.txt", 0644, changed1.id)
+        tree2.add("added.txt", 0o644, added.id)
+        tree2.add("changed.txt", 0o644, changed2.id)
+        tree2.add("unchanged.txt", 0o644, changed1.id)
         store.add_objects([(o, None) for o in [
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
@@ -294,7 +294,7 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_tree_diff_submodule(self):
-        f = StringIO()
+        f = BytesIO()
         store = MemoryObjectStore()
         tree1 = Tree()
         tree1.add("asubmodule", S_IFGITLINK,
@@ -315,13 +315,13 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_blob(self):
-        f = StringIO()
+        f = BytesIO()
         b1 = Blob.from_string("old\nsame\n")
         b2 = Blob.from_string("new\nsame\n")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ("foo.txt", 0644, b1.id),
-                                    ("bar.txt", 0644, b2.id))
+        write_object_diff(f, store, ("foo.txt", 0o644, b1.id),
+                                    ("bar.txt", 0o644, b2.id))
         self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
@@ -334,12 +334,12 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_add_blob(self):
-        f = StringIO()
+        f = BytesIO()
         store = MemoryObjectStore()
         b2 = Blob.from_string("new\nsame\n")
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
-                                    ("bar.txt", 0644, b2.id))
+                                    ("bar.txt", 0o644, b2.id))
         self.assertEqual([
             'diff --git /dev/null b/bar.txt',
              'new mode 644',
@@ -352,11 +352,11 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_remove_blob(self):
-        f = StringIO()
+        f = BytesIO()
         b1 = Blob.from_string("new\nsame\n")
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ("bar.txt", 0644, b1.id),
+        write_object_diff(f, store, ("bar.txt", 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
             'diff --git a/bar.txt /dev/null',
@@ -370,7 +370,7 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob_force(self):
-        f = StringIO()
+        f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
             "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
@@ -380,8 +380,8 @@ class DiffTests(TestCase):
             "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ('foo.png', 0644, b1.id),
-                                    ('bar.png', 0644, b2.id), diff_binary=True)
+        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
+                                    ('bar.png', 0o644, b2.id), diff_binary=True)
         self.assertEqual([
             'diff --git a/foo.png b/bar.png',
             'index f73e47d..06364b7 644',
@@ -398,7 +398,7 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob(self):
-        f = StringIO()
+        f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
             "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
@@ -408,8 +408,8 @@ class DiffTests(TestCase):
             "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ('foo.png', 0644, b1.id),
-                                    ('bar.png', 0644, b2.id))
+        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
+                                    ('bar.png', 0o644, b2.id))
         self.assertEqual([
             'diff --git a/foo.png b/bar.png',
             'index f73e47d..06364b7 644',
@@ -417,14 +417,14 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_add_bin_blob(self):
-        f = StringIO()
+        f = BytesIO()
         b2 = Blob.from_string(
             '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
             '\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3')
         store = MemoryObjectStore()
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
-                                    ('bar.png', 0644, b2.id))
+                                    ('bar.png', 0o644, b2.id))
         self.assertEqual([
             'diff --git /dev/null b/bar.png',
             'new mode 644',
@@ -433,13 +433,13 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_remove_bin_blob(self):
-        f = StringIO()
+        f = BytesIO()
         b1 = Blob.from_string(
             '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
             '\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b')
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ('foo.png', 0644, b1.id),
+        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
             'diff --git a/foo.png /dev/null',
@@ -449,12 +449,12 @@ class DiffTests(TestCase):
             ], f.getvalue().splitlines())
 
     def test_object_diff_kind_change(self):
-        f = StringIO()
+        f = BytesIO()
         b1 = Blob.from_string("new\nsame\n")
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ("bar.txt", 0644, b1.id),
-            ("bar.txt", 0160000, "06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
+        write_object_diff(f, store, ("bar.txt", 0o644, b1.id),
+            ("bar.txt", 0o160000, "06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
         self.assertEqual([
             'diff --git a/bar.txt b/bar.txt',
             'old mode 644',

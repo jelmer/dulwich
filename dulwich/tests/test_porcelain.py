@@ -18,7 +18,7 @@
 
 """Tests for dulwich.porcelain."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import shutil
 import tarfile
@@ -56,8 +56,8 @@ class ArchiveTests(PorcelainTestCase):
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs["refs/heads/master"] = c3.id
-        out = StringIO()
-        err = StringIO()
+        out = BytesIO()
+        err = BytesIO()
         porcelain.archive(self.repo.path, "refs/heads/master", outstream=out,
             errstream=err)
         self.assertEquals("", err.getvalue())
@@ -85,7 +85,7 @@ class CommitTests(PorcelainTestCase):
         self.repo.refs["refs/heads/foo"] = c3.id
         sha = porcelain.commit(self.repo.path, message="Some message",
                 author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
-        self.assertTrue(type(sha) is str)
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 
@@ -102,7 +102,7 @@ class CloneTests(PorcelainTestCase):
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
-        outstream = StringIO()
+        outstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, outstream=outstream)
@@ -122,7 +122,7 @@ class CloneTests(PorcelainTestCase):
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
-        outstream = StringIO()
+        outstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=True, outstream=outstream)
@@ -142,7 +142,7 @@ class CloneTests(PorcelainTestCase):
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
-        outstream = StringIO()
+        outstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             bare=True, outstream=outstream)
@@ -159,7 +159,7 @@ class CloneTests(PorcelainTestCase):
         (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c1.id
         target_path = tempfile.mkdtemp()
-        outstream = StringIO()
+        outstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(ValueError, porcelain.clone, self.repo.path,
             target_path, checkout=True, bare=True, outstream=outstream)
@@ -225,7 +225,7 @@ class LogTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.log(self.repo.path, outstream=outstream)
         self.assertEquals(3, outstream.getvalue().count("-" * 50))
 
@@ -233,7 +233,7 @@ class LogTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
         self.assertEquals(1, outstream.getvalue().count("-" * 50))
 
@@ -244,7 +244,7 @@ class ShowTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
@@ -252,14 +252,14 @@ class ShowTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_blob(self):
         b = Blob.from_string("The Foo\n")
         self.repo.object_store.add_object(b)
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
         self.assertEquals(outstream.getvalue(), "The Foo\n")
 
@@ -271,7 +271,7 @@ class SymbolicRefTests(PorcelainTestCase):
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        outstream = StringIO()
+        outstream = BytesIO()
         self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path, 'foobar')
 
     def test_set_force_wrong_symbolic_ref(self):
@@ -311,7 +311,7 @@ class DiffTreeTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.diff_tree(self.repo.path, c2.tree, c3.tree, outstream=outstream)
         self.assertEquals(outstream.getvalue(), "")
 
@@ -324,14 +324,14 @@ class CommitTreeTests(PorcelainTestCase):
         b = Blob()
         b.data = "foo the bar"
         t = Tree()
-        t.add("somename", 0100644, b.id)
+        t.add("somename", 0o100644, b.id)
         self.repo.object_store.add_object(t)
         self.repo.object_store.add_object(b)
         sha = porcelain.commit_tree(
             self.repo.path, t.id, message="Withcommit.",
             author="Joe <joe@example.com>",
             committer="Jane <jane@example.com>")
-        self.assertTrue(type(sha) is str)
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 
@@ -340,7 +340,7 @@ class RevListTests(PorcelainTestCase):
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
-        outstream = StringIO()
+        outstream = BytesIO()
         porcelain.rev_list(
             self.repo.path, [c3.id], outstream=outstream)
         self.assertEquals(
@@ -429,8 +429,8 @@ class PushTests(PorcelainTestCase):
         clone the remote, commit a file to the clone, then push the changes
         back to the remote.
         """
-        outstream = StringIO()
-        errstream = StringIO()
+        outstream = BytesIO()
+        errstream = BytesIO()
 
         porcelain.commit(repo=self.repo.path, message='init',
             author='', committer='')
@@ -468,8 +468,8 @@ class PushTests(PorcelainTestCase):
 class PullTests(PorcelainTestCase):
 
     def test_simple(self):
-        outstream = StringIO()
-        errstream = StringIO()
+        outstream = BytesIO()
+        errstream = BytesIO()
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)

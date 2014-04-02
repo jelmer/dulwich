@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from cStringIO import StringIO
+from io import BytesIO
 
 from dulwich import (
     client,
@@ -71,8 +71,8 @@ class GitClientTests(TestCase):
 
     def setUp(self):
         super(GitClientTests, self).setUp()
-        self.rout = StringIO()
-        self.rin = StringIO()
+        self.rout = BytesIO()
+        self.rin = BytesIO()
         self.client = DummyClient(lambda x: True, self.rin.read,
                                   self.rout.write)
 
@@ -202,7 +202,7 @@ class GitClientTests(TestCase):
         def generate_pack_contents(have, want):
             return {}
 
-        f = StringIO()
+        f = BytesIO()
         empty_pack = write_pack_objects(f, {})
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertEqual(
@@ -240,7 +240,7 @@ class GitClientTests(TestCase):
         def generate_pack_contents(have, want):
             return [(commit, None), (tree, ''), ]
 
-        f = StringIO()
+        f = BytesIO()
         pack = write_pack_objects(f, generate_pack_contents(None, None))
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertEqual(
@@ -563,7 +563,7 @@ class LocalGitClientTests(TestCase):
     def test_fetch_empty(self):
         c = LocalGitClient()
         s = open_repo('a.git')
-        out = StringIO()
+        out = BytesIO()
         walker = {}
         c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
@@ -573,7 +573,7 @@ class LocalGitClientTests(TestCase):
     def test_fetch_pack_none(self):
         c = LocalGitClient()
         s = open_repo('a.git')
-        out = StringIO()
+        out = BytesIO()
         walker = MemoryRepo().get_graph_walker()
         c.fetch_pack(s.path,
             lambda heads: ["a90fa2d900a17e99b433217e988c4eb4a2e9a097"],

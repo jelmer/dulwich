@@ -19,7 +19,7 @@
 
 """Generic functions for talking the git smart server protocol."""
 
-from cStringIO import StringIO
+from io import BytesIO
 from os import (
     SEEK_END,
     )
@@ -137,7 +137,7 @@ class Protocol(object):
         """
         if self._readahead is not None:
             raise ValueError('Attempted to unread multiple pkt-lines.')
-        self._readahead = StringIO(pkt_line(data))
+        self._readahead = BytesIO(pkt_line(data))
 
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
@@ -240,7 +240,7 @@ class ReceivableProtocol(Protocol):
         super(ReceivableProtocol, self).__init__(self.read, write,
                                                  report_activity)
         self._recv = recv
-        self._rbuf = StringIO()
+        self._rbuf = BytesIO()
         self._rbufsize = rbufsize
 
     def read(self, size):
@@ -252,10 +252,10 @@ class ReceivableProtocol(Protocol):
         #  - use SEEK_END instead of the magic number.
         # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
         # Licensed under the Python Software Foundation License.
-        # TODO: see if buffer is more efficient than cStringIO.
+        # TODO: see if buffer is more efficient than cBytesIO.
         assert size > 0
 
-        # Our use of StringIO rather than lists of string objects returned by
+        # Our use of BytesIO rather than lists of string objects returned by
         # recv() minimizes memory usage and fragmentation that occurs when
         # rbufsize is large compared to the typical return value of recv().
         buf = self._rbuf
@@ -267,18 +267,18 @@ class ReceivableProtocol(Protocol):
             # Already have size bytes in our buffer?  Extract and return.
             buf.seek(start)
             rv = buf.read(size)
-            self._rbuf = StringIO()
+            self._rbuf = BytesIO()
             self._rbuf.write(buf.read())
             self._rbuf.seek(0)
             return rv
 
-        self._rbuf = StringIO()  # reset _rbuf.  we consume it via buf.
+        self._rbuf = BytesIO()  # reset _rbuf.  we consume it via buf.
         while True:
             left = size - buf_len
             # recv() will malloc the amount of memory given as its
             # parameter even though it often returns much less data
             # than that.  The returned data string is short lived
-            # as we copy it into a StringIO and free it.  This avoids
+            # as we copy it into a BytesIO and free it.  This avoids
             # fragmentation issues on many platforms.
             data = self._recv(left)
             if not data:
@@ -319,7 +319,7 @@ class ReceivableProtocol(Protocol):
             if len(data) == size:
                 # shortcut: skip the buffer if we read exactly size bytes
                 return data
-            buf = StringIO()
+            buf = BytesIO()
             buf.write(data)
             buf.seek(0)
             del data  # explicit free
@@ -381,7 +381,7 @@ class BufferedPktLineWriter(object):
         """
         self._write = write
         self._bufsize = bufsize
-        self._wbuf = StringIO()
+        self._wbuf = BytesIO()
         self._buflen = 0
 
     def write(self, data):
@@ -405,7 +405,7 @@ class BufferedPktLineWriter(object):
         if data:
             self._write(data)
         self._len = 0
-        self._wbuf = StringIO()
+        self._wbuf = BytesIO()
 
 
 class PktLineParser(object):
@@ -414,7 +414,7 @@ class PktLineParser(object):
 
     def __init__(self, handle_pkt):
         self.handle_pkt = handle_pkt
-        self._readahead = StringIO()
+        self._readahead = BytesIO()
 
     def parse(self, data):
         """Parse a fragment of data and call back for any completed packets.
@@ -433,7 +433,7 @@ class PktLineParser(object):
                 buf = buf[size:]
             else:
                 break
-        self._readahead = StringIO()
+        self._readahead = BytesIO()
         self._readahead.write(buf)
 
     def get_tail(self):

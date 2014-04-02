@@ -18,7 +18,7 @@
 
 """Tests for the smart protocol server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import tempfile
 
@@ -126,7 +126,7 @@ class HandlerTestCase(TestCase):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except GitProtocolError, e:
+        except GitProtocolError as e:
             self.fail(e)
 
     def test_capability_line(self):
@@ -225,7 +225,7 @@ class FindShallowTests(TestCase):
     def make_linear_commits(self, n, message=''):
         commits = []
         parents = []
-        for _ in xrange(n):
+        for _ in range(n):
             commits.append(self.make_commit(parents=parents, message=message))
             parents = [commits[-1].id]
         return commits
@@ -566,7 +566,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertAck(None, 'nak')
 
     def assertNextEquals(self, sha):
-        self.assertEqual(sha, self._impl.next())
+        self.assertEqual(sha, next(self._impl))
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
@@ -868,8 +868,8 @@ class ServeCommandTests(TestCase):
         commit = make_commit(id=ONE, parents=[], commit_time=111)
         self.backend.repos["/"] = MemoryRepo.init_bare(
             [commit], {"refs/heads/master": commit.id})
-        outf = StringIO()
-        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        outf = BytesIO()
+        exitcode = self.serve_command(ReceivePackHandler, ["/"], BytesIO("0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
         self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",

@@ -861,7 +861,7 @@ else:
             channel = client.get_transport().open_session()
 
             # Run commands
-            apply(channel.exec_command, command)
+            channel.exec_command(*command)
 
             return ParamikoWrapper(client, channel,
                     progress_stderr=progress_stderr)

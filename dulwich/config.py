@@ -28,9 +28,11 @@ import errno
 import os
 import re
 
-from collections import OrderedDict
+from collections import (
+    OrderedDict,
+    MutableMapping,
+    )
 
-from UserDict import DictMixin
 
 from dulwich.file import GitFile
 
@@ -93,8 +95,7 @@ class Config(object):
         raise NotImplementedError(self.itersections)
 
 
-
-class ConfigDict(Config, DictMixin):
+class ConfigDict(Config, MutableMapping):
     """Git configuration stored in a dictionary."""
 
     def __init__(self, values=None):
@@ -112,13 +113,19 @@ class ConfigDict(Config, DictMixin):
             other._values == self._values)
 
     def __getitem__(self, key):
-        return self._values[key]
+        return self._values.__getitem__(key)
 
     def __setitem__(self, key, value):
-        self._values[key] = value
+        return self._values.__setitem__(key, value)
 
-    def keys(self):
-        return self._values.keys()
+    def __delitem__(self, key):
+        return self._values.__delitem__(key)
+
+    def __iter__(self):
+        return self._values.__iter__()
+
+    def __len__(self):
+        return self._values.__len__()
 
     @classmethod
     def _parse_setting(cls, name):

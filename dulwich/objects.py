@@ -804,8 +804,14 @@ def sorted_tree_items(entries, name_order):
         yield TreeEntry(name, mode, hexsha)
 
 
-def cmp_entry((name1, value1), (name2, value2)):
-    """Compare two tree entries in tree order."""
+def cmp_entry(entry1, entry2):
+    """Compare two tree entries in tree order.
+
+    :param entry1: (name, value) tuple
+    :param entry2: (name, value) tuple
+    """
+    (name1, value1) = entry1
+    (name2, value2) = entry2
     if stat.S_ISDIR(value1[0]):
         name1 += "/"
     if stat.S_ISDIR(value2[0]):

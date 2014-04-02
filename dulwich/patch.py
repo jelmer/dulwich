@@ -114,20 +114,20 @@ def is_binary(content):
     return '\0' in content[:FIRST_FEW_BYTES]
 
 
-def write_object_diff(f, store, (old_path, old_mode, old_id),
-                                (new_path, new_mode, new_id),
-                                diff_binary=False):
+def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """Write the diff for an object.
 
     :param f: File-like object to write to
     :param store: Store to retrieve objects from, if necessary
-    :param (old_path, old_mode, old_hexsha): Old file
-    :param (new_path, new_mode, new_hexsha): New file
+    :param old_file: (path, mode, hexsha) tuple
+    :param new_file: (path, mode, hexsha) tuple
     :param diff_binary: Whether to diff files even if they
         are considered binary files by is_binary().
 
     :note: the tuple elements should be None for nonexistant files
     """
+    (old_path, old_mode, old_id) = old_file
+    (new_path, new_mode, new_id) = new_file
     def shortid(hexsha):
         if hexsha is None:
             return "0" * 7
@@ -177,16 +177,17 @@ def write_object_diff(f, store, (old_path, old_mode, old_id),
             old_path, new_path))
 
 
-def write_blob_diff(f, (old_path, old_mode, old_blob),
-                       (new_path, new_mode, new_blob)):
+def write_blob_diff(f, old_file, new_file):
     """Write diff file header.
 
     :param f: File-like object to write to
-    :param (old_path, old_mode, old_blob): Previous file (None if nonexisting)
-    :param (new_path, new_mode, new_blob): New file (None if nonexisting)
+    :param old_file: (path, mode, hexsha) tuple (None if nonexisting)
+    :param new_file: (path, mode, hexsha) tuple (None if nonexisting)
 
     :note: The use of write_object_diff is recommended over this function.
     """
+    (old_path, old_mode, old_blob) = old_file
+    (new_path, new_mode, new_blob) = new_file
     def blob_id(blob):
         if blob is None:
             return "0" * 7

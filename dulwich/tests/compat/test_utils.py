@@ -87,6 +87,6 @@ class GitVersionTests(TestCase):
             self.assertRequireSucceeds((1, 7, 0, 2))
             self.assertRequireFails((1, 7, 0, 3))
             self.assertRequireFails((1, 7, 1))
-        except SkipTest, e:
+        except SkipTest as e:
             # This test is designed to catch all SkipTest exceptions.
             self.fail('Test unexpectedly skipped: %s' % e)

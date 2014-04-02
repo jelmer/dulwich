@@ -146,7 +146,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/master failed to update', str(e))
             self.assertEqual({'refs/heads/branch': 'ok',
                               'refs/heads/master': 'non-fast-forward'},
@@ -160,7 +160,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/branch, refs/heads/master failed to '
                              'update', str(e))
             self.assertEqual({'refs/heads/branch': 'non-fast-forward',

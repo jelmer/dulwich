@@ -13,7 +13,7 @@ r = Repo(".")
 
 w = r.get_walker(paths=[sys.argv[1]], max_entries=1)
 try:
-    c = iter(w).next().commit
+    c = next(iter(w)).commit
 except StopIteration:
     print("No file %s anywhere in history." % sys.argv[1])
 else:

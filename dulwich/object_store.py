@@ -185,12 +185,12 @@ class BaseObjectStore(object):
         :return: List of SHAs that are in common
         """
         haves = []
-        sha = graphwalker.next()
+        sha = next(graphwalker)
         while sha:
             if sha in self:
                 haves.append(sha)
                 graphwalker.ack(sha)
-            sha = graphwalker.next()
+            sha = next(graphwalker)
         return haves
 
     def generate_pack_contents(self, have, want, progress=None):

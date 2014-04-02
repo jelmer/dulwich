@@ -474,7 +474,7 @@ class ProtocolGraphWalker(object):
         if not self._cached:
             if not self._impl and self.http_req:
                 return None
-            return self._impl.next()
+            return next(self._impl)
         self._cache_index += 1
         if self._cache_index > len(self._cache):
             return None

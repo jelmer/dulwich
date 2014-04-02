@@ -386,32 +386,32 @@ class ObjectStoreGraphWalkerTests(TestCase):
 
     def test_empty(self):
         gw = self.get_walker([], {})
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
         gw.ack("aa" * 20)
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_descends(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", gw.next())
-        self.assertEqual("b", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("b", next(gw))
 
     def test_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_parent_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", gw.next())
+        self.assertEqual("a", next(gw))
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_child_ack_later(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": ["c"], "c": []})
-        self.assertEqual("a", gw.next())
-        self.assertEqual("b", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("b", next(gw))
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_only_once(self):
         # a  b
@@ -426,9 +426,9 @@ class ObjectStoreGraphWalkerTests(TestCase):
                 "d": ["e"],
                 "e": [],
                 })
-        self.assertEqual("a", gw.next())
-        self.assertEqual("c", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("c", next(gw))
         gw.ack("a")
-        self.assertEqual("b", gw.next())
-        self.assertEqual("d", gw.next())
-        self.assertIs(None, gw.next())
+        self.assertEqual("b", next(gw))
+        self.assertEqual("d", next(gw))
+        self.assertIs(None, next(gw))

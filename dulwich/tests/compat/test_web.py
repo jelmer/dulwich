@@ -42,26 +42,11 @@ from dulwich.web import (
 
 from dulwich.tests.compat.server_utils import (
     ServerTests,
-    ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
     )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     )
-
-
-if getattr(simple_server.WSGIServer, 'shutdown', None):
-    WSGIServer = WSGIServerLogger
-else:
-    class WSGIServer(ShutdownServerMixIn, WSGIServerLogger):
-        """Subclass of WSGIServer that can be shut down."""
-
-        def __init__(self, *args, **kwargs):
-            # BaseServer is old-style so we have to call both __init__s
-            ShutdownServerMixIn.__init__(self)
-            simple_server.WSGIServer.__init__(self, *args, **kwargs)
-
-        serve = ShutdownServerMixIn.serve_forever
 
 
 class WebTests(ServerTests):
@@ -77,7 +62,7 @@ class WebTests(ServerTests):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
-          'localhost', 0, app, server_class=WSGIServer,
+          'localhost', 0, app, server_class=WSGIServerLogger,
           handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()

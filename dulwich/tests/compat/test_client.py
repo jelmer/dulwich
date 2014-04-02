@@ -53,9 +53,6 @@ from dulwich.tests.compat.utils import (
     import_repo_to_dir,
     run_git_or_fail,
     )
-from dulwich.tests.compat.server_utils import (
-    ShutdownServerMixIn,
-    )
 
 
 class DulwichClientTestBase(object):
@@ -437,18 +434,6 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
 
     def get_url(self):
         return 'http://%s:%s/' % (self.server_name, self.server_port)
-
-
-if not getattr(HTTPGitServer, 'shutdown', None):
-    _HTTPGitServer = HTTPGitServer
-
-    class TCPGitServer(ShutdownServerMixIn, HTTPGitServer):
-        """Subclass of HTTPGitServer that can be shut down."""
-
-        def __init__(self, *args, **kwargs):
-            # BaseServer is old-style so we have to call both __init__s
-            ShutdownServerMixIn.__init__(self)
-            _HTTPGitServer.__init__(self, *args, **kwargs)
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):

@@ -19,7 +19,7 @@
 """Tests for the object store interface."""
 
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import shutil
 import tempfile
@@ -217,7 +217,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         blob = make_object(Blob, data='yummy data')
         o.add_object(blob)
 
-        f = StringIO()
+        f = BytesIO()
         entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'more yummy data')),
           ], store=o)
@@ -315,7 +315,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         blob = make_object(Blob, data='yummy data')
         o.add_object(blob)
 
-        f = StringIO()
+        f = BytesIO()
         entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'more yummy data')),
           ], store=o)

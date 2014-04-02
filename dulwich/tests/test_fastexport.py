@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from cStringIO import StringIO
+from io import BytesIO
 import stat
 
 
@@ -47,7 +47,7 @@ class GitFastExporterTests(TestCase):
     def setUp(self):
         super(GitFastExporterTests, self).setUp()
         self.store = MemoryObjectStore()
-        self.stream = StringIO()
+        self.stream = BytesIO()
         try:
             from dulwich.fastexport import GitFastExporter
         except ImportError:
@@ -126,7 +126,7 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(commit, self.repo["refs/heads/foo"])
 
     def test_import_stream(self):
-        markers = self.processor.import_stream(StringIO("""blob
+        markers = self.processor.import_stream(BytesIO("""blob
 mark :1
 data 11
 text for a

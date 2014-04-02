@@ -33,9 +33,7 @@ a pointer in to the corresponding packfile.
 from collections import defaultdict
 
 import binascii
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 from collections import (
     deque,
     )
@@ -742,7 +740,7 @@ class PackStreamReader(object):
             self.read_some = read_some
         self.sha = sha1()
         self._offset = 0
-        self._rbuf = StringIO()
+        self._rbuf = BytesIO()
         # trailer is a deque to avoid memory allocation on small reads
         self._trailer = deque()
         self._zlib_bufsize = zlib_bufsize
@@ -795,7 +793,7 @@ class PackStreamReader(object):
         if buf_len >= size:
             return self._rbuf.read(size)
         buf_data = self._rbuf.read()
-        self._rbuf = StringIO()
+        self._rbuf = BytesIO()
         return buf_data + self._read(self.read_all, size - buf_len)
 
     def recv(self, size):
@@ -804,7 +802,7 @@ class PackStreamReader(object):
         if buf_len:
             data = self._rbuf.read(size)
             if size >= buf_len:
-                self._rbuf = StringIO()
+                self._rbuf = BytesIO()
             return data
         return self._read(self.read_some, size)
 
@@ -841,7 +839,7 @@ class PackStreamReader(object):
             unpacked.offset = offset
 
             # prepend any unused data to current read buffer
-            buf = StringIO()
+            buf = BytesIO()
             buf.write(unused)
             buf.write(self._rbuf.read())
             buf.seek(0)

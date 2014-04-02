@@ -18,7 +18,7 @@
 
 """Tests for reading and writing configuration files."""
 
-from cStringIO import StringIO
+from io import BytesIO
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
@@ -37,7 +37,7 @@ from dulwich.tests import TestCase
 class ConfigFileTests(TestCase):
 
     def from_file(self, text):
-        return ConfigFile.from_file(StringIO(text))
+        return ConfigFile.from_file(BytesIO(text))
 
     def test_empty(self):
         ConfigFile()
@@ -129,21 +129,21 @@ class ConfigFileTests(TestCase):
 
     def test_write_to_file_empty(self):
         c = ConfigFile()
-        f = StringIO()
+        f = BytesIO()
         c.write_to_file(f)
         self.assertEqual("", f.getvalue())
 
     def test_write_to_file_section(self):
         c = ConfigFile()
         c.set(("core", ), "foo", "bar")
-        f = StringIO()
+        f = BytesIO()
         c.write_to_file(f)
         self.assertEqual("[core]\n\tfoo = bar\n", f.getvalue())
 
     def test_write_to_file_subsection(self):
         c = ConfigFile()
         c.set(("branch", "blie"), "foo", "bar")
-        f = StringIO()
+        f = BytesIO()
         c.write_to_file(f)
         self.assertEqual("[branch \"blie\"]\n\tfoo = bar\n", f.getvalue())
 

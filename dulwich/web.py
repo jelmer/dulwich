@@ -19,7 +19,7 @@
 
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import shutil
 import tempfile
 import gzip
@@ -170,7 +170,7 @@ def get_info_refs(req, backend, mat):
             return
         req.nocache()
         write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
-        proto = ReceivableProtocol(StringIO().read, write)
+        proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               http_req=req, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)

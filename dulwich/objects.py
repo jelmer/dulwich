@@ -20,9 +20,7 @@
 """Access to base git objects."""
 
 import binascii
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 from collections import namedtuple
 import os
 import posixpath
@@ -590,7 +588,7 @@ def _parse_message(chunks):
         order read from the text, possibly including duplicates. Includes a
         field named None for the freeform tag/commit text.
     """
-    f = StringIO("".join(chunks))
+    f = BytesIO("".join(chunks))
     k = None
     v = ""
     for l in f:

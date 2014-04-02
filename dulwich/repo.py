@@ -27,7 +27,7 @@ local disk (Repo).
 
 """
 
-from cStringIO import StringIO
+from io import BytesIO
 import errno
 import os
 
@@ -176,7 +176,7 @@ class BaseRepo(object):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        f = StringIO()
+        f = BytesIO()
         cf = ConfigFile()
         cf.set("core", "repositoryformatversion", "0")
         cf.set("core", "filemode", "true")
@@ -934,7 +934,7 @@ class MemoryRepo(BaseRepo):
         contents = self._named_files.get(path, None)
         if contents is None:
             return None
-        return StringIO(contents)
+        return BytesIO(contents)
 
     def open_index(self):
         """Fail to open index for this repo, since it is bare.

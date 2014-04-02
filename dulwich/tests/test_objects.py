@@ -22,7 +22,7 @@
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
 
-from cStringIO import StringIO
+from io import BytesIO
 import datetime
 from itertools import (
     permutations,
@@ -124,7 +124,7 @@ class BlobReadTests(TestCase):
     def test_legacy_from_file(self):
         b1 = Blob.from_string("foo")
         b_raw = b1.as_legacy_object()
-        b2 = b1.from_file(StringIO(b_raw))
+        b2 = b1.from_file(BytesIO(b_raw))
         self.assertEqual(b1, b2)
 
     def test_chunks(self):
@@ -251,7 +251,7 @@ class ShaFileTests(TestCase):
         # zlib on some systems uses smaller buffers,
         # resulting in a different header.
         # See https://github.com/libgit2/libgit2/pull/464
-        sf = ShaFile.from_file(StringIO(small_buffer_zlib_object))
+        sf = ShaFile.from_file(BytesIO(small_buffer_zlib_object))
         self.assertEqual(sf.type_name, "tag")
         self.assertEqual(sf.tagger, " <@localhost>")
 

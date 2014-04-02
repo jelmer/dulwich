@@ -792,8 +792,8 @@ def sorted_tree_items(entries, name_order):
     :param entries: Dictionary mapping names to (mode, sha) tuples
     :return: Iterator over (name, mode, hexsha)
     """
-    cmp_func = name_order and cmp_entry_name_order or cmp_entry
-    for name, entry in sorted(entries.iteritems(), cmp=cmp_func):
+    key_func = name_order and key_entry_name_order or key_entry
+    for name, entry in sorted(entries.iteritems(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         if not isinstance(mode, int) and not isinstance(mode, long):
@@ -804,24 +804,20 @@ def sorted_tree_items(entries, name_order):
         yield TreeEntry(name, mode, hexsha)
 
 
-def cmp_entry(entry1, entry2):
-    """Compare two tree entries in tree order.
+def key_entry(entry):
+    """Sort key for tree entry.
 
-    :param entry1: (name, value) tuple
-    :param entry2: (name, value) tuple
+    :param entry: (name, value) tuplee
     """
-    (name1, value1) = entry1
-    (name2, value2) = entry2
-    if stat.S_ISDIR(value1[0]):
-        name1 += "/"
-    if stat.S_ISDIR(value2[0]):
-        name2 += "/"
-    return cmp(name1, name2)
+    (name, value) = entry
+    if stat.S_ISDIR(value[0]):
+        name += "/"
+    return name
 
 
-def cmp_entry_name_order(entry1, entry2):
-    """Compare two tree entries in name order."""
-    return cmp(entry1[0], entry2[0])
+def key_entry_name_order(entry):
+    """Sort key for tree entry in name order."""
+    return entry[0]
 
 
 class Tree(ShaFile):
@@ -941,7 +937,7 @@ class Tree(ShaFile):
 
             entry = (name, (mode, sha))
             if last:
-                if cmp_entry(last, entry) > 0:
+                if key_entry(last) > key_entry(entry):
                     raise ObjectFormatException('entries not sorted')
                 if name == last[0]:
                     raise ObjectFormatException('duplicate entry %s' % name)

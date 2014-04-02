@@ -126,7 +126,7 @@ class HandlerTestCase(TestCase):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except GitProtocolError, e:
+        except GitProtocolError as e:
             self.fail(e)
 
     def test_capability_line(self):

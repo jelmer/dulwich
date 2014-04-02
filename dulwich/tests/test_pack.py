@@ -108,7 +108,7 @@ class PackTests(TestCase):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except ChecksumMismatch, e:
+        except ChecksumMismatch as e:
             self.fail(e)
 
 
@@ -518,7 +518,7 @@ class BaseTestPackIndexWriting(object):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except ChecksumMismatch, e:
+        except ChecksumMismatch as e:
             self.fail(e)
 
     def index(self, filename, entries, pack_checksum):
@@ -988,7 +988,7 @@ class DeltaChainIteratorTests(TestCase):
         try:
             list(pack_iter._walk_all_chains())
             self.fail()
-        except KeyError, e:
+        except KeyError as e:
             self.assertEqual(([blob.id],), e.args)
 
     def test_bad_ext_ref_thin_pack(self):
@@ -1006,5 +1006,5 @@ class DeltaChainIteratorTests(TestCase):
         try:
             list(pack_iter._walk_all_chains())
             self.fail()
-        except KeyError, e:
+        except KeyError as e:
             self.assertEqual((sorted([b2.id, b3.id]),), e.args)

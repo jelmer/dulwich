@@ -551,7 +551,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['pre-commit'].execute()
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -594,7 +594,7 @@ class BaseRepo(object):
             c.message = self.hooks['commit-msg'].execute(message)
             if c.message is None:
                 c.message = message
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, message not modified
             c.message = message
@@ -620,7 +620,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['post-commit'].execute()
-        except HookError, e:  # silent failure
+        except HookError as e:  # silent failure
             warnings.warn("post-commit hook failed: %s" % e, UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -708,7 +708,7 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
         try:
             return open(os.path.join(self.controldir(), path), 'rb')
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -820,7 +820,7 @@ class Repo(BaseRepo):
         path = os.path.join(self._controldir, 'config')
         try:
             return ConfigFile.from_path(path)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             ret = ConfigFile()
@@ -839,7 +839,7 @@ class Repo(BaseRepo):
                 return f.read()
             finally:
                 f.close()
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             return None

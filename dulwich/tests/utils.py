@@ -280,7 +280,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         commit_num = commit[0]
         try:
             parent_ids = [nums[pn] for pn in commit[1:]]
-        except KeyError, e:
+        except KeyError as e:
             missing_parent, = e.args
             raise ValueError('Unknown parent %i' % missing_parent)
 

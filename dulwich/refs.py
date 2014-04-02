@@ -649,7 +649,7 @@ class DiskRefsContainer(RefsContainer):
             # may only be packed
             try:
                 os.remove(filename)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
             self._remove_packed_ref(name)
@@ -667,7 +667,7 @@ def _split_ref_line(line):
     sha, name = fields
     try:
         hex_to_sha(sha)
-    except (AssertionError, TypeError), e:
+    except (AssertionError, TypeError) as e:
         raise PackedRefsException(e)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name '%s'" % name)
@@ -708,7 +708,7 @@ def read_packed_refs_with_peeled(f):
                 raise PackedRefsException("unexpected peeled ref line")
             try:
                 hex_to_sha(l[1:])
-            except (AssertionError, TypeError), e:
+            except (AssertionError, TypeError) as e:
                 raise PackedRefsException(e)
             sha, name = _split_ref_line(last)
             last = None

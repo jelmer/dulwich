@@ -19,7 +19,7 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import BaseHTTPServer
 import SimpleHTTPServer
 import copy
@@ -169,7 +169,7 @@ class DulwichClientTestBase(object):
 
     def test_archive(self):
         c = self._client()
-        f = StringIO()
+        f = BytesIO()
         c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
         f.seek(0)
         tf = tarfile.open(fileobj=f)

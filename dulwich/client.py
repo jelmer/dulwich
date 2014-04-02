@@ -38,7 +38,7 @@ Known capabilities that are not supported:
 
 __docformat__ = 'restructuredText'
 
-from cStringIO import StringIO
+from io import BytesIO
 import dulwich
 import select
 import socket
@@ -997,7 +997,7 @@ class HttpGitClient(GitClient):
             return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
@@ -1034,7 +1034,7 @@ class HttpGitClient(GitClient):
             return refs
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(req_proto,
             negotiated_capabilities, graph_walker, wants,

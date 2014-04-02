@@ -19,9 +19,7 @@
 """Tests for the index."""
 
 
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 import os
 import shutil
 import stat
@@ -163,21 +161,21 @@ class CleanupModeTests(TestCase):
 class WriteCacheTimeTests(TestCase):
 
     def test_write_string(self):
-        f = StringIO()
+        f = BytesIO()
         self.assertRaises(TypeError, write_cache_time, f, "foo")
 
     def test_write_int(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, 434343)
         self.assertEqual(struct.pack(">LL", 434343, 0), f.getvalue())
 
     def test_write_tuple(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, (434343, 21))
         self.assertEqual(struct.pack(">LL", 434343, 21), f.getvalue())
 
     def test_write_float(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, 434343.000000021)
         self.assertEqual(struct.pack(">LL", 434343, 21), f.getvalue())
 

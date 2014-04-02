@@ -21,7 +21,7 @@
 """Git object store interfaces and implementation."""
 
 
-from cStringIO import StringIO
+from io import BytesIO
 import errno
 import itertools
 import os
@@ -765,9 +765,9 @@ class MemoryObjectStore(BaseObjectStore):
         :return: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
-        f = StringIO()
+        f = BytesIO()
         def commit():
-            p = PackData.from_file(StringIO(f.getvalue()), f.tell())
+            p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
             for obj in PackInflater.for_pack_data(p):
                 self._data[obj.id] = obj

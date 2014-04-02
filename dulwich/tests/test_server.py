@@ -18,7 +18,7 @@
 
 """Tests for the smart protocol server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import tempfile
 
@@ -868,8 +868,8 @@ class ServeCommandTests(TestCase):
         commit = make_commit(id=ONE, parents=[], commit_time=111)
         self.backend.repos["/"] = MemoryRepo.init_bare(
             [commit], {"refs/heads/master": commit.id})
-        outf = StringIO()
-        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        outf = BytesIO()
+        exitcode = self.serve_command(ReceivePackHandler, ["/"], BytesIO("0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
         self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",

@@ -447,7 +447,7 @@ class DiskRefsContainer(RefsContainer):
                     return {}
                 raise
             try:
-                first_line = iter(f).next().rstrip()
+                first_line = next(iter(f)).rstrip()
                 if (first_line.startswith("# pack-refs") and " peeled" in
                         first_line):
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
@@ -498,7 +498,7 @@ class DiskRefsContainer(RefsContainer):
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
-                    return header + iter(f).next().rstrip("\r\n")
+                    return header + next(iter(f)).rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))

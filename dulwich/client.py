@@ -362,7 +362,7 @@ class GitClient(object):
         for want in wants[1:]:
             proto.write_pkt_line('want %s\n' % want)
         proto.write_pkt_line(None)
-        have = graph_walker.next()
+        have = next(graph_walker)
         while have:
             proto.write_pkt_line('have %s\n' % have)
             if can_read():
@@ -378,7 +378,7 @@ class GitClient(object):
                         raise AssertionError(
                             "%s not in ('continue', 'ready', 'common)" %
                             parts[2])
-            have = graph_walker.next()
+            have = next(graph_walker)
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,

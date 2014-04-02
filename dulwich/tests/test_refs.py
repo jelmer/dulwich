@@ -299,7 +299,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # ensure HEAD was not modified
         f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
-        self.assertEqual('ref: refs/heads/master', iter(f).next().rstrip('\n'))
+        self.assertEqual('ref: refs/heads/master', next(iter(f)).rstrip('\n'))
         f.close()
 
         # ensure the symbolic link was written through

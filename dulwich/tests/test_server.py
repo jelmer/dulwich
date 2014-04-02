@@ -566,7 +566,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertAck(None, 'nak')
 
     def assertNextEquals(self, sha):
-        self.assertEqual(sha, self._impl.next())
+        self.assertEqual(sha, next(self._impl))
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):

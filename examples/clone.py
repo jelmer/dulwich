@@ -13,7 +13,7 @@ opts, args = getopt(sys.argv, "", [])
 opts = dict(opts)
 
 if len(args) < 2:
-    print "usage: %s host:path path" % (args[0], )
+    print("usage: %s host:path path" % (args[0], ))
     sys.exit(1)
 
 # Connect to the remote repository

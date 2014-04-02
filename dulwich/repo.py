@@ -27,7 +27,7 @@ local disk (Repo).
 
 """
 
-from cStringIO import StringIO
+from io import BytesIO
 import errno
 import os
 
@@ -176,7 +176,7 @@ class BaseRepo(object):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        f = StringIO()
+        f = BytesIO()
         cf = ConfigFile()
         cf.set("core", "repositoryformatversion", "0")
         cf.set("core", "filemode", "true")
@@ -246,7 +246,7 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if type(wants) is not list:
+        if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
         shallows = getattr(graph_walker, 'shallow', frozenset())
@@ -439,7 +439,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if type(name) != str:
+        if not isinstance(name, str):
             raise TypeError("'name' must be bytestring, not %.80s" %
                     type(name).__name__)
         if len(name) in (20, 40):
@@ -551,7 +551,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['pre-commit'].execute()
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -594,7 +594,7 @@ class BaseRepo(object):
             c.message = self.hooks['commit-msg'].execute(message)
             if c.message is None:
                 c.message = message
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, message not modified
             c.message = message
@@ -620,7 +620,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['post-commit'].execute()
-        except HookError, e:  # silent failure
+        except HookError as e:  # silent failure
             warnings.warn("post-commit hook failed: %s" % e, UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -708,7 +708,7 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
         try:
             return open(os.path.join(self.controldir(), path), 'rb')
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -820,7 +820,7 @@ class Repo(BaseRepo):
         path = os.path.join(self._controldir, 'config')
         try:
             return ConfigFile.from_path(path)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             ret = ConfigFile()
@@ -839,7 +839,7 @@ class Repo(BaseRepo):
                 return f.read()
             finally:
                 f.close()
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             return None
@@ -934,7 +934,7 @@ class MemoryRepo(BaseRepo):
         contents = self._named_files.get(path, None)
         if contents is None:
             return None
-        return StringIO(contents)
+        return BytesIO(contents)
 
     def open_index(self):
         """Fail to open index for this repo, since it is bare.

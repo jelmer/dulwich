@@ -20,7 +20,7 @@
 """Compatibility tests for dulwich repositories."""
 
 
-from cStringIO import StringIO
+from io import BytesIO
 import itertools
 import os
 
@@ -54,7 +54,7 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def _parse_refs(self, output):
         refs = {}
-        for line in StringIO(output):
+        for line in BytesIO(output):
             fields = line.rstrip('\n').split(' ')
             self.assertEqual(3, len(fields))
             refname, type_name, sha = fields
@@ -64,7 +64,7 @@ class ObjectStoreTestCase(CompatTestCase):
         return refs
 
     def _parse_objects(self, output):
-        return set(s.rstrip('\n').split(' ')[0] for s in StringIO(output))
+        return set(s.rstrip('\n').split(' ')[0] for s in BytesIO(output))
 
     def test_bare(self):
         self.assertTrue(self._repo.bare)

@@ -19,7 +19,7 @@
 
 """Tests for dulwich.refs."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import tempfile
 
@@ -90,16 +90,16 @@ class PackedRefsFileTests(TestCase):
                           '%s bad/../refname' % ONES)
 
     def test_read_without_peeled(self):
-        f = StringIO('# comment\n%s ref/1\n%s ref/2' % (ONES, TWOS))
+        f = BytesIO('# comment\n%s ref/1\n%s ref/2' % (ONES, TWOS))
         self.assertEqual([(ONES, 'ref/1'), (TWOS, 'ref/2')],
                          list(read_packed_refs(f)))
 
     def test_read_without_peeled_errors(self):
-        f = StringIO('%s ref/1\n^%s' % (ONES, TWOS))
+        f = BytesIO('%s ref/1\n^%s' % (ONES, TWOS))
         self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
 
     def test_read_with_peeled(self):
-        f = StringIO('%s ref/1\n%s ref/2\n^%s\n%s ref/4' % (
+        f = BytesIO('%s ref/1\n%s ref/2\n^%s\n%s ref/4' % (
           ONES, TWOS, THREES, FOURS))
         self.assertEqual([
           (ONES, 'ref/1', None),
@@ -108,14 +108,14 @@ class PackedRefsFileTests(TestCase):
           ], list(read_packed_refs_with_peeled(f)))
 
     def test_read_with_peeled_errors(self):
-        f = StringIO('^%s\n%s ref/1' % (TWOS, ONES))
+        f = BytesIO('^%s\n%s ref/1' % (TWOS, ONES))
         self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
 
-        f = StringIO('%s ref/1\n^%s\n^%s' % (ONES, TWOS, THREES))
+        f = BytesIO('%s ref/1\n^%s\n^%s' % (ONES, TWOS, THREES))
         self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
 
     def test_write_with_peeled(self):
-        f = StringIO()
+        f = BytesIO()
         write_packed_refs(f, {'ref/1': ONES, 'ref/2': TWOS},
                           {'ref/1': THREES})
         self.assertEqual(
@@ -123,7 +123,7 @@ class PackedRefsFileTests(TestCase):
           ONES, THREES, TWOS), f.getvalue())
 
     def test_write_without_peeled(self):
-        f = StringIO()
+        f = BytesIO()
         write_packed_refs(f, {'ref/1': ONES, 'ref/2': TWOS})
         self.assertEqual("%s ref/1\n%s ref/2\n" % (ONES, TWOS), f.getvalue())
 
@@ -299,7 +299,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # ensure HEAD was not modified
         f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
-        self.assertEqual('ref: refs/heads/master', iter(f).next().rstrip('\n'))
+        self.assertEqual('ref: refs/heads/master', next(iter(f)).rstrip('\n'))
         f.close()
 
         # ensure the symbolic link was written through
@@ -429,14 +429,14 @@ class InfoRefsContainerTests(TestCase):
 
     def test_invalid_refname(self):
         text = _TEST_REFS_SERIALIZED + '00' * 20 + '\trefs/stash\n'
-        refs = InfoRefsContainer(StringIO(text))
+        refs = InfoRefsContainer(BytesIO(text))
         expected_refs = dict(_TEST_REFS)
         del expected_refs['HEAD']
         expected_refs["refs/stash"] = "00" * 20
         self.assertEqual(expected_refs, refs.as_dict())
 
     def test_keys(self):
-        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         actual_keys = set(refs.keys())
         self.assertEqual(set(refs.allkeys()), actual_keys)
         # ignore the symref loop if it exists
@@ -454,19 +454,19 @@ class InfoRefsContainerTests(TestCase):
                          sorted(refs.keys('refs/tags')))
 
     def test_as_dict(self):
-        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         # refs/heads/loop does not show up even if it exists
         expected_refs = dict(_TEST_REFS)
         del expected_refs['HEAD']
         self.assertEqual(expected_refs, refs.as_dict())
 
     def test_contains(self):
-        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         self.assertTrue('refs/heads/master' in refs)
         self.assertFalse('refs/heads/bar' in refs)
 
     def test_get_peeled(self):
-        refs = InfoRefsContainer(StringIO(_TEST_REFS_SERIALIZED))
+        refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         # refs/heads/loop does not show up even if it exists
         self.assertEqual(
             _TEST_REFS['refs/heads/master'],

@@ -177,8 +177,8 @@ def cleanup_mode(mode):
         return stat.S_IFDIR
     elif S_ISGITLINK(mode):
         return S_IFGITLINK
-    ret = stat.S_IFREG | 0644
-    ret |= (mode & 0111)
+    ret = stat.S_IFREG | 0o644
+    ret |= (mode & 0o111)
     return ret
 
 
@@ -325,7 +325,7 @@ def commit_tree(object_store, blobs):
     def build_tree(path):
         tree = Tree()
         for basename, entry in trees[path].iteritems():
-            if type(entry) == dict:
+            if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))
             else:

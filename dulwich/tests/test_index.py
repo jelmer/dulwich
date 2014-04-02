@@ -19,9 +19,7 @@
 """Tests for the index."""
 
 
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 import os
 import shutil
 import stat
@@ -145,39 +143,39 @@ class CommitTreeTests(TestCase):
 class CleanupModeTests(TestCase):
 
     def test_file(self):
-        self.assertEqual(0100644, cleanup_mode(0100000))
+        self.assertEqual(0o100644, cleanup_mode(0o100000))
 
     def test_executable(self):
-        self.assertEqual(0100755, cleanup_mode(0100711))
+        self.assertEqual(0o100755, cleanup_mode(0o100711))
 
     def test_symlink(self):
-        self.assertEqual(0120000, cleanup_mode(0120711))
+        self.assertEqual(0o120000, cleanup_mode(0o120711))
 
     def test_dir(self):
-        self.assertEqual(0040000, cleanup_mode(040531))
+        self.assertEqual(0o040000, cleanup_mode(0o40531))
 
     def test_submodule(self):
-        self.assertEqual(0160000, cleanup_mode(0160744))
+        self.assertEqual(0o160000, cleanup_mode(0o160744))
 
 
 class WriteCacheTimeTests(TestCase):
 
     def test_write_string(self):
-        f = StringIO()
+        f = BytesIO()
         self.assertRaises(TypeError, write_cache_time, f, "foo")
 
     def test_write_int(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, 434343)
         self.assertEqual(struct.pack(">LL", 434343, 0), f.getvalue())
 
     def test_write_tuple(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, (434343, 21))
         self.assertEqual(struct.pack(">LL", 434343, 21), f.getvalue())
 
     def test_write_float(self):
-        f = StringIO()
+        f = BytesIO()
         write_cache_time(f, 434343.000000021)
         self.assertEqual(struct.pack(">LL", 434343, 21), f.getvalue())
 
@@ -185,14 +183,14 @@ class WriteCacheTimeTests(TestCase):
 class IndexEntryFromStatTests(TestCase):
 
     def test_simple(self):
-        st = os.stat_result((16877, 131078, 64769L,
+        st = os.stat_result((16877, 131078, 64769,
                 154, 1000, 1000, 12288,
                 1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(st, "22" * 20, 0)
         self.assertEqual(entry, (
             1324180496,
             1324180496,
-            64769L,
+            64769,
             131078,
             16384,
             1000,
@@ -202,15 +200,15 @@ class IndexEntryFromStatTests(TestCase):
             0))
 
     def test_override_mode(self):
-        st = os.stat_result((stat.S_IFREG + 0644, 131078, 64769L,
+        st = os.stat_result((stat.S_IFREG + 0o644, 131078, 64769,
                 154, 1000, 1000, 12288,
                 1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(st, "22" * 20, 0,
-                mode=stat.S_IFREG + 0755)
+                mode=stat.S_IFREG + 0o755)
         self.assertEqual(entry, (
             1324180496,
             1324180496,
-            64769L,
+            64769,
             131078,
             33261,
             1000,
@@ -270,9 +268,9 @@ class BuildIndexTests(TestCase):
         filee = Blob.from_string('d')
 
         tree = Tree()
-        tree['a'] = (stat.S_IFREG | 0644, filea.id)
-        tree['b'] = (stat.S_IFREG | 0644, fileb.id)
-        tree['c/d'] = (stat.S_IFREG | 0644, filed.id)
+        tree['a'] = (stat.S_IFREG | 0o644, filea.id)
+        tree['b'] = (stat.S_IFREG | 0o644, fileb.id)
+        tree['c/d'] = (stat.S_IFREG | 0o644, filed.id)
         tree['c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
         repo.object_store.add_objects([(o, None)
@@ -289,21 +287,21 @@ class BuildIndexTests(TestCase):
         apath = os.path.join(repo.path, 'a')
         self.assertTrue(os.path.exists(apath))
         self.assertReasonableIndexEntry(index['a'],
-            stat.S_IFREG | 0644, 6, filea.id)
+            stat.S_IFREG | 0o644, 6, filea.id)
         self.assertFileContents(apath, 'file a')
 
         # fileb
         bpath = os.path.join(repo.path, 'b')
         self.assertTrue(os.path.exists(bpath))
         self.assertReasonableIndexEntry(index['b'],
-            stat.S_IFREG | 0644, 6, fileb.id)
+            stat.S_IFREG | 0o644, 6, fileb.id)
         self.assertFileContents(bpath, 'file b')
 
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
         self.assertReasonableIndexEntry(index['c/d'], 
-            stat.S_IFREG | 0644, 6, filed.id)
+            stat.S_IFREG | 0o644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d

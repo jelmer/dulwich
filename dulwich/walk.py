@@ -303,7 +303,7 @@ class Walker(object):
     def _next(self):
         max_entries = self.max_entries
         while max_entries is None or self._num_entries < max_entries:
-            entry = self._queue.next()
+            entry = next(self._queue)
             if entry is not None:
                 self._out_queue.append(entry)
             if entry is None or len(self._out_queue) > _MAX_EXTRA_COMMITS:

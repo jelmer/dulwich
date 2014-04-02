@@ -55,10 +55,10 @@ which claims that the client doesn't have any objects::
    ...     def next(self): pass
 
 With the ``determine_wants`` function in place, we can now fetch a pack,
-which we will write to a ``StringIO`` object::
+which we will write to a ``BytesIO`` object::
 
-   >>> from cStringIO import StringIO
-   >>> f = StringIO()
+   >>> from io import BytesIO
+   >>> f = BytesIO()
    >>> remote_refs = client.fetch_pack("/", determine_wants,
    ...    DummyGraphWalker(), pack_data=f.write)
 

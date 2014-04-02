@@ -22,8 +22,9 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
+from io import BytesIO
 from difflib import SequenceMatcher
-import rfc822
+import email.parser
 import time
 
 from dulwich.objects import (
@@ -246,7 +247,8 @@ def git_am_patch_split(f):
     :param f: File-like object to parse
     :return: Tuple with commit object, diff contents and git version
     """
-    msg = rfc822.Message(f)
+    parser = email.parser.Parser()
+    msg = parser.parse(f)
     c = Commit()
     c.author = msg["from"]
     c.committer = msg["from"]
@@ -259,7 +261,10 @@ def git_am_patch_split(f):
         subject = msg["subject"][close+2:]
     c.message = subject.replace("\n", "") + "\n"
     first = True
-    for l in f:
+
+    body = BytesIO(msg.get_payload())
+
+    for l in body:
         if l == "---\n":
             break
         if first:
@@ -271,12 +276,12 @@ def git_am_patch_split(f):
         else:
             c.message += l
     diff = ""
-    for l in f:
+    for l in body:
         if l == "-- \n":
             break
         diff += l
     try:
-        version = f.next().rstrip("\n")
+        version = next(body).rstrip("\n")
     except StopIteration:
         version = None
     return c, diff, version

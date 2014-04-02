@@ -30,7 +30,7 @@ try:
     if rst2pdf.version >= '0.16':
         extensions.append('rst2pdf.pdfbuilder')
 except ImportError:
-    print "[NOTE] In order to build PDF you need rst2pdf with version >=0.16"
+    print("[NOTE] In order to build PDF you need rst2pdf with version >=0.16")
 
 
 autoclass_content = "both"

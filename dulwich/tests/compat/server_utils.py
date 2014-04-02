@@ -246,8 +246,9 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
                      if c != 'side-band-64k')
 
 
-def ignore_error((e_type, e_value, e_tb)):
+def ignore_error(error):
     """Check whether this error is safe to ignore."""
+    (e_type, e_value, e_tb) = error
     return (issubclass(e_type, socket.error) and
             e_value[0] in (errno.ECONNRESET, errno.EPIPE))
 

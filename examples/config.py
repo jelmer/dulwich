@@ -9,5 +9,5 @@ from dulwich.repo import Repo
 repo = Repo(".")
 config = repo.get_config()
 
-print config.get("core", "filemode")
-print config.get(("remote", "origin"), "url")
+print(config.get("core", "filemode"))
+print(config.get(("remote", "origin"), "url"))

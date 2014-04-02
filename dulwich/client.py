@@ -38,7 +38,7 @@ Known capabilities that are not supported:
 
 __docformat__ = 'restructuredText'
 
-from cStringIO import StringIO
+from io import BytesIO
 import dulwich
 import select
 import socket
@@ -350,13 +350,13 @@ class GitClient(object):
         :param can_read: function that returns a boolean that indicates
             whether there is extra graph data to read on proto
         """
-        assert isinstance(wants, list) and type(wants[0]) == str
+        assert isinstance(wants, list) and isinstance(wants[0], str)
         proto.write_pkt_line('want %s %s\n' % (
             wants[0], ' '.join(capabilities)))
         for want in wants[1:]:
             proto.write_pkt_line('want %s\n' % want)
         proto.write_pkt_line(None)
-        have = graph_walker.next()
+        have = next(graph_walker)
         while have:
             proto.write_pkt_line('have %s\n' % have)
             if can_read():
@@ -372,7 +372,7 @@ class GitClient(object):
                         raise AssertionError(
                             "%s not in ('continue', 'ready', 'common)" %
                             parts[2])
-            have = graph_walker.next()
+            have = next(graph_walker)
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
@@ -855,7 +855,7 @@ else:
             channel = client.get_transport().open_session()
 
             # Run commands
-            apply(channel.exec_command, command)
+            channel.exec_command(*command)
 
             return ParamikoWrapper(client, channel,
                     progress_stderr=progress_stderr)
@@ -991,7 +991,7 @@ class HttpGitClient(GitClient):
             return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
@@ -1028,7 +1028,7 @@ class HttpGitClient(GitClient):
             return refs
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(req_proto,
             negotiated_capabilities, graph_walker, wants,

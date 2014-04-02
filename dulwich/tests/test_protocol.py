@@ -19,7 +19,7 @@
 """Tests for the smart protocol utility functions."""
 
 
-from StringIO import StringIO
+from io import BytesIO
 
 from dulwich.errors import (
     HangupException,
@@ -105,16 +105,16 @@ class ProtocolTests(BaseProtocolTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        self.rout = StringIO()
-        self.rin = StringIO()
+        self.rout = BytesIO()
+        self.rin = BytesIO()
         self.proto = Protocol(self.rin.read, self.rout.write)
 
 
-class ReceivableStringIO(StringIO):
-    """StringIO with socket-like recv semantics for testing."""
+class ReceivableBytesIO(BytesIO):
+    """BytesIO with socket-like recv semantics for testing."""
 
     def __init__(self):
-        StringIO.__init__(self)
+        BytesIO.__init__(self)
         self.allow_read_past_eof = False
 
     def recv(self, size):
@@ -132,8 +132,8 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        self.rout = StringIO()
-        self.rin = ReceivableStringIO()
+        self.rout = BytesIO()
+        self.rin = ReceivableBytesIO()
         self.proto = ReceivableProtocol(self.rin.recv, self.rout.write)
         self.proto._rbufsize = 8
 
@@ -151,7 +151,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         data = ''
         # We ask for 8 bytes each time and actually read 7, so it should take
         # exactly 10 iterations.
-        for _ in xrange(10):
+        for _ in range(10):
             data += self.proto.recv(10)
         # any more reads would block
         self.assertRaises(AssertionError, self.proto.recv, 10)
@@ -176,17 +176,17 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
 
     def test_mixed(self):
         # arbitrary non-repeating string
-        all_data = ','.join(str(i) for i in xrange(100))
+        all_data = ','.join(str(i) for i in range(100))
         self.rin.write(all_data)
         self.rin.seek(0)
         data = ''
 
-        for i in xrange(1, 100):
+        for i in range(1, 100):
             data += self.proto.recv(i)
             # if we get to the end, do a non-blocking read instead of blocking
             if len(data) + i > len(all_data):
                 data += self.proto.recv(i)
-                # ReceivableStringIO leaves off the last byte unless we ask
+                # ReceivableBytesIO leaves off the last byte unless we ask
                 # nicely
                 data += self.proto.recv(1)
                 break
@@ -232,7 +232,7 @@ class BufferedPktLineWriterTests(TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        self._output = StringIO()
+        self._output = BytesIO()
         self._writer = BufferedPktLineWriter(self._output.write, bufsize=16)
 
     def assertOutputEquals(self, expected):

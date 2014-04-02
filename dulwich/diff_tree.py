@@ -23,7 +23,7 @@ from collections import (
     namedtuple,
     )
 
-from cStringIO import StringIO
+from io import BytesIO
 import itertools
 import stat
 
@@ -281,7 +281,7 @@ def _count_blocks(obj):
     :return: A dict of block hashcode -> total bytes occurring.
     """
     block_counts = defaultdict(int)
-    block = StringIO()
+    block = BytesIO()
     n = 0
 
     # Cache attrs as locals to avoid expensive lookups in the inner loop.

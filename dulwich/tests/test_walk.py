@@ -47,7 +47,7 @@ from dulwich.walk import (
     _topo_reorder
     )
 from dulwich.tests import TestCase
-from utils import (
+from dulwich.tests.utils import (
     F,
     make_object,
     build_commit_graph,

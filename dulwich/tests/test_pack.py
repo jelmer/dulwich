@@ -71,7 +71,7 @@ from dulwich.pack import (
 from dulwich.tests import (
     TestCase,
     )
-from utils import (
+from dulwich.tests.utils import (
     make_object,
     build_pack,
     )

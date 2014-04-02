@@ -325,7 +325,7 @@ def commit_tree(object_store, blobs):
     def build_tree(path):
         tree = Tree()
         for basename, entry in trees[path].iteritems():
-            if type(entry) == dict:
+            if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))
             else:

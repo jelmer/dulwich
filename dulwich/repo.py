@@ -246,7 +246,7 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if type(wants) is not list:
+        if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
         shallows = getattr(graph_walker, 'shallow', frozenset())
@@ -439,7 +439,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if type(name) != str:
+        if not isinstance(name, str):
             raise TypeError("'name' must be bytestring, not %.80s" %
                     type(name).__name__)
         if len(name) in (20, 40):

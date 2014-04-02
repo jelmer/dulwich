@@ -85,7 +85,7 @@ class CommitTests(PorcelainTestCase):
         self.repo.refs["refs/heads/foo"] = c3.id
         sha = porcelain.commit(self.repo.path, message="Some message",
                 author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
-        self.assertTrue(type(sha) is str)
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 
@@ -331,7 +331,7 @@ class CommitTreeTests(PorcelainTestCase):
             self.repo.path, t.id, message="Withcommit.",
             author="Joe <joe@example.com>",
             committer="Jane <jane@example.com>")
-        self.assertTrue(type(sha) is str)
+        self.assertTrue(isinstance(sha, str))
         self.assertEquals(len(sha), 40)
 
 

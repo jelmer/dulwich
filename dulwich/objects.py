@@ -291,7 +291,7 @@ class ShaFile(object):
 
     def set_raw_string(self, text, sha=None):
         """Set the contents of this object from a serialized string."""
-        if type(text) != str:
+        if not isinstance(text, str):
             raise TypeError(text)
         self.set_raw_chunks([text], sha)
 
@@ -740,7 +740,7 @@ class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
 
     def in_path(self, path):
         """Return a copy of this entry with the given path prepended."""
-        if type(self.path) != str:
+        if not isinstance(self.path, str):
             raise TypeError
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
@@ -879,7 +879,7 @@ class Tree(ShaFile):
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
         """
-        if type(name) is int and type(mode) is str:
+        if isinstance(name, int) and isinstance(mode, str):
             (name, mode) = (mode, name)
             warnings.warn("Please use Tree.add(name, mode, hexsha)",
                 category=DeprecationWarning, stacklevel=2)

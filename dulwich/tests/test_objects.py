@@ -56,7 +56,7 @@ from dulwich.objects import (
 from dulwich.tests import (
     TestCase,
     )
-from utils import (
+from dulwich.tests.utils import (
     make_commit,
     make_object,
     functest_builder,

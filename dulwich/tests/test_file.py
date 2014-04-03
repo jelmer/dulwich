@@ -21,6 +21,7 @@ import os
 import shutil
 import sys
 import tempfile
+import io
 
 from dulwich.file import GitFile, fancy_rename
 from dulwich.tests import (
@@ -112,7 +113,7 @@ class GitFileTests(TestCase):
 
     def test_readonly(self):
         f = GitFile(self.path('foo'), 'rb')
-        self.assertTrue(isinstance(f, file))
+        self.assertTrue(isinstance(f, io.IOBase))
         self.assertEqual('foo contents', f.read())
         self.assertEqual('', f.read())
         f.seek(4)

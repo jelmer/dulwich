@@ -318,7 +318,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
     """
     assert start <= end
     while start <= end:
-        i = (start + end)/2
+        i = (start + end) // 2
         file_sha = unpack_name(i)
         x = cmp(file_sha, sha)
         if x < 0:

@@ -83,5 +83,8 @@ setup(name='dulwich',
               include_dirs=include_dirs),
       ],
       distclass=DulwichDistribution,
+      include_package_data=True,
+      use_2to3=True,
+      convert_2to3_doctests=['../docs/*', '../docs/tutorial/*', ],
       **setup_kwargs
       )

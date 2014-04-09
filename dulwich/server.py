@@ -480,6 +480,8 @@ class ProtocolGraphWalker(object):
             return None
         return self._cache[self._cache_index]
 
+    __next__ = next
+
     def read_proto_line(self, allowed):
         """Read a line from the wire.
 
@@ -599,6 +601,8 @@ class SingleAckGraphWalkerImpl(object):
         elif command == 'have':
             return sha
 
+    __next__ = next
+
 
 class MultiAckGraphWalkerImpl(object):
     """Graph walker implementation that speaks the multi-ack protocol."""
@@ -637,6 +641,8 @@ class MultiAckGraphWalkerImpl(object):
                     # blind ack
                     self.walker.send_ack(sha, 'continue')
                 return sha
+
+    __next__ = next
 
 
 class MultiAckDetailedGraphWalkerImpl(object):
@@ -678,6 +684,8 @@ class MultiAckDetailedGraphWalkerImpl(object):
                     # inflight
                     self.walker.send_ack(sha, 'ready')
                 return sha
+
+    __next__ = next
 
 
 class ReceivePackHandler(Handler):

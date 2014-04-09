@@ -181,6 +181,8 @@ class _CommitTimeQueue(object):
         self._is_finished = True
         return None
 
+    __next__ = next
+
 
 class Walker(object):
     """Object for performing a walk of commits in a store.

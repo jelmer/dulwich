@@ -334,10 +334,6 @@ class GitClient(object):
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
             self._report_status_parser.check()
-        # wait for EOF before returning
-        data = proto.read()
-        if data:
-            raise SendPackError('Unexpected response %r' % data)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):
@@ -400,10 +396,6 @@ class GitClient(object):
                 # Just ignore progress data
                 progress = lambda x: None
             self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
-            # wait for EOF before returning
-            data = proto.read()
-            if data:
-                raise Exception('Unexpected response %r' % data)
         else:
             while True:
                 data = proto.read(rbufsize)

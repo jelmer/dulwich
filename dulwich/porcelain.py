@@ -16,25 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
-import sys
-import time
-
-from dulwich import index
-from dulwich.client import get_transport_and_path
-from dulwich.errors import (
-    SendPackError,
-    UpdateRefsError,
-    )
-from dulwich.objects import (
-    Tag,
-    parse_timezone,
-    )
-from dulwich.objectspec import parse_object
-from dulwich.patch import write_tree_diff
-from dulwich.repo import (BaseRepo, Repo)
-from dulwich.server import update_server_info as server_update_server_info
-
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
 Currently implemented:
@@ -60,6 +41,25 @@ Differences in behaviour are considered bugs.
 """
 
 __docformat__ = 'restructuredText'
+
+import os
+import sys
+import time
+
+from dulwich import index
+from dulwich.client import get_transport_and_path
+from dulwich.errors import (
+    SendPackError,
+    UpdateRefsError,
+    )
+from dulwich.objects import (
+    Tag,
+    parse_timezone,
+    )
+from dulwich.objectspec import parse_object
+from dulwich.patch import write_tree_diff
+from dulwich.repo import (BaseRepo, Repo)
+from dulwich.server import update_server_info as server_update_server_info
 
 
 def open_repo(path_or_repo):
@@ -435,7 +435,7 @@ def push(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
-    :param repo : Path to repository
+    :param repo: Path to repository
     :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
     :param outstream: A stream file to write output
@@ -465,7 +465,7 @@ def push(repo, remote_location, refs_path,
 
 def pull(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
-    """ Pull from remote via dulwich.client
+    """Pull from remote via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote

@@ -21,6 +21,9 @@
    wants when talking to empty repository.
    (Damien Tournoud)
 
+ * Various changes to improve compatibility with
+   Python 3. (Gary van der Merwe)
+
  BUG FIXES
 
  * Support unseekable 'wsgi.input' streams.

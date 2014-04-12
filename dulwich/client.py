@@ -334,10 +334,6 @@ class GitClient(object):
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
             self._report_status_parser.check()
-        # wait for EOF before returning
-        data = proto.read()
-        if data:
-            raise SendPackError('Unexpected response %r' % data)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):

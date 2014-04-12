@@ -36,6 +36,10 @@
  * Fix handling of `reset` command in dulwich.fastexport.
    (Jelmer Vernooij, #1249029)
 
+ * In client, don't wait for server to close connection
+   first. Fixes hang when used against GitHub
+   server implementation. (Siddharth Agarwal)
+
  API CHANGES
 
   * Drop support for Python 2.6. (Jelmer Vernooij)

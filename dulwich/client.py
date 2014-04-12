@@ -400,10 +400,6 @@ class GitClient(object):
                 # Just ignore progress data
                 progress = lambda x: None
             self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
-            # wait for EOF before returning
-            data = proto.read()
-            if data:
-                raise Exception('Unexpected response %r' % data)
         else:
             while True:
                 data = proto.read(rbufsize)

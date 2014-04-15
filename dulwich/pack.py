@@ -1264,6 +1264,8 @@ class DeltaChainIterator(object):
             return
 
         for base_sha, pending in sorted(self._pending_ref.iteritems()):
+            if base_sha not in self._pending_ref:
+                continue
             try:
                 type_num, chunks = self._resolve_ext_ref(base_sha)
             except KeyError:

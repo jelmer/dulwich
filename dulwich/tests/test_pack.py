@@ -956,6 +956,22 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([1, 0], entries, pack_iter)
         self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
+    def test_ext_ref_chain_degenerate(self):
+        # Test a degenerate case where the sender is sending a REF_DELTA
+        # object that expands to an object already in the repository.
+        blob, = self.store_blobs(['blob'])
+        blob2, = self.store_blobs(['blob2'])
+        assert blob.id < blob2.id
+
+        f = StringIO()
+        entries = build_pack(f, [
+          (REF_DELTA, (blob.id, 'blob2')),
+          (REF_DELTA, (0, 'blob3')),
+          ], store=self.store)
+        pack_iter = self.make_pack_iter(f)
+        self.assertEntriesMatch([0, 1], entries, pack_iter)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
+
     def test_ext_ref_multiple_times(self):
         blob, = self.store_blobs(['blob'])
         f = BytesIO()

@@ -963,7 +963,7 @@ class DeltaChainIteratorTests(TestCase):
         blob2, = self.store_blobs(['blob2'])
         assert blob.id < blob2.id
 
-        f = StringIO()
+        f = BytesIO()
         entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'blob2')),
           (REF_DELTA, (0, 'blob3')),

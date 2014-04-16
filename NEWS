@@ -40,6 +40,10 @@
    first. Fixes hang when used against GitHub
    server implementation. (Siddharth Agarwal)
 
+ * DeltaChainIterator: fix a corner case where an object is inflated as an
+   object already in the repository.
+   (Damien Tournoud, #135)
+
  API CHANGES
 
   * Drop support for Python 2.6. (Jelmer Vernooij)

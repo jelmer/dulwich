@@ -303,7 +303,10 @@ class PackBasedObjectStore(BaseObjectStore):
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is None or self._pack_cache_stale():
+        if self._pack_cache is not None and self._pack_cache_stale():
+            self.close()
+
+        if self._pack_cache is None:
             self._pack_cache = self._load_packs()
         return self._pack_cache
 

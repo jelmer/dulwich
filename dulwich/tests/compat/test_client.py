@@ -178,7 +178,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_incremental_fetch_pack(self):
@@ -188,7 +189,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
         refs = c.fetch(self._build_path('/dest'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_fetch_pack_no_side_band_64k(self):
@@ -196,7 +198,8 @@ class DulwichClientTestBase(object):
         c._fetch_capabilities.remove('side-band-64k')
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_fetch_pack_zero_sha(self):

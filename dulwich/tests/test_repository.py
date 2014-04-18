@@ -339,13 +339,13 @@ class RepositoryTests(TestCase):
 
         try:
             r1 = Repo.init_bare(r1_dir)
-            map(lambda c: r1.object_store.add_object(r_base.get_object(c)), \
-                r1_commits)
+            for c in r1_commits:
+                r1.object_store.add_object(r_base.get_object(c))
             r1.refs['HEAD'] = r1_commits[0]
 
             r2 = Repo.init_bare(r2_dir)
-            map(lambda c: r2.object_store.add_object(r_base.get_object(c)), \
-                r2_commits)
+            for c in r2_commits:
+                r2.object_store.add_object(r_base.get_object(c))
             r2.refs['HEAD'] = r2_commits[0]
 
             # Finally, the 'real' testing!

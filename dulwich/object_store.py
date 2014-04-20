@@ -251,7 +251,7 @@ class BaseObjectStore(object):
 class PackBasedObjectStore(BaseObjectStore):
 
     def __init__(self):
-        self._pack_cache = None
+        self._pack_cache = {}
 
     @property
     def alternates(self):
@@ -279,36 +279,30 @@ class PackBasedObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def _load_packs(self):
-        raise NotImplementedError(self._load_packs)
-
     def _pack_cache_stale(self):
         """Check whether the pack cache is stale."""
         raise NotImplementedError(self._pack_cache_stale)
 
-    def _add_known_pack(self, pack):
+    def _add_known_pack(self, base_name, pack):
         """Add a newly appeared pack to the cache by path.
 
         """
-        if self._pack_cache is not None:
-            self._pack_cache.append(pack)
+        self._pack_cache[base_name] = pack
 
     def close(self):
         pack_cache = self._pack_cache
-        self._pack_cache = None
+        self._pack_cache = {}
         while pack_cache:
-            pack = pack_cache.pop()
+            (name, pack) = pack_cache.popitem()
             pack.close()
 
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is not None and self._pack_cache_stale():
-            self.close()
+        if self._pack_cache is None or self._pack_cache_stale():
+            self._update_pack_cache()
 
-        if self._pack_cache is None:
-            self._pack_cache = self._load_packs()
-        return self._pack_cache
+        return self._pack_cache.values()
 
     def _iter_alternate_objects(self):
         """Iterate over the SHAs of all the objects in alternate stores."""
@@ -413,6 +407,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._pack_cache_time = 0
+        self._pack_cache = {}
         self._alternates = None
 
     def __repr__(self):
@@ -478,31 +473,29 @@ class DiskObjectStore(PackBasedObjectStore):
             path = os.path.join(self.path, path)
         self.alternates.append(DiskObjectStore(path))
 
-    def _load_packs(self):
-        pack_files = []
+    def _update_pack_cache(self):
         try:
-            self._pack_cache_time = os.stat(self.pack_dir).st_mtime
             pack_dir_contents = os.listdir(self.pack_dir)
-            for name in pack_dir_contents:
-                # TODO: verify that idx exists first
-                if name.startswith("pack-") and name.endswith(".pack"):
-                    filename = os.path.join(self.pack_dir, name)
-                    pack_files.append((os.stat(filename).st_mtime, filename))
         except OSError as e:
             if e.errno == errno.ENOENT:
-                return []
+                self._pack_cache_time = 0
+                self.close()
+                return
             raise
-        pack_files.sort(reverse=True)
-        suffix_len = len(".pack")
-        result = []
-        try:
-            for _, f in pack_files:
-                result.append(Pack(f[:-suffix_len]))
-        except:
-            for p in result:
-                p.close()
-            raise
-        return result
+        self._pack_cache_time = os.stat(self.pack_dir).st_mtime
+        pack_files = set()
+        for name in pack_dir_contents:
+            # TODO: verify that idx exists first
+            if name.startswith("pack-") and name.endswith(".pack"):
+                pack_files.add(name[:-len(".pack")])
+
+        # Open newly appeared pack files
+        for f in pack_files:
+            if f not in self._pack_cache:
+                self._pack_cache[f] = Pack(os.path.join(self.pack_dir, f))
+        # Remove disappeared pack files
+        for f in set(self._pack_cache) - pack_files:
+            self._pack_cache.pop(f).close()
 
     def _pack_cache_stale(self):
         try:
@@ -589,7 +582,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Add the pack to the store and return it.
         final_pack = Pack(pack_base_name)
         final_pack.check_length_and_checksum()
-        self._add_known_pack(final_pack)
+        self._add_known_pack(pack_base_name, final_pack)
         return final_pack
 
     def add_thin_pack(self, read_all, read_some):
@@ -640,7 +633,7 @@ class DiskObjectStore(PackBasedObjectStore):
             p.close()
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
-        self._add_known_pack(final_pack)
+        self._add_known_pack(basename, final_pack)
         return final_pack
 
     def add_pack(self):

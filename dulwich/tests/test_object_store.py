@@ -329,11 +329,9 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual((Blob.type_num, 'more yummy data'),
                              o.get_raw(packed_blob_sha))
         finally:
-            # FIXME: DiskObjectStore should have close() which do the following:
-            for p in o._pack_cache or []:
-                p.close()
-
+            o.close()
             pack.close()
+
 
 class TreeLookupPathTests(TestCase):
 

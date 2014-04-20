@@ -130,7 +130,7 @@ class ServerTests(object):
         run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
                         cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
-        self._old_repo.object_store._pack_cache = None
+        self._old_repo.object_store._pack_cache_time = 0
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_fetch_from_dulwich_no_op(self):
@@ -144,7 +144,7 @@ class ServerTests(object):
         run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
                         cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
-        self._old_repo.object_store._pack_cache = None
+        self._old_repo.object_store._pack_cache_time = 0
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_clone_from_dulwich_empty(self):

@@ -44,6 +44,10 @@
    object already in the repository.
    (Damien Tournoud, #135)
 
+ * Stop leaking file handles during pack reload. (Damien Tournoud)
+
+ * Avoid reopening packs during pack cache reload. (Jelmer Vernooij)
+
  API CHANGES
 
   * Drop support for Python 2.6. (Jelmer Vernooij)

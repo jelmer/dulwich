@@ -1,3 +1,9 @@
+dulwich (0.9.6-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 23 Apr 2014 01:41:04 +0200
+
 dulwich (0.9.5-2) unstable; urgency=medium
 
   * Don't write progress to stderr during testsuite run, as autopkgtest

@@ -19,7 +19,7 @@
 """Tests for the object store interface."""
 
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import shutil
 import tempfile
@@ -109,15 +109,15 @@ class ObjectStoreTests(object):
         for blob in [blob_a1, blob_a2, blob_b]:
             self.store.add_object(blob)
 
-        blobs_1 = [('a', blob_a1.id, 0100644), ('b', blob_b.id, 0100644)]
+        blobs_1 = [('a', blob_a1.id, 0o100644), ('b', blob_b.id, 0o100644)]
         tree1_id = commit_tree(self.store, blobs_1)
-        blobs_2 = [('a', blob_a2.id, 0100644), ('b', blob_b.id, 0100644)]
+        blobs_2 = [('a', blob_a2.id, 0o100644), ('b', blob_b.id, 0o100644)]
         tree2_id = commit_tree(self.store, blobs_2)
-        change_a = (('a', 'a'), (0100644, 0100644), (blob_a1.id, blob_a2.id))
+        change_a = (('a', 'a'), (0o100644, 0o100644), (blob_a1.id, blob_a2.id))
         self.assertEqual([change_a],
                           list(self.store.tree_changes(tree1_id, tree2_id)))
         self.assertEqual(
-          [change_a, (('b', 'b'), (0100644, 0100644), (blob_b.id, blob_b.id))],
+          [change_a, (('b', 'b'), (0o100644, 0o100644), (blob_b.id, blob_b.id))],
           list(self.store.tree_changes(tree1_id, tree2_id,
                                        want_unchanged=True)))
 
@@ -129,11 +129,11 @@ class ObjectStoreTests(object):
             self.store.add_object(blob)
 
         blobs = [
-          ('a', blob_a.id, 0100644),
-          ('ad/b', blob_b.id, 0100644),
-          ('ad/bd/c', blob_c.id, 0100755),
-          ('ad/c', blob_c.id, 0100644),
-          ('c', blob_c.id, 0100644),
+          ('a', blob_a.id, 0o100644),
+          ('ad/b', blob_b.id, 0o100644),
+          ('ad/bd/c', blob_c.id, 0o100755),
+          ('ad/c', blob_c.id, 0o100644),
+          ('c', blob_c.id, 0o100644),
           ]
         tree_id = commit_tree(self.store, blobs)
         self.assertEqual([TreeEntry(p, m, h) for (p, h, m) in blobs],
@@ -147,9 +147,9 @@ class ObjectStoreTests(object):
             self.store.add_object(blob)
 
         blobs = [
-          ('a', blob_a.id, 0100644),
-          ('ad/b', blob_b.id, 0100644),
-          ('ad/bd/c', blob_c.id, 0100755),
+          ('a', blob_a.id, 0o100644),
+          ('ad/b', blob_b.id, 0o100644),
+          ('ad/bd/c', blob_c.id, 0o100755),
           ]
         tree_id = commit_tree(self.store, blobs)
         tree = self.store[tree_id]
@@ -157,12 +157,12 @@ class ObjectStoreTests(object):
         tree_bd = self.store[tree_ad['bd'][1]]
 
         expected = [
-          TreeEntry('', 0040000, tree_id),
-          TreeEntry('a', 0100644, blob_a.id),
-          TreeEntry('ad', 0040000, tree_ad.id),
-          TreeEntry('ad/b', 0100644, blob_b.id),
-          TreeEntry('ad/bd', 0040000, tree_bd.id),
-          TreeEntry('ad/bd/c', 0100755, blob_c.id),
+          TreeEntry('', 0o040000, tree_id),
+          TreeEntry('a', 0o100644, blob_a.id),
+          TreeEntry('ad', 0o040000, tree_ad.id),
+          TreeEntry('ad/b', 0o100644, blob_b.id),
+          TreeEntry('ad/bd', 0o040000, tree_bd.id),
+          TreeEntry('ad/bd/c', 0o100755, blob_c.id),
           ]
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
@@ -217,7 +217,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         blob = make_object(Blob, data='yummy data')
         o.add_object(blob)
 
-        f = StringIO()
+        f = BytesIO()
         entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'more yummy data')),
           ], store=o)
@@ -315,7 +315,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         blob = make_object(Blob, data='yummy data')
         o.add_object(blob)
 
-        f = StringIO()
+        f = BytesIO()
         entries = build_pack(f, [
           (REF_DELTA, (blob.id, 'more yummy data')),
           ], store=o)
@@ -329,11 +329,9 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual((Blob.type_num, 'more yummy data'),
                              o.get_raw(packed_blob_sha))
         finally:
-            # FIXME: DiskObjectStore should have close() which do the following:
-            for p in o._pack_cache or []:
-                p.close()
-
+            o.close()
             pack.close()
+
 
 class TreeLookupPathTests(TestCase):
 
@@ -347,11 +345,11 @@ class TreeLookupPathTests(TestCase):
             self.store.add_object(blob)
 
         blobs = [
-          ('a', blob_a.id, 0100644),
-          ('ad/b', blob_b.id, 0100644),
-          ('ad/bd/c', blob_c.id, 0100755),
-          ('ad/c', blob_c.id, 0100644),
-          ('c', blob_c.id, 0100644),
+          ('a', blob_a.id, 0o100644),
+          ('ad/b', blob_b.id, 0o100644),
+          ('ad/bd/c', blob_c.id, 0o100755),
+          ('ad/c', blob_c.id, 0o100644),
+          ('c', blob_c.id, 0o100644),
           ]
         self.tree_id = commit_tree(self.store, blobs)
 
@@ -386,32 +384,32 @@ class ObjectStoreGraphWalkerTests(TestCase):
 
     def test_empty(self):
         gw = self.get_walker([], {})
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
         gw.ack("aa" * 20)
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_descends(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", gw.next())
-        self.assertEqual("b", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("b", next(gw))
 
     def test_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_parent_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", gw.next())
+        self.assertEqual("a", next(gw))
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_child_ack_later(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": ["c"], "c": []})
-        self.assertEqual("a", gw.next())
-        self.assertEqual("b", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("b", next(gw))
         gw.ack("a")
-        self.assertIs(None, gw.next())
+        self.assertIs(None, next(gw))
 
     def test_only_once(self):
         # a  b
@@ -426,9 +424,9 @@ class ObjectStoreGraphWalkerTests(TestCase):
                 "d": ["e"],
                 "e": [],
                 })
-        self.assertEqual("a", gw.next())
-        self.assertEqual("c", gw.next())
+        self.assertEqual("a", next(gw))
+        self.assertEqual("c", next(gw))
         gw.ack("a")
-        self.assertEqual("b", gw.next())
-        self.assertEqual("d", gw.next())
-        self.assertIs(None, gw.next())
+        self.assertEqual("b", next(gw))
+        self.assertEqual("d", next(gw))
+        self.assertIs(None, next(gw))

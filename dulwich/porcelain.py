@@ -16,22 +16,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
-import sys
-import time
-
-from dulwich import index
-from dulwich.client import get_transport_and_path
-from dulwich.objects import (
-    Commit,
-    Tag,
-    parse_timezone,
-    )
-from dulwich.objectspec import parse_object
-from dulwich.patch import write_tree_diff
-from dulwich.repo import (BaseRepo, Repo)
-from dulwich.server import update_server_info as server_update_server_info
-
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
 Currently implemented:
@@ -42,7 +26,10 @@ Currently implemented:
  * commit-tree
  * diff-tree
  * init
- * remove
+ * list-tags
+ * pull
+ * push
+ * rm
  * reset
  * rev-list
  * tag
@@ -54,6 +41,25 @@ Differences in behaviour are considered bugs.
 """
 
 __docformat__ = 'restructuredText'
+
+import os
+import sys
+import time
+
+from dulwich import index
+from dulwich.client import get_transport_and_path
+from dulwich.errors import (
+    SendPackError,
+    UpdateRefsError,
+    )
+from dulwich.objects import (
+    Tag,
+    parse_timezone,
+    )
+from dulwich.objectspec import parse_object
+from dulwich.patch import write_tree_diff
+from dulwich.repo import (BaseRepo, Repo)
+from dulwich.server import update_server_info as server_update_server_info
 
 
 def open_repo(path_or_repo):
@@ -187,10 +193,19 @@ def add(repo=".", paths=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add
+    :param paths: Paths to add.  No value passed stages all modified files.
     """
-    # FIXME: Support patterns, directories, no argument.
+    # FIXME: Support patterns, directories.
     r = open_repo(repo)
+    if not paths:
+        # If nothing is specified, add all non-ignored files.
+        paths = []
+        for dirpath, dirnames, filenames in os.walk(r.path):
+            # Skip .git and below.
+            if '.git' in dirnames:
+                dirnames.remove('.git')
+            for filename in filenames:
+                paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
     r.stage(paths)
 
 
@@ -343,29 +358,60 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author, message):
+def tag(repo, tag, author=None, message=None, annotated=False,
+        objectish="HEAD", tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
     :param tag: tag string
-    :param author: tag author
-    :param repo: tag message
+    :param author: tag author (optional, if annotated is set)
+    :param message: tag message (optional)
+    :param annotated: whether to create an annotated tag
+    :param objectish: object the tag should point at, defaults to HEAD
+    :param tag_time: Optional time for annotated tag
+    :param tag_timezone: Optional timezone for annotated tag
     """
 
     r = open_repo(repo)
+    object = parse_object(r, objectish)
 
-    # Create the tag object
-    tag_obj = Tag()
-    tag_obj.tagger = author
-    tag_obj.message = message
-    tag_obj.name = tag
-    tag_obj.object = (Commit, r.refs['HEAD'])
-    tag_obj.tag_time = int(time.time())
-    tag_obj.tag_timezone = parse_timezone('-0200')[0]
+    if annotated:
+        # Create the tag object
+        tag_obj = Tag()
+        if author is None:
+            # TODO(jelmer): Don't use repo private method.
+            author = r._get_user_identity()
+        tag_obj.tagger = author
+        tag_obj.message = message
+        tag_obj.name = tag
+        tag_obj.object = (type(object), object.id)
+        tag_obj.tag_time = tag_time
+        if tag_time is None:
+            tag_time = int(time.time())
+        if tag_timezone is None:
+            # TODO(jelmer) Use current user timezone rather than UTC
+            tag_timezone = 0
+        elif isinstance(tag_timezone, str):
+            tag_timezone = parse_timezone(tag_timezone)
+        tag_obj.tag_timezone = tag_timezone
+        r.object_store.add_object(tag_obj)
+        tag_id = tag_obj.id
+    else:
+        tag_id = object.id
 
-    # Add tag to the object store
-    r.object_store.add_object(tag_obj)
-    r.refs['refs/tags/' + tag] = tag_obj.id
+    r.refs['refs/tags/' + tag] = tag_id
+
+
+def list_tags(repo, outstream=sys.stdout):
+    """List all tags.
+
+    :param repo: Path to repository
+    :param outstream: Stream to write tags to
+    """
+    r = open_repo(repo)
+    tags = list(r.refs.as_dict("refs/tags"))
+    tags.sort()
+    return tags
 
 
 def reset(repo, mode, committish="HEAD"):
@@ -382,4 +428,60 @@ def reset(repo, mode, committish="HEAD"):
 
     indexfile = r.index_path()
     tree = r[committish].tree
+    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def push(repo, remote_location, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
+    """Remote push with dulwich via dulwich.client
+
+    :param repo: Path to repository
+    :param remote_location: Location of the remote
+    :param refs_path: relative path to the refs to push to remote
+    :param outstream: A stream file to write output
+    :param errstream: A stream file to write errors
+    """
+
+    # Open the repo
+    r = open_repo(repo)
+
+    # Get the client and path
+    client, path = get_transport_and_path(remote_location)
+
+    def update_refs(refs):
+        new_refs = r.get_refs()
+        refs[refs_path] = new_refs['HEAD']
+        del new_refs['HEAD']
+        return refs
+
+    try:
+        client.send_pack(path, update_refs,
+            r.object_store.generate_pack_contents, progress=errstream.write)
+        outstream.write("Push to %s successful.\n" % remote_location)
+    except (UpdateRefsError, SendPackError) as e:
+        outstream.write("Push to %s failed.\n" % remote_location)
+        errstream.write("Push to %s failed -> '%s'\n" % e.message)
+
+
+def pull(repo, remote_location, refs_path,
+         outstream=sys.stdout, errstream=sys.stderr):
+    """Pull from remote via dulwich.client
+
+    :param repo: Path to repository
+    :param remote_location: Location of the remote
+    :param refs_path: relative path to the fetched refs
+    :param outstream: A stream file to write to output
+    :param errstream: A stream file to write to errors
+    """
+
+    # Open the repo
+    r = open_repo(repo)
+
+    client, path = get_transport_and_path(remote_location)
+    remote_refs = client.fetch(path, r, progress=errstream.write)
+    r['HEAD'] = remote_refs[refs_path]
+
+    # Perform 'git checkout .' - syncs staged changes
+    indexfile = r.index_path()
+    tree = r["HEAD"].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

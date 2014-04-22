@@ -59,7 +59,7 @@ def check_ref_format(refname):
     if '..' in refname:
         return False
     for c in refname:
-        if ord(c) < 040 or c in '\177 ~^:?*[':
+        if ord(c) < 0o40 or c in '\177 ~^:?*[':
             return False
     if refname[-1] in '/.':
         return False
@@ -447,7 +447,7 @@ class DiskRefsContainer(RefsContainer):
                     return {}
                 raise
             try:
-                first_line = iter(f).next().rstrip()
+                first_line = next(iter(f)).rstrip()
                 if (first_line.startswith("# pack-refs") and " peeled" in
                         first_line):
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
@@ -498,7 +498,7 @@ class DiskRefsContainer(RefsContainer):
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
-                    return header + iter(f).next().rstrip("\r\n")
+                    return header + next(iter(f)).rstrip("\r\n")
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
@@ -649,7 +649,7 @@ class DiskRefsContainer(RefsContainer):
             # may only be packed
             try:
                 os.remove(filename)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
             self._remove_packed_ref(name)
@@ -667,7 +667,7 @@ def _split_ref_line(line):
     sha, name = fields
     try:
         hex_to_sha(sha)
-    except (AssertionError, TypeError), e:
+    except (AssertionError, TypeError) as e:
         raise PackedRefsException(e)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name '%s'" % name)
@@ -708,7 +708,7 @@ def read_packed_refs_with_peeled(f):
                 raise PackedRefsException("unexpected peeled ref line")
             try:
                 hex_to_sha(l[1:])
-            except (AssertionError, TypeError), e:
+            except (AssertionError, TypeError) as e:
                 raise PackedRefsException(e)
             sha, name = _split_ref_line(last)
             last = None

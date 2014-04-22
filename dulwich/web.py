@@ -19,7 +19,9 @@
 
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
-from cStringIO import StringIO
+from io import BytesIO
+import shutil
+import tempfile
 import gzip
 import os
 import re
@@ -168,7 +170,7 @@ def get_info_refs(req, backend, mat):
             return
         req.nocache()
         write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
-        proto = ReceivableProtocol(StringIO().read, write)
+        proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               http_req=req, advertise_refs=True)
         handler.proto.write_pkt_line('# service=%s\n' % service)
@@ -358,11 +360,22 @@ class GunzipFilter(object):
 
     def __call__(self, environ, start_response):
         if environ.get('HTTP_CONTENT_ENCODING', '') == 'gzip':
-            environ.pop('HTTP_CONTENT_ENCODING')
+            if hasattr(environ['wsgi.input'], 'seek'):
+                wsgi_input = environ['wsgi.input']
+            else:
+                # The gzip implementation in the standard library of Python 2.x
+                # requires the '.seek()' and '.tell()' methods to be available
+                # on the input stream.  Read the data into a temporary file to
+                # work around this limitation.
+                wsgi_input = tempfile.SpooledTemporaryFile(16 * 1024 * 1024)
+                shutil.copyfileobj(environ['wsgi.input'], wsgi_input)
+                wsgi_input.seek(0)
+
+            environ['wsgi.input'] = gzip.GzipFile(filename=None, fileobj=wsgi_input, mode='r')
+            del environ['HTTP_CONTENT_ENCODING']
             if 'CONTENT_LENGTH' in environ:
                 del environ['CONTENT_LENGTH']
-            environ['wsgi.input'] = gzip.GzipFile(filename=None,
-                fileobj=environ['wsgi.input'], mode='r')
+
         return self.app(environ, start_response)
 
 

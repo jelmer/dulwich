@@ -108,11 +108,23 @@ class RepositoryTests(TestCase):
         self.assertEqual('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                           r["refs/tags/foo"].id)
 
-    def test_getitem_notfound_unicode(self):
+    def test_getitem_unicode(self):
         r = self._repo = open_repo('a.git')
-        # In the future, this might raise a TypeError since we don't
-        # handle unicode strings properly (what encoding?) for refs.
-        self.assertRaises(KeyError, r.__getitem__, u"11" * 19 + "--")
+
+        test_keys = [
+            ('refs/heads/master', True),
+            ('a90fa2d900a17e99b433217e988c4eb4a2e9a097', True),
+            ('11' * 19 + '--', False),
+        ]
+
+        for k, contained in test_keys:
+            self.assertEqual(k in r, contained)
+
+        for k, _ in test_keys:
+            self.assertRaisesRegexp(
+                TypeError, "'name' must be bytestring, not unicode",
+                r.__getitem__, unicode(k)
+            )
 
     def test_delitem(self):
         r = self._repo = open_repo('a.git')
@@ -448,7 +460,7 @@ exit 0
 
         (fd, path) = tempfile.mkstemp(dir=repo_dir)
         post_commit_msg = """#!/bin/sh
-unlink %(file)s
+rm %(file)s
 """ % {'file': path}
 
         root_sha = r.do_commit(
@@ -603,6 +615,21 @@ class BuildRepoTests(TestCase):
             "Jelmer <jelmer@apache.org>",
             r[commit_sha].committer)
 
+    def test_commit_config_identity_in_memoryrepo(self):
+        # commit falls back to the users' identity if it wasn't specified
+        r = MemoryRepo.init_bare([], {})
+        c = r.get_config()
+        c.set(("user", ), "name", "Jelmer")
+        c.set(("user", ), "email", "jelmer@apache.org")
+
+        commit_sha = r.do_commit('message', tree=objects.Tree().id)
+        self.assertEqual(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEqual(
+            "Jelmer <jelmer@apache.org>",
+            r[commit_sha].committer)
+
     def test_commit_fail_ref(self):
         r = self._repo
 
@@ -670,6 +697,46 @@ class BuildRepoTests(TestCase):
         self.assertEqual(
             [self._root_commit, merge_1],
             r[commit_sha].parents)
+
+    def test_commit_dangling_commit(self):
+        r = self._repo
+
+        old_shas = set(r.object_store)
+        old_refs = r.get_refs()
+        commit_sha = r.do_commit('commit with no ref',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=None)
+        new_shas = set(r.object_store) - old_shas
+
+        # New sha is added, but no new refs
+        self.assertEqual(1, len(new_shas))
+        new_commit = r[new_shas.pop()]
+        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
+        self.assertEqual([], r[commit_sha].parents)
+        self.assertEqual(old_refs, r.get_refs())
+
+    def test_commit_dangling_commit_with_parents(self):
+        r = self._repo
+
+        old_shas = set(r.object_store)
+        old_refs = r.get_refs()
+        commit_sha = r.do_commit('commit with no ref',
+             committer='Test Committer <test@nodomain.com>',
+             author='Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=None, merge_heads=[self._root_commit])
+        new_shas = set(r.object_store) - old_shas
+
+        # New sha is added, but no new refs
+        self.assertEqual(1, len(new_shas))
+        new_commit = r[new_shas.pop()]
+        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
+        self.assertEqual([self._root_commit], r[commit_sha].parents)
+        self.assertEqual(old_refs, r.get_refs())
 
     def test_stage_deleted(self):
         r = self._repo

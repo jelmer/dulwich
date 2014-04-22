@@ -113,7 +113,7 @@ exit 0
 
         (fd, path) = tempfile.mkstemp()
         post_commit_msg = """#!/bin/sh
-unlink %(file)s
+rm %(file)s
 """ % {'file': path}
 
         post_commit_msg_fail = """#!/bin/sh

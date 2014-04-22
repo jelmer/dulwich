@@ -204,7 +204,7 @@ class GitImportProcessor(processor.ImportProcessor):
     def reset_handler(self, cmd):
         """Process a ResetCommand."""
         self._reset_base(cmd.from_)
-        self.rep.refs[cmd.from_] = cmd.id
+        self.repo.refs[cmd.ref] = cmd.from_
 
     def tag_handler(self, cmd):
         """Process a TagCommand."""

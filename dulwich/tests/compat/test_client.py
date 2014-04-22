@@ -19,7 +19,7 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import BaseHTTPServer
 import SimpleHTTPServer
 import copy
@@ -52,9 +52,6 @@ from dulwich.tests.compat.utils import (
     check_for_daemon,
     import_repo_to_dir,
     run_git_or_fail,
-    )
-from dulwich.tests.compat.server_utils import (
-    ShutdownServerMixIn,
     )
 
 
@@ -114,7 +111,7 @@ class DulwichClientTestBase(object):
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string('hi')
         dest.object_store.add_object(b)
-        t = index.commit_tree(dest.object_store, [('hi', b.id, 0100644)])
+        t = index.commit_tree(dest.object_store, [('hi', b.id, 0o100644)])
         c = objects.Commit()
         c.author = c.committer = 'Foo Bar <foo@example.com>'
         c.author_time = c.commit_time = 0
@@ -146,7 +143,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/master failed to update', str(e))
             self.assertEqual({'refs/heads/branch': 'ok',
                               'refs/heads/master': 'non-fast-forward'},
@@ -160,7 +157,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError, e:
+        except errors.UpdateRefsError as e:
             self.assertEqual('refs/heads/branch, refs/heads/master failed to '
                              'update', str(e))
             self.assertEqual({'refs/heads/branch': 'non-fast-forward',
@@ -169,7 +166,7 @@ class DulwichClientTestBase(object):
 
     def test_archive(self):
         c = self._client()
-        f = StringIO()
+        f = BytesIO()
         c.archive(self._build_path('/server_new.export'), 'HEAD', f.write)
         f.seek(0)
         tf = tarfile.open(fileobj=f)
@@ -437,18 +434,6 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
 
     def get_url(self):
         return 'http://%s:%s/' % (self.server_name, self.server_port)
-
-
-if not getattr(HTTPGitServer, 'shutdown', None):
-    _HTTPGitServer = HTTPGitServer
-
-    class TCPGitServer(ShutdownServerMixIn, HTTPGitServer):
-        """Subclass of HTTPGitServer that can be shut down."""
-
-        def __init__(self, *args, **kwargs):
-            # BaseServer is old-style so we have to call both __init__s
-            ShutdownServerMixIn.__init__(self)
-            _HTTPGitServer.__init__(self, *args, **kwargs)
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):

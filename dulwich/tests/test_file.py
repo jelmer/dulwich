@@ -155,7 +155,7 @@ class GitFileTests(TestCase):
         try:
             f2 = GitFile(foo, 'wb')
             self.fail()
-        except OSError, e:
+        except OSError as e:
             self.assertEqual(errno.EEXIST, e.errno)
         f1.write(' contents')
         f1.close()

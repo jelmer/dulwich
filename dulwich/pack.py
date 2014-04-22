@@ -33,9 +33,7 @@ a pointer in to the corresponding packfile.
 from collections import defaultdict
 
 import binascii
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 from collections import (
     deque,
     )
@@ -624,7 +622,7 @@ class PackIndex2(FilePackIndex):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8L
+            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 
@@ -719,8 +717,9 @@ def unpack_object(read_all, read_some=None, compute_crc32=False,
     return unpacked, unused
 
 
-def _compute_object_size((num, obj)):
+def _compute_object_size(value):
     """Compute the size of a unresolved object for use with LRUSizeCache."""
+    (num, obj) = value
     if num in DELTA_TYPES:
         return chunks_length(obj[1])
     return chunks_length(obj)
@@ -741,7 +740,7 @@ class PackStreamReader(object):
             self.read_some = read_some
         self.sha = sha1()
         self._offset = 0
-        self._rbuf = StringIO()
+        self._rbuf = BytesIO()
         # trailer is a deque to avoid memory allocation on small reads
         self._trailer = deque()
         self._zlib_bufsize = zlib_bufsize
@@ -794,7 +793,7 @@ class PackStreamReader(object):
         if buf_len >= size:
             return self._rbuf.read(size)
         buf_data = self._rbuf.read()
-        self._rbuf = StringIO()
+        self._rbuf = BytesIO()
         return buf_data + self._read(self.read_all, size - buf_len)
 
     def recv(self, size):
@@ -803,7 +802,7 @@ class PackStreamReader(object):
         if buf_len:
             data = self._rbuf.read(size)
             if size >= buf_len:
-                self._rbuf = StringIO()
+                self._rbuf = BytesIO()
             return data
         return self._read(self.read_some, size)
 
@@ -840,7 +839,7 @@ class PackStreamReader(object):
             unpacked.offset = offset
 
             # prepend any unused data to current read buffer
-            buf = StringIO()
+            buf = BytesIO()
             buf.write(unused)
             buf.write(self._rbuf.read())
             buf.seek(0)
@@ -1265,6 +1264,8 @@ class DeltaChainIterator(object):
             return
 
         for base_sha, pending in sorted(self._pending_ref.iteritems()):
+            if base_sha not in self._pending_ref:
+                continue
             try:
                 type_num, chunks = self._resolve_ext_ref(base_sha)
             except KeyError:
@@ -1650,9 +1651,9 @@ def apply_delta(src_buf, delta):
     :param src_buf: Source buffer
     :param delta: Delta instructions
     """
-    if type(src_buf) != str:
+    if not isinstance(src_buf, str):
         src_buf = ''.join(src_buf)
-    if type(delta) != str:
+    if not isinstance(delta, str):
         delta = ''.join(delta)
     out = []
     index = 0
@@ -1806,7 +1807,7 @@ class Pack(object):
             self._idx.close()
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.index == other.index
+        return isinstance(self, type(other)) and self.index == other.index
 
     def __len__(self):
         """Number of entries in this pack."""

@@ -17,8 +17,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from cStringIO import StringIO
+from io import BytesIO
 import stat
+
 
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -35,6 +36,9 @@ from dulwich.tests import (
     SkipTest,
     TestCase,
     )
+from dulwich.tests.utils import (
+    build_commit_graph,
+    )
 
 
 class GitFastExporterTests(TestCase):
@@ -43,7 +47,7 @@ class GitFastExporterTests(TestCase):
     def setUp(self):
         super(GitFastExporterTests, self).setUp()
         self.store = MemoryObjectStore()
-        self.stream = StringIO()
+        self.stream = BytesIO()
         try:
             from dulwich.fastexport import GitFastExporter
         except ImportError:
@@ -61,7 +65,7 @@ class GitFastExporterTests(TestCase):
         b = Blob()
         b.data = "FOO"
         t = Tree()
-        t.add("foo", stat.S_IFREG | 0644, b.id)
+        t.add("foo", stat.S_IFREG | 0o644, b.id)
         c = Commit()
         c.committer = c.author = "Jelmer <jelmer@host>"
         c.author_time = c.commit_time = 1271345553
@@ -96,6 +100,13 @@ class GitImportProcessorTests(TestCase):
             raise SkipTest("python-fastimport not available")
         self.processor = GitImportProcessor(self.repo)
 
+    def test_reset_handler(self):
+        from fastimport import commands
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        cmd = commands.ResetCommand("refs/heads/foo", c1.id)
+        self.processor.reset_handler(cmd)
+        self.assertEquals(c1.id, self.repo.get_refs()["refs/heads/foo"])
+
     def test_commit_handler(self):
         from fastimport import commands
         cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
@@ -115,7 +126,7 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(commit, self.repo["refs/heads/foo"])
 
     def test_import_stream(self):
-        markers = self.processor.import_stream(StringIO("""blob
+        markers = self.processor.import_stream(BytesIO("""blob
 mark :1
 data 11
 text for a
@@ -139,11 +150,11 @@ M 100644 :1 a
         cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
             ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
             ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
-            "FOO", None, [], [commands.FileModifyCommand("path", 0100644, ":23", None)])
+            "FOO", None, [], [commands.FileModifyCommand("path", 0o100644, ":23", None)])
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
         self.assertEqual([
-            ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172')],
+            ('path', 0o100644, '6320cd248dd8aeaab759d5871f8781b5c0505172')],
             self.repo[commit.tree].items())
 
     def simple_commit(self):
@@ -153,7 +164,7 @@ M 100644 :1 a
         cmd = commands.CommitCommand("refs/heads/foo", "mrkr",
             ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
             ("Jelmer", "jelmer@samba.org", 432432432.0, 3600),
-            "FOO", None, [], [commands.FileModifyCommand("path", 0100644, ":23", None)])
+            "FOO", None, [], [commands.FileModifyCommand("path", 0o100644, ":23", None)])
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
         return commit
@@ -177,8 +188,8 @@ M 100644 :1 a
         self.simple_commit()
         commit = self.make_file_commit([commands.FileCopyCommand("path", "new_path")])
         self.assertEqual([
-            ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
-            ('path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ('new_path', 0o100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ('path', 0o100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
             ], self.repo[commit.tree].items())
 
     def test_file_move(self):
@@ -186,7 +197,7 @@ M 100644 :1 a
         self.simple_commit()
         commit = self.make_file_commit([commands.FileRenameCommand("path", "new_path")])
         self.assertEqual([
-            ('new_path', 0100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
+            ('new_path', 0o100644, '6320cd248dd8aeaab759d5871f8781b5c0505172'),
             ], self.repo[commit.tree].items())
 
     def test_file_delete(self):

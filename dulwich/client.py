@@ -38,7 +38,8 @@ Known capabilities that are not supported:
 
 __docformat__ = 'restructuredText'
 
-from cStringIO import StringIO
+from io import BytesIO
+import dulwich
 import select
 import socket
 import subprocess
@@ -67,12 +68,6 @@ from dulwich.refs import (
     read_info_refs,
     )
 
-
-# Python 2.6.6 included these in urlparse.uses_netloc upstream. Do
-# monkeypatching to enable similar behaviour in earlier Pythons:
-for scheme in ('git', 'git+ssh'):
-    if scheme not in urlparse.uses_netloc:
-        urlparse.uses_netloc.append(scheme)
 
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
@@ -339,10 +334,6 @@ class GitClient(object):
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
             self._report_status_parser.check()
-        # wait for EOF before returning
-        data = proto.read()
-        if data:
-            raise SendPackError('Unexpected response %r' % data)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):
@@ -355,13 +346,13 @@ class GitClient(object):
         :param can_read: function that returns a boolean that indicates
             whether there is extra graph data to read on proto
         """
-        assert isinstance(wants, list) and type(wants[0]) == str
+        assert isinstance(wants, list) and isinstance(wants[0], str)
         proto.write_pkt_line('want %s %s\n' % (
             wants[0], ' '.join(capabilities)))
         for want in wants[1:]:
             proto.write_pkt_line('want %s\n' % want)
         proto.write_pkt_line(None)
-        have = graph_walker.next()
+        have = next(graph_walker)
         while have:
             proto.write_pkt_line('have %s\n' % have)
             if can_read():
@@ -377,7 +368,7 @@ class GitClient(object):
                         raise AssertionError(
                             "%s not in ('continue', 'ready', 'common)" %
                             parts[2])
-            have = graph_walker.next()
+            have = next(graph_walker)
         proto.write_pkt_line('done\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
@@ -405,10 +396,6 @@ class GitClient(object):
                 # Just ignore progress data
                 progress = lambda x: None
             self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
-            # wait for EOF before returning
-            data = proto.read()
-            if data:
-                raise Exception('Unexpected response %r' % data)
         else:
             while True:
                 data = proto.read(rbufsize)
@@ -860,7 +847,7 @@ else:
             channel = client.get_transport().open_session()
 
             # Run commands
-            apply(channel.exec_command, command)
+            channel.exec_command(*command)
 
             return ParamikoWrapper(client, channel,
                     progress_stderr=progress_stderr)
@@ -892,13 +879,36 @@ class SSHGitClient(TraditionalGitClient):
                 con.can_read)
 
 
+def default_user_agent_string():
+    return "dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
+
+
+def default_urllib2_opener(config):
+    if config is not None:
+        proxy_server = config.get("http", "proxy")
+    else:
+        proxy_server = None
+    handlers = []
+    if proxy_server is not None:
+        handlers.append(urllib2.ProxyHandler({"http" : proxy_server}))
+    opener = urllib2.build_opener(*handlers)
+    if config is not None:
+        user_agent = config.get("http", "useragent")
+    else:
+        user_agent = None
+    if user_agent is None:
+        user_agent = default_user_agent_string()
+    opener.addheaders = [('User-agent', user_agent)]
+    return opener
+
+
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, config=None, *args, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
-            self.opener = urllib2.build_opener()
+            self.opener = default_urllib2_opener(config)
         else:
             self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
@@ -973,7 +983,7 @@ class HttpGitClient(GitClient):
             return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
@@ -1010,7 +1020,7 @@ class HttpGitClient(GitClient):
             return refs
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        req_data = StringIO()
+        req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(req_proto,
             negotiated_capabilities, graph_walker, wants,
@@ -1023,10 +1033,11 @@ class HttpGitClient(GitClient):
         return refs
 
 
-def get_transport_and_path_from_url(url, **kwargs):
+def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
     :param url: URL to open
+    :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.
@@ -1043,7 +1054,8 @@ def get_transport_and_path_from_url(url, **kwargs):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed), **kwargs), parsed.path
+        return HttpGitClient(urlparse.urlunparse(parsed), config=config,
+                **kwargs), parsed.path
     elif parsed.scheme == 'file':
         return default_local_git_client_cls(**kwargs), parsed.path
 
@@ -1054,6 +1066,7 @@ def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
     :param location: URL or path
+    :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.

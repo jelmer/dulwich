@@ -32,26 +32,11 @@ from dulwich.server import (
     )
 from dulwich.tests.compat.server_utils import (
     ServerTests,
-    ShutdownServerMixIn,
     NoSideBand64kReceivePackHandler,
     )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     )
-
-
-if not getattr(TCPGitServer, 'shutdown', None):
-    _TCPGitServer = TCPGitServer
-
-    class TCPGitServer(ShutdownServerMixIn, TCPGitServer):
-        """Subclass of TCPGitServer that can be shut down."""
-
-        def __init__(self, *args, **kwargs):
-            # BaseServer is old-style so we have to call both __init__s
-            ShutdownServerMixIn.__init__(self)
-            _TCPGitServer.__init__(self, *args, **kwargs)
-
-        serve = ShutdownServerMixIn.serve_forever
 
 
 class GitServerTestCase(ServerTests, CompatTestCase):

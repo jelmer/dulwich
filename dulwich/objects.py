@@ -20,9 +20,7 @@
 """Access to base git objects."""
 
 import binascii
-from cStringIO import (
-    StringIO,
-    )
+from io import BytesIO
 from collections import namedtuple
 import os
 import posixpath
@@ -58,7 +56,7 @@ _TAG_HEADER = "tag"
 _TAGGER_HEADER = "tagger"
 
 
-S_IFGITLINK = 0160000
+S_IFGITLINK = 0o160000
 
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
@@ -291,7 +289,7 @@ class ShaFile(object):
 
     def set_raw_string(self, text, sha=None):
         """Set the contents of this object from a serialized string."""
-        if type(text) != str:
+        if not isinstance(text, str):
             raise TypeError(text)
         self.set_raw_chunks([text], sha)
 
@@ -590,7 +588,7 @@ def _parse_message(chunks):
         order read from the text, possibly including duplicates. Includes a
         field named None for the freeform tag/commit text.
     """
-    f = StringIO("".join(chunks))
+    f = BytesIO("".join(chunks))
     k = None
     v = ""
     for l in f:
@@ -740,7 +738,7 @@ class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
 
     def in_path(self, path):
         """Return a copy of this entry with the given path prepended."""
-        if type(self.path) != str:
+        if not isinstance(self.path, str):
             raise TypeError
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
@@ -792,8 +790,8 @@ def sorted_tree_items(entries, name_order):
     :param entries: Dictionary mapping names to (mode, sha) tuples
     :return: Iterator over (name, mode, hexsha)
     """
-    cmp_func = name_order and cmp_entry_name_order or cmp_entry
-    for name, entry in sorted(entries.iteritems(), cmp=cmp_func):
+    key_func = name_order and key_entry_name_order or key_entry
+    for name, entry in sorted(entries.iteritems(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         if not isinstance(mode, int) and not isinstance(mode, long):
@@ -804,18 +802,20 @@ def sorted_tree_items(entries, name_order):
         yield TreeEntry(name, mode, hexsha)
 
 
-def cmp_entry((name1, value1), (name2, value2)):
-    """Compare two tree entries in tree order."""
-    if stat.S_ISDIR(value1[0]):
-        name1 += "/"
-    if stat.S_ISDIR(value2[0]):
-        name2 += "/"
-    return cmp(name1, name2)
+def key_entry(entry):
+    """Sort key for tree entry.
+
+    :param entry: (name, value) tuplee
+    """
+    (name, value) = entry
+    if stat.S_ISDIR(value[0]):
+        name += "/"
+    return name
 
 
-def cmp_entry_name_order(entry1, entry2):
-    """Compare two tree entries in name order."""
-    return cmp(entry1[0], entry2[0])
+def key_entry_name_order(entry):
+    """Sort key for tree entry in name order."""
+    return entry[0]
 
 
 class Tree(ShaFile):
@@ -879,7 +879,7 @@ class Tree(ShaFile):
         :param name: The name of the entry, as a string.
         :param hexsha: The hex SHA of the entry as a string.
         """
-        if type(name) is int and type(mode) is str:
+        if isinstance(name, int) and isinstance(mode, str):
             (name, mode) = (mode, name)
             warnings.warn("Please use Tree.add(name, mode, hexsha)",
                 category=DeprecationWarning, stacklevel=2)
@@ -920,10 +920,10 @@ class Tree(ShaFile):
         """
         super(Tree, self).check()
         last = None
-        allowed_modes = (stat.S_IFREG | 0755, stat.S_IFREG | 0644,
+        allowed_modes = (stat.S_IFREG | 0o755, stat.S_IFREG | 0o644,
                          stat.S_IFLNK, stat.S_IFDIR, S_IFGITLINK,
                          # TODO: optionally exclude as in git fsck --strict
-                         stat.S_IFREG | 0664)
+                         stat.S_IFREG | 0o664)
         for name, mode, sha in parse_tree(''.join(self._chunked_text),
                                           True):
             check_hexsha(sha, 'invalid sha %s' % sha)
@@ -935,7 +935,7 @@ class Tree(ShaFile):
 
             entry = (name, (mode, sha))
             if last:
-                if cmp_entry(last, entry) > 0:
+                if key_entry(last) > key_entry(entry):
                     raise ObjectFormatException('entries not sorted')
                 if name == last[0]:
                     raise ObjectFormatException('duplicate entry %s' % name)

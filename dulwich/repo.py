@@ -27,7 +27,7 @@ local disk (Repo).
 
 """
 
-from cStringIO import StringIO
+from io import BytesIO
 import errno
 import os
 
@@ -176,7 +176,7 @@ class BaseRepo(object):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
         self._put_named_file('description', "Unnamed repository")
-        f = StringIO()
+        f = BytesIO()
         cf = ConfigFile()
         cf.set("core", "repositoryformatversion", "0")
         cf.set("core", "filemode", "true")
@@ -246,7 +246,7 @@ class BaseRepo(object):
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
-        if type(wants) is not list:
+        if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
         shallows = getattr(graph_walker, 'shallow', frozenset())
@@ -439,7 +439,10 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if len(name) in (20, 40) and isinstance(name, str):
+        if not isinstance(name, str):
+            raise TypeError("'name' must be bytestring, not %.80s" %
+                    type(name).__name__)
+        if len(name) in (20, 40):
             try:
                 return self.object_store[name]
             except (KeyError, ValueError):
@@ -548,7 +551,7 @@ class BaseRepo(object):
 
         try:
             self.hooks['pre-commit'].execute()
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -591,28 +594,33 @@ class BaseRepo(object):
             c.message = self.hooks['commit-msg'].execute(message)
             if c.message is None:
                 c.message = message
-        except HookError, e:
+        except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
-        try:
-            old_head = self.refs[ref]
-            c.parents = [old_head] + merge_heads
-            self.object_store.add_object(c)
-            ok = self.refs.set_if_equals(ref, old_head, c.id)
-        except KeyError:
+        if ref is None:
+            # Create a dangling commit
             c.parents = merge_heads
             self.object_store.add_object(c)
-            ok = self.refs.add_if_new(ref, c.id)
-        if not ok:
-            # Fail if the atomic compare-and-swap failed, leaving the commit and
-            # all its objects as garbage.
-            raise CommitError("%s changed during commit" % (ref,))
+        else:
+            try:
+                old_head = self.refs[ref]
+                c.parents = [old_head] + merge_heads
+                self.object_store.add_object(c)
+                ok = self.refs.set_if_equals(ref, old_head, c.id)
+            except KeyError:
+                c.parents = merge_heads
+                self.object_store.add_object(c)
+                ok = self.refs.add_if_new(ref, c.id)
+            if not ok:
+                # Fail if the atomic compare-and-swap failed, leaving the commit and
+                # all its objects as garbage.
+                raise CommitError("%s changed during commit" % (ref,))
 
         try:
             self.hooks['post-commit'].execute()
-        except HookError, e:  # silent failure
+        except HookError as e:  # silent failure
             warnings.warn("post-commit hook failed: %s" % e, UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
@@ -700,7 +708,7 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
         try:
             return open(os.path.join(self.controldir(), path), 'rb')
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
             raise
@@ -812,7 +820,7 @@ class Repo(BaseRepo):
         path = os.path.join(self._controldir, 'config')
         try:
             return ConfigFile.from_path(path)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             ret = ConfigFile()
@@ -831,7 +839,7 @@ class Repo(BaseRepo):
                 return f.read()
             finally:
                 f.close()
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
             return None
@@ -899,9 +907,11 @@ class MemoryRepo(BaseRepo):
     """
 
     def __init__(self):
+        from dulwich.config import ConfigFile
         BaseRepo.__init__(self, MemoryObjectStore(), DictRefsContainer({}))
         self._named_files = {}
         self.bare = True
+        self._config = ConfigFile()
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
@@ -924,7 +934,7 @@ class MemoryRepo(BaseRepo):
         contents = self._named_files.get(path, None)
         if contents is None:
             return None
-        return StringIO(contents)
+        return BytesIO(contents)
 
     def open_index(self):
         """Fail to open index for this repo, since it is bare.
@@ -938,8 +948,7 @@ class MemoryRepo(BaseRepo):
 
         :return: `ConfigFile` object.
         """
-        from dulwich.config import ConfigFile
-        return ConfigFile()
+        return self._config
 
     def get_description(self):
         """Retrieve the repository description.

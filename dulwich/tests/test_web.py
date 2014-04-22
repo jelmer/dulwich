@@ -18,7 +18,7 @@
 
 """Tests for the Git HTTP server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import gzip
 import re
 import os
@@ -90,7 +90,7 @@ class WebTestCase(TestCase):
                                     handlers=self._handlers())
         self._status = None
         self._headers = []
-        self._output = StringIO()
+        self._output = BytesIO()
 
     def _start_response(self, status, headers):
         self._status = status
@@ -122,7 +122,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEqual(HTTP_NOT_FOUND, self._status)
 
     def test_send_file(self):
-        f = StringIO('foobar')
+        f = BytesIO('foobar')
         output = ''.join(send_file(self._req, f, 'some/thing'))
         self.assertEqual('foobar', output)
         self.assertEqual(HTTP_OK, self._status)
@@ -132,7 +132,7 @@ class DumbHandlersTestCase(WebTestCase):
     def test_send_file_buffered(self):
         bufsize = 10240
         xs = 'x' * bufsize
-        f = StringIO(2 * xs)
+        f = BytesIO(2 * xs)
         self.assertEqual([xs, xs],
                           list(send_file(self._req, f, 'some/thing')))
         self.assertEqual(HTTP_OK, self._status)
@@ -263,7 +263,7 @@ class DumbHandlersTestCase(WebTestCase):
             def __init__(self, sha):
                 self.data = TestPackData(sha)
 
-        packs = [TestPack(str(i) * 40) for i in xrange(1, 4)]
+        packs = [TestPack(str(i) * 40) for i in range(1, 4)]
 
         class TestObjectStore(MemoryObjectStore):
             # property must be overridden, can't be assigned
@@ -311,7 +311,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
-        self._environ['wsgi.input'] = StringIO('foo')
+        self._environ['wsgi.input'] = BytesIO('foo')
         if content_length is not None:
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
@@ -342,7 +342,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertFalse(self._req.cached)
 
     def test_get_info_refs(self):
-        self._environ['wsgi.input'] = StringIO('foo')
+        self._environ['wsgi.input'] = BytesIO('foo')
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
         mat = re.search('.*', '/git-upload-pack')
@@ -361,16 +361,16 @@ class SmartHandlersTestCase(WebTestCase):
 
 class LengthLimitedFileTestCase(TestCase):
     def test_no_cutoff(self):
-        f = _LengthLimitedFile(StringIO('foobar'), 1024)
+        f = _LengthLimitedFile(BytesIO('foobar'), 1024)
         self.assertEqual('foobar', f.read())
 
     def test_cutoff(self):
-        f = _LengthLimitedFile(StringIO('foobar'), 3)
+        f = _LengthLimitedFile(BytesIO('foobar'), 3)
         self.assertEqual('foo', f.read())
         self.assertEqual('', f.read())
 
     def test_multiple_reads(self):
-        f = _LengthLimitedFile(StringIO('foobar'), 3)
+        f = _LengthLimitedFile(BytesIO('foobar'), 3)
         self.assertEqual('fo', f.read(2))
         self.assertEqual('o', f.read(2))
         self.assertEqual('', f.read())
@@ -454,9 +454,10 @@ class HTTPGitApplicationTestCase(TestCase):
 
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
-    """TestCase for testing the GunzipFilter, ensuring the wsgi.input
+    __doc__ = """TestCase for testing the GunzipFilter, ensuring the wsgi.input
     is correctly decompressed and headers are corrected.
     """
+    example_text = __doc__
 
     def setUp(self):
         super(GunzipTestCase, self).setUp()
@@ -465,18 +466,16 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self._environ['REQUEST_METHOD'] = 'POST'
 
     def _get_zstream(self, text):
-        zstream = StringIO()
+        zstream = BytesIO()
         zfile = gzip.GzipFile(fileobj=zstream, mode='w')
         zfile.write(text)
         zfile.close()
-        return zstream
-
-    def test_call(self):
-        self._add_handler(self._app.app)
-        orig = self.__class__.__doc__
-        zstream = self._get_zstream(orig)
         zlength = zstream.tell()
         zstream.seek(0)
+        return zstream, zlength
+
+    def _test_call(self, orig, zstream, zlength):
+        self._add_handler(self._app.app)
         self.assertLess(zlength, len(orig))
         self.assertEqual(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
         self._environ['CONTENT_LENGTH'] = zlength
@@ -488,3 +487,32 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self.assertEqual(orig, buf.read())
         self.assertIs(None, self._environ.get('CONTENT_LENGTH'))
         self.assertNotIn('HTTP_CONTENT_ENCODING', self._environ)
+
+    def test_call(self):
+        self._test_call(
+            self.example_text,
+            *self._get_zstream(self.example_text)
+        )
+
+    def test_call_no_seek(self):
+        """
+        This ensures that the gunzipping code doesn't require any methods on
+        'wsgi.input' except for '.read()'.  (In particular, it shouldn't
+        require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.)
+        """
+        class MinimalistWSGIInputStream(object):
+            def __init__(self, data):
+                self.data = data
+                self.pos = 0
+
+            def read(self, howmuch):
+                start = self.pos
+                end = self.pos + howmuch
+                if start >= len(self.data):
+                    return ''
+                self.pos = end
+                return self.data[start:end]
+
+        zstream, zlength = self._get_zstream(self.example_text)
+        self._test_call(self.example_text,
+            MinimalistWSGIInputStream(zstream.read()), zlength)

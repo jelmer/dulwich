@@ -1,3 +1,57 @@
+0.9.6	2014-04-23
+
+ IMPROVEMENTS
+
+ * Add support for recursive add in 'git add'.
+   (Ryan Faulkner, Jelmer Vernooij)
+
+ * Add porcelain 'list_tags'. (Ryan Faulkner)
+
+ * Add porcelain 'push'. (Ryan Faulkner)
+
+ * Add porcelain 'pull'. (Ryan Faulkner)
+
+ * Support 'http.proxy' in HttpGitClient.
+   (Jelmer Vernooij, #1096030)
+
+ * Support 'http.useragent' in HttpGitClient.
+   (Jelmer Vernooij)
+
+ * In server, wait for clients to send empty list of
+   wants when talking to empty repository.
+   (Damien Tournoud)
+
+ * Various changes to improve compatibility with
+   Python 3. (Gary van der Merwe)
+
+ BUG FIXES
+
+ * Support unseekable 'wsgi.input' streams.
+   (Jonas Haag)
+
+ * Raise TypeError when passing unicode() object
+   to Repo.__getitem__.
+   (Jonas Haag)
+
+ * Fix handling of `reset` command in dulwich.fastexport.
+   (Jelmer Vernooij, #1249029)
+
+ * In client, don't wait for server to close connection
+   first. Fixes hang when used against GitHub
+   server implementation. (Siddharth Agarwal)
+
+ * DeltaChainIterator: fix a corner case where an object is inflated as an
+   object already in the repository.
+   (Damien Tournoud, #135)
+
+ * Stop leaking file handles during pack reload. (Damien Tournoud)
+
+ * Avoid reopening packs during pack cache reload. (Jelmer Vernooij)
+
+ API CHANGES
+
+  * Drop support for Python 2.6. (Jelmer Vernooij)
+
 0.9.5	2014-02-23
 
  IMPROVEMENTS
@@ -31,6 +85,10 @@
  * Raise KeyError rather than TypeError when passing in
    unicode object of length 20 or 40 to Repo.__getitem__.
    (Jelmer Vernooij)
+
+ * Use 'rm' rather than 'unlink' in tests, since the latter
+   does not exist on OpenBSD and other platforms.
+   (Dmitrij D. Czarkoff)
 
 0.9.4	2013-11-30
 

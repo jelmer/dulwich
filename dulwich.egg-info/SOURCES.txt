@@ -1,8 +1,10 @@
+AUTHORS
 COPYING
+HACKING
 MANIFEST.in
 Makefile
 NEWS
-README
+README.md
 setup.py
 bin/dul-daemon
 bin/dul-receive-pack
@@ -25,7 +27,6 @@ docs/tutorial/remote.txt
 docs/tutorial/repo.txt
 docs/tutorial/tag.txt
 dulwich/__init__.py
-dulwich/_compat.py
 dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c

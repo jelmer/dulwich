@@ -18,7 +18,7 @@
 
 """Tests for the smart protocol server."""
 
-from cStringIO import StringIO
+from io import BytesIO
 import os
 import tempfile
 
@@ -26,6 +26,7 @@ from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
     UnexpectedCommandError,
+    HangupException,
     )
 from dulwich.objects import (
     Commit,
@@ -78,13 +79,18 @@ class TestProto(object):
         self._received = {0: [], 1: [], 2: [], 3: []}
 
     def set_output(self, output_lines):
-        self._output = ['%s\n' % line.rstrip() for line in output_lines]
+        self._output = output_lines
 
     def read_pkt_line(self):
         if self._output:
-            return self._output.pop(0)
+            data = self._output.pop(0)
+            if data is not None:
+                return '%s\n' % data.rstrip()
+            else:
+                # flush-pkt ('0000').
+                return None
         else:
-            return None
+            raise HangupException()
 
     def write_sideband(self, band, data):
         self._received[band].append(data)
@@ -120,7 +126,7 @@ class HandlerTestCase(TestCase):
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
-        except GitProtocolError, e:
+        except GitProtocolError as e:
             self.fail(e)
 
     def test_capability_line(self):
@@ -219,7 +225,7 @@ class FindShallowTests(TestCase):
     def make_linear_commits(self, n, message=''):
         commits = []
         parents = []
-        for _ in xrange(n):
+        for _ in range(n):
             commits.append(self.make_commit(parents=parents, message=message))
             parents = [commits[-1].id]
         return commits
@@ -308,6 +314,27 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[1][1], 'ok')
 
 
+class ProtocolGraphWalkerEmptyTestCase(TestCase):
+    def setUp(self):
+        super(ProtocolGraphWalkerEmptyTestCase, self).setUp()
+        self._repo = MemoryRepo.init_bare([], {})
+        backend = DictBackend({'/': self._repo})
+        self._walker = ProtocolGraphWalker(
+            TestUploadPackHandler(backend, ['/', 'host=lolcats'], TestProto()),
+            self._repo.object_store, self._repo.get_peeled)
+
+    def test_empty_repository(self):
+        # The server should wait for a flush packet.
+        self._walker.proto.set_output([])
+        self.assertRaises(HangupException, self._walker.determine_wants, {})
+        self.assertEqual(None, self._walker.proto.get_received_line())
+
+        self._walker.proto.set_output([None])
+        self.assertEqual([], self._walker.determine_wants({}))
+        self.assertEqual(None, self._walker.proto.get_received_line())
+
+
+
 class ProtocolGraphWalkerTestCase(TestCase):
 
     def setUp(self):
@@ -371,12 +398,14 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEqual((None, None), _split_proto_line('', allowed))
 
     def test_determine_wants(self):
+        self._walker.proto.set_output([None])
         self.assertEqual([], self._walker.determine_wants({}))
         self.assertEqual(None, self._walker.proto.get_received_line())
 
         self._walker.proto.set_output([
           'want %s multi_ack' % ONE,
           'want %s' % TWO,
+          None,
           ])
         heads = {
           'refs/heads/ref1': ONE,
@@ -390,20 +419,20 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEqual([], self._walker.determine_wants(heads))
         self._walker.advertise_refs = False
 
-        self._walker.proto.set_output(['want %s multi_ack' % FOUR])
+        self._walker.proto.set_output(['want %s multi_ack' % FOUR, None])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
-        self._walker.proto.set_output([])
+        self._walker.proto.set_output([None])
         self.assertEqual([], self._walker.determine_wants(heads))
 
-        self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo'])
+        self._walker.proto.set_output(['want %s multi_ack' % ONE, 'foo', None])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
-        self._walker.proto.set_output(['want %s multi_ack' % FOUR])
+        self._walker.proto.set_output(['want %s multi_ack' % FOUR, None])
         self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
 
     def test_determine_wants_advertisement(self):
-        self._walker.proto.set_output([])
+        self._walker.proto.set_output([None])
         # advertise branch tips plus tag
         heads = {
           'refs/heads/ref4': FOUR,
@@ -439,7 +468,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
     # TODO: test commit time cutoff
 
     def _handle_shallow_request(self, lines, heads):
-        self._walker.proto.set_output(lines)
+        self._walker.proto.set_output(lines + [None])
         self._walker._handle_shallow_request(heads)
 
     def assertReceived(self, expected):
@@ -537,7 +566,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertAck(None, 'nak')
 
     def assertNextEquals(self, sha):
-        self.assertEqual(sha, self._impl.next())
+        self.assertEqual(sha, next(self._impl))
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
@@ -839,8 +868,8 @@ class ServeCommandTests(TestCase):
         commit = make_commit(id=ONE, parents=[], commit_time=111)
         self.backend.repos["/"] = MemoryRepo.init_bare(
             [commit], {"refs/heads/master": commit.id})
-        outf = StringIO()
-        exitcode = self.serve_command(ReceivePackHandler, ["/"], StringIO("0000"), outf)
+        outf = BytesIO()
+        exitcode = self.serve_command(ReceivePackHandler, ["/"], BytesIO("0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
         self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",

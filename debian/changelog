@@ -1,4 +1,4 @@
-dulwich (0.9.6-1) UNRELEASED; urgency=medium
+dulwich (0.9.6-1) unstable; urgency=medium
 
   * New upstream release.
   * Allow output to stderr in autopktest.

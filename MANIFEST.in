@@ -1,7 +1,9 @@
 include NEWS
-include README
+include AUTHORS
+include README.md
 include Makefile
 include COPYING
+include HACKING
 include dulwich/stdint.h
 recursive-include docs conf.py *.txt Makefile make.bat
 recursive-include examples *.py

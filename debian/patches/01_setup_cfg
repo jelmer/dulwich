@@ -6,7 +6,7 @@ Author: Jelmer Vernooij <jelmer@debian.org>
 @@ -3,6 +3,7 @@ MANIFEST.in
  Makefile
  NEWS
- README
+ README.md
 +setup.cfg
  setup.py
  bin/dul-daemon

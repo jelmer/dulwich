@@ -1,2 +1,3 @@
 Tests: testsuite
 Depends: python-dulwich, git
+Restrictions: allow-stderr

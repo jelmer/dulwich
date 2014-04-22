@@ -1,3 +1,3 @@
 #!/bin/sh
 set -e
-python -m unittest dulwich.tests.test_suite 2>/dev/null
+python -m unittest dulwich.tests.test_suite

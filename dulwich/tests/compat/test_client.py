@@ -152,16 +152,18 @@ class DulwichClientTestBase(object):
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         # set up for two non-ff errors
-        dest.refs['refs/heads/branch'] = dest.refs['refs/heads/master'] = dummy
+        branch, master = 'refs/heads/branch', 'refs/heads/master'
+        dest.refs[branch] = dest.refs[master] = dummy
         sendrefs, gen_pack = self.compute_send()
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         except errors.UpdateRefsError as e:
-            self.assertEqual('refs/heads/branch, refs/heads/master failed to '
-                             'update', str(e))
-            self.assertEqual({'refs/heads/branch': 'non-fast-forward',
-                              'refs/heads/master': 'non-fast-forward'},
+            self.assertIn(str(e),
+                          ['{0}, {1} failed to update'.format(branch, master),
+                           '{1}, {0} failed to update'.format(branch, master)])
+            self.assertEqual({branch: 'non-fast-forward',
+                              master: 'non-fast-forward'},
                              e.ref_status)
 
     def test_archive(self):

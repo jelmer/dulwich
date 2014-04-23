@@ -177,11 +177,14 @@ class GitClientTests(TestCase):
             return {}
 
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-            '0000000000000000000000000000000000000000 '
-            'refs/heads/master\x00report-status ofs-delta0000')
+            ['007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             '0000000000000000000000000000000000000000 '
+             'refs/heads/master\x00report-status ofs-delta0000',
+             '007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             '0000000000000000000000000000000000000000 '
+             'refs/heads/master\x00ofs-delta report-status0000'])
 
     def test_send_pack_new_ref_only(self):
         self.rin.write(
@@ -205,12 +208,16 @@ class GitClientTests(TestCase):
         f = BytesIO()
         empty_pack = write_pack_objects(f, {})
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f0000000000000000000000000000000000000000 '
-            '310ca9477129b8586fa2afc779c1f57cf64bba6c '
-            'refs/heads/blah12\x00report-status ofs-delta0000%s'
-            % f.getvalue())
+            ['007f0000000000000000000000000000000000000000 '
+             '310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             'refs/heads/blah12\x00report-status ofs-delta0000%s'
+             % f.getvalue(),
+             '007f0000000000000000000000000000000000000000 '
+             '310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             'refs/heads/blah12\x00ofs-delta report-status0000%s'
+             % f.getvalue()])
 
     def test_send_pack_new_ref(self):
         self.rin.write(
@@ -243,11 +250,14 @@ class GitClientTests(TestCase):
         f = BytesIO()
         pack = write_pack_objects(f, generate_pack_contents(None, None))
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f0000000000000000000000000000000000000000 %s '
-            'refs/heads/blah12\x00report-status ofs-delta0000%s'
-            % (commit.id, f.getvalue()))
+            ['007f0000000000000000000000000000000000000000 %s '
+             'refs/heads/blah12\x00report-status ofs-delta0000%s'
+             % (commit.id, f.getvalue()),
+             '007f0000000000000000000000000000000000000000 %s '
+             'refs/heads/blah12\x00ofs-delta report-status0000%s'
+             % (commit.id, f.getvalue())])
 
     def test_send_pack_no_deleteref_delete_only(self):
         pkts = ['310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'

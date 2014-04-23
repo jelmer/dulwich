@@ -1023,4 +1023,4 @@ class DeltaChainIteratorTests(TestCase):
             list(pack_iter._walk_all_chains())
             self.fail()
         except KeyError as e:
-            self.assertEqual((sorted([b2.id, b3.id]),), e.args)
+            self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.args[0]),))

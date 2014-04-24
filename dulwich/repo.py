@@ -30,6 +30,7 @@ local disk (Repo).
 from io import BytesIO
 import errno
 import os
+import stat
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -746,7 +747,8 @@ class Repo(BaseRepo):
         for path in paths:
             full_path = os.path.join(self.path, path)
             try:
-                st = os.stat(full_path)
+                st = os.lstat(full_path)
+                is_symbolic_link = stat.S_ISLNK(st.st_mode)
             except OSError:
                 # File no longer exists
                 try:
@@ -755,11 +757,14 @@ class Repo(BaseRepo):
                     pass  # already removed
             else:
                 blob = Blob()
-                f = open(full_path, 'rb')
-                try:
-                    blob.data = f.read()
-                finally:
-                    f.close()
+                if not is_symbolic_link:
+                    f = open(full_path, 'rb')
+                    try:
+                        blob.data = f.read()
+                    finally:
+                        f.close()
+                else:
+                    blob.data = os.readlink(full_path)
                 self.object_store.add_object(blob)
                 index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()

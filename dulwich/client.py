@@ -939,8 +939,8 @@ class HttpGitClient(GitClient):
         if not self.dumb:
             proto = Protocol(resp.read, None)
             # The first line should mention the service
-            pkts = list(proto.read_pkt_seq())
-            if pkts != [('# service=%s\n' % service)]:
+            pkts = [e.strip() for e in proto.read_pkt_seq()]
+            if pkts != [('# service=%s' % service)]:
                 raise GitProtocolError(
                     "unexpected first line %r from smart server" % pkts)
             return read_pkt_refs(proto)

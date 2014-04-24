@@ -525,9 +525,9 @@ class BuildRepoTests(TestCase):
 
     def setUp(self):
         super(BuildRepoTests, self).setUp()
-        repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
-        os.makedirs(repo_dir)
-        r = self._repo = Repo.init(repo_dir)
+        self._repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
+        os.makedirs(self._repo_dir)
+        r = self._repo = Repo.init(self._repo_dir)
         self.assertFalse(r.bare)
         self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
         self.assertRaises(KeyError, lambda: r.refs['refs/heads/master'])
@@ -566,15 +566,20 @@ class BuildRepoTests(TestCase):
             f.write('new contents')
         finally:
             f.close()
-        r.stage(['a'])
+        os.symlink('a', os.path.join(self._repo_dir, 'b'))
+        r.stage(['a', 'b'])
         commit_sha = r.do_commit('modified a',
                                  committer='Test Committer <test@nodomain.com>',
                                  author='Test Author <test@nodomain.com>',
                                  commit_timestamp=12395, commit_timezone=0,
                                  author_timestamp=12395, author_timezone=0)
         self.assertEqual([self._root_commit], r[commit_sha].parents)
-        _, blob_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
-        self.assertEqual('new contents', r[blob_id].data)
+        a_mode, a_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
+        self.assertEqual(stat.S_IFREG | 0644, a_mode)
+        self.assertEqual('new contents', r[a_id].data)
+        b_mode, b_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'b')
+        self.assertTrue(stat.S_ISLNK(b_mode))
+        self.assertEqual('a', r[b_id].data)
 
     def test_commit_deleted(self):
         r = self._repo

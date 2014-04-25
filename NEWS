@@ -4,6 +4,9 @@
 
   * Fix tests dependent on hash ordering. (Michael Edgar)
 
+  * Support staging symbolic links in Repo.stage.
+    (Robert Brown)
+
 0.9.6	2014-04-23
 
  IMPROVEMENTS

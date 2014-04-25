@@ -1,3 +1,9 @@
+dulwich (0.9.6-2) UNRELEASED; urgency=medium
+
+  * Use canonical URL in Vcs-Git.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 25 Apr 2014 02:29:17 +0200
+
 dulwich (0.9.6-1) unstable; urgency=medium
 
   * New upstream release.

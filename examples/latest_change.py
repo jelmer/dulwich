@@ -17,5 +17,5 @@ try:
 except StopIteration:
     print("No file %s anywhere in history." % sys.argv[1])
 else:
-    print("%s was last changed at %s by %s (commit %s)" % (
+    print("%s was last changed by %s at %s (commit %s)" % (
         sys.argv[1], c.author, time.ctime(c.author_time), c.id))

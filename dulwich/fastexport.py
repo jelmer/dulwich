@@ -70,7 +70,8 @@ class GitFastExporter(object):
         return marker
 
     def _iter_files(self, base_tree, new_tree):
-        for (old_path, new_path), (old_mode, new_mode), (old_hexsha, new_hexsha) in \
+        for ((old_path, new_path), (old_mode, new_mode),
+            (old_hexsha, new_hexsha)) in \
                 self.store.tree_changes(base_tree, new_tree):
             if new_path is None:
                 yield commands.FileDeleteCommand(old_path)
@@ -81,7 +82,8 @@ class GitFastExporter(object):
             if old_path != new_path and old_path is not None:
                 yield commands.FileRenameCommand(old_path, new_path)
             if old_mode != new_mode or old_hexsha != new_hexsha:
-                yield commands.FileModifyCommand(new_path, new_mode, marker, None)
+                yield commands.FileModifyCommand(new_path, new_mode, marker,
+                    None)
 
     def _export_commit(self, commit, ref, base_tree=None):
         file_cmds = list(self._iter_files(base_tree, commit.tree))
@@ -96,7 +98,8 @@ class GitFastExporter(object):
         committer, committer_email = split_email(commit.committer)
         cmd = commands.CommitCommand(ref, marker,
             (author, author_email, commit.author_time, commit.author_timezone),
-            (committer, committer_email, commit.commit_time, commit.commit_timezone),
+            (committer, committer_email, commit.commit_time,
+                commit.commit_timezone),
             commit.message, from_, merges, file_cmds)
         return (cmd, marker)
 
@@ -143,7 +146,8 @@ class GitImportProcessor(processor.ImportProcessor):
         else:
             author = cmd.committer
         (author_name, author_email, author_timestamp, author_timezone) = author
-        (committer_name, committer_email, commit_timestamp, commit_timezone) = cmd.committer
+        (committer_name, committer_email, commit_timestamp,
+            commit_timezone) = cmd.committer
         commit.author = "%s <%s>" % (author_name, author_email)
         commit.author_timezone = author_timezone
         commit.author_time = int(author_timestamp)
@@ -161,15 +165,18 @@ class GitImportProcessor(processor.ImportProcessor):
                     self.repo.object_store.add(blob)
                     blob_id = blob.id
                 else:
-                    assert filecmd.dataref[0] == ":", "non-marker refs not supported yet"
+                    assert filecmd.dataref[0] == ":", \
+                        "non-marker refs not supported yet"
                     blob_id = self.markers[filecmd.dataref[1:]]
                 self._contents[filecmd.path] = (filecmd.mode, blob_id)
             elif filecmd.name == "filedelete":
                 del self._contents[filecmd.path]
             elif filecmd.name == "filecopy":
-                self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
+                self._contents[filecmd.dest_path] = self._contents[
+                    filecmd.src_path]
             elif filecmd.name == "filerename":
-                self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
+                self._contents[filecmd.new_path] = self._contents[
+                    filecmd.old_path]
                 del self._contents[filecmd.old_path]
             elif filecmd.name == "filedeleteall":
                 self._contents = {}

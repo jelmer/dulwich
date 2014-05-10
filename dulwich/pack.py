@@ -480,7 +480,7 @@ class FilePackIndex(PackIndex):
 
     def close(self):
         self._file.close()
-        if getattr(self._contents, "close", None) is not None:
+        if getattr(self._contents, 'close', None) is not None:
             self._contents.close()
 
     def __len__(self):
@@ -1605,7 +1605,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
         fan_out_table[i+1] += fan_out_table[i]
     for (name, offset, entry_checksum) in entries:
         if not (offset <= 0xffffffff):
-            raise TypeError("pack format 1 only supports offsets < 2Gb")
+            raise TypeError('pack format 1 only supports offsets < 2Gb')
         f.write(struct.pack('>L20s', offset, name))
     assert len(pack_checksum) == 20
     f.write(pack_checksum)

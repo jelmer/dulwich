@@ -104,7 +104,7 @@ class RefsContainer(object):
 
     def import_refs(self, base, other):
         for name, value in other.iteritems():
-            self["%s/%s" % (base, name)] = value
+            self['%s/%s' % (base, name)] = value
 
     def allkeys(self):
         """All refs present in this container."""
@@ -141,10 +141,10 @@ class RefsContainer(object):
         ret = {}
         keys = self.keys(base)
         if base is None:
-            base = ""
+            base = ''
         for key in keys:
             try:
-                ret[key] = self[("%s/%s" % (base, key)).strip("/")]
+                ret[key] = self[('%s/%s' % (base, key)).strip('/')]
             except KeyError:
                 continue  # Unable to resolve
 
@@ -348,8 +348,8 @@ class InfoRefsContainer(RefsContainer):
         self._refs = {}
         self._peeled = {}
         for l in f.readlines():
-            sha, name = l.rstrip("\n").split("\t")
-            if name.endswith("^{}"):
+            sha, name = l.rstrip('\n').split('\t')
+            if name.endswith('^{}'):
                 name = name[:-3]
                 if not check_ref_format(name):
                     raise ValueError("invalid ref name '%s'" % name)
@@ -384,33 +384,33 @@ class DiskRefsContainer(RefsContainer):
         self._peeled_refs = None
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.path)
+        return '%s(%r)' % (self.__class__.__name__, self.path)
 
     def subkeys(self, base):
         keys = set()
         path = self.refpath(base)
         for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, '/')
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/")
+                refname = ('%s/%s' % (dir, filename)).strip('/')
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
-                if check_ref_format("%s/%s" % (base, refname)):
+                if check_ref_format('%s/%s' % (base, refname)):
                     keys.add(refname)
         for key in self.get_packed_refs():
             if key.startswith(base):
-                keys.add(key[len(base):].strip("/"))
+                keys.add(key[len(base):].strip('/'))
         return keys
 
     def allkeys(self):
         keys = set()
-        if os.path.exists(self.refpath("HEAD")):
-            keys.add("HEAD")
-        path = self.refpath("")
-        for root, dirs, files in os.walk(self.refpath("refs")):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        if os.path.exists(self.refpath('HEAD')):
+            keys.add('HEAD')
+        path = self.refpath('')
+        for root, dirs, files in os.walk(self.refpath('refs')):
+            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, '/')
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/")
+                refname = ('%s/%s' % (dir, filename)).strip('/')
                 if check_ref_format(refname):
                     keys.add(refname)
         keys.update(self.get_packed_refs())
@@ -418,8 +418,8 @@ class DiskRefsContainer(RefsContainer):
 
     def refpath(self, name):
         """Return the disk path of a ref."""
-        if os.path.sep != "/":
-            name = name.replace("/", os.path.sep)
+        if os.path.sep != '/':
+            name = name.replace('/', os.path.sep)
         return os.path.join(self.path, name)
 
     def get_packed_refs(self):
@@ -445,7 +445,7 @@ class DiskRefsContainer(RefsContainer):
                 raise
             try:
                 first_line = next(iter(f)).rstrip()
-                if (first_line.startswith("# pack-refs") and " peeled" in
+                if (first_line.startswith('# pack-refs') and ' peeled' in
                         first_line):
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
                         self._packed_refs[name] = sha
@@ -496,7 +496,7 @@ class DiskRefsContainer(RefsContainer):
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
-                    return header + next(iter(f)).rstrip("\r\n")
+                    return header + next(iter(f)).rstrip('\r\n')
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
@@ -581,7 +581,7 @@ class DiskRefsContainer(RefsContainer):
                     f.abort()
                     raise
             try:
-                f.write(new_ref + "\n")
+                f.write(new_ref + '\n')
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -614,7 +614,7 @@ class DiskRefsContainer(RefsContainer):
                 f.abort()
                 return False
             try:
-                f.write(ref + "\n")
+                f.write(ref + '\n')
             except (OSError, IOError):
                 f.abort()
                 raise
@@ -659,7 +659,7 @@ class DiskRefsContainer(RefsContainer):
 
 def _split_ref_line(line):
     """Split a single ref line into a tuple of SHA1 and name."""
-    fields = line.rstrip("\n").split(" ")
+    fields = line.rstrip('\n').split(' ')
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line '%s'" % line)
     sha, name = fields
@@ -679,12 +679,12 @@ def read_packed_refs(f):
     :return: Iterator over tuples with SHA1s and ref names.
     """
     for l in f:
-        if l[0] == "#":
+        if l[0] == '#':
             # Comment
             continue
-        if l[0] == "^":
+        if l[0] == '^':
             raise PackedRefsException(
-              "found peeled ref in packed-refs without peeled")
+              'found peeled ref in packed-refs without peeled')
         yield _split_ref_line(l)
 
 
@@ -698,12 +698,12 @@ def read_packed_refs_with_peeled(f):
     """
     last = None
     for l in f:
-        if l[0] == "#":
+        if l[0] == '#':
             continue
-        l = l.rstrip("\r\n")
-        if l[0] == "^":
+        l = l.rstrip('\r\n')
+        if l[0] == '^':
             if not last:
-                raise PackedRefsException("unexpected peeled ref line")
+                raise PackedRefsException('unexpected peeled ref line')
             try:
                 hex_to_sha(l[1:])
             except (AssertionError, TypeError) as e:
@@ -741,7 +741,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 def read_info_refs(f):
     ret = {}
     for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
+        (sha, name) = l.rstrip('\r\n').split('\t', 1)
         ret[name] = sha
     return ret
 

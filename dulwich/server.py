@@ -156,7 +156,7 @@ class DictBackend(Backend):
             return self.repos[path]
         except KeyError:
             raise NotGitRepository(
-                "No git repository was found at %(path)s" % dict(path=path)
+                'No git repository was found at %(path)s' % dict(path=path)
             )
 
 
@@ -189,7 +189,7 @@ class Handler(object):
 
     @classmethod
     def innocuous_capabilities(cls):
-        return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
+        return ('include-tag', 'thin-pack', 'no-progress', 'ofs-delta')
 
     @classmethod
     def required_capabilities(cls):
@@ -231,15 +231,15 @@ class UploadPackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta", "no-progress", "include-tag", "shallow")
+        return ('multi_ack_detailed', 'multi_ack', 'side-band-64k', 'thin-pack',
+                'ofs-delta', 'no-progress', 'include-tag', 'shallow')
 
     @classmethod
     def required_capabilities(cls):
-        return ("side-band-64k", "thin-pack", "ofs-delta")
+        return ('side-band-64k', 'thin-pack', 'ofs-delta')
 
     def progress(self, message):
-        if self.has_capability("no-progress"):
+        if self.has_capability('no-progress'):
             return
         self.proto.write_sideband(2, message)
 
@@ -254,12 +254,12 @@ class UploadPackHandler(Handler):
         :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha
             of a tag whose peeled value is peeled_sha.
         """
-        if not self.has_capability("include-tag"):
+        if not self.has_capability('include-tag'):
             return {}
         if refs is None:
             refs = self.repo.get_refs()
         if repo is None:
-            repo = getattr(self.repo, "repo", None)
+            repo = getattr(self.repo, 'repo', None)
             if repo is None:
                 # Bail if we don't have a Repo available; this is ok since
                 # clients must be able to handle if the server doesn't include
@@ -287,12 +287,12 @@ class UploadPackHandler(Handler):
         if len(objects_iter) == 0:
             return
 
-        self.progress("dul-daemon says what\n")
-        self.progress("counting objects: %d, done.\n" % len(objects_iter))
+        self.progress('dul-daemon says what\n')
+        self.progress('counting objects: %d, done.\n' % len(objects_iter))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress("how was that, then?\n")
+        self.progress('how was that, then?\n')
         # we are done
-        self.proto.write("0000")
+        self.proto.write('0000')
 
 
 def _split_proto_line(line, allowed):
@@ -422,10 +422,10 @@ class ProtocolGraphWalker(object):
         values = set(heads.itervalues())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.iteritems())):
-                line = "%s %s" % (sha, ref)
+                line = '%s %s' % (sha, ref)
                 if not i:
-                    line = "%s\x00%s" % (line, self.handler.capability_line())
-                self.proto.write_pkt_line("%s\n" % line)
+                    line = '%s\x00%s' % (line, self.handler.capability_line())
+                self.proto.write_pkt_line('%s\n' % line)
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line('%s %s^{}\n' %
@@ -552,7 +552,7 @@ class ProtocolGraphWalker(object):
             commit = pending.popleft()
             if commit.id in haves:
                 return True
-            if commit.type_name != "commit":
+            if commit.type_name != 'commit':
                 # non-commit wants are assumed to be satisfied
                 continue
             for parent in commit.parents:
@@ -705,7 +705,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return ("report-status", "delete-refs", "side-band-64k")
+        return ('report-status', 'delete-refs', 'side-band-64k')
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
@@ -721,7 +721,7 @@ class ReceivePackHandler(Handler):
         if will_send_pack:
             # TODO: more informative error messages than just the exception string
             try:
-                recv = getattr(self.proto, "recv", None)
+                recv = getattr(self.proto, 'recv', None)
                 p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append(('unpack', 'ok'))
             except all_exceptions as e:
@@ -785,16 +785,16 @@ class ReceivePackHandler(Handler):
         if self.advertise_refs or not self.http_req:
             if refs:
                 self.proto.write_pkt_line(
-                  "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
+                  '%s %s\x00%s\n' % (refs[0][1], refs[0][0],
                                      self.capability_line()))
                 for i in range(1, len(refs)):
                     ref = refs[i]
-                    self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+                    self.proto.write_pkt_line('%s %s\n' % (ref[1], ref[0]))
             else:
-                self.proto.write_pkt_line("%s capabilities^{}\0%s" % (
+                self.proto.write_pkt_line('%s capabilities^{}\0%s' % (
                   ZERO_SHA, self.capability_line()))
 
-            self.proto.write("0000")
+            self.proto.write('0000')
             if self.advertise_refs:
                 return
 
@@ -877,20 +877,20 @@ def main(argv=sys.argv):
     """Entry point for starting a TCP git server."""
     import optparse
     parser = optparse.OptionParser()
-    parser.add_option("-b", "--backend", dest="backend",
-                      help="Select backend to use.",
-                      choices=["file"], default="file")
+    parser.add_option('-b', '--backend', dest='backend',
+                      help='Select backend to use.',
+                      choices=['file'], default='file')
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    if options.backend == "file":
+    if options.backend == 'file':
         if len(argv) > 1:
             gitdir = args[1]
         else:
             gitdir = '.'
         backend = DictBackend({'/': Repo(gitdir)})
     else:
-        raise Exception("No such backend %s." % backend)
+        raise Exception('No such backend %s.' % backend)
     server = TCPGitServer(backend, 'localhost')
     server.serve_forever()
 
@@ -944,10 +944,10 @@ def update_server_info(repo):
     similar to "git update-server-info".
     """
     repo._put_named_file(os.path.join('info', 'refs'),
-        "".join(generate_info_refs(repo)))
+        ''.join(generate_info_refs(repo)))
 
     repo._put_named_file(os.path.join('objects', 'info', 'packs'),
-        "".join(generate_objects_info_packs(repo)))
+        ''.join(generate_objects_info_packs(repo)))
 
 
 if __name__ == '__main__':

@@ -32,7 +32,7 @@ from dulwich.errors import (
 
 TCP_GIT_PORT = 9418
 
-ZERO_SHA = "0" * 40
+ZERO_SHA = '0' * 40
 
 SINGLE_ACK = 0
 MULTI_ACK = 1
@@ -199,7 +199,7 @@ class Protocol(object):
         # 65520-5 = 65515
         # WTF: Why have the len in ASCII, but the channel in binary.
         while blob:
-            self.write_pkt_line("%s%s" % (chr(channel), blob[:65515]))
+            self.write_pkt_line('%s%s' % (chr(channel), blob[:65515]))
             blob = blob[65515:]
 
     def send_cmd(self, cmd, *args):
@@ -210,7 +210,7 @@ class Protocol(object):
         :param cmd: The remote service to access.
         :param args: List of arguments to send to remove service.
         """
-        self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
+        self.write_pkt_line('%s %s' % (cmd, ''.join(['%s\0' % a for a in args])))
 
     def read_cmd(self):
         """Read a command and some arguments from the git client
@@ -220,9 +220,9 @@ class Protocol(object):
         :return: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
-        splice_at = line.find(" ")
+        splice_at = line.find(' ')
         cmd, args = line[:splice_at], line[splice_at+1:]
-        assert args[-1] == "\x00"
+        assert args[-1] == '\x00'
         return cmd, args[:-1].split(chr(0))
 
 
@@ -301,7 +301,7 @@ class ReceivableProtocol(Protocol):
                 buf.write(data)
                 del data  # explicit free
                 break
-            assert n <= left, "_recv(%d) returned %d bytes" % (left, n)
+            assert n <= left, '_recv(%d) returned %d bytes' % (left, n)
             buf.write(data)
             buf_len += n
             del data  # explicit free
@@ -340,10 +340,10 @@ def extract_capabilities(text):
     :return: Tuple with text with capabilities removed and list of
         capabilities.
     """
-    if not "\0" in text:
+    if not '\0' in text:
         return text, []
-    text, capabilities = text.rstrip().split("\0")
-    return (text, capabilities.strip().split(" "))
+    text, capabilities = text.rstrip().split('\0')
+    return (text, capabilities.strip().split(' '))
 
 
 def extract_want_line_capabilities(text):
@@ -359,10 +359,10 @@ def extract_want_line_capabilities(text):
     :return: Tuple with text with capabilities removed and list of
         capabilities
     """
-    split_text = text.rstrip().split(" ")
+    split_text = text.rstrip().split(' ')
     if len(split_text) < 3:
         return text, []
-    return (" ".join(split_text[:2]), split_text[2:])
+    return (' '.join(split_text[:2]), split_text[2:])
 
 
 def ack_type(capabilities):

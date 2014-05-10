@@ -44,16 +44,16 @@ def pathsplit(path):
     :return: Tuple with directory name and basename
     """
     try:
-        (dirname, basename) = path.rsplit("/", 1)
+        (dirname, basename) = path.rsplit('/', 1)
     except ValueError:
-        return ("", path)
+        return ('', path)
     else:
         return (dirname, basename)
 
 
 def pathjoin(*args):
     """Join a /-delimited path."""
-    return "/".join([p for p in args if p])
+    return '/'.join([p for p in args if p])
 
 
 def read_cache_time(f):
@@ -62,7 +62,7 @@ def read_cache_time(f):
     :param f: File-like object to read from
     :return: Tuple with seconds and nanoseconds
     """
-    return struct.unpack(">LL", f.read(8))
+    return struct.unpack('>LL', f.read(8))
 
 
 def write_cache_time(f, t):
@@ -78,7 +78,7 @@ def write_cache_time(f, t):
         t = (int(secs), int(nsecs * 1000000000))
     elif not isinstance(t, tuple):
         raise TypeError(t)
-    f.write(struct.pack(">LL", *t))
+    f.write(struct.pack('>LL', *t))
 
 
 def read_cache_entry(f):
@@ -91,7 +91,7 @@ def read_cache_entry(f):
     ctime = read_cache_time(f)
     mtime = read_cache_time(f)
     (dev, ino, mode, uid, gid, size, sha, flags, ) = \
-        struct.unpack(">LLLLLL20sH", f.read(20 + 4 * 6 + 2))
+        struct.unpack('>LLLLLL20sH', f.read(20 + 4 * 6 + 2))
     name = f.read((flags & 0x0fff))
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
@@ -112,18 +112,18 @@ def write_cache_entry(f, entry):
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
     flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    f.write(struct.pack('>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    f.write("\0" * ((beginoffset + real_size) - f.tell()))
+    f.write('\0' * ((beginoffset + real_size) - f.tell()))
 
 
 def read_index(f):
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
-    if header != "DIRC":
-        raise AssertionError("Invalid index file header: %r" % header)
-    (version, num_entries) = struct.unpack(">LL", f.read(4 * 2))
+    if header != 'DIRC':
+        raise AssertionError('Invalid index file header: %r' % header)
+    (version, num_entries) = struct.unpack('>LL', f.read(4 * 2))
     assert version in (1, 2)
     for i in range(num_entries):
         yield read_cache_entry(f)
@@ -146,8 +146,8 @@ def write_index(f, entries):
     :param f: File-like object to write to
     :param entries: Iterable over the entries to write
     """
-    f.write("DIRC")
-    f.write(struct.pack(">LL", 2, len(entries)))
+    f.write('DIRC')
+    f.write(struct.pack('>LL', 2, len(entries)))
     for x in entries:
         write_cache_entry(f, x)
 
@@ -191,7 +191,7 @@ class Index(object):
         self.read()
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._filename)
+        return '%s(%r)' % (self.__class__.__name__, self._filename)
 
     def write(self):
         """Write current contents of index to disk."""
@@ -305,7 +305,7 @@ def commit_tree(object_store, blobs):
     :return: SHA1 of the created tree.
     """
 
-    trees = {"": {}}
+    trees = {'': {}}
 
     def add_tree(path):
         if path in trees:
@@ -334,7 +334,7 @@ def commit_tree(object_store, blobs):
             tree.add(basename, mode, sha)
         object_store.add_object(tree)
         return tree.id
-    return build_tree("")
+    return build_tree('')
 
 
 def commit_index(object_store, index):

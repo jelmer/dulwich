@@ -75,8 +75,8 @@ class ShellHook(Hook):
         """Execute the hook with given args"""
 
         if len(args) != self.numparam:
-            raise HookError("Hook %s executed with wrong number of args. \
-                            Expected %d. Saw %d. %s"
+            raise HookError('Hook %s executed with wrong number of args. \
+                            Expected %d. Saw %d. %s'
                             % (self.name, self.numparam, len(args)))
 
         if (self.pre_exec_callback is not None):
@@ -87,7 +87,7 @@ class ShellHook(Hook):
             if ret != 0:
                 if (self.post_exec_callback is not None):
                     self.post_exec_callback(0, *args)
-                raise HookError("Hook %s exited with non-zero status"
+                raise HookError('Hook %s exited with non-zero status.'
                                 % (self.name))
             if (self.post_exec_callback is not None):
                 return self.post_exec_callback(1, *args)

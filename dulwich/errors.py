@@ -35,10 +35,10 @@ class ChecksumMismatch(Exception):
         self.extra = extra
         if self.extra is None:
             Exception.__init__(self,
-                "Checksum mismatch: Expected %s, got %s" % (expected, got))
+                'Checksum mismatch: Expected %s, got %s' % (expected, got))
         else:
             Exception.__init__(self,
-                "Checksum mismatch: Expected %s, got %s; %s" %
+                'Checksum mismatch: Expected %s, got %s; %s' %
                 (expected, got, extra))
 
 
@@ -52,7 +52,7 @@ class WrongObjectException(Exception):
     """
 
     def __init__(self, sha, *args, **kwargs):
-        Exception.__init__(self, "%s is not a %s" % (sha, self.type_name))
+        Exception.__init__(self, '%s is not a %s' % (sha, self.type_name))
 
 
 class NotCommitError(WrongObjectException):
@@ -84,14 +84,14 @@ class MissingCommitError(Exception):
 
     def __init__(self, sha, *args, **kwargs):
         self.sha = sha
-        Exception.__init__(self, "%s is not in the revision store" % sha)
+        Exception.__init__(self, '%s is not in the revision store' % sha)
 
 
 class ObjectMissing(Exception):
     """Indicates that a requested object is missing."""
 
     def __init__(self, sha, *args, **kwargs):
-        Exception.__init__(self, "%s is not in the pack" % sha)
+        Exception.__init__(self, '%s is not in the pack' % sha)
 
 
 class ApplyDeltaError(Exception):
@@ -135,7 +135,7 @@ class HangupException(GitProtocolError):
 
     def __init__(self):
         Exception.__init__(self,
-            "The remote server unexpectedly closed the connection.")
+            'The remote server unexpectedly closed the connection.')
 
 
 class UnexpectedCommandError(GitProtocolError):

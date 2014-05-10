@@ -43,29 +43,29 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     :return: tuple with filename and contents
     """
     (num, total) = progress
-    f.write("From %s %s\n" % (commit.id, time.ctime(commit.commit_time)))
-    f.write("From: %s\n" % commit.author)
-    f.write("Date: %s\n" % time.strftime("%a, %d %b %Y %H:%M:%S %Z"))
-    f.write("Subject: [PATCH %d/%d] %s\n" % (num, total, commit.message))
-    f.write("\n")
-    f.write("---\n")
+    f.write('From %s %s\n' % (commit.id, time.ctime(commit.commit_time)))
+    f.write('From: %s\n' % commit.author)
+    f.write('Date: %s\n' % time.strftime('%a, %d %b %Y %H:%M:%S %Z'))
+    f.write('Subject: [PATCH %d/%d] %s\n' % (num, total, commit.message))
+    f.write('\n')
+    f.write('---\n')
     try:
         import subprocess
-        p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
+        p = subprocess.Popen(['diffstat'], stdout=subprocess.PIPE,
                              stdin=subprocess.PIPE)
     except (ImportError, OSError):
         pass # diffstat not available?
     else:
         (diffstat, _) = p.communicate(contents)
         f.write(diffstat)
-        f.write("\n")
+        f.write('\n')
     f.write(contents)
-    f.write("-- \n")
+    f.write('-- \n')
     if version is None:
         from dulwich import __version__ as dulwich_version
-        f.write("Dulwich %d.%d.%d\n" % dulwich_version)
+        f.write('Dulwich %d.%d.%d\n' % dulwich_version)
     else:
-        f.write("%s\n" % version)
+        f.write('%s\n' % version)
 
 
 def get_summary(commit):
@@ -74,7 +74,7 @@ def get_summary(commit):
     :param commit: Commit
     :return: Summary string
     """
-    return commit.message.splitlines()[0].replace(" ", "-")
+    return commit.message.splitlines()[0].replace(' ', '-')
 
 
 def unified_diff(a, b, fromfile='', tofile='', n=3):
@@ -90,7 +90,7 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
             yield '+++ %s\n' % tofile
             started = True
         i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        yield "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        yield '@@ -%d,%d +%d,%d @@\n' % (i1+1, i2-i1, j1+1, j2-j1)
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
@@ -132,7 +132,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     (new_path, new_mode, new_id) = new_file
     def shortid(hexsha):
         if hexsha is None:
-            return "0" * 7
+            return '0' * 7
         else:
             return hexsha[:7]
 
@@ -140,7 +140,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         if hexsha is None:
             return ''
         elif S_ISGITLINK(mode):
-            return "Submodule commit " + hexsha + "\n"
+            return 'Submodule commit ' + hexsha + '\n'
         else:
             return store[hexsha].data
 
@@ -151,29 +151,29 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
             return content.splitlines(True)
 
     if old_path is None:
-        old_path = "/dev/null"
+        old_path = '/dev/null'
     else:
-        old_path = "a/%s" % old_path
+        old_path = 'a/%s' % old_path
     if new_path is None:
-        new_path = "/dev/null"
+        new_path = '/dev/null'
     else:
-        new_path = "b/%s" % new_path
-    f.write("diff --git %s %s\n" % (old_path, new_path))
+        new_path = 'b/%s' % new_path
+    f.write('diff --git %s %s\n' % (old_path, new_path))
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                f.write("old mode %o\n" % old_mode)
-            f.write("new mode %o\n" % new_mode)
+                f.write('old mode %o\n' % old_mode)
+            f.write('new mode %o\n' % new_mode)
         else:
-            f.write("deleted mode %o\n" % old_mode)
-    f.write("index %s..%s" % (shortid(old_id), shortid(new_id)))
+            f.write('deleted mode %o\n' % old_mode)
+    f.write('index %s..%s' % (shortid(old_id), shortid(new_id)))
     if new_mode is not None:
-        f.write(" %o" % new_mode)
-    f.write("\n")
+        f.write(' %o' % new_mode)
+    f.write('\n')
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
     if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
-        f.write("Binary files %s and %s differ\n" % (old_path, new_path))
+        f.write('Binary files %s and %s differ\n' % (old_path, new_path))
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
             old_path, new_path))
@@ -193,7 +193,7 @@ def write_blob_diff(f, old_file, new_file):
     (new_path, new_mode, new_blob) = new_file
     def blob_id(blob):
         if blob is None:
-            return "0" * 7
+            return '0' * 7
         else:
             return blob.id[:7]
     def lines(blob):
@@ -202,25 +202,25 @@ def write_blob_diff(f, old_file, new_file):
         else:
             return []
     if old_path is None:
-        old_path = "/dev/null"
+        old_path = '/dev/null'
     else:
-        old_path = "a/%s" % old_path
+        old_path = 'a/%s' % old_path
     if new_path is None:
-        new_path = "/dev/null"
+        new_path = '/dev/null'
     else:
-        new_path = "b/%s" % new_path
-    f.write("diff --git %s %s\n" % (old_path, new_path))
+        new_path = 'b/%s' % new_path
+    f.write('diff --git %s %s\n' % (old_path, new_path))
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                f.write("old mode %o\n" % old_mode)
-            f.write("new mode %o\n" % new_mode)
+                f.write('old mode %o\n' % old_mode)
+            f.write('new mode %o\n' % new_mode)
         else:
-            f.write("deleted mode %o\n" % old_mode)
-    f.write("index %s..%s" % (blob_id(old_blob), blob_id(new_blob)))
+            f.write('deleted mode %o\n' % old_mode)
+    f.write('index %s..%s' % (blob_id(old_blob), blob_id(new_blob)))
     if new_mode is not None:
-        f.write(" %o" % new_mode)
-    f.write("\n")
+        f.write(' %o' % new_mode)
+    f.write('\n')
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
@@ -252,38 +252,38 @@ def git_am_patch_split(f):
     parser = email.parser.Parser()
     msg = parser.parse(f)
     c = Commit()
-    c.author = msg["from"]
-    c.committer = msg["from"]
+    c.author = msg['from']
+    c.committer = msg['from']
     try:
-        patch_tag_start = msg["subject"].index("[PATCH")
+        patch_tag_start = msg['subject'].index('[PATCH')
     except ValueError:
-        subject = msg["subject"]
+        subject = msg['subject']
     else:
-        close = msg["subject"].index("] ", patch_tag_start)
-        subject = msg["subject"][close+2:]
-    c.message = subject.replace("\n", "") + "\n"
+        close = msg['subject'].index('] ', patch_tag_start)
+        subject = msg['subject'][close+2:]
+    c.message = subject.replace('\n', '') + '\n'
     first = True
 
     body = BytesIO(msg.get_payload())
 
     for l in body:
-        if l == "---\n":
+        if l == '---\n':
             break
         if first:
-            if l.startswith("From: "):
-                c.author = l[len("From: "):].rstrip()
+            if l.startswith('From: '):
+                c.author = l[len('From: '):].rstrip()
             else:
-                c.message += "\n" + l
+                c.message += '\n' + l
             first = False
         else:
             c.message += l
-    diff = ""
+    diff = ''
     for l in body:
-        if l == "-- \n":
+        if l == '-- \n':
             break
         diff += l
     try:
-        version = next(body).rstrip("\n")
+        version = next(body).rstrip('\n')
     except StopIteration:
         version = None
     return c, diff, version

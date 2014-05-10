@@ -71,7 +71,7 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
-                if not sha in self and not ref.endswith("^{}") and
+                if not sha in self and not ref.endswith('^{}') and
                    not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -365,7 +365,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError("Invalid object name %r" % name)
+            raise AssertionError('Invalid object name %r' % name)
         for pack in self.packs:
             try:
                 return pack.get_raw(sha)
@@ -418,7 +418,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._alternates = None
 
     def __repr__(self):
-        return "<%s(%r)>" % (self.__class__.__name__, self.path)
+        return '<%s(%r)>' % (self.__class__.__name__, self.path)
 
     @property
     def alternates(self):
@@ -431,7 +431,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _read_alternate_paths(self):
         try:
-            f = GitFile(os.path.join(self.path, "info", "alternates"),
+            f = GitFile(os.path.join(self.path, 'info', 'alternates'),
                     'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
@@ -440,8 +440,8 @@ class DiskObjectStore(PackBasedObjectStore):
         ret = []
         try:
             for l in f.readlines():
-                l = l.rstrip("\n")
-                if l[0] == "#":
+                l = l.rstrip('\n')
+                if l[0] == '#':
                     continue
                 if os.path.isabs(l):
                     ret.append(l)
@@ -454,11 +454,11 @@ class DiskObjectStore(PackBasedObjectStore):
     def add_alternate_path(self, path):
         """Add an alternate path to this object store."""
         try:
-            os.mkdir(os.path.join(self.path, "info"))
+            os.mkdir(os.path.join(self.path, 'info'))
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        alternates_path = os.path.join(self.path, "info/alternates")
+        alternates_path = os.path.join(self.path, 'info/alternates')
         f = GitFile(alternates_path, 'wb')
         try:
             try:
@@ -471,7 +471,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     f.write(orig_f.read())
                 finally:
                     orig_f.close()
-            f.write("%s\n" % path)
+            f.write('%s\n' % path)
         finally:
             f.close()
 
@@ -492,8 +492,8 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_files = set()
         for name in pack_dir_contents:
             # TODO: verify that idx exists first
-            if name.startswith("pack-") and name.endswith(".pack"):
-                pack_files.add(name[:-len(".pack")])
+            if name.startswith('pack-') and name.endswith('.pack'):
+                pack_files.add(name[:-len('.pack')])
 
         # Open newly appeared pack files
         for f in pack_files:
@@ -632,15 +632,15 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
-            f = GitFile(basename+".idx", "wb")
+                'pack-%s' % iter_sha1(entry[0] for entry in entries))
+            f = GitFile(basename+'.idx', 'wb')
             try:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
             finally:
                 f.close()
         finally:
             p.close()
-        os.rename(path, basename + ".pack")
+        os.rename(path, basename + '.pack')
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
         return final_pack
@@ -652,7 +652,7 @@ class DiskObjectStore(PackBasedObjectStore):
             call when the pack is finished and an abort
             function.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
+        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix='.pack')
         f = os.fdopen(fd, 'wb')
         def commit():
             os.fsync(fd)
@@ -694,7 +694,7 @@ class DiskObjectStore(PackBasedObjectStore):
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        os.mkdir(os.path.join(path, "info"))
+        os.mkdir(os.path.join(path, 'info'))
         os.mkdir(os.path.join(path, PACKDIR))
         return cls(path)
 
@@ -712,7 +712,7 @@ class MemoryObjectStore(BaseObjectStore):
         elif len(sha) == 20:
             return sha_to_hex(sha)
         else:
-            raise ValueError("Invalid sha %r" % (sha,))
+            raise ValueError('Invalid sha %r' % (sha,))
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""
@@ -1054,7 +1054,7 @@ class MissingObjectFinder(object):
         if not leaf:
             o = self.object_store[sha]
             if isinstance(o, Commit):
-                self.add_todo([(o.tree, "", False)])
+                self.add_todo([(o.tree, '', False)])
             elif isinstance(o, Tree):
                 self.add_todo([(s, n, not stat.S_ISDIR(m))
                                for n, m, s in o.iteritems()
@@ -1064,7 +1064,7 @@ class MissingObjectFinder(object):
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress("counting objects: %d\r" % len(self.sha_done))
+        self.progress('counting objects: %d\r' % len(self.sha_done))
         return (sha, name)
 
 

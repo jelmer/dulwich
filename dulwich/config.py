@@ -65,11 +65,11 @@ class Config(object):
             value = self.get(section, name)
         except KeyError:
             return default
-        if value.lower() == "true":
+        if value.lower() == 'true':
             return True
-        elif value.lower() == "false":
+        elif value.lower() == 'false':
             return False
-        raise ValueError("not a valid boolean string: %r" % value)
+        raise ValueError('not a valid boolean string: %r' % value)
 
     def set(self, section, name, value):
         """Set a configuration value.
@@ -109,7 +109,7 @@ class ConfigDict(Config, MutableMapping):
         self._values = values
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._values)
+        return '%s(%r)' % (self.__class__.__name__, self._values)
 
     def __eq__(self, other):
         return (
@@ -133,7 +133,7 @@ class ConfigDict(Config, MutableMapping):
 
     @classmethod
     def _parse_setting(cls, name):
-        parts = name.split(".")
+        parts = name.split('.')
         if len(parts) == 3:
             return (parts[0], parts[1], parts[2])
         else:
@@ -162,10 +162,10 @@ class ConfigDict(Config, MutableMapping):
 
 
 def _format_string(value):
-    if (value.startswith(" ") or
-        value.startswith("\t") or
-        value.endswith(" ") or
-        value.endswith("\t")):
+    if (value.startswith(' ') or
+        value.startswith('\t') or
+        value.endswith(' ') or
+        value.endswith('\t')):
         return '"%s"' % _escape_value(value)
     return _escape_value(value)
 
@@ -176,40 +176,40 @@ def _parse_string(value):
     block = []
     in_quotes  = False
     for c in value:
-        if c == "\"":
+        if c == '"':
             in_quotes = (not in_quotes)
-            ret.append(_unescape_value("".join(block)))
+            ret.append(_unescape_value(''.join(block)))
             block = []
-        elif c in ("#", ";") and not in_quotes:
+        elif c in ('#', ';') and not in_quotes:
             # the rest of the line is a comment
             break
         else:
             block.append(c)
 
     if in_quotes:
-        raise ValueError("value starts with quote but lacks end quote")
+        raise ValueError('value starts with quote but lacks end quote')
 
-    ret.append(_unescape_value("".join(block)).rstrip())
+    ret.append(_unescape_value(''.join(block)).rstrip())
 
-    return "".join(ret)
+    return ''.join(ret)
 
 
 def _unescape_value(value):
     """Unescape a value."""
     def unescape(c):
         return {
-            "\\\\": "\\",
-            "\\\"": "\"",
-            "\\n": "\n",
-            "\\t": "\t",
-            "\\b": "\b",
+            '\\\\': '\\',
+            '\\"': '"',
+            '\\n': '\n',
+            '\\t': '\t',
+            '\\b': '\b',
             }[c.group(0)]
-    return re.sub(r"(\\.)", unescape, value)
+    return re.sub(r'(\\.)', unescape, value)
 
 
 def _escape_value(value):
     """Escape a value."""
-    return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t").replace("\"", "\\\"")
+    return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\t', '\\t').replace('"', '\\"')
 
 
 def _check_variable_name(name):
@@ -227,8 +227,8 @@ def _check_section_name(name):
 
 
 def _strip_comments(line):
-    line = line.split("#")[0]
-    line = line.split(";")[0]
+    line = line.split('#')[0]
+    line = line.split(';')[0]
     return line
 
 
@@ -244,47 +244,47 @@ class ConfigFile(ConfigDict):
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
-                if len(line) > 0 and line[0] == "[":
+                if len(line) > 0 and line[0] == '[':
                     line = _strip_comments(line).rstrip()
-                    last = line.index("]")
+                    last = line.index(']')
                     if last == -1:
-                        raise ValueError("expected trailing ]")
-                    pts = line[1:last].split(" ", 1)
+                        raise ValueError('expected trailing ]')
+                    pts = line[1:last].split(' ', 1)
                     line = line[last+1:]
                     pts[0] = pts[0].lower()
                     if len(pts) == 2:
-                        if pts[1][0] != "\"" or pts[1][-1] != "\"":
+                        if pts[1][0] != '"' or pts[1][-1] != '"':
                             raise ValueError(
-                                "Invalid subsection " + pts[1])
+                                'Invalid subsection ' + pts[1])
                         else:
                             pts[1] = pts[1][1:-1]
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %s" %
+                            raise ValueError('invalid section name %s' %
                                              pts[0])
                         section = (pts[0], pts[1])
                     else:
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %s" %
+                            raise ValueError('invalid section name %s' %
                                     pts[0])
-                        pts = pts[0].split(".", 1)
+                        pts = pts[0].split('.', 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])
                         else:
                             section = (pts[0], )
                     ret._values[section] = OrderedDict()
-                if _strip_comments(line).strip() == "":
+                if _strip_comments(line).strip() == '':
                     continue
                 if section is None:
-                    raise ValueError("setting %r without section" % line)
+                    raise ValueError('setting %r without section' % line)
                 try:
-                    setting, value = line.split("=", 1)
+                    setting, value = line.split('=', 1)
                 except ValueError:
                     setting = line
-                    value = "true"
+                    value = 'true'
                 setting = setting.strip().lower()
                 if not _check_variable_name(setting):
-                    raise ValueError("invalid variable name %s" % setting)
-                if value.endswith("\\\n"):
+                    raise ValueError('invalid variable name %s' % setting)
+                if value.endswith('\\\n'):
                     value = value[:-2]
                     continuation = True
                 else:
@@ -294,7 +294,7 @@ class ConfigFile(ConfigDict):
                 if not continuation:
                     setting = None
             else: # continuation line
-                if line.endswith("\\\n"):
+                if line.endswith('\\\n'):
                     line = line[:-2]
                     continuation = True
                 else:
@@ -335,11 +335,11 @@ class ConfigFile(ConfigDict):
                 (section_name, ) = section
                 subsection_name = None
             if subsection_name is None:
-                f.write("[%s]\n" % section_name)
+                f.write('[%s]\n' % section_name)
             else:
-                f.write("[%s \"%s\"]\n" % (section_name, subsection_name))
+                f.write('[%s "%s"]\n' % (section_name, subsection_name))
             for key, value in values.iteritems():
-                f.write("\t%s = %s\n" % (key, _escape_value(value)))
+                f.write('\t%s = %s\n' % (key, _escape_value(value)))
 
 
 class StackedConfig(Config):
@@ -350,7 +350,7 @@ class StackedConfig(Config):
         self.writable = writable
 
     def __repr__(self):
-        return "<%s for %r>" % (self.__class__.__name__, self.backends)
+        return '<%s for %r>' % (self.__class__.__name__, self.backends)
 
     @classmethod
     def default_backends(cls):
@@ -360,8 +360,8 @@ class StackedConfig(Config):
         configuration.
         """
         paths = []
-        paths.append(os.path.expanduser("~/.gitconfig"))
-        paths.append("/etc/gitconfig")
+        paths.append(os.path.expanduser('~/.gitconfig'))
+        paths.append('/etc/gitconfig')
         backends = []
         for path in paths:
             try:

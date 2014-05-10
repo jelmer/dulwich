@@ -44,18 +44,16 @@ def pathsplit(path):
     :return: Tuple with directory name and basename
     """
     try:
-        (dirname, basename) = path.rsplit("/", 1)
+        (dirname, basename) = path.rsplit('/', 1)
     except ValueError:
-        return ("", path)
+        return ('', path)
     else:
         return (dirname, basename)
 
 
 def pathjoin(*args):
-    """Join a /-delimited path.
-
-    """
-    return "/".join([p for p in args if p])
+    """Join a /-delimited path."""
+    return '/'.join([p for p in args if p])
 
 
 def read_cache_time(f):
@@ -64,7 +62,7 @@ def read_cache_time(f):
     :param f: File-like object to read from
     :return: Tuple with seconds and nanoseconds
     """
-    return struct.unpack(">LL", f.read(8))
+    return struct.unpack('>LL', f.read(8))
 
 
 def write_cache_time(f, t):
@@ -80,7 +78,7 @@ def write_cache_time(f, t):
         t = (int(secs), int(nsecs * 1000000000))
     elif not isinstance(t, tuple):
         raise TypeError(t)
-    f.write(struct.pack(">LL", *t))
+    f.write(struct.pack('>LL', *t))
 
 
 def read_cache_entry(f):
@@ -93,7 +91,7 @@ def read_cache_entry(f):
     ctime = read_cache_time(f)
     mtime = read_cache_time(f)
     (dev, ino, mode, uid, gid, size, sha, flags, ) = \
-        struct.unpack(">LLLLLL20sH", f.read(20 + 4 * 6 + 2))
+        struct.unpack('>LLLLLL20sH', f.read(20 + 4 * 6 + 2))
     name = f.read((flags & 0x0fff))
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
@@ -114,18 +112,18 @@ def write_cache_entry(f, entry):
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
     flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    f.write(struct.pack('>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    f.write("\0" * ((beginoffset + real_size) - f.tell()))
+    f.write('\0' * ((beginoffset + real_size) - f.tell()))
 
 
 def read_index(f):
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
-    if header != "DIRC":
-        raise AssertionError("Invalid index file header: %r" % header)
-    (version, num_entries) = struct.unpack(">LL", f.read(4 * 2))
+    if header != 'DIRC':
+        raise AssertionError('Invalid index file header: %r' % header)
+    (version, num_entries) = struct.unpack('>LL', f.read(4 * 2))
     assert version in (1, 2)
     for i in range(num_entries):
         yield read_cache_entry(f)
@@ -148,16 +146,14 @@ def write_index(f, entries):
     :param f: File-like object to write to
     :param entries: Iterable over the entries to write
     """
-    f.write("DIRC")
-    f.write(struct.pack(">LL", 2, len(entries)))
+    f.write('DIRC')
+    f.write(struct.pack('>LL', 2, len(entries)))
     for x in entries:
         write_cache_entry(f, x)
 
 
 def write_index_dict(f, entries):
-    """Write an index file based on the contents of a dictionary.
-
-    """
+    """Write an index file based on the contents of a dictionary."""
     entries_list = []
     for name in sorted(entries):
         entries_list.append((name,) + tuple(entries[name]))
@@ -195,7 +191,7 @@ class Index(object):
         self.read()
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._filename)
+        return '%s(%r)' % (self.__class__.__name__, self._filename)
 
     def write(self):
         """Write current contents of index to disk."""
@@ -228,7 +224,8 @@ class Index(object):
     def __getitem__(self, name):
         """Retrieve entry by relative path.
 
-        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid,
+            size, sha, flags)
         """
         return self._byname[name]
 
@@ -272,12 +269,16 @@ class Index(object):
             self[name] = value
 
     def changes_from_tree(self, object_store, tree, want_unchanged=False):
-        """Find the differences between the contents of this index and a tree.
+        """Find the differences between the contents of this index and a
+        tree.
 
-        :param object_store: Object store to use for retrieving tree contents
+        :param object_store: Object store to use for retrieving tree
+            contents
         :param tree: SHA1 of the root tree
-        :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :param want_unchanged: Whether unchanged files should be
+            reported
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+            newmode), (oldsha, newsha)
         """
         def lookup_entry(path):
             entry = self[path]
@@ -304,7 +305,7 @@ def commit_tree(object_store, blobs):
     :return: SHA1 of the created tree.
     """
 
-    trees = {"": {}}
+    trees = {'': {}}
 
     def add_tree(path):
         if path in trees:
@@ -333,7 +334,7 @@ def commit_tree(object_store, blobs):
             tree.add(basename, mode, sha)
         object_store.add_object(tree)
         return tree.id
-    return build_tree("")
+    return build_tree('')
 
 
 def commit_index(object_store, index):
@@ -354,11 +355,12 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
 
     :param names: Iterable of names in the working copy
     :param lookup_entry: Function to lookup an entry in the working copy
-    :param object_store: Object store to use for retrieving tree contents
+    :param object_store: Object store to use for retrieving tree
+        contents
     :param tree: SHA1 of the root tree, or None for an empty tree
     :param want_unchanged: Whether unchanged files should be reported
-    :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
-        (oldsha, newsha)
+    :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+         newmode), (oldsha, newsha)
     """
     other_names = set(names)
 
@@ -402,10 +404,11 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     :param prefix: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
-    :param honor_filemode: An optional flag to honor core.filemode setting in
-        config file, default is core.filemode=True, change executable bit
+    :param honor_filemode: An optional flag to honor core.filemode
+        setting in config file, default is core.filemode=True, change
+        executable bit
 
-    :note:: existing index is wiped and contents are not merged
+    :note: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
     """
 

@@ -16,7 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Simple wrapper that provides porcelain-like functions on top of Dulwich.
+"""Simple wrapper that provides porcelain-like functions on top of
+Dulwich.
 
 Currently implemented:
  * archive
@@ -63,7 +64,9 @@ from dulwich.server import update_server_info as server_update_server_info
 
 
 def open_repo(path_or_repo):
-    """Open an argument that can be a repository or a path for a repository."""
+    """Open an argument that can be a repository or a path for a
+    repository.
+    """
     if isinstance(path_or_repo, BaseRepo):
         return path_or_repo
     return Repo(path_or_repo)
@@ -73,7 +76,8 @@ def archive(location, committish=None, outstream=sys.stdout,
             errstream=sys.stderr):
     """Create an archive.
 
-    :param location: Location of repository for which to generate an archive.
+    :param location: Location of repository for which to generate an
+        archive.
     :param committish: Commit SHA1 or ref to use
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
@@ -81,11 +85,11 @@ def archive(location, committish=None, outstream=sys.stdout,
 
     client, path = get_transport_and_path(location)
     if committish is None:
-        committish = "HEAD"
+        committish = 'HEAD'
     client.archive(path, committish, outstream.write, errstream.write)
 
 
-def update_server_info(repo="."):
+def update_server_info(repo='.'):
     """Update server info files for a repository.
 
     :param repo: path to the repository
@@ -99,7 +103,8 @@ def symbolic_ref(repo, ref_name, force=False):
 
     :param repo: path to the repository
     :param ref_name: short name of the new ref
-    :param force: force settings without checking if it exists in refs/heads
+    :param force: force settings without checking if it exists in
+        refs/heads
     """
     repo_obj = open_repo(repo)
     ref_path = 'refs/heads/%s' % ref_name
@@ -108,7 +113,7 @@ def symbolic_ref(repo, ref_name, force=False):
     repo_obj.refs.set_symbolic_ref('HEAD', ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None):
+def commit(repo='.', message=None, author=None, committer=None):
     """Create a new commit.
 
     :param repo: Path to repository
@@ -137,7 +142,7 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
             author=author)
 
 
-def init(path=".", bare=False):
+def init(path='.', bare=False):
     """Create a new git repository.
 
     :param path: Path to repository.
@@ -165,11 +170,11 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     if checkout is None:
         checkout = (not bare)
     if checkout and bare:
-        raise ValueError("checkout and bare are incompatible")
+        raise ValueError('checkout and bare are incompatible')
     client, host_path = get_transport_and_path(source)
 
     if target is None:
-        target = host_path.split("/")[-1]
+        target = host_path.split('/')[-1]
 
     if not os.path.exists(target):
         os.mkdir(target)
@@ -180,20 +185,21 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     remote_refs = client.fetch(host_path, r,
         determine_wants=r.object_store.determine_wants_all,
         progress=outstream.write)
-    r["HEAD"] = remote_refs["HEAD"]
+    r['HEAD'] = remote_refs['HEAD']
     if checkout:
         outstream.write('Checking out HEAD')
         index.build_index_from_tree(r.path, r.index_path(),
-                                    r.object_store, r["HEAD"].tree)
+                                    r.object_store, r['HEAD'].tree)
 
     return r
 
 
-def add(repo=".", paths=None):
+def add(repo='.', paths=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add.  No value passed stages all modified files.
+    :param paths: Paths to add.  No value passed stages all modified
+        files.
     """
     # FIXME: Support patterns, directories.
     r = open_repo(repo)
@@ -209,7 +215,7 @@ def add(repo=".", paths=None):
     r.stage(paths)
 
 
-def rm(repo=".", paths=None):
+def rm(repo='.', paths=None):
     """Remove files from the staging area.
 
     :param repo: Repository for the files
@@ -228,15 +234,15 @@ def print_commit(commit, outstream):
     :param commit: A `Commit` object
     :param outstream: A stream file to write to
     """
-    outstream.write("-" * 50 + "\n")
-    outstream.write("commit: %s\n" % commit.id)
+    outstream.write('-' * 50 + '\n')
+    outstream.write('commit: %s\n' % commit.id)
     if len(commit.parents) > 1:
-        outstream.write("merge: %s\n" % "...".join(commit.parents[1:]))
-    outstream.write("author: %s\n" % commit.author)
-    outstream.write("committer: %s\n" % commit.committer)
-    outstream.write("\n")
-    outstream.write(commit.message + "\n")
-    outstream.write("\n")
+        outstream.write('merge: %s\n' % '...'.join(commit.parents[1:]))
+    outstream.write('author: %s\n' % commit.author)
+    outstream.write('committer: %s\n' % commit.committer)
+    outstream.write('\n')
+    outstream.write(commit.message + '\n')
+    outstream.write('\n')
 
 
 def print_tag(tag, outstream):
@@ -245,11 +251,11 @@ def print_tag(tag, outstream):
     :param tag: A `Tag` object
     :param outstream: A stream to write to
     """
-    outstream.write("Tagger: %s\n" % tag.tagger)
-    outstream.write("Date:   %s\n" % tag.tag_time)
-    outstream.write("\n")
-    outstream.write("%s\n" % tag.message)
-    outstream.write("\n")
+    outstream.write('Tagger: %s\n' % tag.tagger)
+    outstream.write('Date:   %s\n' % tag.tag_time)
+    outstream.write('\n')
+    outstream.write('%s\n' % tag.message)
+    outstream.write('\n')
 
 
 def show_blob(repo, blob, outstream):
@@ -282,7 +288,7 @@ def show_tree(repo, tree, outstream):
     :param outstream: Stream to write to
     """
     for n in tree:
-        outstream.write("%s\n" % n)
+        outstream.write('%s\n' % n)
 
 
 def show_tag(repo, tag, outstream):
@@ -298,14 +304,14 @@ def show_tag(repo, tag, outstream):
 
 def show_object(repo, obj, outstream):
     return {
-        "tree": show_tree,
-        "blob": show_blob,
-        "commit": show_commit,
-        "tag": show_tag,
+        'tree': show_tree,
+        'blob': show_blob,
+        'commit': show_commit,
+        'tag': show_tag,
             }[obj.type_name](repo, obj, outstream)
 
 
-def log(repo=".", outstream=sys.stdout, max_entries=None):
+def log(repo='.', outstream=sys.stdout, max_entries=None):
     """Write commit logs.
 
     :param repo: Path to repository
@@ -318,7 +324,7 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
         print_commit(entry.commit, outstream)
 
 
-def show(repo=".", objects=None, outstream=sys.stdout):
+def show(repo='.', objects=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
     :param repo: Path to repository
@@ -326,7 +332,7 @@ def show(repo=".", objects=None, outstream=sys.stdout):
     :param outstream: Stream to write to
     """
     if objects is None:
-        objects = ["HEAD"]
+        objects = ['HEAD']
     if not isinstance(objects, list):
         objects = [objects]
     r = open_repo(repo)
@@ -335,7 +341,8 @@ def show(repo=".", objects=None, outstream=sys.stdout):
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
-    """Compares the content and mode of blobs found via two tree objects.
+    """Compares the content and mode of blobs found via two tree
+    objects.
 
     :param repo: Path to repository
     :param old_tree: Id of old tree
@@ -355,11 +362,11 @@ def rev_list(repo, commits, outstream=sys.stdout):
     """
     r = open_repo(repo)
     for entry in r.get_walker(include=[r[c].id for c in commits]):
-        outstream.write("%s\n" % entry.commit.id)
+        outstream.write('%s\n' % entry.commit.id)
 
 
 def tag(repo, tag, author=None, message=None, annotated=False,
-        objectish="HEAD", tag_time=None, tag_timezone=None):
+        objectish='HEAD', tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
@@ -409,20 +416,20 @@ def list_tags(repo, outstream=sys.stdout):
     :param outstream: Stream to write tags to
     """
     r = open_repo(repo)
-    tags = list(r.refs.as_dict("refs/tags"))
+    tags = list(r.refs.as_dict('refs/tags'))
     tags.sort()
     return tags
 
 
-def reset(repo, mode, committish="HEAD"):
+def reset(repo, mode, committish='HEAD'):
     """Reset current HEAD to the specified state.
 
     :param repo: Path to repository
     :param mode: Mode ("hard", "soft", "mixed")
     """
 
-    if mode != "hard":
-        raise ValueError("hard is the only mode currently supported")
+    if mode != 'hard':
+        raise ValueError('hard is the only mode currently supported')
 
     r = open_repo(repo)
 
@@ -457,9 +464,9 @@ def push(repo, remote_location, refs_path,
     try:
         client.send_pack(path, update_refs,
             r.object_store.generate_pack_contents, progress=errstream.write)
-        outstream.write("Push to %s successful.\n" % remote_location)
+        outstream.write('Push to %s successful.\n' % remote_location)
     except (UpdateRefsError, SendPackError) as e:
-        outstream.write("Push to %s failed.\n" % remote_location)
+        outstream.write('Push to %s failed.\n' % remote_location)
         errstream.write("Push to %s failed -> '%s'\n" % e.message)
 
 
@@ -483,5 +490,5 @@ def pull(repo, remote_location, refs_path,
 
     # Perform 'git checkout .' - syncs staged changes
     indexfile = r.index_path()
-    tree = r["HEAD"].tree
+    tree = r['HEAD'].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)

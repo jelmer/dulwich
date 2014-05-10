@@ -18,7 +18,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Repository access.
 
 This module contains the base class for git repositories
@@ -86,15 +85,15 @@ OBJECTDIR = 'objects'
 REFSDIR = 'refs'
 REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
-INDEX_FILENAME = "index"
+INDEX_FILENAME = 'index'
 
 BASE_DIRECTORIES = [
-    ["branches"],
+    ['branches'],
     [REFSDIR],
     [REFSDIR, REFSDIR_TAGS],
     [REFSDIR, REFSDIR_HEADS],
-    ["hooks"],
-    ["info"]
+    ['hooks'],
+    ['info']
     ]
 
 
@@ -176,13 +175,13 @@ class BaseRepo(object):
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
-        self._put_named_file('description', "Unnamed repository")
+        self._put_named_file('description', 'Unnamed repository')
         f = BytesIO()
         cf = ConfigFile()
-        cf.set("core", "repositoryformatversion", "0")
-        cf.set("core", "filemode", "true")
-        cf.set("core", "bare", str(bare).lower())
-        cf.set("core", "logallrefupdates", "true")
+        cf.set('core', 'repositoryformatversion', '0')
+        cf.set('core', 'filemode', 'true')
+        cf.set('core', 'bare', str(bare).lower())
+        cf.set('core', 'logallrefupdates', 'true')
         cf.write_to_file(f)
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), '')
@@ -190,17 +189,19 @@ class BaseRepo(object):
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
-        Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-based Repo, the object returned need not be
-        pointing to a file in that location.
+        Although the filename should be interpreted as a filename
+        relative to the control dir in a disk-based Repo, the object
+        returned need not be pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
-        :return: An open file object, or None if the file does not exist.
+        :return: An open file object, or None if the file does not
+            exist.
         """
         raise NotImplementedError(self.get_named_file)
 
     def _put_named_file(self, path, contents):
-        """Write a file to the control dir with the given name and contents.
+        """Write a file to the control dir with the given name and
+        contents.
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
@@ -219,8 +220,8 @@ class BaseRepo(object):
         """Fetch objects into another repository.
 
         :param target: The target repository
-        :param determine_wants: Optional function to determine what refs to
-            fetch.
+        :param determine_wants: Optional function to determine what refs
+            to fetch.
         :param progress: Optional progress function
         :return: The local refs
         """
@@ -235,20 +236,20 @@ class BaseRepo(object):
                       get_tagged=None):
         """Fetch the missing objects required for a set of revisions.
 
-        :param determine_wants: Function that takes a dictionary with heads
-            and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions
-            to fetch and has an "ack" method that will be called to acknowledge
-            that a revision is present.
-        :param progress: Simple progress function that will be called with
-            updated progress strings.
-        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
-            sha for including tags.
+        :param determine_wants: Function that takes a dictionary with
+            heads and returns the list of heads to fetch.
+        :param graph_walker: Object that can iterate over the list of
+            revisions to fetch and has an "ack" method that will be
+            called to acknowledge that a revision is present.
+        :param progress: Simple progress function that will be called
+            with updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to
+            sha -> tag sha for including tags.
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
         if not isinstance(wants, list):
-            raise TypeError("determine_wants() did not return a list")
+            raise TypeError('determine_wants() did not return a list')
 
         shallows = getattr(graph_walker, 'shallow', frozenset())
         unshallows = getattr(graph_walker, 'unshallow', frozenset())
@@ -319,7 +320,7 @@ class BaseRepo(object):
             elif cls is Tag:
                 raise NotTagError(ret)
             else:
-                raise Exception("Type invalid: %r != %r" % (
+                raise Exception('Type invalid: %r != %r' % (
                   ret.type_name, cls.type_name))
         return ret
 
@@ -368,7 +369,8 @@ class BaseRepo(object):
     def set_description(self, description):
         """Set the description for this repository.
 
-        :param description: Text to set as description for this repository.
+        :param description: Text to set as description for this
+            repository.
         """
         raise NotImplementedError(self.set_description)
 
@@ -389,9 +391,9 @@ class BaseRepo(object):
         """Get the peeled value of a ref.
 
         :param ref: The refname to peel.
-        :return: The fully-peeled SHA1 of a tag object, after peeling all
-            intermediate tags; if the original ref does not point to a tag, this
-            will equal the original SHA1.
+        :return: The fully-peeled SHA1 of a tag object, after peeling
+            all intermediate tags; if the original ref does not point to
+            a tag, this will equal the original SHA1.
         """
         cached = self.refs.get_peeled(ref)
         if cached is not None:
@@ -401,26 +403,28 @@ class BaseRepo(object):
     def get_walker(self, include=None, *args, **kwargs):
         """Obtain a walker for this repository.
 
-        :param include: Iterable of SHAs of commits to include along with their
-            ancestors. Defaults to [HEAD]
-        :param exclude: Iterable of SHAs of commits to exclude along with their
-            ancestors, overriding includes.
-        :param order: ORDER_* constant specifying the order of results. Anything
-            other than ORDER_DATE may result in O(n) memory usage.
-        :param reverse: If True, reverse the order of output, requiring O(n)
-            memory.
-        :param max_entries: The maximum number of entries to yield, or None for
-            no limit.
-        :param paths: Iterable of file or subtree paths to show entries for.
+        :param include: Iterable of SHAs of commits to include along
+            with their ancestors. Defaults to [HEAD]
+        :param exclude: Iterable of SHAs of commits to exclude along
+            with their ancestors, overriding includes.
+        :param order: ORDER_* constant specifying the order of results.
+            Anything other than ORDER_DATE may result in O(n) memory
+            usage.
+        :param reverse: If True, reverse the order of output, requiring
+            O(n) memory.
+        :param max_entries: The maximum number of entries to yield, or
+            None for no limit.
+        :param paths: Iterable of file or subtree paths to show entries
+            for.
         :param rename_detector: diff.RenameDetector object for detecting
             renames.
-        :param follow: If True, follow path across renames/copies. Forces a
-            default rename_detector.
+        :param follow: If True, follow path across renames/copies.
+            Forces a default rename_detector.
         :param since: Timestamp to list commits after.
         :param until: Timestamp to list commits before.
-        :param queue_cls: A class to use for a queue of commits, supporting the
-            iterator protocol. The constructor takes a single argument, the
-            Walker.
+        :param queue_cls: A class to use for a queue of commits,
+            supporting the iterator protocol. The constructor takes a
+            single argument, the Walker.
         :return: A `Walker` object
         """
         from dulwich.walk import Walker
@@ -469,7 +473,7 @@ class BaseRepo(object):
         :param name: ref name
         :param value: Ref value - either a ShaFile object, or a hex sha
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith('refs/') or name == 'HEAD':
             if isinstance(value, ShaFile):
                 self.refs[name] = value.id
             elif isinstance(value, str):
@@ -484,7 +488,7 @@ class BaseRepo(object):
 
         :param name: Name of the ref to remove
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith('refs/') or name == 'HEAD':
             del self.refs[name]
         else:
             raise ValueError(name)
@@ -493,14 +497,15 @@ class BaseRepo(object):
         """Determine the identity to use for new commits.
         """
         config = self.get_config_stack()
-        return "%s <%s>" % (
-            config.get(("user", ), "name"),
-            config.get(("user", ), "email"))
+        return '%s <%s>' % (
+            config.get(('user', ), 'name'),
+            config.get(('user', ), 'email'))
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
 
-        :param updated_graftpoints: Dict of commit shas to list of parent shas
+        :param updated_graftpoints: Dict of commit shas to list of
+            parent shas
         """
 
         # Simple validation
@@ -529,14 +534,17 @@ class BaseRepo(object):
         :param committer: Committer fullname
         :param author: Author fullname (defaults to committer)
         :param commit_timestamp: Commit timestamp (defaults to now)
-        :param commit_timezone: Commit timestamp timezone (defaults to GMT)
-        :param author_timestamp: Author timestamp (defaults to commit timestamp)
+        :param commit_timezone: Commit timestamp timezone (defaults to
+            GMT)
+        :param author_timestamp: Author timestamp (defaults to commit
+            timestamp)
         :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
         :param tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
         :param encoding: Encoding
-        :param ref: Optional ref to commit to (defaults to current branch)
+        :param ref: Optional ref to commit to (defaults to current
+            branch)
         :param merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
         :return: New commit SHA1
         """
@@ -547,7 +555,7 @@ class BaseRepo(object):
             c.tree = index.commit(self.object_store)
         else:
             if len(tree) != 40:
-                raise ValueError("tree must be a 40-byte hex sha string")
+                raise ValueError('tree must be a 40-byte hex sha string')
             c.tree = tree
 
         try:
@@ -589,7 +597,7 @@ class BaseRepo(object):
             c.encoding = encoding
         if message is None:
             # FIXME: Try to read commit message from .git/MERGE_MSG
-            raise ValueError("No commit message specified")
+            raise ValueError('No commit message specified')
 
         try:
             c.message = self.hooks['commit-msg'].execute(message)
@@ -617,12 +625,12 @@ class BaseRepo(object):
             if not ok:
                 # Fail if the atomic compare-and-swap failed, leaving the commit and
                 # all its objects as garbage.
-                raise CommitError("%s changed during commit" % (ref,))
+                raise CommitError('%s changed during commit' % (ref,))
 
         try:
             self.hooks['post-commit'].execute()
         except HookError as e:  # silent failure
-            warnings.warn("post-commit hook failed: %s" % e, UserWarning)
+            warnings.warn('post-commit hook failed: %s' % e, UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
@@ -639,16 +647,16 @@ class Repo(BaseRepo):
     """
 
     def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
+        if os.path.isdir(os.path.join(root, '.git', OBJECTDIR)):
             self.bare = False
-            self._controldir = os.path.join(root, ".git")
+            self._controldir = os.path.join(root, '.git')
         elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
               os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
-        elif (os.path.isfile(os.path.join(root, ".git"))):
+        elif (os.path.isfile(os.path.join(root, '.git'))):
             import re
-            f = open(os.path.join(root, ".git"), 'r')
+            f = open(os.path.join(root, '.git'), 'r')
             try:
                 _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
             finally:
@@ -657,7 +665,7 @@ class Repo(BaseRepo):
             self._controldir = os.path.join(root, path)
         else:
             raise NotGitRepository(
-                "No git repository was found at %(path)s" % dict(path=root)
+                'No git repository was found at %(path)s' % dict(path=root)
             )
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.controldir(),
@@ -666,10 +674,10 @@ class Repo(BaseRepo):
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
-        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        graft_file = self.get_named_file(os.path.join('info', 'grafts'))
         if graft_file:
             self._graftpoints.update(parse_graftpoints(graft_file))
-        graft_file = self.get_named_file("shallow")
+        graft_file = self.get_named_file('shallow')
         if graft_file:
             self._graftpoints.update(parse_graftpoints(graft_file))
 
@@ -682,7 +690,8 @@ class Repo(BaseRepo):
         return self._controldir
 
     def _put_named_file(self, path, contents):
-        """Write a file to the control dir with the given name and contents.
+        """Write a file to the control dir with the given name and
+        contents.
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
@@ -697,12 +706,13 @@ class Repo(BaseRepo):
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
-        Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-based Repo, the object returned need not be
-        pointing to a file in that location.
+        Although the filename should be interpreted as a filename
+        relative to the control dir in a disk-based Repo, the object
+        returned need not be pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
-        :return: An open file object, or None if the file does not exist.
+        :return: An open file object, or None if the file does not
+            exist.
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
@@ -770,7 +780,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin="origin"):
+            origin='origin'):
         """Clone this repository.
 
         :param target_path: Target path
@@ -811,7 +821,7 @@ class Repo(BaseRepo):
     def _build_tree(self):
         from dulwich.index import build_index_from_tree
         config = self.get_config()
-        honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        honor_filemode = config.get_boolean('core', 'filemode', os.name != 'nt')
         return build_index_from_tree(self.path, self.index_path(),
                 self.object_store, self['HEAD'].tree,
                 honor_filemode=honor_filemode)
@@ -850,12 +860,13 @@ class Repo(BaseRepo):
             return None
 
     def __repr__(self):
-        return "<Repo at %r>" % self.path
+        return '<Repo at %r>' % self.path
 
     def set_description(self, description):
         """Set the description for this repository.
 
-        :param description: Text to set as description for this repository.
+        :param description: Text to set as description for this
+            repository.
         """
 
         path = os.path.join(self._controldir, 'description')
@@ -871,7 +882,7 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref('HEAD', 'refs/heads/master')
         ret._init_files(bare)
         return ret
 
@@ -885,7 +896,7 @@ class Repo(BaseRepo):
         """
         if mkdir:
             os.mkdir(path)
-        controldir = os.path.join(path, ".git")
+        controldir = os.path.join(path, '.git')
         os.mkdir(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)
@@ -907,8 +918,8 @@ class Repo(BaseRepo):
 class MemoryRepo(BaseRepo):
     """Repo that stores refs, objects, and named files in memory.
 
-    MemoryRepos are always bare: they have no working tree and no index, since
-    those have a stronger dependency on the filesystem.
+    MemoryRepos are always bare: they have no working tree and no index,
+    since those have a stronger dependency on the filesystem.
     """
 
     def __init__(self):
@@ -919,7 +930,8 @@ class MemoryRepo(BaseRepo):
         self._config = ConfigFile()
 
     def _put_named_file(self, path, contents):
-        """Write a file to the control dir with the given name and contents.
+        """Write a file to the control dir with the given name and
+        contents.
 
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
@@ -929,12 +941,13 @@ class MemoryRepo(BaseRepo):
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
-        Although the filename should be interpreted as a filename relative to
-        the control dir in a disk-baked Repo, the object returned need not be
-        pointing to a file in that location.
+        Although the filename should be interpreted as a filename
+        relative to the control dir in a disk-baked Repo, the object
+        returned need not be pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
-        :return: An open file object, or None if the file does not exist.
+        :return: An open file object, or None if the file does not
+            exist.
         """
         contents = self._named_files.get(path, None)
         if contents is None:

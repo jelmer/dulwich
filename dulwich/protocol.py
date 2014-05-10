@@ -32,7 +32,7 @@ from dulwich.errors import (
 
 TCP_GIT_PORT = 9418
 
-ZERO_SHA = "0" * 40
+ZERO_SHA = '0' * 40
 
 SINGLE_ACK = 0
 MULTI_ACK = 1
@@ -57,8 +57,8 @@ def pkt_line(data):
     """Wrap data in a pkt-line.
 
     :param data: The data to wrap, as a str or None.
-    :return: The data prefixed with its length in pkt-line format; if data was
-        None, returns the flush-pkt ('0000').
+    :return: The data prefixed with its length in pkt-line format; if
+        data was None, returns the flush-pkt ('0000').
     """
     if data is None:
         return '0000'
@@ -68,10 +68,11 @@ def pkt_line(data):
 class Protocol(object):
     """Class for interacting with a remote git process over the wire.
 
-    Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
-    consists of the length of the line as a 4-byte hex string, followed by the
-    payload data. The length includes the 4-byte header. The special line '0000'
-    indicates the end of a section of input and is called a 'flush-pkt'.
+    Parts of the git wire protocol use 'pkt-lines' to communicate. A
+    pkt-line consists of the length of the line as a 4-byte hex string,
+    followed by the payload data. The length includes the 4-byte header.
+    The special line '0000' indicates the end of a section of input and
+    is called a 'flush-pkt'.
 
     For details on the pkt-line format, see the cgit distribution:
         Documentation/technical/protocol-common.txt
@@ -86,10 +87,11 @@ class Protocol(object):
     def read_pkt_line(self):
         """Reads a pkt-line from the remote git process.
 
-        This method may read from the readahead buffer; see unread_pkt_line.
+        This method may read from the readahead buffer; see
+        unread_pkt_line.
 
-        :return: The next string from the stream, without the length prefix, or
-            None for a flush-pkt ('0000').
+        :return: The next string from the stream, without the length
+            prefix, or None for a flush-pkt ('0000').
         """
         if self._readahead is None:
             read = self.read
@@ -115,7 +117,8 @@ class Protocol(object):
     def eof(self):
         """Test whether the protocol stream has reached EOF.
 
-        Note that this refers to the actual stream EOF and not just a flush-pkt.
+        Note that this refers to the actual stream EOF and not just a
+        flush-pkt.
 
         :return: True if the stream is at EOF, False otherwise.
         """
@@ -142,7 +145,8 @@ class Protocol(object):
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
 
-        :return: Yields each line of data up to but not including the next flush-pkt.
+        :return: Yields each line of data up to but not including the
+            next flush-pkt.
         """
         pkt = self.read_pkt_line()
         while pkt:
@@ -152,8 +156,8 @@ class Protocol(object):
     def write_pkt_line(self, line):
         """Sends a pkt-line to the remote git process.
 
-        :param line: A string containing the data to send, without the length
-            prefix.
+        :param line: A string containing the data to send, without the
+            length prefix.
         """
         try:
             line = pkt_line(line)
@@ -188,13 +192,14 @@ class Protocol(object):
         """Write multiplexed data to the sideband.
 
         :param channel: An int specifying the channel to write to.
-        :param blob: A blob of data (as a string) to send on this channel.
+        :param blob: A blob of data (as a string) to send on this
+            channel.
         """
         # a pktline can be a max of 65520. a sideband line can therefore be
         # 65520-5 = 65515
         # WTF: Why have the len in ASCII, but the channel in binary.
         while blob:
-            self.write_pkt_line("%s%s" % (chr(channel), blob[:65515]))
+            self.write_pkt_line('%s%s' % (chr(channel), blob[:65515]))
             blob = blob[65515:]
 
     def send_cmd(self, cmd, *args):
@@ -205,7 +210,7 @@ class Protocol(object):
         :param cmd: The remote service to access.
         :param args: List of arguments to send to remove service.
         """
-        self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
+        self.write_pkt_line('%s %s' % (cmd, ''.join(['%s\0' % a for a in args])))
 
     def read_cmd(self):
         """Read a command and some arguments from the git client
@@ -215,9 +220,9 @@ class Protocol(object):
         :return: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
-        splice_at = line.find(" ")
+        splice_at = line.find(' ')
         cmd, args = line[:splice_at], line[splice_at+1:]
-        assert args[-1] == "\x00"
+        assert args[-1] == '\x00'
         return cmd, args[:-1].split(chr(0))
 
 
@@ -225,15 +230,16 @@ _RBUFSIZE = 8192  # Default read buffer size.
 
 
 class ReceivableProtocol(Protocol):
-    """Variant of Protocol that allows reading up to a size without blocking.
+    """Variant of Protocol that allows reading up to a size without
+    blocking.
 
-    This class has a recv() method that behaves like socket.recv() in addition
-    to a read() method.
+    This class has a recv() method that behaves like socket.recv() in
+    addition to a read() method.
 
-    If you want to read n bytes from the wire and block until exactly n bytes
-    (or EOF) are read, use read(n). If you want to read at most n bytes from the
-    wire but don't care if you get less, use recv(n). Note that recv(n) will
-    still block until at least one byte is read.
+    If you want to read n bytes from the wire and block until exactly
+    n bytes (or EOF) are read, use read(n). If you want to read at most
+    n bytes from the wire but don't care if you get less, use recv(n).
+    Note that recv(n) will still block until at least one byte is read.
     """
 
     def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
@@ -295,7 +301,7 @@ class ReceivableProtocol(Protocol):
                 buf.write(data)
                 del data  # explicit free
                 break
-            assert n <= left, "_recv(%d) returned %d bytes" % (left, n)
+            assert n <= left, '_recv(%d) returned %d bytes' % (left, n)
             buf.write(data)
             buf_len += n
             del data  # explicit free
@@ -331,29 +337,32 @@ def extract_capabilities(text):
     """Extract a capabilities list from a string, if present.
 
     :param text: String to extract from
-    :return: Tuple with text with capabilities removed and list of capabilities
+    :return: Tuple with text with capabilities removed and list of
+        capabilities.
     """
-    if not "\0" in text:
+    if not '\0' in text:
         return text, []
-    text, capabilities = text.rstrip().split("\0")
-    return (text, capabilities.strip().split(" "))
+    text, capabilities = text.rstrip().split('\0')
+    return (text, capabilities.strip().split(' '))
 
 
 def extract_want_line_capabilities(text):
     """Extract a capabilities list from a want line, if present.
 
-    Note that want lines have capabilities separated from the rest of the line
-    by a space instead of a null byte. Thus want lines have the form:
+    Note that want lines have capabilities separated from the rest of
+    the line by a space instead of a null byte. Thus want lines have the
+    form:
 
         want obj-id cap1 cap2 ...
 
     :param text: Want line to extract from
-    :return: Tuple with text with capabilities removed and list of capabilities
+    :return: Tuple with text with capabilities removed and list of
+        capabilities
     """
-    split_text = text.rstrip().split(" ")
+    split_text = text.rstrip().split(' ')
     if len(split_text) < 3:
         return text, []
-    return (" ".join(split_text[:2]), split_text[2:])
+    return (' '.join(split_text[:2]), split_text[2:])
 
 
 def ack_type(capabilities):
@@ -366,18 +375,20 @@ def ack_type(capabilities):
 
 
 class BufferedPktLineWriter(object):
-    """Writer that wraps its data in pkt-lines and has an independent buffer.
+    """Writer that wraps its data in pkt-lines and has an independent
+    buffer.
 
-    Consecutive calls to write() wrap the data in a pkt-line and then buffers it
-    until enough lines have been written such that their total length (including
-    length prefix) reach the buffer size.
+    Consecutive calls to write() wrap the data in a pkt-line and then
+    buffers it until enough lines have been written such that their
+    total length (including length prefix) reach the buffer size.
     """
 
     def __init__(self, write, bufsize=65515):
         """Initialize the BufferedPktLineWriter.
 
         :param write: A write callback for the underlying writer.
-        :param bufsize: The internal buffer size, including length prefixes.
+        :param bufsize: The internal buffer size, including length
+            prefixes.
         """
         self._write = write
         self._bufsize = bufsize
@@ -409,7 +420,8 @@ class BufferedPktLineWriter(object):
 
 
 class PktLineParser(object):
-    """Packet line parser that hands completed packets off to a callback.
+    """Packet line parser that hands completed packets off to a
+    callback.
     """
 
     def __init__(self, handle_pkt):
@@ -417,7 +429,8 @@ class PktLineParser(object):
         self._readahead = BytesIO()
 
     def parse(self, data):
-        """Parse a fragment of data and call back for any completed packets.
+        """Parse a fragment of data and call back for any completed
+        packets.
         """
         self._readahead.write(data)
         buf = self._readahead.getvalue()

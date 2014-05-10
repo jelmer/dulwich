@@ -32,7 +32,9 @@ def ensure_dir_exists(dirname):
 
 
 def fancy_rename(oldname, newname):
-    """Rename file with temporary backup file to rollback if rename fails"""
+    """Rename file with temporary backup file to rollback if rename
+    fails.
+    """
     if not os.path.exists(newname):
         try:
             os.rename(oldname, newname)
@@ -42,7 +44,7 @@ def fancy_rename(oldname, newname):
 
     # destination file exists
     try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        (fd, tmpfile) = tempfile.mkstemp('.tmp', prefix=oldname+'.', dir='.')
         os.close(fd)
         os.remove(tmpfile)
     except OSError as e:
@@ -68,10 +70,10 @@ def GitFile(filename, mode='rb', bufsize=-1):
 
     :note: See _GitFile for a description of the file locking protocol.
 
-    Only read-only and write-only (binary) modes are supported; r+, w+, and a
-    are not.  To read and write from the same file, you can take advantage of
-    the fact that opening a file for write does not actually open the file you
-    request.
+    Only read-only and write-only (binary) modes are supported; r+, w+,
+    and a are not.  To read and write from the same file, you can take
+    advantage of the fact that opening a file for write does not
+    actually open the file you request.
     """
     if 'a' in mode:
         raise IOError('append mode not supported for Git files')
@@ -89,11 +91,11 @@ class _GitFile(object):
     """File that follows the git locking protocol for writes.
 
     All writes to a file foo will be written into foo.lock in the same
-    directory, and the lockfile will be renamed to overwrite the original file
-    on close.
+    directory, and the lockfile will be renamed to overwrite the
+    original file on close.
 
-    :note: You *must* call close() or abort() on a _GitFile for the lock to be
-        released. Typically this will happen in a finally block.
+    :note: You *must* call close() or abort() on a _GitFile for the lock
+        to be released. Typically this will happen in a finally block.
     """
 
     PROXY_PROPERTIES = set(['closed', 'encoding', 'errors', 'mode', 'name',
@@ -105,7 +107,7 @@ class _GitFile(object):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
         fd = os.open(self._lockfilename,
-            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0))
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 
@@ -113,7 +115,8 @@ class _GitFile(object):
             setattr(self, method, getattr(self._file, method))
 
     def abort(self):
-        """Close and discard the lockfile without overwriting the target.
+        """Close and discard the lockfile without overwriting the
+        target.
 
         If the file is already closed, this is a no-op.
         """
@@ -132,13 +135,14 @@ class _GitFile(object):
     def close(self):
         """Close this file, saving the lockfile over the original.
 
-        :note: If this method fails, it will attempt to delete the lockfile.
-            However, it is not guaranteed to do so (e.g. if a filesystem becomes
-            suddenly read-only), which will prevent future writes to this file
-            until the lockfile is removed manually.
-        :raises OSError: if the original file could not be overwritten. The lock
-            file is still closed, so further attempts to write to the same file
-            object will raise ValueError.
+        :note: If this method fails, it will attempt to delete the
+            lockfile. However, it is not guaranteed to do so (e.g. if a
+            filesystem becomes suddenly read-only), which will prevent
+            future writes to this file until the lockfile is removed
+            manually.
+        :raises OSError: if the original file could not be overwritten.
+            The lock file is still closed, so further attempts to write
+            to the same file object will raise ValueError.
         """
         if self._closed:
             return

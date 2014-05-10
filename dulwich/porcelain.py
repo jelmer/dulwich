@@ -354,8 +354,10 @@ def rev_list(repo, commits, outstream=sys.stdout):
     :param outstream: Stream to write to
     """
     r = open_repo(repo)
-    for entry in r.get_walker(include=[r[c].id for c in commits]):
-        outstream.write("%s\n" % entry.commit.id)
+    includes = [r[c].id for c in commits if c[0] != '^']
+    excludes = [r[c[1:]].id for c in commits if c[0] == '^']
+    for entry in r.get_walker(include=includes, exclude=excludes):
+        outstream.write('%s\n' % entry.commit.id)
 
 
 def tag(repo, tag, author=None, message=None, annotated=False,

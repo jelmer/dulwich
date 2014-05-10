@@ -56,13 +56,13 @@ class ShellHook(Hook):
         :param path: absolute path to executable file
         :param numparam: number of requirements parameters
         :param pre_exec_callback: closure for setup before execution
-            Defaults to None. Takes in the variable argument list from the
-            execute functions and returns a modified argument list for the
-            shell hook.
+            Defaults to None. Takes in the variable argument list from
+            the execute functions and returns a modified argument list
+            for the shell hook.
         :param post_exec_callback: closure for cleanup after execution
-            Defaults to None. Takes in a boolean for hook success and the
-            modified argument list and returns the final hook return value
-            if applicable
+            Defaults to None. Takes in a boolean for hook success and
+            the modified argument list and returns the final hook return
+            value if applicable
         """
         self.name = name
         self.filepath = path

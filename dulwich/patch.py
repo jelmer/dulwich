@@ -18,8 +18,8 @@
 
 """Classes for dealing with git am-style patches.
 
-These patches are basically unified diffs with some extra metadata tacked
-on.
+These patches are basically unified diffs with some extra metadata
+tacked on.
 """
 
 from io import BytesIO
@@ -78,7 +78,8 @@ def get_summary(commit):
 
 
 def unified_diff(a, b, fromfile='', tofile='', n=3):
-    """difflib.unified_diff that doesn't write any dates or trailing spaces.
+    """difflib.unified_diff that doesn't write any dates or trailing
+    spaces.
 
     Based on the same function in Python2.6.5-rc2's difflib.py
     """
@@ -185,7 +186,8 @@ def write_blob_diff(f, old_file, new_file):
     :param old_file: (path, mode, hexsha) tuple (None if nonexisting)
     :param new_file: (path, mode, hexsha) tuple (None if nonexisting)
 
-    :note: The use of write_object_diff is recommended over this function.
+    :note: The use of write_object_diff is recommended over this
+        function.
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file

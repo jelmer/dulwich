@@ -52,9 +52,7 @@ def pathsplit(path):
 
 
 def pathjoin(*args):
-    """Join a /-delimited path.
-
-    """
+    """Join a /-delimited path."""
     return "/".join([p for p in args if p])
 
 
@@ -155,9 +153,7 @@ def write_index(f, entries):
 
 
 def write_index_dict(f, entries):
-    """Write an index file based on the contents of a dictionary.
-
-    """
+    """Write an index file based on the contents of a dictionary."""
     entries_list = []
     for name in sorted(entries):
         entries_list.append((name,) + tuple(entries[name]))
@@ -228,7 +224,8 @@ class Index(object):
     def __getitem__(self, name):
         """Retrieve entry by relative path.
 
-        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid,
+            size, sha, flags)
         """
         return self._byname[name]
 
@@ -272,12 +269,16 @@ class Index(object):
             self[name] = value
 
     def changes_from_tree(self, object_store, tree, want_unchanged=False):
-        """Find the differences between the contents of this index and a tree.
+        """Find the differences between the contents of this index and a
+        tree.
 
-        :param object_store: Object store to use for retrieving tree contents
+        :param object_store: Object store to use for retrieving tree
+            contents
         :param tree: SHA1 of the root tree
-        :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :param want_unchanged: Whether unchanged files should be
+            reported
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+            newmode), (oldsha, newsha)
         """
         def lookup_entry(path):
             entry = self[path]
@@ -354,11 +355,12 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
 
     :param names: Iterable of names in the working copy
     :param lookup_entry: Function to lookup an entry in the working copy
-    :param object_store: Object store to use for retrieving tree contents
+    :param object_store: Object store to use for retrieving tree
+        contents
     :param tree: SHA1 of the root tree, or None for an empty tree
     :param want_unchanged: Whether unchanged files should be reported
-    :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
-        (oldsha, newsha)
+    :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+         newmode), (oldsha, newsha)
     """
     other_names = set(names)
 
@@ -402,10 +404,11 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     :param prefix: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
-    :param honor_filemode: An optional flag to honor core.filemode setting in
-        config file, default is core.filemode=True, change executable bit
+    :param honor_filemode: An optional flag to honor core.filemode
+        setting in config file, default is core.filemode=True, change
+        executable bit
 
-    :note:: existing index is wiped and contents are not merged
+    :note: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
     """
 

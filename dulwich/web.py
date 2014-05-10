@@ -76,9 +76,9 @@ def url_prefix(mat):
     """Extract the URL prefix from a regex match.
 
     :param mat: A regex match object.
-    :returns: The URL prefix, defined as the text before the match in the
-        original string. Normalized to start with one leading slash and end with
-        zero.
+    :returns: The URL prefix, defined as the text before the match in
+        the original string. Normalized to start with one leading slash
+        and end with zero.
     """
     return '/' + mat.string[:mat.start()].strip('/')
 
@@ -195,11 +195,12 @@ def get_info_packs(req, backend, mat):
 
 
 class _LengthLimitedFile(object):
-    """Wrapper class to limit the length of reads from a file-like object.
+    """Wrapper class to limit the length of reads from a file-like
+    object.
 
     This is used to ensure EOF is read from the wsgi.input object once
-    Content-Length bytes are read. This behavior is required by the WSGI spec
-    but not implemented in wsgiref as of 2.5.
+    Content-Length bytes are read. This behavior is required by the WSGI
+    spec but not implemented in wsgiref as of 2.5.
     """
 
     def __init__(self, input, max_bytes):
@@ -419,7 +420,9 @@ try:
         make_server,
     )
     class ServerHandlerLogger(ServerHandler):
-        """ServerHandler that uses dulwich's logger for logging exceptions."""
+        """ServerHandler that uses dulwich's logger for logging
+        exceptions.
+        """
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -432,7 +435,9 @@ try:
             logger.error(*args)
 
     class WSGIRequestHandlerLogger(WSGIRequestHandler):
-        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
+        """WSGIRequestHandler that uses dulwich's logger for logging
+        exceptions.
+        """
 
         def log_exception(self, exc_info):
             logger.exception('Exception happened during processing of request',
@@ -445,7 +450,7 @@ try:
             logger.error(*args)
 
         def handle(self):
-            """Handle a single HTTP request"""
+            """Handle a single HTTP request."""
 
             self.raw_requestline = self.rfile.readline()
             if not self.parse_request(): # An error code has been sent, just exit
@@ -487,7 +492,9 @@ except ImportError:
     # No wsgiref found; don't provide the reference functionality, but leave
     # the rest of the WSGI-based implementation.
     def main(argv=sys.argv):
-        """Stub entry point for failing to start a server without wsgiref."""
+        """Stub entry point for failing to start a server without
+        wsgiref.
+        """
         sys.stderr.write(
             'Sorry, the wsgiref module is required for dul-web.\n')
         sys.exit(1)

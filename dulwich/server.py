@@ -20,7 +20,8 @@
 """Git smart network protocol server implementation.
 
 For more detailed implementation on the network protocol, see the
-Documentation/technical directory in the cgit distribution, and in particular:
+Documentation/technical directory in the cgit distribution, and in
+particular:
 
 * Documentation/technical/protocol-capabilities.txt
 * Documentation/technical/pack-protocol.txt
@@ -113,8 +114,7 @@ class BackendRepo(object):
     refs = None
 
     def get_refs(self):
-        """
-        Get all the refs in the repository
+        """Get all the refs in the repository
 
         :return: dict of name -> sha
         """
@@ -124,21 +124,22 @@ class BackendRepo(object):
         """Return the cached peeled value of a ref, if available.
 
         :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to
-            a tag, this will be the SHA the ref refers to. If no cached
-            information about a tag is available, this method may return None,
-            but it should attempt to peel the tag if possible.
+        :return: The peeled value of the ref. If the ref is known not
+            point to a tag, this will be the SHA the ref refers to. If
+            no cached information about a tag is available, this method
+            may return None, but it should attempt to peel the tag if
+            possible.
         """
         return None
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):
-        """
-        Yield the objects required for a list of commits.
+        """Yield the objects required for a list of commits.
 
-        :param progress: is a callback to send progress messages to the client
-        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
-            sha for including tags.
+        :param progress: is a callback to send progress messages to the
+            client
+        :param get_tagged: Function that returns a dict of pointed-to
+            sha -> tag sha for including tags.
         """
         raise NotImplementedError
 
@@ -160,7 +161,9 @@ class DictBackend(Backend):
 
 
 class FileSystemBackend(Backend):
-    """Simple backend that looks up Git repositories in the local file system."""
+    """Simple backend that looks up Git repositories in the local file
+    system.
+    """
 
     def open_repository(self, path):
         logger.debug('opening repository at %s', path)
@@ -190,7 +193,9 @@ class Handler(object):
 
     @classmethod
     def required_capabilities(cls):
-        """Return a list of capabilities that we require the client to have."""
+        """Return a list of capabilities that we require the client to
+        have.
+        """
         return []
 
     def set_client_capabilities(self, caps):
@@ -239,14 +244,15 @@ class UploadPackHandler(Handler):
         self.proto.write_sideband(2, message)
 
     def get_tagged(self, refs=None, repo=None):
-        """Get a dict of peeled values of tags to their original tag shas.
+        """Get a dict of peeled values of tags to their original tag
+        shas.
 
-        :param refs: dict of refname -> sha of possible tags; defaults to all of
-            the backend's refs.
-        :param repo: optional Repo instance for getting peeled refs; defaults to
-            the backend's repo, if available
-        :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
-            tag whose peeled value is peeled_sha.
+        :param refs: dict of refname -> sha of possible tags; defaults
+            to all of the backend's refs.
+        :param repo: optional Repo instance for getting peeled refs;
+            defaults to the backend's repo, if available
+        :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha
+            of a tag whose peeled value is peeled_sha.
         """
         if not self.has_capability("include-tag"):
             return {}
@@ -295,16 +301,16 @@ def _split_proto_line(line, allowed):
     :param line: The line read from the wire.
     :param allowed: An iterable of command names that should be allowed.
         Command names not listed below as possible return values will be
-        ignored.  If None, any commands from the possible return values are
-        allowed.
+        ignored.  If None, any commands from the possible return values
+        are allowed.
     :return: a tuple having one of the following forms:
         ('want', obj_id)
         ('have', obj_id)
         ('done', None)
         (None, None)  (for a flush-pkt)
 
-    :raise UnexpectedCommandError: if the line cannot be parsed into one of the
-        allowed return values.
+    :raise UnexpectedCommandError: if the line cannot be parsed into one
+        of the allowed return values.
     """
     if not line:
         fields = [None]
@@ -333,9 +339,10 @@ def _find_shallow(store, heads, depth):
     :param store: An ObjectStore for looking up objects.
     :param heads: Iterable of head SHAs to start walking from.
     :param depth: The depth of ancestors to include.
-    :return: A tuple of (shallow, not_shallow), sets of SHAs that should be
-        considered shallow and unshallow according to the arguments. Note that
-        these sets may overlap if a commit is reachable along multiple paths.
+    :return: A tuple of (shallow, not_shallow), sets of SHAs that should
+        be considered shallow and unshallow according to the arguments.
+        Note that these sets may overlap if a commit is reachable along
+        multiple paths.
     """
     parents = {}
     def get_parents(sha):
@@ -368,15 +375,15 @@ def _find_shallow(store, heads, depth):
 class ProtocolGraphWalker(object):
     """A graph walker that knows the git protocol.
 
-    As a graph walker, this class implements ack(), next(), and reset(). It
-    also contains some base methods for interacting with the wire and walking
-    the commit tree.
+    As a graph walker, this class implements ack(), next(), and reset().
+    It also contains some base methods for interacting with the wire and
+    walking the commit tree.
 
     The work of determining which acks to send is passed on to the
-    implementation instance stored in _impl. The reason for this is that we do
-    not know at object creation time what ack level the protocol requires. A
-    call to set_ack_level() is required to set up the implementation, before any
-    calls to next() or ack() are made.
+    implementation instance stored in _impl. The reason for this is that
+    we do not know at object creation time what ack level the protocol
+    requires. A call to set_ack_level() is required to set up the
+    implementation, before any calls to next() or ack() are made.
     """
     def __init__(self, handler, object_store, get_peeled):
         self.handler = handler
@@ -397,16 +404,17 @@ class ProtocolGraphWalker(object):
     def determine_wants(self, heads):
         """Determine the wants for a set of heads.
 
-        The given heads are advertised to the client, who then specifies which
-        refs he wants using 'want' lines. This portion of the protocol is the
-        same regardless of ack type, and in fact is used to set the ack type of
-        the ProtocolGraphWalker.
+        The given heads are advertised to the client, who then specifies
+        which refs he wants using 'want' lines. This portion of the
+        protocol is the same regardless of ack type, and in fact is used
+        to set the ack type of the ProtocolGraphWalker.
 
-        If the client has the 'shallow' capability, this method also reads and
-        responds to the 'shallow' and 'deepen' lines from the client. These are
-        not part of the wants per se, but they set up necessary state for
-        walking the graph. Additionally, later code depends on this method
-        consuming everything up to the first 'have' line.
+        If the client has the 'shallow' capability, this method also
+        reads and responds to the 'shallow' and 'deepen' lines from the
+        client. These are not part of the wants per se, but they set up
+        necessary state for walking the graph. Additionally, later code
+        depends on this method consuming everything up to the first
+        'have' line.
 
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
@@ -483,9 +491,11 @@ class ProtocolGraphWalker(object):
     def read_proto_line(self, allowed):
         """Read a line from the wire.
 
-        :param allowed: An iterable of command names that should be allowed.
+        :param allowed: An iterable of command names that should be
+            allowed.
         :return: A tuple of (command, value); see _split_proto_line.
-        :raise UnexpectedCommandError: If an error occurred reading the line.
+        :raise UnexpectedCommandError: If an error occurred reading the
+            line.
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
@@ -527,14 +537,14 @@ class ProtocolGraphWalker(object):
     def _is_satisfied(self, haves, want, earliest):
         """Check whether a want is satisfied by a set of haves.
 
-        A want, typically a branch tip, is "satisfied" only if there exists a
-        path back from that want to one of the haves.
+        A want, typically a branch tip, is "satisfied" only if there
+        exists a path back from that want to one of the haves.
 
         :param haves: A set of commits we know the client has.
         :param want: The want to check satisfaction for.
-        :param earliest: A timestamp beyond which the search for haves will be
-            terminated, presumably because we're searching too far down the
-            wrong branch.
+        :param earliest: A timestamp beyond which the search for haves
+            will be terminated, presumably because we're searching too
+            far down the wrong branch.
         """
         o = self.store[want]
         pending = collections.deque([o])
@@ -553,11 +563,13 @@ class ProtocolGraphWalker(object):
         return False
 
     def all_wants_satisfied(self, haves):
-        """Check whether all the current wants are satisfied by a set of haves.
+        """Check whether all the current wants are satisfied by a set of
+        haves.
 
         :param haves: A set of commits we know the client has.
-        :note: Wants are specified with set_wants rather than passed in since
-            in the current interface they are determined outside this class.
+        :note: Wants are specified with set_wants rather than passed in
+            since in the current interface they are determined outside
+            this class.
         """
         haves = set(haves)
         earliest = min([self.store[h].commit_time for h in haves])
@@ -640,7 +652,9 @@ class MultiAckGraphWalkerImpl(object):
 
 
 class MultiAckDetailedGraphWalkerImpl(object):
-    """Graph walker implementation speaking the multi-ack-detailed protocol."""
+    """Graph walker implementation speaking the multi-ack-detailed
+    protocol.
+    """
 
     def __init__(self, walker):
         self.walker = walker
@@ -885,14 +899,19 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
                   outf=sys.stdout):
     """Serve a single command.
 
-    This is mostly useful for the implementation of commands used by e.g. git+ssh.
+    This is mostly useful for the implementation of commands used by
+    e.g. git+ssh.
 
     :param handler_cls: `Handler` class to use for the request
-    :param argv: execv-style command-line arguments. Defaults to sys.argv.
+    :param argv: execv-style command-line arguments. Defaults to
+        sys.argv.
     :param backend: `Backend` to use
-    :param inf: File-like object to read from, defaults to standard input.
-    :param outf: File-like object to write to, defaults to standard output.
-    :return: Exit code for use with sys.exit. 0 on success, 1 on failure.
+    :param inf: File-like object to read from, defaults to standard
+        input.
+    :param outf: File-like object to write to, defaults to standard
+        output.
+    :return: Exit code for use with sys.exit. 0 on success, 1 on
+        failure.
     """
     if backend is None:
         backend = FileSystemBackend()

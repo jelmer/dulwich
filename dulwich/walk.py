@@ -58,9 +58,10 @@ class WalkEntry(object):
         """Get the tree changes for this entry.
 
         :return: For commits with up to one parent, a list of TreeChange
-            objects; if the commit has no parents, these will be relative to the
-            empty tree. For merge commits, a list of lists of TreeChange
-            objects; see dulwich.diff.tree_changes_for_merge.
+            objects; if the commit has no parents, these will be
+            relative to the empty tree. For merge commits, a list of
+            lists of TreeChange objects; see
+            dulwich.diff.tree_changes_for_merge.
         """
         if self._changes is None:
             commit = self.commit
@@ -185,8 +186,8 @@ class _CommitTimeQueue(object):
 class Walker(object):
     """Object for performing a walk of commits in a store.
 
-    Walker objects are initialized with a store and other options and can then
-    be treated as iterators of Commit objects.
+    Walker objects are initialized with a store and other options and
+    can then be treated as iterators of Commit objects.
     """
 
     def __init__(self, store, include, exclude=None, order=ORDER_DATE,
@@ -197,27 +198,29 @@ class Walker(object):
         """Constructor.
 
         :param store: ObjectStore instance for looking up objects.
-        :param include: Iterable of SHAs of commits to include along with their
-            ancestors.
-        :param exclude: Iterable of SHAs of commits to exclude along with their
-            ancestors, overriding includes.
-        :param order: ORDER_* constant specifying the order of results. Anything
-            other than ORDER_DATE may result in O(n) memory usage.
-        :param reverse: If True, reverse the order of output, requiring O(n)
-            memory.
-        :param max_entries: The maximum number of entries to yield, or None for
-            no limit.
-        :param paths: Iterable of file or subtree paths to show entries for.
+        :param include: Iterable of SHAs of commits to include along
+            with their ancestors.
+        :param exclude: Iterable of SHAs of commits to exclude along
+            with their ancestors, overriding includes.
+        :param order: ORDER_* constant specifying the order of results.
+            Anything other than ORDER_DATE may result in O(n) memory
+            usage.
+        :param reverse: If True, reverse the order of output, requiring
+            O(n) memory.
+        :param max_entries: The maximum number of entries to yield, or
+            None for no limit.
+        :param paths: Iterable of file or subtree paths to show entries
+            for.
         :param rename_detector: diff.RenameDetector object for detecting
             renames.
-        :param follow: If True, follow path across renames/copies. Forces a
-            default rename_detector.
+        :param follow: If True, follow path across renames/copies.
+            Forces a default rename_detector.
         :param since: Timestamp to list commits after.
         :param until: Timestamp to list commits before.
         :param get_parents: Method to retrieve the parents of a commit
-        :param queue_cls: A class to use for a queue of commits, supporting the
-            iterator protocol. The constructor takes a single argument, the
-            Walker.
+        :param queue_cls: A class to use for a queue of commits,
+            supporting the iterator protocol. The constructor takes a
+            single argument, the Walker.
         """
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
@@ -272,8 +275,9 @@ class Walker(object):
         """Determine if a walk entry should be returned..
 
         :param entry: The WalkEntry to consider.
-        :return: True if the WalkEntry should be returned by this walk, or False
-            otherwise (e.g. if it doesn't match any requested paths).
+        :return: True if the WalkEntry should be returned by this walk,
+            or False otherwise (e.g. if it doesn't match any requested
+            paths).
         """
         commit = entry.commit
         if self.since is not None and commit.commit_time < self.since:
@@ -318,10 +322,10 @@ class Walker(object):
     def _reorder(self, results):
         """Possibly reorder a results iterator.
 
-        :param results: An iterator of WalkEntry objects, in the order returned
-            from the queue_cls.
-        :return: An iterator or list of WalkEntry objects, in the order required
-            by the Walker.
+        :param results: An iterator of WalkEntry objects, in the order
+            returned from the queue_cls.
+        :return: An iterator or list of WalkEntry objects, in the order
+            required by the Walker.
         """
         if self.order == ORDER_TOPO:
             results = _topo_reorder(results, self.get_parents)
@@ -336,13 +340,15 @@ class Walker(object):
 def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     """Reorder an iterable of entries topologically.
 
-    This works best assuming the entries are already in almost-topological
-    order, e.g. in commit time order.
+    This works best assuming the entries are already in
+    almost-topological order, e.g. in commit time order.
 
     :param entries: An iterable of WalkEntry objects.
-    :param get_parents: Optional function for getting the parents of a commit.
-    :return: iterator over WalkEntry objects from entries in FIFO order, except
-        where a parent would be yielded before any of its children.
+    :param get_parents: Optional function for getting the parents of a
+        commit.
+    :return: iterator over WalkEntry objects from entries in FIFO order,
+        except where a parent would be yielded before any of its
+        children.
     """
     todo = collections.deque()
     pending = {}

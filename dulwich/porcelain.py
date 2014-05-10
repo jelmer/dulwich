@@ -16,7 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Simple wrapper that provides porcelain-like functions on top of Dulwich.
+"""Simple wrapper that provides porcelain-like functions on top of
+Dulwich.
 
 Currently implemented:
  * archive
@@ -63,7 +64,9 @@ from dulwich.server import update_server_info as server_update_server_info
 
 
 def open_repo(path_or_repo):
-    """Open an argument that can be a repository or a path for a repository."""
+    """Open an argument that can be a repository or a path for a
+    repository.
+    """
     if isinstance(path_or_repo, BaseRepo):
         return path_or_repo
     return Repo(path_or_repo)
@@ -73,7 +76,8 @@ def archive(location, committish=None, outstream=sys.stdout,
             errstream=sys.stderr):
     """Create an archive.
 
-    :param location: Location of repository for which to generate an archive.
+    :param location: Location of repository for which to generate an
+        archive.
     :param committish: Commit SHA1 or ref to use
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
@@ -99,7 +103,8 @@ def symbolic_ref(repo, ref_name, force=False):
 
     :param repo: path to the repository
     :param ref_name: short name of the new ref
-    :param force: force settings without checking if it exists in refs/heads
+    :param force: force settings without checking if it exists in
+        refs/heads
     """
     repo_obj = open_repo(repo)
     ref_path = 'refs/heads/%s' % ref_name
@@ -193,7 +198,8 @@ def add(repo=".", paths=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add.  No value passed stages all modified files.
+    :param paths: Paths to add.  No value passed stages all modified
+        files.
     """
     # FIXME: Support patterns, directories.
     r = open_repo(repo)
@@ -335,7 +341,8 @@ def show(repo=".", objects=None, outstream=sys.stdout):
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
-    """Compares the content and mode of blobs found via two tree objects.
+    """Compares the content and mode of blobs found via two tree
+    objects.
 
     :param repo: Path to repository
     :param old_tree: Id of old tree

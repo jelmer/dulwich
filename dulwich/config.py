@@ -43,7 +43,8 @@ class Config(object):
     def get(self, section, name):
         """Retrieve the contents of a configuration setting.
 
-        :param section: Tuple with section name and optional subsection namee
+        :param section: Tuple with section name and optional subsection
+            name
         :param subsection: Subsection name
         :return: Contents of the setting
         :raise KeyError: if the value is not set
@@ -53,7 +54,8 @@ class Config(object):
     def get_boolean(self, section, name, default=None):
         """Retrieve a configuration setting as boolean.
 
-        :param section: Tuple with section name and optional subsection namee
+        :param section: Tuple with section name and optional subsection
+            name
         :param name: Name of the setting, including section and possible
             subsection.
         :return: Contents of the setting
@@ -72,7 +74,8 @@ class Config(object):
     def set(self, section, name, value):
         """Set a configuration value.
 
-        :param section: Tuple with section name and optional subsection namee
+        :param section: Tuple with section name and optional subsection
+            name
         :param name: Name of the configuration value, including section
             and optional subsection
         :param: Value of the setting
@@ -82,7 +85,8 @@ class Config(object):
     def iteritems(self, section):
         """Iterate over the configuration pairs for a specific section.
 
-        :param section: Tuple with section name and optional subsection namee
+        :param section: Tuple with section name and optional subsection
+            name
         :return: Iterator over (name, value) pairs
         """
         raise NotImplementedError(self.iteritems)
@@ -229,8 +233,7 @@ def _strip_comments(line):
 
 
 class ConfigFile(ConfigDict):
-    """A Git configuration file, like .git/config or ~/.gitconfig.
-    """
+    """A Git configuration file, like .git/config or ~/.gitconfig."""
 
     @classmethod
     def from_file(cls, f):
@@ -340,7 +343,7 @@ class ConfigFile(ConfigDict):
 
 
 class StackedConfig(Config):
-    """Configuration which reads from multiple config files.."""
+    """Configuration which reads from multiple config files."""
 
     def __init__(self, backends, writable=None):
         self.backends = backends

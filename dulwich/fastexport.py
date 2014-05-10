@@ -17,7 +17,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-
 """Fast export/import functionality."""
 
 from dulwich.index import (
@@ -110,8 +109,8 @@ class GitFastExporter(object):
 
 
 class GitImportProcessor(processor.ImportProcessor):
-    """An import processor that imports into a Git repository using Dulwich.
-
+    """An import processor that imports into a Git repository using
+    Dulwich.
     """
     # FIXME: Batch creation of objects?
 

@@ -17,10 +17,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+"""Ref handling."""
 
-"""Ref handling.
-
-"""
 import errno
 import os
 
@@ -88,8 +86,8 @@ class RefsContainer(object):
 
         :return: Dictionary mapping ref names to SHA1s
 
-        :note: Will return an empty dictionary when no packed-refs file is
-            present.
+        :note: Will return an empty dictionary when no packed-refs file
+            is present.
         """
         raise NotImplementedError(self.get_packed_refs)
 
@@ -97,9 +95,10 @@ class RefsContainer(object):
         """Return the cached peeled value of a ref, if available.
 
         :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to a
-            tag, this will be the SHA the ref refers to. If the ref may point to
-            a tag, but no cached information is available, None is returned.
+        :return: The peeled value of the ref. If the ref is known not
+            point to a tag, this will be the SHA the ref refers to. If
+            the ref may point to a tag, but no cached information is
+            available, None is returned.
         """
         return None
 
@@ -115,8 +114,8 @@ class RefsContainer(object):
         """Refs present in this container.
 
         :param base: An optional base to return refs under.
-        :return: An unsorted set of valid refs in this container, including
-            packed refs.
+        :return: An unsorted set of valid refs in this container,
+            including packed refs.
         """
         if base is not None:
             return self.subkeys(base)
@@ -127,8 +126,8 @@ class RefsContainer(object):
         """Refs present in this container under a base.
 
         :param base: The base to return refs under.
-        :return: A set of valid refs in this container under the base; the base
-            prefix is stripped from the ref names returned.
+        :return: A set of valid refs in this container under the base;
+            the base prefix is stripped from the ref names returned.
         """
         keys = set()
         base_len = len(base) + 1
@@ -138,9 +137,7 @@ class RefsContainer(object):
         return keys
 
     def as_dict(self, base=None):
-        """Return the contents of this container as a dictionary.
-
-        """
+        """Return the contents of this container as a dictionary."""
         ret = {}
         keys = self.keys(base)
         if base is None:
@@ -156,13 +153,15 @@ class RefsContainer(object):
     def _check_refname(self, name):
         """Ensure a refname is valid and lives in refs or is HEAD.
 
-        HEAD is not a valid refname according to git-check-ref-format, but this
-        class needs to be able to touch HEAD. Also, check_ref_format expects
-        refnames without the leading 'refs/', but this class requires that
-        so it cannot touch anything outside the refs dir (or HEAD).
+        HEAD is not a valid refname according to git-check-ref-format,
+        but this class needs to be able to touch HEAD. Also,
+        check_ref_format expects refnames without the leading 'refs/',
+        but this class requires that so it cannot touch anything outside
+        the refs dir (or HEAD).
 
         :param name: The name of the reference.
-        :raises KeyError: if a refname is not HEAD or is otherwise not valid.
+        :raises KeyError: if a refname is not HEAD or is otherwise not
+            valid.
         """
         if name in ('HEAD', 'refs/stash'):
             return
@@ -193,8 +192,8 @@ class RefsContainer(object):
     def _follow(self, name):
         """Follow a reference name.
 
-        :return: a tuple of (refname, sha), where refname is the name of the
-            last reference in the symbolic reference chain
+        :return: a tuple of (refname, sha), where refname is the name of
+            the last reference in the symbolic reference chain
         """
         contents = SYMREF + name
         depth = 0
@@ -226,13 +225,13 @@ class RefsContainer(object):
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.
 
-        This method follows all symbolic references if applicable for the
-        subclass, and can be used to perform an atomic compare-and-swap
-        operation.
+        This method follows all symbolic references if applicable for
+        the subclass, and can be used to perform an atomic
+        compare-and-swap operation.
 
         :param name: The refname to set.
-        :param old_ref: The old sha the refname must refer to, or None to set
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None
+            to set unconditionally.
         :param new_ref: The new sha the refname will refer to.
         :return: True if the set was successful, False otherwise.
         """
@@ -245,12 +244,12 @@ class RefsContainer(object):
     def __setitem__(self, name, ref):
         """Set a reference name to point to the given SHA1.
 
-        This method follows all symbolic references if applicable for the
-        subclass.
+        This method follows all symbolic references if applicable for
+        the subclass.
 
         :note: This method unconditionally overwrites the contents of a
-            reference. To update atomically only if the reference has not
-            changed, use set_if_equals().
+            reference. To update atomically only if the reference has
+            not changed, use set_if_equals().
         :param name: The refname to set.
         :param ref: The new sha the refname will refer to.
         """
@@ -259,13 +258,13 @@ class RefsContainer(object):
     def remove_if_equals(self, name, old_ref):
         """Remove a refname only if it currently equals old_ref.
 
-        This method does not follow symbolic references, even if applicable for
-        the subclass. It can be used to perform an atomic compare-and-delete
-        operation.
+        This method does not follow symbolic references, even if
+        applicable for the subclass. It can be used to perform an atomic
+        compare-and-delete operation.
 
         :param name: The refname to delete.
-        :param old_ref: The old sha the refname must refer to, or None to delete
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None
+            to delete unconditionally.
         :return: True if the delete was successful, False otherwise.
         """
         raise NotImplementedError(self.remove_if_equals)
@@ -273,12 +272,12 @@ class RefsContainer(object):
     def __delitem__(self, name):
         """Remove a refname.
 
-        This method does not follow symbolic references, even if applicable for
-        the subclass.
+        This method does not follow symbolic references, even if
+        applicable for the subclass.
 
-        :note: This method unconditionally deletes the contents of a reference.
-            To delete atomically only if the reference has not changed, use
-            remove_if_equals().
+        :note: This method unconditionally deletes the contents of a
+            reference. To delete atomically only if the reference has
+            not changed, use remove_if_equals().
 
         :param name: The refname to delete.
         """
@@ -288,8 +287,8 @@ class RefsContainer(object):
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.
 
-    This container does not support symbolic or packed references and is not
-    threadsafe.
+    This container does not support symbolic or packed references and is
+    not threadsafe.
     """
 
     def __init__(self, refs):
@@ -418,9 +417,7 @@ class DiskRefsContainer(RefsContainer):
         return keys
 
     def refpath(self, name):
-        """Return the disk path of a ref.
-
-        """
+        """Return the disk path of a ref."""
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
@@ -430,8 +427,8 @@ class DiskRefsContainer(RefsContainer):
 
         :return: Dictionary mapping ref names to SHA1s
 
-        :note: Will return an empty dictionary when no packed-refs file is
-            present.
+        :note: Will return an empty dictionary when no packed-refs file
+            is present.
         """
         # TODO: invalidate the cache on repacking
         if self._packed_refs is None:
@@ -466,9 +463,10 @@ class DiskRefsContainer(RefsContainer):
         """Return the cached peeled value of a ref, if available.
 
         :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to a
-            tag, this will be the SHA the ref refers to. If the ref may point to
-            a tag, but no cached information is available, None is returned.
+        :return: The peeled value of the ref. If the ref is known not
+            point to a tag, this will be the SHA the ref refers to. If
+            the ref may point to a tag, but no cached information is
+            available, None is returned.
         """
         self.get_packed_refs()
         if self._peeled_refs is None or name not in self._packed_refs:
@@ -483,12 +481,12 @@ class DiskRefsContainer(RefsContainer):
     def read_loose_ref(self, name):
         """Read a reference file and return its contents.
 
-        If the reference file a symbolic reference, only read the first line of
-        the file. Otherwise, only read the first 40 bytes.
+        If the reference file a symbolic reference, only read the first
+        line of the file. Otherwise, only read the first 40 bytes.
 
         :param name: the refname to read, relative to refpath
-        :return: The contents of the ref file, or None if the file does not
-            exist.
+        :return: The contents of the ref file, or None if the file does
+            not exist.
         :raises IOError: if any other error occurs
         """
         filename = self.refpath(name)
@@ -552,12 +550,12 @@ class DiskRefsContainer(RefsContainer):
     def set_if_equals(self, name, old_ref, new_ref):
         """Set a refname to new_ref only if it currently equals old_ref.
 
-        This method follows all symbolic references, and can be used to perform
-        an atomic compare-and-swap operation.
+        This method follows all symbolic references, and can be used to
+        perform an atomic compare-and-swap operation.
 
         :param name: The refname to set.
-        :param old_ref: The old sha the refname must refer to, or None to set
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None
+            to set unconditionally.
         :param new_ref: The new sha the refname will refer to.
         :return: True if the set was successful, False otherwise.
         """
@@ -594,8 +592,8 @@ class DiskRefsContainer(RefsContainer):
     def add_if_new(self, name, ref):
         """Add a new reference only if it does not already exist.
 
-        This method follows symrefs, and only ensures that the last ref in the
-        chain does not exist.
+        This method follows symrefs, and only ensures that the last ref
+        in the chain does not exist.
 
         :param name: The refname to set.
         :param ref: The new sha the refname will refer to.
@@ -627,12 +625,12 @@ class DiskRefsContainer(RefsContainer):
     def remove_if_equals(self, name, old_ref):
         """Remove a refname only if it currently equals old_ref.
 
-        This method does not follow symbolic references. It can be used to
-        perform an atomic compare-and-delete operation.
+        This method does not follow symbolic references. It can be used
+        to perform an atomic compare-and-delete operation.
 
         :param name: The refname to delete.
-        :param old_ref: The old sha the refname must refer to, or None to delete
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None
+            to delete unconditionally.
         :return: True if the delete was successful, False otherwise.
         """
         self._check_refname(name)
@@ -693,8 +691,8 @@ def read_packed_refs(f):
 def read_packed_refs_with_peeled(f):
     """Read a packed refs file including peeled refs.
 
-    Assumes the "# pack-refs with: peeled" line was already read. Yields tuples
-    with ref names, SHA1s, and peeled SHA1s (or None).
+    Assumes the "# pack-refs with: peeled" line was already read. Yields
+    tuples with ref names, SHA1s, and peeled SHA1s (or None).
 
     :param f: file-like object to read from, seek'ed to the second line
     """

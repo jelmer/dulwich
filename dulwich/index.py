@@ -18,6 +18,7 @@
 
 """Parser for the git index file format."""
 
+import collections
 import errno
 import os
 import stat
@@ -35,6 +36,12 @@ from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
     )
+
+
+IndexEntry = collections.namedtuple(
+    'IndexEntry', [
+        'name', 'ctime', 'mtime', 'dev', 'ino',
+        'mode', 'uid', 'gid', 'size', 'sha', 'flags'])
 
 
 def pathsplit(path):
@@ -98,8 +105,8 @@ def read_cache_entry(f):
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     data = f.read((beginoffset + real_size) - f.tell())
-    return (name, ctime, mtime, dev, ino, mode, uid, gid, size,
-            sha_to_hex(sha), flags & ~0x0fff)
+    return IndexEntry(name, ctime, mtime, dev, ino, mode, uid, gid, size,
+                      sha_to_hex(sha), flags & ~0x0fff)
 
 
 def write_cache_entry(f, entry):

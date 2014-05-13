@@ -490,8 +490,20 @@ class StatusTests(PorcelainTestCase):
         out = StringIO()
         err = StringIO()
 
+        # Commit a dummy file then modify it
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        filename_commit = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=[filename_commit])
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+        with open(filename_commit, 'w+') as f:
+            f.write('stuff')
+
+        # Make a dummy file and stage it
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename_add = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename_add)
+
         results = porcelain.status(self.repo, outstream=out, errstream=err)
-        self.assertEquals(results['staged'][0], filename)
+        self.assertEquals(results['staged'][0], filename_add)
+        self.assertEquals(results['unstaged'][0], filename_commit)

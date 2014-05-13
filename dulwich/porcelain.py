@@ -64,22 +64,6 @@ Differences in behaviour are considered bugs.
 
 __docformat__ = 'restructuredText'
 
-PORCELAIN_GIT_STATUS_HEADER_COMMITTED = '# Changes to be committed:\n#\t(' \
-                                        'use "git reset HEAD <file>..." to ' \
-                                        'unstage)\n#\n'
-
-PORCELAIN_GIT_STATUS_HEADER_UNSTAGED = '#\n# Changes not staged for commit:' \
-                                       '\n#\t(use "git add <file>..." to ' \
-                                       'update what will be committed)\n#\t(' \
-                                       'use "git checkout -- <file>..." to ' \
-                                       'discard changes in working directory' \
-                                       ')\n#\n'
-
-PORCELAIN_GIT_STATUS_HEADER_UNTRACKED = '#\n# Untracked files:\n#\t(use "' \
-                                        'git add <file>..." to include in ' \
-                                        'what will be committed)\n#\n'
-
-
 
 def open_repo(path_or_repo):
     """Open an argument that can be a repository or a path for a repository."""
@@ -488,28 +472,27 @@ def pull(repo, remote_location, refs_path,
 
 
 def status(repo, outstream=sys.stdout, errstream=sys.stderr):
-    """ git status
+    """ git status - returns staged, unstaged, and untracked changes
+        relative to the HEAD
 
     :param repo: Path to repository
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
+
+    :return: dict with staged, unstaged, and untracked paths
     """
 
     r = open_repo(repo)
     index = r.open_index()
 
-    outstream.write(PORCELAIN_GIT_STATUS_HEADER_COMMITTED)
+    # TODO - parse .gitignore to omit from status
+
+    # STATUS OF STAGED FOR COMMIT
 
     # Iterate through the tree changes and report add/delete/modify
     tracked_changes = _get_tree_changes(repo)
-    for added in tracked_changes['add']:
-        outstream.write('#\tnew file:\t' + added + '\n')
-    for deleted in tracked_changes['delete']:
-        outstream.write('#\tdeleted:\t' + deleted + '\n')
-    for modified in tracked_changes['modify']:
-        outstream.write('#\tmodify:\t' + modified + '\n')
 
-    outstream.write(PORCELAIN_GIT_STATUS_HEADER_UNSTAGED)
+    # STATUS OF UNSTAGED
 
     # Walk through the index checking for yet to be staged modifications by
     # checking the time of last modification
@@ -520,26 +503,14 @@ def status(repo, outstream=sys.stdout, errstream=sys.stderr):
             unstaged_changes.append(i[0])
             outstream.write('#\tmodified:\t' + i[0] + '\n')
 
-    outstream.write(PORCELAIN_GIT_STATUS_HEADER_UNTRACKED)
+    # STATUS OF UNTRACKED
 
-    # Untracked files - omitted for now, need to process git ignore here also
-    untracked_changes = []
-
-    # Check each unignored item to see if it's not in the indexed or tree
-    # changes
-
-    # indexed_files = [i[0] for i in index.iteritems()]
-    # unignored = _get_non_ignored(repo, _get_git_ignore_rules(repo))
-    #
-    # for item in unignored:
-    #     if not item in indexed_files and not item in tracked_changes:
-    #         untracked_changes.append(item)
-    #         outstream.write('#\t\t' + item + '\n')
+    # TODO - add untracked changes, need gitignore
 
     return {
         'staged': tracked_changes,
         'unstaged': unstaged_changes,
-        'untracked': untracked_changes,
+        'untracked': [],
     }
 
 
@@ -567,38 +538,3 @@ def _get_tree_changes(repo):
         elif change.type == 'modify':
             tracked_changes['modify'].append(change.old.path)
     return tracked_changes
-
-
-def _get_git_ignore_rules(repo):
-    """
-    Obtain gitignored files
-
-    :param repo:
-
-    :return:
-    """
-    r = open_repo(repo)
-    ignore_rules = list()
-    if os.path.exists(r.path + '.gitignore'):
-        with open('.gitignore') as f:
-            ignore_rules.append(f.read().strip())
-    return ignore_rules
-
-
-def _get_non_ignored(repo, ignore_rules):
-    """
-    Handles extracting files that may be modified in the repo by parsing
-    the ignore rules
-
-    :param repo:
-    :param ignore_rules:
-
-    :return: list of valid repo paths
-    """
-    # TODO - implement
-    # r = open_repo(repo)
-    # for dirpath, dnames, fnames in os.walk(r.path):
-    #     # Determine if any of the rules filter the path
-    #     # Determine if any of the rules filter the file
-    #     pass
-    raise NotImplementedError()

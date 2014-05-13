@@ -498,7 +498,7 @@ def status(repo, outstream=sys.stdout, errstream=sys.stderr):
     # checking the time of last modification
     unstaged_changes = []
     for i in index.iteritems():
-        statbuf = os.stat(i[0])
+        statbuf = os.stat(os.path.join(r.path, i[0]))
         if statbuf.st_mtime > i[1][0][0] and not i[0] in tracked_changes:
             unstaged_changes.append(i[0])
             outstream.write('#\tmodified:\t' + i[0] + '\n')

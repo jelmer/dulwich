@@ -23,6 +23,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -496,7 +497,8 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=[filename_commit])
         porcelain.commit(repo=self.repo.path, message='test status',
             author='', committer='')
-        with open(filename_commit, 'w+') as f:
+        time.sleep(1)
+        with open(fullpath, 'a') as f:
             f.write('stuff')
 
         # Make a dummy file and stage it
@@ -505,5 +507,6 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=filename_add)
 
         results = porcelain.status(self.repo, outstream=out, errstream=err)
-        self.assertEquals(results['staged'][0], filename_add)
+
+        self.assertEquals(results['staged']['add'][0], filename_add)
         self.assertEquals(results['unstaged'][0], filename_commit)

@@ -488,8 +488,6 @@ class PullTests(PorcelainTestCase):
 class StatusTests(PorcelainTestCase):
 
     def test_simple_newfile(self):
-        out = StringIO()
-        err = StringIO()
 
         # Commit a dummy file then modify it
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
@@ -506,7 +504,7 @@ class StatusTests(PorcelainTestCase):
         filename_add = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename_add)
 
-        results = porcelain.status(self.repo, outstream=out, errstream=err)
+        results = porcelain.status(self.repo)
 
         self.assertEquals(results['staged']['add'][0], filename_add)
         self.assertEquals(results['unstaged'][0], filename_commit)

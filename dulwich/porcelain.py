@@ -471,42 +471,29 @@ def pull(repo, remote_location, refs_path,
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def status(repo, outstream=sys.stdout, errstream=sys.stderr):
-    """ git status - returns staged, unstaged, and untracked changes
-        relative to the HEAD
+def status(repo):
+    """ Returns staged, unstaged, and untracked changes relative to the HEAD
 
     :param repo: Path to repository
-    :param outstream: A stream file to write to output
-    :param errstream: A stream file to write to errors
 
     :return: dict with staged, unstaged, and untracked paths
     """
 
-    r = open_repo(repo)
-    index = r.open_index()
+    # 1. Get status of staged
+    tracked_changes = get_tree_changes(repo)
 
-    # TODO - parse .gitignore to omit from status
+    # 2. Get status of unstaged
+    unstaged_changes = get_unstaged_changes(repo)
 
-    # STATUS OF STAGED FOR COMMIT
 
-    # Iterate through the tree changes and report add/delete/modify
-    tracked_changes = _get_tree_changes(repo)
-
-    # STATUS OF UNSTAGED
-
-    # Walk through the index checking for yet to be staged modifications by
-    # checking the time of last modification
-    unstaged_changes = []
-    for i in index.iteritems():
-        statbuf = os.stat(os.path.join(r.path, i[0]))
-        if statbuf.st_mtime > i[1][0][0] and not i[0] in tracked_changes:
-            unstaged_changes.append(i[0])
-            outstream.write('#\tmodified:\t' + i[0] + '\n')
-
-    # STATUS OF UNTRACKED
-
+    # Status of untracked
     # TODO - add untracked changes, need gitignore
 
+    # Return a dict with status elements as follows
+    #
+    #   staged:     list of staged paths (diff index/HEAD)
+    #   unstaged:   list of unstaged paths (diff index/working-tree)
+    #   untracked:  list of untracked, un-ignored & non-.git paths
     return {
         'staged': tracked_changes,
         'unstaged': unstaged_changes,
@@ -514,23 +501,26 @@ def status(repo, outstream=sys.stdout, errstream=sys.stderr):
     }
 
 
-def _get_tree_changes(repo):
-    """
-    Returns the add/delete/modify changes to tree
+def get_tree_changes(repo):
+    """ Return add/delete/modify changes to tree by comparing index to HEAD
 
-    :return:    dict with lists for each type of change
+    :param repo:    repo path or object
+
+    :return:        dict with lists for each type of change
     """
 
     r = open_repo(repo)
     index = r.open_index()
 
+    # Compares the Index to the HEAD & determines changes
+    # Iterate through the changes and report add/delete/modify
     tracked_changes = {
         'add': [],
         'delete': [],
         'modify': [],
     }
     for change in list(tree_changes(r, r['HEAD'].tree,
-                                     index.commit(r.object_store))):
+                                    index.commit(r.object_store))):
         if change.type == 'add':
             tracked_changes['add'].append(change.new.path)
         elif change.type == 'delete':
@@ -538,3 +528,29 @@ def _get_tree_changes(repo):
         elif change.type == 'modify':
             tracked_changes['modify'].append(change.old.path)
     return tracked_changes
+
+
+def get_unstaged_changes(repo, tracked_changes=None):
+    """ Walk through the index check for differences against working tree
+
+    :param repo:                repo path or object
+    :param tracked_changes:     list of paths already staged
+
+    :return:                    list of paths not staged
+    """
+
+    r = open_repo(repo)
+    unstaged_changes = []
+    index = r.open_index()
+
+    # tracked_changes is a list
+    if not tracked_changes:
+        tracked_changes = []
+
+    # For each entry in the index check the time of last modification & ensure not staged
+    for entry in index.iteritems():
+        statbuf = os.stat(os.path.join(r.path, entry[0]))
+        if statbuf.st_mtime > entry[1][0][0] and not entry[0] in tracked_changes:
+            unstaged_changes.append(entry[0])
+
+    return unstaged_changes

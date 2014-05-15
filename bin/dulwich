@@ -234,6 +234,7 @@ def cmd_tag(args):
 
 def cmd_reset(args):
     opts, args = getopt(args, "", ["hard", "soft", "mixed"])
+    opts = dict(opts)
     mode = ""
     if "--hard" in opts:
         mode = "hard"

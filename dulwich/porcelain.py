@@ -45,6 +45,7 @@ __docformat__ = 'restructuredText'
 import os
 import sys
 import time
+import warnings
 
 from dulwich import index
 from dulwich.client import get_transport_and_path
@@ -85,33 +86,36 @@ def archive(location, committish=None, outstream=sys.stdout,
     client.archive(path, committish, outstream.write, errstream.write)
 
 
-def update_server_info(repo="."):
+def update_server_info(repo='.'):
     """Update server info files for a repository.
 
-    :param repo: path to the repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     """
-    r = open_repo(repo)
-    server_update_server_info(r)
+    repo_obj = open_repo(repo)
+    server_update_server_info(repo_obj)
 
 
 def symbolic_ref(repo, ref_name, force=False):
     """Set git symbolic ref into HEAD.
 
-    :param repo: path to the repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param ref_name: short name of the new ref
     :param force: force settings without checking if it exists in refs/heads
     """
     repo_obj = open_repo(repo)
     ref_path = 'refs/heads/%s' % ref_name
     if not force and ref_path not in repo_obj.refs.keys():
-        raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
+        raise ValueError("fatal: ref '%s' is not a ref" % ref_name)
     repo_obj.refs.set_symbolic_ref('HEAD', ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None):
+def commit(repo='.', message=None, author=None, committer=None):
     """Create a new commit.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param message: Optional commit message
     :param author: Optional author name and email
     :param committer: Optional committer name and email
@@ -119,25 +123,26 @@ def commit(repo=".", message=None, author=None, committer=None):
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
-    r = open_repo(repo)
-    return r.do_commit(message=message, author=author,
-        committer=committer)
+    repo_obj = open_repo(repo)
+    return repo_obj.do_commit(message=message, author=author,
+                              committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
     """Create a new commit object.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param tree: An existing tree object
     :param author: Optional author name and email
     :param committer: Optional committer name and email
     """
-    r = open_repo(repo)
-    return r.do_commit(message=message, tree=tree, committer=committer,
-            author=author)
+    repo_obj = open_repo(repo)
+    return repo_obj.do_commit(message=message, tree=tree, committer=committer,
+                              author=author)
 
 
-def init(path=".", bare=False):
+def init(path='.', bare=False):
     """Create a new git repository.
 
     :param path: Path to repository.
@@ -173,52 +178,57 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
 
     if not os.path.exists(target):
         os.mkdir(target)
+
     if bare:
-        r = Repo.init_bare(target)
+        target_repo = Repo.init_bare(target)
     else:
-        r = Repo.init(target)
-    remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
+        target_repo = Repo.init(target)
+
+    remote_refs = client.fetch(host_path, target_repo,
+        determine_wants=target_repo.object_store.determine_wants_all,
         progress=outstream.write)
-    r["HEAD"] = remote_refs["HEAD"]
+    target_repo['HEAD'] = remote_refs['HEAD']
     if checkout:
         outstream.write('Checking out HEAD')
-        index.build_index_from_tree(r.path, r.index_path(),
-                                    r.object_store, r["HEAD"].tree)
+        index.build_index_from_tree(target_repo.path,
+                                    target_repo.index_path(),
+                                    target_repo.object_store,
+                                    target_repo['HEAD'].tree)
+    return target_repo
 
-    return r
 
-
-def add(repo=".", paths=None):
+def add(repo='.', paths=None):
     """Add files to the staging area.
 
-    :param repo: Repository for the files
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param paths: Paths to add.  No value passed stages all modified files.
     """
     # FIXME: Support patterns, directories.
-    r = open_repo(repo)
+    repo_obj = open_repo(repo)
     if not paths:
         # If nothing is specified, add all non-ignored files.
         paths = []
-        for dirpath, dirnames, filenames in os.walk(r.path):
+        for dirpath, dirnames, filenames in os.walk(repo_obj.path):
             # Skip .git and below.
             if '.git' in dirnames:
                 dirnames.remove('.git')
             for filename in filenames:
-                paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-    r.stage(paths)
+                paths.append(os.path.join(dirpath[len(repo_obj.path)+1:], filename))
+    repo_obj.stage(paths)
 
 
-def rm(repo=".", paths=None):
+def rm(repo='.', paths=None):
     """Remove files from the staging area.
 
-    :param repo: Repository for the files
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param paths: Paths to remove
     """
-    r = open_repo(repo)
-    index = r.open_index()
-    for p in paths:
-        del index[p]
+    repo_obj = open_repo(repo)
+    index = repo_obj.open_index()
+    for path in paths:
+        del index[path]
     index.write()
 
 
@@ -281,8 +291,8 @@ def show_tree(repo, tree, outstream):
     :param tree: A `Tree` object
     :param outstream: Stream to write to
     """
-    for n in tree:
-        outstream.write("%s\n" % n)
+    for node in tree:
+        outstream.write('%s\n' % node)
 
 
 def show_tag(repo, tag, outstream):
@@ -305,23 +315,25 @@ def show_object(repo, obj, outstream):
             }[obj.type_name](repo, obj, outstream)
 
 
-def log(repo=".", outstream=sys.stdout, max_entries=None):
+def log(repo='.', outstream=sys.stdout, max_entries=None):
     """Write commit logs.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param outstream: Stream to write log output to
     :param max_entries: Optional maximum number of entries to display
     """
-    r = open_repo(repo)
-    walker = r.get_walker(max_entries=max_entries)
+    repo_obj = open_repo(repo)
+    walker = repo_obj.get_walker(max_entries=max_entries)
     for entry in walker:
         print_commit(entry.commit, outstream)
 
 
-def show(repo=".", objects=None, outstream=sys.stdout):
+def show(repo='.', objects=None, outstream=sys.stdout):
     """Print the changes in a commit.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
     """
@@ -329,40 +341,43 @@ def show(repo=".", objects=None, outstream=sys.stdout):
         objects = ["HEAD"]
     if not isinstance(objects, list):
         objects = [objects]
-    r = open_repo(repo)
+    repo_obj = open_repo(repo)
     for objectish in objects:
-        show_object(r, parse_object(r, objectish), outstream)
+        show_object(repo_obj, parse_object(repo_obj, objectish), outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
     """Compares the content and mode of blobs found via two tree objects.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param old_tree: Id of old tree
     :param new_tree: Id of new tree
     :param outstream: Stream to write to
     """
-    r = open_repo(repo)
-    write_tree_diff(outstream, r.object_store, old_tree, new_tree)
+    repo_obj = open_repo(repo)
+    write_tree_diff(outstream, repo_obj.object_store, old_tree, new_tree)
 
 
 def rev_list(repo, commits, outstream=sys.stdout):
     """Lists commit objects in reverse chronological order.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param commits: Commits over which to iterate
     :param outstream: Stream to write to
     """
-    r = open_repo(repo)
-    for entry in r.get_walker(include=[r[c].id for c in commits]):
+    repo_obj = open_repo(repo)
+    for entry in repo_obj.get_walker(include=[repo_obj[c].id for c in commits]):
         outstream.write("%s\n" % entry.commit.id)
 
 
 def tag(repo, tag, author=None, message=None, annotated=False,
-        objectish="HEAD", tag_time=None, tag_timezone=None):
+        objectish='HEAD', tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param tag: tag string
     :param author: tag author (optional, if annotated is set)
     :param message: tag message (optional)
@@ -371,16 +386,15 @@ def tag(repo, tag, author=None, message=None, annotated=False,
     :param tag_time: Optional time for annotated tag
     :param tag_timezone: Optional timezone for annotated tag
     """
-
-    r = open_repo(repo)
-    object = parse_object(r, objectish)
+    repo_obj = open_repo(repo)
+    object = parse_object(repo_obj, objectish)
 
     if annotated:
         # Create the tag object
         tag_obj = Tag()
         if author is None:
             # TODO(jelmer): Don't use repo private method.
-            author = r._get_user_identity()
+            author = repo_obj._get_user_identity()
         tag_obj.tagger = author
         tag_obj.message = message
         tag_obj.name = tag
@@ -394,48 +408,57 @@ def tag(repo, tag, author=None, message=None, annotated=False,
         elif isinstance(tag_timezone, str):
             tag_timezone = parse_timezone(tag_timezone)
         tag_obj.tag_timezone = tag_timezone
-        r.object_store.add_object(tag_obj)
+        repo_obj.object_store.add_object(tag_obj)
         tag_id = tag_obj.id
     else:
         tag_id = object.id
 
-    r.refs['refs/tags/' + tag] = tag_id
+    repo_obj.refs['refs/tags/' + tag] = tag_id
 
 
-def list_tags(repo, outstream=sys.stdout):
+def list_tags(repo='.', outstream=None):
     """List all tags.
 
-    :param repo: Path to repository
-    :param outstream: Stream to write tags to
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
+    :param outstream: Do not use, deprecated.
+    :return: A list of tags.
     """
-    r = open_repo(repo)
-    tags = list(r.refs.as_dict("refs/tags"))
+    if outstream is not None:
+        warnings.warn("Parameter 'outstream' is deprecated.",
+                      DeprecationWarning)
+    repo_obj = open_repo(repo)
+    tags = list(repo_obj.refs.as_dict('refs/tags'))
     tags.sort()
     return tags
 
 
-def reset(repo, mode, committish="HEAD"):
+def reset(repo, mode, committish='HEAD'):
     """Reset current HEAD to the specified state.
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param mode: Mode ("hard", "soft", "mixed")
+    :param committish: Commit SHA1 or ref to reset to
     """
 
     if mode != "hard":
         raise ValueError("hard is the only mode currently supported")
 
-    r = open_repo(repo)
+    repo_obj = open_repo(repo)
 
-    indexfile = r.index_path()
-    tree = r[committish].tree
-    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+    indexfile = repo_obj.index_path()
+    tree = repo_obj[committish].tree
+    index.build_index_from_tree(repo_obj.path, indexfile,
+                                repo_obj.object_store, tree)
 
 
 def push(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        a path to a git repository
     :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
     :param outstream: A stream file to write output
@@ -443,20 +466,21 @@ def push(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    repo_obj = open_repo(repo)
 
     # Get the client and path
     client, path = get_transport_and_path(remote_location)
 
     def update_refs(refs):
-        new_refs = r.get_refs()
+        new_refs = repo_obj.get_refs()
         refs[refs_path] = new_refs['HEAD']
         del new_refs['HEAD']
         return refs
 
     try:
         client.send_pack(path, update_refs,
-            r.object_store.generate_pack_contents, progress=errstream.write)
+                         repo_obj.object_store.generate_pack_contents,
+                         progress=errstream.write)
         outstream.write("Push to %s successful.\n" % remote_location)
     except (UpdateRefsError, SendPackError) as e:
         outstream.write("Push to %s failed.\n" % remote_location)
@@ -467,7 +491,8 @@ def pull(repo, remote_location, refs_path,
          outstream=sys.stdout, errstream=sys.stderr):
     """Pull from remote via dulwich.client
 
-    :param repo: Path to repository
+    :param repo: Repository in form of an object of type `BaseRepo` or
+        path to a git repository
     :param remote_location: Location of the remote
     :param refs_path: relative path to the fetched refs
     :param outstream: A stream file to write to output
@@ -475,13 +500,13 @@ def pull(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    repo_obj = open_repo(repo)
 
     client, path = get_transport_and_path(remote_location)
-    remote_refs = client.fetch(path, r, progress=errstream.write)
-    r['HEAD'] = remote_refs[refs_path]
+    remote_refs = client.fetch(path, repo_obj, progress=errstream.write)
+    repo_obj['HEAD'] = remote_refs[refs_path]
 
     # Perform 'git checkout .' - syncs staged changes
-    indexfile = r.index_path()
-    tree = r["HEAD"].tree
-    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+    indexfile = repo_obj.index_path()
+    tree = repo_obj['HEAD'].tree
+    index.build_index_from_tree(repo_obj.path, indexfile, repo_obj.object_store, tree)

@@ -119,7 +119,7 @@ class ServerTests(object):
         run_git_or_fail(['push', self.url(port), ":master"],
                         cwd=self._new_repo.path)
 
-        self.assertEquals(
+        self.assertEqual(
             self._old_repo.get_refs().keys(), ["refs/heads/branch"])
 
     def test_fetch_from_dulwich(self):

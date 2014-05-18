@@ -222,17 +222,17 @@ class IndexEntryFromStatTests(TestCase):
 class BuildIndexTests(TestCase):
 
     def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
-        self.assertEquals(index_entry[4], mode)  # mode
-        self.assertEquals(index_entry[7], filesize)  # filesize
-        self.assertEquals(index_entry[8], sha)  # sha
+        self.assertEqual(index_entry[4], mode)  # mode
+        self.assertEqual(index_entry[7], filesize)  # filesize
+        self.assertEqual(index_entry[8], sha)  # sha
 
     def assertFileContents(self, path, contents, symlink=False):
         if symlink:
-            self.assertEquals(os.readlink(path), contents)
+            self.assertEqual(os.readlink(path), contents)
         else:
             f = open(path, 'rb')
             try:
-                self.assertEquals(f.read(), contents)
+                self.assertEqual(f.read(), contents)
             finally:
                 f.close()
 
@@ -249,10 +249,10 @@ class BuildIndexTests(TestCase):
 
         # Verify index entries
         index = repo.open_index()
-        self.assertEquals(len(index), 0)
+        self.assertEqual(len(index), 0)
 
         # Verify no files
-        self.assertEquals(['.git'], os.listdir(repo.path))
+        self.assertEqual(['.git'], os.listdir(repo.path))
 
     def test_nonempty(self):
         if os.name != 'posix':
@@ -282,7 +282,7 @@ class BuildIndexTests(TestCase):
 
         # Verify index entries
         index = repo.open_index()
-        self.assertEquals(len(index), 4)
+        self.assertEqual(len(index), 4)
 
         # filea
         apath = os.path.join(repo.path, 'a')
@@ -313,9 +313,9 @@ class BuildIndexTests(TestCase):
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files
-        self.assertEquals(['.git', 'a', 'b', 'c'],
+        self.assertEqual(['.git', 'a', 'b', 'c'],
             sorted(os.listdir(repo.path)))
-        self.assertEquals(['d', 'e'],
+        self.assertEqual(['d', 'e'],
             sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
 

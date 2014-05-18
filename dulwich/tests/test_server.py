@@ -472,12 +472,12 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker._handle_shallow_request(heads)
 
     def assertReceived(self, expected):
-        self.assertEquals(
+        self.assertEqual(
           expected, list(iter(self._walker.proto.get_received_line, None)))
 
     def test_handle_shallow_request_no_client_shallows(self):
         self._handle_shallow_request(['deepen 1\n'], [FOUR, FIVE])
-        self.assertEquals(set([TWO, THREE]), self._walker.shallow)
+        self.assertEqual(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([
           'shallow %s' % TWO,
           'shallow %s' % THREE,
@@ -490,7 +490,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
           'deepen 1\n',
           ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
-        self.assertEquals(set([TWO, THREE]), self._walker.shallow)
+        self.assertEqual(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([])
 
     def test_handle_shallow_request_unshallows(self):
@@ -499,7 +499,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
           'deepen 2\n',
           ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
-        self.assertEquals(set([ONE]), self._walker.shallow)
+        self.assertEqual(set([ONE]), self._walker.shallow)
         self.assertReceived([
           'shallow %s' % ONE,
           'unshallow %s' % TWO,

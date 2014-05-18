@@ -243,7 +243,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.store.add_object(b2)
         self.assertEqual([], self.store.packs)
         self.assertEqual(2, self.store.pack_loose_objects())
-        self.assertNotEquals([], self.store.packs)
+        self.assertNotEqual([], self.store.packs)
         self.assertEqual(0, self.store.pack_loose_objects())
 
 
@@ -442,6 +442,6 @@ class ObjectStoreGraphWalkerTests(TestCase):
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 
-        self.assertEquals(["a", "b", "c", "d"], sorted(walk))
+        self.assertEqual(["a", "b", "c", "d"], sorted(walk))
         self.assertLess(walk.index("a"), walk.index("c"))
         self.assertLess(walk.index("b"), walk.index("d"))

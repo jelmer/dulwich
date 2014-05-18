@@ -19,6 +19,7 @@
 import os
 import sys
 import time
+from collections import namedtuple
 
 from dulwich import index
 from dulwich.diff_tree import tree_changes
@@ -63,6 +64,9 @@ Differences in behaviour are considered bugs.
 """
 
 __docformat__ = 'restructuredText'
+
+# Module level tuple definition for status output
+StatusTuple = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
 def open_repo(path_or_repo):
@@ -472,43 +476,31 @@ def pull(repo, remote_location, refs_path,
 
 
 def status(repo):
-    """ Returns staged, unstaged, and untracked changes relative to the HEAD
+    """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository
 
     :return: dict with staged, unstaged, and untracked paths
     """
+    tracked_changes = get_tree_changes(repo)    # 1. Get status of staged
+    unstaged_changes = get_unstaged_changes(repo)   # 2. Get status of unstaged
+    # TODO - Status of untracked - add untracked changes, need gitignore.
+    untracked_changes = []
 
-    # 1. Get status of staged
-    tracked_changes = get_tree_changes(repo)
-
-    # 2. Get status of unstaged
-    unstaged_changes = get_unstaged_changes(repo)
-
-
-    # Status of untracked
-    # TODO - add untracked changes, need gitignore
-
-    # Return a dict with status elements as follows
-    #
+    # Return a StatusTuple with status elements as follows
     #   staged:     list of staged paths (diff index/HEAD)
     #   unstaged:   list of unstaged paths (diff index/working-tree)
     #   untracked:  list of untracked, un-ignored & non-.git paths
-    return {
-        'staged': tracked_changes,
-        'unstaged': unstaged_changes,
-        'untracked': [],
-    }
+    return StatusTuple(tracked_changes, unstaged_changes, untracked_changes)
 
 
 def get_tree_changes(repo):
-    """ Return add/delete/modify changes to tree by comparing index to HEAD
+    """Return add/delete/modify changes to tree by comparing index to HEAD.
 
     :param repo:    repo path or object
 
     :return:        dict with lists for each type of change
     """
-
     r = open_repo(repo)
     index = r.open_index()
 
@@ -519,38 +511,36 @@ def get_tree_changes(repo):
         'delete': [],
         'modify': [],
     }
-    for change in list(tree_changes(r, r['HEAD'].tree,
-                                    index.commit(r.object_store))):
-        if change.type == 'add':
-            tracked_changes['add'].append(change.new.path)
-        elif change.type == 'delete':
-            tracked_changes['delete'].append(change.old.path)
-        elif change.type == 'modify':
-            tracked_changes['modify'].append(change.old.path)
+    for change in list(index.changes_from_tree(r.object_store,
+                           r['HEAD'].tree)):
+        if not change[0][0]:
+            tracked_changes['add'].append(change[0][1])
+        elif not change[0][1]:
+            tracked_changes['delete'].append(change[0][0])
+        elif change[0][0] == change[0][1]:
+            tracked_changes['modify'].append(change[0][0])
+        else:
+            tracked_changes['move'].append(change[0][0] + ' -> ' +
+                                           change[0][1])
     return tracked_changes
 
 
-def get_unstaged_changes(repo, tracked_changes=None):
-    """ Walk through the index check for differences against working tree
+def get_unstaged_changes(repo):
+    """Walk through the index check for differences against working tree.
 
     :param repo:                repo path or object
     :param tracked_changes:     list of paths already staged
 
     :return:                    list of paths not staged
     """
-
     r = open_repo(repo)
     unstaged_changes = []
     index = r.open_index()
 
-    # tracked_changes is a list
-    if not tracked_changes:
-        tracked_changes = []
-
-    # For each entry in the index check the time of last modification & ensure not staged
+    # For each entry in the index check the time of last modification &
+    # ensure not staged
     for entry in index.iteritems():
         statbuf = os.stat(os.path.join(r.path, entry[0]))
-        if statbuf.st_mtime > entry[1][0][0] and not entry[0] in tracked_changes:
+        if statbuf.st_mtime > entry[1][0][0]:
             unstaged_changes.append(entry[0])
-
     return unstaged_changes

@@ -487,7 +487,8 @@ class PullTests(PorcelainTestCase):
 
 class StatusTests(PorcelainTestCase):
 
-    def test_simple_newfile(self):
+    def test_status(self):
+        """Integration test for `status` functionality."""
 
         # Commit a dummy file then modify it
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
@@ -495,7 +496,10 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=[filename_commit])
         porcelain.commit(repo=self.repo.path, message='test status',
             author='', committer='')
-        time.sleep(1)
+
+        # modify access and modify time of path
+        os.utime(fullpath, (0, 0))
+
         with open(fullpath, 'a') as f:
             f.write('stuff')
 
@@ -506,5 +510,72 @@ class StatusTests(PorcelainTestCase):
 
         results = porcelain.status(self.repo)
 
-        self.assertEquals(results['staged']['add'][0], filename_add)
-        self.assertEquals(results['unstaged'][0], filename_commit)
+        self.assertEquals(results.staged['add'][0], filename_add)
+        self.assertEquals(results.unstaged[0], filename_commit)
+
+    def test_get_unstaged_changes(self):
+        """Unit test for get_unstaged_changes."""
+
+        # Commit a dummy file then modify it
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename_commit = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=[filename_commit])
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+
+        # modify access and modify time of path
+        os.utime(fullpath, (0, 0))
+
+        with open(fullpath, 'a') as f:
+            f.write('stuff')
+
+        changes = porcelain.get_unstaged_changes(self.repo.path)
+
+        self.assertEquals(changes[0], filename_commit)
+
+    def test_get_tree_changes_add(self):
+        """Unit test for get_tree_changes add."""
+
+        # Make a dummy file, stage
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['add'][0], filename)
+
+    def test_get_tree_changes_modify(self):
+        """Unit test for get_tree_changes modify."""
+
+        # Make a dummy file, stage, commit, modify
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+        with open(fullpath, 'a') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['modify'][0], filename)
+
+    def test_get_tree_changes_delete(self):
+        """Unit test for get_tree_changes delete."""
+
+        # Make a dummy file, stage, commit, remove
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+        porcelain.rm(repo=self.repo.path, paths=[filename])
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['delete'][0], filename)

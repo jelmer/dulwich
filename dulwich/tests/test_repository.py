@@ -575,7 +575,7 @@ class BuildRepoTests(TestCase):
                                  author_timestamp=12395, author_timezone=0)
         self.assertEqual([self._root_commit], r[commit_sha].parents)
         a_mode, a_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
-        self.assertEqual(stat.S_IFREG | 0644, a_mode)
+        self.assertEqual(stat.S_IFREG | 0o644, a_mode)
         self.assertEqual('new contents', r[a_id].data)
         b_mode, b_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'b')
         self.assertTrue(stat.S_ISLNK(b_mode))

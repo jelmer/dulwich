@@ -59,7 +59,7 @@ class TestPack(PackTests):
             sha = line[:40]
             try:
                 binascii.unhexlify(sha)
-            except TypeError:
+            except (TypeError, binascii.Error):
                 continue  # non-sha line
             pack_shas.add(sha)
         orig_shas = set(o.id for o in origpack.iterobjects())

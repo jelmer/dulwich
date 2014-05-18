@@ -529,12 +529,12 @@ class SSHGitClientTests(TestCase):
         client.port = 1337
 
         client._connect("command", "/path/to/repo")
-        self.assertEquals("username", server.username)
-        self.assertEquals(1337, server.port)
-        self.assertEquals(["git-command '/path/to/repo'"], server.command)
+        self.assertEqual("username", server.username)
+        self.assertEqual(1337, server.port)
+        self.assertEqual(["git-command '/path/to/repo'"], server.command)
 
         client._connect("relative-command", "/~/path/to/repo")
-        self.assertEquals(["git-relative-command '~/path/to/repo'"],
+        self.assertEqual(["git-relative-command '~/path/to/repo'"],
                           server.command)
 
 
@@ -568,7 +568,7 @@ class LocalGitClientTests(TestCase):
         c = LocalGitClient()
         t = MemoryRepo()
         s = open_repo('a.git')
-        self.assertEquals(s.get_refs(), c.fetch(s.path, t))
+        self.assertEqual(s.get_refs(), c.fetch(s.path, t))
 
     def test_fetch_empty(self):
         c = LocalGitClient()
@@ -577,7 +577,7 @@ class LocalGitClientTests(TestCase):
         walker = {}
         c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
-        self.assertEquals("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
+        self.assertEqual("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
             "\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
     def test_fetch_pack_none(self):

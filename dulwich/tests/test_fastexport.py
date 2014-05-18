@@ -105,7 +105,7 @@ class GitImportProcessorTests(TestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         cmd = commands.ResetCommand("refs/heads/foo", c1.id)
         self.processor.reset_handler(cmd)
-        self.assertEquals(c1.id, self.repo.get_refs()["refs/heads/foo"])
+        self.assertEqual(c1.id, self.repo.get_refs()["refs/heads/foo"])
 
     def test_commit_handler(self):
         from fastimport import commands

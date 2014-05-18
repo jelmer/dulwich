@@ -60,10 +60,10 @@ class ArchiveTests(PorcelainTestCase):
         err = BytesIO()
         porcelain.archive(self.repo.path, "refs/heads/master", outstream=out,
             errstream=err)
-        self.assertEquals("", err.getvalue())
+        self.assertEqual("", err.getvalue())
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
-        self.assertEquals([], tf.getnames())
+        self.assertEqual([], tf.getnames())
 
 
 class UpdateServerInfoTests(PorcelainTestCase):
@@ -86,7 +86,7 @@ class CommitTests(PorcelainTestCase):
         sha = porcelain.commit(self.repo.path, message="Some message",
                 author="Joe <joe@example.com>", committer="Bob <bob@example.com>")
         self.assertTrue(isinstance(sha, str))
-        self.assertEquals(len(sha), 40)
+        self.assertEqual(len(sha), 40)
 
 
 class CloneTests(PorcelainTestCase):
@@ -106,8 +106,8 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, outstream=outstream)
-        self.assertEquals(r.path, target_path)
-        self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertEqual(r.path, target_path)
+        self.assertEqual(Repo(target_path).head(), c3.id)
         self.assertTrue('f1' not in os.listdir(target_path))
         self.assertTrue('f2' not in os.listdir(target_path))
 
@@ -126,8 +126,8 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=True, outstream=outstream)
-        self.assertEquals(r.path, target_path)
-        self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertEqual(r.path, target_path)
+        self.assertEqual(Repo(target_path).head(), c3.id)
         self.assertTrue('f1' in os.listdir(target_path))
         self.assertTrue('f2' in os.listdir(target_path))
 
@@ -146,8 +146,8 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             bare=True, outstream=outstream)
-        self.assertEquals(r.path, target_path)
-        self.assertEquals(Repo(target_path).head(), c3.id)
+        self.assertEqual(r.path, target_path)
+        self.assertEqual(Repo(target_path).head(), c3.id)
         self.assertFalse('f1' in os.listdir(target_path))
         self.assertFalse('f2' in os.listdir(target_path))
 
@@ -199,7 +199,7 @@ class AddTests(PorcelainTestCase):
 
         # Check that foo was added and nothing in .git was modified
         index = self.repo.open_index()
-        self.assertEquals(list(index), ['blah', 'foo', 'adir/afile'])
+        self.assertEqual(list(index), ['blah', 'foo', 'adir/afile'])
 
     def test_add_file(self):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
@@ -227,7 +227,7 @@ class LogTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertEquals(3, outstream.getvalue().count("-" * 50))
+        self.assertEqual(3, outstream.getvalue().count("-" * 50))
 
     def test_max_entries(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
@@ -235,7 +235,7 @@ class LogTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
-        self.assertEquals(1, outstream.getvalue().count("-" * 50))
+        self.assertEqual(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):
@@ -261,7 +261,7 @@ class ShowTests(PorcelainTestCase):
         self.repo.object_store.add_object(b)
         outstream = BytesIO()
         porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
-        self.assertEquals(outstream.getvalue(), "The Foo\n")
+        self.assertEqual(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):
@@ -313,7 +313,7 @@ class DiffTreeTests(PorcelainTestCase):
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
         porcelain.diff_tree(self.repo.path, c2.tree, c3.tree, outstream=outstream)
-        self.assertEquals(outstream.getvalue(), "")
+        self.assertEqual(outstream.getvalue(), "")
 
 
 class CommitTreeTests(PorcelainTestCase):
@@ -332,7 +332,7 @@ class CommitTreeTests(PorcelainTestCase):
             author="Joe <joe@example.com>",
             committer="Jane <jane@example.com>")
         self.assertTrue(isinstance(sha, str))
-        self.assertEquals(len(sha), 40)
+        self.assertEqual(len(sha), 40)
 
 
 class RevListTests(PorcelainTestCase):
@@ -343,7 +343,7 @@ class RevListTests(PorcelainTestCase):
         outstream = BytesIO()
         porcelain.rev_list(
             self.repo.path, [c3.id], outstream=outstream)
-        self.assertEquals(
+        self.assertEqual(
             "%s\n%s\n%s\n" % (c3.id, c2.id, c1.id),
             outstream.getvalue())
 
@@ -359,11 +359,11 @@ class TagTests(PorcelainTestCase):
                 annotated=True)
 
         tags = self.repo.refs.as_dict("refs/tags")
-        self.assertEquals(tags.keys(), ["tryme"])
+        self.assertEqual(tags.keys(), ["tryme"])
         tag = self.repo['refs/tags/tryme']
         self.assertTrue(isinstance(tag, Tag))
-        self.assertEquals("foo <foo@bar.com>", tag.tagger)
-        self.assertEquals("bar", tag.message)
+        self.assertEqual("foo <foo@bar.com>", tag.tagger)
+        self.assertEqual("bar", tag.message)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
@@ -373,23 +373,23 @@ class TagTests(PorcelainTestCase):
         porcelain.tag(self.repo.path, "tryme", annotated=False)
 
         tags = self.repo.refs.as_dict("refs/tags")
-        self.assertEquals(tags.keys(), ["tryme"])
+        self.assertEqual(tags.keys(), ["tryme"])
         tag = self.repo['refs/tags/tryme']
-        self.assertEquals(tags.values(), [self.repo.head()])
+        self.assertEqual(tags.values(), [self.repo.head()])
 
 
 class ListTagsTests(PorcelainTestCase):
 
     def test_empty(self):
         tags = porcelain.list_tags(self.repo.path)
-        self.assertEquals([], tags)
+        self.assertEqual([], tags)
 
     def test_simple(self):
         self.repo.refs["refs/tags/foo"] = "aa" * 20
         self.repo.refs["refs/tags/bar/bla"] = "bb" * 20
         tags = porcelain.list_tags(self.repo.path)
 
-        self.assertEquals(["bar/bla", "foo"], tags)
+        self.assertEqual(["bar/bla", "foo"], tags)
 
 
 class ResetTests(PorcelainTestCase):
@@ -418,7 +418,7 @@ class ResetTests(PorcelainTestCase):
                        index.commit(self.repo.object_store),
                        self.repo['HEAD'].tree))
 
-        self.assertEquals([], changes)
+        self.assertEqual([], changes)
 
 
 class PushTests(PorcelainTestCase):
@@ -461,8 +461,8 @@ class PushTests(PorcelainTestCase):
         change = list(tree_changes(self.repo, self.repo['HEAD'].tree,
                                    self.repo['refs/heads/foo'].tree))[0]
 
-        self.assertEquals(r_clone['HEAD'].id, self.repo[refs_path].id)
-        self.assertEquals(os.path.basename(fullpath), change.new.path)
+        self.assertEqual(r_clone['HEAD'].id, self.repo[refs_path].id)
+        self.assertEqual(os.path.basename(fullpath), change.new.path)
 
 
 class PullTests(PorcelainTestCase):
@@ -495,7 +495,7 @@ class PullTests(PorcelainTestCase):
 
         # Check the target repo for pushed changes
         r = Repo(target_path)
-        self.assertEquals(r['HEAD'].id, self.repo['HEAD'].id)
+        self.assertEqual(r['HEAD'].id, self.repo['HEAD'].id)
 
 
 class StatusTests(PorcelainTestCase):

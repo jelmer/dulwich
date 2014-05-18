@@ -178,13 +178,13 @@ class RepositoryTests(TestCase):
             f.write("Some description")
         finally:
             f.close()
-        self.assertEquals("Some description", r.get_description())
+        self.assertEqual("Some description", r.get_description())
 
     def test_set_description(self):
         r = self._repo = open_repo('a.git')
         description = "Some description"
         r.set_description(description)
-        self.assertEquals(description, r.get_description())
+        self.assertEqual(description, r.get_description())
 
     def test_contains_missing(self):
         r = self._repo = open_repo('a.git')

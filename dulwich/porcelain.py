@@ -22,7 +22,6 @@ import time
 from collections import namedtuple
 
 from dulwich import index
-from dulwich.diff_tree import tree_changes
 from dulwich.client import get_transport_and_path
 from dulwich.errors import (
     SendPackError,
@@ -32,6 +31,7 @@ from dulwich.objects import (
     Commit,
     Tag,
     parse_timezone,
+    Blob,
     )
 from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
@@ -66,7 +66,7 @@ Differences in behaviour are considered bugs.
 __docformat__ = 'restructuredText'
 
 # Module level tuple definition for status output
-StatusTuple = namedtuple('GitStatus', 'staged unstaged untracked')
+GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
 def open_repo(path_or_repo):
@@ -480,18 +480,16 @@ def status(repo):
 
     :param repo: Path to repository
 
-    :return: dict with staged, unstaged, and untracked paths
+    :return: GitStatus tuple,
+        staged -    list of staged paths (diff index/HEAD)
+        unstaged -  list of unstaged paths (diff index/working-tree)
+        untracked - list of untracked, un-ignored & non-.git paths
     """
     tracked_changes = get_tree_changes(repo)    # 1. Get status of staged
     unstaged_changes = get_unstaged_changes(repo)   # 2. Get status of unstaged
     # TODO - Status of untracked - add untracked changes, need gitignore.
     untracked_changes = []
-
-    # Return a StatusTuple with status elements as follows
-    #   staged:     list of staged paths (diff index/HEAD)
-    #   unstaged:   list of unstaged paths (diff index/working-tree)
-    #   untracked:  list of untracked, un-ignored & non-.git paths
-    return StatusTuple(tracked_changes, unstaged_changes, untracked_changes)
+    return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
 def get_tree_changes(repo):
@@ -520,8 +518,7 @@ def get_tree_changes(repo):
         elif change[0][0] == change[0][1]:
             tracked_changes['modify'].append(change[0][0])
         else:
-            tracked_changes['move'].append(change[0][0] + ' -> ' +
-                                           change[0][1])
+            assert False    # path names different; move ops not yet supported
     return tracked_changes
 
 
@@ -540,7 +537,9 @@ def get_unstaged_changes(repo):
     # For each entry in the index check the time of last modification &
     # ensure not staged
     for entry in index.iteritems():
-        statbuf = os.stat(os.path.join(r.path, entry[0]))
-        if statbuf.st_mtime > entry[1][0][0]:
+        f = open(os.path.join(r.path, entry[0]), 'rb')
+        sha1 = Blob.from_string(f.read()).id
+        f.close()
+        if sha1 != entry[1][-2]:
             unstaged_changes.append(entry[0])
     return unstaged_changes

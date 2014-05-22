@@ -533,8 +533,7 @@ def get_unstaged_changes(repo):
     unstaged_changes = []
     index = r.open_index()
 
-    # For each entry in the index check the time of last modification &
-    # ensure not staged
+    # For each entry in the index check the sha1 & ensure not staged
     for entry in index.iteritems():
         f = open(os.path.join(r.path, entry[0]), 'rb')
         sha1 = Blob.from_string(f.read()).id

@@ -515,7 +515,7 @@ def get_tree_changes(repo):
         elif change[0][0] == change[0][1]:
             tracked_changes['modify'].append(change[0][0])
         else:
-            assert False    # path names different; move ops not yet supported
+            raise AssertionError('git mv ops not yet supported')
     return tracked_changes
 
 
@@ -532,9 +532,8 @@ def get_unstaged_changes(repo):
 
     # For each entry in the index check the sha1 & ensure not staged
     for entry in index.iteritems():
-        f = open(os.path.join(r.path, entry[0]), 'rb')
-        sha1 = Blob.from_string(f.read()).id
-        f.close()
+        with open(os.path.join(r.path, entry[0]), 'rb') as f:
+            sha1 = Blob.from_string(f.read()).id
         if sha1 != entry[1][-2]:
             unstaged_changes.append(entry[0])
     return unstaged_changes

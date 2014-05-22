@@ -479,7 +479,6 @@ def status(repo):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository
-
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -495,9 +494,8 @@ def status(repo):
 def get_tree_changes(repo):
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
-    :param repo:    repo path or object
-
-    :return:        dict with lists for each type of change
+    :param repo: repo path or object
+    :return: dict with lists for each type of change
     """
     r = open_repo(repo)
     index = r.open_index()
@@ -524,10 +522,9 @@ def get_tree_changes(repo):
 def get_unstaged_changes(repo):
     """Walk through the index check for differences against working tree.
 
-    :param repo:                repo path or object
-    :param tracked_changes:     list of paths already staged
-
-    :return:                    list of paths not staged
+    :param repo: repo path or object
+    :param tracked_changes: list of paths already staged
+    :return: list of paths not staged
     """
     r = open_repo(repo)
     unstaged_changes = []

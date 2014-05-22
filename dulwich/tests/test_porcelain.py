@@ -553,6 +553,10 @@ class StatusTests(PorcelainTestCase):
         self.assertEquals(len(changes['modify']), 0)
         self.assertEquals(len(changes['delete']), 0)
 
+        self.assertEquals(len(changes['add']), 1)
+        self.assertEquals(len(changes['modify']), 0)
+        self.assertEquals(len(changes['delete']), 0)
+
     def test_get_tree_changes_modify(self):
         """Unit test for get_tree_changes modify."""
 
@@ -571,6 +575,11 @@ class StatusTests(PorcelainTestCase):
         self.assertEquals(changes['modify'][0], filename)
         self.assertEquals(len(changes['delete']), 0)
 
+        self.assertEquals(len(changes['add']), 0)
+        self.assertEquals(len(changes['modify']), 1)
+        self.assertEquals(len(changes['delete']), 0)
+
+
     def test_get_tree_changes_delete(self):
         """Unit test for get_tree_changes delete."""
 
@@ -586,3 +595,8 @@ class StatusTests(PorcelainTestCase):
         self.assertEquals(len(changes['add']), 0)
         self.assertEquals(len(changes['modify']), 0)
         self.assertEquals(changes['delete'][0], filename)
+
+        self.assertEquals(len(changes['add']), 0)
+        self.assertEquals(len(changes['modify']), 0)
+        self.assertEquals(len(changes['delete']), 1)
+

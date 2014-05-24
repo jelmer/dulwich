@@ -496,3 +496,121 @@ class PullTests(PorcelainTestCase):
         # Check the target repo for pushed changes
         r = Repo(target_path)
         self.assertEquals(r['HEAD'].id, self.repo['HEAD'].id)
+
+
+class StatusTests(PorcelainTestCase):
+
+    def test_status(self):
+        """Integration test for `status` functionality."""
+
+        # Commit a dummy file then modify it
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write('origstuff')
+
+        porcelain.add(repo=self.repo.path, paths=['foo'])
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+
+        # modify access and modify time of path
+        os.utime(fullpath, (0, 0))
+
+        with open(fullpath, 'w') as f:
+            f.write('stuff')
+
+        # Make a dummy file and stage it
+        filename_add = 'bar'
+        fullpath = os.path.join(self.repo.path, filename_add)
+        with open(fullpath, 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename_add)
+
+        results = porcelain.status(self.repo)
+
+        self.assertEquals(results.staged['add'][0], filename_add)
+        self.assertEquals(results.unstaged, ['foo'])
+
+    def test_get_unstaged_changes(self):
+        """Unit test for get_unstaged_changes."""
+
+        # Commit a dummy file then modify it
+        filename_commit = 'foo'
+        fullpath = os.path.join(self.repo.path, filename_commit)
+        with open(fullpath, 'w') as f:
+            f.write('origstuff')
+
+
+        porcelain.add(repo=self.repo.path, paths=[filename_commit])
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+
+        with open(fullpath, 'w') as f:
+            f.write('newstuff')
+
+        # modify access and modify time of path
+        os.utime(fullpath, (0, 0))
+
+        changes = porcelain.get_unstaged_changes(self.repo.path)
+
+        self.assertEquals(list(changes), [filename_commit])
+
+    def test_get_tree_changes_add(self):
+        """Unit test for get_tree_changes add."""
+
+        # Make a dummy file, stage
+        filename = 'bar'
+        with open(os.path.join(self.repo.path, filename), 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+
+        filename = 'foo'
+        with open(os.path.join(self.repo.path, filename), 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['add'][0], filename)
+        self.assertEquals(len(changes['add']), 1)
+        self.assertEquals(len(changes['modify']), 0)
+        self.assertEquals(len(changes['delete']), 0)
+
+    def test_get_tree_changes_modify(self):
+        """Unit test for get_tree_changes modify."""
+
+        # Make a dummy file, stage, commit, modify
+        filename = 'foo'
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+        with open(fullpath, 'w') as f:
+            f.write('otherstuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['modify'][0], filename)
+        self.assertEquals(len(changes['add']), 0)
+        self.assertEquals(len(changes['modify']), 1)
+        self.assertEquals(len(changes['delete']), 0)
+
+    def test_get_tree_changes_delete(self):
+        """Unit test for get_tree_changes delete."""
+
+        # Make a dummy file, stage, commit, remove
+        filename = 'foo'
+        with open(os.path.join(self.repo.path, filename), 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test status',
+            author='', committer='')
+        porcelain.rm(repo=self.repo.path, paths=[filename])
+        changes = porcelain.get_tree_changes(self.repo.path)
+
+        self.assertEquals(changes['delete'][0], filename)
+        self.assertEquals(len(changes['add']), 0)
+        self.assertEquals(len(changes['modify']), 0)
+        self.assertEquals(len(changes['delete']), 1)

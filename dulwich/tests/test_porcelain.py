@@ -534,25 +534,27 @@ class StatusTests(PorcelainTestCase):
         """Unit test for get_unstaged_changes."""
 
         # Commit a dummy file then modify it
-        filename_commit = 'foo'
-        fullpath = os.path.join(self.repo.path, filename_commit)
-        with open(fullpath, 'w') as f:
+        foo1_fullpath = os.path.join(self.repo.path, 'foo1')
+        with open(foo1_fullpath, 'w') as f:
             f.write('origstuff')
 
+        foo2_fullpath = os.path.join(self.repo.path, 'foo2')
+        with open(foo2_fullpath, 'w') as f:
+            f.write('origstuff')
 
-        porcelain.add(repo=self.repo.path, paths=[filename_commit])
+        porcelain.add(repo=self.repo.path, paths=['foo1', 'foo2'])
         porcelain.commit(repo=self.repo.path, message='test status',
             author='', committer='')
 
-        with open(fullpath, 'w') as f:
+        with open(foo1_fullpath, 'w') as f:
             f.write('newstuff')
 
         # modify access and modify time of path
-        os.utime(fullpath, (0, 0))
+        os.utime(foo1_fullpath, (0, 0))
 
         changes = porcelain.get_unstaged_changes(self.repo.path)
 
-        self.assertEquals(list(changes), [filename_commit])
+        self.assertEquals(list(changes), ['foo1'])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""

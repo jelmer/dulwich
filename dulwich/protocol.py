@@ -108,7 +108,11 @@ class Protocol(object):
                 return None
             if self.report_activity:
                 self.report_activity(size, 'read')
-            return read(size-4)
+            pkt_contents = read(size-4)
+            if len(pkt_contents) + 4 != size:
+                raise AssertionError('Length of pkt read {:04x} does not match length prefix {:04x}.'
+                                     .format(len(pkt_contents) + 4, size))
+            return pkt_contents
         except socket.error as e:
             raise GitProtocolError(e)
 

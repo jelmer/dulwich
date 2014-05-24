@@ -54,8 +54,8 @@ from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
     )
+from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
-    Blob,
     Tag,
     parse_timezone,
     )
@@ -505,7 +505,7 @@ def status(repo):
     # 1. Get status of staged
     tracked_changes = get_tree_changes(repo)
     # 2. Get status of unstaged
-    unstaged_changes = list(get_unstaged_changes(repo))
+    unstaged_changes = list(get_unstaged_changes(repo.open_index(), repo.path))
     # TODO - Status of untracked - add untracked changes, need gitignore.
     untracked_changes = []
     return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
@@ -537,22 +537,3 @@ def get_tree_changes(repo):
         else:
             raise AssertionError('git mv ops not yet supported')
     return tracked_changes
-
-
-def get_unstaged_changes(repo):
-    """Walk through the index check for differences against working tree.
-
-    :param repo: repo path or object
-    :param tracked_changes: list of paths already staged
-    :yields: paths not staged
-    """
-    r = open_repo(repo)
-    index = r.open_index()
-
-    # For each entry in the index check the sha1 & ensure not staged
-    for entry in index.iteritems():
-        fp = os.path.join(r.path, entry[0])
-        with open(fp, 'rb') as f:
-            sha1 = Blob.from_string(f.read()).id
-        if sha1 != entry[1][-2]:
-            yield entry[0]

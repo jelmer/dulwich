@@ -31,6 +31,7 @@ from dulwich.index import (
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
+    get_unstaged_changes,
     index_entry_from_stat,
     read_index,
     write_cache_time,
@@ -300,19 +301,51 @@ class BuildIndexTests(TestCase):
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
-        self.assertReasonableIndexEntry(index['c/d'], 
+        self.assertReasonableIndexEntry(index['c/d'],
             stat.S_IFREG | 0o644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d
         epath = os.path.join(repo.path, 'c', 'e')
         self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index['c/e'], 
+        self.assertReasonableIndexEntry(index['c/e'],
             stat.S_IFLNK, 1, filee.id)
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files
         self.assertEquals(['.git', 'a', 'b', 'c'],
             sorted(os.listdir(repo.path)))
-        self.assertEquals(['d', 'e'], 
+        self.assertEquals(['d', 'e'],
             sorted(os.listdir(os.path.join(repo.path, 'c'))))
+
+
+class BuildIndexTests(TestCase):
+
+    def test_get_unstaged_changes(self):
+        """Unit test for get_unstaged_changes."""
+
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        # Commit a dummy file then modify it
+        foo1_fullpath = os.path.join(repo_dir, 'foo1')
+        with open(foo1_fullpath, 'w') as f:
+            f.write('origstuff')
+
+        foo2_fullpath = os.path.join(repo_dir, 'foo2')
+        with open(foo2_fullpath, 'w') as f:
+            f.write('origstuff')
+
+        repo.stage(['foo1', 'foo2'])
+        repo.do_commit('test status', author='', committer='')
+
+        with open(foo1_fullpath, 'w') as f:
+            f.write('newstuff')
+
+        # modify access and modify time of path
+        os.utime(foo1_fullpath, (0, 0))
+
+        changes = get_unstaged_changes(repo.open_index(), repo_dir)
+
+        self.assertEquals(list(changes), ['foo1'])

@@ -742,13 +742,15 @@ class Repo(BaseRepo):
         """
         if isinstance(paths, basestring):
             paths = [paths]
-        from dulwich.index import index_entry_from_stat
+        from dulwich.index import (
+            blob_from_path_and_stat,
+            index_entry_from_stat,
+            )
         index = self.open_index()
         for path in paths:
             full_path = os.path.join(self.path, path)
             try:
                 st = os.lstat(full_path)
-                is_symbolic_link = stat.S_ISLNK(st.st_mode)
             except OSError:
                 # File no longer exists
                 try:
@@ -756,15 +758,7 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                blob = Blob()
-                if not is_symbolic_link:
-                    f = open(full_path, 'rb')
-                    try:
-                        blob.data = f.read()
-                    finally:
-                        f.close()
-                else:
-                    blob.data = os.readlink(full_path)
+                blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
                 index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()

@@ -26,6 +26,7 @@ import struct
 
 from dulwich.file import GitFile
 from dulwich.objects import (
+    Blob,
     S_IFGITLINK,
     S_ISGITLINK,
     Tree,
@@ -452,3 +453,37 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()
+
+
+def blob_from_path_and_stat(path, st):
+    """Create a blob from a path and a stat object.
+
+    :param path: Full path to file
+    :param st: A stat object
+    :return: A `Blob` object
+    """
+    blob = Blob()
+    if not stat.S_ISLNK(st.st_mode):
+        f = open(path, 'rb')
+        try:
+            blob.data = f.read()
+        finally:
+            f.close()
+    else:
+        blob.data = os.readlink(path)
+    return blob
+
+
+def get_unstaged_changes(index, path):
+    """Walk through an index and check for differences against working tree.
+
+    :param index: index to check
+    :param path: path in which to find files
+    :yields: paths with unstaged changes
+    """
+    # For each entry in the index check the sha1 & ensure not staged
+    for name, entry in index.iteritems():
+        fp = os.path.join(path, name)
+        blob = blob_from_path_and_stat(fp, os.lstat(fp))
+        if blob.id != entry[-2]:
+            yield name

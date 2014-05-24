@@ -7,6 +7,10 @@
   * Support staging symbolic links in Repo.stage.
     (Robert Brown)
 
+ IMPROVEMENTS
+
+  * Add porcelain 'status'. (Ryan Faulkner)
+
 0.9.6	2014-04-23
 
  IMPROVEMENTS

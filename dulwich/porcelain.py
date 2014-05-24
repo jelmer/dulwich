@@ -34,6 +34,7 @@ Currently implemented:
  * rev-list
  * tag
  * update-server-info
+ * status
  * symbolic-ref
 
 These functions are meant to behave similarly to the git subcommands.
@@ -42,6 +43,7 @@ Differences in behaviour are considered bugs.
 
 __docformat__ = 'restructuredText'
 
+from collections import namedtuple
 import os
 import sys
 import time
@@ -53,6 +55,7 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.objects import (
+    Blob,
     Tag,
     parse_timezone,
     )
@@ -60,6 +63,9 @@ from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
+
+# Module level tuple definition for status output
+GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
 def open_repo(path_or_repo):
@@ -485,3 +491,68 @@ def pull(repo, remote_location, refs_path,
     indexfile = r.index_path()
     tree = r["HEAD"].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def status(repo):
+    """Returns staged, unstaged, and untracked changes relative to the HEAD.
+
+    :param repo: Path to repository
+    :return: GitStatus tuple,
+        staged -    list of staged paths (diff index/HEAD)
+        unstaged -  list of unstaged paths (diff index/working-tree)
+        untracked - list of untracked, un-ignored & non-.git paths
+    """
+    # 1. Get status of staged
+    tracked_changes = get_tree_changes(repo)
+    # 2. Get status of unstaged
+    unstaged_changes = list(get_unstaged_changes(repo))
+    # TODO - Status of untracked - add untracked changes, need gitignore.
+    untracked_changes = []
+    return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
+
+
+def get_tree_changes(repo):
+    """Return add/delete/modify changes to tree by comparing index to HEAD.
+
+    :param repo: repo path or object
+    :return: dict with lists for each type of change
+    """
+    r = open_repo(repo)
+    index = r.open_index()
+
+    # Compares the Index to the HEAD & determines changes
+    # Iterate through the changes and report add/delete/modify
+    tracked_changes = {
+        'add': [],
+        'delete': [],
+        'modify': [],
+    }
+    for change in index.changes_from_tree(r.object_store, r['HEAD'].tree):
+        if not change[0][0]:
+            tracked_changes['add'].append(change[0][1])
+        elif not change[0][1]:
+            tracked_changes['delete'].append(change[0][0])
+        elif change[0][0] == change[0][1]:
+            tracked_changes['modify'].append(change[0][0])
+        else:
+            raise AssertionError('git mv ops not yet supported')
+    return tracked_changes
+
+
+def get_unstaged_changes(repo):
+    """Walk through the index check for differences against working tree.
+
+    :param repo: repo path or object
+    :param tracked_changes: list of paths already staged
+    :yields: paths not staged
+    """
+    r = open_repo(repo)
+    index = r.open_index()
+
+    # For each entry in the index check the sha1 & ensure not staged
+    for entry in index.iteritems():
+        fp = os.path.join(r.path, entry[0])
+        with open(fp, 'rb') as f:
+            sha1 = Blob.from_string(f.read()).id
+        if sha1 != entry[1][-2]:
+            yield entry[0]

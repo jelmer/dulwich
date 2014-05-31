@@ -527,8 +527,8 @@ class StatusTests(PorcelainTestCase):
 
         results = porcelain.status(self.repo)
 
-        self.assertEquals(results.staged['add'][0], filename_add)
-        self.assertEquals(results.unstaged, ['foo'])
+        self.assertEqual(results.staged['add'][0], filename_add)
+        self.assertEqual(results.unstaged, ['foo'])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""
@@ -547,10 +547,10 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=filename)
         changes = porcelain.get_tree_changes(self.repo.path)
 
-        self.assertEquals(changes['add'][0], filename)
-        self.assertEquals(len(changes['add']), 1)
-        self.assertEquals(len(changes['modify']), 0)
-        self.assertEquals(len(changes['delete']), 0)
+        self.assertEqual(changes['add'][0], filename)
+        self.assertEqual(len(changes['add']), 1)
+        self.assertEqual(len(changes['modify']), 0)
+        self.assertEqual(len(changes['delete']), 0)
 
     def test_get_tree_changes_modify(self):
         """Unit test for get_tree_changes modify."""
@@ -568,10 +568,10 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=filename)
         changes = porcelain.get_tree_changes(self.repo.path)
 
-        self.assertEquals(changes['modify'][0], filename)
-        self.assertEquals(len(changes['add']), 0)
-        self.assertEquals(len(changes['modify']), 1)
-        self.assertEquals(len(changes['delete']), 0)
+        self.assertEqual(changes['modify'][0], filename)
+        self.assertEqual(len(changes['add']), 0)
+        self.assertEqual(len(changes['modify']), 1)
+        self.assertEqual(len(changes['delete']), 0)
 
     def test_get_tree_changes_delete(self):
         """Unit test for get_tree_changes delete."""
@@ -586,7 +586,7 @@ class StatusTests(PorcelainTestCase):
         porcelain.rm(repo=self.repo.path, paths=[filename])
         changes = porcelain.get_tree_changes(self.repo.path)
 
-        self.assertEquals(changes['delete'][0], filename)
-        self.assertEquals(len(changes['add']), 0)
-        self.assertEquals(len(changes['modify']), 0)
-        self.assertEquals(len(changes['delete']), 1)
+        self.assertEqual(changes['delete'][0], filename)
+        self.assertEqual(len(changes['add']), 0)
+        self.assertEqual(len(changes['modify']), 0)
+        self.assertEqual(len(changes['delete']), 1)

@@ -59,7 +59,7 @@ class FancyRenameTests(TestCase):
         new_f = open(self.bar, 'rb')
         self.assertEqual('foo contents', new_f.read())
         new_f.close()
-         
+
     def test_dest_exists(self):
         self.create(self.bar, 'bar contents')
         fancy_rename(self.foo, self.bar)
@@ -154,7 +154,7 @@ class GitFileTests(TestCase):
         f1 = GitFile(foo, 'wb')
         f1.write('new')
         try:
-            f2 = GitFile(foo, 'wb')
+            f2 = GitFile(foo, 'wb') # pylint: disable=W0612
             self.fail()
         except OSError as e:
             self.assertEqual(errno.EEXIST, e.errno)

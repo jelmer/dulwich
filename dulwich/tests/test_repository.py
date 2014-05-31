@@ -501,8 +501,10 @@ exit 1
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         warnings.simplefilter("always", UserWarning)
+
         self.addCleanup(warnings.resetwarnings)
-        warnings_list = setup_warning_catcher()
+        warnings_list, set_original_showwarning, original_showwarning = setup_warning_catcher()
+        self.addCleanup(set_original_showwarning, original_showwarning)
 
         commit_sha2 = r.do_commit(
             'empty commit',
@@ -748,4 +750,3 @@ class BuildRepoTests(TestCase):
         os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
-

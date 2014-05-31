@@ -61,8 +61,8 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
 
         commit_spec = [[1], [2, 1], [3, 2]]
         trees = {1: [('f1', f1_1), ('f2', f2_1)],
-                2: [('f1', f1_1), ('f2', f2_2), ('f3', f3_2)],
-                3: [('f2', f2_3), ('f3', f3_2)] }
+                 2: [('f1', f1_1), ('f2', f2_2), ('f3', f3_2)],
+                 3: [('f2', f2_3), ('f3', f3_2)]}
         # commit 1: f1 and f2
         # commit 2: f3 added, f2 changed. Missing shall report commit id and a
         # tree referenced by commit

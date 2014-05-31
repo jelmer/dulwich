@@ -21,11 +21,9 @@
 
 import errno
 import os
-import select
 import shutil
 import socket
 import tempfile
-import threading
 
 from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha
@@ -248,7 +246,6 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
 
 def ignore_error(error):
     """Check whether this error is safe to ignore."""
-    (e_type, e_value, e_tb) = error
+    (e_type, e_value, _) = error
     return (issubclass(e_type, socket.error) and
             e_value[0] in (errno.ECONNRESET, errno.EPIPE))
-

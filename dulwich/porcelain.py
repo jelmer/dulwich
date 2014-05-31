@@ -222,10 +222,10 @@ def rm(repo=".", paths=None):
     :param paths: Paths to remove
     """
     r = open_repo(repo)
-    index = r.open_index()
+    idx_obj = r.open_index()
     for p in paths:
-        del index[p]
-    index.write()
+        del idx_obj[p]
+    idx_obj.write()
 
 
 def print_commit(commit, outstream):
@@ -318,8 +318,8 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
     :param outstream: Stream to write log output to
     :param max_entries: Optional maximum number of entries to display
     """
-    r = open_repo(repo)
-    walker = r.get_walker(max_entries=max_entries)
+    repo_obj = open_repo(repo)
+    walker = repo_obj.get_walker(max_entries=max_entries)
     for entry in walker:
         print_commit(entry.commit, outstream)
 
@@ -379,7 +379,7 @@ def tag(repo, tag, author=None, message=None, annotated=False,
     """
 
     r = open_repo(repo)
-    object = parse_object(r, objectish)
+    obj = parse_object(r, objectish)
 
     if annotated:
         # Create the tag object
@@ -390,7 +390,7 @@ def tag(repo, tag, author=None, message=None, annotated=False,
         tag_obj.tagger = author
         tag_obj.message = message
         tag_obj.name = tag
-        tag_obj.object = (type(object), object.id)
+        tag_obj.object = (type(obj), obj.id)
         tag_obj.tag_time = tag_time
         if tag_time is None:
             tag_time = int(time.time())
@@ -403,7 +403,7 @@ def tag(repo, tag, author=None, message=None, annotated=False,
         r.object_store.add_object(tag_obj)
         tag_id = tag_obj.id
     else:
-        tag_id = object.id
+        tag_id = obj.id
 
     r.refs['refs/tags/' + tag] = tag_id
 
@@ -414,8 +414,8 @@ def list_tags(repo, outstream=sys.stdout):
     :param repo: Path to repository
     :param outstream: Stream to write tags to
     """
-    r = open_repo(repo)
-    tags = list(r.refs.as_dict("refs/tags"))
+    repo_obj = open_repo(repo)
+    tags = list(repo_obj.refs.as_dict("refs/tags"))
     tags.sort()
     return tags
 

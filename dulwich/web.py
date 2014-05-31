@@ -67,7 +67,7 @@ def date_time_string(timestamp=None):
               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     if timestamp is None:
         timestamp = time.time()
-    year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
+    year, month, day, hh, mm, ss, wd, _, _ = time.gmtime(timestamp)
     return '%s, %02d %3s %4d %02d:%02d:%02d GMD' % (
             weekdays[wd], day, months[month], year, hh, mm, ss)
 
@@ -202,8 +202,8 @@ class _LengthLimitedFile(object):
     but not implemented in wsgiref as of 2.5.
     """
 
-    def __init__(self, input, max_bytes):
-        self._input = input
+    def __init__(self, input_data, max_bytes):
+        self._input = input_data
         self._bytes_avail = max_bytes
 
     def read(self, size=-1):

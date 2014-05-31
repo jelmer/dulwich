@@ -293,7 +293,7 @@ class PackBasedObjectStore(BaseObjectStore):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
-            (name, pack) = pack_cache.popitem()
+            _, pack = pack_cache.popitem()
             pack.close()
 
     @property
@@ -329,7 +329,7 @@ class PackBasedObjectStore(BaseObjectStore):
         for sha in self._iter_loose_objects():
             objects.add((self._get_loose_object(sha), None))
         self.add_objects(list(objects))
-        for obj, path in objects:
+        for obj, _ in objects:
             self._remove_loose_object(obj.id)
         return len(objects)
 
@@ -663,13 +663,13 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param obj: Object to add
         """
-        dir = os.path.join(self.path, obj.id[:2])
+        dir_path = os.path.join(self.path, obj.id[:2])
         try:
-            os.mkdir(dir)
+            os.mkdir(dir_path)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        path = os.path.join(dir, obj.id[2:])
+        path = os.path.join(dir_path, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
         f = GitFile(path, 'wb')
@@ -749,7 +749,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param objects: Iterable over a list of objects.
         """
-        for obj, path in objects:
+        for obj, _ in objects:
             self._data[obj.id] = obj
 
     def add_pack(self):
@@ -865,7 +865,7 @@ class ObjectStoreIterator(ObjectIterator):
 
     def iterobjects(self):
         """Iterate over just the objects."""
-        for o, path in self:
+        for o, _ in self:
             yield o
 
     def itershas(self):
@@ -923,11 +923,11 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     :param kset: set to fill with references to files and directories
     """
     filetree = obj_store[tree_sha]
-    for name, mode, sha in filetree.iteritems():
-       if not S_ISGITLINK(mode) and sha not in kset:
-           kset.add(sha)
-           if stat.S_ISDIR(mode):
-               _collect_filetree_revs(obj_store, sha, kset)
+    for _, mode, sha in filetree.iteritems():
+        if not S_ISGITLINK(mode) and sha not in kset:
+            kset.add(sha)
+            if stat.S_ISDIR(mode):
+                _collect_filetree_revs(obj_store, sha, kset)
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
@@ -1001,7 +1001,7 @@ class MissingObjectFinder(object):
         missing_commits, common_commits = object_store._collect_ancestors(
             want_commits,
             all_ancestors,
-            get_parents=self._get_parents);
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally

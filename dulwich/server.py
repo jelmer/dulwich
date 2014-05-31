@@ -515,10 +515,10 @@ class ProtocolGraphWalker(object):
 
         self.proto.write_pkt_line(None)
 
-    def send_ack(self, sha, ack_type=''):
-        if ack_type:
-            ack_type = ' %s' % ack_type
-        self.proto.write_pkt_line('ACK %s%s\n' % (sha, ack_type))
+    def send_ack(self, sha, acknowledgement_type=''):
+        if acknowledgement_type:
+            acknowledgement_type = ' %s' % acknowledgement_type
+        self.proto.write_pkt_line('ACK %s%s\n' % (sha, acknowledgement_type))
 
     def send_nak(self):
         self.proto.write_pkt_line('NAK\n')
@@ -716,7 +716,7 @@ class ReceivePackHandler(Handler):
             # TODO: more informative error messages than just the exception string
             try:
                 recv = getattr(self.proto, "recv", None)
-                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append(('unpack', 'ok'))
             except all_exceptions as e:
                 status.append(('unpack', str(e).replace('\n', '')))
@@ -727,7 +727,7 @@ class ReceivePackHandler(Handler):
             # even if no pack data has been sent.
             status.append(('unpack', 'ok'))
 
-        for oldsha, sha, ref in refs:
+        for _, sha, ref in refs:
             ref_status = 'ok'
             try:
                 if sha == ZERO_SHA:
@@ -744,7 +744,7 @@ class ReceivePackHandler(Handler):
                         self.repo.refs[ref] = sha
                     except all_exceptions:
                         ref_status = 'failed to write'
-            except KeyError as e:
+            except KeyError:
                 ref_status = 'bad ref'
             status.append((ref, ref_status))
 
@@ -916,7 +916,6 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
 
 def generate_info_refs(repo):
     """Generate an info refs file."""
-    refs = repo.get_refs()
     return write_info_refs(repo.get_refs(), repo.object_store)
 
 

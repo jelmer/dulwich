@@ -64,7 +64,7 @@ def S_ISGITLINK(m):
     :param m: Mode to check
     :return: a ``boolean``
     """
-    return (stat.S_IFMT(m) == S_IFGITLINK)
+    return stat.S_IFMT(m) == S_IFGITLINK
 
 
 def _decompress(string):
@@ -81,23 +81,23 @@ def sha_to_hex(sha):
     return hexsha
 
 
-def hex_to_sha(hex):
+def hex_to_sha(hex_string):
     """Takes a hex sha and returns a binary sha"""
-    assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
+    assert len(hex_string) == 40, "Incorrent length of hexsha: %s" % hex_string
     try:
-        return binascii.unhexlify(hex)
+        return binascii.unhexlify(hex_string)
     except TypeError as exc:
-        if not isinstance(hex, str):
+        if not isinstance(hex_string, str):
             raise
         raise ValueError(exc.args[0])
 
 
-def hex_to_filename(path, hex):
+def hex_to_filename(path, hex_string):
     """Takes a hex sha and returns its filename relative to the given path."""
-    dir = hex[:2]
-    file = hex[2:]
+    directory = hex_string[:2]
+    filename = hex_string[2:]
     # Check from object dir
-    return os.path.join(path, dir, file)
+    return os.path.join(path, directory, filename)
 
 
 def filename_to_hex(filename):
@@ -108,9 +108,9 @@ def filename_to_hex(filename):
     assert len(names) == 2, errmsg
     base, rest = names
     assert len(base) == 2 and len(rest) == 38, errmsg
-    hex = base + rest
-    hex_to_sha(hex)
-    return hex
+    hex_string = base + rest
+    hex_to_sha(hex_string)
+    return hex_string
 
 
 def object_header(num_type, length):
@@ -131,25 +131,25 @@ def serializable_property(name, docstring=None):
     return property(get, set, doc=docstring)
 
 
-def object_class(type):
+def object_class(object_type):
     """Get the object class corresponding to the given type.
 
-    :param type: Either a type name string or a numeric type.
+    :param object_type: Either a type name string or a numeric type.
     :return: The ShaFile subclass corresponding to the given type, or None if
         type is not a valid type name/number.
     """
-    return _TYPE_MAP.get(type, None)
+    return _TYPE_MAP.get(object_type, None)
 
 
-def check_hexsha(hex, error_msg):
+def check_hexsha(hex_string, error_msg):
     """Check if a string is a valid hex sha string.
 
-    :param hex: Hex string to check
+    :param hex_string: Hex string to check
     :param error_msg: Error message to use in exception
     :raise ObjectFormatException: Raised when the string is not valid
     """
     try:
-        hex_to_sha(hex)
+        hex_to_sha(hex_string)
     except (TypeError, AssertionError, ValueError):
         raise ObjectFormatException("%s %s" % (error_msg, hex))
 
@@ -219,9 +219,9 @@ class ShaFile(object):
         ret._magic = magic
         return ret
 
-    def _parse_legacy_object(self, map):
+    def _parse_legacy_object(self, object_map):
         """Parse a legacy object, setting the raw string."""
-        text = _decompress(map)
+        text = _decompress(object_map)
         header_end = text.find('\0')
         if header_end < 0:
             raise ObjectFormatException("Invalid object header, no \\0")
@@ -398,7 +398,7 @@ class ShaFile(object):
             obj._needs_serialization = True
             obj._file = f
             return obj
-        except (IndexError, ValueError) as e:
+        except (IndexError, ValueError):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
@@ -501,9 +501,9 @@ class ShaFile(object):
         """Return the type number for this object class."""
         return self.type_num
 
-    def set_type(self, type):
+    def set_type(self, type_to_set):
         """Set the type number for this object class."""
-        self.type_num = type
+        self.type_num = type_to_set
 
     # DEPRECATED: use type_num or type_name as needed.
     type = property(get_type, set_type)
@@ -964,13 +964,13 @@ class Tree(ShaFile):
         parts = path.split('/')
         sha = self.id
         mode = None
-        for p in parts:
-            if not p:
+        for part in parts:
+            if not part:
                 continue
             obj = lookup_obj(sha)
             if not isinstance(obj, Tree):
                 raise NotTreeError(sha)
-            mode, sha = obj[p]
+            mode, sha = obj[part]
         return mode, sha
 
 

@@ -206,7 +206,7 @@ class GitClientTests(TestCase):
             return {}
 
         f = BytesIO()
-        empty_pack = write_pack_objects(f, {})
+        write_pack_objects(f, {})
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertIn(
             self.rout.getvalue(),
@@ -248,7 +248,7 @@ class GitClientTests(TestCase):
             return [(commit, None), (tree, ''), ]
 
         f = BytesIO()
-        pack = write_pack_objects(f, generate_pack_contents(None, None))
+        write_pack_objects(f, generate_pack_contents(None, None))
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertIn(
             self.rout.getvalue(),
@@ -387,7 +387,7 @@ class TestGetTransportAndPath(TestCase):
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
-        c, path = get_transport_and_path('prospero://bar/baz')
+        c, _ = get_transport_and_path('prospero://bar/baz')
         self.assertTrue(isinstance(c, SSHGitClient))
 
     def test_http(self):

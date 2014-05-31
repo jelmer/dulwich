@@ -51,7 +51,7 @@ class BuildCommitGraphTest(TestCase):
         self.assertTrue(c2.commit_time > c1.commit_time)
 
     def test_merge(self):
-        c1, c2, c3, c4 = build_commit_graph(self.store,
+        _, c2, c3, c4 = build_commit_graph(self.store,
                                             [[1], [2, 1], [3, 1], [4, 2, 3]])
         self.assertEqual([c2.id, c3.id], c4.parents)
         self.assertTrue(c4.commit_time > c2.commit_time)

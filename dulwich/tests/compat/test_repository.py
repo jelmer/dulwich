@@ -24,15 +24,9 @@ from io import BytesIO
 import itertools
 import os
 
-from dulwich.objects import (
-    hex_to_sha,
-    )
-from dulwich.repo import (
-    check_ref_format,
-    )
-from dulwich.tests.utils import (
-    tear_down_repo,
-    )
+from dulwich.objects import hex_to_sha
+from dulwich.refs import check_ref_format
+from dulwich.tests.utils import tear_down_repo
 
 from dulwich.tests.compat.utils import (
     run_git_or_fail,

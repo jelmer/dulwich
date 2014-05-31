@@ -323,7 +323,7 @@ class GitClient(object):
         if "side-band-64k" in capabilities:
             if progress is None:
                 progress = lambda x: None
-            channel_callbacks = { 2: progress }
+            channel_callbacks = {2: progress}
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet).parse
@@ -434,7 +434,7 @@ class TraditionalGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        proto, unused_can_read = self._connect('receive-pack', path)
+        proto, _ = self._connect('receive-pack', path)
         old_refs, server_capabilities = read_pkt_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
@@ -483,7 +483,7 @@ class TraditionalGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(proto.write_file(), objects)
+            write_pack_objects(proto.write_file(), objects)
         elif len(set(new_refs.values()) - set([ZERO_SHA])) > 0:
             # Check for valid create/update refs
             filtered_new_refs = \
@@ -491,7 +491,7 @@ class TraditionalGitClient(GitClient):
                      if sha != ZERO_SHA])
             if len(set(filtered_new_refs.iteritems()) -
                     set(old_refs.iteritems())) > 0:
-                entries, sha = write_pack_objects(proto.write_file(), objects)
+                write_pack_objects(proto.write_file(), objects)
 
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
             progress)
@@ -531,7 +531,7 @@ class TraditionalGitClient(GitClient):
         return refs
 
     def archive(self, path, committish, write_data, progress=None):
-        proto, can_read = self._connect('upload-archive', path)
+        proto, _ = self._connect('upload-archive', path)
         proto.write_pkt_line("argument %s" % committish)
         proto.write_pkt_line(None)
         pkt = proto.read_pkt_line()
@@ -564,22 +564,22 @@ class TCPGitClient(TraditionalGitClient):
             socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
         err = socket.error("no address found for %s" % self._host)
-        for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
-            s = socket.socket(family, socktype, proto)
-            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        for (family, socktype, proto, _, sockaddr) in sockaddrs:
+            sock = socket.socket(family, socktype, proto)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
-                s.connect(sockaddr)
+                sock.connect(sockaddr)
                 break
             except socket.error as err:
-                if s is not None:
-                    s.close()
-                s = None
-        if s is None:
+                if sock is not None:
+                    sock.close()
+                sock = None
+        if sock is None:
             raise err
         # -1 means system default buffering
-        rfile = s.makefile('rb', -1)
+        rfile = sock.makefile('rb', -1)
         # 0 means unbuffered
-        wfile = s.makefile('wb', 0)
+        wfile = sock.makefile('wb', 0)
         proto = Protocol(rfile.read, wfile.write,
                          report_activity=self._report_activity)
         if path.startswith("/~"):
@@ -623,7 +623,6 @@ class SubprocessGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
-        import subprocess
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
@@ -727,7 +726,6 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
-        import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:
@@ -991,7 +989,7 @@ class HttpGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(req_proto.write_file(), objects)
+            write_pack_objects(req_proto.write_file(), objects)
         resp = self._smart_request("git-receive-pack", url,
             data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)

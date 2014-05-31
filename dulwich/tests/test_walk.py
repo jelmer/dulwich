@@ -23,10 +23,8 @@ from itertools import (
     )
 
 from dulwich.diff_tree import (
-    CHANGE_ADD,
     CHANGE_MODIFY,
     CHANGE_RENAME,
-    CHANGE_COPY,
     TreeChange,
     RenameDetector,
     )
@@ -263,7 +261,7 @@ class WalkerTest(TestCase):
 
     def test_changes_with_renames(self):
         blob = make_object(Blob, data='blob')
-        c1, c2 = self.make_linear_commits(
+        _, c2 = self.make_linear_commits(
           2, trees={1: [('a', blob)], 2: [('b', blob)]})
         entry_a = ('a', F, blob.id)
         entry_b = ('b', F, blob.id)
@@ -282,7 +280,7 @@ class WalkerTest(TestCase):
         names = ['a', 'a', 'b', 'b', 'c', 'c']
 
         trees = dict((i + 1, [(n, blob, F)]) for i, n in enumerate(names))
-        c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
+        c1, _, c3, _, c5, c6 = self.make_linear_commits(6, trees=trees)
         self.assertWalkYields([c5], [c6.id], paths=['c'])
 
         e = lambda n: (n, F, blob.id)
@@ -404,7 +402,7 @@ class WalkerTest(TestCase):
         #   \          /
         #    \-y3--y4-/--y5
         # Due to skew, y5 is the oldest commit.
-        c1, x2, y3, y4, y5, m6 = cs = self.make_commits(
+        c1, x2, y3, y4, y5, m6 = self.make_commits(
           [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]],
           times=[2, 3, 4, 5, 1, 6])
         self.assertWalkYields([m6, y4, y3, x2, c1], [m6.id])
@@ -413,5 +411,5 @@ class WalkerTest(TestCase):
         self.assertWalkYields([m6, x2], [m6.id], exclude=[y5.id])
 
     def test_empty_walk(self):
-        c1, c2, c3 = self.make_linear_commits(3)
+        _, _, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], exclude=[c3.id])

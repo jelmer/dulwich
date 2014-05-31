@@ -170,7 +170,7 @@ def _parse_string(value):
     value = value.strip()
     ret = []
     block = []
-    in_quotes  = False
+    in_quotes = False
     for c in value:
         if c == "\"":
             in_quotes = (not in_quotes)
@@ -238,7 +238,7 @@ class ConfigFile(ConfigDict):
         ret = cls()
         section = None
         setting = None
-        for lineno, line in enumerate(f.readlines()):
+        for line in f.readlines():
             line = line.lstrip()
             if setting is None:
                 if len(line) > 0 and line[0] == "[":

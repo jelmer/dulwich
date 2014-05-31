@@ -66,6 +66,7 @@ from dulwich.hooks import (
     CommitMsgShellHook,
     )
 
+# These imports from refs are needed for backwards compatibility
 from dulwich.refs import (
     check_ref_format,
     RefsContainer,
@@ -75,8 +76,8 @@ from dulwich.refs import (
     read_packed_refs,
     read_packed_refs_with_peeled,
     write_packed_refs,
-    SYMREF,
-    )
+    SYMREF
+)
 
 
 import warnings
@@ -646,7 +647,7 @@ class Repo(BaseRepo):
               os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
-        elif (os.path.isfile(os.path.join(root, ".git"))):
+        elif os.path.isfile(os.path.join(root, ".git")):
             import re
             f = open(os.path.join(root, ".git"), 'r')
             try:

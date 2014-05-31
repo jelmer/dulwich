@@ -56,7 +56,7 @@ class GitFastExporter(object):
         self.outf.write("%r\n" % cmd)
 
     def _allocate_marker(self):
-        self._marker_idx+=1
+        self._marker_idx += 1
         return str(self._marker_idx)
 
     def _export_blob(self, blob):

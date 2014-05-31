@@ -83,7 +83,7 @@ class ObjectStoreTests(object):
         self.store.add_objects([])
 
     def test_add_commit(self):
-        # TODO: Argh, no way to construct Git commit objects without 
+        # TODO: Argh, no way to construct Git commit objects without
         # access to a serialized form.
         self.store.add_objects([])
 
@@ -431,14 +431,14 @@ class ObjectStoreGraphWalkerTests(TestCase):
         # A branch (a, c) or (b, d) may be done after 2 steps or 3 depending on
         # the order walked: 3-step walks include (a, b, c) and (b, a, d), etc.
         if walk == ["a", "c"] or walk == ["b", "d"]:
-          gw.ack(walk[0])
-          acked = True
+            gw.ack(walk[0])
+            acked = True
 
         walk.append(next(gw))
         if not acked and walk[2] == "c":
-          gw.ack("a")
+            gw.ack("a")
         elif not acked and walk[2] == "d":
-          gw.ack("b")
+            gw.ack("b")
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 

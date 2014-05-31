@@ -24,9 +24,6 @@
 
 from dulwich.objects import (
     Blob,
-    Commit,
-    Tag,
-    Tree,
     )
 from dulwich.objectspec import (
     parse_object,
@@ -38,7 +35,6 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
-    make_object,
     )
 
 
@@ -65,6 +61,6 @@ class ParseCommitRangeTests(TestCase):
 
     def test_commit_by_sha(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1],
+        c1, _, _ = build_commit_graph(r.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))

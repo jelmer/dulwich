@@ -54,7 +54,7 @@ class ArchiveTests(PorcelainTestCase):
     """Tests for the archive command."""
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs["refs/heads/master"] = c3.id
         out = BytesIO()
         err = BytesIO()
@@ -69,7 +69,7 @@ class ArchiveTests(PorcelainTestCase):
 class UpdateServerInfoTests(PorcelainTestCase):
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
         porcelain.update_server_info(self.repo.path)
@@ -80,7 +80,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
 class CommitTests(PorcelainTestCase):
 
     def test_custom_author(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["refs/heads/foo"] = c3.id
         sha = porcelain.commit(self.repo.path, message="Some message",
@@ -98,7 +98,7 @@ class CloneTests(PorcelainTestCase):
                  2: [('f1', f1_1), ('f2', f1_1)],
                  3: [('f1', f1_1), ('f2', f1_1)], }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+        _, _, c3 = build_commit_graph(self.repo.object_store,
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
@@ -118,7 +118,7 @@ class CloneTests(PorcelainTestCase):
                  2: [('f1', f1_1), ('f2', f1_1)],
                  3: [('f1', f1_1), ('f2', f1_1)], }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+        _, _, c3 = build_commit_graph(self.repo.object_store,
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
@@ -138,7 +138,7 @@ class CloneTests(PorcelainTestCase):
                  2: [('f1', f1_1), ('f2', f1_1)],
                  3: [('f1', f1_1), ('f2', f1_1)], }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store,
+        _, _, c3 = build_commit_graph(self.repo.object_store,
                                         commit_spec, trees)
         self.repo.refs["refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
@@ -222,7 +222,7 @@ class RemoveTests(PorcelainTestCase):
 class LogTests(PorcelainTestCase):
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
@@ -230,7 +230,7 @@ class LogTests(PorcelainTestCase):
         self.assertEqual(3, outstream.getvalue().count("-" * 50))
 
     def test_max_entries(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
@@ -241,7 +241,7 @@ class LogTests(PorcelainTestCase):
 class ShowTests(PorcelainTestCase):
 
     def test_nolist(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
@@ -249,7 +249,7 @@ class ShowTests(PorcelainTestCase):
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
@@ -267,15 +267,13 @@ class ShowTests(PorcelainTestCase):
 class SymbolicRefTests(PorcelainTestCase):
 
     def test_set_wrong_symbolic_ref(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
-
-        outstream = BytesIO()
         self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path, 'foobar')
 
     def test_set_force_wrong_symbolic_ref(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
@@ -286,14 +284,14 @@ class SymbolicRefTests(PorcelainTestCase):
         self.assertEqual(new_ref, 'ref: refs/heads/force_foobar\n')
 
     def test_set_symbolic_ref(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
         porcelain.symbolic_ref(self.repo.path, 'master')
 
     def test_set_symbolic_ref_other_than_master(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]], attrs=dict(refs='develop'))
         self.repo.refs["HEAD"] = c3.id
         self.repo.refs["refs/heads/develop"] = c3.id
@@ -308,7 +306,7 @@ class SymbolicRefTests(PorcelainTestCase):
 class DiffTreeTests(PorcelainTestCase):
 
     def test_empty(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
         outstream = BytesIO()
@@ -319,7 +317,7 @@ class DiffTreeTests(PorcelainTestCase):
 class CommitTreeTests(PorcelainTestCase):
 
     def test_simple(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         b = Blob()
         b.data = "foo the bar"
@@ -351,7 +349,7 @@ class RevListTests(PorcelainTestCase):
 class TagTests(PorcelainTestCase):
 
     def test_annotated(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
@@ -366,7 +364,7 @@ class TagTests(PorcelainTestCase):
         self.assertEqual("bar", tag.message)
 
     def test_unannotated(self):
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
@@ -374,7 +372,7 @@ class TagTests(PorcelainTestCase):
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
-        tag = self.repo['refs/tags/tryme']
+        self.repo['refs/tags/tryme']
         self.assertEqual(tags.values(), [self.repo.head()])
 
 
@@ -440,7 +438,7 @@ class PushTests(PorcelainTestCase):
         porcelain.clone(self.repo.path, target=clone_path, outstream=outstream)
 
         # create a second file to be pushed back to origin
-        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        _, fullpath = tempfile.mkstemp(dir=clone_path)
         porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
         porcelain.commit(repo=clone_path, message='push',
             author='', committer='')
@@ -472,7 +470,7 @@ class PullTests(PorcelainTestCase):
         errstream = BytesIO()
 
         # create a file for initial commit
-        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        _, fullpath = tempfile.mkstemp(dir=self.repo.path)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message='test',
@@ -483,7 +481,7 @@ class PullTests(PorcelainTestCase):
         porcelain.clone(self.repo.path, target=target_path, outstream=outstream)
 
         # create a second file to be pushed
-        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        _, fullpath = tempfile.mkstemp(dir=self.repo.path)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message='test2',

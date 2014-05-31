@@ -159,8 +159,8 @@ class BlobReadTests(TestCase):
         t = self.get_tag(tag_sha)
         self.assertEqual(t.object,
             (Commit, '51b668fd5bf7061b7d6fa525f88803e6cfadaa51'))
-        self.assertEqual(t.name,'signed')
-        self.assertEqual(t.tagger,'Ali Sabil <ali.sabil@gmail.com>')
+        self.assertEqual(t.name, 'signed')
+        self.assertEqual(t.tagger, 'Ali Sabil <ali.sabil@gmail.com>')
         self.assertEqual(t.tag_time, 1231203091)
         self.assertEqual(t.message, 'This is a signed tag\n-----BEGIN PGP SIGNATURE-----\nVersion: GnuPG v1.4.9 (GNU/Linux)\n\niEYEABECAAYFAkliqx8ACgkQqSMmLy9u/kcx5ACfakZ9NnPl02tOyYP6pkBoEkU1\n5EcAn0UFgokaSvS371Ym/4W9iJj6vh3h\n=ql7y\n-----END PGP SIGNATURE-----\n')
 

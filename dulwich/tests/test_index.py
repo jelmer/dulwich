@@ -348,4 +348,4 @@ class BuildIndexTests(TestCase):
 
         changes = get_unstaged_changes(repo.open_index(), repo_dir)
 
-        self.assertEquals(list(changes), ['foo1'])
+        self.assertEqual(list(changes), ['foo1'])

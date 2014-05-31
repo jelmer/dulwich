@@ -29,9 +29,7 @@ from dulwich.objects import (
     Commit,
     Tree,
     )
-from dulwich.repo import (
-    MemoryRepo,
-    )
+from dulwich.repo import MemoryRepo
 from dulwich.tests import (
     SkipTest,
     TestCase,

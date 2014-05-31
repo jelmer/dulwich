@@ -35,9 +35,7 @@ from dulwich.repo import (
     Repo,
     MemoryRepo,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,

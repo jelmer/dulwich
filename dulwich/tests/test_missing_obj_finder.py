@@ -16,12 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
-from dulwich.objects import (
-    Blob,
-    )
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,

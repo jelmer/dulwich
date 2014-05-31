@@ -30,9 +30,7 @@ from dulwich.objectspec import (
     parse_commit_range,
     )
 from dulwich.repo import MemoryRepo
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     build_commit_graph,
     )

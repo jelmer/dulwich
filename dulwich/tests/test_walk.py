@@ -18,9 +18,7 @@
 
 """Tests for commit walking functionality."""
 
-from itertools import (
-    permutations,
-    )
+from itertools import permutations
 
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
@@ -28,12 +26,8 @@ from dulwich.diff_tree import (
     TreeChange,
     RenameDetector,
     )
-from dulwich.errors import (
-    MissingCommitError,
-    )
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
+from dulwich.errors import MissingCommitError
+from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import (
     Commit,
     Blob,

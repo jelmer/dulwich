@@ -48,9 +48,7 @@ from dulwich.pack import (
     REF_DELTA,
     write_pack_objects,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,
     build_pack,

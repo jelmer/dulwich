@@ -27,15 +27,10 @@ import shutil
 import tempfile
 import zlib
 
-from dulwich.errors import (
-    ChecksumMismatch,
-    )
-from dulwich.file import (
-    GitFile,
-    )
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
+from dulwich.errors import ChecksumMismatch
+from dulwich.file import GitFile
+from dulwich.object_store import MemoryObjectStore
+
 from dulwich.objects import (
     Blob,
     hex_to_sha,
@@ -66,9 +61,7 @@ from dulwich.pack import (
     PackStreamReader,
     DeltaChainIterator,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,
     build_pack,

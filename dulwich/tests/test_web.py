@@ -23,9 +23,7 @@ import gzip
 import re
 import os
 
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
+from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import (
     Blob,
     Tag,
@@ -34,12 +32,8 @@ from dulwich.repo import (
     BaseRepo,
     MemoryRepo,
     )
-from dulwich.server import (
-    DictBackend,
-    )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.server import DictBackend
+from dulwich.tests import TestCase
 from dulwich.web import (
     HTTP_OK,
     HTTP_NOT_FOUND,
@@ -59,10 +53,7 @@ from dulwich.web import (
     HTTPGitApplication,
     )
 
-from dulwich.tests.utils import (
-    make_object,
-    )
-
+from dulwich.tests.utils import make_object
 
 class TestHTTPGitRequest(HTTPGitRequest):
     """HTTPGitRequest with overridden methods to help test caching."""

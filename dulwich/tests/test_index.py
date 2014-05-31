@@ -37,9 +37,7 @@ from dulwich.index import (
     write_cache_time,
     write_index,
     )
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
+from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import (
     Blob,
     Tree,

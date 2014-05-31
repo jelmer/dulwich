@@ -52,9 +52,7 @@ from dulwich.objects import (
     TreeEntry,
     Tree,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     F,
     make_object,

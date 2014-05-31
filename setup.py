@@ -44,6 +44,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         stderr=subprocess.PIPE, env={})
     out, err = p.communicate()
     for l in out.splitlines():
+        l = l.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''

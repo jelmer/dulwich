@@ -104,7 +104,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 			Py_DECREF(name);
 			return NULL;
 		}
-		item = Py_BuildValue("(NlN)", name, mode, sha); 
+		item = Py_BuildValue("(NlN)", name, mode, sha);
 		if (item == NULL) {
 			Py_DECREF(ret);
 			Py_DECREF(sha);
@@ -254,28 +254,52 @@ init_objects(void)
 	PyObject *m, *objects_mod, *errors_mod;
 
 	m = Py_InitModule3("_objects", py_objects_methods, NULL);
-	if (m == NULL)
-		return;
-
+	if (m == NULL) {
+#if PY_MAJOR_VERSION < 3
+	  return;
+#else
+	  return NULL;
+#endif
+	}
 
 	errors_mod = PyImport_ImportModule("dulwich.errors");
-	if (errors_mod == NULL)
-		return;
+	if (errors_mod == NULL) {
+#if PY_MAJOR_VERSION < 3
+	  return;
+#else
+	  return NULL;
+#endif
+	}
 
 	object_format_exception_cls = PyObject_GetAttrString(
 		errors_mod, "ObjectFormatException");
 	Py_DECREF(errors_mod);
-	if (object_format_exception_cls == NULL)
-		return;
+	if (object_format_exception_cls == NULL) {
+#if PY_MAJOR_VERSION < 3
+	  return;
+#else
+	  return NULL;
+#endif
+	}
 
 	/* This is a circular import but should be safe since this module is
 	 * imported at at the very bottom of objects.py. */
 	objects_mod = PyImport_ImportModule("dulwich.objects");
-	if (objects_mod == NULL)
-		return;
+	if (objects_mod == NULL) {
+#if PY_MAJOR_VERSION < 3
+	  return;
+#else
+	  return NULL;
+#endif
+	}
 
 	tree_entry_cls = PyObject_GetAttrString(objects_mod, "TreeEntry");
 	Py_DECREF(objects_mod);
-	if (tree_entry_cls == NULL)
-		return;
+	if (tree_entry_cls == NULL) {
+#if PY_MAJOR_VERSION < 3
+	  return;
+#else
+	  return NULL;
+#endif
+	}
 }

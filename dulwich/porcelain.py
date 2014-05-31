@@ -127,7 +127,7 @@ def commit(repo=".", message=None, author=None, committer=None):
     # FIXME: Support --signoff argument
     r = open_repo(repo)
     return r.do_commit(message=message, author=author,
-        committer=committer)
+                       committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -140,7 +140,7 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     """
     r = open_repo(repo)
     return r.do_commit(message=message, tree=tree, committer=committer,
-            author=author)
+                       author=author)
 
 
 def init(path=".", bare=False):
@@ -184,8 +184,8 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     else:
         r = Repo.init(target)
     remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=outstream.write)
+                               determine_wants=r.object_store.determine_wants_all,
+                               progress=outstream.write)
     r["HEAD"] = remote_refs["HEAD"]
     if checkout:
         outstream.write('Checking out HEAD')
@@ -303,12 +303,10 @@ def show_tag(repo, tag, outstream):
 
 
 def show_object(repo, obj, outstream):
-    return {
-        "tree": show_tree,
-        "blob": show_blob,
-        "commit": show_commit,
-        "tag": show_tag,
-            }[obj.type_name](repo, obj, outstream)
+    return {"tree": show_tree,
+            "blob": show_blob,
+            "commit": show_commit,
+            "tag": show_tag}[obj.type_name](repo, obj, outstream)
 
 
 def log(repo=".", outstream=sys.stdout, max_entries=None):
@@ -462,7 +460,7 @@ def push(repo, remote_location, refs_path,
 
     try:
         client.send_pack(path, update_refs,
-            r.object_store.generate_pack_contents, progress=errstream.write)
+                         r.object_store.generate_pack_contents, progress=errstream.write)
         outstream.write("Push to %s successful.\n" % remote_location)
     except (UpdateRefsError, SendPackError) as e:
         outstream.write("Push to %s failed.\n" % remote_location)

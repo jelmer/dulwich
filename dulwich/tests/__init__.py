@@ -77,7 +77,7 @@ class BlackboxTestCase(TestCase):
     """Blackbox testing."""
 
     bin_directory = os.path.abspath(os.path.join(os.path.dirname(__file__),
-        "..", "..", "bin"))
+                                                 "..", "..", "bin"))
 
     def bin_path(self, name):
         """Determine the full path of a binary.
@@ -103,10 +103,10 @@ class BlackboxTestCase(TestCase):
         # Save us from all that headache and call python with the bin script.
         argv = [sys.executable, self.bin_path(name)] + args
         return subprocess.Popen(argv,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True,
-            env=env)
+                                stdout=subprocess.PIPE,
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True,
+                                env=env)
 
 
 def self_test_suite():
@@ -158,7 +158,7 @@ def tutorial_test_suite():
         os.chdir(test.__old_cwd)
         shutil.rmtree(test.__dulwich_tempdir)
     return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
-        *tutorial_files)
+                                *tutorial_files)
 
 
 def nocompat_test_suite():

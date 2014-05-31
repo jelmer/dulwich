@@ -77,7 +77,7 @@ from dulwich.objects import (
     )
 
 supports_mmap_offset = (sys.version_info[0] >= 3 or
-        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
+                        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
 
 
 OFS_DELTA = 6
@@ -112,17 +112,17 @@ class UnpackedObject(object):
     """
 
     __slots__ = [
-      'offset',         # Offset in its pack.
-      '_sha',           # Cached binary SHA.
-      'obj_type_num',   # Type of this object.
-      'obj_chunks',     # Decompressed and delta-resolved chunks.
-      'pack_type_num',  # Type of this object in the pack (may be a delta).
-      'delta_base',     # Delta base offset or SHA.
-      'comp_chunks',    # Compressed object chunks.
-      'decomp_chunks',  # Decompressed object chunks.
-      'decomp_len',     # Decompressed length of this object.
-      'crc32',          # CRC32.
-      ]
+        'offset',         # Offset in its pack.
+        '_sha',           # Cached binary SHA.
+        'obj_type_num',   # Type of this object.
+        'obj_chunks',     # Decompressed and delta-resolved chunks.
+        'pack_type_num',  # Type of this object in the pack (may be a delta).
+        'delta_base',     # Delta base offset or SHA.
+        'comp_chunks',    # Compressed object chunks.
+        'decomp_chunks',  # Decompressed object chunks.
+        'decomp_len',     # Decompressed length of this object.
+        'crc32',          # CRC32.
+    ]
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
@@ -300,7 +300,7 @@ def load_pack_index_file(path, f):
         version = struct.unpack('>L', contents[4:8])[0]
         if version == 2:
             return PackIndex2(path, file=f, contents=contents,
-                size=size)
+                              size=size)
         else:
             raise KeyError('Unknown pack index format %d' % version)
     else:
@@ -465,7 +465,7 @@ class FilePackIndex(PackIndex):
 
     def __eq__(self, other):
         # Quick optimization:
-        if (isinstance(other, FilePackIndex) and
+        if (isinstance(other, FilePackIndex) and \
             self._fan_out_table != other._fan_out_table):
             return False
 
@@ -608,7 +608,7 @@ class PackIndex2(FilePackIndex):
         self._pack_offset_table_offset = (self._crc32_table_offset +
                                           4 * len(self))
         self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
-                                          4 * len(self))
+                                               4 * len(self))
 
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
@@ -628,7 +628,7 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from('>L', self._contents,
-                          self._crc32_table_offset + i * 4)[0]
+                           self._crc32_table_offset + i * 4)[0]
 
 
 def read_pack_header(read):
@@ -835,8 +835,8 @@ class PackStreamReader(object):
         for _ in xrange(self._num_objects):
             offset = self.offset
             unpacked, unused = unpack_object(
-              self.read, read_some=self.recv, compute_crc32=compute_crc32,
-              zlib_bufsize=self._zlib_bufsize)
+                self.read, read_some=self.recv, compute_crc32=compute_crc32,
+                zlib_bufsize=self._zlib_bufsize)
             unpacked.offset = offset
 
             # prepend any unused data to current read buffer
@@ -977,7 +977,7 @@ class PackData(object):
             self._file = file
         _, self._num_objects = read_pack_header(self._file.read)
         self._offset_cache = LRUSizeCache(1024*1024*20,
-            compute_size=_compute_object_size)
+                                          compute_size=_compute_object_size)
         self.pack = None
 
     @property
@@ -1071,7 +1071,7 @@ class PackData(object):
         for i in xrange(1, self._num_objects + 1):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
-              self._file.read, compute_crc32=compute_crc32)
+                self._file.read, compute_crc32=compute_crc32)
             if progress is not None:
                 progress(i, self._num_objects)
             yield (offset, unpacked.pack_type_num, unpacked._obj(),
@@ -1085,7 +1085,7 @@ class PackData(object):
         for _ in xrange(self._num_objects):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
-              self._file.read, compute_crc32=False)
+                self._file.read, compute_crc32=False)
             unpacked.offset = offset
             yield unpacked
             self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
@@ -1288,8 +1288,8 @@ class DeltaChainIterator(object):
     def _resolve_object(self, offset, obj_type_num, base_chunks):
         self._file.seek(offset)
         unpacked, _ = unpack_object(
-          self._file.read, include_comp=self._include_comp,
-          compute_crc32=self._compute_crc32)
+            self._file.read, include_comp=self._include_comp,
+            compute_crc32=self._compute_crc32)
         unpacked.offset = offset
         if base_chunks is None:
             assert unpacked.pack_type_num == obj_type_num
@@ -1310,7 +1310,7 @@ class DeltaChainIterator(object):
                         self._pending_ref.pop(unpacked.sha(), []))
         for new_offset in pending:
             for new_result in self._follow_chain(
-              new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
+                    new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
                 yield new_result
 
     def __iter__(self):
@@ -1459,7 +1459,7 @@ def write_pack(filename, objects, num_objects=None):
     f = GitFile(filename + '.pack', 'wb')
     try:
         entries, data_sum = write_pack_objects(f, objects,
-            num_objects=num_objects)
+                                               num_objects=num_objects)
     finally:
         f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
@@ -1691,8 +1691,8 @@ def apply_delta(src_buf, delta):
                     cp_size |= x << (i * 8)
             if cp_size == 0:
                 cp_size = 0x10000
-            if (cp_off + cp_size < cp_size or
-                cp_off + cp_size > src_size or
+            if (cp_off + cp_size < cp_size or \
+                cp_off + cp_size > src_size or \
                 cp_size > dest_size):
                 break
             out.append(src_buf[cp_off:cp_off+cp_size])

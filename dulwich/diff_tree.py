@@ -168,10 +168,10 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
     """
-    if (rename_detector is not None and tree1_id is not None and
+    if (rename_detector is not None and tree1_id is not None and \
         tree2_id is not None):
         for change in rename_detector.changes_with_renames(
-          tree1_id, tree2_id, want_unchanged=want_unchanged):
+                tree1_id, tree2_id, want_unchanged=want_unchanged):
             yield change
         return
 
@@ -396,7 +396,7 @@ class RenameDetector(object):
         self._changes = []
 
     def _should_split(self, change):
-        if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or
+        if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or \
             change.old.sha == change.new.sha):
             return False
         old_obj = self._store[change.old.sha]
@@ -540,8 +540,8 @@ class RenameDetector(object):
         for add in self._adds:
             path = add.new.path
             delete = delete_map.get(path)
-            if (delete is not None and
-              stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+            if (delete is not None and \
+                stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]

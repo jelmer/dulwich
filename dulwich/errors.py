@@ -35,11 +35,11 @@ class ChecksumMismatch(Exception):
         self.extra = extra
         if self.extra is None:
             Exception.__init__(self,
-                "Checksum mismatch: Expected %s, got %s" % (expected, got))
+                               "Checksum mismatch: Expected %s, got %s" % (expected, got))
         else:
             Exception.__init__(self,
-                "Checksum mismatch: Expected %s, got %s; %s" %
-                (expected, got, extra))
+                               "Checksum mismatch: Expected %s, got %s; %s" %
+                               (expected, got, extra))
 
 
 class WrongObjectException(Exception):
@@ -135,7 +135,7 @@ class HangupException(GitProtocolError):
 
     def __init__(self):
         Exception.__init__(self,
-            "The remote server unexpectedly closed the connection.")
+                           "The remote server unexpectedly closed the connection.")
 
 
 class UnexpectedCommandError(GitProtocolError):

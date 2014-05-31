@@ -72,7 +72,7 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def test_refs(self):
         output = self._run_git(
-          ['for-each-ref', '--format=%(refname) %(objecttype) %(objectname)'])
+            ['for-each-ref', '--format=%(refname) %(objecttype) %(objectname)'])
         expected_refs = self._parse_refs(output)
 
         actual_refs = {}

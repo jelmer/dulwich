@@ -38,11 +38,11 @@ class MissingObjectFinderTest(TestCase):
     def assertMissingMatch(self, haves, wants, expected):
         for sha, path in self.store.find_missing_objects(haves, wants):
             self.assertTrue(sha in expected,
-                "(%s,%s) erroneously reported as missing" % (sha, path))
+                            "(%s,%s) erroneously reported as missing" % (sha, path))
             expected.remove(sha)
 
         self.assertEqual(len(expected), 0,
-            "some objects are not reported as missing: %s" % (expected, ))
+                         "some objects are not reported as missing: %s" % (expected, ))
 
 
 class MOFLinearRepoTest(MissingObjectFinderTest):
@@ -74,15 +74,15 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
 
     def test_1_to_2(self):
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(2).id],
-            self.missing_1_2)
+                                self.missing_1_2)
 
     def test_2_to_3(self):
         self.assertMissingMatch([self.cmt(2).id], [self.cmt(3).id],
-            self.missing_2_3)
+                                self.missing_2_3)
 
     def test_1_to_3(self):
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id],
-            self.missing_1_3)
+                                self.missing_1_3)
 
     def test_bogus_haves_failure(self):
         """Ensure non-existent SHA in haves are not tolerated"""
@@ -90,7 +90,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id, bogus_sha]
         wants = [self.cmt(3).id]
         self.assertRaises(KeyError, self.store.find_missing_objects,
-            self.store, haves, wants)
+                          self.store, haves, wants)
 
     def test_bogus_wants_failure(self):
         """Ensure non-existent SHA in wants are not tolerated"""
@@ -98,7 +98,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
         self.assertRaises(KeyError, self.store.find_missing_objects,
-            self.store, haves, wants)
+                          self.store, haves, wants)
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
@@ -123,14 +123,14 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         f3_5 = make_object(Blob, data='f3-5')
         commit_spec = [[1], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3, 4], [7, 6]]
         trees = {1: [('f1', f1_1), ('f2', f2_1)],
-                2: [('f1', f1_2), ('f2', f2_1)], # f1 changed
-                # f3 added, f2 changed
-                3: [('f1', f1_2), ('f2', f2_3), ('f3', f3_3)],
-                4: [('f1', f1_4), ('f2', f2_1)],  # f1 changed
-                5: [('f1', f1_2), ('f3', f3_5)], # f2 removed, f3 changed
-                6: [('f1', f1_4), ('f2', f2_3), ('f3', f3_3)], # merged 3 and 4
-                # f1 changed to match rev2. f3 removed
-                7: [('f1', f1_7), ('f2', f2_3)]}
+                 2: [('f1', f1_2), ('f2', f2_1)], # f1 changed
+                 # f3 added, f2 changed
+                 3: [('f1', f1_2), ('f2', f2_3), ('f3', f3_3)],
+                 4: [('f1', f1_4), ('f2', f2_1)],  # f1 changed
+                 5: [('f1', f1_2), ('f3', f3_5)], # f2 removed, f3 changed
+                 6: [('f1', f1_4), ('f2', f2_3), ('f3', f3_3)], # merged 3 and 4
+                 # f1 changed to match rev2. f3 removed
+                 7: [('f1', f1_7), ('f2', f2_3)]}
         self.commits = build_commit_graph(self.store, commit_spec, trees)
 
         self.f1_2_id = f1_2.id
@@ -149,7 +149,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         # doesn't record f1_2 was known prior to that, hence can't detect f1_7
         # is in fact f1_2 and shall not be reported)
         self.assertMissingMatch([self.cmt(6).id], [self.cmt(7).id],
-            [self.cmt(7).id, self.cmt(7).tree, self.f1_7_id])
+                                [self.cmt(7).id, self.cmt(7).tree, self.f1_7_id])
 
     def test_have4_want7(self):
         # have 4, want 7. Shall not include rev5 as it is not in the tree
@@ -174,9 +174,9 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         # BUT shall report any changes descending rev2 (excluding rev3)
         # Shall NOT report f1_7 as it's techically == f1_2
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(7).id], [
-              self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
-              self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
-              self.f1_4_id])
+            self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
+            self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
+            self.f1_4_id])
 
     def test_have5_want7(self):
         # have 5, want 7. Common parent is rev2, hence children of rev2 from
@@ -184,6 +184,6 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         # expects f1_4 from rev6. f3_5 is known in rev5;
         # f1_7 shall be the same as f1_2 (known, too)
         self.assertMissingMatch([self.cmt(5).id], [self.cmt(7).id], [
-              self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
-              self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
-              self.f1_4_id])
+            self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
+            self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
+            self.f1_4_id])

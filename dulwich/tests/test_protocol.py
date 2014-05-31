@@ -226,11 +226,11 @@ class CapabilitiesTestCase(TestCase):
         self.assertEqual(SINGLE_ACK, ack_type(['foo', 'bar']))
         self.assertEqual(MULTI_ACK, ack_type(['foo', 'bar', 'multi_ack']))
         self.assertEqual(MULTI_ACK_DETAILED,
-                          ack_type(['foo', 'bar', 'multi_ack_detailed']))
+                         ack_type(['foo', 'bar', 'multi_ack_detailed']))
         # choose detailed when both present
         self.assertEqual(MULTI_ACK_DETAILED,
-                          ack_type(['foo', 'bar', 'multi_ack',
-                                    'multi_ack_detailed']))
+                         ack_type(['foo', 'bar', 'multi_ack',
+                                   'multi_ack_detailed']))
 
 
 class BufferedPktLineWriterTests(TestCase):

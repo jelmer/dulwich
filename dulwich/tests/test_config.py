@@ -93,7 +93,7 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_with_open_quoted(self):
         self.assertRaises(ValueError,
-            self.from_file, "[core]\nfoo = \"bar\n")
+                          self.from_file, "[core]\nfoo = \"bar\n")
 
     def test_from_file_with_quotes(self):
         cf = self.from_file(
@@ -120,7 +120,7 @@ class ConfigFileTests(TestCase):
 
     def test_from_file_subsection_invalid(self):
         self.assertRaises(ValueError,
-            self.from_file, "[branch \"foo]\nfoo = bar\n")
+                          self.from_file, "[branch \"foo]\nfoo = bar\n")
 
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file("[branch.foo]\nfoo = bar\n")
@@ -186,23 +186,22 @@ class ConfigDictTests(TestCase):
         cd.set(("core", ), "foo", "bla")
         cd.set(("core2", ), "foo", "bloe")
 
-        self.assertEqual(
-            [('foo', 'bla')],
-            list(cd.iteritems(("core", ))))
+        self.assertEqual([('foo', 'bla')],
+                         list(cd.iteritems(("core", ))))
 
     def test_iteritems_nonexistant(self):
         cd = ConfigDict()
         cd.set(("core2", ), "foo", "bloe")
 
         self.assertEqual([],
-            list(cd.iteritems(("core", ))))
+                         list(cd.iteritems(("core", ))))
 
     def test_itersections(self):
         cd = ConfigDict()
         cd.set(("core2", ), "foo", "bloe")
 
         self.assertEqual([("core2", )],
-            list(cd.itersections()))
+                         list(cd.itersections()))
 
 
 

@@ -290,8 +290,9 @@ class Index(object):
             entry = self[path]
             return entry[-2], entry[-6]
         for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
-                want_unchanged=want_unchanged):
+                                                   lookup_entry, object_store,
+                                                   tree,
+                                                   want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
     def commit(self, object_store):
@@ -355,7 +356,7 @@ def commit_index(object_store, index):
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
+                      want_unchanged=False):
     """Find the differences between the contents of a tree and
     a working copy.
 

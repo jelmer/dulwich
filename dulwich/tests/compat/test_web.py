@@ -56,8 +56,8 @@ class WebTests(ServerTests):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
-          'localhost', 0, app, server_class=WSGIServerLogger,
-          handler_class=WSGIRequestHandlerLogger)
+            'localhost', 0, app, server_class=WSGIServerLogger,
+            handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server

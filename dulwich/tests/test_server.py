@@ -166,7 +166,7 @@ class UploadPackHandlerTestCase(TestCase):
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': self._repo})
         self._handler = UploadPackHandler(
-          backend, ['/', 'host=lolcathost'], TestProto())
+            backend, ['/', 'host=lolcathost'], TestProto())
 
     def test_progress(self):
         caps = self._handler.required_capabilities()
@@ -204,7 +204,7 @@ class UploadPackHandlerTestCase(TestCase):
         caps = list(self._handler.required_capabilities()) + ['include-tag']
         self._handler.set_client_capabilities(caps)
         self.assertEqual({'1234' * 10: ONE, '5678' * 10: TWO},
-                          self._handler.get_tagged(refs, repo=self._repo))
+                         self._handler.get_tagged(refs, repo=self._repo))
 
         # non-include-tag case
         caps = self._handler.required_capabilities()
@@ -299,7 +299,7 @@ class ReceivePackHandlerTestCase(TestCase):
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': self._repo})
         self._handler = ReceivePackHandler(
-          backend, ['/', 'host=lolcathost'], TestProto())
+            backend, ['/', 'host=lolcathost'], TestProto())
 
     def test_apply_pack_del_ref(self):
         refs = {
@@ -343,13 +343,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
         #   3---5
         #  /
         # 1---2---4
-        commits = [
-          make_commit(id=ONE, parents=[], commit_time=111),
-          make_commit(id=TWO, parents=[ONE], commit_time=222),
-          make_commit(id=THREE, parents=[ONE], commit_time=333),
-          make_commit(id=FOUR, parents=[TWO], commit_time=444),
-          make_commit(id=FIVE, parents=[THREE], commit_time=555),
-          ]
+        commits = [make_commit(id=ONE, parents=[], commit_time=111),
+                   make_commit(id=TWO, parents=[ONE], commit_time=222),
+                   make_commit(id=THREE, parents=[ONE], commit_time=333),
+                   make_commit(id=FOUR, parents=[TWO], commit_time=444),
+                   make_commit(id=FIVE, parents=[THREE], commit_time=555)]
         self._repo = MemoryRepo.init_bare(commits, {})
         backend = DictBackend({'/': self._repo})
         self._walker = ProtocolGraphWalker(
@@ -384,9 +382,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
     def test_split_proto_line(self):
         allowed = ('want', 'done', None)
         self.assertEqual(('want', ONE),
-                          _split_proto_line('want %s\n' % ONE, allowed))
+                         _split_proto_line('want %s\n' % ONE, allowed))
         self.assertEqual(('want', TWO),
-                          _split_proto_line('want %s\n' % TWO, allowed))
+                         _split_proto_line('want %s\n' % TWO, allowed))
         self.assertRaises(GitProtocolError, _split_proto_line,
                           'want xxxx\n', allowed)
         self.assertRaises(UnexpectedCommandError, _split_proto_line,
@@ -403,15 +401,15 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEqual(None, self._walker.proto.get_received_line())
 
         self._walker.proto.set_output([
-          'want %s multi_ack' % ONE,
-          'want %s' % TWO,
-          None,
-          ])
+            'want %s multi_ack' % ONE,
+            'want %s' % TWO,
+            None,
+        ])
         heads = {
-          'refs/heads/ref1': ONE,
-          'refs/heads/ref2': TWO,
-          'refs/heads/ref3': THREE,
-          }
+            'refs/heads/ref1': ONE,
+            'refs/heads/ref2': TWO,
+            'refs/heads/ref3': THREE,
+        }
         self._repo.refs._update(heads)
         self.assertEqual([ONE, TWO], self._walker.determine_wants(heads))
 
@@ -435,10 +433,10 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.proto.set_output([None])
         # advertise branch tips plus tag
         heads = {
-          'refs/heads/ref4': FOUR,
-          'refs/heads/ref5': FIVE,
-          'refs/heads/tag6': SIX,
-          }
+            'refs/heads/ref4': FOUR,
+            'refs/heads/ref5': FIVE,
+            'refs/heads/tag6': SIX,
+        }
         self._repo.refs._update(heads)
         self._repo.refs._update_peeled(heads)
         self._repo.refs._update_peeled({'refs/heads/tag6': FIVE})
@@ -454,11 +452,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
             lines.append(line.rstrip())
 
         self.assertEqual([
-          '%s refs/heads/ref4' % FOUR,
-          '%s refs/heads/ref5' % FIVE,
-          '%s refs/heads/tag6^{}' % FIVE,
-          '%s refs/heads/tag6' % SIX,
-          ], sorted(lines))
+            '%s refs/heads/ref4' % FOUR,
+            '%s refs/heads/ref5' % FIVE,
+            '%s refs/heads/tag6^{}' % FIVE,
+            '%s refs/heads/tag6' % SIX,
+        ], sorted(lines))
 
         # ensure peeled tag was advertised immediately following tag
         for i, line in enumerate(lines):
@@ -473,38 +471,38 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def assertReceived(self, expected):
         self.assertEqual(
-          expected, list(iter(self._walker.proto.get_received_line, None)))
+            expected, list(iter(self._walker.proto.get_received_line, None)))
 
     def test_handle_shallow_request_no_client_shallows(self):
         self._handle_shallow_request(['deepen 1\n'], [FOUR, FIVE])
         self.assertEqual(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([
-          'shallow %s' % TWO,
-          'shallow %s' % THREE,
-          ])
+            'shallow %s' % TWO,
+            'shallow %s' % THREE,
+        ])
 
     def test_handle_shallow_request_no_new_shallows(self):
         lines = [
-          'shallow %s\n' % TWO,
-          'shallow %s\n' % THREE,
-          'deepen 1\n',
-          ]
+            'shallow %s\n' % TWO,
+            'shallow %s\n' % THREE,
+            'deepen 1\n',
+        ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
         self.assertEqual(set([TWO, THREE]), self._walker.shallow)
         self.assertReceived([])
 
     def test_handle_shallow_request_unshallows(self):
         lines = [
-          'shallow %s\n' % TWO,
-          'deepen 2\n',
-          ]
+            'shallow %s\n' % TWO,
+            'deepen 2\n',
+        ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
         self.assertEqual(set([ONE]), self._walker.shallow)
         self.assertReceived([
-          'shallow %s' % ONE,
-          'unshallow %s' % TWO,
-          # THREE is unshallow but was is not shallow in the client
-          ])
+            'shallow %s' % ONE,
+            'unshallow %s' % TWO,
+            # THREE is unshallow but was is not shallow in the client
+        ])
 
 
 class TestProtocolGraphWalker(object):
@@ -544,11 +542,11 @@ class AckGraphWalkerImplTestCase(TestCase):
         super(AckGraphWalkerImplTestCase, self).setUp()
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
-          ('have', TWO),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self._impl = self.impl_cls(self._walker)
 
     def assertNoAck(self):
@@ -674,12 +672,12 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     def test_multi_ack_flush(self):
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -749,12 +747,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_flush(self):
         # same as ack test but contains a flush-pkt in the middle
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -788,12 +786,12 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_nak_flush(self):
         # same as nak test but contains a flush-pkt in the middle
         self._walker.lines = [
-          ('have', TWO),
-          (None, None),
-          ('have', ONE),
-          ('have', THREE),
-          ('done', None),
-          ]
+            ('have', TWO),
+            (None, None),
+            ('have', ONE),
+            ('have', THREE),
+            ('done', None),
+        ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -835,7 +833,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_nonexistant(self):
         self.assertRaises(NotGitRepository,
-            self.backend.open_repository, "/does/not/exist/unless/foo")
+                          self.backend.open_repository, "/does/not/exist/unless/foo")
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
@@ -843,7 +841,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_child(self):
         self.assertRaises(NotGitRepository,
-            self.backend.open_repository, os.path.join(self.path, "foo"))
+                          self.backend.open_repository, os.path.join(self.path, "foo"))
 
     def test_bad_repo_path(self):
         repo = MemoryRepo.init_bare([], {})
@@ -862,7 +860,7 @@ class ServeCommandTests(TestCase):
 
     def serve_command(self, handler_cls, args, inf, outf):
         return serve_command(handler_cls, ["test"] + args, backend=self.backend,
-            inf=inf, outf=outf)
+                             inf=inf, outf=outf)
 
     def test_receive_pack(self):
         commit = make_commit(id=ONE, parents=[], commit_time=111)
@@ -873,7 +871,7 @@ class ServeCommandTests(TestCase):
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
         self.assertEqual("1111111111111111111111111111111111111111 refs/heads/master",
-            outlines[0][4:].split("\x00")[0])
+                         outlines[0][4:].split("\x00")[0])
         self.assertEqual("0000", outlines[-1])
         self.assertEqual(0, exitcode)
 
@@ -889,9 +887,9 @@ class UpdateServerInfoTests(TestCase):
     def test_empty(self):
         update_server_info(self.repo)
         self.assertEqual("",
-            open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
+                         open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
         self.assertEqual("",
-            open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
+                         open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
 
     def test_simple(self):
         commit_id = self.repo.do_commit(

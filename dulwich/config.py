@@ -158,9 +158,9 @@ class ConfigDict(Config, MutableMapping):
 
 
 def _format_string(value):
-    if (value.startswith(" ") or
-        value.startswith("\t") or
-        value.endswith(" ") or
+    if (value.startswith(" ") or \
+        value.startswith("\t") or \
+        value.endswith(" ") or \
         value.endswith("\t")):
         return '"%s"' % _escape_value(value)
     return _escape_value(value)
@@ -262,7 +262,7 @@ class ConfigFile(ConfigDict):
                     else:
                         if not _check_section_name(pts[0]):
                             raise ValueError("invalid section name %s" %
-                                    pts[0])
+                                             pts[0])
                         pts = pts[0].split(".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])

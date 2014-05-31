@@ -71,8 +71,8 @@ class GitFastExporter(object):
 
     def _iter_files(self, base_tree, new_tree):
         for ((old_path, new_path), (old_mode, new_mode),
-            (old_hexsha, new_hexsha)) in \
-                self.store.tree_changes(base_tree, new_tree):
+             (old_hexsha, new_hexsha)) in \
+            self.store.tree_changes(base_tree, new_tree):
             if new_path is None:
                 yield commands.FileDeleteCommand(old_path)
                 continue
@@ -83,7 +83,7 @@ class GitFastExporter(object):
                 yield commands.FileRenameCommand(old_path, new_path)
             if old_mode != new_mode or old_hexsha != new_hexsha:
                 yield commands.FileModifyCommand(new_path, new_mode, marker,
-                    None)
+                                                 None)
 
     def _export_commit(self, commit, ref, base_tree=None):
         file_cmds = list(self._iter_files(base_tree, commit.tree))
@@ -97,10 +97,14 @@ class GitFastExporter(object):
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
         cmd = commands.CommitCommand(ref, marker,
-            (author, author_email, commit.author_time, commit.author_timezone),
-            (committer, committer_email, commit.commit_time,
-                commit.commit_timezone),
-            commit.message, from_, merges, file_cmds)
+                                     (author, author_email,
+                                      commit.author_time,
+                                      commit.author_timezone),
+                                     (committer, committer_email,
+                                      commit.commit_time,
+                                      commit.commit_timezone),
+                                     commit.message, from_, merges,
+                                     file_cmds)
         return (cmd, marker)
 
     def emit_commit(self, commit, ref, base_tree=None):
@@ -147,7 +151,7 @@ class GitImportProcessor(processor.ImportProcessor):
             author = cmd.committer
         (author_name, author_email, author_timestamp, author_timezone) = author
         (committer_name, committer_email, commit_timestamp,
-            commit_timezone) = cmd.committer
+         commit_timezone) = cmd.committer
         commit.author = "%s <%s>" % (author_name, author_email)
         commit.author_timezone = author_timezone
         commit.author_time = int(author_timestamp)
@@ -183,8 +187,8 @@ class GitImportProcessor(processor.ImportProcessor):
             else:
                 raise Exception("Command %s not supported" % filecmd.name)
         commit.tree = commit_tree(self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in
-                self._contents.iteritems()))
+                                  ((path, hexsha, mode) for (path, (mode, hexsha)) in
+                                   self._contents.iteritems()))
         if self.last_commit is not None:
             commit.parents.append(self.last_commit)
         commit.parents += cmd.merges

@@ -105,7 +105,7 @@ class _GitFile(object):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
         fd = os.open(self._lockfilename,
-            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+                     os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 

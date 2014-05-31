@@ -685,8 +685,7 @@ def read_packed_refs(f):
             # Comment
             continue
         if l[0] == "^":
-            raise PackedRefsException(
-              "found peeled ref in packed-refs without peeled")
+            raise PackedRefsException("found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 

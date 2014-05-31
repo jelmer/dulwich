@@ -71,7 +71,7 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
-                if not sha in self and not ref.endswith("^{}") and
+                if not sha in self and not ref.endswith("^{}") and \
                    not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -425,7 +425,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
-                    'rb')
+                        'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
@@ -568,7 +568,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -623,7 +623,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+                                    "pack-%s" % iter_sha1(entry[0] for entry in entries))
             f = GitFile(basename+".idx", "wb")
             try:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
@@ -809,7 +809,8 @@ class MemoryObjectStore(BaseObjectStore):
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(read_all, read_some, f,
+                                      delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except:
@@ -978,7 +979,7 @@ class MissingObjectFinder(object):
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-            get_tagged=None, get_parents=lambda commit: commit.parents):
+                 get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
         self._get_parents = get_parents
         # process Commits and Tags differently
@@ -986,15 +987,15 @@ class MissingObjectFinder(object):
         # and such SHAs would get filtered out by _split_commits_and_tags,
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
-        have_commits, have_tags = \
-                _split_commits_and_tags(object_store, haves, True)
-        want_commits, want_tags = \
-                _split_commits_and_tags(object_store, wants, False)
+        have_commits, have_tags = _split_commits_and_tags(object_store,
+                                                          haves, True)
+        want_commits, want_tags = _split_commits_and_tags(object_store,
+                                                          wants, False)
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-                have_commits,
-                get_parents=self._get_parents)[0]
+            have_commits,
+            get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants

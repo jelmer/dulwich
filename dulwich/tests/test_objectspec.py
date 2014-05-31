@@ -60,5 +60,5 @@ class ParseCommitRangeTests(TestCase):
     def test_commit_by_sha(self):
         r = MemoryRepo()
         c1, _, _ = build_commit_graph(r.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+                                                       [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))

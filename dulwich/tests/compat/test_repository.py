@@ -21,7 +21,7 @@
 
 
 from io import BytesIO
-import itertools
+from itertools import chain
 import os
 
 from dulwich.objects import (
@@ -118,7 +118,7 @@ class ObjectStoreTestCase(CompatTestCase):
     def test_packed_objects(self):
         expected_shas = self._get_all_shas() - self._get_loose_shas()
         self.assertShasMatch(expected_shas,
-                             itertools.chain(*self._repo.object_store.packs))
+                             chain(*self._repo.object_store.packs))
 
     def test_all_objects(self):
         expected_shas = self._get_all_shas()

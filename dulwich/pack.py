@@ -38,11 +38,13 @@ from collections import (
     deque,
     )
 import difflib
-from itertools import (
-    chain,
-    imap,
-    izip,
-    )
+
+try:
+    from itertools import chain, imap, izip
+except ImportError: # On Py3k the equivalents are the basic map and zip
+    from itertools import chain
+    imap, izip = map, zip
+
 try:
     import mmap
 except ImportError:

@@ -34,8 +34,10 @@ from dulwich.index import (
     get_unstaged_changes,
     index_entry_from_stat,
     read_index,
+    read_index_dict,
     write_cache_time,
     write_index,
+    write_index_dict,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -83,6 +85,7 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual('bla', newname)
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
 
+
 class SimpleIndexWriterTestCase(IndexTestCase):
 
     def setUp(self):
@@ -106,6 +109,33 @@ class SimpleIndexWriterTestCase(IndexTestCase):
         x = open(filename, 'r')
         try:
             self.assertEqual(entries, list(read_index(x)))
+        finally:
+            x.close()
+
+
+class ReadIndexDictTests(IndexTestCase):
+
+    def setUp(self):
+        IndexTestCase.setUp(self)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        IndexTestCase.tearDown(self)
+        shutil.rmtree(self.tempdir)
+
+    def test_simple_write(self):
+        entries = {'barbla': ((1230680220, 0), (1230680220, 0), 2050, 3761020,
+                    33188, 1000, 1000, 0,
+                    'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
+        filename = os.path.join(self.tempdir, 'test-simple-write-index')
+        x = open(filename, 'w+')
+        try:
+            write_index_dict(x, entries)
+        finally:
+            x.close()
+        x = open(filename, 'r')
+        try:
+            self.assertEqual(entries, read_index_dict(x))
         finally:
             x.close()
 

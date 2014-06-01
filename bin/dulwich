@@ -38,6 +38,13 @@ from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
 
+try:
+    import gevent
+    import geventhttpclient
+    gevent_support = True
+except ImportError:
+    gevent_support = False
+
 
 def cmd_archive(args):
     opts, args = getopt(args, "", [])
@@ -156,6 +163,30 @@ def cmd_init(args):
 
     porcelain.init(path, bare=("--bare" in opts))
 
+def cmd_init_swift(args):
+    if not gevent_support:
+        print "gevent and geventhttpclient libraries are mandatory " \
+              " for use the Swift backend."
+        sys.exit(1)
+    from dulwich.swift import (
+        SwiftRepo,
+        SwiftConnector,
+        load_conf,
+    )
+    opts, args = getopt(args, "c:", [])
+    opts = dict(opts)
+    try:
+        conf = opts['-c']
+        conf = load_conf(conf)
+    except KeyError:
+        conf = load_conf()
+    if args == []:
+        print "Usage: dulwich init-swift [-c config_file] REPONAME"
+        sys.exit(1)
+    else:
+        repo = args[0]
+    scon = SwiftConnector(repo, conf)
+    SwiftRepo.init_bare(scon, conf)
 
 def cmd_clone(args):
     opts, args = getopt(args, "", ["bare"])
@@ -258,6 +289,7 @@ commands = {
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
     "init": cmd_init,
+    "init-swift": cmd_init_swift,
     "log": cmd_log,
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,

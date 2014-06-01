@@ -15,6 +15,9 @@
     for concurrency of some object store operations.
     (Fabien Boucher)
 
+   * Various changes to improve compatibility with Python 3.
+     (Gary van der Merwe, Hannu Valtonen, michael-k)
+
 0.9.6	2014-04-23
 
  IMPROVEMENTS

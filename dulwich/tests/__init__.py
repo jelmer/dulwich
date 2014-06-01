@@ -30,10 +30,10 @@ import tempfile
 if sys.version_info >= (2, 7):
     # If Python itself provides an exception, use that
     import unittest
-    from unittest import SkipTest, TestCase as _TestCase
+    from unittest import SkipTest, skipIf, TestCase as _TestCase
 else:
     import unittest2 as unittest
-    from unittest2 import SkipTest, TestCase as _TestCase
+    from unittest2 import SkipTest, skipIf, TestCase as _TestCase
 
 
 def get_safe_env(env=None):
@@ -118,6 +118,7 @@ def self_test_suite():
         'fastexport',
         'file',
         'grafts',
+        'greenthreads',
         'hooks',
         'index',
         'lru_cache',

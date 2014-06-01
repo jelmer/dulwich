@@ -11,6 +11,10 @@
 
   * Add porcelain 'status'. (Ryan Faulkner)
 
+  * Add `dulwich.greenthreads` module which provides support
+    for concurrency of some object store operations.
+    (Fabien Boucher)
+
 0.9.6	2014-04-23
 
  IMPROVEMENTS

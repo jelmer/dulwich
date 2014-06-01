@@ -74,12 +74,13 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 COMMON_CAPABILITIES = ['ofs-delta', 'side-band-64k']
-FETCH_CAPABILITIES = ['thin-pack', 'multi_ack', 'multi_ack_detailed'] + COMMON_CAPABILITIES
+FETCH_CAPABILITIES = (['thin-pack', 'multi_ack', 'multi_ack_detailed'] +
+                      COMMON_CAPABILITIES)
 SEND_CAPABILITIES = ['report-status'] + COMMON_CAPABILITIES
 
 
 class ReportStatusParser(object):
-    """Handle status as reported by servers with the 'report-status' capability.
+    """Handle status as reported by servers with 'report-status' capability.
     """
 
     def __init__(self):
@@ -180,8 +181,8 @@ class GitClient(object):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return a sequence of the
-            shas of the objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of
+            the shas of the objects to upload.
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -204,8 +205,9 @@ class GitClient(object):
             determine_wants = target.object_store.determine_wants_all
         f, commit, abort = target.object_store.add_pack()
         try:
-            result = self.fetch_pack(path, determine_wants,
-                    target.get_graph_walker(), f.write, progress)
+            result = self.fetch_pack(
+                path, determine_wants, target.get_graph_walker(), f.write,
+                progress)
         except:
             abort()
             raise
@@ -282,7 +284,8 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
-    def _handle_receive_pack_head(self, proto, capabilities, old_refs, new_refs):
+    def _handle_receive_pack_head(self, proto, capabilities, old_refs,
+                                  new_refs):
         """Handle the head of a 'git-receive-pack' request.
 
         :param proto: Protocol object to read from
@@ -301,12 +304,12 @@ class GitClient(object):
 
             if old_sha1 != new_sha1:
                 if sent_capabilities:
-                    proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
-                                                            refname))
+                    proto.write_pkt_line('%s %s %s' % (
+                        old_sha1, new_sha1, refname))
                 else:
                     proto.write_pkt_line(
-                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
-                                        ' '.join(capabilities)))
+                        '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
+                                          ' '.join(capabilities)))
                     sent_capabilities = True
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
@@ -323,7 +326,7 @@ class GitClient(object):
         if "side-band-64k" in capabilities:
             if progress is None:
                 progress = lambda x: None
-            channel_callbacks = { 2: progress }
+            channel_callbacks = {2: progress}
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet).parse
@@ -426,8 +429,8 @@ class TraditionalGitClient(GitClient):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return a sequence of the
-            shas of the objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of
+            the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
 
         :raises SendPackError: if server rejects the pack data
@@ -477,8 +480,8 @@ class TraditionalGitClient(GitClient):
                 self._report_status_parser.check()
             return old_refs
 
-        (have, want) = self._handle_receive_pack_head(proto,
-            negotiated_capabilities, old_refs, new_refs)
+        (have, want) = self._handle_receive_pack_head(
+            proto, negotiated_capabilities, old_refs, new_refs)
         if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
@@ -493,8 +496,8 @@ class TraditionalGitClient(GitClient):
                     set(old_refs.iteritems())) > 0:
                 entries, sha = write_pack_objects(proto.write_file(), objects)
 
-        self._handle_receive_pack_tail(proto, negotiated_capabilities,
-            progress)
+        self._handle_receive_pack_tail(
+            proto, negotiated_capabilities, progress)
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -508,7 +511,8 @@ class TraditionalGitClient(GitClient):
         """
         proto, can_read = self._connect('upload-pack', path)
         refs, server_capabilities = read_pkt_refs(proto)
-        negotiated_capabilities = self._fetch_capabilities & server_capabilities
+        negotiated_capabilities = (
+            self._fetch_capabilities & server_capabilities)
 
         if refs is None:
             proto.write_pkt_line(None)
@@ -524,10 +528,10 @@ class TraditionalGitClient(GitClient):
         if not wants:
             proto.write_pkt_line(None)
             return refs
-        self._handle_upload_pack_head(proto, negotiated_capabilities,
-            graph_walker, wants, can_read)
-        self._handle_upload_pack_tail(proto, negotiated_capabilities,
-            graph_walker, pack_data, progress)
+        self._handle_upload_pack_head(
+            proto, negotiated_capabilities, graph_walker, wants, can_read)
+        self._handle_upload_pack_tail(
+            proto, negotiated_capabilities, graph_walker, pack_data, progress)
         return refs
 
     def archive(self, path, committish, write_data, progress=None):
@@ -560,8 +564,8 @@ class TCPGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
-        sockaddrs = socket.getaddrinfo(self._host, self._port,
-            socket.AF_UNSPEC, socket.SOCK_STREAM)
+        sockaddrs = socket.getaddrinfo(
+            self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
         err = socket.error("no address found for %s" % self._host)
         for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
@@ -652,8 +656,8 @@ class LocalGitClient(GitClient):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return a sequence of the
-            shas of the objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of
+            the shas of the objects to upload.
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -674,7 +678,8 @@ class LocalGitClient(GitClient):
         """
         from dulwich.repo import Repo
         r = Repo(path)
-        return r.fetch(target, determine_wants=determine_wants, progress=progress)
+        return r.fetch(target, determine_wants=determine_wants,
+                       progress=progress)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None):
@@ -698,6 +703,7 @@ class LocalGitClient(GitClient):
 
 # What Git client to use for local access
 default_local_git_client_cls = SubprocessGitClient
+
 
 class SSHVendor(object):
     """A client side SSH implementation."""
@@ -764,7 +770,8 @@ else:
 
             # Start
             if self.should_monitor:
-                self.monitor_thread = threading.Thread(target=self.monitor_stderr)
+                self.monitor_thread = threading.Thread(
+                    target=self.monitor_stderr)
                 self.monitor_thread.start()
 
         def monitor_stderr(self):
@@ -830,7 +837,7 @@ else:
             self.ssh_kwargs = {}
 
         def run_command(self, host, command, username=None, port=None,
-                progress_stderr=None):
+                        progress_stderr=None):
 
             # Paramiko needs an explicit port. None is not valid
             if port is None:
@@ -849,8 +856,8 @@ else:
             # Run commands
             channel.exec_command(*command)
 
-            return ParamikoWrapper(client, channel,
-                    progress_stderr=progress_stderr)
+            return ParamikoWrapper(
+                client, channel, progress_stderr=progress_stderr)
 
 
 # Can be overridden by users
@@ -875,8 +882,9 @@ class SSHGitClient(TraditionalGitClient):
         con = get_ssh_vendor().run_command(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
             port=self.port, username=self.username)
-        return (Protocol(con.read, con.write, report_activity=self._report_activity),
-                con.can_read)
+        return (Protocol(
+            con.read, con.write, report_activity=self._report_activity),
+            con.can_read)
 
 
 def default_user_agent_string():
@@ -890,7 +898,7 @@ def default_urllib2_opener(config):
         proxy_server = None
     handlers = []
     if proxy_server is not None:
-        handlers.append(urllib2.ProxyHandler({"http" : proxy_server}))
+        handlers.append(urllib2.ProxyHandler({"http": proxy_server}))
     opener = urllib2.build_opener(*handlers)
     if config is not None:
         user_agent = config.get("http", "useragent")
@@ -904,7 +912,8 @@ def default_urllib2_opener(config):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, config=None, *args, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, config=None, *args,
+                 **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
@@ -931,7 +940,7 @@ class HttpGitClient(GitClient):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, "info/refs")
         headers = {}
-        if self.dumb != False:
+        if self.dumb is not False:
             url += "?service=%s" % service
             headers["Content-Type"] = "application/x-%s-request" % service
         resp = self._http_request(url, headers)
@@ -962,8 +971,8 @@ class HttpGitClient(GitClient):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
-        :param generate_pack_contents: Function that can return a sequence of the
-            shas of the objects to upload.
+        :param generate_pack_contents: Function that can return a sequence of
+            the shas of the objects to upload.
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -1022,11 +1031,11 @@ class HttpGitClient(GitClient):
             raise NotImplementedError(self.send_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
-        self._handle_upload_pack_head(req_proto,
-            negotiated_capabilities, graph_walker, wants,
+        self._handle_upload_pack_head(
+            req_proto, negotiated_capabilities, graph_walker, wants,
             lambda: False)
-        resp = self._smart_request("git-upload-pack", url,
-            data=req_data.getvalue())
+        resp = self._smart_request(
+            "git-upload-pack", url, data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)
         self._handle_upload_pack_tail(resp_proto, negotiated_capabilities,
             graph_walker, pack_data, progress)

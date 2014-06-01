@@ -131,7 +131,8 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         to None. If neither entry's path is None, they are guaranteed to
         match.
     """
-    # This could be fairly easily generalized to >2 trees if we find a use case.
+    # This could be fairly easily generalized to >2 trees if we find a use
+    # case.
     mode1 = tree1_id and stat.S_IFDIR or None
     mode2 = tree2_id and stat.S_IFDIR or None
     todo = [(TreeEntry('', mode1, tree1_id), TreeEntry('', mode2, tree2_id))]
@@ -171,8 +172,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
     if (rename_detector is not None and tree1_id is not None and
         tree2_id is not None):
         for change in rename_detector.changes_with_renames(
-          tree1_id, tree2_id, want_unchanged=want_unchanged):
-            yield change
+            tree1_id, tree2_id, want_unchanged=want_unchanged):
+                yield change
         return
 
     entries = walk_trees(store, tree1_id, tree2_id,
@@ -229,8 +230,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
         in the merge.
 
         Each list contains one element per parent, with the TreeChange for that
-        path relative to that parent. An element may be None if it never existed
-        in one parent and was deleted in two others.
+        path relative to that parent. An element may be None if it never
+        existed in one parent and was deleted in two others.
 
         A path is only included in the output if it is a conflict, i.e. its SHA
         in the merge tree is not found in any of the parents, or in the case of
@@ -265,7 +266,8 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
             yield changes
         elif None not in changes:
             # If no change was found relative to one parent, that means the SHA
-            # must have matched the SHA in that parent, so it is not a conflict.
+            # must have matched the SHA in that parent, so it is not a
+            # conflict.
             yield changes
 
 
@@ -329,11 +331,11 @@ def _similarity_score(obj1, obj2, block_cache=None):
 
     :param obj1: The first object to score.
     :param obj2: The second object to score.
-    :param block_cache: An optional dict of SHA to block counts to cache results
-        between calls.
-    :return: The similarity score between the two objects, defined as the number
-        of bytes in common between the two objects divided by the maximum size,
-        scaled to the range 0-100.
+    :param block_cache: An optional dict of SHA to block counts to cache
+        results between calls.
+    :return: The similarity score between the two objects, defined as the
+        number of bytes in common between the two objects divided by the
+        maximum size, scaled to the range 0-100.
     """
     if block_cache is None:
         block_cache = {}
@@ -372,8 +374,8 @@ class RenameDetector(object):
         :param store: An ObjectStore for looking up objects.
         :param rename_threshold: The threshold similarity score for considering
             an add/delete pair to be a rename/copy; see _similarity_score.
-        :param max_files: The maximum number of adds and deletes to consider, or
-            None for no limit. The detector is guaranteed to compare no more
+        :param max_files: The maximum number of adds and deletes to consider,
+            or None for no limit. The detector is guaranteed to compare no more
             than max_files ** 2 add/delete pairs. This limit is provided because
             rename detection can be quadratic in the project size. If the limit
             is exceeded, no content rename detection is attempted.
@@ -475,7 +477,8 @@ class RenameDetector(object):
             return CHANGE_MODIFY
         elif delete.type != CHANGE_DELETE:
             # If it's in deletes but not marked as a delete, it must have been
-            # added due to find_copies_harder, and needs to be marked as a copy.
+            # added due to find_copies_harder, and needs to be marked as a
+            # copy.
             return CHANGE_COPY
         return CHANGE_RENAME
 
@@ -509,7 +512,8 @@ class RenameDetector(object):
                     candidates.append((-score, rename))
 
     def _choose_content_renames(self):
-        # Sort scores from highest to lowest, but keep names in ascending order.
+        # Sort scores from highest to lowest, but keep names in ascending
+        # order.
         self._candidates.sort()
 
         delete_paths = set()
@@ -541,11 +545,12 @@ class RenameDetector(object):
             path = add.new.path
             delete = delete_map.get(path)
             if (delete is not None and
-              stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+                stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]
-        self._deletes = [a for a in self._deletes if a.new.path not in modifies]
+        self._deletes = [a for a in self._deletes if a.new.path not in
+                         modifies]
         self._changes += modifies.values()
 
     def _sorted_changes(self):

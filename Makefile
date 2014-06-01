@@ -1,5 +1,6 @@
 PYTHON = python
 PYFLAKES = pyflakes
+PEP8 = pep8
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 ifeq ($(shell $(PYTHON) -c "import sys; print(sys.version_info >= (2, 7))"),True)
@@ -51,3 +52,6 @@ clean::
 
 flakes:
 	$(PYFLAKES) dulwich
+
+pep8:
+	$(PEP8) dulwich

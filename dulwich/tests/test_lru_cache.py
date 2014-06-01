@@ -40,18 +40,18 @@ class TestLRUCache(TestCase):
     def test_missing(self):
         cache = lru_cache.LRUCache(max_cache=10)
 
-        self.failIf('foo' in cache)
+        self.assertFalse('foo' in cache)
         self.assertRaises(KeyError, cache.__getitem__, 'foo')
 
         cache['foo'] = 'bar'
         self.assertEqual('bar', cache['foo'])
-        self.failUnless('foo' in cache)
-        self.failIf('bar' in cache)
+        self.assertTrue('foo' in cache)
+        self.assertFalse('bar' in cache)
 
     def test_map_None(self):
         # Make sure that we can properly map None as a key.
         cache = lru_cache.LRUCache(max_cache=10)
-        self.failIf(None in cache)
+        self.assertFalse(None in cache)
         cache[None] = 1
         self.assertEqual(1, cache[None])
         cache[None] = 2
@@ -77,8 +77,8 @@ class TestLRUCache(TestCase):
         # With a max cache of 1, adding 'baz' should pop out 'foo'
         cache['baz'] = 'biz'
 
-        self.failIf('foo' in cache)
-        self.failUnless('baz' in cache)
+        self.assertFalse('foo' in cache)
+        self.assertTrue('baz' in cache)
 
         self.assertEqual('biz', cache['baz'])
 
@@ -94,7 +94,7 @@ class TestLRUCache(TestCase):
         # This must kick out 'foo' because it was the last accessed
         cache['nub'] = 'in'
 
-        self.failIf('foo' in cache)
+        self.assertFalse('foo' in cache)
 
     def test_cleanup(self):
         """Test that we can use a cleanup function."""

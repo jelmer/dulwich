@@ -209,7 +209,8 @@ class DulwichClientTestBase(object):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest,
             lambda refs: [protocol.ZERO_SHA])
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
 
     def test_send_remove_branch(self):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))

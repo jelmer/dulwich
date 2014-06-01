@@ -24,7 +24,11 @@ from collections import (
     )
 
 from io import BytesIO
-import itertools
+try:
+    from itertools import izip, chain
+except ImportError:
+    from itertools import chain
+    izip = zip
 import stat
 
 from dulwich.objects import (
@@ -292,7 +296,7 @@ def _count_blocks(obj):
     block_truncate = block.truncate
     block_getvalue = block.getvalue
 
-    for c in itertools.chain(*obj.as_raw_chunks()):
+    for c in chain(*obj.as_raw_chunks()):
         block_write(c)
         n += 1
         if c == '\n' or n == _BLOCK_SIZE:
@@ -449,7 +453,7 @@ class RenameDetector(object):
         delete_paths = set()
         for sha, sha_deletes in delete_map.iteritems():
             sha_adds = add_map[sha]
-            for (old, is_delete), new in itertools.izip(sha_deletes, sha_adds):
+            for (old, is_delete), new in izip(sha_deletes, sha_adds):
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):
                     continue
                 if is_delete:

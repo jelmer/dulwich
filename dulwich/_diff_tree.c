@@ -437,7 +437,11 @@ init_diff_tree(void)
 	}
 
 	Py_DECREF(diff_tree_mod);
+#if PY_MAJOR_VERSION < 3
 	return;
+#else
+	return NULL;
+#endif
 
 error:
 	Py_XDECREF(objects_mod);
@@ -446,5 +450,9 @@ error:
 	Py_XDECREF(block_size_obj);
 	Py_XDECREF(defaultdict_cls);
 	Py_XDECREF(int_cls);
+#if PY_MAJOR_VERSION < 3
 	return;
+#else
+	return NULL;
+#endif
 }

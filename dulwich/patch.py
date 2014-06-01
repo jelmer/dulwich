@@ -175,7 +175,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         f.write("Binary files %s and %s differ\n" % (old_path, new_path))
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
-            old_path, new_path))
+                                  old_path, new_path))
 
 
 def write_blob_diff(f, old_file, new_file):
@@ -222,7 +222,7 @@ def write_blob_diff(f, old_file, new_file):
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
-        old_path, new_path))
+                              old_path, new_path))
 
 
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
@@ -237,8 +237,8 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
         write_object_diff(f, store, (oldpath, oldmode, oldsha),
-                                    (newpath, newmode, newsha),
-                                    diff_binary=diff_binary)
+                          (newpath, newmode, newsha),
+                          diff_binary=diff_binary)
 
 
 def git_am_patch_split(f):

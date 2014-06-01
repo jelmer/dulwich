@@ -105,10 +105,9 @@ def read_cache_entry(f):
     name = f.read((flags & 0x0fff))
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    data = f.read((beginoffset + real_size) - f.tell())
+    f.read((beginoffset + real_size) - f.tell())
     return IndexEntry(name, ctime, mtime, dev, ino, mode, uid, gid, size,
                       sha_to_hex(sha), flags & ~0x0fff)
-
 
 def write_cache_entry(f, entry):
     """Write an index entry to a file.
@@ -135,7 +134,7 @@ def read_index(f):
         raise AssertionError("Invalid index file header: %r" % header)
     (version, num_entries) = struct.unpack(">LL", f.read(4 * 2))
     assert version in (1, 2)
-    for i in range(num_entries):
+    for _ in range(num_entries):
         yield read_cache_entry(f)
 
 
@@ -291,8 +290,9 @@ class Index(object):
             entry = self[path]
             return entry[-2], entry[-6]
         for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
-                want_unchanged=want_unchanged):
+                                                   lookup_entry, object_store,
+                                                   tree,
+                                                   want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
     def commit(self, object_store):
@@ -356,7 +356,7 @@ def commit_index(object_store, index):
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
+                      want_unchanged=False):
     """Find the differences between the contents of a tree and
     a working copy.
 
@@ -379,7 +379,7 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
                 yield ((name, None), (mode, None), (sha, None))
             else:
                 other_names.remove(name)
-                if (want_unchanged or other_sha != sha or other_mode != mode):
+                if want_unchanged or other_sha != sha or other_mode != mode:
                     yield ((name, name), (mode, other_mode), (sha, other_sha))
 
     # Mention added files

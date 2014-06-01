@@ -21,7 +21,6 @@ import os
 import stat
 import shutil
 import tempfile
-import warnings
 
 from dulwich import errors
 
@@ -111,7 +110,7 @@ exit 0
 
     def test_hook_post_commit(self):
 
-        (fd, path) = tempfile.mkstemp()
+        _, path = tempfile.mkstemp()
         post_commit_msg = """#!/bin/sh
 rm %(file)s
 """ % {'file': path}

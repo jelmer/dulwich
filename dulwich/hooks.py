@@ -76,23 +76,23 @@ class ShellHook(Hook):
 
         if len(args) != self.numparam:
             raise HookError("Hook %s executed with wrong number of args. \
-                            Expected %d. Saw %d. %s"
+                            Expected %d. Saw %d."
                             % (self.name, self.numparam, len(args)))
 
-        if (self.pre_exec_callback is not None):
+        if self.pre_exec_callback is not None:
             args = self.pre_exec_callback(*args)
 
         try:
             ret = subprocess.call([self.filepath] + list(args))
             if ret != 0:
-                if (self.post_exec_callback is not None):
+                if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)
                 raise HookError("Hook %s exited with non-zero status"
                                 % (self.name))
-            if (self.post_exec_callback is not None):
+            if self.post_exec_callback is not None:
                 return self.post_exec_callback(1, *args)
         except OSError:  # no file. silent failure.
-            if (self.post_exec_callback is not None):
+            if self.post_exec_callback is not None:
                 self.post_exec_callback(0, *args)
 
 

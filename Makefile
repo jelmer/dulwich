@@ -29,7 +29,7 @@ check:: build
 	$(RUNTEST) dulwich.tests.test_suite
 
 check-tutorial:: build
-	$(RUNTEST) dulwich.tests.tutorial_test_suite 
+	$(RUNTEST) dulwich.tests.tutorial_test_suite
 
 check-nocompat:: build
 	$(RUNTEST) dulwich.tests.nocompat_test_suite

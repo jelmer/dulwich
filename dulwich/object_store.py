@@ -71,7 +71,7 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.iteritems()
-                if not sha in self and not ref.endswith("^{}") and
+                if not sha in self and not ref.endswith("^{}") and \
                    not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -293,7 +293,7 @@ class PackBasedObjectStore(BaseObjectStore):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
-            (name, pack) = pack_cache.popitem()
+            _, pack = pack_cache.popitem()
             pack.close()
 
     @property
@@ -329,7 +329,7 @@ class PackBasedObjectStore(BaseObjectStore):
         for sha in self._iter_loose_objects():
             objects.add((self._get_loose_object(sha), None))
         self.add_objects(list(objects))
-        for obj, path in objects:
+        for obj, path in objects: # pylint: disable=W0612
             self._remove_loose_object(obj.id)
         return len(objects)
 
@@ -425,7 +425,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, "info", "alternates"),
-                    'rb')
+                        'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return []
@@ -568,7 +568,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -623,7 +623,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+                                    "pack-%s" % iter_sha1(entry[0] for entry in entries))
             f = GitFile(basename+".idx", "wb")
             try:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
@@ -663,13 +663,13 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param obj: Object to add
         """
-        dir = os.path.join(self.path, obj.id[:2])
+        dir_path = os.path.join(self.path, obj.id[:2])
         try:
-            os.mkdir(dir)
+            os.mkdir(dir_path)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        path = os.path.join(dir, obj.id[2:])
+        path = os.path.join(dir_path, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
         f = GitFile(path, 'wb')
@@ -749,7 +749,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param objects: Iterable over a list of objects.
         """
-        for obj, path in objects:
+        for obj, path in objects: # pylint: disable=W0612
             self._data[obj.id] = obj
 
     def add_pack(self):
@@ -809,7 +809,8 @@ class MemoryObjectStore(BaseObjectStore):
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(read_all, read_some, f,
+                                      delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except:
@@ -865,7 +866,7 @@ class ObjectStoreIterator(ObjectIterator):
 
     def iterobjects(self):
         """Iterate over just the objects."""
-        for o, path in self:
+        for o, path in self: # pylint: disable=W0612
             yield o
 
     def itershas(self):
@@ -923,11 +924,11 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     :param kset: set to fill with references to files and directories
     """
     filetree = obj_store[tree_sha]
-    for name, mode, sha in filetree.iteritems():
-       if not S_ISGITLINK(mode) and sha not in kset:
-           kset.add(sha)
-           if stat.S_ISDIR(mode):
-               _collect_filetree_revs(obj_store, sha, kset)
+    for name, mode, sha in filetree.iteritems(): # pylint: disable=W0612
+        if not S_ISGITLINK(mode) and sha not in kset:
+            kset.add(sha)
+            if stat.S_ISDIR(mode):
+                _collect_filetree_revs(obj_store, sha, kset)
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
@@ -978,7 +979,7 @@ class MissingObjectFinder(object):
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-            get_tagged=None, get_parents=lambda commit: commit.parents):
+                 get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
         self._get_parents = get_parents
         # process Commits and Tags differently
@@ -986,22 +987,22 @@ class MissingObjectFinder(object):
         # and such SHAs would get filtered out by _split_commits_and_tags,
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
-        have_commits, have_tags = \
-                _split_commits_and_tags(object_store, haves, True)
-        want_commits, want_tags = \
-                _split_commits_and_tags(object_store, wants, False)
+        have_commits, have_tags = _split_commits_and_tags(object_store,
+                                                          haves, True)
+        want_commits, want_tags = _split_commits_and_tags(object_store,
+                                                          wants, False)
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-                have_commits,
-                get_parents=self._get_parents)[0]
+            have_commits,
+            get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
             want_commits,
             all_ancestors,
-            get_parents=self._get_parents);
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally

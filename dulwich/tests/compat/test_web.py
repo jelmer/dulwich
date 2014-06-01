@@ -27,12 +27,8 @@ warning: these tests should be fairly stable, but when writing/debugging new
 import threading
 from wsgiref import simple_server
 
-from dulwich.server import (
-    DictBackend,
-    )
-from dulwich.tests import (
-    SkipTest,
-    )
+from dulwich.server import DictBackend
+from dulwich.tests import SkipTest
 from dulwich.web import (
     make_wsgi_chain,
     HTTPGitApplication,
@@ -44,9 +40,7 @@ from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
     )
-from dulwich.tests.compat.utils import (
-    CompatTestCase,
-    )
+from dulwich.tests.compat.utils import CompatTestCase
 
 
 class WebTests(ServerTests):
@@ -62,8 +56,8 @@ class WebTests(ServerTests):
         backend = DictBackend({'/': repo})
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
-          'localhost', 0, app, server_class=WSGIServerLogger,
-          handler_class=WSGIRequestHandlerLogger)
+            'localhost', 0, app, server_class=WSGIServerLogger,
+            handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server

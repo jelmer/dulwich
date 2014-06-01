@@ -208,7 +208,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest,
-            lambda refs: [protocol.ZERO_SHA])
+                       lambda refs: [protocol.ZERO_SHA])
         map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
 
     def test_send_remove_branch(self):
@@ -233,7 +233,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
-                              protocol.TCP_GIT_PORT)
+                           protocol.TCP_GIT_PORT)
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()

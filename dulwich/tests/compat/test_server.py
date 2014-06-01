@@ -26,18 +26,12 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 
 import threading
 
-from dulwich.server import (
-    DictBackend,
-    TCPGitServer,
-    )
+from dulwich.server import DictBackend, TCPGitServer
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
     )
-from dulwich.tests.compat.utils import (
-    CompatTestCase,
-    )
-
+from dulwich.tests.compat.utils import CompatTestCase
 
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.

@@ -31,7 +31,10 @@ load-plugins=
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
-#disable=
+# C0111: Missing %s docstring
+# C0103: Invalid %s name "%s"
+# W0511: (warning notes in code comments; message varies)
+disable=C0103, C0111, W0511
 
 
 [REPORTS]

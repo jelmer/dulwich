@@ -390,10 +390,10 @@ class DiskRefsContainer(RefsContainer):
     def subkeys(self, base):
         keys = set()
         path = self.refpath(base)
-        for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        for root, dirs, files in os.walk(path): # pylint: disable=W0612
+            directory = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/")
+                refname = ("%s/%s" % (directory, filename)).strip("/")
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format("%s/%s" % (base, refname)):
@@ -408,10 +408,10 @@ class DiskRefsContainer(RefsContainer):
         if os.path.exists(self.refpath("HEAD")):
             keys.add("HEAD")
         path = self.refpath("")
-        for root, dirs, files in os.walk(self.refpath("refs")):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        for root, dirs, files in os.walk(self.refpath("refs")): # pylint: disable=W0612
+            directory = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/")
+                refname = ("%s/%s" % (directory, filename)).strip("/")
                 if check_ref_format(refname):
                     keys.add(refname)
         keys.update(self.get_packed_refs())
@@ -685,8 +685,7 @@ def read_packed_refs(f):
             # Comment
             continue
         if l[0] == "^":
-            raise PackedRefsException(
-              "found peeled ref in packed-refs without peeled")
+            raise PackedRefsException("found peeled ref in packed-refs without peeled")
         yield _split_ref_line(l)
 
 

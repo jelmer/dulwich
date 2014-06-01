@@ -27,15 +27,10 @@ import shutil
 import tempfile
 import zlib
 
-from dulwich.errors import (
-    ChecksumMismatch,
-    )
-from dulwich.file import (
-    GitFile,
-    )
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
+from dulwich.errors import ChecksumMismatch
+from dulwich.file import GitFile
+from dulwich.object_store import MemoryObjectStore
+
 from dulwich.objects import (
     Blob,
     hex_to_sha,
@@ -47,7 +42,6 @@ from dulwich.objects import (
 from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
-    DELTA_TYPES,
     MemoryPackIndex,
     Pack,
     PackData,
@@ -60,7 +54,6 @@ from dulwich.pack import (
     write_pack_header,
     write_pack_index_v1,
     write_pack_index_v2,
-    SHA1Writer,
     write_pack_object,
     write_pack,
     unpack_object,
@@ -68,9 +61,7 @@ from dulwich.pack import (
     PackStreamReader,
     DeltaChainIterator,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,
     build_pack,
@@ -187,7 +178,7 @@ class TestPackData(PackTests):
     """Tests getting the data from the packfile."""
 
     def test_create_pack(self):
-        p = self.get_pack_data(pack1_sha)
+        self.get_pack_data(pack1_sha)
 
     def test_from_file(self):
         path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha)
@@ -490,7 +481,6 @@ class WritePackTests(TestCase):
 
         f.write('x')  # unpack_object needs extra trailing data.
         f.seek(offset)
-        comp_len = len(f.getvalue()) - offset - 1
         unpacked, unused = unpack_object(f.read, compute_crc32=True)
         self.assertEqual(Blob.type_num, unpacked.pack_type_num)
         self.assertEqual(Blob.type_num, unpacked.obj_type_num)
@@ -998,8 +988,8 @@ class DeltaChainIteratorTests(TestCase):
     def test_bad_ext_ref_non_thin_pack(self):
         blob, = self.store_blobs(['blob'])
         f = BytesIO()
-        entries = build_pack(f, [(REF_DELTA, (blob.id, 'blob1'))],
-                             store=self.store)
+        build_pack(f, [(REF_DELTA, (blob.id, 'blob1'))],
+                   store=self.store)
         pack_iter = self.make_pack_iter(f, thin=False)
         try:
             list(pack_iter._walk_all_chains())
@@ -1010,12 +1000,12 @@ class DeltaChainIteratorTests(TestCase):
     def test_bad_ext_ref_thin_pack(self):
         b1, b2, b3 = self.store_blobs(['foo', 'bar', 'baz'])
         f = BytesIO()
-        entries = build_pack(f, [
-          (REF_DELTA, (1, 'foo99')),
-          (REF_DELTA, (b1.id, 'foo1')),
-          (REF_DELTA, (b2.id, 'bar2')),
-          (REF_DELTA, (b3.id, 'baz3')),
-          ], store=self.store)
+        build_pack(f, [
+            (REF_DELTA, (1, 'foo99')),
+            (REF_DELTA, (b1.id, 'foo1')),
+            (REF_DELTA, (b2.id, 'bar2')),
+            (REF_DELTA, (b3.id, 'baz3')),
+        ], store=self.store)
         del self.store[b2.id]
         del self.store[b3.id]
         pack_iter = self.make_pack_iter(f)

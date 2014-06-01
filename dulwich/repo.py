@@ -66,6 +66,7 @@ from dulwich.hooks import (
     CommitMsgShellHook,
     )
 
+# These imports from refs are needed for backwards compatibility
 from dulwich.refs import (
     check_ref_format,
     RefsContainer,
@@ -75,8 +76,8 @@ from dulwich.refs import (
     read_packed_refs,
     read_packed_refs_with_peeled,
     write_packed_refs,
-    SYMREF,
-    )
+    SYMREF
+)
 
 
 import warnings
@@ -227,8 +228,8 @@ class BaseRepo(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         target.object_store.add_objects(
-          self.fetch_objects(determine_wants, target.get_graph_walker(),
-                             progress))
+            self.fetch_objects(determine_wants, target.get_graph_walker(),
+                               progress))
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
@@ -277,10 +278,10 @@ class BaseRepo(object):
             return self.get_parents(commit.id, commit)
 
         return self.object_store.iter_shas(
-          self.object_store.find_missing_objects(
-              haves, wants, progress,
-              get_tagged,
-              get_parents=get_parents))
+            self.object_store.find_missing_objects(
+                haves, wants, progress,
+                get_tagged,
+                get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.
@@ -320,7 +321,7 @@ class BaseRepo(object):
                 raise NotTagError(ret)
             else:
                 raise Exception("Type invalid: %r != %r" % (
-                  ret.type_name, cls.type_name))
+                    ret.type_name, cls.type_name))
         return ret
 
     def get_object(self, sha):
@@ -442,7 +443,7 @@ class BaseRepo(object):
         """
         if not isinstance(name, str):
             raise TypeError("'name' must be bytestring, not %.80s" %
-                    type(name).__name__)
+                            type(name).__name__)
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
@@ -646,7 +647,7 @@ class Repo(BaseRepo):
               os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
-        elif (os.path.isfile(os.path.join(root, ".git"))):
+        elif os.path.isfile(os.path.join(root, ".git")):
             import re
             f = open(os.path.join(root, ".git"), 'r')
             try:
@@ -764,7 +765,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin="origin"):
+              origin="origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -807,8 +808,8 @@ class Repo(BaseRepo):
         config = self.get_config()
         honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
         return build_index_from_tree(self.path, self.index_path(),
-                self.object_store, self['HEAD'].tree,
-                honor_filemode=honor_filemode)
+                                     self.object_store, self['HEAD'].tree,
+                                     honor_filemode=honor_filemode)
 
     def get_config(self):
         """Retrieve the config object.

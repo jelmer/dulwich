@@ -271,10 +271,10 @@ class UploadPackHandler(Handler):
         write = lambda x: self.proto.write_sideband(1, x)
 
         graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
-            self.repo.get_peeled)
+                                           self.repo.get_peeled)
         objects_iter = self.repo.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress,
-          get_tagged=self.get_tagged)
+            graph_walker.determine_wants, graph_walker, self.progress,
+            get_tagged=self.get_tagged)
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
@@ -442,8 +442,7 @@ class ProtocolGraphWalker(object):
         want_revs = []
         while command == 'want':
             if sha not in values:
-                raise GitProtocolError(
-                  'Client wants invalid object %s' % sha)
+                raise GitProtocolError('Client wants invalid object %s' % sha)
             want_revs.append(sha)
             command, sha = self.read_proto_line(allowed)
 
@@ -515,10 +514,10 @@ class ProtocolGraphWalker(object):
 
         self.proto.write_pkt_line(None)
 
-    def send_ack(self, sha, ack_type=''):
-        if ack_type:
-            ack_type = ' %s' % ack_type
-        self.proto.write_pkt_line('ACK %s%s\n' % (sha, ack_type))
+    def send_ack(self, sha, acknowledgement_type=''):
+        if acknowledgement_type:
+            acknowledgement_type = ' %s' % acknowledgement_type
+        self.proto.write_pkt_line('ACK %s%s\n' % (sha, acknowledgement_type))
 
     def send_nak(self):
         self.proto.write_pkt_line('NAK\n')
@@ -569,11 +568,9 @@ class ProtocolGraphWalker(object):
         return True
 
     def set_ack_type(self, ack_type):
-        impl_classes = {
-          MULTI_ACK: MultiAckGraphWalkerImpl,
-          MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
-          SINGLE_ACK: SingleAckGraphWalkerImpl,
-          }
+        impl_classes = {MULTI_ACK: MultiAckGraphWalkerImpl,
+                        MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
+                        SINGLE_ACK: SingleAckGraphWalkerImpl}
         self._impl = impl_classes[ack_type](self)
 
 
@@ -716,7 +713,7 @@ class ReceivePackHandler(Handler):
             # TODO: more informative error messages than just the exception string
             try:
                 recv = getattr(self.proto, "recv", None)
-                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append(('unpack', 'ok'))
             except all_exceptions as e:
                 status.append(('unpack', str(e).replace('\n', '')))
@@ -727,14 +724,14 @@ class ReceivePackHandler(Handler):
             # even if no pack data has been sent.
             status.append(('unpack', 'ok'))
 
-        for oldsha, sha, ref in refs:
+        for oldsha, sha, ref in refs: # pylint: disable=W0612
             ref_status = 'ok'
             try:
                 if sha == ZERO_SHA:
                     if not 'delete-refs' in self.capabilities():
                         raise GitProtocolError(
-                          'Attempted to delete refs without delete-refs '
-                          'capability.')
+                            'Attempted to delete refs without delete-refs '
+                            'capability.')
                     try:
                         del self.repo.refs[ref]
                     except all_exceptions:
@@ -744,7 +741,7 @@ class ReceivePackHandler(Handler):
                         self.repo.refs[ref] = sha
                     except all_exceptions:
                         ref_status = 'failed to write'
-            except KeyError as e:
+            except KeyError:
                 ref_status = 'bad ref'
             status.append((ref, ref_status))
 
@@ -753,7 +750,7 @@ class ReceivePackHandler(Handler):
     def _report_status(self, status):
         if self.has_capability('side-band-64k'):
             writer = BufferedPktLineWriter(
-              lambda d: self.proto.write_sideband(1, d))
+                lambda d: self.proto.write_sideband(1, d))
             write = writer.write
 
             def flush():
@@ -779,14 +776,14 @@ class ReceivePackHandler(Handler):
         if self.advertise_refs or not self.http_req:
             if refs:
                 self.proto.write_pkt_line(
-                  "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
-                                     self.capability_line()))
+                    "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
+                                       self.capability_line()))
                 for i in range(1, len(refs)):
                     ref = refs[i]
                     self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
             else:
                 self.proto.write_pkt_line("%s capabilities^{}\0%s" % (
-                  ZERO_SHA, self.capability_line()))
+                    ZERO_SHA, self.capability_line()))
 
             self.proto.write("0000")
             if self.advertise_refs:
@@ -817,10 +814,8 @@ class ReceivePackHandler(Handler):
 
 
 # Default handler classes for git services.
-DEFAULT_HANDLERS = {
-  'git-upload-pack': UploadPackHandler,
-  'git-receive-pack': ReceivePackHandler,
-  }
+DEFAULT_HANDLERS = {'git-upload-pack': UploadPackHandler,
+                    'git-receive-pack': ReceivePackHandler}
 
 
 class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
@@ -916,7 +911,6 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
 
 def generate_info_refs(repo):
     """Generate an info refs file."""
-    refs = repo.get_refs()
     return write_info_refs(repo.get_refs(), repo.object_store)
 
 
@@ -933,10 +927,10 @@ def update_server_info(repo):
     similar to "git update-server-info".
     """
     repo._put_named_file(os.path.join('info', 'refs'),
-        "".join(generate_info_refs(repo)))
+                         "".join(generate_info_refs(repo)))
 
     repo._put_named_file(os.path.join('objects', 'info', 'packs'),
-        "".join(generate_objects_info_packs(repo)))
+                         "".join(generate_objects_info_packs(repo)))
 
 
 if __name__ == '__main__':

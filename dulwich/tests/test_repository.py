@@ -35,9 +35,7 @@ from dulwich.repo import (
     Repo,
     MemoryRepo,
     )
-from dulwich.tests import (
-    TestCase,
-    )
+from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
@@ -106,7 +104,7 @@ class RepositoryTests(TestCase):
         r = self._repo = open_repo('a.git')
         r["refs/tags/foo"] = 'a90fa2d900a17e99b433217e988c4eb4a2e9a097'
         self.assertEqual('a90fa2d900a17e99b433217e988c4eb4a2e9a097',
-                          r["refs/tags/foo"].id)
+                         r["refs/tags/foo"].id)
 
     def test_getitem_unicode(self):
         r = self._repo = open_repo('a.git')
@@ -237,7 +235,7 @@ class RepositoryTests(TestCase):
             }, t.refs.as_dict())
         shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, [t.head(),
-                         '2a72d929692c41d8554c07f6301757ba18a65d91'])
+                                '2a72d929692c41d8554c07f6301757ba18a65d91'])
 
     def test_clone_no_head(self):
         temp_dir = tempfile.mkdtemp()
@@ -396,12 +394,11 @@ exit 0
             f.close()
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            'empty commit',
-            committer='Test Committer <test@nodomain.com>',
-            author='Test Author <test@nodomain.com>',
-            commit_timestamp=12395, commit_timezone=0,
-            author_timestamp=12395, author_timezone=0)
+        commit_sha = r.do_commit('empty commit',
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
 
     def test_shell_hook_commit_msg(self):
@@ -463,12 +460,11 @@ exit 0
 rm %(file)s
 """ % {'file': path}
 
-        root_sha = r.do_commit(
-            'empty commit',
-            committer='Test Committer <test@nodomain.com>',
-            author='Test Author <test@nodomain.com>',
-            commit_timestamp=12345, commit_timezone=0,
-            author_timestamp=12345, author_timezone=0)
+        root_sha = r.do_commit('empty commit',
+                               committer='Test Committer <test@nodomain.com>',
+                               author='Test Author <test@nodomain.com>',
+                               commit_timestamp=12345, commit_timezone=0,
+                               author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[root_sha].parents)
 
         post_commit = os.path.join(r.controldir(), 'hooks', 'post-commit')
@@ -480,12 +476,11 @@ rm %(file)s
             f.close()
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            'empty commit',
-            committer='Test Committer <test@nodomain.com>',
-            author='Test Author <test@nodomain.com>',
-            commit_timestamp=12345, commit_timezone=0,
-            author_timestamp=12345, author_timezone=0)
+        commit_sha = r.do_commit('empty commit',
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12345, commit_timezone=0,
+                                 author_timestamp=12345, author_timezone=0)
         self.assertEqual([root_sha], r[commit_sha].parents)
 
         self.assertFalse(os.path.exists(path))
@@ -501,15 +496,16 @@ exit 1
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         warnings.simplefilter("always", UserWarning)
-        self.addCleanup(warnings.resetwarnings)
-        warnings_list = setup_warning_catcher()
 
-        commit_sha2 = r.do_commit(
-            'empty commit',
-            committer='Test Committer <test@nodomain.com>',
-            author='Test Author <test@nodomain.com>',
-            commit_timestamp=12345, commit_timezone=0,
-            author_timestamp=12345, author_timezone=0)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list, set_original_showwarning, original_showwarning = setup_warning_catcher()
+        self.addCleanup(set_original_showwarning, original_showwarning)
+
+        commit_sha2 = r.do_commit('empty commit',
+                                  committer='Test Committer <test@nodomain.com>',
+                                  author='Test Author <test@nodomain.com>',
+                                  commit_timestamp=12345, commit_timezone=0,
+                                  author_timestamp=12345, author_timezone=0)
         self.assertEqual(len(warnings_list), 1)
         self.assertIsInstance(warnings_list[-1], UserWarning)
         self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
@@ -598,11 +594,11 @@ class BuildRepoTests(TestCase):
     def test_commit_encoding(self):
         r = self._repo
         commit_sha = r.do_commit('commit with strange character \xee',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             encoding="iso8859-1")
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 encoding="iso8859-1")
         self.assertEqual("iso8859-1", r[commit_sha].encoding)
 
     def test_commit_config_identity(self):
@@ -663,11 +659,11 @@ class BuildRepoTests(TestCase):
         r = self._repo
 
         commit_sha = r.do_commit('commit to branch',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 ref="refs/heads/new_branch")
         self.assertEqual(self._root_commit, r["HEAD"].id)
         self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
         self.assertEqual([], r[commit_sha].parents)
@@ -676,11 +672,11 @@ class BuildRepoTests(TestCase):
         new_branch_head = commit_sha
 
         commit_sha = r.do_commit('commit to branch 2',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 ref="refs/heads/new_branch")
         self.assertEqual(self._root_commit, r["HEAD"].id)
         self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
         self.assertEqual([new_branch_head], r[commit_sha].parents)
@@ -688,20 +684,19 @@ class BuildRepoTests(TestCase):
     def test_commit_merge_heads(self):
         r = self._repo
         merge_1 = r.do_commit('commit to branch 2',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
+                              committer='Test Committer <test@nodomain.com>',
+                              author='Test Author <test@nodomain.com>',
+                              commit_timestamp=12395, commit_timezone=0,
+                              author_timestamp=12395, author_timezone=0,
+                              ref="refs/heads/new_branch")
         commit_sha = r.do_commit('commit with merge',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             merge_heads=[merge_1])
-        self.assertEqual(
-            [self._root_commit, merge_1],
-            r[commit_sha].parents)
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 merge_heads=[merge_1])
+        self.assertEqual([self._root_commit, merge_1],
+                         r[commit_sha].parents)
 
     def test_commit_dangling_commit(self):
         r = self._repo
@@ -709,11 +704,11 @@ class BuildRepoTests(TestCase):
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
         commit_sha = r.do_commit('commit with no ref',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             ref=None)
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 ref=None)
         new_shas = set(r.object_store) - old_shas
 
         # New sha is added, but no new refs
@@ -729,11 +724,11 @@ class BuildRepoTests(TestCase):
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
         commit_sha = r.do_commit('commit with no ref',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
-             commit_timestamp=12395, commit_timezone=0,
-             author_timestamp=12395, author_timezone=0,
-             ref=None, merge_heads=[self._root_commit])
+                                 committer='Test Committer <test@nodomain.com>',
+                                 author='Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0,
+                                 ref=None, merge_heads=[self._root_commit])
         new_shas = set(r.object_store) - old_shas
 
         # New sha is added, but no new refs
@@ -748,4 +743,3 @@ class BuildRepoTests(TestCase):
         os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
-

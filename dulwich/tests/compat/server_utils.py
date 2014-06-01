@@ -21,11 +21,9 @@
 
 import errno
 import os
-import select
 import shutil
 import socket
 import tempfile
-import threading
 
 from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha
@@ -181,7 +179,7 @@ class ServerTests(object):
 
         # Fetch at depth 1
         run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
         expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
@@ -197,13 +195,13 @@ class ServerTests(object):
 
         # Fetch at depth 1
         run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
         expected_shallow = ['94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
         self.assertEqual(expected_shallow, _get_shallow(clone))
@@ -218,18 +216,18 @@ class ServerTests(object):
 
         # Fetch at depth 1
         run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
-                        self.url(port), self._stub_repo.path])
+                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
 
         # The whole repo only has depth 3, so it should equal server_new.
         run_git_or_fail(
-          ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
-          cwd=self._stub_repo.path)
+            ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
+            cwd=self._stub_repo.path)
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
@@ -248,7 +246,6 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
 
 def ignore_error(error):
     """Check whether this error is safe to ignore."""
-    (e_type, e_value, e_tb) = error
+    (e_type, e_value, _) = error
     return (issubclass(e_type, socket.error) and
             e_value[0] in (errno.ECONNRESET, errno.EPIPE))
-

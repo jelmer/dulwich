@@ -158,10 +158,10 @@ class ConfigDict(Config, MutableMapping):
 
 
 def _format_string(value):
-    if (value.startswith(" ") or
-        value.startswith("\t") or
-        value.endswith(" ") or
-        value.endswith("\t")):
+    if (value.startswith(" ") or # pylint: disable=C0330
+        value.startswith("\t") or # pylint: disable=C0330
+        value.endswith(" ") or # pylint: disable=C0330
+        value.endswith("\t")): # pylint: disable=C0330
         return '"%s"' % _escape_value(value)
     return _escape_value(value)
 
@@ -170,7 +170,7 @@ def _parse_string(value):
     value = value.strip()
     ret = []
     block = []
-    in_quotes  = False
+    in_quotes = False
     for c in value:
         if c == "\"":
             in_quotes = (not in_quotes)
@@ -238,7 +238,7 @@ class ConfigFile(ConfigDict):
         ret = cls()
         section = None
         setting = None
-        for lineno, line in enumerate(f.readlines()):
+        for line in f.readlines():
             line = line.lstrip()
             if setting is None:
                 if len(line) > 0 and line[0] == "[":
@@ -262,7 +262,7 @@ class ConfigFile(ConfigDict):
                     else:
                         if not _check_section_name(pts[0]):
                             raise ValueError("invalid section name %s" %
-                                    pts[0])
+                                             pts[0])
                         pts = pts[0].split(".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])

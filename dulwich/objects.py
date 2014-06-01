@@ -64,7 +64,7 @@ def S_ISGITLINK(m):
     :param m: Mode to check
     :return: a ``boolean``
     """
-    return (stat.S_IFMT(m) == S_IFGITLINK)
+    return stat.S_IFMT(m) == S_IFGITLINK
 
 
 def _decompress(string):
@@ -81,23 +81,23 @@ def sha_to_hex(sha):
     return hexsha
 
 
-def hex_to_sha(hex):
+def hex_to_sha(hex_string):
     """Takes a hex sha and returns a binary sha"""
-    assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
+    assert len(hex_string) == 40, "Incorrent length of hexsha: %s" % hex_string
     try:
-        return binascii.unhexlify(hex)
+        return binascii.unhexlify(hex_string)
     except TypeError as exc:
-        if not isinstance(hex, str):
+        if not isinstance(hex_string, str):
             raise
         raise ValueError(exc.args[0])
 
 
-def hex_to_filename(path, hex):
+def hex_to_filename(path, hex_string):
     """Takes a hex sha and returns its filename relative to the given path."""
-    dir = hex[:2]
-    file = hex[2:]
+    directory = hex_string[:2]
+    filename = hex_string[2:]
     # Check from object dir
-    return os.path.join(path, dir, file)
+    return os.path.join(path, directory, filename)
 
 
 def filename_to_hex(filename):
@@ -108,9 +108,9 @@ def filename_to_hex(filename):
     assert len(names) == 2, errmsg
     base, rest = names
     assert len(base) == 2 and len(rest) == 38, errmsg
-    hex = base + rest
-    hex_to_sha(hex)
-    return hex
+    hex_string = base + rest
+    hex_to_sha(hex_string)
+    return hex_string
 
 
 def object_header(num_type, length):
@@ -131,25 +131,25 @@ def serializable_property(name, docstring=None):
     return property(get, set, doc=docstring)
 
 
-def object_class(type):
+def object_class(object_type):
     """Get the object class corresponding to the given type.
 
-    :param type: Either a type name string or a numeric type.
+    :param object_type: Either a type name string or a numeric type.
     :return: The ShaFile subclass corresponding to the given type, or None if
         type is not a valid type name/number.
     """
-    return _TYPE_MAP.get(type, None)
+    return _TYPE_MAP.get(object_type, None)
 
 
-def check_hexsha(hex, error_msg):
+def check_hexsha(hex_string, error_msg):
     """Check if a string is a valid hex sha string.
 
-    :param hex: Hex string to check
+    :param hex_string: Hex string to check
     :param error_msg: Error message to use in exception
     :raise ObjectFormatException: Raised when the string is not valid
     """
     try:
-        hex_to_sha(hex)
+        hex_to_sha(hex_string)
     except (TypeError, AssertionError, ValueError):
         raise ObjectFormatException("%s %s" % (error_msg, hex))
 
@@ -164,9 +164,9 @@ def check_identity(identity, error_msg):
     """
     email_start = identity.find("<")
     email_end = identity.find(">")
-    if (email_start < 0 or email_end < 0 or email_end <= email_start
-        or identity.find("<", email_start + 1) >= 0
-        or identity.find(">", email_end + 1) >= 0
+    if (email_start < 0 or email_end < 0 or email_end <= email_start \
+        or identity.find("<", email_start + 1) >= 0 \
+        or identity.find(">", email_end + 1) >= 0 \
         or not identity.endswith(">")):
         raise ObjectFormatException(error_msg)
 
@@ -219,9 +219,9 @@ class ShaFile(object):
         ret._magic = magic
         return ret
 
-    def _parse_legacy_object(self, map):
+    def _parse_legacy_object(self, object_map):
         """Parse a legacy object, setting the raw string."""
-        text = _decompress(map)
+        text = _decompress(object_map)
         header_end = text.find('\0')
         if header_end < 0:
             raise ObjectFormatException("Invalid object header, no \\0")
@@ -398,7 +398,7 @@ class ShaFile(object):
             obj._needs_serialization = True
             obj._file = f
             return obj
-        except (IndexError, ValueError) as e:
+        except (IndexError, ValueError):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
@@ -501,9 +501,9 @@ class ShaFile(object):
         """Return the type number for this object class."""
         return self.type_num
 
-    def set_type(self, type):
+    def set_type(self, type_to_set):
         """Set the type number for this object class."""
-        self.type_num = type
+        self.type_num = type_to_set
 
     # DEPRECATED: use type_num or type_name as needed.
     type = property(get_type, set_type)
@@ -562,7 +562,8 @@ class Blob(ShaFile):
     def _deserialize(self, chunks):
         self._chunked_text = chunks
 
-    chunked = property(_get_chunked, _set_chunked,
+    chunked = property(
+        _get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
 
     @classmethod
@@ -666,9 +667,9 @@ class Tag(ShaFile):
                 chunks.append("%s %s\n" % (_TAGGER_HEADER, self._tagger))
             else:
                 chunks.append("%s %s %d %s\n" % (
-                  _TAGGER_HEADER, self._tagger, self._tag_time,
-                  format_timezone(self._tag_timezone,
-                    self._tag_timezone_neg_utc)))
+                    _TAGGER_HEADER, self._tagger, self._tag_time,
+                    format_timezone(self._tag_timezone,
+                                    self._tag_timezone_neg_utc)))
         chunks.append("\n") # To close headers
         chunks.append(self._message)
         return chunks
@@ -724,13 +725,16 @@ class Tag(ShaFile):
     object = property(_get_object, _set_object)
 
     name = serializable_property("name", "The name of this tag")
-    tagger = serializable_property("tagger",
+    tagger = serializable_property(
+        "tagger",
         "Returns the name of the person who created this tag")
-    tag_time = serializable_property("tag_time",
+    tag_time = serializable_property(
+        "tag_time",
         "The creation timestamp of the tag.  As the number of seconds since the epoch")
     tag_timezone = serializable_property("tag_timezone",
-        "The timezone that tag_time is in.")
-    message = serializable_property("message", "The message attached to this tag")
+                                         "The timezone that tag_time is in.")
+    message = serializable_property("message",
+                                    "The message attached to this tag")
 
 
 class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
@@ -882,7 +886,7 @@ class Tree(ShaFile):
         if isinstance(name, int) and isinstance(mode, str):
             (name, mode) = (mode, name)
             warnings.warn("Please use Tree.add(name, mode, hexsha)",
-                category=DeprecationWarning, stacklevel=2)
+                          category=DeprecationWarning, stacklevel=2)
         self._ensure_parsed()
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
@@ -964,13 +968,13 @@ class Tree(ShaFile):
         parts = path.split('/')
         sha = self.id
         mode = None
-        for p in parts:
-            if not p:
+        for part in parts:
+            if not part:
                 continue
             obj = lookup_obj(sha)
             if not isinstance(obj, Tree):
                 raise NotTreeError(sha)
-            mode, sha = obj[p]
+            mode, sha = obj[part]
         return mode, sha
 
 
@@ -1088,12 +1092,11 @@ class Commit(ShaFile):
 
     def _deserialize(self, chunks):
         (self._tree, self._parents, author_info, commit_info, self._encoding,
-                self._mergetag, self._message, self._extra) = \
-                        parse_commit(chunks)
+         self._mergetag, self._message, self._extra) = parse_commit(chunks)
         (self._author, self._author_time, (self._author_timezone,
-            self._author_timezone_neg_utc)) = author_info
+                                           self._author_timezone_neg_utc)) = author_info
         (self._committer, self._commit_time, (self._commit_timezone,
-            self._commit_timezone_neg_utc)) = commit_info
+                                              self._commit_timezone_neg_utc)) = commit_info
 
     def check(self):
         """Check this object for internal consistency.
@@ -1137,13 +1140,13 @@ class Commit(ShaFile):
         for p in self._parents:
             chunks.append("%s %s\n" % (_PARENT_HEADER, p))
         chunks.append("%s %s %s %s\n" % (
-          _AUTHOR_HEADER, self._author, str(self._author_time),
-          format_timezone(self._author_timezone,
-                          self._author_timezone_neg_utc)))
+            _AUTHOR_HEADER, self._author, str(self._author_time),
+            format_timezone(self._author_timezone,
+                            self._author_timezone_neg_utc)))
         chunks.append("%s %s %s %s\n" % (
-          _COMMITTER_HEADER, self._committer, str(self._commit_time),
-          format_timezone(self._commit_timezone,
-                          self._commit_timezone_neg_utc)))
+            _COMMITTER_HEADER, self._committer, str(self._commit_time),
+            format_timezone(self._commit_timezone,
+                            self._commit_timezone_neg_utc)))
         if self.encoding:
             chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
         for mergetag in self.mergetag:
@@ -1187,31 +1190,34 @@ class Commit(ShaFile):
     extra = property(_get_extra)
 
     author = serializable_property("author",
-        "The name of the author of the commit")
+                                   "The name of the author of the commit")
 
     committer = serializable_property("committer",
-        "The name of the committer of the commit")
+                                      "The name of the committer of the commit")
 
     message = serializable_property("message",
-        "The commit message")
+                                    "The commit message")
 
-    commit_time = serializable_property("commit_time",
+    commit_time = serializable_property(
+        "commit_time",
         "The timestamp of the commit. As the number of seconds since the epoch.")
 
     commit_timezone = serializable_property("commit_timezone",
-        "The zone the commit time is in")
+                                            "The zone the commit time is in")
 
-    author_time = serializable_property("author_time",
+    author_time = serializable_property(
+        "author_time",
         "The timestamp the commit was written. as the number of seconds since the epoch.")
 
-    author_timezone = serializable_property("author_timezone",
+    author_timezone = serializable_property(
+        "author_timezone",
         "Returns the zone the author time is in.")
 
     encoding = serializable_property("encoding",
-        "Encoding of the commit message.")
+                                     "Encoding of the commit message.")
 
     mergetag = serializable_property("mergetag",
-        "Associated signed tag.")
+                                     "Associated signed tag.")
 
 
 OBJECT_CLASSES = (

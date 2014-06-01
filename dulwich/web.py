@@ -67,9 +67,9 @@ def date_time_string(timestamp=None):
               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     if timestamp is None:
         timestamp = time.time()
-    year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
+    year, month, day, hh, mm, ss, wd, _, _ = time.gmtime(timestamp)
     return '%s, %02d %3s %4d %02d:%02d:%02d GMD' % (
-            weekdays[wd], day, months[month], year, hh, mm, ss)
+        weekdays[wd], day, months[month], year, hh, mm, ss)
 
 
 def url_prefix(mat):
@@ -202,8 +202,8 @@ class _LengthLimitedFile(object):
     but not implemented in wsgiref as of 2.5.
     """
 
-    def __init__(self, input, max_bytes):
-        self._input = input
+    def __init__(self, input_data, max_bytes):
+        self._input = input_data
         self._bytes_avail = max_bytes
 
     def read(self, size=-1):
@@ -283,19 +283,19 @@ class HTTPGitRequest(object):
     def nocache(self):
         """Set the response to never be cached by the client."""
         self._cache_headers = [
-          ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
-          ('Pragma', 'no-cache'),
-          ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
-          ]
+            ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
+            ('Pragma', 'no-cache'),
+            ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
+        ]
 
     def cache_forever(self):
         """Set the response to be cached forever by the client."""
         now = time.time()
         self._cache_headers = [
-          ('Date', date_time_string(now)),
-          ('Expires', date_time_string(now + 31536000)),
-          ('Cache-Control', 'public, max-age=31536000'),
-          ]
+            ('Date', date_time_string(now)),
+            ('Expires', date_time_string(now + 31536000)),
+            ('Cache-Control', 'public, max-age=31536000'),
+        ]
 
 
 class HTTPGitApplication(object):
@@ -305,17 +305,17 @@ class HTTPGitApplication(object):
     """
 
     services = {
-      ('GET', re.compile('/HEAD$')): get_text_file,
-      ('GET', re.compile('/info/refs$')): get_info_refs,
-      ('GET', re.compile('/objects/info/alternates$')): get_text_file,
-      ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
-      ('GET', re.compile('/objects/info/packs$')): get_info_packs,
-      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
+        ('GET', re.compile('/HEAD$')): get_text_file,
+        ('GET', re.compile('/info/refs$')): get_info_refs,
+        ('GET', re.compile('/objects/info/alternates$')): get_text_file,
+        ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
+        ('GET', re.compile('/objects/info/packs$')): get_info_packs,
+        ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
+        ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
+        ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
 
-      ('POST', re.compile('/git-upload-pack$')): handle_service_request,
-      ('POST', re.compile('/git-receive-pack$')): handle_service_request,
+        ('POST', re.compile('/git-upload-pack$')): handle_service_request,
+        ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
     def __init__(self, backend, dumb=False, handlers=None, fallback_app=None):

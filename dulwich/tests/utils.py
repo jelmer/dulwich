@@ -318,9 +318,11 @@ def setup_warning_catcher():
 
     caught_warnings = []
     original_showwarning = warnings.showwarning
-
-    def custom_showwarning(*args,  **kwargs):
+    def custom_showwarning(*args, **kwargs):
         caught_warnings.append(args[0])
 
+    def set_original_showwarning(original_showwarning):
+        warnings.showwarning = original_showwarning
+
     warnings.showwarning = custom_showwarning
-    return caught_warnings
+    return caught_warnings, set_original_showwarning, original_showwarning

@@ -205,7 +205,7 @@ class GitClient(object):
         f, commit, abort = target.object_store.add_pack()
         try:
             result = self.fetch_pack(path, determine_wants,
-                    target.get_graph_walker(), f.write, progress)
+                                     target.get_graph_walker(), f.write, progress)
         except:
             abort()
             raise
@@ -302,11 +302,11 @@ class GitClient(object):
             if old_sha1 != new_sha1:
                 if sent_capabilities:
                     proto.write_pkt_line('%s %s %s' % (old_sha1, new_sha1,
-                                                            refname))
+                                                       refname))
                 else:
                     proto.write_pkt_line(
-                      '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
-                                        ' '.join(capabilities)))
+                        '%s %s %s\0%s' % (old_sha1, new_sha1, refname,
+                                          ' '.join(capabilities)))
                     sent_capabilities = True
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
@@ -323,7 +323,7 @@ class GitClient(object):
         if "side-band-64k" in capabilities:
             if progress is None:
                 progress = lambda x: None
-            channel_callbacks = { 2: progress }
+            channel_callbacks = {2: progress}
             if 'report-status' in capabilities:
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet).parse
@@ -434,7 +434,7 @@ class TraditionalGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        proto, unused_can_read = self._connect('receive-pack', path)
+        proto, unused_can_read = self._connect('receive-pack', path) # pylint: disable=W0612
         old_refs, server_capabilities = read_pkt_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
@@ -478,23 +478,23 @@ class TraditionalGitClient(GitClient):
             return old_refs
 
         (have, want) = self._handle_receive_pack_head(proto,
-            negotiated_capabilities, old_refs, new_refs)
+                                                      negotiated_capabilities,
+                                                      old_refs, new_refs)
         if not want and old_refs == new_refs:
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(proto.write_file(), objects)
+            write_pack_objects(proto.write_file(), objects)
         elif len(set(new_refs.values()) - set([ZERO_SHA])) > 0:
             # Check for valid create/update refs
             filtered_new_refs = \
                 dict([(ref, sha) for ref, sha in new_refs.iteritems()
-                     if sha != ZERO_SHA])
-            if len(set(filtered_new_refs.iteritems()) -
-                    set(old_refs.iteritems())) > 0:
-                entries, sha = write_pack_objects(proto.write_file(), objects)
+                      if sha != ZERO_SHA])
+            if len(set(filtered_new_refs.iteritems()) - set(old_refs.iteritems())) > 0:
+                write_pack_objects(proto.write_file(), objects)
 
         self._handle_receive_pack_tail(proto, negotiated_capabilities,
-            progress)
+                                       progress)
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -525,13 +525,13 @@ class TraditionalGitClient(GitClient):
             proto.write_pkt_line(None)
             return refs
         self._handle_upload_pack_head(proto, negotiated_capabilities,
-            graph_walker, wants, can_read)
+                                      graph_walker, wants, can_read)
         self._handle_upload_pack_tail(proto, negotiated_capabilities,
-            graph_walker, pack_data, progress)
+                                      graph_walker, pack_data, progress)
         return refs
 
     def archive(self, path, committish, write_data, progress=None):
-        proto, can_read = self._connect('upload-archive', path)
+        proto, can_read = self._connect('upload-archive', path) # pylint: disable=W0612
         proto.write_pkt_line("argument %s" % committish)
         proto.write_pkt_line(None)
         pkt = proto.read_pkt_line()
@@ -561,25 +561,25 @@ class TCPGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         sockaddrs = socket.getaddrinfo(self._host, self._port,
-            socket.AF_UNSPEC, socket.SOCK_STREAM)
+                                       socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
         err = socket.error("no address found for %s" % self._host)
-        for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
-            s = socket.socket(family, socktype, proto)
-            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        for (family, socktype, proto, canonname, sockaddr) in sockaddrs: # pylint: disable=W0612
+            sock = socket.socket(family, socktype, proto)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
-                s.connect(sockaddr)
+                sock.connect(sockaddr)
                 break
             except socket.error as err:
-                if s is not None:
-                    s.close()
-                s = None
-        if s is None:
+                if sock is not None:
+                    sock.close()
+                sock = None
+        if sock is None:
             raise err
         # -1 means system default buffering
-        rfile = s.makefile('rb', -1)
+        rfile = sock.makefile('rb', -1)
         # 0 means unbuffered
-        wfile = s.makefile('wb', 0)
+        wfile = sock.makefile('wb', 0)
         proto = Protocol(rfile.read, wfile.write,
                          report_activity=self._report_activity)
         if path.startswith("/~"):
@@ -623,7 +623,6 @@ class SubprocessGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, service, path):
-        import subprocess
         argv = ['git', service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
@@ -727,7 +726,6 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
-        import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:
@@ -830,7 +828,7 @@ else:
             self.ssh_kwargs = {}
 
         def run_command(self, host, command, username=None, port=None,
-                progress_stderr=None):
+                        progress_stderr=None):
 
             # Paramiko needs an explicit port. None is not valid
             if port is None:
@@ -850,7 +848,7 @@ else:
             channel.exec_command(*command)
 
             return ParamikoWrapper(client, channel,
-                    progress_stderr=progress_stderr)
+                                   progress_stderr=progress_stderr)
 
 
 # Can be overridden by users
@@ -953,8 +951,8 @@ class HttpGitClient(GitClient):
         headers = {"Content-Type": "application/x-%s-request" % service}
         resp = self._http_request(url, headers, data)
         if resp.info().gettype() != ("application/x-%s-result" % service):
-            raise GitProtocolError("Invalid content-type from server: %s"
-                % resp.info().gettype())
+            raise GitProtocolError("Invalid content-type from server: %s" % \
+                                   resp.info().gettype())
         return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -991,12 +989,12 @@ class HttpGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(req_proto.write_file(), objects)
+            write_pack_objects(req_proto.write_file(), objects)
         resp = self._smart_request("git-receive-pack", url,
-            data=req_data.getvalue())
+                                   data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)
         self._handle_receive_pack_tail(resp_proto, negotiated_capabilities,
-            progress)
+                                       progress)
         return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -1023,13 +1021,14 @@ class HttpGitClient(GitClient):
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(req_proto,
-            negotiated_capabilities, graph_walker, wants,
-            lambda: False)
+                                      negotiated_capabilities,
+                                      graph_walker, wants,
+                                      lambda: False)
         resp = self._smart_request("git-upload-pack", url,
-            data=req_data.getvalue())
+                                   data=req_data.getvalue())
         resp_proto = Protocol(resp.read, None)
         self._handle_upload_pack_tail(resp_proto, negotiated_capabilities,
-            graph_walker, pack_data, progress)
+                                      graph_walker, pack_data, progress)
         return refs
 
 
@@ -1055,7 +1054,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient(urlparse.urlunparse(parsed), config=config,
-                **kwargs), parsed.path
+                             **kwargs), parsed.path
     elif parsed.scheme == 'file':
         return default_local_git_client_cls(**kwargs), parsed.path
 

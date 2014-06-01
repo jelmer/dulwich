@@ -159,8 +159,8 @@ class _CommitTimeQueue(object):
                     else:
                         reset_extra_commits = False
 
-            if (self._min_time is not None and \
-                commit.commit_time < self._min_time):
+            if (self._min_time is not None and # pylint: disable=C0330
+                commit.commit_time < self._min_time): # pylint: disable=C0330
                 # We want to stop walking at min_time, but commits at the
                 # boundary may be out of order with respect to their parents. So
                 # we walk _MAX_EXTRA_COMMITS more commits once we hit this
@@ -250,8 +250,8 @@ class Walker(object):
         for followed_path in self.paths:
             if changed_path == followed_path:
                 return True
-            if (changed_path.startswith(followed_path) and \
-                changed_path[len(followed_path)] == '/'):
+            if (changed_path.startswith(followed_path) and # pylint: disable=C0330
+                changed_path[len(followed_path)] == '/'): # pylint: disable=C0330
                 return True
         return False
 

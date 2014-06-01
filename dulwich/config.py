@@ -158,10 +158,10 @@ class ConfigDict(Config, MutableMapping):
 
 
 def _format_string(value):
-    if (value.startswith(" ") or \
-        value.startswith("\t") or \
-        value.endswith(" ") or \
-        value.endswith("\t")):
+    if (value.startswith(" ") or # pylint: disable=C0330
+        value.startswith("\t") or # pylint: disable=C0330
+        value.endswith(" ") or # pylint: disable=C0330
+        value.endswith("\t")): # pylint: disable=C0330
         return '"%s"' % _escape_value(value)
     return _escape_value(value)
 

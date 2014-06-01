@@ -434,7 +434,7 @@ class TraditionalGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        proto, _ = self._connect('receive-pack', path)
+        proto, unused_can_read = self._connect('receive-pack', path) # pylint: disable=W0612
         old_refs, server_capabilities = read_pkt_refs(proto)
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
@@ -531,7 +531,7 @@ class TraditionalGitClient(GitClient):
         return refs
 
     def archive(self, path, committish, write_data, progress=None):
-        proto, _ = self._connect('upload-archive', path)
+        proto, can_read = self._connect('upload-archive', path) # pylint: disable=W0612
         proto.write_pkt_line("argument %s" % committish)
         proto.write_pkt_line(None)
         pkt = proto.read_pkt_line()
@@ -564,7 +564,7 @@ class TCPGitClient(TraditionalGitClient):
                                        socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
         err = socket.error("no address found for %s" % self._host)
-        for (family, socktype, proto, _, sockaddr) in sockaddrs:
+        for (family, socktype, proto, canonname, sockaddr) in sockaddrs: # pylint: disable=W0612
             sock = socket.socket(family, socktype, proto)
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:

@@ -413,7 +413,7 @@ class MemoryPackIndex(PackIndex):
         :param pack_checksum: Optional pack checksum
         """
         self._by_sha = {}
-        for name, idx, _ in entries:
+        for name, idx, crc32 in entries: # pylint: disable=W0612
             self._by_sha[name] = idx
         self._entries = entries
         self._pack_checksum = pack_checksum
@@ -975,7 +975,7 @@ class PackData(object):
             self._file = GitFile(self._filename, 'rb')
         else:
             self._file = file
-        _, self._num_objects = read_pack_header(self._file.read)
+        version, self._num_objects = read_pack_header(self._file.read) # pylint: disable=W0612
         self._offset_cache = LRUSizeCache(1024*1024*20,
                                           compute_size=_compute_object_size)
         self.pack = None
@@ -1495,7 +1495,7 @@ def deltify_pack_objects(objects, window=10):
 
     possible_bases = deque()
 
-    for type_num, path, _, o in magic:
+    for type_num, path, neg_length, o in magic: # pylint: disable=W0612
         raw = o.as_raw_string()
         winner = raw
         winner_base = None
@@ -1571,13 +1571,13 @@ def write_pack_index_v1(f, entries, pack_checksum):
     """
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
-    for name, offset, _ in entries:
+    for name, offset, entry_checksum in entries: # pylint: disable=W0612
         fan_out_table[ord(name[0])] += 1
     # Fan-out table
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
         fan_out_table[i+1] += fan_out_table[i]
-    for name, offset, _ in entries:
+    for name, offset, entry_checksum in entries: # pylint: disable=W0612
         if not offset <= 0xffffffff:
             raise TypeError("pack format 1 only supports offsets < 2Gb")
         f.write(struct.pack('>L20s', offset, name))

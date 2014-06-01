@@ -329,7 +329,7 @@ class PackBasedObjectStore(BaseObjectStore):
         for sha in self._iter_loose_objects():
             objects.add((self._get_loose_object(sha), None))
         self.add_objects(list(objects))
-        for obj, _ in objects:
+        for obj, path in objects: # pylint: disable=W0612
             self._remove_loose_object(obj.id)
         return len(objects)
 
@@ -749,7 +749,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         :param objects: Iterable over a list of objects.
         """
-        for obj, _ in objects:
+        for obj, path in objects: # pylint: disable=W0612
             self._data[obj.id] = obj
 
     def add_pack(self):
@@ -866,7 +866,7 @@ class ObjectStoreIterator(ObjectIterator):
 
     def iterobjects(self):
         """Iterate over just the objects."""
-        for o, _ in self:
+        for o, path in self: # pylint: disable=W0612
             yield o
 
     def itershas(self):
@@ -924,7 +924,7 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     :param kset: set to fill with references to files and directories
     """
     filetree = obj_store[tree_sha]
-    for _, mode, sha in filetree.iteritems():
+    for name, mode, sha in filetree.iteritems(): # pylint: disable=W0612
         if not S_ISGITLINK(mode) and sha not in kset:
             kset.add(sha)
             if stat.S_ISDIR(mode):

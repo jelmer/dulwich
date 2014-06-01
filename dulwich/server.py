@@ -724,7 +724,7 @@ class ReceivePackHandler(Handler):
             # even if no pack data has been sent.
             status.append(('unpack', 'ok'))
 
-        for _, sha, ref in refs:
+        for oldsha, sha, ref in refs: # pylint: disable=W0612
             ref_status = 'ok'
             try:
                 if sha == ZERO_SHA:

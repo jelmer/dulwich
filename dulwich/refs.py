@@ -390,7 +390,7 @@ class DiskRefsContainer(RefsContainer):
     def subkeys(self, base):
         keys = set()
         path = self.refpath(base)
-        for root, _, files in os.walk(path):
+        for root, dirs, files in os.walk(path): # pylint: disable=W0612
             directory = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
                 refname = ("%s/%s" % (directory, filename)).strip("/")
@@ -408,7 +408,7 @@ class DiskRefsContainer(RefsContainer):
         if os.path.exists(self.refpath("HEAD")):
             keys.add("HEAD")
         path = self.refpath("")
-        for root, _, files in os.walk(self.refpath("refs")):
+        for root, dirs, files in os.walk(self.refpath("refs")): # pylint: disable=W0612
             directory = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
                 refname = ("%s/%s" % (directory, filename)).strip("/")

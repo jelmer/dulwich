@@ -76,9 +76,6 @@ from dulwich.objects import (
     object_header,
     )
 
-supports_mmap_offset = (sys.version_info[0] >= 3 or
-        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
-
 
 OFS_DELTA = 6
 REF_DELTA = 7

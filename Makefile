@@ -55,3 +55,6 @@ flakes:
 
 pep8:
 	$(PEP8) dulwich
+
+before-push: check
+	git diff origin/master | $(PEP8) --diff

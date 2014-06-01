@@ -24,9 +24,6 @@
 
 from dulwich.objects import (
     Blob,
-    Commit,
-    Tag,
-    Tree,
     )
 from dulwich.objectspec import (
     parse_object,
@@ -38,7 +35,6 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
-    make_object,
     )
 
 

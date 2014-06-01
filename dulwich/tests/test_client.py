@@ -206,7 +206,7 @@ class GitClientTests(TestCase):
             return {}
 
         f = BytesIO()
-        empty_pack = write_pack_objects(f, {})
+        write_pack_objects(f, {})
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertIn(
             self.rout.getvalue(),
@@ -248,7 +248,7 @@ class GitClientTests(TestCase):
             return [(commit, None), (tree, ''), ]
 
         f = BytesIO()
-        pack = write_pack_objects(f, generate_pack_contents(None, None))
+        write_pack_objects(f, generate_pack_contents(None, None))
         self.client.send_pack('/', determine_wants, generate_pack_contents)
         self.assertIn(
             self.rout.getvalue(),

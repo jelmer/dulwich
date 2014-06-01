@@ -271,7 +271,6 @@ class SymbolicRefTests(PorcelainTestCase):
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        outstream = BytesIO()
         self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path, 'foobar')
 
     def test_set_force_wrong_symbolic_ref(self):
@@ -374,7 +373,7 @@ class TagTests(PorcelainTestCase):
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
-        tag = self.repo['refs/tags/tryme']
+        self.repo['refs/tags/tryme']
         self.assertEqual(tags.values(), [self.repo.head()])
 
 

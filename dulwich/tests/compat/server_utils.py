@@ -21,11 +21,9 @@
 
 import errno
 import os
-import select
 import shutil
 import socket
 import tempfile
-import threading
 
 from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha

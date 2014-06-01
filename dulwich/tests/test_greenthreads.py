@@ -23,7 +23,6 @@ import time
 
 from dulwich.tests import (
     TestCase,
-    skipIf,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -35,6 +34,8 @@ from dulwich.objects import (
     Tree,
     parse_timezone,
     )
+
+from unittest import skipIf
 
 try:
     import gevent

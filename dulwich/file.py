@@ -37,7 +37,7 @@ def fancy_rename(oldname, newname):
     if not os.path.exists(newname):
         try:
             os.rename(oldname, newname)
-        except OSError as e:
+        except OSError:
             raise
         return
 
@@ -46,17 +46,17 @@ def fancy_rename(oldname, newname):
         (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
         os.close(fd)
         os.remove(tmpfile)
-    except OSError as e:
+    except OSError:
         # either file could not be created (e.g. permission problem)
         # or could not be deleted (e.g. rude virus scanner)
         raise
     try:
         os.rename(newname, tmpfile)
-    except OSError as e:
+    except OSError:
         raise   # no rename occurred
     try:
         os.rename(oldname, newname)
-    except OSError as e:
+    except OSError:
         os.rename(tmpfile, newname)
         raise
     os.remove(tmpfile)

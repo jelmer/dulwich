@@ -716,7 +716,7 @@ class ReceivePackHandler(Handler):
             # TODO: more informative error messages than just the exception string
             try:
                 recv = getattr(self.proto, "recv", None)
-                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append(('unpack', 'ok'))
             except all_exceptions as e:
                 status.append(('unpack', str(e).replace('\n', '')))
@@ -917,7 +917,7 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
 def generate_info_refs(repo):
     """Generate an info refs file."""
     refs = repo.get_refs()
-    return write_info_refs(repo.get_refs(), repo.object_store)
+    return write_info_refs(refs, repo.object_store)
 
 
 def generate_objects_info_packs(repo):

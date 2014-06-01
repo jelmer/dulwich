@@ -105,7 +105,7 @@ def read_cache_entry(f):
     name = f.read((flags & 0x0fff))
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    data = f.read((beginoffset + real_size) - f.tell())
+    f.read((beginoffset + real_size) - f.tell())
     return IndexEntry(name, ctime, mtime, dev, ino, mode, uid, gid, size,
                       sha_to_hex(sha), flags & ~0x0fff)
 

@@ -32,6 +32,7 @@ import tarfile
 import tempfile
 import threading
 import urllib
+from unittest import SkipTest
 
 from dulwich import (
     client,
@@ -44,7 +45,6 @@ from dulwich import (
     )
 from dulwich.tests import (
     get_safe_env,
-    SkipTest,
     )
 
 from dulwich.tests.compat.utils import (

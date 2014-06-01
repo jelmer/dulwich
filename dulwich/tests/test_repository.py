@@ -502,7 +502,8 @@ exit 1
 
         warnings.simplefilter("always", UserWarning)
         self.addCleanup(warnings.resetwarnings)
-        warnings_list = setup_warning_catcher()
+        warnings_list, restore_warnings = setup_warning_catcher()
+        self.addCleanup(restore_warnings)
 
         commit_sha2 = r.do_commit(
             'empty commit',

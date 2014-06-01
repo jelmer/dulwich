@@ -480,7 +480,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self.assertEqual(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
         self._environ['CONTENT_LENGTH'] = zlength
         self._environ['wsgi.input'] = zstream
-        app_output = self._app(self._environ, None)
+        self._app(self._environ, None)
         buf = self._environ['wsgi.input']
         self.assertIsNot(buf, zstream)
         buf.seek(0)

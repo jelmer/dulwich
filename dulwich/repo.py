@@ -30,7 +30,6 @@ local disk (Repo).
 from io import BytesIO
 import errno
 import os
-import stat
 
 from dulwich.errors import (
     NoIndexPresent,

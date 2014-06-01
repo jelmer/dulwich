@@ -398,7 +398,7 @@ class ShaFile(object):
             obj._needs_serialization = True
             obj._file = f
             return obj
-        except (IndexError, ValueError) as e:
+        except (IndexError, ValueError):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod

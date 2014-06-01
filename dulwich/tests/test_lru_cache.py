@@ -102,7 +102,7 @@ class TestLRUCache(TestCase):
         def cleanup_func(key, val):
             cleanup_called.append((key, val))
 
-        cache = lru_cache.LRUCache(max_cache=2)
+        cache = lru_cache.LRUCache(max_cache=2, after_cleanup_count=2)
 
         cache.add('baz', '1', cleanup=cleanup_func)
         cache.add('foo', '2', cleanup=cleanup_func)
@@ -188,7 +188,7 @@ class TestLRUCache(TestCase):
         # By default _after_cleanup_size is 80% of the normal size
         self.assertEqual(4, cache._after_cleanup_count)
 
-    def test_cleanup(self):
+    def test_cleanup_2(self):
         cache = lru_cache.LRUCache(max_cache=5, after_cleanup_count=2)
 
         # Add these in order

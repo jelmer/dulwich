@@ -872,7 +872,6 @@ class RenameDetectionTest(DiffTestCase):
         blob_c2 = make_object(Blob, data='a\nb\nc\ne\n')
         tree1 = self.commit_tree([('a', blob_a1), ('b', blob_b)])
         tree2 = self.commit_tree([('c', blob_c2), ('b', blob_b)])
-        detector = RenameDetector(self.store)
         self.assertEqual(
           [TreeChange(CHANGE_RENAME, ('a', F, blob_a1.id),
                       ('c', F, blob_c2.id))],

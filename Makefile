@@ -1,4 +1,5 @@
 PYTHON = python
+PYFLAKES = pyflakes
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 ifeq ($(shell $(PYTHON) -c "import sys; print(sys.version_info >= (2, 7))"),True)
@@ -47,3 +48,6 @@ check-all: check check-pypy check-noextensions
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
+
+flakes:
+	$(PYFLAKES) dulwich

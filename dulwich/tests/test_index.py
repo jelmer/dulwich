@@ -319,7 +319,7 @@ class BuildIndexTests(TestCase):
             sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
 
-class BuildIndexTests(TestCase):
+class GetUnstagedChangesTests(TestCase):
 
     def test_get_unstaged_changes(self):
         """Unit test for get_unstaged_changes."""

@@ -21,7 +21,6 @@ import os
 import stat
 import shutil
 import tempfile
-import warnings
 
 from dulwich import errors
 

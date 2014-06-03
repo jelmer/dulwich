@@ -23,7 +23,7 @@ from collections import defaultdict
 
 import collections
 import heapq
-import itertools
+from itertools import chain
 
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
@@ -100,7 +100,7 @@ class _CommitTimeQueue(object):
         self._extra_commits_left = _MAX_EXTRA_COMMITS
         self._is_finished = False
 
-        for commit_id in itertools.chain(walker.include, walker.excluded):
+        for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
 
     def _push(self, commit_id):

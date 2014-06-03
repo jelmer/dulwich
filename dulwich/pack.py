@@ -1481,7 +1481,7 @@ def write_pack_header(f, num_objects):
 def deltify_pack_objects(objects, window=10):
     """Generate deltas for pack objects.
 
-    :param objects: Objects to deltify
+    :param objects: An iterable of (object, path) tuples to deltify.
     :param window: Window size
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries

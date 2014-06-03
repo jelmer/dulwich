@@ -1524,10 +1524,7 @@ def write_pack_objects(f, objects, window=10, num_objects=None):
     """
     if num_objects is None:
         num_objects = len(objects)
-    # FIXME: pack_contents = deltify_pack_objects(objects, window)
-    pack_contents = (
-        (o.type_num, o.sha().digest(), None, o.as_raw_string())
-        for (o, path) in objects)
+    pack_contents = deltify_pack_objects(objects, window)
     return write_pack_data(f, num_objects, pack_contents)
 
 

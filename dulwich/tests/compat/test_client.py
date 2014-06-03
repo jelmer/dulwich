@@ -28,11 +28,15 @@ import select
 import shutil
 import signal
 import subprocess
+import sys
 import tarfile
 import tempfile
 import threading
 import urllib
 from unittest import SkipTest
+
+if sys.platform == 'win32':
+    import ctypes
 
 from dulwich import (
     client,
@@ -52,6 +56,7 @@ from dulwich.tests.compat.utils import (
     check_for_daemon,
     import_repo_to_dir,
     run_git_or_fail,
+    _DEFAULT_GIT,
     )
 
 
@@ -235,25 +240,37 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
                               protocol.TCP_GIT_PORT)
+        env = get_safe_env()
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
-        run_git_or_fail(
-            ['daemon', '--verbose', '--export-all',
-             '--pid-file=%s' % self.pidfile, '--base-path=%s' % self.gitroot,
-             '--detach', '--reuseaddr', '--enable=receive-pack',
-             '--enable=upload-archive', '--listen=localhost', self.gitroot], cwd=self.gitroot)
+        args = [_DEFAULT_GIT, 'daemon', '--verbose', '--export-all',
+                '--pid-file=%s' % self.pidfile,
+                '--base-path=%s' % self.gitroot,
+                '--enable=receive-pack', '--enable=upload-archive',
+                '--listen=localhost', '--reuseaddr',
+                self.gitroot]
+        self.process = subprocess.Popen(
+            args, env=env, cwd=self.gitroot,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
 
     def tearDown(self):
-        try:
-            with open(self.pidfile) as f:
-                pid = f.read()
-            os.kill(int(pid.strip()), signal.SIGKILL)
-            os.unlink(self.pidfile)
-        except (OSError, IOError):
-            pass
+        with open(self.pidfile) as f:
+            pid = int(f.read().strip())
+        if sys.platform == 'win32':
+            PROCESS_TERMINATE = 1
+            handle = ctypes.windll.kernel32.OpenProcess(
+                PROCESS_TERMINATE, False, pid)
+            ctypes.windll.kernel32.TerminateProcess(handle, -1)
+            ctypes.windll.kernel32.CloseHandle(handle)
+        else:
+            try:
+                os.kill(pid, signal.SIGKILL)
+                os.unlink(self.pidfile)
+            except (OSError, IOError):
+                pass
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 

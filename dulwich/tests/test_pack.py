@@ -640,12 +640,12 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
 class ReadZlibTests(TestCase):
 
     decomp = (
-      'tree 4ada885c9196b6b6fa08744b5862bf92896fc002\n'
-      'parent None\n'
-      'author Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
-      'committer Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
-      '\n'
-      "Provide replacement for mmap()'s offset argument.")
+      b'tree 4ada885c9196b6b6fa08744b5862bf92896fc002\n'
+      b'parent None\n'
+      b'author Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
+      b'committer Jelmer Vernooij <jelmer@samba.org> 1228980214 +0000\n'
+      b'\n'
+      b"Provide replacement for mmap()'s offset argument.")
     comp = zlib.compress(decomp)
     extra = 'nextobject'
 

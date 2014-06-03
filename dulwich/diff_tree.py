@@ -24,11 +24,7 @@ from collections import (
     )
 
 from io import BytesIO
-try:
-    from itertools import izip, chain
-except ImportError:
-    from itertools import chain
-    izip = zip
+from itertools import chain, izip
 import stat
 
 from dulwich.objects import (

@@ -37,6 +37,16 @@ from dulwich.tests.compat.utils import (
     run_git_or_fail,
     )
 
+def _git_verify_pack_object_list(output):
+    pack_shas = set()
+    for line in output.splitlines():
+        sha = line[:40]
+        try:
+            binascii.unhexlify(sha)
+        except (TypeError, binascii.Error):
+            continue  # non-sha line
+        pack_shas.add(sha)
+    return pack_shas
 
 class TestPack(PackTests):
     """Compatibility tests for reading and writing pack files."""
@@ -53,14 +63,5 @@ class TestPack(PackTests):
             pack_path = os.path.join(self._tempdir, "Elch")
             write_pack(pack_path, origpack.pack_tuples())
             output = run_git_or_fail(['verify-pack', '-v', pack_path])
-
-            pack_shas = set()
-            for line in output.splitlines():
-                sha = line[:40]
-                try:
-                    binascii.unhexlify(sha)
-                except (TypeError, binascii.Error):
-                    continue  # non-sha line
-                pack_shas.add(sha)
             orig_shas = set(o.id for o in origpack.iterobjects())
-            self.assertEqual(orig_shas, pack_shas)
+            self.assertEqual(orig_shas, _git_verify_pack_object_list(output))

@@ -1544,6 +1544,7 @@ def write_pack_data(f, num_records, records):
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
     for type_num, object_id, delta_base, raw in records:
+        offset = f.offset()
         if delta_base is not None:
             try:
                 base_offset, base_crc32 = entries[delta_base]
@@ -1552,8 +1553,7 @@ def write_pack_data(f, num_records, records):
                 raw = (delta_base, raw)
             else:
                 type_num = OFS_DELTA
-                raw = (base_offset, raw)
-        offset = f.offset()
+                raw = (offset - base_offset, raw)
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)
     return entries, f.write_sha()

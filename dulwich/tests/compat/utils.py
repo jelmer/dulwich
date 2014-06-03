@@ -194,6 +194,8 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
         try:
             s.connect(('localhost', port))
             return True
+        except socket.timeout:
+            pass
         except socket.error as e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise

@@ -18,10 +18,7 @@
 
 """Tests for file and tree diff utilities."""
 
-from itertools import (
-    permutations,
-    )
-
+from itertools import permutations
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
     CHANGE_RENAME,

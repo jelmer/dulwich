@@ -23,7 +23,7 @@
 
 from io import BytesIO
 import errno
-import itertools
+from itertools import chain
 import os
 import stat
 import tempfile
@@ -336,7 +336,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
         iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
-        return itertools.chain(*iterables)
+        return chain(*iterables)
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose.

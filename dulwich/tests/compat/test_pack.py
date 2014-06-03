@@ -22,13 +22,18 @@
 
 import binascii
 import os
+import re
 import shutil
 import tempfile
 
 from dulwich.pack import (
     write_pack,
     )
+from dulwich.objects import (
+    Blob,
+    )
 from dulwich.tests.test_pack import (
+    a_sha,
     pack1_sha,
     PackTests,
     )
@@ -36,6 +41,8 @@ from dulwich.tests.compat.utils import (
     require_git_version,
     run_git_or_fail,
     )
+
+_NON_DELTA_RE = re.compile('non delta: (?P<non_delta>\d+) objects')
 
 def _git_verify_pack_object_list(output):
     pack_shas = set()
@@ -65,3 +72,22 @@ class TestPack(PackTests):
             output = run_git_or_fail(['verify-pack', '-v', pack_path])
             orig_shas = set(o.id for o in origpack.iterobjects())
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
+
+    def test_deltas_work(self):
+        orig_pack = self.get_pack(pack1_sha)
+        orig_blob = orig_pack[a_sha]
+        new_blob = Blob()
+        new_blob.data = orig_blob.data + 'x'
+        all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
+        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
+        write_pack(pack_path, all_to_pack)
+        output = run_git_or_fail(['verify-pack', '-v', pack_path])
+        self.assertEqual(set(x[0].id for x in all_to_pack),
+                         _git_verify_pack_object_list(output))
+        # We specifically made a new blob that should be a delta
+        # against the blob a_sha, so make sure we really got only 3
+        # non-delta objects:
+        got_non_delta = int(_NON_DELTA_RE.search(output).group('non_delta'))
+        self.assertEqual(
+            3, got_non_delta,
+            'Expected 3 non-delta objects, got %d' % got_non_delta)

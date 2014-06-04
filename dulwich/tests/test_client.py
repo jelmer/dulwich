@@ -17,6 +17,8 @@
 # MA  02110-1301, USA.
 
 from io import BytesIO
+import sys
+from unittest import skipIf
 
 from dulwich import (
     client,
@@ -383,6 +385,12 @@ class TestGetTransportAndPath(TestCase):
         c, path = get_transport_and_path('foo.bar/baz')
         self.assertTrue(isinstance(c, SubprocessGitClient))
         self.assertEqual('foo.bar/baz', path)
+
+    @skipIf(sys.platform != 'win32', 'Behaviour only happens on windows.')
+    def test_local_abs_windows_path(self):
+        c, path = get_transport_and_path('C:\\foo.bar\\baz')
+        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertEqual('C:\\foo.bar\\baz', path)
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the

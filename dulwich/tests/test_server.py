@@ -888,10 +888,10 @@ class UpdateServerInfoTests(TestCase):
 
     def test_empty(self):
         update_server_info(self.repo)
-        self.assertEqual("",
-            open(os.path.join(self.path, ".git", "info", "refs"), 'r').read())
-        self.assertEqual("",
-            open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read())
+        with open(os.path.join(self.path, ".git", "info", "refs"), 'rb') as f:
+            self.assertEqual(b'', f.read())
+        with open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'rb') as f:
+            self.assertEqual(b'', f.read())
 
     def test_simple(self):
         commit_id = self.repo.do_commit(
@@ -899,7 +899,7 @@ class UpdateServerInfoTests(TestCase):
             committer="Joe Example <joe@example.com>",
             ref="refs/heads/foo")
         update_server_info(self.repo)
-        ref_text = open(os.path.join(self.path, ".git", "info", "refs"), 'r').read()
-        self.assertEqual(ref_text, "%s\trefs/heads/foo\n" % commit_id)
-        packs_text = open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'r').read()
-        self.assertEqual(packs_text, "")
+        with open(os.path.join(self.path, ".git", "info", "refs"), 'rb') as f:
+            self.assertEqual(f.read(), commit_id + b'\trefs/heads/foo\n')
+        with open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'rb') as f:
+            self.assertEqual(f.read(), b'')

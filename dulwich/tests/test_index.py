@@ -101,16 +101,11 @@ class SimpleIndexWriterTestCase(IndexTestCase):
                     33188, 1000, 1000, 0,
                     'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)]
         filename = os.path.join(self.tempdir, 'test-simple-write-index')
-        x = open(filename, 'w+')
-        try:
+        with open(filename, 'w+') as x:
             write_index(x, entries)
-        finally:
-            x.close()
-        x = open(filename, 'r')
-        try:
+
+        with open(filename, 'r') as x:
             self.assertEqual(entries, list(read_index(x)))
-        finally:
-            x.close()
 
 
 class ReadIndexDictTests(IndexTestCase):
@@ -128,16 +123,11 @@ class ReadIndexDictTests(IndexTestCase):
                     33188, 1000, 1000, 0,
                     'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
         filename = os.path.join(self.tempdir, 'test-simple-write-index')
-        x = open(filename, 'w+')
-        try:
+        with open(filename, 'w+') as x:
             write_index_dict(x, entries)
-        finally:
-            x.close()
-        x = open(filename, 'r')
-        try:
+
+        with open(filename, 'r') as x:
             self.assertEqual(entries, read_index_dict(x))
-        finally:
-            x.close()
 
 
 class CommitTreeTests(TestCase):
@@ -260,11 +250,8 @@ class BuildIndexTests(TestCase):
         if symlink:
             self.assertEqual(os.readlink(path), contents)
         else:
-            f = open(path, 'rb')
-            try:
+            with open(path, 'rb') as f:
                 self.assertEqual(f.read(), contents)
-            finally:
-                f.close()
 
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()

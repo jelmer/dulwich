@@ -43,6 +43,7 @@ import dulwich
 import select
 import socket
 import subprocess
+import sys
 import urllib2
 import urlparse
 
@@ -1105,6 +1106,11 @@ def get_transport_and_path(location, **kwargs):
         return get_transport_and_path_from_url(location, **kwargs)
     except ValueError:
         pass
+
+    if (sys.platform == 'win32' and
+            location[0].isalpha() and location[1:2] == ':\\'):
+        # Windows local path
+        return default_local_git_client_cls(**kwargs), location
 
     if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.

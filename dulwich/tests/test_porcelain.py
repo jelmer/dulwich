@@ -35,6 +35,7 @@ from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
     )
+from dulwich.tests.compat.utils import require_git_version
 from dulwich.tests.utils import (
     build_commit_graph,
     make_object,
@@ -54,6 +55,8 @@ class ArchiveTests(PorcelainTestCase):
     """Tests for the archive command."""
 
     def test_simple(self):
+        # TODO(jelmer): Remove this once dulwich has its own implementation of archive.
+        require_git_version((1, 5, 0))
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs["refs/heads/master"] = c3.id
         out = BytesIO()

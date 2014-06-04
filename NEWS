@@ -7,6 +7,9 @@
   * Support staging symbolic links in Repo.stage.
     (Robert Brown)
 
+  * Ensure that all files object are closed when running the test suite.
+    (Gary van der Merwe)
+
  IMPROVEMENTS
 
   * Add porcelain 'status'. (Ryan Faulkner)
@@ -17,6 +20,14 @@
 
    * Various changes to improve compatibility with Python 3.
      (Gary van der Merwe, Hannu Valtonen, michael-k)
+
+API CHANGES
+
+  * An optional close function can be passed to the Protocol class. This will
+    be called by it's close method. (Gary van der Merwe)
+
+  * All classes with close methods are now context managers, so that they can
+    be easily closed using a `with` statement. (Gary van der Merwe)
 
 0.9.6	2014-04-23
 

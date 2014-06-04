@@ -1586,6 +1586,18 @@ def write_pack_index_v1(f, entries, pack_checksum):
     return f.write_sha()
 
 
+def _delta_encode_size(size):
+    ret = ''
+    c = size & 0x7f
+    size >>= 7
+    while size:
+        ret += chr(c | 0x80)
+        c = size & 0x7f
+        size >>= 7
+    ret += chr(c)
+    return ret
+
+
 def create_delta(base_buf, target_buf):
     """Use python difflib to work out how to transform base_buf to target_buf.
 
@@ -1595,19 +1607,9 @@ def create_delta(base_buf, target_buf):
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ''
-    # write delta header
-    def encode_size(size):
-        ret = ''
-        c = size & 0x7f
-        size >>= 7
-        while size:
-            ret += chr(c | 0x80)
-            c = size & 0x7f
-            size >>= 7
-        ret += chr(c)
-        return ret
-    out_buf += encode_size(len(base_buf))
-    out_buf += encode_size(len(target_buf))
+     # write delta header
+    out_buf += _delta_encode_size(len(base_buf))
+    out_buf += _delta_encode_size(len(target_buf))
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():

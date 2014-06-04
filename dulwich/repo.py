@@ -667,10 +667,12 @@ class Repo(BaseRepo):
         self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints.update(parse_graftpoints(graft_file))
+            with graft_file:
+                self._graftpoints.update(parse_graftpoints(graft_file))
         graft_file = self.get_named_file("shallow")
         if graft_file:
-            self._graftpoints.update(parse_graftpoints(graft_file))
+            with graft_file:
+                self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())

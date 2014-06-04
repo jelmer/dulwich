@@ -48,19 +48,19 @@ class TestPack(PackTests):
         self.addCleanup(shutil.rmtree, self._tempdir)
 
     def test_copy(self):
-        origpack = self.get_pack(pack1_sha)
-        self.assertSucceeds(origpack.index.check)
-        pack_path = os.path.join(self._tempdir, "Elch")
-        write_pack(pack_path, origpack.pack_tuples())
-        output = run_git_or_fail(['verify-pack', '-v', pack_path])
+        with self.get_pack(pack1_sha) as origpack:
+            self.assertSucceeds(origpack.index.check)
+            pack_path = os.path.join(self._tempdir, "Elch")
+            write_pack(pack_path, origpack.pack_tuples())
+            output = run_git_or_fail(['verify-pack', '-v', pack_path])
 
-        pack_shas = set()
-        for line in output.splitlines():
-            sha = line[:40]
-            try:
-                binascii.unhexlify(sha)
-            except (TypeError, binascii.Error):
-                continue  # non-sha line
-            pack_shas.add(sha)
-        orig_shas = set(o.id for o in origpack.iterobjects())
-        self.assertEqual(orig_shas, pack_shas)
+            pack_shas = set()
+            for line in output.splitlines():
+                sha = line[:40]
+                try:
+                    binascii.unhexlify(sha)
+                except (TypeError, binascii.Error):
+                    continue  # non-sha line
+                pack_shas.add(sha)
+            orig_shas = set(o.id for o in origpack.iterobjects())
+            self.assertEqual(orig_shas, pack_shas)

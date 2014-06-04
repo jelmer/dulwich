@@ -492,6 +492,7 @@ class TestSSHVendor(object):
         class Subprocess: pass
         setattr(Subprocess, 'read', lambda: None)
         setattr(Subprocess, 'write', lambda: None)
+        setattr(Subprocess, 'close', lambda: None)
         setattr(Subprocess, 'can_read', lambda: None)
         return Subprocess()
 

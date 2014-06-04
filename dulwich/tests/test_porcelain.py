@@ -281,8 +281,9 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, 'force_foobar', force=True)
 
         #test if we actually changed the file
-        new_ref = self.repo.get_named_file('HEAD').read()
-        self.assertEqual(new_ref, 'ref: refs/heads/force_foobar\n')
+        with self.repo.get_named_file('HEAD') as f:
+            new_ref = f.read()
+        self.assertEqual(new_ref, b'ref: refs/heads/force_foobar\n')
 
     def test_set_symbolic_ref(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
@@ -300,8 +301,9 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, 'develop')
 
         #test if we actually changed the file
-        new_ref = self.repo.get_named_file('HEAD').read()
-        self.assertEqual(new_ref, 'ref: refs/heads/develop\n')
+        with self.repo.get_named_file('HEAD') as f:
+            new_ref = f.read()
+        self.assertEqual(new_ref, b'ref: refs/heads/develop\n')
 
 
 class DiffTreeTests(PorcelainTestCase):

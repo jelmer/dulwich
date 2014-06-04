@@ -61,6 +61,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
                                   handlers=self._handlers())
         self._check_server(dul_server)
         self.addCleanup(dul_server.shutdown)
+        self.addCleanup(dul_server.server_close)
         threading.Thread(target=dul_server.serve).start()
         self._server = dul_server
         _, port = self._server.socket.getsockname()

@@ -989,6 +989,12 @@ class PackData(object):
     def close(self):
         self._file.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def _get_size(self):
         if self._size is not None:
             return self._size
@@ -1800,6 +1806,12 @@ class Pack(object):
             self._data.close()
         if self._idx is not None:
             self._idx.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def __eq__(self, other):
         return isinstance(self, type(other)) and self.index == other.index

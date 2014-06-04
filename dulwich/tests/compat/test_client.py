@@ -248,7 +248,9 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def tearDown(self):
         try:
-            os.kill(int(open(self.pidfile).read().strip()), signal.SIGKILL)
+            with open(self.pidfile) as f:
+                pid = f.read()
+            os.kill(int(pid.strip()), signal.SIGKILL)
             os.unlink(self.pidfile)
         except (OSError, IOError):
             pass
@@ -460,6 +462,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
+        self._httpd.shutdown()
+        self._httpd.socket.close()
 
     def _client(self):
         return client.HttpGitClient(self._httpd.get_url())

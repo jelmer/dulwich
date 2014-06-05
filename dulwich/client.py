@@ -536,7 +536,8 @@ class TraditionalGitClient(GitClient):
                 proto, negotiated_capabilities, graph_walker, pack_data, progress)
             return refs
 
-    def archive(self, path, committish, write_data, progress=None):
+    def archive(self, path, committish, write_data, progress=None,
+                write_error=None):
         proto, can_read = self._connect(b'upload-archive', path)
         with proto:
             proto.write_pkt_line("argument %s" % committish)
@@ -553,7 +554,8 @@ class TraditionalGitClient(GitClient):
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
-            self._read_side_band64k_data(proto, {1: write_data, 2: progress})
+            self._read_side_band64k_data(proto, {
+                1: write_data, 2: progress, 3: write_error})
 
 
 class TCPGitClient(TraditionalGitClient):

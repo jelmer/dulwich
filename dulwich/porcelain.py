@@ -90,7 +90,8 @@ def archive(location, committish=None, outstream=sys.stdout,
         committish = "HEAD"
     # TODO(jelmer): This invokes C git; this introduces a dependency.
     # Instead, dulwich should have its own archiver implementation.
-    client.archive(path, committish, outstream.write, errstream.write)
+    client.archive(path, committish, outstream.write, errstream.write,
+                   errstream.write)
 
 
 def update_server_info(repo="."):

@@ -25,6 +25,7 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 """
 
 import threading
+import os
 
 from dulwich.server import (
     DictBackend,
@@ -36,6 +37,7 @@ from dulwich.tests.compat.server_utils import (
     )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
+    require_git_version,
     )
 
 
@@ -73,6 +75,15 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
 
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
     min_git_version = (1, 7, 0, 2)
+
+    def setUp(self):
+        super(GitServerSideBand64kTestCase, self).setUp()
+        # side-band-64k is broken in the widows client.
+        # https://github.com/msysgit/git/issues/101
+        # Fix has landed for the 1.9.3 release.
+        if os.name == 'nt':
+            require_git_version((1, 9, 3))
+
 
     def _handlers(self):
         return None  # default handlers include side-band-64k

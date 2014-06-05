@@ -1627,7 +1627,7 @@ def create_delta(base_buf, target_buf):
                     scratch += chr((copy_start >> i*8) & 0xff)
                     op |= 1 << i
             copy_len = i2 - i1
-            for i in range(2):
+            for i in range(3):
                 if copy_len & 0xff << i*8:
                     scratch += chr((copy_len >> i*8) & 0xff)
                     op |= 1 << (4+i)

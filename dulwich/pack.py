@@ -1598,6 +1598,24 @@ def _delta_encode_size(size):
     return ret
 
 
+# copy operations in git's delta format can be at most this long -
+# after this you have to decompose the copy into multiple operations.
+_MAX_COPY_LEN = 0xffffff
+
+def _encode_copy_operation(start, length):
+    scratch = ''
+    op = 0x80
+    for i in range(4):
+        if start & 0xff << i*8:
+            scratch += chr((start >> i*8) & 0xff)
+            op |= 1 << i
+    for i in range(3):
+        if length & 0xff << i*8:
+            scratch += chr((length >> i*8) & 0xff)
+            op |= 1 << (4+i)
+    return chr(op) + scratch
+
+
 def create_delta(base_buf, target_buf):
     """Use python difflib to work out how to transform base_buf to target_buf.
 
@@ -1619,20 +1637,13 @@ def create_delta(base_buf, target_buf):
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            scratch = ''
-            op = 0x80
             copy_start = i1
-            for i in range(4):
-                if copy_start & 0xff << i*8:
-                    scratch += chr((copy_start >> i*8) & 0xff)
-                    op |= 1 << i
             copy_len = i2 - i1
-            for i in range(3):
-                if copy_len & 0xff << i*8:
-                    scratch += chr((copy_len >> i*8) & 0xff)
-                    op |= 1 << (4+i)
-            out_buf += chr(op)
-            out_buf += scratch
+            while copy_len > 0:
+                to_copy = min(copy_len, _MAX_COPY_LEN)
+                out_buf += _encode_copy_operation(copy_start, to_copy)
+                copy_start += to_copy
+                copy_len -= to_copy
         if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)

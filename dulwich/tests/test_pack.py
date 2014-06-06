@@ -64,6 +64,8 @@ from dulwich.pack import (
     compute_file_sha,
     PackStreamReader,
     DeltaChainIterator,
+    _delta_encode_size,
+    _encode_copy_operation,
     )
 from dulwich.tests import (
     TestCase,
@@ -1027,3 +1029,22 @@ class DeltaChainIteratorTests(TestCase):
             self.fail()
         except KeyError as e:
             self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.args[0]),))
+
+
+class DeltaEncodeSizeTests(TestCase):
+
+    def test_basic(self):
+        self.assertEquals('\x00', _delta_encode_size(0))
+        self.assertEquals('\x01', _delta_encode_size(1))
+        self.assertEquals('\xfa\x01', _delta_encode_size(250))
+        self.assertEquals('\xe8\x07', _delta_encode_size(1000))
+        self.assertEquals('\xa0\x8d\x06', _delta_encode_size(100000))
+
+
+class EncodeCopyOperationTests(TestCase):
+
+    def test_basic(self):
+        self.assertEquals('\x80', _encode_copy_operation(0, 0))
+        self.assertEquals('\x91\x01\x0a', _encode_copy_operation(1, 10))
+        self.assertEquals('\xb1\x64\xe8\x03', _encode_copy_operation(100, 1000))
+        self.assertEquals('\x93\xe8\x03\x01', _encode_copy_operation(1000, 1))

@@ -10,6 +10,14 @@
   * Ensure that all files object are closed when running the test suite.
     (Gary van der Merwe)
 
+  * When writing OFS_DELTA pack entries, write correct offset.
+    (Augie Fackler)
+
+  * Fix handler of larger copy operations in packs. (Augie Fackler)
+
+  * Various fixes to improve test suite running on Windows.
+    (Gary van der Merwe)
+
  IMPROVEMENTS
 
   * Add porcelain 'status'. (Ryan Faulkner)
@@ -28,6 +36,9 @@ API CHANGES
 
   * All classes with close methods are now context managers, so that they can
     be easily closed using a `with` statement. (Gary van der Merwe)
+
+  * Remove deprecated `num_objects` argument to `write_pack` methods.
+    (Jelmer Vernooij)
 
 0.9.6	2014-04-23
 

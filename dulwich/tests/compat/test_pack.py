@@ -25,6 +25,7 @@ import os
 import re
 import shutil
 import tempfile
+from unittest import SkipTest
 
 from dulwich.pack import (
     write_pack,
@@ -54,6 +55,7 @@ def _git_verify_pack_object_list(output):
             continue  # non-sha line
         pack_shas.add(sha)
     return pack_shas
+
 
 class TestPack(PackTests):
     """Compatibility tests for reading and writing pack files."""
@@ -128,6 +130,7 @@ class TestPack(PackTests):
         # This tests an object set that will have a copy operation
         # 2**25 in size. This is a copy large enough that it requires
         # two copy operations in git's binary delta format.
+        raise SkipTest('skipping slow, large test')
         orig_pack = self.get_pack(pack1_sha)
         orig_blob = orig_pack[a_sha]
         new_blob = Blob()

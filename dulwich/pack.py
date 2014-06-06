@@ -80,6 +80,9 @@ REF_DELTA = 7
 DELTA_TYPES = (OFS_DELTA, REF_DELTA)
 
 
+DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
+
+
 def take_msb_bytes(read, crc32=None):
     """Read bytes marked with most significant bit.
 
@@ -1444,21 +1447,20 @@ def write_pack_object(f, type, object, sha=None):
     return crc32 & 0xffffffff
 
 
-def write_pack(filename, objects, num_objects=None):
+def write_pack(filename, objects, deltify=None, delta_window_size=None):
     """Write a new pack data file.
 
     :param filename: Path to the new pack file (without .pack extension)
     :param objects: Iterable of (object, path) tuples to write.
         Should provide __len__
+    :param window_size: Delta window size
+    :param deltify: Whether to deltify pack objects
     :return: Tuple with checksum of pack file and index file
     """
-    if num_objects is not None:
-        warnings.warn('num_objects argument to write_pack is deprecated',
-                      DeprecationWarning)
     f = GitFile(filename + '.pack', 'wb')
     try:
         entries, data_sum = write_pack_objects(f, objects,
-            num_objects=num_objects)
+            delta_window_size=delta_window_size, deltify=deltify)
     finally:
         f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
@@ -1477,14 +1479,16 @@ def write_pack_header(f, num_objects):
     f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
 
-def deltify_pack_objects(objects, window=10):
+def deltify_pack_objects(objects, window_size=None):
     """Generate deltas for pack objects.
 
     :param objects: An iterable of (object, path) tuples to deltify.
-    :param window: Window size
+    :param window_size: Window size; None for default
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
+    if window_size is None:
+        window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
@@ -1507,25 +1511,29 @@ def deltify_pack_objects(objects, window=10):
                 winner = delta
         yield type_num, o.sha().digest(), winner_base, winner
         possible_bases.appendleft(o)
-        while len(possible_bases) > window:
+        while len(possible_bases) > window_size:
             possible_bases.pop()
 
 
-def write_pack_objects(f, objects, window=10, num_objects=None):
+def write_pack_objects(f, objects, delta_window_size=None, deltify=False):
     """Write a new pack data file.
 
     :param f: File to write to
     :param objects: Iterable of (object, path) tuples to write.
         Should provide __len__
-    :param window: Sliding window size for searching for deltas; currently
-                   unimplemented
-    :param num_objects: Number of objects (do not use, deprecated)
+    :param window_size: Sliding window size for searching for deltas;
+                        Set to None for default window size.
+    :param deltify: Whether to deltify objects
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
-    if num_objects is None:
-        num_objects = len(objects)
-    pack_contents = deltify_pack_objects(objects, window)
-    return write_pack_data(f, num_objects, pack_contents)
+    if deltify:
+        pack_contents = deltify_pack_objects(objects, delta_window_size)
+    else:
+        pack_contents = (
+            (o.type_num, o.sha().digest(), None, o.as_raw_string())
+            for (o, path) in objects)
+
+    return write_pack_data(f, len(objects), pack_contents)
 
 
 def write_pack_data(f, num_records, records):

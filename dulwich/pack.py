@@ -1481,7 +1481,7 @@ def write_pack_header(f, num_objects):
 def deltify_pack_objects(objects, window=10):
     """Generate deltas for pack objects.
 
-    :param objects: Objects to deltify
+    :param objects: An iterable of (object, path) tuples to deltify.
     :param window: Window size
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
@@ -1525,10 +1525,7 @@ def write_pack_objects(f, objects, window=10, num_objects=None):
     """
     if num_objects is None:
         num_objects = len(objects)
-    # FIXME: pack_contents = deltify_pack_objects(objects, window)
-    pack_contents = (
-        (o.type_num, o.sha().digest(), None, o.as_raw_string())
-        for (o, path) in objects)
+    pack_contents = deltify_pack_objects(objects, window)
     return write_pack_data(f, num_objects, pack_contents)
 
 
@@ -1545,6 +1542,7 @@ def write_pack_data(f, num_records, records):
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
     for type_num, object_id, delta_base, raw in records:
+        offset = f.offset()
         if delta_base is not None:
             try:
                 base_offset, base_crc32 = entries[delta_base]
@@ -1553,8 +1551,7 @@ def write_pack_data(f, num_records, records):
                 raw = (delta_base, raw)
             else:
                 type_num = OFS_DELTA
-                raw = (base_offset, raw)
-        offset = f.offset()
+                raw = (offset - base_offset, raw)
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)
     return entries, f.write_sha()
@@ -1586,6 +1583,36 @@ def write_pack_index_v1(f, entries, pack_checksum):
     return f.write_sha()
 
 
+def _delta_encode_size(size):
+    ret = ''
+    c = size & 0x7f
+    size >>= 7
+    while size:
+        ret += chr(c | 0x80)
+        c = size & 0x7f
+        size >>= 7
+    ret += chr(c)
+    return ret
+
+
+# copy operations in git's delta format can be at most this long -
+# after this you have to decompose the copy into multiple operations.
+_MAX_COPY_LEN = 0xffffff
+
+def _encode_copy_operation(start, length):
+    scratch = ''
+    op = 0x80
+    for i in range(4):
+        if start & 0xff << i*8:
+            scratch += chr((start >> i*8) & 0xff)
+            op |= 1 << i
+    for i in range(3):
+        if length & 0xff << i*8:
+            scratch += chr((length >> i*8) & 0xff)
+            op |= 1 << (4+i)
+    return chr(op) + scratch
+
+
 def create_delta(base_buf, target_buf):
     """Use python difflib to work out how to transform base_buf to target_buf.
 
@@ -1595,19 +1622,9 @@ def create_delta(base_buf, target_buf):
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ''
-    # write delta header
-    def encode_size(size):
-        ret = ''
-        c = size & 0x7f
-        size >>= 7
-        while size:
-            ret += chr(c | 0x80)
-            c = size & 0x7f
-            size >>= 7
-        ret += chr(c)
-        return ret
-    out_buf += encode_size(len(base_buf))
-    out_buf += encode_size(len(target_buf))
+     # write delta header
+    out_buf += _delta_encode_size(len(base_buf))
+    out_buf += _delta_encode_size(len(target_buf))
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
@@ -1617,20 +1634,13 @@ def create_delta(base_buf, target_buf):
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            scratch = ''
-            op = 0x80
-            o = i1
-            for i in range(4):
-                if o & 0xff << i*8:
-                    scratch += chr((o >> i*8) & 0xff)
-                    op |= 1 << i
-            s = i2 - i1
-            for i in range(2):
-                if s & 0xff << i*8:
-                    scratch += chr((s >> i*8) & 0xff)
-                    op |= 1 << (4+i)
-            out_buf += chr(op)
-            out_buf += scratch
+            copy_start = i1
+            copy_len = i2 - i1
+            while copy_len > 0:
+                to_copy = min(copy_len, _MAX_COPY_LEN)
+                out_buf += _encode_copy_operation(copy_start, to_copy)
+                copy_start += to_copy
+                copy_len -= to_copy
         if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)

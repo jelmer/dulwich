@@ -55,7 +55,6 @@ from os import (
     )
 import struct
 from struct import unpack_from
-import sys
 import warnings
 import zlib
 

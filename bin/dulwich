@@ -29,6 +29,7 @@ a way to test Dulwich.
 import os
 import sys
 from getopt import getopt
+import optparse
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
@@ -245,12 +246,35 @@ def cmd_reset(args):
     porcelain.reset('.', mode=mode, *args)
 
 
+def cmd_daemon(args):
+    from dulwich import log_utils
+    from dulwich.protocol import TCP_GIT_PORT
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=TCP_GIT_PORT,
+                      help="Binding TCP port.")
+    options, args = parser.parse_args(args)
+
+    log_utils.default_logging_config()
+    if len(args) > 1:
+        gitdir = args[1]
+    else:
+        gitdir = '.'
+    from dulwich import porcelain
+    porcelain.daemon(gitdir, address=options.listen_address,
+                     port=options.port)
+
+
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
+    "daemon": cmd_daemon,
     "diff": cmd_diff,
     "diff-tree": cmd_diff_tree,
     "dump-pack": cmd_dump_pack,

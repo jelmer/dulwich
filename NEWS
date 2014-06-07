@@ -25,6 +25,8 @@
 
   * Add porcelain 'status'. (Ryan Faulkner)
 
+  * Add porcelain 'daemon'. (Jelmer Vernooij)
+
   * Add `dulwich.greenthreads` module which provides support
     for concurrency of some object store operations.
     (Fabien Boucher)
@@ -45,6 +47,11 @@ API CHANGES
 
   * Remove deprecated `num_objects` argument to `write_pack` methods.
     (Jelmer Vernooij)
+
+ OTHER CHANGES
+
+  * The 'dul-daemon' script has been removed. The same functionality
+    is now available as 'dulwich daemon'. (Jelmer Vernooij)
 
 0.9.6	2014-04-23
 

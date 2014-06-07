@@ -231,7 +231,7 @@ def rm(repo=".", paths=None):
     index.write()
 
 
-def print_commit(commit, outstream):
+def print_commit(commit, outstream=sys.stdout):
     """Write a human-readable commit log entry.
 
     :param commit: A `Commit` object
@@ -248,7 +248,7 @@ def print_commit(commit, outstream):
     outstream.write("\n")
 
 
-def print_tag(tag, outstream):
+def print_tag(tag, outstream=sys.stdout):
     """Write a human-readable tag.
 
     :param tag: A `Tag` object
@@ -261,7 +261,7 @@ def print_tag(tag, outstream):
     outstream.write("\n")
 
 
-def show_blob(repo, blob, outstream):
+def show_blob(repo, blob, outstream=sys.stdout):
     """Write a blob to a stream.
 
     :param repo: A `Repo` object
@@ -271,7 +271,7 @@ def show_blob(repo, blob, outstream):
     outstream.write(blob.data)
 
 
-def show_commit(repo, commit, outstream):
+def show_commit(repo, commit, outstream=sys.stdout):
     """Show a commit to a stream.
 
     :param repo: A `Repo` object
@@ -283,7 +283,7 @@ def show_commit(repo, commit, outstream):
     write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
 
 
-def show_tree(repo, tree, outstream):
+def show_tree(repo, tree, outstream=sys.stdout):
     """Print a tree to a stream.
 
     :param repo: A `Repo` object
@@ -294,7 +294,7 @@ def show_tree(repo, tree, outstream):
         outstream.write("%s\n" % n)
 
 
-def show_tag(repo, tag, outstream):
+def show_tag(repo, tag, outstream=sys.stdout):
     """Print a tag to a stream.
 
     :param repo: A `Repo` object

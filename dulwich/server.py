@@ -871,9 +871,6 @@ def main(argv=sys.argv):
     """Entry point for starting a TCP git server."""
     import optparse
     parser = optparse.OptionParser()
-    parser.add_option("-b", "--backend", dest="backend",
-                      help="Select backend to use.",
-                      choices=["file"], default="file")
     parser.add_option("-l", "--listen_address", dest="listen_address",
                       default="localhost",
                       help="Binding IP address.")
@@ -883,14 +880,11 @@ def main(argv=sys.argv):
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    if options.backend == "file":
-        if len(argv) > 1:
-            gitdir = args[1]
-        else:
-            gitdir = '.'
-        backend = DictBackend({'/': Repo(gitdir)})
+    if len(argv) > 1:
+        gitdir = args[1]
     else:
-        raise Exception("No such backend %s." % backend)
+        gitdir = '.'
+    backend = FileSystemBackend(gitdir)
     server = TCPGitServer(backend, options.listen_address,
                           port=options.port)
     server.serve_forever()

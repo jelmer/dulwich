@@ -846,6 +846,22 @@ class FileSystemBackendTests(TestCase):
             self.backend.open_repository, os.path.join(self.path, "foo"))
 
     def test_bad_repo_path(self):
+        backend = FileSystemBackend()
+
+        self.assertRaises(NotGitRepository,
+                          lambda: backend.open_repository('/ups'))
+
+
+class DictBackendTests(TestCase):
+    """Tests for DictBackend."""
+
+    def test_nonexistant(self):
+        repo = MemoryRepo.init_bare([], {})
+        backend = DictBackend({'/': repo})
+        self.assertRaises(NotGitRepository,
+            backend.open_repository, "/does/not/exist/unless/foo")
+
+    def test_bad_repo_path(self):
         repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({'/': repo})
 

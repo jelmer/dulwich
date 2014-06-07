@@ -884,10 +884,9 @@ def main(argv=sys.argv):
         gitdir = args[1]
     else:
         gitdir = '.'
-    backend = FileSystemBackend(gitdir)
-    server = TCPGitServer(backend, options.listen_address,
-                          port=options.port)
-    server.serve_forever()
+    from dulwich import porcelain
+    porcelain.daemon(gitdir, address=options.listen_address,
+                     port=options.port)
 
 
 def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,

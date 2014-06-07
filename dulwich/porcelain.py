@@ -24,6 +24,7 @@ Currently implemented:
  * clone
  * commit
  * commit-tree
+ * daemon
  * diff-tree
  * init
  * list-tags
@@ -540,3 +541,18 @@ def get_tree_changes(repo):
         else:
             raise AssertionError('git mv ops not yet supported')
     return tracked_changes
+
+
+def daemon(path=".", address=None, port=None):
+    """Run a daemon serving Git requests over TCP/IP.
+
+    :param path: Path to the directory to serve.
+    """
+    # TODO(jelmer): Support git-daemon-export-ok and --export-all.
+    from dulwich.server import (
+        FileSystemBackend,
+        TCPGitServer,
+        )
+    backend = FileSystemBackend(path)
+    server = TCPGitServer(backend, address, port)
+    server.serve_forever()

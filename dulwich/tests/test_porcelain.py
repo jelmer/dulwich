@@ -594,3 +594,6 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(len(changes['add']), 0)
         self.assertEqual(len(changes['modify']), 0)
         self.assertEqual(len(changes['delete']), 1)
+
+
+# TODO(jelmer): Add test for dulwich.porcelain.daemon

@@ -874,6 +874,12 @@ def main(argv=sys.argv):
     parser.add_option("-b", "--backend", dest="backend",
                       help="Select backend to use.",
                       choices=["file"], default="file")
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=TCP_GIT_PORT,
+                      help="Binding TCP port.")
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
@@ -885,7 +891,8 @@ def main(argv=sys.argv):
         backend = DictBackend({'/': Repo(gitdir)})
     else:
         raise Exception("No such backend %s." % backend)
-    server = TCPGitServer(backend, 'localhost')
+    server = TCPGitServer(backend, options.listen_address,
+                          port=options.port)
     server.serve_forever()
 
 

@@ -18,6 +18,9 @@
   * Various fixes to improve test suite running on Windows.
     (Gary van der Merwe)
 
+  * Fix logic for extra adds of identical files in rename detector.
+    (Robert Brown)
+
  IMPROVEMENTS
 
   * Add porcelain 'status'. (Ryan Faulkner)

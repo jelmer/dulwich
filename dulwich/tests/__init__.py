@@ -131,7 +131,6 @@ def self_test_suite():
         'server',
         'walk',
         'web',
-        'swift',
         ]
     module_names = ['dulwich.tests.test_' + name for name in names]
     loader = unittest.TestLoader()
@@ -162,7 +161,9 @@ def tutorial_test_suite():
 def nocompat_test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
+    from dulwich.contrib import test_suite as contrib_test_suite
     result.addTests(tutorial_test_suite())
+    result.addTests(contrib_test_suite())
     return result
 
 
@@ -179,4 +180,6 @@ def test_suite():
     result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())
+    from dulwich.contrib import test_suite as contrib_test_suite
+    result.addTests(contrib_test_suite())
     return result

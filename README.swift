@@ -1,7 +1,8 @@
 Openstack Swift as backend for Dulwich
 ======================================
+Fabien Boucher <fabien.boucher@enovance.com>
 
-The module dulwich/swift.py implements dulwich.repo.BaseRepo
+The module dulwich/contrib/swift.py implements dulwich.repo.BaseRepo
 in order to being compatible with Openstack Swift.
 We can then use Dulwich as server (Git server) and instead of using
 a regular POSIX file system to store repository objects we use the
@@ -55,7 +56,7 @@ How to start unittest
 There is no need to have a Swift cluster running to run the unitests.
 Just run the following command in the Dulwich source directory:
 
-    $ PYTHONPATH=. nosetests dulwich/tests/test_swift.py
+    $ PYTHONPATH=. python -m dulwich.contrib.test_swift
 
 How to start functional tests
 -----------------------------
@@ -64,7 +65,7 @@ We provide some basic tests to perform smoke tests against a real Swift
 cluster. To run those functional tests you need a properly configured
 configuration file. The tests can be run as follow:
 
-    $ DULWICH_SWIFT_CFG=/etc/swift-dul.conf PYTHONPATH=. nosetests dulwich/tests_swift/test_smoke.py
+    $ DULWICH_SWIFT_CFG=/etc/swift-dul.conf PYTHONPATH=. python -m dulwich.contrib.test_swift_smoke
 
 How to install
 --------------
@@ -79,7 +80,7 @@ How to run the server
 
 Start the server using the following command:
 
-    $ dul-daemon -c /etc/swift-dul.conf -l 127.0.0.1 --backend=swift
+    $ python -m dulwich.contrib.swift daemon -c /etc/swift-dul.conf -l 127.0.0.1
 
 Note that a lot of request will be performed against the Swift
 cluster so it is better to start the Dulwich server as close
@@ -93,7 +94,7 @@ Once you have validated that the functional tests is working as expected and
 the server is running we can init a bare repository. Run this
 command with the name of the repository to create:
 
-    $ dulwich init-swift -c /etc/swift-dul.conf edeploy
+    $ python -m dulwich.contrib.swift init -c /etc/swift-dul.conf edeploy
 
 The repository name will be the container that will contain all the Git
 objects for the repository. Then standard c Git client can be used to
@@ -116,8 +117,8 @@ Then push an existing project in it:
 The other Git commands can be used the way you do usually against
 a regular repository.
 
-Note the swift-dul-daemon start a Git server listening for the
-Git protocol. Therefor there ins't any authentication or encryption
+Note the daemon subcommands starts a Git server listening for the
+Git protocol. Therefor there is no authentication or encryption
 at all between the cGIT client and the GIT server (Dulwich).
 
 Note on the .info file for pack object

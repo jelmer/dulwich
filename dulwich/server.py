@@ -85,12 +85,6 @@ from dulwich.repo import (
     Repo,
     )
 
-try:
-    import gevent
-    import geventhttpclient
-    gevent_support = True
-except ImportError:
-    gevent_support = False
 
 logger = log_utils.getLogger(__name__)
 
@@ -879,44 +873,22 @@ def main(argv=sys.argv):
     parser = optparse.OptionParser()
     parser.add_option("-b", "--backend", dest="backend",
                       help="Select backend to use.",
-                      choices=["file", "swift"], default="file")
+                      choices=["file"], default="file")
     parser.add_option("-l", "--listen_address", dest="listen_address",
-                      default="127.0.0.1",
+                      default="localhost",
                       help="Binding IP address.")
     parser.add_option("-p", "--port", dest="port", type=int,
                       default=TCP_GIT_PORT,
                       help="Binding TCP port.")
-    parser.add_option("-c", "--swift_config", dest="swift_config",
-                      default="",
-                      help="Path to the configuration file for Swift backend.")
-    parser.add_option("-f", "--fs_path", dest="fs_path",
-                      default=".",
-                      help="Path to GIT repo directory for file backend.")
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
     if options.backend == "file":
-        backend = DictBackend({'/': Repo(options.fs_path)})
-    elif options.backend == "swift":
-        if gevent_support:
-            import gevent.monkey
-            gevent.monkey.patch_socket()
-            from dulwich.swift import SwiftRepo
-            from dulwich.swift import load_conf
-            class SwiftSystemBackend(Backend):
-                def __init__(self, logger, conf):
-                    self.conf = conf
-                    self.logger = logger
-
-                def open_repository(self, path):
-                    self.logger.info('opening repository at %s', path)
-                    return SwiftRepo(path, self.conf)
-            conf = load_conf(options.swift_config)
-            backend = SwiftSystemBackend(logger, conf)
+        if len(argv) > 1:
+            gitdir = args[1]
         else:
-            print "gevent and geventhttpclient libraries are mandatory " \
-                  " for use the Swift backend."
-            sys.exit(-1)
+            gitdir = '.'
+        backend = DictBackend({'/': Repo(gitdir)})
     else:
         raise Exception("No such backend %s." % backend)
     server = TCPGitServer(backend, options.listen_address,

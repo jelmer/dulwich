@@ -19,23 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import os
-import unittest
-import tempfile
-import shutil
-
-import gevent
-from gevent import monkey
-monkey.patch_all()
-
-from dulwich import server
-from dulwich import swift
-from dulwich import repo
-from dulwich import index
-from dulwich import client
-from dulwich import objects
-
-
 """Start functional tests
 
 A Swift installation must be available before
@@ -48,6 +31,22 @@ in cls.fakerepo and will be deleted after the tests.
 DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
     dulwich.tests_swift.test_smoke
 """
+
+import os
+import unittest
+import tempfile
+import shutil
+
+import gevent
+from gevent import monkey
+monkey.patch_all()
+
+from dulwich import server
+from dulwich import repo
+from dulwich import index
+from dulwich import client
+from dulwich import objects
+from dulwich.contrib import swift
 
 
 class DulwichServer():
@@ -79,7 +78,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.backend = SwiftSystemBackend()
-        cls.port = 9418
+        cls.port = 9148
         cls.server_address = 'localhost'
         cls.fakerepo = 'fakerepo'
         cls.th_server = DulwichServer(cls.backend, cls.port)

@@ -36,9 +36,23 @@ from cStringIO import StringIO
 from ConfigParser import ConfigParser
 from geventhttpclient import HTTPClient
 
-from dulwich.repo import (
-    BaseRepo,
-    OBJECTDIR,
+from dulwich.greenthreads import (
+    GreenThreadsMissingObjectFinder,
+    GreenThreadsObjectStoreIterator,
+    )
+
+from dulwich.lru_cache import LRUSizeCache
+from dulwich.objects import (
+    Blob,
+    Commit,
+    Tree,
+    Tag,
+    S_ISGITLINK,
+    )
+from dulwich.object_store import (
+    PackBasedObjectStore,
+    PACKDIR,
+    INFODIR,
     )
 from dulwich.pack import (
     PackData,
@@ -55,26 +69,19 @@ from dulwich.pack import (
     unpack_object,
     write_pack_object,
     )
-from lru_cache import LRUSizeCache
-from dulwich.object_store import (
-    PackBasedObjectStore,
-    PACKDIR,
-    INFODIR,
-    )
+from dulwich.protocol import TCP_GIT_PORT
 from dulwich.refs import (
     InfoRefsContainer,
     read_info_refs,
     write_info_refs,
     )
-from dulwich.objects import (
-    Commit,
-    Tree,
-    Tag,
-    S_ISGITLINK,
+from dulwich.repo import (
+    BaseRepo,
+    OBJECTDIR,
     )
-from dulwich.greenthreads import (
-    GreenThreadsMissingObjectFinder,
-    GreenThreadsObjectStoreIterator,
+from dulwich.server import (
+    Backend,
+    TCPGitServer,
     )
 
 try:
@@ -83,6 +90,8 @@ try:
 except ImportError:
     from json import loads as json_loads
     from json import dumps as json_dumps
+
+import sys
 
 
 """
@@ -114,6 +123,7 @@ cache_length = 20
 
 
 class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
+
     def __len__(self):
         while len(self.finder.objects_to_send):
             for _ in xrange(0, len(self.finder.objects_to_send)):
@@ -123,6 +133,7 @@ class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
 
 
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
+
     def next(self):
         while True:
             if not self.objects_to_send:
@@ -188,18 +199,18 @@ def pack_info_create(pack_data, pack_index):
     info = {}
     for obj in pack.iterobjects():
         # Commit
-        if obj.type_num == 1:
+        if obj.type_num == Commit.type_num:
             info[obj.id] = (obj.type_num, obj.parents, obj.tree)
         # Tree
-        elif obj.type_num == 2:
+        elif obj.type_num == Tree.type_num:
             shas = [(s, n, not stat.S_ISDIR(m)) for
                     n, m, s in obj.iteritems() if not S_ISGITLINK(m)]
             info[obj.id] = (obj.type_num, shas)
         # Blob
-        elif obj.type_num == 3:
+        elif obj.type_num == Blob.type_num:
             info[obj.id] = None
         # Tag
-        elif obj.type_num == 4:
+        elif obj.type_num == Tag.type_num:
             info[obj.id] = (obj.type_num, obj._object_sha)
     return zlib.compress(json_dumps(info))
 
@@ -234,8 +245,8 @@ class SwiftConnector(object):
         self.conf = conf
         self.auth_ver = self.conf.get("swift", "auth_ver")
         if self.auth_ver not in ["1", "2"]:
-            raise NotImplementedError("Wrong authentication version \
-                    use either 1 or 2")
+            raise NotImplementedError(
+                "Wrong authentication version use either 1 or 2")
         self.auth_url = self.conf.get("swift", "auth_url")
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
@@ -277,9 +288,7 @@ class SwiftConnector(object):
                    'X-Auth-Key': self.password}
         path = urlparse(self.auth_url).path
 
-        ret = auth_httpclient.request('GET',
-                                      path,
-                                      headers=headers)
+        ret = auth_httpclient.request('GET', path, headers=headers)
 
         # Should do something with redirections (301 in my case)
 
@@ -312,8 +321,7 @@ class SwiftConnector(object):
         path = urlparse(self.auth_url).path
         if not path.endswith('tokens'):
             path = posixpath.join(path, 'tokens')
-        ret = auth_httpclient.request('POST',
-                                      path,
+        ret = auth_httpclient.request('POST', path,
                                       body=auth_json,
                                       headers=headers)
 
@@ -338,8 +346,7 @@ class SwiftConnector(object):
 
         :return: True if exist or None it not
         """
-        ret = self.httpclient.request('HEAD',
-                                      self.base_path)
+        ret = self.httpclient.request('HEAD', self.base_path)
         if ret.status_code == 404:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
@@ -353,8 +360,7 @@ class SwiftConnector(object):
         :raise: `SwiftException` if unable to create
         """
         if not self.test_root_exists():
-            ret = self.httpclient.request('PUT',
-                                          self.base_path)
+            ret = self.httpclient.request('PUT', self.base_path)
             if ret.status_code < 200 or ret.status_code > 300:
                 raise SwiftException('PUT request failed with error code %s'
                                      % ret.status_code)
@@ -367,8 +373,7 @@ class SwiftConnector(object):
         """
         qs = '?format=json'
         path = self.base_path + qs
-        ret = self.httpclient.request('GET',
-                                      path)
+        ret = self.httpclient.request('GET', path)
         if ret.status_code == 404:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
@@ -385,8 +390,7 @@ class SwiftConnector(object):
                  or None if object does not exist
         """
         path = self.base_path + '/' + name
-        ret = self.httpclient.request('HEAD',
-                                      path)
+        ret = self.httpclient.request('HEAD', path)
         if ret.status_code == 404:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
@@ -410,8 +414,7 @@ class SwiftConnector(object):
         headers = {'Content-Length': str(len(data))}
 
         def _send():
-            ret = self.httpclient.request('PUT',
-                                          path,
+            ret = self.httpclient.request('PUT', path,
                                           body=data,
                                           headers=headers)
             return ret
@@ -440,9 +443,7 @@ class SwiftConnector(object):
         if range:
             headers['Range'] = 'bytes=%s' % range
         path = self.base_path + '/' + name
-        ret = self.httpclient.request('GET',
-                                      path,
-                                      headers=headers)
+        ret = self.httpclient.request('GET', path, headers=headers)
         if ret.status_code == 404:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
@@ -461,8 +462,7 @@ class SwiftConnector(object):
         :raise: `SwiftException` if unable to delete
         """
         path = self.base_path + '/' + name
-        ret = self.httpclient.request('DELETE',
-                                      path)
+        ret = self.httpclient.request('DELETE', path)
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('DELETE request failed with error code %s'
                                  % ret.status_code)
@@ -474,8 +474,7 @@ class SwiftConnector(object):
         """
         for obj in self.get_container_objects():
             self.del_object(obj['name'])
-        ret = self.httpclient.request('DELETE',
-                                      self.base_path)
+        ret = self.httpclient.request('DELETE', self.base_path)
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException('DELETE request failed with error code %s'
                                  % ret.status_code)
@@ -510,10 +509,8 @@ class SwiftPackReader(object):
         if more:
             self.buff_length = self.buff_length * 2
         l = self.base_offset
-        r = min(self.base_offset + self.buff_length,
-                self.pack_length)
-        ret = self.scon.get_object(self.filename,
-                                   range="%s-%s" % (l, r))
+        r = min(self.base_offset + self.buff_length, self.pack_length)
+        ret = self.scon.get_object(self.filename, range="%s-%s" % (l, r))
         self.buff = ret
 
     def read(self, length):
@@ -644,7 +641,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         self.root = self.scon.root
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
         self._alternates = None
-    
+
     @property
     def packs(self):
         """List with pack objects."""
@@ -889,7 +886,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self._write_refs(refs)
         del self._refs[name]
         return True
-    
+
     def allkeys(self):
         try:
             self._refs['HEAD'] = self._refs['refs/heads/master']
@@ -951,3 +948,86 @@ class SwiftRepo(BaseRepo):
         ret = cls(scon.root, conf)
         ret._init_files(True)
         return ret
+
+
+class SwiftSystemBackend(Backend):
+
+    def __init__(self, logger, conf):
+        self.conf = conf
+        self.logger = logger
+
+    def open_repository(self, path):
+        self.logger.info('opening repository at %s', path)
+        return SwiftRepo(path, self.conf)
+
+
+def cmd_daemon(args):
+    """Entry point for starting a TCP git server."""
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="127.0.0.1",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=TCP_GIT_PORT,
+                      help="Binding TCP port.")
+    parser.add_option("-c", "--swift_config", dest="swift_config",
+                      default="",
+                      help="Path to the configuration file for Swift backend.")
+    options, args = parser.parse_args(args)
+
+    try:
+        import gevent
+        import geventhttpclient
+    except ImportError:
+        print("gevent and geventhttpclient libraries are mandatory "
+              " for use the Swift backend.")
+        sys.exit(1)
+    import gevent.monkey
+    gevent.monkey.patch_socket()
+    from dulwich.swift import load_conf
+    from dulwich import log_utils
+    logger = log_utils.getLogger(__name__)
+    conf = load_conf(options.swift_config)
+    backend = SwiftSystemBackend(logger, conf)
+
+    log_utils.default_logging_config()
+    server = TCPGitServer(backend, options.listen_address,
+                          port=options.port)
+    server.serve_forever()
+
+
+def cmd_init(args):
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-c", "--swift_config", dest="swift_config",
+                      default="",
+                      help="Path to the configuration file for Swift backend.")
+    options, args = parser.parse_args(args)
+
+    conf = load_conf(options.swift_config)
+    if args == []:
+        parser.error("missing repository name")
+    repo = args[0]
+    scon = SwiftConnector(repo, conf)
+    SwiftRepo.init_bare(scon, conf)
+
+
+def main(argv=sys.argv):
+    commands = {
+        "init": cmd_init,
+        "daemon": cmd_daemon,
+    }
+
+    if len(sys.argv) < 2:
+        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    if not cmd in commands:
+        print("No such subcommand: %s" % cmd)
+        sys.exit(1)
+    commands[cmd](sys.argv[2:])
+
+if __name__ == '__main__':
+    main()

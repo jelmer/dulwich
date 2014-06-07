@@ -26,8 +26,11 @@
     for concurrency of some object store operations.
     (Fabien Boucher)
 
-   * Various changes to improve compatibility with Python 3.
-     (Gary van der Merwe, Hannu Valtonen, michael-k)
+  * Various changes to improve compatibility with Python 3.
+    (Gary van der Merwe, Hannu Valtonen, michael-k)
+
+  * Add OpenStack Swift backed repository implementation
+    in dulwich.contrib. See README.swift for details. (Fabien Boucher)
 
 API CHANGES
 

@@ -19,17 +19,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-"""Tests for dulwich.swift."""
+"""Tests for dulwich.contrib.swift."""
 
 import posixpath
 
 from time import time
 from cStringIO import StringIO
-from contextlib import nested
+from unittest import skipIf
 
 from dulwich.tests import (
     TestCase,
-    skipIf,
     )
 from dulwich.tests.test_object_store import (
     ObjectStoreTests,
@@ -56,16 +55,27 @@ try:
 except ImportError:
     from json import dumps as json_dumps
 
+missing_libs = []
+
 try:
     import gevent
-    import geventhttpclient
-    from mock import patch
-    lib_support = True
-    from dulwich import swift
 except ImportError:
-    lib_support = False
+    missing_libs.append("gevent")
 
-skipmsg = "Required libraries are not installed (gevent, geventhttpclient, mock)"
+try:
+    import geventhttpclient
+except ImportError:
+    missing_libs.append("geventhttpclient")
+
+try:
+    from mock import patch
+except ImportError:
+    missing_libs.append("mock")
+
+skipmsg = "Required libraries are not installed (%r)" % missing_libs
+
+if not missing_libs:
+    from dulwich.contrib import swift
 
 config_file = """[swift]
 auth_url = http://127.0.0.1:8080/auth/%(version_str)s
@@ -99,6 +109,7 @@ def create_swift_connector(store={}):
 
 
 class Response(object):
+
     def __init__(self, headers={}, status=200, content=None):
         self.headers = headers
         self.status_code = status
@@ -124,6 +135,7 @@ def fake_auth_request_v1(*args, **kwargs):
                     'X-Auth-Token': '12' * 10},
                    200)
     return ret
+
 
 def fake_auth_request_v1_error(*args, **kwargs):
     ret = Response({},
@@ -153,7 +165,7 @@ def create_commit(data, marker='Default', blob=None):
     if not blob:
         blob = Blob.from_string('The blob content %s' % marker)
     tree = Tree()
-    tree.add("thefile_%s" % marker, 0100644, blob.id)
+    tree.add("thefile_%s" % marker, 0o100644, blob.id)
     cmt = Commit()
     if data:
         assert isinstance(data[-1], Commit)
@@ -184,7 +196,7 @@ def create_commits(length=1, marker='Default'):
         data.extend([blob, tree, tag, cmt])
     return data
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class FakeSwiftConnector(object):
 
     def __init__(self, root, conf, store=None):
@@ -240,7 +252,7 @@ class FakeSwiftConnector(object):
         return {'content-length': len(self.store[name])}
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class TestSwiftObjectStore(TestCase):
 
     def setUp(self):
@@ -359,7 +371,7 @@ class TestSwiftObjectStore(TestCase):
         self.assertEqual(len(self.fsc.store), 6)
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class TestSwiftRepo(TestCase):
 
     def setUp(self):
@@ -369,20 +381,20 @@ class TestSwiftRepo(TestCase):
 
     def test_init(self):
         store = {'fakerepo/objects/pack': ''}
-        with patch('dulwich.swift.SwiftConnector',
+        with patch('dulwich.contrib.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
             swift.SwiftRepo('fakerepo', conf=self.conf)
 
     def test_init_no_data(self):
-        with patch('dulwich.swift.SwiftConnector',
+        with patch('dulwich.contrib.swift.SwiftConnector',
                    new_callable=create_swift_connector):
             self.assertRaises(Exception, swift.SwiftRepo,
                               'fakerepo', self.conf)
 
     def test_init_bad_data(self):
         store = {'fakerepo/.git/objects/pack': ''}
-        with patch('dulwich.swift.SwiftConnector',
+        with patch('dulwich.contrib.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
             self.assertRaises(Exception, swift.SwiftRepo,
@@ -390,7 +402,7 @@ class TestSwiftRepo(TestCase):
 
     def test_put_named_file(self):
         store = {'fakerepo/objects/pack': ''}
-        with patch('dulwich.swift.SwiftConnector',
+        with patch('dulwich.contrib.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=store):
             repo = swift.SwiftRepo('fakerepo', conf=self.conf)
@@ -401,7 +413,7 @@ class TestSwiftRepo(TestCase):
 
     def test_init_bare(self):
         fsc = FakeSwiftConnector('fakeroot', conf=self.conf)
-        with patch('dulwich.swift.SwiftConnector',
+        with patch('dulwich.contrib.swift.SwiftConnector',
                    new_callable=create_swift_connector,
                    store=fsc.store):
             swift.SwiftRepo.init_bare(fsc, conf=self.conf)
@@ -410,7 +422,7 @@ class TestSwiftRepo(TestCase):
         self.assertIn('fakeroot/description', fsc.store)
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class TestPackInfoLoadDump(TestCase):
     def setUp(self):
         conf = swift.load_conf(file=StringIO(config_file %
@@ -452,7 +464,7 @@ class TestPackInfoLoadDump(TestCase):
             self.assertIn(obj.id, pack_infos)
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class TestSwiftInfoRefsContainer(TestCase):
 
     def setUp(self):
@@ -490,7 +502,7 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.assertNotIn('refs/heads/dev', irc.allkeys())
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class TestSwiftConnector(TestCase):
 
     def setUp(self):
@@ -540,19 +552,17 @@ class TestSwiftConnector(TestCase):
             self.assertEqual(self.conn.test_root_exists(), None)
 
     def test_create_root(self):
-        ctx = [patch('dulwich.swift.SwiftConnector.test_root_exists',
-                     lambda *args: None),
-               patch('geventhttpclient.HTTPClient.request',
-                     lambda *args: Response())]
-        with nested(*ctx):
+        with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
+                lambda *args: None), \
+             patch('geventhttpclient.HTTPClient.request',
+                lambda *args: Response()):
             self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
-        ctx = [patch('dulwich.swift.SwiftConnector.test_root_exists',
-                     lambda *args: None),
-               patch('geventhttpclient.HTTPClient.request',
-                     lambda *args: Response(status=404))]
-        with nested(*ctx):
+        with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
+                   lambda *args: None), \
+             patch('geventhttpclient.HTTPClient.request',
+                   lambda *args: Response(status=404)):
             self.assertRaises(swift.SwiftException,
                               lambda: self.conn.create_root())
 
@@ -610,17 +620,17 @@ class TestSwiftConnector(TestCase):
             self.assertEqual(self.conn.del_object('a'), None)
 
     def test_del_root(self):
-        ctx = [patch('dulwich.swift.SwiftConnector.del_object',
-                     lambda *args: None),
-               patch('dulwich.swift.SwiftConnector.get_container_objects',
-                     lambda *args: ({'name': 'a'}, {'name': 'b'})),
-               patch('geventhttpclient.HTTPClient.request',
-                     lambda *args: Response())]
-        with nested(*ctx):
+        with patch('dulwich.contrib.swift.SwiftConnector.del_object',
+                   lambda *args: None), \
+             patch('dulwich.contrib.swift.SwiftConnector.'
+                   'get_container_objects',
+                   lambda *args: ({'name': 'a'}, {'name': 'b'})), \
+             patch('geventhttpclient.HTTPClient.request',
+                    lambda *args: Response()):
             self.assertEqual(self.conn.del_root(), None)
 
 
-@skipIf(not lib_support, skipmsg)
+@skipIf(missing_libs, skipmsg)
 class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):

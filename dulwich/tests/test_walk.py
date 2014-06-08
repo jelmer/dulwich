@@ -23,10 +23,8 @@ from itertools import (
     )
 
 from dulwich.diff_tree import (
-    CHANGE_ADD,
     CHANGE_MODIFY,
     CHANGE_RENAME,
-    CHANGE_COPY,
     TreeChange,
     RenameDetector,
     )
@@ -404,7 +402,7 @@ class WalkerTest(TestCase):
         #   \          /
         #    \-y3--y4-/--y5
         # Due to skew, y5 is the oldest commit.
-        c1, x2, y3, y4, y5, m6 = cs = self.make_commits(
+        c1, x2, y3, y4, y5, m6 = self.make_commits(
           [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]],
           times=[2, 3, 4, 5, 1, 6])
         self.assertWalkYields([m6, y4, y3, x2, c1], [m6.id])

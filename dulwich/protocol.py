@@ -77,11 +77,22 @@ class Protocol(object):
         Documentation/technical/protocol-common.txt
     """
 
-    def __init__(self, read, write, report_activity=None):
+    def __init__(self, read, write, close=None, report_activity=None):
         self.read = read
         self.write = write
+        self._close = close
         self.report_activity = report_activity
         self._readahead = None
+
+    def close(self):
+        if self._close:
+            self._close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def read_pkt_line(self):
         """Reads a pkt-line from the remote git process.
@@ -108,7 +119,11 @@ class Protocol(object):
                 return None
             if self.report_activity:
                 self.report_activity(size, 'read')
-            return read(size-4)
+            pkt_contents = read(size-4)
+            if len(pkt_contents) + 4 != size:
+                raise AssertionError('Length of pkt read {:04x} does not match length prefix {:04x}.'
+                                     .format(len(pkt_contents) + 4, size))
+            return pkt_contents
         except socket.error as e:
             raise GitProtocolError(e)
 

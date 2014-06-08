@@ -22,7 +22,6 @@ from io import BytesIO
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
-    OrderedDict,
     StackedConfig,
     _check_section_name,
     _check_variable_name,

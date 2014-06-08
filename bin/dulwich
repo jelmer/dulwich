@@ -29,6 +29,7 @@ a way to test Dulwich.
 import os
 import sys
 from getopt import getopt
+import optparse
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
@@ -80,9 +81,9 @@ def cmd_fetch(args):
     if "--all" in opts:
         determine_wants = r.object_store.determine_wants_all
     refs = client.fetch(path, r, progress=sys.stdout.write)
-    print "Remote refs:"
+    print("Remote refs:")
     for item in refs.iteritems():
-        print "%s -> %s" % item
+        print("%s -> %s" % item)
 
 
 def cmd_log(args):
@@ -98,7 +99,7 @@ def cmd_diff(args):
     opts, args = getopt(args, "", [])
 
     if args == []:
-        print "Usage: dulwich diff COMMITID"
+        print("Usage: dulwich diff COMMITID")
         sys.exit(1)
 
     r = Repo(".")
@@ -112,37 +113,37 @@ def cmd_dump_pack(args):
     opts, args = getopt(args, "", [])
 
     if args == []:
-        print "Usage: dulwich dump-pack FILENAME"
+        print("Usage: dulwich dump-pack FILENAME")
         sys.exit(1)
 
     basename, _ = os.path.splitext(args[0])
     x = Pack(basename)
-    print "Object names checksum: %s" % x.name()
-    print "Checksum: %s" % sha_to_hex(x.get_stored_checksum())
+    print("Object names checksum: %s" % x.name())
+    print("Checksum: %s" % sha_to_hex(x.get_stored_checksum()))
     if not x.check():
-        print "CHECKSUM DOES NOT MATCH"
-    print "Length: %d" % len(x)
+        print("CHECKSUM DOES NOT MATCH")
+    print("Length: %d" % len(x))
     for name in x:
         try:
-            print "\t%s" % x[name]
+            print("\t%s" % x[name])
         except KeyError, k:
-            print "\t%s: Unable to resolve base %s" % (name, k)
+            print("\t%s: Unable to resolve base %s" % (name, k))
         except ApplyDeltaError, e:
-            print "\t%s: Unable to apply delta: %r" % (name, e)
+            print("\t%s: Unable to apply delta: %r" % (name, e))
 
 
 def cmd_dump_index(args):
     opts, args = getopt(args, "", [])
 
     if args == []:
-        print "Usage: dulwich dump-index FILENAME"
+        print("Usage: dulwich dump-index FILENAME")
         sys.exit(1)
 
     filename = args[0]
     idx = Index(filename)
 
     for o in idx:
-        print o, idx[o]
+        print(o, idx[o])
 
 
 def cmd_init(args):
@@ -162,7 +163,7 @@ def cmd_clone(args):
     opts = dict(opts)
 
     if args == []:
-        print "usage: dulwich clone host:path [PATH]"
+        print("usage: dulwich clone host:path [PATH]")
         sys.exit(1)
 
     source = args.pop(0)
@@ -183,7 +184,7 @@ def cmd_commit(args):
 def cmd_commit_tree(args):
     opts, args = getopt(args, "", ["message"])
     if args == []:
-        print "usage: dulwich commit-tree tree"
+        print("usage: dulwich commit-tree tree")
         sys.exit(1)
     opts = dict(opts)
     porcelain.commit_tree(".", tree=args[0], message=opts["--message"])
@@ -196,7 +197,7 @@ def cmd_update_server_info(args):
 def cmd_symbolic_ref(args):
     opts, args = getopt(args, "", ["ref-name", "force"])
     if not args:
-        print "Usage: dulwich symbolic-ref REF_NAME [--force]"
+        print("Usage: dulwich symbolic-ref REF_NAME [--force]")
         sys.exit(1)
 
     ref_name = args.pop(0)
@@ -211,26 +212,30 @@ def cmd_show(args):
 def cmd_diff_tree(args):
     opts, args = getopt(args, "", [])
     if len(args) < 2:
-        print "Usage: dulwich diff-tree OLD-TREE NEW-TREE"
+        print("Usage: dulwich diff-tree OLD-TREE NEW-TREE")
         sys.exit(1)
     porcelain.diff_tree(".", args[0], args[1])
 
 
 def cmd_rev_list(args):
     opts, args = getopt(args, "", [])
-    if len(args) < 2:
-        print "Usage: dulwich tag NAME"
+    if len(args) < 1:
+        print('Usage: dulwich rev-list COMMITID...')
         sys.exit(1)
-    porcelain.tag(".", args[0])
+    porcelain.rev_list('.', args)
 
 
 def cmd_tag(args):
-    opts, args = getopt(args, "", [])
-    porcelain.tag(".", args[0])
+    opts, args = getopt(args, '', [])
+    if len(args) < 2:
+        print 'Usage: dulwich tag NAME'
+        sys.exit(1)
+    porcelain.tag('.', args[0])
 
 
 def cmd_reset(args):
     opts, args = getopt(args, "", ["hard", "soft", "mixed"])
+    opts = dict(opts)
     mode = ""
     if "--hard" in opts:
         mode = "hard"
@@ -238,7 +243,29 @@ def cmd_reset(args):
         mode = "soft"
     elif "--mixed" in opts:
         mode = "mixed"
-    porcelain.tag(".", mode=mode, *args)
+    porcelain.reset('.', mode=mode, *args)
+
+
+def cmd_daemon(args):
+    from dulwich import log_utils
+    from dulwich.protocol import TCP_GIT_PORT
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=TCP_GIT_PORT,
+                      help="Binding TCP port.")
+    options, args = parser.parse_args(args)
+
+    log_utils.default_logging_config()
+    if len(args) > 1:
+        gitdir = args[1]
+    else:
+        gitdir = '.'
+    from dulwich import porcelain
+    porcelain.daemon(gitdir, address=options.listen_address,
+                     port=options.port)
 
 
 commands = {
@@ -247,6 +274,7 @@ commands = {
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
+    "daemon": cmd_daemon,
     "diff": cmd_diff,
     "diff-tree": cmd_diff_tree,
     "dump-pack": cmd_dump_pack,
@@ -265,11 +293,11 @@ commands = {
     }
 
 if len(sys.argv) < 2:
-    print "Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys()))
+    print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
     sys.exit(1)
 
 cmd = sys.argv[1]
 if not cmd in commands:
-    print "No such subcommand: %s" % cmd
+    print("No such subcommand: %s" % cmd)
     sys.exit(1)
 commands[cmd](sys.argv[2:])

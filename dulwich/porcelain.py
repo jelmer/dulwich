@@ -24,6 +24,7 @@ Currently implemented:
  * clone
  * commit
  * commit-tree
+ * daemon
  * diff-tree
  * init
  * list-tags
@@ -34,6 +35,7 @@ Currently implemented:
  * rev-list
  * tag
  * update-server-info
+ * status
  * symbolic-ref
 
 These functions are meant to behave similarly to the git subcommands.
@@ -42,6 +44,7 @@ Differences in behaviour are considered bugs.
 
 __docformat__ = 'restructuredText'
 
+from collections import namedtuple
 import os
 import sys
 import time
@@ -52,6 +55,7 @@ from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
     )
+from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
     Tag,
     parse_timezone,
@@ -60,6 +64,9 @@ from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import update_server_info as server_update_server_info
+
+# Module level tuple definition for status output
+GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
 def open_repo(path_or_repo):
@@ -82,7 +89,10 @@ def archive(location, committish=None, outstream=sys.stdout,
     client, path = get_transport_and_path(location)
     if committish is None:
         committish = "HEAD"
-    client.archive(path, committish, outstream.write, errstream.write)
+    # TODO(jelmer): This invokes C git; this introduces a dependency.
+    # Instead, dulwich should have its own archiver implementation.
+    client.archive(path, committish, outstream.write, errstream.write,
+                   errstream.write)
 
 
 def update_server_info(repo="."):
@@ -222,7 +232,7 @@ def rm(repo=".", paths=None):
     index.write()
 
 
-def print_commit(commit, outstream):
+def print_commit(commit, outstream=sys.stdout):
     """Write a human-readable commit log entry.
 
     :param commit: A `Commit` object
@@ -239,7 +249,7 @@ def print_commit(commit, outstream):
     outstream.write("\n")
 
 
-def print_tag(tag, outstream):
+def print_tag(tag, outstream=sys.stdout):
     """Write a human-readable tag.
 
     :param tag: A `Tag` object
@@ -252,7 +262,7 @@ def print_tag(tag, outstream):
     outstream.write("\n")
 
 
-def show_blob(repo, blob, outstream):
+def show_blob(repo, blob, outstream=sys.stdout):
     """Write a blob to a stream.
 
     :param repo: A `Repo` object
@@ -262,7 +272,7 @@ def show_blob(repo, blob, outstream):
     outstream.write(blob.data)
 
 
-def show_commit(repo, commit, outstream):
+def show_commit(repo, commit, outstream=sys.stdout):
     """Show a commit to a stream.
 
     :param repo: A `Repo` object
@@ -274,7 +284,7 @@ def show_commit(repo, commit, outstream):
     write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
 
 
-def show_tree(repo, tree, outstream):
+def show_tree(repo, tree, outstream=sys.stdout):
     """Print a tree to a stream.
 
     :param repo: A `Repo` object
@@ -285,7 +295,7 @@ def show_tree(repo, tree, outstream):
         outstream.write("%s\n" % n)
 
 
-def show_tag(repo, tag, outstream):
+def show_tag(repo, tag, outstream=sys.stdout):
     """Print a tag to a stream.
 
     :param repo: A `Repo` object
@@ -485,3 +495,64 @@ def pull(repo, remote_location, refs_path,
     indexfile = r.index_path()
     tree = r["HEAD"].tree
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+
+
+def status(repo):
+    """Returns staged, unstaged, and untracked changes relative to the HEAD.
+
+    :param repo: Path to repository
+    :return: GitStatus tuple,
+        staged -    list of staged paths (diff index/HEAD)
+        unstaged -  list of unstaged paths (diff index/working-tree)
+        untracked - list of untracked, un-ignored & non-.git paths
+    """
+    # 1. Get status of staged
+    tracked_changes = get_tree_changes(repo)
+    # 2. Get status of unstaged
+    unstaged_changes = list(get_unstaged_changes(repo.open_index(), repo.path))
+    # TODO - Status of untracked - add untracked changes, need gitignore.
+    untracked_changes = []
+    return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
+
+
+def get_tree_changes(repo):
+    """Return add/delete/modify changes to tree by comparing index to HEAD.
+
+    :param repo: repo path or object
+    :return: dict with lists for each type of change
+    """
+    r = open_repo(repo)
+    index = r.open_index()
+
+    # Compares the Index to the HEAD & determines changes
+    # Iterate through the changes and report add/delete/modify
+    tracked_changes = {
+        'add': [],
+        'delete': [],
+        'modify': [],
+    }
+    for change in index.changes_from_tree(r.object_store, r['HEAD'].tree):
+        if not change[0][0]:
+            tracked_changes['add'].append(change[0][1])
+        elif not change[0][1]:
+            tracked_changes['delete'].append(change[0][0])
+        elif change[0][0] == change[0][1]:
+            tracked_changes['modify'].append(change[0][0])
+        else:
+            raise AssertionError('git mv ops not yet supported')
+    return tracked_changes
+
+
+def daemon(path=".", address=None, port=None):
+    """Run a daemon serving Git requests over TCP/IP.
+
+    :param path: Path to the directory to serve.
+    """
+    # TODO(jelmer): Support git-daemon-export-ok and --export-all.
+    from dulwich.server import (
+        FileSystemBackend,
+        TCPGitServer,
+        )
+    backend = FileSystemBackend(path)
+    server = TCPGitServer(backend, address, port)
+    server.serve_forever()

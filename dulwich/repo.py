@@ -667,10 +667,12 @@ class Repo(BaseRepo):
         self._graftpoints = {}
         graft_file = self.get_named_file(os.path.join("info", "grafts"))
         if graft_file:
-            self._graftpoints.update(parse_graftpoints(graft_file))
+            with graft_file:
+                self._graftpoints.update(parse_graftpoints(graft_file))
         graft_file = self.get_named_file("shallow")
         if graft_file:
-            self._graftpoints.update(parse_graftpoints(graft_file))
+            with graft_file:
+                self._graftpoints.update(parse_graftpoints(graft_file))
 
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
@@ -741,12 +743,15 @@ class Repo(BaseRepo):
         """
         if isinstance(paths, basestring):
             paths = [paths]
-        from dulwich.index import index_entry_from_stat
+        from dulwich.index import (
+            blob_from_path_and_stat,
+            index_entry_from_stat,
+            )
         index = self.open_index()
         for path in paths:
             full_path = os.path.join(self.path, path)
             try:
-                st = os.stat(full_path)
+                st = os.lstat(full_path)
             except OSError:
                 # File no longer exists
                 try:
@@ -754,12 +759,7 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                blob = Blob()
-                f = open(full_path, 'rb')
-                try:
-                    blob.data = f.read()
-                finally:
-                    f.close()
+                blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
                 index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()

@@ -27,13 +27,9 @@ import sys
 import tempfile
 
 
-if sys.version_info >= (2, 7):
-    # If Python itself provides an exception, use that
-    import unittest
-    from unittest import SkipTest, TestCase as _TestCase
-else:
-    import unittest2 as unittest
-    from unittest2 import SkipTest, TestCase as _TestCase
+# If Python itself provides an exception, use that
+import unittest
+from unittest import TestCase as _TestCase
 
 
 def get_safe_env(env=None):
@@ -118,6 +114,7 @@ def self_test_suite():
         'fastexport',
         'file',
         'grafts',
+        'greenthreads',
         'hooks',
         'index',
         'lru_cache',
@@ -164,7 +161,9 @@ def tutorial_test_suite():
 def nocompat_test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
+    from dulwich.contrib import test_suite as contrib_test_suite
     result.addTests(tutorial_test_suite())
+    result.addTests(contrib_test_suite())
     return result
 
 
@@ -181,4 +180,6 @@ def test_suite():
     result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())
+    from dulwich.contrib import test_suite as contrib_test_suite
+    result.addTests(contrib_test_suite())
     return result

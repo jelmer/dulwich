@@ -38,11 +38,9 @@ from collections import (
     deque,
     )
 import difflib
-from itertools import (
-    chain,
-    imap,
-    izip,
-    )
+
+from itertools import chain, imap, izip
+
 try:
     import mmap
 except ImportError:
@@ -57,7 +55,6 @@ from os import (
     )
 import struct
 from struct import unpack_from
-import sys
 import warnings
 import zlib
 
@@ -76,14 +73,14 @@ from dulwich.objects import (
     object_header,
     )
 
-supports_mmap_offset = (sys.version_info[0] >= 3 or
-        (sys.version_info[0] == 2 and sys.version_info[1] >= 6))
-
 
 OFS_DELTA = 6
 REF_DELTA = 7
 
 DELTA_TYPES = (OFS_DELTA, REF_DELTA)
+
+
+DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
 
 
 def take_msb_bytes(read, crc32=None):
@@ -318,7 +315,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
     """
     assert start <= end
     while start <= end:
-        i = (start + end)/2
+        i = (start + end) // 2
         file_sha = unpack_name(i)
         x = cmp(file_sha, sha)
         if x < 0:
@@ -994,6 +991,12 @@ class PackData(object):
     def close(self):
         self._file.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def _get_size(self):
         if self._size is not None:
             return self._size
@@ -1444,21 +1447,20 @@ def write_pack_object(f, type, object, sha=None):
     return crc32 & 0xffffffff
 
 
-def write_pack(filename, objects, num_objects=None):
+def write_pack(filename, objects, deltify=None, delta_window_size=None):
     """Write a new pack data file.
 
     :param filename: Path to the new pack file (without .pack extension)
     :param objects: Iterable of (object, path) tuples to write.
         Should provide __len__
+    :param window_size: Delta window size
+    :param deltify: Whether to deltify pack objects
     :return: Tuple with checksum of pack file and index file
     """
-    if num_objects is not None:
-        warnings.warn('num_objects argument to write_pack is deprecated',
-                      DeprecationWarning)
     f = GitFile(filename + '.pack', 'wb')
     try:
         entries, data_sum = write_pack_objects(f, objects,
-            num_objects=num_objects)
+            delta_window_size=delta_window_size, deltify=deltify)
     finally:
         f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
@@ -1477,14 +1479,16 @@ def write_pack_header(f, num_objects):
     f.write(struct.pack('>L', num_objects))  # Number of objects in pack
 
 
-def deltify_pack_objects(objects, window=10):
+def deltify_pack_objects(objects, window_size=None):
     """Generate deltas for pack objects.
 
-    :param objects: Objects to deltify
-    :param window: Window size
+    :param objects: An iterable of (object, path) tuples to deltify.
+    :param window_size: Window size; None for default
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
+    if window_size is None:
+        window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
@@ -1507,28 +1511,29 @@ def deltify_pack_objects(objects, window=10):
                 winner = delta
         yield type_num, o.sha().digest(), winner_base, winner
         possible_bases.appendleft(o)
-        while len(possible_bases) > window:
+        while len(possible_bases) > window_size:
             possible_bases.pop()
 
 
-def write_pack_objects(f, objects, window=10, num_objects=None):
+def write_pack_objects(f, objects, delta_window_size=None, deltify=False):
     """Write a new pack data file.
 
     :param f: File to write to
     :param objects: Iterable of (object, path) tuples to write.
         Should provide __len__
-    :param window: Sliding window size for searching for deltas; currently
-                   unimplemented
-    :param num_objects: Number of objects (do not use, deprecated)
+    :param window_size: Sliding window size for searching for deltas;
+                        Set to None for default window size.
+    :param deltify: Whether to deltify objects
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
-    if num_objects is None:
-        num_objects = len(objects)
-    # FIXME: pack_contents = deltify_pack_objects(objects, window)
-    pack_contents = (
-        (o.type_num, o.sha().digest(), None, o.as_raw_string())
-        for (o, path) in objects)
-    return write_pack_data(f, num_objects, pack_contents)
+    if deltify:
+        pack_contents = deltify_pack_objects(objects, delta_window_size)
+    else:
+        pack_contents = (
+            (o.type_num, o.sha().digest(), None, o.as_raw_string())
+            for (o, path) in objects)
+
+    return write_pack_data(f, len(objects), pack_contents)
 
 
 def write_pack_data(f, num_records, records):
@@ -1544,6 +1549,7 @@ def write_pack_data(f, num_records, records):
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
     for type_num, object_id, delta_base, raw in records:
+        offset = f.offset()
         if delta_base is not None:
             try:
                 base_offset, base_crc32 = entries[delta_base]
@@ -1552,8 +1558,7 @@ def write_pack_data(f, num_records, records):
                 raw = (delta_base, raw)
             else:
                 type_num = OFS_DELTA
-                raw = (base_offset, raw)
-        offset = f.offset()
+                raw = (offset - base_offset, raw)
         crc32 = write_pack_object(f, type_num, raw)
         entries[object_id] = (offset, crc32)
     return entries, f.write_sha()
@@ -1585,6 +1590,36 @@ def write_pack_index_v1(f, entries, pack_checksum):
     return f.write_sha()
 
 
+def _delta_encode_size(size):
+    ret = ''
+    c = size & 0x7f
+    size >>= 7
+    while size:
+        ret += chr(c | 0x80)
+        c = size & 0x7f
+        size >>= 7
+    ret += chr(c)
+    return ret
+
+
+# copy operations in git's delta format can be at most this long -
+# after this you have to decompose the copy into multiple operations.
+_MAX_COPY_LEN = 0xffffff
+
+def _encode_copy_operation(start, length):
+    scratch = ''
+    op = 0x80
+    for i in range(4):
+        if start & 0xff << i*8:
+            scratch += chr((start >> i*8) & 0xff)
+            op |= 1 << i
+    for i in range(3):
+        if length & 0xff << i*8:
+            scratch += chr((length >> i*8) & 0xff)
+            op |= 1 << (4+i)
+    return chr(op) + scratch
+
+
 def create_delta(base_buf, target_buf):
     """Use python difflib to work out how to transform base_buf to target_buf.
 
@@ -1594,19 +1629,9 @@ def create_delta(base_buf, target_buf):
     assert isinstance(base_buf, str)
     assert isinstance(target_buf, str)
     out_buf = ''
-    # write delta header
-    def encode_size(size):
-        ret = ''
-        c = size & 0x7f
-        size >>= 7
-        while size:
-            ret += chr(c | 0x80)
-            c = size & 0x7f
-            size >>= 7
-        ret += chr(c)
-        return ret
-    out_buf += encode_size(len(base_buf))
-    out_buf += encode_size(len(target_buf))
+     # write delta header
+    out_buf += _delta_encode_size(len(base_buf))
+    out_buf += _delta_encode_size(len(target_buf))
     # write out delta opcodes
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
@@ -1616,20 +1641,13 @@ def create_delta(base_buf, target_buf):
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
             # Write out an opcode that says what range to use
-            scratch = ''
-            op = 0x80
-            o = i1
-            for i in range(4):
-                if o & 0xff << i*8:
-                    scratch += chr((o >> i*8) & 0xff)
-                    op |= 1 << i
-            s = i2 - i1
-            for i in range(2):
-                if s & 0xff << i*8:
-                    scratch += chr((s >> i*8) & 0xff)
-                    op |= 1 << (4+i)
-            out_buf += chr(op)
-            out_buf += scratch
+            copy_start = i1
+            copy_len = i2 - i1
+            while copy_len > 0:
+                to_copy = min(copy_len, _MAX_COPY_LEN)
+                out_buf += _encode_copy_operation(copy_start, to_copy)
+                copy_start += to_copy
+                copy_len -= to_copy
         if opcode == 'replace' or opcode == 'insert':
             # If we are replacing a range or adding one, then we just
             # output it to the stream (prefixed by its size)
@@ -1805,6 +1823,12 @@ class Pack(object):
             self._data.close()
         if self._idx is not None:
             self._idx.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def __eq__(self, other):
         return isinstance(self, type(other)) and self.index == other.index

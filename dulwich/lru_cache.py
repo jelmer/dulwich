@@ -362,6 +362,6 @@ class LRUSizeCache(LRUCache):
     def _update_max_size(self, max_size, after_cleanup_size=None):
         self._max_size = max_size
         if after_cleanup_size is None:
-            self._after_cleanup_size = self._max_size * 8 / 10
+            self._after_cleanup_size = self._max_size * 8 // 10
         else:
             self._after_cleanup_size = min(after_cleanup_size, self._max_size)

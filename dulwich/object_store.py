@@ -23,7 +23,7 @@
 
 from io import BytesIO
 import errno
-import itertools
+from itertools import chain
 import os
 import stat
 import tempfile
@@ -336,7 +336,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
         iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
-        return itertools.chain(*iterables)
+        return chain(*iterables)
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose.
@@ -924,10 +924,10 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
     """
     filetree = obj_store[tree_sha]
     for name, mode, sha in filetree.iteritems():
-       if not S_ISGITLINK(mode) and sha not in kset:
-           kset.add(sha)
-           if stat.S_ISDIR(mode):
-               _collect_filetree_revs(obj_store, sha, kset)
+        if not S_ISGITLINK(mode) and sha not in kset:
+            kset.add(sha)
+            if stat.S_ISDIR(mode):
+                _collect_filetree_revs(obj_store, sha, kset)
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
@@ -978,7 +978,7 @@ class MissingObjectFinder(object):
     """
 
     def __init__(self, object_store, haves, wants, progress=None,
-            get_tagged=None, get_parents=lambda commit: commit.parents):
+                 get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
         self._get_parents = get_parents
         # process Commits and Tags differently
@@ -986,22 +986,19 @@ class MissingObjectFinder(object):
         # and such SHAs would get filtered out by _split_commits_and_tags,
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
-        have_commits, have_tags = \
-                _split_commits_and_tags(object_store, haves, True)
-        want_commits, want_tags = \
-                _split_commits_and_tags(object_store, wants, False)
+        have_commits, have_tags = (
+            _split_commits_and_tags(object_store, haves, True))
+        want_commits, want_tags = (
+            _split_commits_and_tags(object_store, wants, False))
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-                have_commits,
-                get_parents=self._get_parents)[0]
+            have_commits, get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
-            want_commits,
-            all_ancestors,
-            get_parents=self._get_parents);
+            want_commits, all_ancestors, get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -1055,6 +1052,8 @@ class MissingObjectFinder(object):
         self.progress("counting objects: %d\r" % len(self.sha_done))
         return (sha, name)
 
+    __next__ = next
+
 
 class ObjectStoreGraphWalker(object):
     """Graph walker that finds what commits are missing from an object store.
@@ -1106,3 +1105,5 @@ class ObjectStoreGraphWalker(object):
             self.heads.update([p for p in ps if not p in self.parents])
             return ret
         return None
+
+    __next__ = next

@@ -25,13 +25,13 @@ warning: these tests should be fairly stable, but when writing/debugging new
 """
 
 import threading
+from unittest import (
+    SkipTest,
+    )
 from wsgiref import simple_server
 
 from dulwich.server import (
     DictBackend,
-    )
-from dulwich.tests import (
-    SkipTest,
     )
 from dulwich.web import (
     make_wsgi_chain,
@@ -65,6 +65,7 @@ class WebTests(ServerTests):
           'localhost', 0, app, server_class=WSGIServerLogger,
           handler_class=WSGIRequestHandlerLogger)
         self.addCleanup(dul_server.shutdown)
+        self.addCleanup(dul_server.server_close)
         threading.Thread(target=dul_server.serve_forever).start()
         self._server = dul_server
         _, port = dul_server.socket.getsockname()

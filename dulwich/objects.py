@@ -58,6 +58,7 @@ _TAGGER_HEADER = "tagger"
 
 S_IFGITLINK = 0o160000
 
+
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
@@ -398,7 +399,7 @@ class ShaFile(object):
             obj._needs_serialization = True
             obj._file = f
             return obj
-        except (IndexError, ValueError) as e:
+        except (IndexError, ValueError):
             raise ObjectFormatException("invalid object header")
 
     @staticmethod
@@ -727,10 +728,12 @@ class Tag(ShaFile):
     tagger = serializable_property("tagger",
         "Returns the name of the person who created this tag")
     tag_time = serializable_property("tag_time",
-        "The creation timestamp of the tag.  As the number of seconds since the epoch")
+        "The creation timestamp of the tag.  As the number of seconds "
+        "since the epoch")
     tag_timezone = serializable_property("tag_timezone",
         "The timezone that tag_time is in.")
-    message = serializable_property("message", "The message attached to this tag")
+    message = serializable_property(
+        "message", "The message attached to this tag")
 
 
 class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
@@ -881,7 +884,8 @@ class Tree(ShaFile):
         """
         if isinstance(name, int) and isinstance(mode, str):
             (name, mode) = (mode, name)
-            warnings.warn("Please use Tree.add(name, mode, hexsha)",
+            warnings.warn(
+                "Please use Tree.add(name, mode, hexsha)",
                 category=DeprecationWarning, stacklevel=2)
         self._ensure_parsed()
         self._entries[name] = mode, hexsha
@@ -890,7 +894,8 @@ class Tree(ShaFile):
     def iteritems(self, name_order=False):
         """Iterate over entries.
 
-        :param name_order: If True, iterate in name order instead of tree order.
+        :param name_order: If True, iterate in name order instead of tree
+            order.
         :return: Iterator over (name, mode, sha) tuples
         """
         self._ensure_parsed()
@@ -909,8 +914,8 @@ class Tree(ShaFile):
             parsed_entries = parse_tree("".join(chunks))
         except ValueError as e:
             raise ObjectFormatException(e)
-        # TODO: list comprehension is for efficiency in the common (small) case;
-        # if memory efficiency in the large case is a concern, use a genexp.
+        # TODO: list comprehension is for efficiency in the common (small)
+        # case; if memory efficiency in the large case is a concern, use a genexp.
         self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
 
     def check(self):
@@ -1088,12 +1093,12 @@ class Commit(ShaFile):
 
     def _deserialize(self, chunks):
         (self._tree, self._parents, author_info, commit_info, self._encoding,
-                self._mergetag, self._message, self._extra) = \
-                        parse_commit(chunks)
+                self._mergetag, self._message, self._extra) = (
+                        parse_commit(chunks))
         (self._author, self._author_time, (self._author_timezone,
-            self._author_timezone_neg_utc)) = author_info
+             self._author_timezone_neg_utc)) = author_info
         (self._committer, self._commit_time, (self._commit_timezone,
-            self._commit_timezone_neg_utc)) = commit_info
+             self._commit_timezone_neg_utc)) = commit_info
 
     def check(self):
         """Check this object for internal consistency.
@@ -1137,12 +1142,12 @@ class Commit(ShaFile):
         for p in self._parents:
             chunks.append("%s %s\n" % (_PARENT_HEADER, p))
         chunks.append("%s %s %s %s\n" % (
-          _AUTHOR_HEADER, self._author, str(self._author_time),
-          format_timezone(self._author_timezone,
+            _AUTHOR_HEADER, self._author, str(self._author_time),
+            format_timezone(self._author_timezone,
                           self._author_timezone_neg_utc)))
         chunks.append("%s %s %s %s\n" % (
-          _COMMITTER_HEADER, self._committer, str(self._commit_time),
-          format_timezone(self._commit_timezone,
+            _COMMITTER_HEADER, self._committer, str(self._commit_time),
+            format_timezone(self._commit_timezone,
                           self._commit_timezone_neg_utc)))
         if self.encoding:
             chunks.append("%s %s\n" % (_ENCODING_HEADER, self.encoding))
@@ -1158,13 +1163,15 @@ class Commit(ShaFile):
             chunks[-1] = chunks[-1].rstrip(" \n")
         for k, v in self.extra:
             if "\n" in k or "\n" in v:
-                raise AssertionError("newline in extra data: %r -> %r" % (k, v))
+                raise AssertionError(
+                    "newline in extra data: %r -> %r" % (k, v))
             chunks.append("%s %s\n" % (k, v))
-        chunks.append("\n") # There must be a new line after the headers
+        chunks.append("\n")  # There must be a new line after the headers
         chunks.append(self._message)
         return chunks
 
-    tree = serializable_property("tree", "Tree that is the state of this commit")
+    tree = serializable_property(
+        "tree", "Tree that is the state of this commit")
 
     def _get_parents(self):
         """Return a list of parents of this commit."""
@@ -1192,8 +1199,8 @@ class Commit(ShaFile):
     committer = serializable_property("committer",
         "The name of the committer of the commit")
 
-    message = serializable_property("message",
-        "The commit message")
+    message = serializable_property(
+        "message", "The commit message")
 
     commit_time = serializable_property("commit_time",
         "The timestamp of the commit. As the number of seconds since the epoch.")
@@ -1202,16 +1209,17 @@ class Commit(ShaFile):
         "The zone the commit time is in")
 
     author_time = serializable_property("author_time",
-        "The timestamp the commit was written. as the number of seconds since the epoch.")
+        "The timestamp the commit was written. As the number of "
+        "seconds since the epoch.")
 
-    author_timezone = serializable_property("author_timezone",
-        "Returns the zone the author time is in.")
+    author_timezone = serializable_property(
+        "author_timezone", "Returns the zone the author time is in.")
 
-    encoding = serializable_property("encoding",
-        "Encoding of the commit message.")
+    encoding = serializable_property(
+        "encoding", "Encoding of the commit message.")
 
-    mergetag = serializable_property("mergetag",
-        "Associated signed tag.")
+    mergetag = serializable_property(
+        "mergetag", "Associated signed tag.")
 
 
 OBJECT_CLASSES = (
@@ -1226,7 +1234,6 @@ _TYPE_MAP = {}
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls
     _TYPE_MAP[cls.type_num] = cls
-
 
 
 # Hold on to the pure-python implementations for testing

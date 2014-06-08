@@ -480,6 +480,8 @@ class ProtocolGraphWalker(object):
             return None
         return self._cache[self._cache_index]
 
+    __next__ = next
+
     def read_proto_line(self, allowed):
         """Read a line from the wire.
 
@@ -599,6 +601,8 @@ class SingleAckGraphWalkerImpl(object):
         elif command == 'have':
             return sha
 
+    __next__ = next
+
 
 class MultiAckGraphWalkerImpl(object):
     """Graph walker implementation that speaks the multi-ack protocol."""
@@ -637,6 +641,8 @@ class MultiAckGraphWalkerImpl(object):
                     # blind ack
                     self.walker.send_ack(sha, 'continue')
                 return sha
+
+    __next__ = next
 
 
 class MultiAckDetailedGraphWalkerImpl(object):
@@ -679,6 +685,8 @@ class MultiAckDetailedGraphWalkerImpl(object):
                     self.walker.send_ack(sha, 'ready')
                 return sha
 
+    __next__ = next
+
 
 class ReceivePackHandler(Handler):
     """Protocol handler for downloading a pack from the client."""
@@ -708,7 +716,7 @@ class ReceivePackHandler(Handler):
             # TODO: more informative error messages than just the exception string
             try:
                 recv = getattr(self.proto, "recv", None)
-                p = self.repo.object_store.add_thin_pack(self.proto.read, recv)
+                self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append(('unpack', 'ok'))
             except all_exceptions as e:
                 status.append(('unpack', str(e).replace('\n', '')))
@@ -863,22 +871,22 @@ def main(argv=sys.argv):
     """Entry point for starting a TCP git server."""
     import optparse
     parser = optparse.OptionParser()
-    parser.add_option("-b", "--backend", dest="backend",
-                      help="Select backend to use.",
-                      choices=["file"], default="file")
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=TCP_GIT_PORT,
+                      help="Binding TCP port.")
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    if options.backend == "file":
-        if len(argv) > 1:
-            gitdir = args[1]
-        else:
-            gitdir = '.'
-        backend = DictBackend({'/': Repo(gitdir)})
+    if len(argv) > 1:
+        gitdir = args[1]
     else:
-        raise Exception("No such backend %s." % backend)
-    server = TCPGitServer(backend, 'localhost')
-    server.serve_forever()
+        gitdir = '.'
+    from dulwich import porcelain
+    porcelain.daemon(gitdir, address=options.listen_address,
+                     port=options.port)
 
 
 def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
@@ -909,7 +917,7 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
 def generate_info_refs(repo):
     """Generate an info refs file."""
     refs = repo.get_refs()
-    return write_info_refs(repo.get_refs(), repo.object_store)
+    return write_info_refs(refs, repo.object_store)
 
 
 def generate_objects_info_packs(repo):

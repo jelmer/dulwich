@@ -18,10 +18,7 @@
 
 """Tests for file and tree diff utilities."""
 
-from itertools import (
-    permutations,
-    )
-
+from itertools import permutations
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
     CHANGE_RENAME,
@@ -755,6 +752,18 @@ class RenameDetectionTest(DiffTestCase):
            TreeChange.delete(('b', F, blob2.id))],
           self.detect_renames(tree1, tree2))
 
+    def test_content_rename_with_more_deletions(self):
+        blob1 = make_object(Blob, data='')
+        tree1 = self.commit_tree([('a', blob1), ('b', blob1), ('c', blob1), ('d', blob1)])
+        tree2 = self.commit_tree([('e', blob1), ('f', blob1), ('g', blob1)])
+        self.maxDiff = None
+        self.assertEqual(
+          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('e', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, ('b', F, blob1.id), ('f', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, ('c', F, blob1.id), ('g', F, blob1.id)),
+           TreeChange.delete(('d', F, blob1.id))],
+          self.detect_renames(tree1, tree2))
+
     def test_content_rename_gitlink(self):
         blob1 = make_object(Blob, data='blob1')
         blob2 = make_object(Blob, data='blob2')
@@ -872,7 +881,6 @@ class RenameDetectionTest(DiffTestCase):
         blob_c2 = make_object(Blob, data='a\nb\nc\ne\n')
         tree1 = self.commit_tree([('a', blob_a1), ('b', blob_b)])
         tree2 = self.commit_tree([('c', blob_c2), ('b', blob_b)])
-        detector = RenameDetector(self.store)
         self.assertEqual(
           [TreeChange(CHANGE_RENAME, ('a', F, blob_a1.id),
                       ('c', F, blob_c2.id))],

@@ -25,13 +25,13 @@ import socket
 import subprocess
 import tempfile
 import time
+from unittest import SkipTest
 
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
     get_safe_env,
-    SkipTest,
     TestCase,
     )
 
@@ -193,13 +193,14 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
         s.settimeout(delay)
         try:
             s.connect(('localhost', port))
-            s.close()
             return True
         except socket.error as e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
                 raise
+        finally:
+            s.close()
     return False
 
 

@@ -21,6 +21,7 @@
 import errno
 import os
 import tempfile
+import io
 
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
@@ -36,7 +37,7 @@ def fancy_rename(oldname, newname):
     if not os.path.exists(newname):
         try:
             os.rename(oldname, newname)
-        except OSError as e:
+        except OSError:
             raise
         return
 
@@ -45,17 +46,17 @@ def fancy_rename(oldname, newname):
         (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
         os.close(fd)
         os.remove(tmpfile)
-    except OSError as e:
+    except OSError:
         # either file could not be created (e.g. permission problem)
         # or could not be deleted (e.g. rude virus scanner)
         raise
     try:
         os.rename(newname, tmpfile)
-    except OSError as e:
+    except OSError:
         raise   # no rename occurred
     try:
         os.rename(oldname, newname)
-    except OSError as e:
+    except OSError:
         os.rename(tmpfile, newname)
         raise
     os.remove(tmpfile)
@@ -82,7 +83,7 @@ def GitFile(filename, mode='rb', bufsize=-1):
     if 'w' in mode:
         return _GitFile(filename, mode, bufsize)
     else:
-        return file(filename, mode, bufsize)
+        return io.open(filename, mode, bufsize)
 
 
 class _GitFile(object):
@@ -98,8 +99,8 @@ class _GitFile(object):
 
     PROXY_PROPERTIES = set(['closed', 'encoding', 'errors', 'mode', 'name',
                             'newlines', 'softspace'])
-    PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'next', 'read',
-                     'readline', 'readlines', 'xreadlines', 'seek', 'tell',
+    PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'read',
+                     'readline', 'readlines', 'seek', 'tell',
                      'truncate', 'write', 'writelines')
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
@@ -153,6 +154,12 @@ class _GitFile(object):
                 fancy_rename(self._lockfilename, self._filename)
         finally:
             self.abort()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def __getattr__(self, name):
         """Proxy property calls to the underlying file."""

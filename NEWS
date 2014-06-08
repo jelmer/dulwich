@@ -1,4 +1,4 @@
-0.9.7	UNRELEASED
+0.9.7	2014-06-08
 
  BUG FIXES
 
@@ -40,7 +40,7 @@
 API CHANGES
 
   * An optional close function can be passed to the Protocol class. This will
-    be called by it's close method. (Gary van der Merwe)
+    be called by its close method. (Gary van der Merwe)
 
   * All classes with close methods are now context managers, so that they can
     be easily closed using a `with` statement. (Gary van der Merwe)

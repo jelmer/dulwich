@@ -1,4 +1,4 @@
-dulwich (0.9.7-1) UNRELEASED; urgency=medium
+dulwich (0.9.7-1) unstable; urgency=medium
 
   * New upstream release.
   * Use canonical URL in Vcs-Git.

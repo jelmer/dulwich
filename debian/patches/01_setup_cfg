@@ -1,17 +1,14 @@
-Description: Include setup.cfg in SOURCES.txt
-Author: Jelmer Vernooij <jelmer@debian.org>
-
---- dulwich-0.9.1.orig/dulwich.egg-info/SOURCES.txt
-+++ dulwich-0.9.1/dulwich.egg-info/SOURCES.txt
-@@ -3,6 +3,7 @@ MANIFEST.in
+--- dulwich-0.9.7.orig/dulwich.egg-info/SOURCES.txt
++++ dulwich-0.9.7/dulwich.egg-info/SOURCES.txt
+@@ -5,6 +5,7 @@ MANIFEST.in
  Makefile
  NEWS
  README.md
 +setup.cfg
  setup.py
- bin/dul-daemon
  bin/dul-receive-pack
-@@ -170,4 +170,4 @@ dulwich/tests/data/trees/70/c190eb48fa8b
+ bin/dul-upload-pack
+@@ -176,4 +177,4 @@ dulwich/tests/data/trees/70/c190eb48fa8b
  examples/clone.py
  examples/config.py
  examples/diff.py

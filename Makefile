@@ -1,8 +1,9 @@
 PYTHON = python
-PYLINT = pylint
+PYFLAKES = pyflakes
+PEP8 = pep8
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
-ifeq ($(shell $(PYTHON) -c "import sys; print sys.version_info >= (2, 7)"),True)
+ifeq ($(shell $(PYTHON) -c "import sys; print(sys.version_info >= (2, 7))"),True)
 TESTRUNNER ?= unittest
 else
 TESTRUNNER ?= unittest2.__main__
@@ -29,7 +30,7 @@ check:: build
 	$(RUNTEST) dulwich.tests.test_suite
 
 check-tutorial:: build
-	$(RUNTEST) dulwich.tests.tutorial_test_suite 
+	$(RUNTEST) dulwich.tests.tutorial_test_suite
 
 check-nocompat:: build
 	$(RUNTEST) dulwich.tests.nocompat_test_suite
@@ -49,5 +50,11 @@ clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
 
-lint::
-	$(PYLINT) --rcfile=.pylintrc --msg-template="{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}" dulwich
+flakes:
+	$(PYFLAKES) dulwich
+
+pep8:
+	$(PEP8) dulwich
+
+before-push: check
+	git diff origin/master | $(PEP8) --diff

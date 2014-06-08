@@ -1,11 +1,11 @@
-#!/usr/bin/python
-# dul-daemon - Simple git-daemon-like server
-# Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# __init__.py -- Contrib module for Dulwich
+# Copyright (C) 2014 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; version 2
-# or (at your option) a later version of the License.
+# of the License or (at your option) any later version of
+# the License.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,7 +17,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.server import main
 
-if __name__ == '__main__':
-    main()
+def test_suite():
+    import unittest
+    names = [
+        'swift',
+        ]
+    module_names = ['dulwich.contrib.test_' + name for name in names]
+    loader = unittest.TestLoader()
+    return loader.loadTestsFromNames(module_names)

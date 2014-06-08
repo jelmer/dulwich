@@ -32,6 +32,7 @@ import tarfile
 import tempfile
 import threading
 import urllib
+from unittest import SkipTest
 
 from dulwich import (
     client,
@@ -44,7 +45,6 @@ from dulwich import (
     )
 from dulwich.tests import (
     get_safe_env,
-    SkipTest,
     )
 
 from dulwich.tests.compat.utils import (
@@ -152,16 +152,18 @@ class DulwichClientTestBase(object):
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         # set up for two non-ff errors
-        dest.refs['refs/heads/branch'] = dest.refs['refs/heads/master'] = dummy
+        branch, master = 'refs/heads/branch', 'refs/heads/master'
+        dest.refs[branch] = dest.refs[master] = dummy
         sendrefs, gen_pack = self.compute_send()
         c = self._client()
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         except errors.UpdateRefsError as e:
-            self.assertEqual('refs/heads/branch, refs/heads/master failed to '
-                             'update', str(e))
-            self.assertEqual({'refs/heads/branch': 'non-fast-forward',
-                              'refs/heads/master': 'non-fast-forward'},
+            self.assertIn(str(e),
+                          ['{0}, {1} failed to update'.format(branch, master),
+                           '{1}, {0} failed to update'.format(branch, master)])
+            self.assertEqual({branch: 'non-fast-forward',
+                              master: 'non-fast-forward'},
                              e.ref_status)
 
     def test_archive(self):
@@ -176,7 +178,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_incremental_fetch_pack(self):
@@ -186,7 +189,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
         refs = c.fetch(self._build_path('/dest'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_fetch_pack_no_side_band_64k(self):
@@ -194,7 +198,8 @@ class DulwichClientTestBase(object):
         c._fetch_capabilities.remove('side-band-64k')
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest)
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
         self.assertDestEqualsSrc()
 
     def test_fetch_pack_zero_sha(self):
@@ -204,7 +209,8 @@ class DulwichClientTestBase(object):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
         refs = c.fetch(self._build_path('/server_new.export'), dest,
             lambda refs: [protocol.ZERO_SHA])
-        map(lambda r: dest.refs.set_if_equals(r[0], None, r[1]), refs.items())
+        for r in refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
 
     def test_send_remove_branch(self):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
@@ -242,7 +248,9 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def tearDown(self):
         try:
-            os.kill(int(open(self.pidfile).read().strip()), signal.SIGKILL)
+            with open(self.pidfile) as f:
+                pid = f.read()
+            os.kill(int(pid.strip()), signal.SIGKILL)
             os.unlink(self.pidfile)
         except (OSError, IOError):
             pass
@@ -454,6 +462,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
     def tearDown(self):
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
+        self._httpd.shutdown()
+        self._httpd.socket.close()
 
     def _client(self):
         return client.HttpGitClient(self._httpd.get_url())

@@ -10,7 +10,7 @@ except ImportError:
     has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.6'
+dulwich_version_string = '0.9.7'
 
 include_dirs = []
 # Windows MSVC support
@@ -44,6 +44,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         stderr=subprocess.PIPE, env={})
     out, err = p.communicate()
     for l in out.splitlines():
+        l = l.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
@@ -71,8 +72,8 @@ setup(name='dulwich',
       The project is named after the part of London that Mr. and Mrs. Git live in
       in the particular Monty Python sketch.
       """,
-      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat'],
-      scripts=['bin/dulwich', 'bin/dul-daemon', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
+      scripts=['bin/dulwich', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),
@@ -82,5 +83,8 @@ setup(name='dulwich',
               include_dirs=include_dirs),
       ],
       distclass=DulwichDistribution,
+      include_package_data=True,
+      use_2to3=True,
+      convert_2to3_doctests=['../docs/*', '../docs/tutorial/*', ],
       **setup_kwargs
       )

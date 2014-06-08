@@ -18,6 +18,7 @@
 
 """Parser for the git index file format."""
 
+import collections
 import errno
 import os
 import stat
@@ -25,6 +26,7 @@ import struct
 
 from dulwich.file import GitFile
 from dulwich.objects import (
+    Blob,
     S_IFGITLINK,
     S_ISGITLINK,
     Tree,
@@ -35,6 +37,12 @@ from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
     )
+
+
+IndexEntry = collections.namedtuple(
+    'IndexEntry', [
+        'ctime', 'mtime', 'dev', 'ino', 'mode', 'uid', 'gid', 'size', 'sha',
+        'flags'])
 
 
 def pathsplit(path):
@@ -97,7 +105,7 @@ def read_cache_entry(f):
     name = f.read((flags & 0x0fff))
     # Padding:
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    data = f.read((beginoffset + real_size) - f.tell())
+    f.read((beginoffset + real_size) - f.tell())
     return (name, ctime, mtime, dev, ino, mode, uid, gid, size,
             sha_to_hex(sha), flags & ~0x0fff)
 
@@ -138,7 +146,7 @@ def read_index_dict(f):
     """
     ret = {}
     for x in read_index(f):
-        ret[x[0]] = tuple(x[1:])
+        ret[x[0]] = IndexEntry(*x[1:])
     return ret
 
 
@@ -214,7 +222,7 @@ class Index(object):
         try:
             f = SHA1Reader(f)
             for x in read_index(f):
-                self[x[0]] = tuple(x[1:])
+                self[x[0]] = IndexEntry(*x[1:])
             # FIXME: Additional data?
             f.read(os.path.getsize(self._filename)-f.tell()-20)
             f.check_sha()
@@ -238,17 +246,17 @@ class Index(object):
 
     def get_sha1(self, path):
         """Return the (git object) SHA1 for the object at a path."""
-        return self[path][-2]
+        return self[path].sha
 
     def get_mode(self, path):
         """Return the POSIX file mode for the object at a path."""
-        return self[path][-6]
+        return self[path].mode
 
     def iterblobs(self):
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
-            yield path, entry[-2], cleanup_mode(entry[-6])
+            yield path, entry.sha, cleanup_mode(entry.mode)
 
     def clear(self):
         """Remove all contents from this index."""
@@ -281,7 +289,7 @@ class Index(object):
         """
         def lookup_entry(path):
             entry = self[path]
-            return entry[-2], entry[-6]
+            return entry.sha, entry.mode
         for (name, mode, sha) in changes_from_tree(self._byname.keys(),
                 lookup_entry, object_store, tree,
                 want_unchanged=want_unchanged):
@@ -445,3 +453,37 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()
+
+
+def blob_from_path_and_stat(path, st):
+    """Create a blob from a path and a stat object.
+
+    :param path: Full path to file
+    :param st: A stat object
+    :return: A `Blob` object
+    """
+    blob = Blob()
+    if not stat.S_ISLNK(st.st_mode):
+        f = open(path, 'rb')
+        try:
+            blob.data = f.read()
+        finally:
+            f.close()
+    else:
+        blob.data = os.readlink(path)
+    return blob
+
+
+def get_unstaged_changes(index, path):
+    """Walk through an index and check for differences against working tree.
+
+    :param index: index to check
+    :param path: path in which to find files
+    :return: iterator over paths with unstaged changes
+    """
+    # For each entry in the index check the sha1 & ensure not staged
+    for name, entry in index.iteritems():
+        fp = os.path.join(path, name)
+        blob = blob_from_path_and_stat(fp, os.lstat(fp))
+        if blob.id != entry.sha:
+            yield name

@@ -421,7 +421,7 @@ Merge ../b
 
         d = Commit()
         d._deserialize(commit.as_raw_chunks())
-        self.assertEquals(commit, d)
+        self.assertEqual(commit, d)
 
 
 default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'

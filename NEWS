@@ -1,3 +1,58 @@
+0.9.7	2014-06-08
+
+ BUG FIXES
+
+  * Fix tests dependent on hash ordering. (Michael Edgar)
+
+  * Support staging symbolic links in Repo.stage.
+    (Robert Brown)
+
+  * Ensure that all files object are closed when running the test suite.
+    (Gary van der Merwe)
+
+  * When writing OFS_DELTA pack entries, write correct offset.
+    (Augie Fackler)
+
+  * Fix handler of larger copy operations in packs. (Augie Fackler)
+
+  * Various fixes to improve test suite running on Windows.
+    (Gary van der Merwe)
+
+  * Fix logic for extra adds of identical files in rename detector.
+    (Robert Brown)
+
+ IMPROVEMENTS
+
+  * Add porcelain 'status'. (Ryan Faulkner)
+
+  * Add porcelain 'daemon'. (Jelmer Vernooij)
+
+  * Add `dulwich.greenthreads` module which provides support
+    for concurrency of some object store operations.
+    (Fabien Boucher)
+
+  * Various changes to improve compatibility with Python 3.
+    (Gary van der Merwe, Hannu Valtonen, michael-k)
+
+  * Add OpenStack Swift backed repository implementation
+    in dulwich.contrib. See README.swift for details. (Fabien Boucher)
+
+API CHANGES
+
+  * An optional close function can be passed to the Protocol class. This will
+    be called by its close method. (Gary van der Merwe)
+
+  * All classes with close methods are now context managers, so that they can
+    be easily closed using a `with` statement. (Gary van der Merwe)
+
+  * Remove deprecated `num_objects` argument to `write_pack` methods.
+    (Jelmer Vernooij)
+
+ OTHER CHANGES
+
+  * The 'dul-daemon' script has been removed. The same functionality
+    is now available as 'dulwich daemon'. (Jelmer Vernooij)
+
 0.9.6	2014-04-23
 
  IMPROVEMENTS

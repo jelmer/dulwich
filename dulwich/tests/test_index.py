@@ -31,10 +31,13 @@ from dulwich.index import (
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
+    get_unstaged_changes,
     index_entry_from_stat,
     read_index,
+    read_index_dict,
     write_cache_time,
     write_index,
+    write_index_dict,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -82,6 +85,7 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual('bla', newname)
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
 
+
 class SimpleIndexWriterTestCase(IndexTestCase):
 
     def setUp(self):
@@ -105,6 +109,33 @@ class SimpleIndexWriterTestCase(IndexTestCase):
         x = open(filename, 'r')
         try:
             self.assertEqual(entries, list(read_index(x)))
+        finally:
+            x.close()
+
+
+class ReadIndexDictTests(IndexTestCase):
+
+    def setUp(self):
+        IndexTestCase.setUp(self)
+        self.tempdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        IndexTestCase.tearDown(self)
+        shutil.rmtree(self.tempdir)
+
+    def test_simple_write(self):
+        entries = {'barbla': ((1230680220, 0), (1230680220, 0), 2050, 3761020,
+                    33188, 1000, 1000, 0,
+                    'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
+        filename = os.path.join(self.tempdir, 'test-simple-write-index')
+        x = open(filename, 'w+')
+        try:
+            write_index_dict(x, entries)
+        finally:
+            x.close()
+        x = open(filename, 'r')
+        try:
+            self.assertEqual(entries, read_index_dict(x))
         finally:
             x.close()
 
@@ -221,17 +252,17 @@ class IndexEntryFromStatTests(TestCase):
 class BuildIndexTests(TestCase):
 
     def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
-        self.assertEquals(index_entry[4], mode)  # mode
-        self.assertEquals(index_entry[7], filesize)  # filesize
-        self.assertEquals(index_entry[8], sha)  # sha
+        self.assertEqual(index_entry[4], mode)  # mode
+        self.assertEqual(index_entry[7], filesize)  # filesize
+        self.assertEqual(index_entry[8], sha)  # sha
 
     def assertFileContents(self, path, contents, symlink=False):
         if symlink:
-            self.assertEquals(os.readlink(path), contents)
+            self.assertEqual(os.readlink(path), contents)
         else:
             f = open(path, 'rb')
             try:
-                self.assertEquals(f.read(), contents)
+                self.assertEqual(f.read(), contents)
             finally:
                 f.close()
 
@@ -248,10 +279,10 @@ class BuildIndexTests(TestCase):
 
         # Verify index entries
         index = repo.open_index()
-        self.assertEquals(len(index), 0)
+        self.assertEqual(len(index), 0)
 
         # Verify no files
-        self.assertEquals(['.git'], os.listdir(repo.path))
+        self.assertEqual(['.git'], os.listdir(repo.path))
 
     def test_nonempty(self):
         if os.name != 'posix':
@@ -281,7 +312,7 @@ class BuildIndexTests(TestCase):
 
         # Verify index entries
         index = repo.open_index()
-        self.assertEquals(len(index), 4)
+        self.assertEqual(len(index), 4)
 
         # filea
         apath = os.path.join(repo.path, 'a')
@@ -300,19 +331,51 @@ class BuildIndexTests(TestCase):
         # filed
         dpath = os.path.join(repo.path, 'c', 'd')
         self.assertTrue(os.path.exists(dpath))
-        self.assertReasonableIndexEntry(index['c/d'], 
+        self.assertReasonableIndexEntry(index['c/d'],
             stat.S_IFREG | 0o644, 6, filed.id)
         self.assertFileContents(dpath, 'file d')
 
         # symlink to d
         epath = os.path.join(repo.path, 'c', 'e')
         self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index['c/e'], 
+        self.assertReasonableIndexEntry(index['c/e'],
             stat.S_IFLNK, 1, filee.id)
         self.assertFileContents(epath, 'd', symlink=True)
 
         # Verify no extra files
-        self.assertEquals(['.git', 'a', 'b', 'c'],
+        self.assertEqual(['.git', 'a', 'b', 'c'],
             sorted(os.listdir(repo.path)))
-        self.assertEquals(['d', 'e'], 
+        self.assertEqual(['d', 'e'],
             sorted(os.listdir(os.path.join(repo.path, 'c'))))
+
+
+class GetUnstagedChangesTests(TestCase):
+
+    def test_get_unstaged_changes(self):
+        """Unit test for get_unstaged_changes."""
+
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        # Commit a dummy file then modify it
+        foo1_fullpath = os.path.join(repo_dir, 'foo1')
+        with open(foo1_fullpath, 'w') as f:
+            f.write('origstuff')
+
+        foo2_fullpath = os.path.join(repo_dir, 'foo2')
+        with open(foo2_fullpath, 'w') as f:
+            f.write('origstuff')
+
+        repo.stage(['foo1', 'foo2'])
+        repo.do_commit('test status', author='', committer='')
+
+        with open(foo1_fullpath, 'w') as f:
+            f.write('newstuff')
+
+        # modify access and modify time of path
+        os.utime(foo1_fullpath, (0, 0))
+
+        changes = get_unstaged_changes(repo.open_index(), repo_dir)
+
+        self.assertEqual(list(changes), ['foo1'])

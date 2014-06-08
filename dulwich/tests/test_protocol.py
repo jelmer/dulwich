@@ -82,6 +82,11 @@ class BaseProtocolTests(object):
         self.rin.seek(0)
         self.assertEqual(None, self.proto.read_pkt_line())
 
+    def test_read_pkt_line_wrong_size(self):
+        self.rin.write('0100too short')
+        self.rin.seek(0)
+        self.assertRaises(AssertionError, self.proto.read_pkt_line)
+
     def test_write_sideband(self):
         self.proto.write_sideband(3, 'bloe')
         self.assertEqual(self.rout.getvalue(), '0009\x03bloe')

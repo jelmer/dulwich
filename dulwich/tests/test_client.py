@@ -177,11 +177,14 @@ class GitClientTests(TestCase):
             return {}
 
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-            '0000000000000000000000000000000000000000 '
-            'refs/heads/master\x00report-status ofs-delta0000')
+            ['007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             '0000000000000000000000000000000000000000 '
+             'refs/heads/master\x00report-status ofs-delta0000',
+             '007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             '0000000000000000000000000000000000000000 '
+             'refs/heads/master\x00ofs-delta report-status0000'])
 
     def test_send_pack_new_ref_only(self):
         self.rin.write(
@@ -203,14 +206,18 @@ class GitClientTests(TestCase):
             return {}
 
         f = BytesIO()
-        empty_pack = write_pack_objects(f, {})
+        write_pack_objects(f, {})
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f0000000000000000000000000000000000000000 '
-            '310ca9477129b8586fa2afc779c1f57cf64bba6c '
-            'refs/heads/blah12\x00report-status ofs-delta0000%s'
-            % f.getvalue())
+            ['007f0000000000000000000000000000000000000000 '
+             '310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             'refs/heads/blah12\x00report-status ofs-delta0000%s'
+             % f.getvalue(),
+             '007f0000000000000000000000000000000000000000 '
+             '310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             'refs/heads/blah12\x00ofs-delta report-status0000%s'
+             % f.getvalue()])
 
     def test_send_pack_new_ref(self):
         self.rin.write(
@@ -241,13 +248,16 @@ class GitClientTests(TestCase):
             return [(commit, None), (tree, ''), ]
 
         f = BytesIO()
-        pack = write_pack_objects(f, generate_pack_contents(None, None))
+        write_pack_objects(f, generate_pack_contents(None, None))
         self.client.send_pack('/', determine_wants, generate_pack_contents)
-        self.assertEqual(
+        self.assertIn(
             self.rout.getvalue(),
-            '007f0000000000000000000000000000000000000000 %s '
-            'refs/heads/blah12\x00report-status ofs-delta0000%s'
-            % (commit.id, f.getvalue()))
+            ['007f0000000000000000000000000000000000000000 %s '
+             'refs/heads/blah12\x00report-status ofs-delta0000%s'
+             % (commit.id, f.getvalue()),
+             '007f0000000000000000000000000000000000000000 %s '
+             'refs/heads/blah12\x00ofs-delta report-status0000%s'
+             % (commit.id, f.getvalue())])
 
     def test_send_pack_no_deleteref_delete_only(self):
         pkts = ['310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'
@@ -482,6 +492,7 @@ class TestSSHVendor(object):
         class Subprocess: pass
         setattr(Subprocess, 'read', lambda: None)
         setattr(Subprocess, 'write', lambda: None)
+        setattr(Subprocess, 'close', lambda: None)
         setattr(Subprocess, 'can_read', lambda: None)
         return Subprocess()
 
@@ -519,12 +530,12 @@ class SSHGitClientTests(TestCase):
         client.port = 1337
 
         client._connect("command", "/path/to/repo")
-        self.assertEquals("username", server.username)
-        self.assertEquals(1337, server.port)
-        self.assertEquals(["git-command '/path/to/repo'"], server.command)
+        self.assertEqual("username", server.username)
+        self.assertEqual(1337, server.port)
+        self.assertEqual(["git-command '/path/to/repo'"], server.command)
 
         client._connect("relative-command", "/~/path/to/repo")
-        self.assertEquals(["git-relative-command '~/path/to/repo'"],
+        self.assertEqual(["git-relative-command '~/path/to/repo'"],
                           server.command)
 
 
@@ -558,7 +569,7 @@ class LocalGitClientTests(TestCase):
         c = LocalGitClient()
         t = MemoryRepo()
         s = open_repo('a.git')
-        self.assertEquals(s.get_refs(), c.fetch(s.path, t))
+        self.assertEqual(s.get_refs(), c.fetch(s.path, t))
 
     def test_fetch_empty(self):
         c = LocalGitClient()
@@ -567,7 +578,7 @@ class LocalGitClientTests(TestCase):
         walker = {}
         c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
-        self.assertEquals("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
+        self.assertEqual("PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
             "\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
     def test_fetch_pack_none(self):

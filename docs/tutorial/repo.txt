@@ -14,7 +14,7 @@ repositories:
   Regular Repositories -- They are the ones you create using ``git init`` and
   you daily use. They contain a ``.git`` folder.
 
-  Bare Repositories -- There is not ".git" folder. The top-level folder
+  Bare Repositories -- There is no ".git" folder. The top-level folder
   contains itself the "branches", "hooks"... folders. These are used for
   published repositories (mirrors). They do not have a working tree.
 

@@ -26,6 +26,9 @@ import shutil
 import tempfile
 import time
 import types
+from unittest import (
+    SkipTest,
+    )
 import warnings
 
 from dulwich.index import (
@@ -46,9 +49,6 @@ from dulwich.pack import (
     create_delta,
     )
 from dulwich.repo import Repo
-from dulwich.tests import (
-    SkipTest,
-    )
 
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0o100644  # Shorthand mode for Files.
@@ -323,4 +323,8 @@ def setup_warning_catcher():
         caught_warnings.append(args[0])
 
     warnings.showwarning = custom_showwarning
-    return caught_warnings
+
+    def restore_showwarning():
+        warnings.showwarning = original_showwarning
+
+    return caught_warnings, restore_showwarning

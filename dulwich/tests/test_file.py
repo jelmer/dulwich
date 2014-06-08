@@ -17,14 +17,15 @@
 # MA  02110-1301, USA.
 
 import errno
+import io
 import os
 import shutil
 import sys
 import tempfile
+from unittest import SkipTest
 
 from dulwich.file import GitFile, fancy_rename
 from dulwich.tests import (
-    SkipTest,
     TestCase,
     )
 
@@ -58,7 +59,7 @@ class FancyRenameTests(TestCase):
         new_f = open(self.bar, 'rb')
         self.assertEqual('foo contents', new_f.read())
         new_f.close()
-         
+
     def test_dest_exists(self):
         self.create(self.bar, 'bar contents')
         fancy_rename(self.foo, self.bar)
@@ -112,7 +113,7 @@ class GitFileTests(TestCase):
 
     def test_readonly(self):
         f = GitFile(self.path('foo'), 'rb')
-        self.assertTrue(isinstance(f, file))
+        self.assertTrue(isinstance(f, io.IOBase))
         self.assertEqual('foo contents', f.read())
         self.assertEqual('', f.read())
         f.seek(4)
@@ -157,6 +158,8 @@ class GitFileTests(TestCase):
             self.fail()
         except OSError as e:
             self.assertEqual(errno.EEXIST, e.errno)
+        else:
+            f2.close()
         f1.write(' contents')
         f1.close()
 

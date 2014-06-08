@@ -45,7 +45,7 @@ class MissingObjectFinderTest(TestCase):
                 "(%s,%s) erroneously reported as missing" % (sha, path))
             expected.remove(sha)
 
-        self.assertEquals(len(expected), 0,
+        self.assertEqual(len(expected), 0,
             "some objects are not reported as missing: %s" % (expected, ))
 
 
@@ -143,7 +143,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         self.f2_3_id = f2_3.id
         self.f3_3_id = f3_3.id
 
-        self.assertEquals(f1_2.id, f1_7.id, "[sanity]")
+        self.assertEqual(f1_2.id, f1_7.id, "[sanity]")
 
     def test_have6_want7(self):
         # have 6, want 7. Ideally, shall not report f1_7 as it's the same as

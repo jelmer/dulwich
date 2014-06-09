@@ -294,6 +294,32 @@ def cmd_upload_pack(args):
     porcelain.upload_pack(gitdir)
 
 
+def cmd_status(args):
+    parser = optparse.OptionParser()
+    options, args = parser.parse_args(args)
+    if len(args) >= 1:
+        gitdir = args[0]
+    else:
+        gitdir = '.'
+    status = porcelain.status(gitdir)
+    if status.staged:
+        sys.stdout.write("Changes to be committed:\n\n")
+        for kind, names in status.staged.iteritems():
+            for name in names:
+                sys.stdout.write("\t%s: %s\n" % (kind, name))
+        sys.stdout.write("\n")
+    if status.unstaged:
+        sys.stdout.write("Changes not staged for commit:\n\n")
+        for name in status.unstaged:
+            sys.stdout.write("\t%s\n" % name)
+        sys.stdout.write("\n")
+    if status.untracked:
+        sys.stdout.write("Untracked files:\n\n")
+        for name in status.untracked:
+            sys.stdout.write("\t%s\n" % name)
+        sys.stdout.write("\n")
+
+
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
@@ -314,6 +340,7 @@ commands = {
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
     "show": cmd_show,
+    "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,

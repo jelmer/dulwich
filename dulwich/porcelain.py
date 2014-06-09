@@ -31,9 +31,11 @@ Currently implemented:
  * pull
  * push
  * rm
+ * receive-pack
  * reset
  * rev-list
  * tag
+ * upload-pack
  * update-server-info
  * status
  * symbolic-ref
@@ -62,8 +64,16 @@ from dulwich.objects import (
     )
 from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
+from dulwich.protocol import Protocol
 from dulwich.repo import (BaseRepo, Repo)
-from dulwich.server import update_server_info as server_update_server_info
+from dulwich.server import (
+    FileSystemBackend,
+    TCPGitServer,
+    ReceivePackHandler,
+    UploadPackHandler,
+    update_server_info as server_update_server_info,
+    )
+
 
 # Module level tuple definition for status output
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
@@ -549,10 +559,42 @@ def daemon(path=".", address=None, port=None):
     :param path: Path to the directory to serve.
     """
     # TODO(jelmer): Support git-daemon-export-ok and --export-all.
-    from dulwich.server import (
-        FileSystemBackend,
-        TCPGitServer,
-        )
     backend = FileSystemBackend(path)
     server = TCPGitServer(backend, address, port)
     server.serve_forever()
+
+
+def upload_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+    """Upload a pack file after negotiating its contents using smart protocol.
+
+    :param path: Path to the repository
+    :param inf: Input stream to communicate with client
+    :param outf: Output stream to communicate with client
+    """
+    backend = FileSystemBackend()
+    def send_fn(data):
+        outf.write(data)
+        outf.flush()
+    proto = Protocol(inf.read, send_fn)
+    handler = UploadPackHandler(backend, [path], proto)
+    # FIXME: Catch exceptions and write a single-line summary to outf.
+    handler.handle()
+    return 0
+
+
+def receive_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+    """Receive a pack file after negotiating its contents using smart protocol.
+
+    :param path: Path to the repository
+    :param inf: Input stream to communicate with client
+    :param outf: Output stream to communicate with client
+    """
+    backend = FileSystemBackend()
+    def send_fn(data):
+        outf.write(data)
+        outf.flush()
+    proto = Protocol(inf.read, send_fn)
+    handler = ReceivePackHandler(backend, [path], proto)
+    # FIXME: Catch exceptions and write a single-line summary to outf.
+    handler.handle()
+    return 0

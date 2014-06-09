@@ -507,19 +507,21 @@ def pull(repo, remote_location, refs_path,
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def status(repo):
+def status(repo="."):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
-    :param repo: Path to repository
+    :param repo: Path to repository or repository object
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """
+    r = open_repo(repo)
+
     # 1. Get status of staged
-    tracked_changes = get_tree_changes(repo)
+    tracked_changes = get_tree_changes(r)
     # 2. Get status of unstaged
-    unstaged_changes = list(get_unstaged_changes(repo.open_index(), repo.path))
+    unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
     # TODO - Status of untracked - add untracked changes, need gitignore.
     untracked_changes = []
     return GitStatus(tracked_changes, unstaged_changes, untracked_changes)

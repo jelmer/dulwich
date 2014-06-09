@@ -538,6 +538,7 @@ def get_tree_changes(repo):
 
     # Compares the Index to the HEAD & determines changes
     # Iterate through the changes and report add/delete/modify
+    # TODO: call out to dulwich.diff_tree somehow.
     tracked_changes = {
         'add': [],
         'delete': [],

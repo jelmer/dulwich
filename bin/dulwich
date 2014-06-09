@@ -30,6 +30,12 @@ import os
 import sys
 from getopt import getopt
 import optparse
+import signal
+
+def signal_int(signal, frame):
+    sys.exit(1)
+
+signal.signal(signal.SIGINT, signal_int)
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
@@ -271,13 +277,21 @@ def cmd_daemon(args):
 def cmd_receive_pack(args):
     parser = optparse.OptionParser()
     options, args = parser.parse_args(args)
-    porcelain.receive_pack(args[0])
+    if len(args) >= 1:
+        gitdir = args[0]
+    else:
+        gitdir = '.'
+    porcelain.receive_pack(gitdir)
 
 
 def cmd_upload_pack(args):
     parser = optparse.OptionParser()
     options, args = parser.parse_args(args)
-    porcelain.upload_pack(args[0])
+    if len(args) >= 1:
+        gitdir = args[0]
+    else:
+        gitdir = '.'
+    porcelain.upload_pack(gitdir)
 
 
 commands = {

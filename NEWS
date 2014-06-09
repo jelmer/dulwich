@@ -1,5 +1,9 @@
 0.9.8	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add porcelain 'receive-pack' and 'upload-pack'. (Jelmer Vernooij)
+
 0.9.7	2014-06-08
 
  BUG FIXES

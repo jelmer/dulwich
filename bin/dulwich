@@ -259,13 +259,25 @@ def cmd_daemon(args):
     options, args = parser.parse_args(args)
 
     log_utils.default_logging_config()
-    if len(args) > 1:
-        gitdir = args[1]
+    if len(args) >= 1:
+        gitdir = args[0]
     else:
         gitdir = '.'
     from dulwich import porcelain
     porcelain.daemon(gitdir, address=options.listen_address,
                      port=options.port)
+
+
+def cmd_receive_pack(args):
+    parser = optparse.OptionParser()
+    options, args = parser.parse_args(args)
+    porcelain.receive_pack(args[0])
+
+
+def cmd_upload_pack(args):
+    parser = optparse.OptionParser()
+    options, args = parser.parse_args(args)
+    porcelain.upload_pack(args[0])
 
 
 commands = {
@@ -283,6 +295,7 @@ commands = {
     "fetch": cmd_fetch,
     "init": cmd_init,
     "log": cmd_log,
+    "receive-pack": cmd_receive_pack,
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
@@ -290,6 +303,7 @@ commands = {
     "symbolic-ref": cmd_symbolic_ref,
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,
+    "upload-pack": cmd_upload_pack,
     }
 
 if len(sys.argv) < 2:

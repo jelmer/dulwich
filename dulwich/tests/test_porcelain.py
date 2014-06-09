@@ -597,3 +597,36 @@ class StatusTests(PorcelainTestCase):
 
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
+
+
+class UploadPackTests(PorcelainTestCase):
+    """Tests for upload_pack."""
+
+    def test_upload_pack(self):
+        outf = BytesIO()
+        exitcode = porcelain.upload_pack(self.repo.path, BytesIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEqual(["0000"], outlines)
+        self.assertEqual(0, exitcode)
+
+
+class ReceivePackTests(PorcelainTestCase):
+    """Tests for receive_pack."""
+
+    def test_receive_pack(self):
+        filename = 'foo'
+        with open(os.path.join(self.repo.path, filename), 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        self.repo.do_commit(message='test status',
+            author='', committer='', author_timestamp=1402354300,
+            commit_timestamp=1402354300, author_timezone=0, commit_timezone=0)
+        outf = BytesIO()
+        exitcode = porcelain.receive_pack(self.repo.path, BytesIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEqual([
+            '005a9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00report-status '
+            'delete-refs side-band-64k',
+            '003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
+            '0000'], outlines)
+        self.assertEqual(0, exitcode)

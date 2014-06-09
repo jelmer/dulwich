@@ -6,6 +6,8 @@
 
   * Handle SIGINT signals in bin/dulwich. (Jelmer Vernooij)
 
+  * Add 'status' support to bin/dulwich. (Jelmer Vernooij)
+
 0.9.7	2014-06-08
 
  BUG FIXES

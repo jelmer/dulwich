@@ -202,7 +202,7 @@ class AddTests(PorcelainTestCase):
 
         # Check that foo was added and nothing in .git was modified
         index = self.repo.open_index()
-        self.assertEqual(list(index), ['blah', 'foo', 'adir/afile'])
+        self.assertEqual(sorted(index), ['adir/afile', 'blah', 'foo'])
 
     def test_add_file(self):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:

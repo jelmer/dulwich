@@ -1,5 +1,10 @@
 0.9.8	UNRELEASED
 
+ BUG FIXES
+
+  * Various fixes to improve test suite running on Windows.
+    (Gary van der Merwe)
+
  IMPROVEMENTS
 
   * Add porcelain 'receive-pack' and 'upload-pack'. (Jelmer Vernooij)

@@ -1,8 +1,8 @@
 language: python
 python:
   - "2.7"
-script: make check
+script: PYTHONHASHSEED=random python setup.py test
 install:
-  - pip install unittest2 fastimport
   - sudo apt-get update
-  - sudo apt-get install -qq git
+  - sudo apt-get install -qq git python-setuptools
+

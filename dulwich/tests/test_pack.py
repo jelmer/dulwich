@@ -305,15 +305,12 @@ class TestPack(PackTests):
             self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
     def test_copy(self):
-        origpack = self.get_pack(pack1_sha)
-
-        try:
+        with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, 'Elch')
             write_pack(basename, origpack.pack_tuples())
-            newpack = Pack(basename)
 
-            try:
+            with Pack(basename) as newpack:
                 self.assertEqual(origpack, newpack)
                 self.assertSucceeds(newpack.index.check)
                 self.assertEqual(origpack.name(), newpack.name())
@@ -324,10 +321,6 @@ class TestPack(PackTests):
                 orig_checksum = origpack.index.get_stored_checksum()
                 new_checksum = newpack.index.get_stored_checksum()
                 self.assertTrue(wrong_version or orig_checksum == new_checksum)
-            finally:
-                newpack.close()
-        finally:
-            origpack.close()
 
     def test_commit_obj(self):
         with self.get_pack(pack1_sha) as p:
@@ -351,12 +344,9 @@ class TestPack(PackTests):
         # file should exist
         self.assertTrue(os.path.exists(keepfile_name))
 
-        f = open(keepfile_name, 'r')
-        try:
+        with open(keepfile_name, 'r') as f:
             buf = f.read()
             self.assertEqual('', buf)
-        finally:
-            f.close()
 
     def test_keep_message(self):
         with self.get_pack(pack1_sha) as p:
@@ -370,12 +360,9 @@ class TestPack(PackTests):
         self.assertTrue(os.path.exists(keepfile_name))
 
         # and contain the right message, with a linefeed
-        f = open(keepfile_name, 'r')
-        try:
+        with open(keepfile_name, 'r') as f:
             buf = f.read()
             self.assertEqual(msg + '\n', buf)
-        finally:
-            f.close()
 
     def test_name(self):
         with self.get_pack(pack1_sha) as p:
@@ -437,15 +424,12 @@ class TestThinPack(PackTests):
         self.addCleanup(shutil.rmtree, self.pack_dir)
         self.pack_prefix = os.path.join(self.pack_dir, 'pack')
 
-        f = open(self.pack_prefix + '.pack', 'wb')
-        try:
+        with open(self.pack_prefix + '.pack', 'wb') as f:
             build_pack(f, [
                 (REF_DELTA, (self.blobs['foo'].id, 'foo1234')),
                 (Blob.type_num, 'bar'),
                 (REF_DELTA, (self.blobs['bar'].id, 'bar2468'))],
                 store=self.store)
-        finally:
-            f.close()
 
         # Index the new pack.
         with self.make_pack(True) as pack:
@@ -595,11 +579,8 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
 
     def writeIndex(self, filename, entries, pack_checksum):
         # FIXME: Write to BytesIO instead rather than hitting disk ?
-        f = GitFile(filename, "wb")
-        try:
+        with GitFile(filename, "wb") as f:
             self._write_fn(f, entries, pack_checksum)
-        finally:
-            f.close()
 
 
 class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):

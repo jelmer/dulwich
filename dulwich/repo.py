@@ -647,11 +647,8 @@ class Repo(BaseRepo):
             self._controldir = root
         elif (os.path.isfile(os.path.join(root, ".git"))):
             import re
-            f = open(os.path.join(root, ".git"), 'r')
-            try:
+            with open(os.path.join(root, ".git"), 'r') as f:
                 _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
-            finally:
-                f.close()
             self.bare = False
             self._controldir = os.path.join(root, path)
         else:
@@ -689,11 +686,8 @@ class Repo(BaseRepo):
         :param contents: A string to write to the file.
         """
         path = path.lstrip(os.path.sep)
-        f = GitFile(os.path.join(self.controldir(), path), 'wb')
-        try:
+        with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
-        finally:
-            f.close()
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -834,11 +828,8 @@ class Repo(BaseRepo):
         """
         path = os.path.join(self._controldir, 'description')
         try:
-            f = GitFile(path, 'rb')
-            try:
+            with GitFile(path, 'rb') as f:
                 return f.read()
-            finally:
-                f.close()
         except (IOError, OSError) as e:
             if e.errno != errno.ENOENT:
                 raise
@@ -854,11 +845,8 @@ class Repo(BaseRepo):
         """
 
         path = os.path.join(self._controldir, 'description')
-        f = open(path, 'w')
-        try:
+        with open(path, 'w') as f:
             f.write(description)
-        finally:
-            f.close()
 
     @classmethod
     def _init_maybe_bare(cls, path, bare):

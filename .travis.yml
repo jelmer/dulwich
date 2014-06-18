@@ -4,5 +4,4 @@ python:
 script: PYTHONHASHSEED=random python setup.py test
 install:
   - sudo apt-get update
-  - sudo apt-get install -qq git python-setuptools
-
+  - sudo apt-get install -qq git python-setuptools python-gevent python-fastimport python-mock

@@ -54,10 +54,8 @@ class CreateRepositoryTests(TestCase):
         if not f:
             self.assertEqual(expected, None)
         else:
-            try:
+            with f:
                 self.assertEqual(expected, f.read())
-            finally:
-                f.close()
 
     def _check_repo_contents(self, repo, expect_bare):
         self.assertEqual(expect_bare, repo.bare)
@@ -173,11 +171,8 @@ class RepositoryTests(TestCase):
 
     def test_get_description(self):
         r = self._repo = open_repo('a.git')
-        f = open(os.path.join(r.path, 'description'), 'w')
-        try:
+        with open(os.path.join(r.path, 'description'), 'w') as f:
             f.write("Some description")
-        finally:
-            f.close()
         self.assertEqual("Some description", r.get_description())
 
     def test_set_description(self):
@@ -376,11 +371,8 @@ exit 0
 
         pre_commit = os.path.join(r.controldir(), 'hooks', 'pre-commit')
 
-        f = open(pre_commit, 'wb')
-        try:
+        with open(pre_commit, 'wb') as f:
             f.write(pre_commit_fail)
-        finally:
-            f.close()
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
@@ -389,11 +381,8 @@ exit 0
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
 
-        f = open(pre_commit, 'wb')
-        try:
+        with open(pre_commit, 'wb') as f:
             f.write(pre_commit_success)
-        finally:
-            f.close()
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         commit_sha = r.do_commit(
@@ -422,11 +411,8 @@ exit 0
 
         commit_msg = os.path.join(r.controldir(), 'hooks', 'commit-msg')
 
-        f = open(commit_msg, 'wb')
-        try:
+        with open(commit_msg, 'wb') as f:
             f.write(commit_msg_fail)
-        finally:
-            f.close()
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
@@ -435,11 +421,8 @@ exit 0
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
 
-        f = open(commit_msg, 'wb')
-        try:
+        with open(commit_msg, 'wb') as f:
             f.write(commit_msg_success)
-        finally:
-            f.close()
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         commit_sha = r.do_commit(
@@ -473,11 +456,8 @@ rm %(file)s
 
         post_commit = os.path.join(r.controldir(), 'hooks', 'post-commit')
 
-        f = open(post_commit, 'wb')
-        try:
+        with open(post_commit, 'wb') as f:
             f.write(post_commit_msg)
-        finally:
-            f.close()
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         commit_sha = r.do_commit(
@@ -493,11 +473,8 @@ rm %(file)s
         post_commit_msg_fail = """#!/bin/sh
 exit 1
 """
-        f = open(post_commit, 'wb')
-        try:
+        with open(post_commit, 'wb') as f:
             f.write(post_commit_msg_fail)
-        finally:
-            f.close()
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         warnings.simplefilter("always", UserWarning)
@@ -533,11 +510,8 @@ class BuildRepoTests(TestCase):
         self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
         self.assertRaises(KeyError, lambda: r.refs['refs/heads/master'])
 
-        f = open(os.path.join(r.path, 'a'), 'wb')
-        try:
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
             f.write('file contents')
-        finally:
-            f.close()
         r.stage(['a'])
         commit_sha = r.do_commit('msg',
                                  committer='Test Committer <test@nodomain.com>',
@@ -562,11 +536,8 @@ class BuildRepoTests(TestCase):
 
     def test_commit_modified(self):
         r = self._repo
-        f = open(os.path.join(r.path, 'a'), 'wb')
-        try:
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
             f.write('new contents')
-        finally:
-            f.close()
         os.symlink('a', os.path.join(self._repo_dir, 'b'))
         r.stage(['a', 'b'])
         commit_sha = r.do_commit('modified a',

@@ -359,11 +359,8 @@ class ShaFile(object):
         raise NotImplementedError(self._serialize)
 
     def _parse_path(self):
-        f = GitFile(self._path, 'rb')
-        try:
+        with GitFile(self._path, 'rb') as f:
             self._parse_file(f)
-        finally:
-            f.close()
 
     def _parse_file(self, f):
         magic = self._magic
@@ -378,16 +375,13 @@ class ShaFile(object):
     @classmethod
     def from_path(cls, path):
         """Open a SHA file from disk."""
-        f = GitFile(path, 'rb')
-        try:
+        with GitFile(path, 'rb') as f:
             obj = cls.from_file(f)
             obj._path = path
             obj._sha = FixedSha(filename_to_hex(path))
             obj._file = None
             obj._magic = None
             return obj
-        finally:
-            f.close()
 
     @classmethod
     def from_file(cls, f):

@@ -258,11 +258,8 @@ def load_pack_index(path):
     :param filename: Path to the index file
     :return: A PackIndex loaded from the given path
     """
-    f = GitFile(path, 'rb')
-    try:
+    with GitFile(path, 'rb') as f:
         return load_pack_index_file(path, f)
-    finally:
-        f.close()
 
 
 def _load_file_contents(f, size=None):
@@ -1128,11 +1125,8 @@ class PackData(object):
         :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             return write_pack_index_v1(f, entries, self.calculate_checksum())
-        finally:
-            f.close()
 
     def create_index_v2(self, filename, progress=None):
         """Create a version 2 index file for this data file.
@@ -1142,11 +1136,8 @@ class PackData(object):
         :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             return write_pack_index_v2(f, entries, self.calculate_checksum())
-        finally:
-            f.close()
 
     def create_index(self, filename, progress=None,
                      version=2):
@@ -1457,19 +1448,13 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     :param deltify: Whether to deltify pack objects
     :return: Tuple with checksum of pack file and index file
     """
-    f = GitFile(filename + '.pack', 'wb')
-    try:
+    with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(f, objects,
             delta_window_size=delta_window_size, deltify=deltify)
-    finally:
-        f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
     entries.sort()
-    f = GitFile(filename + '.idx', 'wb')
-    try:
+    with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
-    finally:
-        f.close()
 
 
 def write_pack_header(f, num_objects):
@@ -1918,13 +1903,10 @@ class Pack(object):
         :return: The path of the .keep file, as a string.
         """
         keepfile_name = '%s.keep' % self._basename
-        keepfile = GitFile(keepfile_name, 'wb')
-        try:
+        with GitFile(keepfile_name, 'wb') as keepfile:
             if msg:
                 keepfile.write(msg)
                 keepfile.write('\n')
-        finally:
-            keepfile.close()
         return keepfile_name
 
 

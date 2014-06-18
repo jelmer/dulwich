@@ -438,12 +438,9 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
                 else:
                     raise
         else:
-            f = open(full_path, 'wb')
-            try:
+            with open(full_path, 'wb') as f:
                 # Write out file
                 f.write(object_store[entry.sha].as_raw_string())
-            finally:
-                f.close()
 
             if honor_filemode:
                 os.chmod(full_path, entry.mode)
@@ -464,11 +461,8 @@ def blob_from_path_and_stat(path, st):
     """
     blob = Blob()
     if not stat.S_ISLNK(st.st_mode):
-        f = open(path, 'rb')
-        try:
+        with open(path, 'rb') as f:
             blob.data = f.read()
-        finally:
-            f.close()
     else:
         blob.data = os.readlink(path)
     return blob

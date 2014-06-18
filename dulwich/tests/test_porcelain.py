@@ -213,11 +213,8 @@ class AddTests(PorcelainTestCase):
 class RemoveTests(PorcelainTestCase):
 
     def test_remove_file(self):
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
-        finally:
-            f.close()
         porcelain.add(self.repo.path, paths=["foo"])
         porcelain.rm(self.repo.path, paths=["foo"])
 
@@ -399,21 +396,15 @@ class ListTagsTests(PorcelainTestCase):
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
-        finally:
-            f.close()
         porcelain.add(self.repo.path, paths=["foo"])
         porcelain.commit(self.repo.path, message="Some message",
                 committer="Jane <jane@example.com>",
                 author="John <john@example.com>")
 
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("OOH")
-        finally:
-            f.close()
 
         porcelain.reset(self.repo, "hard", "HEAD")
 

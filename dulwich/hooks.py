@@ -127,21 +127,15 @@ class CommitMsgShellHook(ShellHook):
         def prepare_msg(*args):
             (fd, path) = tempfile.mkstemp()
 
-            f = os.fdopen(fd, 'wb')
-            try:
+            with os.fdopen(fd, 'wb') as f:
                 f.write(args[0])
-            finally:
-                f.close()
 
             return (path,)
 
         def clean_msg(success, *args):
             if success:
-                f = open(args[0], 'rb')
-                try:
+                with open(args[0], 'rb') as f:
                     new_msg = f.read()
-                finally:
-                    f.close()
                 os.unlink(args[0])
                 return new_msg
             os.unlink(args[0])

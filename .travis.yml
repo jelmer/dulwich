@@ -1,6 +1,8 @@
 language: python
 python:
   - "2.7"
+virtualenv:
+  system_site_packages: true
 script: PYTHONHASHSEED=random python setup.py test
 install:
   - sudo apt-get update

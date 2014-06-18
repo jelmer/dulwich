@@ -101,7 +101,6 @@ class BlackboxTestCase(TestCase):
         return subprocess.Popen(argv,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True,
             env=env)
 
 

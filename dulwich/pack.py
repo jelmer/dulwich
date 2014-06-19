@@ -931,7 +931,7 @@ class PackData(object):
     Pack files can be accessed both sequentially for exploding a pack, and
     directly with the help of an index to retrieve a specific object.
 
-    The objects within are either complete or a delta aginst another.
+    The objects within are either complete or a delta against another.
 
     The header is variable length. If the MSB of each byte is set then it
     indicates that the subsequent byte is still part of the header.

@@ -496,7 +496,7 @@ def push(repo, remote_location, refs_path, config=None, opener=None,
         outstream.write("Push to %s successful.\n" % remote_location)
     except (UpdateRefsError, SendPackError) as e:
         outstream.write("Push to %s failed.\n" % remote_location)
-        errstream.write("Push to %s failed -> '%s'\n" % e.message)
+        errstream.write("Push to %s failed -> '%s'\n" % (remote_location, e.message))
 
 
 def pull(repo, remote_location, refs_path, config=None, opener=None,

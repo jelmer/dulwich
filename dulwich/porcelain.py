@@ -52,7 +52,10 @@ import sys
 import time
 
 from dulwich import index
-from dulwich.client import get_transport_and_path
+from dulwich.client import (
+    get_transport_and_path,
+    HttpGitClient
+    )
 from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
@@ -94,13 +97,13 @@ def archive(location, committish=None, config=None, opener=None,
     :param committish: Commit SHA1 or ref to use
     :param config: Optional config object
     :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
-    :param outstream: Output stream (defaults to stdout)
+    :param outstream: Output stresam (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     """
 
-    client, path = get_transport_and_path(location, config=config)
+    client, path = get_transport_and_path(location, **{'config': config} if config else {})
 
-    if opener:
+    if type(client) is HttpGitClient and opener:
         client.opener = opener
 
     if committish is None:
@@ -194,9 +197,9 @@ def clone(source, target=None, bare=False, checkout=None, config=None, opener=No
         checkout = (not bare)
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
-    client, host_path = get_transport_and_path(source, config=config)
+    client, host_path = get_transport_and_path(source, **{'config': config} if config else {})
 
-    if opener:
+    if type(client) is HttpGitClient and opener:
         client.opener = opener
 
     if target is None:
@@ -471,7 +474,7 @@ def push(repo, remote_location, refs_path, config=None, opener=None,
     :param refs_path: relative path to the refs to push to remote
     :param config: Optional config object
     :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
-    param outstream: A stream file to write output
+    :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """
 
@@ -479,9 +482,9 @@ def push(repo, remote_location, refs_path, config=None, opener=None,
     r = open_repo(repo)
 
     # Get the client and path
-    client, path = get_transport_and_path(remote_location, config=config)
+    client, path = get_transport_and_path(remote_location, **{'config': config} if config else {})
 
-    if opener:
+    if type(client) is HttpGitClient and opener:
         client.opener = opener
 
     def update_refs(refs):
@@ -515,9 +518,9 @@ def pull(repo, remote_location, refs_path, config=None, opener=None,
     # Open the repo
     r = open_repo(repo)
 
-    client, path = get_transport_and_path(remote_location, config=config)
+    client, path = get_transport_and_path(remote_location, **{'config': config} if config else {})
 
-    if opener:
+    if type(client) is HttpGitClient and opener:
         client.opener = opener
 
     remote_refs = client.fetch(path, r, progress=errstream.write)

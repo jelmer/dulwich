@@ -227,6 +227,15 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
                          o.get_raw(packed_blob_sha))
 
 
+    def test_add_thin_pack_empty(self):
+        o = MemoryObjectStore()
+
+        f = BytesIO()
+        entries = build_pack(f, [], store=o)
+        self.assertEquals([], entries)
+        o.add_thin_pack(f.read, None)
+
+
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def tearDown(self):
@@ -315,12 +324,12 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         try:
             blob = make_object(Blob, data='yummy data')
             o.add_object(blob)
-    
+
             f = BytesIO()
             entries = build_pack(f, [
               (REF_DELTA, (blob.id, 'more yummy data')),
               ], store=o)
-            
+
             with o.add_thin_pack(f.read, None) as pack:
                 packed_blob_sha = sha_to_hex(entries[0][3])
                 pack.check_length_and_checksum()
@@ -331,6 +340,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                                  o.get_raw(packed_blob_sha))
         finally:
             o.close()
+
+    def test_add_thin_pack_empty(self):
+        o = DiskObjectStore(self.store_dir)
+
+        f = BytesIO()
+        entries = build_pack(f, [], store=o)
+        self.assertEquals([], entries)
+        o.add_thin_pack(f.read, None)
 
 
 class TreeLookupPathTests(TestCase):

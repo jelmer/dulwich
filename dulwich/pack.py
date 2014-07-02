@@ -916,7 +916,13 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
     """
     sha = sha1()
     f.seek(0, SEEK_END)
-    todo = f.tell() + end_ofs - start_ofs
+    length = f.tell()
+    if (end_ofs < 0 and length + end_ofs < start_ofs) or end_ofs > length:
+        raise AssertionError(
+            "Attempt to read beyond file length. "
+            "start_ofs: %d, end_ofs: %d, file length: %d" % (
+                start_ofs, end_ofs, length))
+    todo = length + end_ofs - start_ofs
     f.seek(start_ofs)
     while todo:
         data = f.read(min(todo, buffer_size))

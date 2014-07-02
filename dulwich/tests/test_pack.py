@@ -259,6 +259,13 @@ class TestPackData(PackTests):
           sha1('1234').hexdigest(),
           compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest())
 
+    def test_compute_file_sha_short_file(self):
+        f = BytesIO('abcd1234wxyz')
+        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
+        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
+        self.assertRaises(AssertionError, compute_file_sha, f, start_ofs=10,
+            end_ofs=-12)
+
 
 class TestPack(PackTests):
 

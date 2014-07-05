@@ -1,6 +1,7 @@
 dulwich (0.9.7-2) UNRELEASED; urgency=medium
 
   * Require at least Python 2.7. Closes: #753519
+  * Add branch to Vcs-Git header.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Wed, 02 Jul 2014 21:20:48 +0200
 

@@ -1,4 +1,4 @@
-dulwich (0.9.7-2) UNRELEASED; urgency=medium
+dulwich (0.9.7-2) unstable; urgency=medium
 
   * Require at least Python 2.7. Closes: #753519
   * Add branch to Vcs-Git header.

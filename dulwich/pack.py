@@ -1593,9 +1593,9 @@ def _delta_encode_size(size):
     return ret
 
 
-# copy operations in git's delta format can be at most this long -
-# after this you have to decompose the copy into multiple operations.
-_MAX_COPY_LEN = 0xffffff
+# The length of delta compression copy operations in version 2 packs is limited
+# to 64K.  To copy more, we use several copy operations.
+_MAX_COPY_LEN = 0xffff
 
 def _encode_copy_operation(start, length):
     scratch = ''
@@ -1604,7 +1604,7 @@ def _encode_copy_operation(start, length):
         if start & 0xff << i*8:
             scratch += chr((start >> i*8) & 0xff)
             op |= 1 << i
-    for i in range(3):
+    for i in range(2):
         if length & 0xff << i*8:
             scratch += chr((length >> i*8) & 0xff)
             op |= 1 << (4+i)
@@ -1692,6 +1692,7 @@ def apply_delta(src_buf, delta):
                     index += 1
                     cp_off |= x << (i * 8)
             cp_size = 0
+            # Version 3 packs can contain copy sizes larger than 64K.
             for i in range(3):
                 if cmd & (1 << (4+i)):
                     x = ord(delta[index])

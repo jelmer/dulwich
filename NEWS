@@ -5,6 +5,8 @@
   * Various fixes to improve test suite running on Windows.
     (Gary van der Merwe)
 
+  * Limit delta copy length to 64K in v2 pack files. (Robert Brown)
+
  IMPROVEMENTS
 
   * Add porcelain 'receive-pack' and 'upload-pack'. (Jelmer Vernooij)

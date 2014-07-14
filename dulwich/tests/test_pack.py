@@ -168,18 +168,24 @@ class TestPackDeltas(TestCase):
     def test_nochange(self):
         self._test_roundtrip(self.test_string1, self.test_string1)
 
+    def test_nochange_huge(self):
+        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
+
     def test_change(self):
         self._test_roundtrip(self.test_string1, self.test_string2)
 
     def test_rewrite(self):
         self._test_roundtrip(self.test_string1, self.test_string3)
 
-    def test_overflow(self):
+    def test_empty_to_big(self):
         self._test_roundtrip(self.test_string_empty, self.test_string_big)
 
-    def test_overflow_64k(self):
-        self.skipTest("big strings don't work yet")
-        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
+    def test_empty_to_huge(self):
+        self._test_roundtrip(self.test_string_empty, self.test_string_huge)
+
+    def test_huge_copy(self):
+        self._test_roundtrip(self.test_string_huge + self.test_string1,
+                             self.test_string_huge + self.test_string2)
 
 
 class TestPackData(PackTests):

@@ -52,7 +52,10 @@ import sys
 import time
 
 from dulwich import index
-from dulwich.client import get_transport_and_path
+from dulwich.client import (
+    get_transport_and_path,
+    HttpGitClient
+    )
 from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
@@ -86,17 +89,23 @@ def open_repo(path_or_repo):
     return Repo(path_or_repo)
 
 
-def archive(location, committish=None, outstream=sys.stdout,
-            errstream=sys.stderr):
+def archive(location, committish=None, config=None, opener=None,
+            outstream=sys.stdout, errstream=sys.stderr):
     """Create an archive.
 
     :param location: Location of repository for which to generate an archive.
     :param committish: Commit SHA1 or ref to use
-    :param outstream: Output stream (defaults to stdout)
+    :param config: Optional config object
+    :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
+    :param outstream: Output stresam (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     """
 
-    client, path = get_transport_and_path(location)
+    client, path = get_transport_and_path(location, **{'config': config} if config else {})
+
+    if type(client) is HttpGitClient and opener:
+        client.opener = opener
+
     if committish is None:
         committish = "HEAD"
     # TODO(jelmer): This invokes C git; this introduces a dependency.
@@ -173,11 +182,13 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
+def clone(source, target=None, bare=False, checkout=None, config=None, opener=None, outstream=sys.stdout):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
     :param target: Path to target repository (optional)
+    :param config: Optional config object
+    :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
     :param bare: Whether or not to create a bare repository
     :param outstream: Optional stream to write progress to
     :return: The new repository
@@ -186,7 +197,10 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
         checkout = (not bare)
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
-    client, host_path = get_transport_and_path(source)
+    client, host_path = get_transport_and_path(source, **{'config': config} if config else {})
+
+    if type(client) is HttpGitClient and opener:
+        client.opener = opener
 
     if target is None:
         target = host_path.split("/")[-1]
@@ -451,13 +465,15 @@ def reset(repo, mode, committish="HEAD"):
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def push(repo, remote_location, refs_path,
+def push(repo, remote_location, refs_path, config=None, opener=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
     :param refs_path: relative path to the refs to push to remote
+    :param config: Optional config object
+    :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """
@@ -466,7 +482,10 @@ def push(repo, remote_location, refs_path,
     r = open_repo(repo)
 
     # Get the client and path
-    client, path = get_transport_and_path(remote_location)
+    client, path = get_transport_and_path(remote_location, **{'config': config} if config else {})
+
+    if type(client) is HttpGitClient and opener:
+        client.opener = opener
 
     def update_refs(refs):
         new_refs = r.get_refs()
@@ -480,16 +499,18 @@ def push(repo, remote_location, refs_path,
         outstream.write("Push to %s successful.\n" % remote_location)
     except (UpdateRefsError, SendPackError) as e:
         outstream.write("Push to %s failed.\n" % remote_location)
-        errstream.write("Push to %s failed -> '%s'\n" % e.message)
+        errstream.write("Push to %s failed -> '%s'\n" % (remote_location, e.message))
 
 
-def pull(repo, remote_location, refs_path,
+def pull(repo, remote_location, refs_path, config=None, opener=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
     :param refs_path: relative path to the fetched refs
+    :param config: Optional config object
+    :param opener: Custom urllib2 opener for http(s) transport; primarily used for authentication
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
     """
@@ -497,7 +518,11 @@ def pull(repo, remote_location, refs_path,
     # Open the repo
     r = open_repo(repo)
 
-    client, path = get_transport_and_path(remote_location)
+    client, path = get_transport_and_path(remote_location, **{'config': config} if config else {})
+
+    if type(client) is HttpGitClient and opener:
+        client.opener = opener
+
     remote_refs = client.fetch(path, r, progress=errstream.write)
     r['HEAD'] = remote_refs[refs_path]
 

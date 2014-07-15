@@ -1054,6 +1054,8 @@ class ObjectStoreGraphWalker(object):
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
+        if len(sha) != 40:
+            raise ValueError("unexpected sha %r received" % sha)
         ancestors = set([sha])
 
         # stop if we run out of heads to remove

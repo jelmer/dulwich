@@ -401,6 +401,10 @@ class ObjectStoreGraphWalkerTests(TestCase):
         return ObjectStoreGraphWalker([x * 40 for x in heads],
             new_parent_map.__getitem__)
 
+    def test_ack_invalid_value(self):
+        gw = self.get_walker([], {})
+        self.assertRaises(ValueError, gw.ack, "tooshort")
+
     def test_empty(self):
         gw = self.get_walker([], {})
         self.assertIs(None, next(gw))

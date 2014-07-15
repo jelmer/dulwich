@@ -390,7 +390,7 @@ class GitClient(object):
         while pkt:
             parts = pkt.rstrip('\n').split(' ')
             if parts[0] == 'ACK':
-                graph_walker.ack(pkt.split(' ')[1])
+                graph_walker.ack(parts[1])
             if len(parts) < 3 or parts[2] not in (
                     'ready', 'continue', 'common'):
                 break

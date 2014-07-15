@@ -464,6 +464,8 @@ class ProtocolGraphWalker(object):
         self.proto.unread_pkt_line('%s %s' % (command, value))
 
     def ack(self, have_ref):
+        if len(have_ref) != 40:
+            raise ValueError("invalid sha %r" % have_ref)
         return self._impl.ack(have_ref)
 
     def reset(self):

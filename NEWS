@@ -7,6 +7,9 @@
 
   * Limit delta copy length to 64K in v2 pack files. (Robert Brown)
 
+  * Strip newline from final ACKed SHA while fetching packs.
+    (Michael Edgar)
+
  IMPROVEMENTS
 
   * Add porcelain 'receive-pack' and 'upload-pack'. (Jelmer Vernooij)

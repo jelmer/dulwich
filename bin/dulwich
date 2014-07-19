@@ -274,6 +274,27 @@ def cmd_daemon(args):
                      port=options.port)
 
 
+def cmd_web_daemon(args):
+    from dulwich import log_utils
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=8000,
+                      help="Binding TCP port.")
+    options, args = parser.parse_args(args)
+
+    log_utils.default_logging_config()
+    if len(args) >= 1:
+        gitdir = args[0]
+    else:
+        gitdir = '.'
+    from dulwich import porcelain
+    porcelain.daemon(gitdir, address=options.listen_address,
+                     port=options.port)
+
+
 def cmd_receive_pack(args):
     parser = optparse.OptionParser()
     options, args = parser.parse_args(args)
@@ -345,6 +366,7 @@ commands = {
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
+    "web-daemon": cmd_web_daemon,
     }
 
 if len(sys.argv) < 2:

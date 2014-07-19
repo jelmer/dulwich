@@ -560,10 +560,33 @@ def daemon(path=".", address=None, port=None):
     """Run a daemon serving Git requests over TCP/IP.
 
     :param path: Path to the directory to serve.
+    :param address: Optional address to listen on (defaults to ::)
+    :param port: Optional port to listen on (defaults to TCP_GIT_PORT)
     """
     # TODO(jelmer): Support git-daemon-export-ok and --export-all.
     backend = FileSystemBackend(path)
     server = TCPGitServer(backend, address, port)
+    server.serve_forever()
+
+
+def web_daemon(path=".", address=None, port=None):
+    """Run a daemon serving Git requests over HTTP.
+
+    :param path: Path to the directory to serve
+    :param address: Optional address to listen on (defaults to ::)
+    :param port: Optional port to listen on (defaults to 80)
+    """
+    from dulwich.web import (
+        make_wsgi_chain,
+        make_server,
+        WSGIRequestHandlerLogger,
+        WSGIServerLogger)
+
+    backend = FileSystemBackend(path)
+    app = make_wsgi_chain(backend)
+    server = make_server(address, port, app,
+                         handler_class=WSGIRequestHandlerLogger,
+                         server_class=WSGIServerLogger)
     server.serve_forever()
 
 

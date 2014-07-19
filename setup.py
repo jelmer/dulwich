@@ -67,7 +67,7 @@ setup(name='dulwich',
       in the particular Monty Python sketch.
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
-      scripts=['bin/dulwich', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),

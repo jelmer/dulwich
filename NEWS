@@ -18,6 +18,11 @@
 
   * Add 'status' support to bin/dulwich. (Jelmer Vernooij)
 
+ CHANGES
+
+  * dul-web is now available as 'dulwich web-daemon'.
+    (Jelmer Vernooij)
+
 0.9.7	2014-06-08
 
  BUG FIXES

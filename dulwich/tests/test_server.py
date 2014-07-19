@@ -839,7 +839,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
-        self.assertEqual(repo.path, self.repo.path)
+        self.assertEqual(os.path.abspath(repo.path), os.path.abspath(self.repo.path))
 
     def test_child(self):
         self.assertRaises(NotGitRepository,

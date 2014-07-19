@@ -23,6 +23,8 @@
 
   * Add 'fetch' porcelain. (Jelmer Vernooij)
 
+  * Add 'tag_delete' porcelain. (Jelmer Vernooij)
+
  CHANGES
 
   * dul-web is now available as 'dulwich web-daemon'.

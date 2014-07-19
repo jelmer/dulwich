@@ -393,6 +393,17 @@ class TagListTests(PorcelainTestCase):
         self.assertEqual(["bar/bla", "foo"], tags)
 
 
+class TagDeleteTests(PorcelainTestCase):
+
+    def test_simple(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.tag_create(self.repo, 'foo')
+        self.assertTrue("foo" in porcelain.tag_list(self.repo))
+        porcelain.tag_delete(self.repo, 'foo')
+        self.assertFalse("foo" in porcelain.tag_list(self.repo))
+
+
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):

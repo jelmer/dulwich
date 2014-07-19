@@ -882,7 +882,7 @@ def main(argv=sys.argv):
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    if len(argv) > 1:
+    if len(args) > 1:
         gitdir = args[1]
     else:
         gitdir = '.'

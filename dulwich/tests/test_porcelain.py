@@ -349,15 +349,15 @@ class RevListTests(PorcelainTestCase):
             outstream.getvalue())
 
 
-class TagTests(PorcelainTestCase):
+class TagCreateTests(PorcelainTestCase):
 
     def test_annotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        porcelain.tag(self.repo.path, "tryme", 'foo <foo@bar.com>', 'bar',
-                annotated=True)
+        porcelain.tag_create(self.repo.path, "tryme", 'foo <foo@bar.com>',
+                'bar', annotated=True)
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
@@ -371,7 +371,7 @@ class TagTests(PorcelainTestCase):
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        porcelain.tag(self.repo.path, "tryme", annotated=False)
+        porcelain.tag_create(self.repo.path, "tryme", annotated=False)
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
@@ -379,16 +379,16 @@ class TagTests(PorcelainTestCase):
         self.assertEqual(tags.values(), [self.repo.head()])
 
 
-class ListTagsTests(PorcelainTestCase):
+class TagListTests(PorcelainTestCase):
 
     def test_empty(self):
-        tags = porcelain.list_tags(self.repo.path)
+        tags = porcelain.tag_list(self.repo.path)
         self.assertEqual([], tags)
 
     def test_simple(self):
         self.repo.refs["refs/tags/foo"] = "aa" * 20
         self.repo.refs["refs/tags/bar/bla"] = "bb" * 20
-        tags = porcelain.list_tags(self.repo.path)
+        tags = porcelain.tag_list(self.repo.path)
 
         self.assertEqual(["bar/bla", "foo"], tags)
 
@@ -664,3 +664,39 @@ class BranchDeleteTests(PorcelainTestCase):
         self.assertTrue("foo" in porcelain.branch_list(self.repo))
         porcelain.branch_delete(self.repo, 'foo')
         self.assertFalse("foo" in porcelain.branch_list(self.repo))
+
+
+class FetchTests(PorcelainTestCase):
+
+    def test_simple(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+                         author='test', committer='test')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        target_repo = porcelain.clone(self.repo.path, target=target_path,
+            outstream=outstream)
+
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test2',
+            author='test2', committer='test2')
+
+        self.assertFalse(self.repo['HEAD'].id in target_repo)
+
+        # Fetch changes into the cloned repo
+        porcelain.fetch(target_path, self.repo.path, outstream=outstream,
+            errstream=errstream)
+
+        # Check the target repo for pushed changes
+        r = Repo(target_path)
+        self.assertTrue(self.repo['HEAD'].id in r)

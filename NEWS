@@ -21,9 +21,15 @@
   * Add 'branch_create', 'branch_list', 'branch_delete' porcelain.
     (Jelmer Vernooij)
 
+  * Add 'fetch' porcelain. (Jelmer Vernooij)
+
  CHANGES
 
   * dul-web is now available as 'dulwich web-daemon'.
+    (Jelmer Vernooij)
+
+  * dulwich.porcelain.tag has been renamed to tag_create.
+    dulwich.porcelain.list_tags has been renamed to tag_list.
     (Jelmer Vernooij)
 
 0.9.7	2014-06-08

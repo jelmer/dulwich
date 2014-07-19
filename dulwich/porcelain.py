@@ -27,15 +27,15 @@ Currently implemented:
  * commit-tree
  * daemon
  * diff-tree
+ * fetch
  * init
- * list-tags
  * pull
  * push
  * rm
  * receive-pack
  * reset
  * rev-list
- * tag
+ * tag{_create,_list}
  * upload-pack
  * update-server-info
  * status
@@ -379,7 +379,13 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author=None, message=None, annotated=False,
+def tag(*args, **kwargs):
+    import warnings
+    warnings.warn(DeprecationWarning, "tag has been deprecated in favour of tag_create.")
+    return tag_create(*args, **kwargs)
+
+
+def tag_create(repo, tag, author=None, message=None, annotated=False,
         objectish="HEAD", tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
@@ -423,7 +429,13 @@ def tag(repo, tag, author=None, message=None, annotated=False,
     r.refs['refs/tags/' + tag] = tag_id
 
 
-def list_tags(repo, outstream=sys.stdout):
+def list_tags(*args, **kwargs):
+    import warnings
+    warnings.warn(DeprecationWarning, "list_tags has been deprecated in favour of tag_list.")
+    return tag_list(*args, **kwargs)
+
+
+def tag_list(repo, outstream=sys.stdout):
     """List all tags.
 
     :param repo: Path to repository
@@ -675,3 +687,18 @@ def branch_list(repo):
     """
     r = open_repo(repo)
     return r.refs.keys(base="refs/heads/")
+
+
+def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+    """Fetch objects from a remote server.
+
+    :param repo: Path to the repository
+    :param remote_location: String identifying a remote server
+    :param outstream: Output stream (defaults to stdout)
+    :param errstream: Error stream (defaults to stderr)
+    :return: Dictionary with refs on the remote
+    """
+    r = open_repo(repo)
+    client, path = get_transport_and_path(remote_location)
+    remote_refs = client.fetch(path, r, progress=errstream.write)
+    return remote_refs

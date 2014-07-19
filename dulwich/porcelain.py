@@ -35,7 +35,7 @@ Currently implemented:
  * receive-pack
  * reset
  * rev-list
- * tag{_create,_list}
+ * tag{_create,_delete,_list}
  * upload-pack
  * update-server-info
  * status
@@ -445,6 +445,23 @@ def tag_list(repo, outstream=sys.stdout):
     tags = list(r.refs.as_dict("refs/tags"))
     tags.sort()
     return tags
+
+
+def tag_delete(repo, name):
+    """Remove a tag.
+
+    :param repo: Path to repository
+    :param name: Name of tag to remove
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected tag name type %r" % name)
+    for name in names:
+        del r.refs["refs/tags/" + name]
 
 
 def reset(repo, mode, committish="HEAD"):

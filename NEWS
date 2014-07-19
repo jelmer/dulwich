@@ -18,6 +18,9 @@
 
   * Add 'status' support to bin/dulwich. (Jelmer Vernooij)
 
+  * Add 'branch_create', 'branch_list', 'branch_delete' porcelain.
+    (Jelmer Vernooij)
+
  CHANGES
 
   * dul-web is now available as 'dulwich web-daemon'.

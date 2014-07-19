@@ -21,6 +21,7 @@
 Currently implemented:
  * archive
  * add
+ * branch{_create,_delete,_list}
  * clone
  * commit
  * commit-tree
@@ -624,3 +625,53 @@ def receive_pack(path=".", inf=sys.stdin, outf=sys.stdout):
     # FIXME: Catch exceptions and write a single-line summary to outf.
     handler.handle()
     return 0
+
+
+def branch_delete(repo, name):
+    """Delete a branch.
+
+    :param repo: Path to the repository
+    :param name: Name of the branch
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected branch name type %r" % name)
+    for name in names:
+        del r.refs["refs/heads/" + name]
+
+
+def branch_create(repo, name, objectish=None, force=False):
+    """Create a branch.
+
+    :param repo: Path to the repository
+    :param name: Name of the new branch
+    :param objectish: Target object to point new branch at (defaults to HEAD)
+    :param force: Force creation of branch, even if it already exists
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected branch name type %r" % name)
+    if objectish is None:
+        objectish = "HEAD"
+    object = parse_object(r, objectish)
+    refname = "refs/heads/" + name
+    if refname in r.refs and not force:
+        raise KeyError("Branch with name %s already exists." % name)
+    r.refs[refname] = object.id
+
+
+def branch_list(repo):
+    """List all branches.
+
+    :param repo: Path to the repository
+    """
+    r = open_repo(repo)
+    return r.refs.keys(base="refs/heads/")

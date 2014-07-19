@@ -38,6 +38,7 @@ from dulwich.file import (
 
 
 SYMREF = 'ref: '
+LOCAL_BRANCH_PREFIX = 'refs/heads/'
 
 
 def check_ref_format(refname):
@@ -752,3 +753,6 @@ def write_info_refs(refs, store):
         yield '%s\t%s\n' % (o.id, name)
         if o.id != peeled.id:
             yield '%s\t%s^{}\n' % (peeled.id, name)
+
+
+is_local_branch = lambda x: x.startswith("refs/heads/")

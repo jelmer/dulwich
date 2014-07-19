@@ -621,3 +621,46 @@ class ReceivePackTests(PorcelainTestCase):
             '003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
             '0000'], outlines)
         self.assertEqual(0, exitcode)
+
+
+class BranchListTests(PorcelainTestCase):
+
+    def test_standard(self):
+        self.assertEquals(set([]), set(porcelain.branch_list(self.repo)))
+
+    def test_new_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertEquals(
+            set(["master", "foo"]),
+            set(porcelain.branch_list(self.repo)))
+
+
+class BranchCreateTests(PorcelainTestCase):
+
+    def test_branch_exists(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertRaises(KeyError, porcelain.branch_create, self.repo, "foo")
+        porcelain.branch_create(self.repo, "foo", force=True)
+
+    def test_new_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertEquals(
+            set(["master", "foo"]),
+            set(porcelain.branch_list(self.repo)))
+
+
+class BranchDeleteTests(PorcelainTestCase):
+
+    def test_simple(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, 'foo')
+        self.assertTrue("foo" in porcelain.branch_list(self.repo))
+        porcelain.branch_delete(self.repo, 'foo')
+        self.assertFalse("foo" in porcelain.branch_list(self.repo))

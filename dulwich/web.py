@@ -464,23 +464,29 @@ class WSGIServerLogger(WSGIServer):
 
 def main(argv=sys.argv):
     """Entry point for starting an HTTP git server."""
-    if len(argv) > 1:
-        gitdir = argv[1]
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=8000,
+                      help="Port to listen on.")
+    options, args = parser.parse_args(argv)
+
+    if len(args) > 1:
+        gitdir = args[1]
     else:
         gitdir = os.getcwd()
-
-    # TODO: allow serving on other addresses/ports via command-line flag
-    listen_addr = ''
-    port = 8000
 
     log_utils.default_logging_config()
     backend = DictBackend({'/': Repo(gitdir)})
     app = make_wsgi_chain(backend)
-    server = make_server(listen_addr, port, app,
+    server = make_server(options.listen_address, options.port, app,
                          handler_class=WSGIRequestHandlerLogger,
                          server_class=WSGIServerLogger)
-    logger.info('Listening for HTTP connections on %s:%d', listen_addr,
-                port)
+    logger.info('Listening for HTTP connections on %s:%d',
+                options.listen_address, options.port)
     server.serve_forever()
 
 

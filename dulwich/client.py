@@ -847,7 +847,7 @@ else:
             self.ssh_kwargs = {}
 
         def run_command(self, host, command, username=None, port=None,
-                        progress_stderr=None):
+                        progress_stderr=None, **auth_kwargs):
 
             # Paramiko needs an explicit port. None is not valid
             if port is None:
@@ -858,7 +858,7 @@ else:
             policy = paramiko.client.MissingHostKeyPolicy()
             client.set_missing_host_key_policy(policy)
             client.connect(host, username=username, port=port,
-                           **self.ssh_kwargs)
+                           **auth_kwargs)
 
             # Open SSH session
             channel = client.get_transport().open_session()
@@ -876,10 +876,50 @@ get_ssh_vendor = SubprocessSSHVendor
 
 class SSHGitClient(TraditionalGitClient):
 
-    def __init__(self, host, port=None, username=None, *args, **kwargs):
+    def __init__(self, host, port=None, username=None, password=None,
+                 pkey=None, key_filename=None, timeout=None,
+                 allow_agent=True, look_for_keys=True, *args, **kwargs):
+        """Creates a new class:`SSHGitClient` instance. It is designed to
+        accept most of func:`paramiko.SSHClient.connect`'s auth parameters.
+
+        :param host: the server to connect to
+        :type host: str
+
+        :param port: the server port to connect to
+        :type port: int
+
+        :param username: the username to authenticate as (defaults to the
+            current local username)
+        :type username: str
+
+        :param pkey: an optional private key to use for authentication
+        :type pkey: class:`paramiko.pkey.PKey`
+
+        :param key_filename: the filename, or list of filenames, of optional
+            private key(s) to try for authentication
+        :type key_filename: str
+
+        :param timeout: an optional timeout (in seconds) for the TCP connect
+        :type timeout: float
+
+        :param allow_agent: set to False to disable connecting to the SSH agent
+        :type allow_agent: bool
+
+        :param look_for_keys: set to False to disable searching for
+            discoverable private key files in ``~/.ssh/``
+        :type look_for_keys: bool
+        """
         self.host = host
         self.port = port
         self.username = username
+        self.ssh_auth_kwargs = {
+            'password': password,
+            'pkey': pkey,
+            'key_filename': key_filename,
+            'timeout': timeout,
+            'allow_agent': allow_agent,
+            'look_for_keys': look_for_keys
+        }
         TraditionalGitClient.__init__(self, *args, **kwargs)
         self.alternative_paths = {}
 
@@ -891,9 +931,10 @@ class SSHGitClient(TraditionalGitClient):
             path = path[1:]
         con = get_ssh_vendor().run_command(
             self.host, ["%s '%s'" % (self._get_cmd_path(cmd), path)],
-            port=self.port, username=self.username)
-        return (Protocol(con.read, con.write, con.close, 
-                         report_activity=self._report_activity), 
+            port=self.port, username=self.username
+        )
+        return (Protocol(con.read, con.write, con.close,
+                         report_activity=self._report_activity),
                 con.can_read)
 
 

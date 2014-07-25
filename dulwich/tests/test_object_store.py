@@ -102,6 +102,25 @@ class ObjectStoreTests(object):
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
 
+    def test_objects_are_static(self):
+        t1 = make_object(Tree)
+        self.store.add_object(t1)
+        t1_id = t1.id
+
+        self.assertEqual(self.store[t1_id].id, t1_id)
+
+        blob = make_object(Blob, data='blob')
+        self.store.add_object(blob)
+        t2 = self.store[t1_id]
+        t2['blob'] = (0o644, blob.id)
+        self.store.add_object(t2)
+
+        self.assertNotEqual(t1_id, t2.id)
+
+        self.assertNotEqual(
+            self.store[t1_id].id,
+            self.store[t2.id].id)
+
     def test_tree_changes(self):
         blob_a1 = make_object(Blob, data='a1')
         blob_a2 = make_object(Blob, data='a2')

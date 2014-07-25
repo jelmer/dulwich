@@ -20,6 +20,7 @@
 
 from io import BytesIO
 import gzip
+import mock
 import re
 import os
 
@@ -188,15 +189,14 @@ class DumbHandlersTestCase(WebTestCase):
         list(get_loose_object(self._req, _test_backend([]), mat))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
 
-    def test_get_loose_object_error(self):
+    @mock.patch('dulwich.objects.ShaFile.as_legacy_object')
+    def test_get_loose_object_error(self, as_legacy_object):
+        as_legacy_object.side_effect = IOError
+
         blob = make_object(Blob, data='foo')
         backend = _test_backend([blob])
         mat = re.search('^(..)(.{38})$', blob.id)
 
-        def as_legacy_object_error():
-            raise IOError
-
-        blob.as_legacy_object = as_legacy_object_error
         list(get_loose_object(self._req, backend, mat))
         self.assertEqual(HTTP_ERROR, self._status)
 

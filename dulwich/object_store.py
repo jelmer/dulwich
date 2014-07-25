@@ -712,7 +712,10 @@ class MemoryObjectStore(BaseObjectStore):
         return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
-        return self._data[self._to_hexsha(name)]
+        sha = self._to_hexsha(name)
+        obj = self._data[self._to_hexsha(name)]
+        type_num, uncomp = obj.type_num, obj.as_raw_string()
+        return ShaFile.from_raw_string(type_num, uncomp, sha=sha)
 
     def __delitem__(self, name):
         """Delete an object from this store, for testing only."""

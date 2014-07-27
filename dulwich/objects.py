@@ -487,6 +487,14 @@ class ShaFile(object):
             self._sha = new_sha
         return self._sha
 
+    def copy(self):
+        """Create a new copy of this SHA1 object from its raw string"""
+        obj_class = object_class(self.get_type())
+        return obj_class.from_raw_string(
+            self.get_type(),
+            self.as_raw_string(),
+            self.id)
+
     @property
     def id(self):
         """The hex SHA of this object."""

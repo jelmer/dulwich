@@ -52,6 +52,7 @@ from dulwich.objects import (
     _parse_tree_py,
     sorted_tree_items,
     _sorted_tree_items_py,
+    object_class,
     )
 from dulwich.tests import (
     TestCase,
@@ -878,3 +879,46 @@ class TimezoneTests(TestCase):
             (int(((7 * 60)) * 60), False), parse_timezone("+700"))
         self.assertEqual(
             (int(((7 * 60)) * 60), True), parse_timezone("--700"))
+
+
+class ShaFileCopyTests(TestCase):
+
+    def assert_copy(self, orig):
+        oclass = object_class(orig.type_num)
+
+        copy = orig.copy()
+        self.assertTrue(isinstance(copy, oclass))
+        self.assertEqual(copy, orig)
+        self.assertTrue(copy is not orig)
+
+    def test_commit_copy(self):
+        attrs = {'tree': 'd80c186a03f423a81b39df39dc87fd269736ca86',
+                 'parents': ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                             '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                 'author': 'James Westby <jw+debian@jameswestby.net>',
+                 'committer': 'James Westby <jw+debian@jameswestby.net>',
+                 'commit_time': 1174773719,
+                 'author_time': 1174773719,
+                 'commit_timezone': 0,
+                 'author_timezone': 0,
+                 'message':  'Merge ../b\n'}
+        commit = make_commit(**attrs)
+        self.assert_copy(commit)
+
+    def test_blob_copy(self):
+        blob = make_object(Blob, data="i am a blob")
+        self.assert_copy(blob)
+
+    def test_tree_copy(self):
+        blob = make_object(Blob, data="i am a blob")
+        tree = Tree()
+        tree['blob'] = (stat.S_IFREG, blob.id)
+        self.assert_copy(tree)
+
+    def test_tag_copy(self):
+        tag = make_object(
+            Tag, name='tag', message='',
+            tagger='Tagger <test@example.com>',
+            tag_time=12345, tag_timezone=0,
+            object=(Commit, '0' * 40))
+        self.assert_copy(tag)

@@ -40,6 +40,7 @@ from dulwich.objects import (
     Commit,
     ShaFile,
     Tag,
+    TreeEntry,
     format_timezone,
     hex_to_sha,
     sha_to_hex,
@@ -47,12 +48,11 @@ from dulwich.objects import (
     check_hexsha,
     check_identity,
     parse_timezone,
-    TreeEntry,
+    object_class,
     parse_tree,
     _parse_tree_py,
     sorted_tree_items,
     _sorted_tree_items_py,
-    object_class,
     )
 from dulwich.tests import (
     TestCase,

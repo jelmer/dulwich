@@ -53,6 +53,7 @@ from dulwich.objects import (
     _parse_tree_py,
     sorted_tree_items,
     _sorted_tree_items_py,
+    object_class,
     )
 from dulwich.tests import (
     TestCase,

@@ -59,6 +59,7 @@ from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_commit,
     make_object,
+    make_tag,
     skipIfPY3,
     )
 from dulwich.protocol import (
@@ -280,10 +281,7 @@ class FindShallowTests(TestCase):
 
     def test_tag(self):
         c1, c2 = self.make_linear_commits(2)
-        tag = make_object(Tag, name='tag', message='',
-                          tagger='Tagger <test@example.com>',
-                          tag_time=12345, tag_timezone=0,
-                          object=(Commit, c2.id))
+        tag = make_tag(c2, name='tag')
         self._store.add_object(tag)
 
         self.assertEqual((set([c1.id]), set([c2.id])),

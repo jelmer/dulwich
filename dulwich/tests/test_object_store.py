@@ -84,7 +84,7 @@ class ObjectStoreTests(object):
         self.store.add_objects([])
 
     def test_add_commit(self):
-        # TODO: Argh, no way to construct Git commit objects without 
+        # TODO: Argh, no way to construct Git commit objects without
         # access to a serialized form.
         self.store.add_objects([])
 
@@ -400,8 +400,6 @@ class TreeLookupPathTests(TestCase):
 
     def test_lookup_not_tree(self):
         self.assertRaises(NotTreeError, tree_lookup_path, self.get_object, self.tree_id, 'ad/b/j')
-
-# TODO: MissingObjectFinderTests
 
 @skipIfPY3
 class ObjectStoreGraphWalkerTests(TestCase):

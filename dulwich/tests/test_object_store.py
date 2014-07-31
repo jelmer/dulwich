@@ -53,6 +53,7 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     make_object,
+    make_tag,
     build_pack,
     skipIfPY3,
     )
@@ -169,10 +170,7 @@ class ObjectStoreTests(object):
         self.assertEqual(expected, list(actual))
 
     def make_tag(self, name, obj):
-        tag = make_object(Tag, name=name, message='',
-                          tag_time=12345, tag_timezone=0,
-                          tagger='Test Tagger <test@example.com>',
-                          object=(object_class(obj.type_name), obj.id))
+        tag = make_tag(obj, name=name)
         self.store.add_object(tag)
         return tag
 

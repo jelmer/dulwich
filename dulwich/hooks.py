@@ -142,3 +142,25 @@ class CommitMsgShellHook(ShellHook):
 
         ShellHook.__init__(self, 'commit-msg', filepath, 1,
                            prepare_msg, clean_msg)
+
+
+class PreReceiveShellHook(ShellHook):
+    """pre-receive shell hook"""
+
+    def __init__(self, controldir):
+        filepath = os.path.join(controldir, '.git', 'hooks', 'pre-receive')
+        ShellHook.__init__(self, 'pre-receive', filepath, 0)
+
+    def exists(self):
+        print(self.filepath)
+        return os.path.exists(self.filepath)
+
+    def execute(self, stdin):
+        p = subprocess.Popen(
+            self.filepath,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        self.stdout, self.stderr = p.communicate(stdin)
+        return p.returncode

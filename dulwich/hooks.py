@@ -76,8 +76,8 @@ class ShellHook(Hook):
 
         if len(args) != self.numparam:
             raise HookError("Hook %s executed with wrong number of args. \
-                            Expected %d. Saw %d. %s"
-                            % (self.name, self.numparam, len(args)))
+                            Expected %d. Saw %d. args: %s"
+                            % (self.name, self.numparam, len(args), args))
 
         if (self.pre_exec_callback is not None):
             args = self.pre_exec_callback(*args)

@@ -84,7 +84,6 @@ from dulwich.refs import (
 from dulwich.repo import (
     Repo,
     )
-from hooks import PreReceiveShellHook
 
 
 logger = log_utils.getLogger(__name__)
@@ -817,19 +816,23 @@ class ReceivePackHandler(Handler):
             client_refs.append(ref.split())
             ref = self.proto.read_pkt_line()
 
-        hook = PreReceiveShellHook(self.repo.path)
+        hook = self.hooks.get('pre-receive', None)
         ret = 0
-        if hook.exists():
-            ret = hook.execute(stdin=' '.join(client_refs[0]))
+        if hook and hook.exists():
+            ret = hook.execute(
+                stdin='\n'.join([' '.join(i) for i in client_refs])
+            )
             self.proto.write_sideband(2, hook.stdout)
 
         if ret == 0:
-            # backend can now deal with this refs and read a pack using self.read
+            # backend can now deal with this refs and read a
+            # pack using self.read
             status = self._apply_pack(client_refs)
         else:
             status = [
                 ('unpack', 'ok'),
-                (client_refs[0][-1], 'pre-receive hook declined')
+            ] + [
+                (r[-1], 'pre-receive hook declined') for r in client_refs
             ]
 
         # when we have read all the pack from the client, send a status report

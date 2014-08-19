@@ -28,13 +28,13 @@ from dulwich.hooks import (
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
+    PreReceiveShellHook
 )
 
 from dulwich.tests import TestCase
 
 
 class ShellHookTests(TestCase):
-
     def setUp(self):
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
@@ -126,3 +126,45 @@ exit 1
 
         hook.execute()
         self.assertFalse(os.path.exists(path))
+
+    def test_hook_pre_receive_success(self):
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.makedirs(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        pre_receive = os.path.join(repo_dir, 'hooks', 'pre-receive')
+        hook = PreReceiveShellHook(repo_dir)
+
+        with open(pre_receive, 'wb') as f:
+            f.write("""#!/bin/sh
+
+while read x ; do echo $x ; done
+exit 0
+            """)
+
+        os.chmod(pre_receive, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        self.assertTrue(hook.exists())
+        self.assertEqual(hook.execute("line1\nline2\nline3\n"), 0)
+        self.assertEqual(
+            hook.stdout,
+            "line1\nline2\nline3\n"
+        )
+
+    def test_hook_pre_receive_fail(self):
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.makedirs(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        pre_receive = os.path.join(repo_dir, 'hooks', 'pre-receive')
+        hook = PreReceiveShellHook(repo_dir)
+
+        with open(pre_receive, 'wb') as f:
+            f.write("""#!/bin/sh
+exit 1
+            """)
+
+        os.chmod(pre_receive, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        self.assertTrue(hook.exists())
+        self.assertEqual(hook.execute("line1\nline2\nline3\n"), 1)

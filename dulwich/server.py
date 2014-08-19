@@ -829,6 +829,13 @@ class ReceivePackHandler(Handler):
             # backend can now deal with this refs and read a
             # pack using self.read
             status = self._apply_pack(client_refs)
+            hook = self.repo.hooks.get('post-receive', None)
+            if hook:
+                hook.execute(
+                    stdin='\n'.join([' '.join(i) for i in client_refs])
+                )
+                if hook.stdout:
+                    self.proto.write_sideband(2, hook.stdout)
         else:
             status = [
                 ('unpack', 'ok'),

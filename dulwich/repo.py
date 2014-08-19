@@ -63,7 +63,8 @@ from dulwich.hooks import (
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
-    PreReceiveShellHook
+    PreReceiveShellHook,
+    PostReceiveShellHook
     )
 
 from dulwich.refs import (
@@ -676,6 +677,7 @@ class Repo(BaseRepo):
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
         self.hooks['pre-receive'] = PreReceiveShellHook(self.controldir())
+        self.hooks['post-receive'] = PostReceiveShellHook(self.controldir())
 
     def controldir(self):
         """Return the path of the control directory."""

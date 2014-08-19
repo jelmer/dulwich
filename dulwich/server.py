@@ -783,9 +783,9 @@ class ReceivePackHandler(Handler):
         flush()
 
     def handle(self):
-        refs = sorted(self.repo.get_refs().iteritems())
-
         if self.advertise_refs or not self.http_req:
+            refs = sorted(self.repo.get_refs().iteritems())
+
             if refs:
                 self.proto.write_pkt_line(
                   "%s %s\x00%s\n" % (refs[0][1], refs[0][0],

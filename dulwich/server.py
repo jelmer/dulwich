@@ -456,6 +456,7 @@ def _find_shallow(store, heads, depth):
 def _want_satisfied(store, haves, want, earliest):
     o = store[want]
     pending = collections.deque([o])
+    known = set([want])
     while pending:
         commit = pending.popleft()
         if commit.id in haves:
@@ -464,6 +465,9 @@ def _want_satisfied(store, haves, want, earliest):
             # non-commit wants are assumed to be satisfied
             continue
         for parent in commit.parents:
+            if parent in known:
+                continue
+            known.add(parent)
             parent_obj = store[parent]
             # TODO: handle parents with later commit times than children
             if parent_obj.commit_time >= earliest:

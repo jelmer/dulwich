@@ -28,7 +28,8 @@ from dulwich.hooks import (
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
-    PreReceiveShellHook
+    PreReceiveShellHook,
+    PostReceiveShellHook,
 )
 
 from dulwich.tests import TestCase
@@ -176,3 +177,26 @@ exit 1
 
         self.assertEqual(hook.execute("line1\nline2\nline3\n"), 0)
         self.assertIsNone(hook.stdout)
+
+    def test_hook_post_receive(self):
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.makedirs(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        post_receive = os.path.join(repo_dir, 'hooks', 'post-receive')
+        hook = PostReceiveShellHook(repo_dir)
+
+        with open(post_receive, 'wb') as f:
+            f.write("""#!/bin/sh
+
+while read x ; do echo $x ; done
+exit 0
+            """)
+
+        os.chmod(post_receive, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        self.assertEqual(hook.execute("line1\nline2\nline3\n"), 0)
+        self.assertEqual(
+            hook.stdout,
+            "line1\nline2\nline3\n"
+        )

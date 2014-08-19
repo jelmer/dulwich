@@ -816,7 +816,7 @@ class ReceivePackHandler(Handler):
             client_refs.append(ref.split())
             ref = self.proto.read_pkt_line()
 
-        hook = self.hooks.get('pre-receive', None)
+        hook = self.repo.hooks.get('pre-receive', None)
         ret = 0
         if hook:
             ret = hook.execute(

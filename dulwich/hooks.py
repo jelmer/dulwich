@@ -148,11 +148,10 @@ class PreReceiveShellHook(ShellHook):
     """pre-receive shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, '.git', 'hooks', 'pre-receive')
+        filepath = os.path.join(controldir, 'hooks', 'pre-receive')
         ShellHook.__init__(self, 'pre-receive', filepath, 0)
 
     def exists(self):
-        print(self.filepath)
         return os.path.exists(self.filepath)
 
     def execute(self, stdin):

@@ -144,7 +144,6 @@ exit 0
 
         os.chmod(pre_receive, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertTrue(hook.exists())
         self.assertEqual(hook.execute("line1\nline2\nline3\n"), 0)
         self.assertEqual(
             hook.stdout,
@@ -166,5 +165,14 @@ exit 1
 
         os.chmod(pre_receive, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertTrue(hook.exists())
         self.assertEqual(hook.execute("line1\nline2\nline3\n"), 1)
+
+    def test_hook_pre_receive_missing(self):
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.makedirs(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        hook = PreReceiveShellHook(repo_dir)
+
+        self.assertEqual(hook.execute("line1\nline2\nline3\n"), 0)
+        self.assertIsNone(hook.stdout)

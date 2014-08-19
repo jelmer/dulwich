@@ -151,15 +151,16 @@ class PreReceiveShellHook(ShellHook):
         filepath = os.path.join(controldir, 'hooks', 'pre-receive')
         ShellHook.__init__(self, 'pre-receive', filepath, 0)
 
-    def exists(self):
-        return os.path.exists(self.filepath)
-
     def execute(self, stdin):
-        p = subprocess.Popen(
-            self.filepath,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        self.stdout, self.stderr = p.communicate(stdin)
-        return p.returncode
+        try:
+            p = subprocess.Popen(
+                self.filepath,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            self.stdout, self.stderr = p.communicate(stdin)
+            return p.returncode
+        except OSError:  # no file. silent failure.
+            self.stdout = None
+            return 0

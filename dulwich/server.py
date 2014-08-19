@@ -818,11 +818,12 @@ class ReceivePackHandler(Handler):
 
         hook = self.hooks.get('pre-receive', None)
         ret = 0
-        if hook and hook.exists():
+        if hook:
             ret = hook.execute(
                 stdin='\n'.join([' '.join(i) for i in client_refs])
             )
-            self.proto.write_sideband(2, hook.stdout)
+            if hook.stdout:
+                self.proto.write_sideband(2, hook.stdout)
 
         if ret == 0:
             # backend can now deal with this refs and read a

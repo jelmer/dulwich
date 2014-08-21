@@ -88,7 +88,7 @@ def hex_to_sha(hex):
     try:
         return binascii.unhexlify(hex)
     except TypeError as exc:
-        if not isinstance(hex, str):
+        if not isinstance(hex, basestring):
             raise
         raise ValueError(exc.args[0])
 

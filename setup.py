@@ -68,6 +68,13 @@ setup(name='dulwich',
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      classifiers=[
+          'Development Status :: 4 - Beta',
+          'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+          'Programming Language :: Python :: 2.7',
+          'Operating System :: POSIX',
+          'Topic :: Software Development :: Version Control',
+      ],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),

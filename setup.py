@@ -71,6 +71,7 @@ setup(name='dulwich',
       classifiers=[
           'Development Status :: 4 - Beta',
           'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+          'Programming Language :: Python :: 2.6',
           'Programming Language :: Python :: 2.7',
           'Operating System :: POSIX',
           'Topic :: Software Development :: Version Control',

@@ -19,9 +19,8 @@
 
 """Tests for git compatibility utilities."""
 
-from unittest import SkipTest
-
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 from dulwich.tests.compat import utils

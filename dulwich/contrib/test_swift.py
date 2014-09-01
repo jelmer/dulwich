@@ -25,7 +25,10 @@ import posixpath
 
 from time import time
 from cStringIO import StringIO
-from unittest import skipIf
+try:
+    from unittest import skipIf
+except ImportError:
+    from unittest2 import skipIf
 
 from dulwich.tests import (
     TestCase,
@@ -553,18 +556,18 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root(self):
         with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
-                lambda *args: None), \
-             patch('geventhttpclient.HTTPClient.request',
+                lambda *args: None):
+            with patch('geventhttpclient.HTTPClient.request',
                 lambda *args: Response()):
-            self.assertEqual(self.conn.create_root(), None)
+                self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
         with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
-                   lambda *args: None), \
-             patch('geventhttpclient.HTTPClient.request',
-                   lambda *args: Response(status=404)):
-            self.assertRaises(swift.SwiftException,
-                              lambda: self.conn.create_root())
+                   lambda *args: None):
+            with patch('geventhttpclient.HTTPClient.request',
+                       lambda *args: Response(status=404)):
+                self.assertRaises(swift.SwiftException,
+                                  lambda: self.conn.create_root())
 
     def test_get_container_objects(self):
         with patch('geventhttpclient.HTTPClient.request',
@@ -621,13 +624,13 @@ class TestSwiftConnector(TestCase):
 
     def test_del_root(self):
         with patch('dulwich.contrib.swift.SwiftConnector.del_object',
-                   lambda *args: None), \
-             patch('dulwich.contrib.swift.SwiftConnector.'
-                   'get_container_objects',
-                   lambda *args: ({'name': 'a'}, {'name': 'b'})), \
-             patch('geventhttpclient.HTTPClient.request',
-                    lambda *args: Response()):
-            self.assertEqual(self.conn.del_root(), None)
+                   lambda *args: None):
+            with patch('dulwich.contrib.swift.SwiftConnector.'
+                       'get_container_objects',
+                       lambda *args: ({'name': 'a'}, {'name': 'b'})):
+                with patch('geventhttpclient.HTTPClient.request',
+                           lambda *args: Response()):
+                    self.assertEqual(self.conn.del_root(), None)
 
 
 @skipIf(missing_libs, skipmsg)

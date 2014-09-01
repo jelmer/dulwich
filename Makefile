@@ -3,8 +3,12 @@ PYFLAKES = pyflakes
 PEP8 = pep8
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
+ifeq ($(shell $(PYTHON) -c "import sys; print(sys.version_info >= (2, 7))"),True)
 TESTRUNNER ?= unittest
-RUNTEST = PYTHONHASHSEED=random PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER)
+else
+TESTRUNNER ?= unittest2.__main__
+endif
+RUNTEST = PYTHONHASHSEED=random PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
 
 DESTDIR=/
 

@@ -33,7 +33,6 @@ import tarfile
 import tempfile
 import threading
 import urllib
-from unittest import SkipTest
 
 if sys.platform == 'win32':
     import ctypes
@@ -49,6 +48,7 @@ from dulwich import (
     )
 from dulwich.tests import (
     get_safe_env,
+    SkipTest,
     )
 
 from dulwich.tests.compat.utils import (

@@ -18,7 +18,10 @@
 
 from io import BytesIO
 import sys
-from unittest import skipIf
+try:
+    from unittest import skipIf
+except ImportError:
+    from unittest2 import skipIf
 
 from dulwich import (
     client,

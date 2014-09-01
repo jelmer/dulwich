@@ -19,7 +19,6 @@
 """Tests for patch.py."""
 
 from io import BytesIO
-from unittest import SkipTest
 
 from dulwich.objects import (
     Blob,
@@ -38,6 +37,7 @@ from dulwich.patch import (
     write_tree_diff,
     )
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 

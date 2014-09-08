@@ -36,9 +36,7 @@ Currently supported capabilities:
  * no-progress
  * report-status
  * delete-refs
-
-Known capabilities that are not supported:
- * shallow (http://pad.lv/909524)
+ * shallow
 """
 
 import collections

@@ -20,8 +20,12 @@ You can generate the documentation by running "make doc".
 
 Running the tests
 -----------------
-To run the testsuite, you should be able to simply run "make check". This
+To run the testsuite on a GNU system, you should be able to simply run "make check". This
 will run the tests using unittest on Python 2.7 and higher, and using
 unittest2 (which you will need to have installed) on older versions of Python.
 
  $ make check
+
+On a non-GNU system (with GNU make installed), run:
+
+ $ gmake check

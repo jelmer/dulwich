@@ -455,21 +455,15 @@ class TraditionalGitClient(GitClient):
 
             if not 'delete-refs' in server_capabilities:
                 # Server does not support deletions. Fail later.
-                def remove_del(pair):
-                    if pair[1] == ZERO_SHA:
+                new_refs = dict(orig_new_refs)
+                for ref, sha in orig_new_refs.iteritems():
+                    if sha == ZERO_SHA:
                         if 'report-status' in negotiated_capabilities:
                             report_status_parser._ref_statuses.append(
                                 'ng %s remote does not support deleting refs'
-                                % pair[1])
+                                % sha)
                             report_status_parser._ref_status_ok = False
-                        return False
-                    else:
-                        return True
-
-                new_refs = dict(
-                    filter(
-                        remove_del,
-                        [(ref, sha) for ref, sha in new_refs.iteritems()]))
+                        del new_refs[ref]
 
             if new_refs is None:
                 proto.write_pkt_line(None)

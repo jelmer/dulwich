@@ -478,8 +478,8 @@ class TraditionalGitClient(GitClient):
             if len(new_refs) == 0 and len(orig_new_refs):
                 # NOOP - Original new refs filtered out by policy
                 proto.write_pkt_line(None)
-                if self._report_status_parser is not None:
-                    self._report_status_parser.check()
+                if report_status_parser is not None:
+                    report_status_parser.check()
                 return old_refs
 
             (have, want) = self._handle_receive_pack_head(

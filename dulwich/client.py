@@ -481,16 +481,13 @@ class TraditionalGitClient(GitClient):
             if not want and old_refs == new_refs:
                 return new_refs
             objects = generate_pack_contents(have, want)
-            if len(objects) > 0:
+
+            dowrite = len(objects) > 0
+            dowrite = dowrite or any(old_refs.get(ref) != sha
+                                     for (ref, sha) in new_refs.iteritems()
+                                     if sha != ZERO_SHA)
+            if dowrite:
                 entries, sha = write_pack_objects(proto.write_file(), objects)
-            elif len(set(new_refs.values()) - set([ZERO_SHA])) > 0:
-                # Check for valid create/update refs
-                filtered_new_refs = \
-                    dict([(ref, sha) for ref, sha in new_refs.iteritems()
-                         if sha != ZERO_SHA])
-                if len(set(filtered_new_refs.iteritems()) -
-                        set(old_refs.iteritems())) > 0:
-                    entries, sha = write_pack_objects(proto.write_file(), objects)
 
             self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress)

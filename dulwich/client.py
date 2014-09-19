@@ -178,13 +178,15 @@ class GitClient(object):
             self._fetch_capabilities.remove('thin-pack')
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
-                  progress=None):
+                  progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
+        :param write_pack: Function called with (file, iterable of objects) to
+            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -426,13 +428,15 @@ class TraditionalGitClient(GitClient):
         raise NotImplementedError()
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
-                  progress=None):
+                  progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
+        :param write_pack: Function called with (file, iterable of objects) to
+            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -487,7 +491,7 @@ class TraditionalGitClient(GitClient):
                                      for (ref, sha) in new_refs.iteritems()
                                      if sha != ZERO_SHA)
             if dowrite:
-                entries, sha = write_pack_objects(proto.write_file(), objects)
+                write_pack(proto.write_file(), objects)
 
             self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress)
@@ -656,13 +660,15 @@ class LocalGitClient(GitClient):
         # Ignore the thin_packs argument
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
-                  progress=None):
+                  progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
+        :param write_pack: Function called with (file, iterable of objects) to
+            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -971,13 +977,15 @@ class HttpGitClient(GitClient):
         return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
-                  progress=None):
+                  progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
+        :param write_pack: Function called with (file, iterable of objects) to
+            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -1004,7 +1012,7 @@ class HttpGitClient(GitClient):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
-            entries, sha = write_pack_objects(req_proto.write_file(), objects)
+            write_pack(req_proto.write_file(), objects)
         resp = self._smart_request("git-receive-pack", url,
                                    data=req_data.getvalue())
         try:

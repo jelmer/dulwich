@@ -1041,6 +1041,7 @@ def parse_commit(chunks):
     message = None
 
     for field, value in _parse_message(chunks):
+        # TODO(jelmer): Enforce ordering
         if field == _TREE_HEADER:
             tree = value
         elif field == _PARENT_HEADER:
@@ -1186,14 +1187,19 @@ class Commit(ShaFile):
         self._needs_serialization = True
         self._parents = value
 
-    parents = property(_get_parents, _set_parents)
+    parents = property(_get_parents, _set_parents,
+                       doc="Parents of this commit, by their SHA1.")
 
     def _get_extra(self):
         """Return extra settings of this commit."""
         self._ensure_parsed()
         return self._extra
 
-    extra = property(_get_extra)
+    extra = property(_get_extra,
+        doc="Extra header fields not understood (presumably added in a "
+            "newer version of git). Kept verbatim so the object can "
+            "be correctly reserialized. For private commit metadata, use "
+            "pseudo-headers in Commit.message, rather than this field.")
 
     author = serializable_property("author",
         "The name of the author of the commit")

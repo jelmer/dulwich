@@ -25,6 +25,9 @@
 
   * Add 'tag_delete' porcelain. (Jelmer Vernooij)
 
+  * Add support for serializing/deserializing 'gpgsig' attributes in Commit.
+    (Jelmer Vernooij)
+
  CHANGES
 
   * dul-web is now available as 'dulwich web-daemon'.

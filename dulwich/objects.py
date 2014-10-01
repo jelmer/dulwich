@@ -48,6 +48,7 @@ _AUTHOR_HEADER = "author"
 _COMMITTER_HEADER = "committer"
 _ENCODING_HEADER = "encoding"
 _MERGETAG_HEADER = "mergetag"
+_GPGSIG_HEADER = "gpgsig"
 
 # Header fields for objects
 _OBJECT_HEADER = "object"
@@ -1029,7 +1030,7 @@ def parse_commit(chunks):
 
     :param chunks: Chunks to parse
     :return: Tuple of (tree, parents, author_info, commit_info,
-        encoding, mergetag, message, extra)
+        encoding, mergetag, gpgsig, message, extra)
     """
     parents = []
     extra = []
@@ -1039,6 +1040,7 @@ def parse_commit(chunks):
     encoding = None
     mergetag = []
     message = None
+    gpgsig = None
 
     for field, value in _parse_message(chunks):
         # TODO(jelmer): Enforce ordering
@@ -1058,12 +1060,14 @@ def parse_commit(chunks):
             encoding = value
         elif field == _MERGETAG_HEADER:
             mergetag.append(Tag.from_string(value + "\n"))
+        elif field == _GPGSIG_HEADER:
+            gpgsig = value
         elif field is None:
             message = value
         else:
             extra.append((field, value))
     return (tree, parents, author_info, commit_info, encoding, mergetag,
-            message, extra)
+            gpgsig, message, extra)
 
 
 class Commit(ShaFile):
@@ -1076,13 +1080,14 @@ class Commit(ShaFile):
                  '_commit_timezone_neg_utc', '_commit_time',
                  '_author_time', '_author_timezone', '_commit_timezone',
                  '_author', '_committer', '_parents', '_extra',
-                 '_encoding', '_tree', '_message', '_mergetag')
+                 '_encoding', '_tree', '_message', '_mergetag', '_gpgsig')
 
     def __init__(self):
         super(Commit, self).__init__()
         self._parents = []
         self._encoding = None
         self._mergetag = []
+        self._gpgsig = None
         self._extra = []
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False
@@ -1096,7 +1101,7 @@ class Commit(ShaFile):
 
     def _deserialize(self, chunks):
         (self._tree, self._parents, author_info, commit_info, self._encoding,
-                self._mergetag, self._message, self._extra) = (
+                self._mergetag, self._gpgsig, self._message, self._extra) = (
                         parse_commit(chunks))
         (self._author, self._author_time, (self._author_timezone,
              self._author_timezone_neg_utc)) = author_info
@@ -1169,6 +1174,11 @@ class Commit(ShaFile):
                 raise AssertionError(
                     "newline in extra data: %r -> %r" % (k, v))
             chunks.append("%s %s\n" % (k, v))
+        if self.gpgsig:
+            sig_chunks = self.gpgsig.split("\n")
+            chunks.append("%s %s\n" % (_GPGSIG_HEADER, sig_chunks[0]))
+            for chunk in sig_chunks[1:]:
+                chunks.append(" %s\n" % chunk)
         chunks.append("\n")  # There must be a new line after the headers
         chunks.append(self._message)
         return chunks
@@ -1228,6 +1238,9 @@ class Commit(ShaFile):
 
     mergetag = serializable_property(
         "mergetag", "Associated signed tag.")
+
+    gpgsig = serializable_property(
+        "gpgsig", "GPG Signature.")
 
 
 OBJECT_CLASSES = (

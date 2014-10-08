@@ -24,9 +24,10 @@ from collections import (
     )
 
 from io import BytesIO
-from itertools import chain, izip
+from itertools import chain
 import stat
 
+from dulwich._compat import izip
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,

@@ -39,7 +39,7 @@ from collections import (
     )
 import difflib
 
-from itertools import chain, imap, izip
+from itertools import chain
 
 try:
     import mmap
@@ -58,6 +58,7 @@ from struct import unpack_from
 import warnings
 import zlib
 
+from dulwich._compat import imap, izip
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,

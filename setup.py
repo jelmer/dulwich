@@ -91,6 +91,4 @@ setup(name='dulwich',
       tests_require=tests_require,
       distclass=DulwichDistribution,
       include_package_data=True,
-      use_2to3=True,
-      convert_2to3_doctests=['../docs/*', '../docs/tutorial/*', ],
       )

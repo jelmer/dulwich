@@ -73,6 +73,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_pack,
+    skipIfPY3,
     )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -82,6 +83,7 @@ tree_sha = 'b2a2766a2879c209ab1176e7e778b81ae422eeaa'
 commit_sha = 'f18faa16531ac570a3fdc8c7ca16682548dafd12'
 
 
+@skipIfPY3
 class PackTests(TestCase):
     """Base class for testing packs"""
 
@@ -111,6 +113,7 @@ class PackTests(TestCase):
             self.fail(e)
 
 
+@skipIfPY3
 class PackIndexTests(PackTests):
     """Class that tests the index of packfiles"""
 
@@ -151,6 +154,7 @@ class PackIndexTests(PackTests):
         self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
 
 
+@skipIfPY3
 class TestPackDeltas(TestCase):
 
     test_string1 = 'The answer was flailing in the wind'
@@ -188,6 +192,7 @@ class TestPackDeltas(TestCase):
                              self.test_string_huge + self.test_string2)
 
 
+@skipIfPY3
 class TestPackData(PackTests):
     """Tests getting the data from the packfile."""
 
@@ -273,6 +278,7 @@ class TestPackData(PackTests):
             end_ofs=-12)
 
 
+@skipIfPY3
 class TestPack(PackTests):
 
     def test_len(self):
@@ -420,6 +426,7 @@ class TestPack(PackTests):
             self.assertTrue(isinstance(objs[commit_sha], Commit))
 
 
+@skipIfPY3
 class TestThinPack(PackTests):
 
     def setUp(self):
@@ -476,6 +483,7 @@ class TestThinPack(PackTests):
                 sorted(o.id for o in p.iterobjects()))
 
 
+@skipIfPY3
 class WritePackTests(TestCase):
 
     def test_write_pack_header(self):
@@ -596,6 +604,7 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
             self._write_fn(f, entries, pack_checksum)
 
 
+@skipIfPY3
 class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
@@ -610,6 +619,7 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
         TestCase.tearDown(self)
 
 
+@skipIfPY3
 class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
 
     def setUp(self):
@@ -625,6 +635,7 @@ class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
         BaseTestFilePackIndexWriting.tearDown(self)
 
 
+@skipIfPY3
 class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
 
     def setUp(self):
@@ -640,6 +651,7 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
         BaseTestFilePackIndexWriting.tearDown(self)
 
 
+@skipIfPY3
 class ReadZlibTests(TestCase):
 
     decomp = (
@@ -721,6 +733,7 @@ class ReadZlibTests(TestCase):
         self.assertEqual(self.comp, ''.join(self.unpacked.comp_chunks))
 
 
+@skipIfPY3
 class DeltifyTests(TestCase):
 
     def test_empty(self):
@@ -743,6 +756,7 @@ class DeltifyTests(TestCase):
             list(deltify_pack_objects([(b1, ""), (b2, "")])))
 
 
+@skipIfPY3
 class TestPackStreamReader(TestCase):
 
     def test_read_objects_emtpy(self):
@@ -793,6 +807,7 @@ class TestPackStreamReader(TestCase):
         self.assertEqual([], list(reader.read_objects()))
 
 
+@skipIfPY3
 class TestPackIterator(DeltaChainIterator):
 
     _compute_crc32 = True
@@ -814,6 +829,7 @@ class TestPackIterator(DeltaChainIterator):
           offset, pack_type_num, base_chunks)
 
 
+@skipIfPY3
 class DeltaChainIteratorTests(TestCase):
 
     def setUp(self):
@@ -1025,6 +1041,7 @@ class DeltaChainIteratorTests(TestCase):
             self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.args[0]),))
 
 
+@skipIfPY3
 class DeltaEncodeSizeTests(TestCase):
 
     def test_basic(self):
@@ -1035,6 +1052,7 @@ class DeltaEncodeSizeTests(TestCase):
         self.assertEquals('\xa0\x8d\x06', _delta_encode_size(100000))
 
 
+@skipIfPY3
 class EncodeCopyOperationTests(TestCase):
 
     def test_basic(self):

@@ -56,7 +56,9 @@ from dulwich import (
 from dulwich.tests import (
     get_safe_env,
     )
-
+from dulwich.tests.utils import (
+    skipIfPY3,
+    )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
@@ -66,6 +68,7 @@ from dulwich.tests.compat.utils import (
     )
 
 
+@skipIfPY3
 class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 

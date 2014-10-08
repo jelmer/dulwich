@@ -31,6 +31,8 @@ import tempfile
 import unittest
 from unittest import TestCase as _TestCase
 
+from dulwich._compat import PY2
+
 
 def get_safe_env(env=None):
     """Returns the environment "env" (or a copy of "os.environ" by default)
@@ -176,7 +178,8 @@ def compat_test_suite():
 def test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
-    result.addTests(tutorial_test_suite())
+    if PY2:
+        result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())
     from dulwich.contrib import test_suite as contrib_test_suite

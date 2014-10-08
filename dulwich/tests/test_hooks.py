@@ -31,8 +31,10 @@ from dulwich.hooks import (
 )
 
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 
 
+@skipIfPY3
 class ShellHookTests(TestCase):
 
     def setUp(self):

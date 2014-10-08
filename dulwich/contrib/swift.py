@@ -32,7 +32,7 @@ import tempfile
 import posixpath
 
 from urlparse import urlparse
-from cStringIO import StringIO
+from io import BytesIO
 from ConfigParser import ConfigParser
 from geventhttpclient import HTTPClient
 
@@ -453,7 +453,7 @@ class SwiftConnector(object):
 
         if range:
             return content
-        return StringIO(content)
+        return BytesIO(content)
 
     def del_object(self, name):
         """Delete an object
@@ -718,7 +718,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         :return: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
-        f = StringIO()
+        f = BytesIO()
 
         def commit():
             f.seek(0)
@@ -729,7 +729,7 @@ class SwiftObjectStore(PackBasedObjectStore):
                                           "pack-%s" %
                                           iter_sha1(entry[0] for
                                                     entry in entries))
-                index = StringIO()
+                index = BytesIO()
                 write_pack_index_v2(index, entries, pack.get_stored_checksum())
                 self.scon.put_object(basename + ".pack", f)
                 f.close()
@@ -808,7 +808,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Write the index.
         filename = pack_base_name + '.idx'
-        index_file = StringIO()
+        index_file = BytesIO()
         write_pack_index_v2(index_file, entries, pack_sha)
         self.scon.put_object(filename, index_file)
 
@@ -820,7 +820,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         serialized_pack_info = pack_info_create(pack_data, pack_index)
         f.close()
         index_file.close()
-        pack_info_file = StringIO(serialized_pack_info)
+        pack_info_file = BytesIO(serialized_pack_info)
         filename = pack_base_name + '.info'
         self.scon.put_object(filename, pack_info_file)
         pack_info_file.close()
@@ -842,7 +842,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self.store = store
         f = self.scon.get_object(self.filename)
         if not f:
-            f = StringIO('')
+            f = BytesIO('')
         super(SwiftInfoRefsContainer, self).__init__(f)
 
     def _load_check_ref(self, name, old_ref):
@@ -857,7 +857,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         return refs
 
     def _write_refs(self, refs):
-        f = StringIO()
+        f = BytesIO()
         f.writelines(write_info_refs(refs, self.store))
         self.scon.put_object(self.filename, f)
 
@@ -928,7 +928,7 @@ class SwiftRepo(BaseRepo):
         :param filename: the path to the object to put on Swift
         :param contents: the content as bytestring
         """
-        f = StringIO()
+        f = BytesIO()
         f.write(contents)
         self.scon.put_object(filename, f)
         f.close()
@@ -944,7 +944,7 @@ class SwiftRepo(BaseRepo):
         scon.create_root()
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),
                     posixpath.join(INFODIR, 'refs')]:
-            scon.put_object(obj, StringIO(''))
+            scon.put_object(obj, BytesIO(''))
         ret = cls(scon.root, conf)
         ret._init_files(True)
         return ret

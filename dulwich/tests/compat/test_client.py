@@ -20,8 +20,6 @@
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
 from io import BytesIO
-import BaseHTTPServer
-import SimpleHTTPServer
 import copy
 import os
 import select
@@ -34,6 +32,14 @@ import tempfile
 import threading
 import urllib
 from unittest import SkipTest
+
+try:
+    import BaseHTTPServer
+    import SimpleHTTPServer
+except ImportError:
+    import http.server
+    BaseHTTPServer = http.server
+    SimpleHTTPServer = http.server
 
 if sys.platform == 'win32':
     import ctypes

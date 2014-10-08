@@ -31,6 +31,7 @@ from unittest import (
     )
 import warnings
 
+from dulwich._compat import iteritems
 from dulwich.index import (
     commit_tree,
     )
@@ -98,7 +99,7 @@ def make_object(cls, **attrs):
         pass
 
     obj = TestObject()
-    for name, value in attrs.iteritems():
+    for name, value in iteritems(attrs):
         if name == 'id':
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)

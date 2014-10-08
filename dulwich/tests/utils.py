@@ -27,9 +27,13 @@ import tempfile
 import time
 import types
 
+from unittest import (
+    SkipTest,
+    skipIf,
+    )
 import warnings
 
-from dulwich._compat import iteritems
+from dulwich._compat import iteritems, PY2
 from dulwich.index import (
     commit_tree,
     )
@@ -329,3 +333,5 @@ def setup_warning_catcher():
         warnings.showwarning = original_showwarning
 
     return caught_warnings, restore_showwarning
+
+skipIfPY3 = skipIf(not PY2, "Feature not yet ported to python3.")

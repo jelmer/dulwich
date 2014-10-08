@@ -54,6 +54,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_pack,
+    skipIfPY3,
     )
 
 
@@ -194,6 +195,7 @@ class ObjectStoreTests(object):
         self.store.close()
 
 
+@skipIfPY3
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
@@ -236,6 +238,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         o.add_thin_pack(f.read, None)
 
 
+@skipIfPY3
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def tearDown(self):
@@ -256,6 +259,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertEqual(0, self.store.pack_loose_objects())
 
 
+@skipIfPY3
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def setUp(self):
@@ -350,6 +354,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         o.add_thin_pack(f.read, None)
 
 
+@skipIfPY3
 class TreeLookupPathTests(TestCase):
 
     def setUp(self):
@@ -393,6 +398,7 @@ class TreeLookupPathTests(TestCase):
 
 # TODO: MissingObjectFinderTests
 
+@skipIfPY3
 class ObjectStoreGraphWalkerTests(TestCase):
 
     def get_walker(self, heads, parent_map):

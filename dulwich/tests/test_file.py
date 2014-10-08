@@ -28,8 +28,12 @@ from dulwich.tests import (
     SkipTest,
     TestCase,
     )
+from dulwich.tests.utils import (
+    skipIfPY3
+    )
 
 
+@skipIfPY3
 class FancyRenameTests(TestCase):
 
     def setUp(self):
@@ -87,6 +91,7 @@ class FancyRenameTests(TestCase):
         new_f.close()
 
 
+@skipIfPY3
 class GitFileTests(TestCase):
 
     def setUp(self):

@@ -23,6 +23,7 @@ import shutil
 
 from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 from dulwich.objects import (
     Tree,
     )
@@ -38,6 +39,7 @@ def makesha(digit):
     return (str(digit) * 40)[:40]
 
 
+@skipIfPY3
 class GraftParserTests(TestCase):
 
     def assertParse(self, expected, graftpoints):
@@ -63,6 +65,7 @@ class GraftParserTests(TestCase):
              ' '.join([makesha(3), makesha(4), makesha(5)])])
 
 
+@skipIfPY3
 class GraftSerializerTests(TestCase):
 
     def assertSerialize(self, expected, graftpoints):
@@ -91,6 +94,7 @@ class GraftSerializerTests(TestCase):
              makesha(3): [makesha(4), makesha(5)]})
 
 
+@skipIfPY3
 class GraftsInRepositoryBase(object):
 
     def tearDown(self):
@@ -135,6 +139,7 @@ class GraftsInRepositoryBase(object):
             {self._shas[-1]: ['1']})
 
 
+@skipIfPY3
 class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
     def setUp(self):
@@ -178,6 +183,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         self.assertEqual({self._shas[-1]: [self._shas[0]]}, r._graftpoints)
 
 
+@skipIfPY3
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
 
     def setUp(self):

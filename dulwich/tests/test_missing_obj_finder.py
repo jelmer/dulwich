@@ -26,9 +26,11 @@ from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,
     build_commit_graph,
+    skipIfPY3,
     )
 
 
+@skipIfPY3
 class MissingObjectFinderTest(TestCase):
 
     def setUp(self):
@@ -49,6 +51,7 @@ class MissingObjectFinderTest(TestCase):
             "some objects are not reported as missing: %s" % (expected, ))
 
 
+@skipIfPY3
 class MOFLinearRepoTest(MissingObjectFinderTest):
 
     def setUp(self):
@@ -108,6 +111,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
 
 
+@skipIfPY3
 class MOFMergeForkRepoTest(MissingObjectFinderTest):
     # 1 --- 2 --- 4 --- 6 --- 7
     #          \        /

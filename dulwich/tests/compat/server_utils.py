@@ -32,6 +32,7 @@ from dulwich.server import (
     )
 from dulwich.tests.utils import (
     tear_down_repo,
+    skipIfPY3,
     )
 from dulwich.tests.compat.utils import (
     import_repo,
@@ -63,6 +64,7 @@ def _get_shallow(repo):
     return shallows
 
 
+@skipIfPY3
 class ServerTests(object):
     """Base tests for testing servers.
 

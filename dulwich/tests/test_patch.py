@@ -40,8 +40,12 @@ from dulwich.tests import (
     SkipTest,
     TestCase,
     )
+from dulwich.tests.utils import (
+    skipIfPY3,
+    )
 
 
+@skipIfPY3
 class WriteCommitPatchTests(TestCase):
 
     def test_simple(self):
@@ -72,6 +76,7 @@ class WriteCommitPatchTests(TestCase):
             self.assertEqual(lines[8], " 0 files changed\n")
 
 
+@skipIfPY3
 class ReadGitAmPatch(TestCase):
 
     def test_extract(self):
@@ -201,6 +206,7 @@ More help   : https://help.launchpad.net/ListHelp
         self.assertEqual(None, version)
 
 
+@skipIfPY3
 class DiffTests(TestCase):
     """Tests for write_blob_diff and write_tree_diff."""
 

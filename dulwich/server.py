@@ -569,7 +569,10 @@ class ProtocolGraphWalker(object):
             in the current interface they are determined outside this class.
         """
         haves = set(haves)
-        earliest = min([self.store[h].commit_time for h in haves])
+        if haves:
+            earliest = min([self.store[h].commit_time for h in haves])
+        else:
+            earliest = 0
         for want in self._wants:
             if not self._is_satisfied(haves, want, earliest):
                 return False

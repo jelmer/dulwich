@@ -33,7 +33,7 @@ a pointer in to the corresponding packfile.
 from collections import defaultdict
 
 import binascii
-from io import BytesIO
+from io import BytesIO, UnsupportedOperation
 from collections import (
     deque,
     )
@@ -264,10 +264,12 @@ def load_pack_index(path):
 
 
 def _load_file_contents(f, size=None):
-    fileno = getattr(f, 'fileno', None)
-    # Attempt to use mmap if possible
-    if fileno is not None:
+    try:
         fd = f.fileno()
+    except (UnsupportedOperation, AttributeError):
+        fd = None
+    # Attempt to use mmap if possible
+    if fd is not None:
         if size is None:
             size = os.fstat(fd).st_size
         if has_mmap:

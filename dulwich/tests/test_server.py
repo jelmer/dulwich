@@ -356,20 +356,28 @@ class ProtocolGraphWalkerTestCase(TestCase):
             TestUploadPackHandler(backend, ['/', 'host=lolcats'], TestProto()),
             self._repo.object_store, self._repo.get_peeled)
 
-    def test_is_satisfied_no_haves(self):
-        self.assertFalse(self._walker._is_satisfied([], ONE, 0))
-        self.assertFalse(self._walker._is_satisfied([], TWO, 0))
-        self.assertFalse(self._walker._is_satisfied([], THREE, 0))
+    def test_all_wants_satisfied_no_haves(self):
+        self._walker.set_wants([ONE])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
+        self._walker.set_wants([TWO])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
+        self._walker.set_wants([THREE])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
 
-    def test_is_satisfied_have_root(self):
-        self.assertTrue(self._walker._is_satisfied([ONE], ONE, 0))
-        self.assertTrue(self._walker._is_satisfied([ONE], TWO, 0))
-        self.assertTrue(self._walker._is_satisfied([ONE], THREE, 0))
+    def test_all_wants_satisfied_have_root(self):
+        self._walker.set_wants([ONE])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
+        self._walker.set_wants([TWO])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
+        self._walker.set_wants([THREE])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
 
-    def test_is_satisfied_have_branch(self):
-        self.assertTrue(self._walker._is_satisfied([TWO], TWO, 0))
+    def testall_wants_satisfied_have_branch(self):
+        self._walker.set_wants([TWO])
+        self.assertTrue(self._walker.all_wants_satisfied([TWO]))
         # wrong branch
-        self.assertFalse(self._walker._is_satisfied([TWO], THREE, 0))
+        self._walker.set_wants([THREE])
+        self.assertFalse(self._walker.all_wants_satisfied([TWO]))
 
     def test_all_wants_satisfied(self):
         self._walker.set_wants([FOUR, FIVE])

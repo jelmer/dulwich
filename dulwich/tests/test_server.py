@@ -372,7 +372,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.set_wants([THREE])
         self.assertTrue(self._walker.all_wants_satisfied([ONE]))
 
-    def testall_wants_satisfied_have_branch(self):
+    def test_all_wants_satisfied_have_branch(self):
         self._walker.set_wants([TWO])
         self.assertTrue(self._walker.all_wants_satisfied([TWO]))
         # wrong branch

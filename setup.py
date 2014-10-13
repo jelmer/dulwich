@@ -47,6 +47,9 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
 
+tests_require = ['fastimport', 'mock', 'gevent', 'geventhttpclient']
+if sys.version_info < (2, 7):
+    tests_require.append('unittest2')
 
 setup(name='dulwich',
       description='Python Git Library',
@@ -85,7 +88,7 @@ setup(name='dulwich',
               include_dirs=include_dirs),
       ],
       test_suite='dulwich.tests.test_suite',
-      tests_require=['fastimport', 'mock', 'gevent', 'geventhttpclient'],
+      tests_require=tests_require,
       distclass=DulwichDistribution,
       include_package_data=True,
       use_2to3=True,

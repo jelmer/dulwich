@@ -1,5 +1,5 @@
 language: python
-# Workarround to make 2.7 use system site packages, and 2.6 not use system
+# Workaround to make 2.7 use system site packages, and 2.6 not use system
 # site packages.
 # https://github.com/travis-ci/travis-ci/issues/2219#issuecomment-41804942
 python:

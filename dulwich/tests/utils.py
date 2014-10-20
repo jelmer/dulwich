@@ -102,6 +102,7 @@ def make_object(cls, **attrs):
         __dict__ instead of __slots__.
         """
         pass
+    TestObject.__name__ = 'TestObject_' + cls.__name__
 
     obj = TestObject()
     for name, value in attrs.items():

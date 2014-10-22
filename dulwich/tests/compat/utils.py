@@ -53,11 +53,11 @@ def git_version(git_path=_DEFAULT_GIT):
         output = run_git_or_fail(['--version'], git_path=git_path)
     except OSError:
         return None
-    version_prefix = 'git version '
+    version_prefix = b'git version '
     if not output.startswith(version_prefix):
         return None
 
-    parts = output[len(version_prefix):].split('.')
+    parts = output[len(version_prefix):].split(b'.')
     nums = []
     for part in parts:
         try:

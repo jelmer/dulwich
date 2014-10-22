@@ -62,6 +62,7 @@ from dulwich.tests.utils import (
     make_object,
     functest_builder,
     ext_functest_builder,
+    skipIfPY3,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -71,6 +72,7 @@ tree_sha = '70c190eb48fa8bbb50ddc692a17b44cb781af7f6'
 tag_sha = '71033db03a03c6a36721efcf1968dd8f8e0cf023'
 
 
+@skipIfPY3
 class TestHexToSha(TestCase):
 
     def test_simple(self):
@@ -80,6 +82,7 @@ class TestHexToSha(TestCase):
         self.assertEqual("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
+@skipIfPY3
 class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
@@ -217,6 +220,7 @@ class BlobReadTests(TestCase):
         self.assertNotEqual(sha, c._make_sha())
 
 
+@skipIfPY3
 class ShaFileCheckTests(TestCase):
 
     def assertCheckFails(self, cls, data):
@@ -246,6 +250,7 @@ small_buffer_zlib_object = (
  )
 
 
+@skipIfPY3
 class ShaFileTests(TestCase):
 
     def test_deflated_smaller_window_buffer(self):
@@ -257,6 +262,7 @@ class ShaFileTests(TestCase):
         self.assertEqual(sf.tagger, " <@localhost>")
 
 
+@skipIfPY3
 class CommitSerializationTests(TestCase):
 
     def make_commit(self, **kwargs):
@@ -473,6 +479,7 @@ Merge ../b
 
 default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'
 
+@skipIfPY3
 class CommitParseTests(ShaFileCheckTests):
 
     def make_commit_lines(self,
@@ -636,6 +643,7 @@ _SORTED_TREE_ITEMS = [
   ]
 
 
+@skipIfPY3
 class TreeTests(ShaFileCheckTests):
 
     def test_add(self):
@@ -782,6 +790,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEqual(set(["foo"]), set(t))
 
 
+@skipIfPY3
 class TagSerializeTests(TestCase):
 
     def test_serialize_simple(self):
@@ -814,6 +823,7 @@ OK2XeQOiEeXtT76rV4t2WR4=
 """
 
 
+@skipIfPY3
 class TagParseTests(ShaFileCheckTests):
 
     def make_tag_lines(self,
@@ -895,6 +905,7 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Tag, text)
 
 
+@skipIfPY3
 class CheckTests(TestCase):
 
     def test_check_hexsha(self):
@@ -926,6 +937,7 @@ class CheckTests(TestCase):
                           "trailing characters")
 
 
+@skipIfPY3
 class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
@@ -971,6 +983,7 @@ class TimezoneTests(TestCase):
             (int(((7 * 60)) * 60), True), parse_timezone("--700"))
 
 
+@skipIfPY3
 class ShaFileCopyTests(TestCase):
 
     def assert_copy(self, orig):

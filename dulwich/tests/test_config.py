@@ -31,8 +31,10 @@ from dulwich.config import (
     _unescape_value,
     )
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 
 
+@skipIfPY3
 class ConfigFileTests(TestCase):
 
     def from_file(self, text):
@@ -151,6 +153,7 @@ class ConfigFileTests(TestCase):
         self.assertEqual("bar", cf.get(("branch", "foo"), "foo"))
 
 
+@skipIfPY3
 class ConfigDictTests(TestCase):
 
     def test_get_set(self):
@@ -206,12 +209,14 @@ class ConfigDictTests(TestCase):
 
 
 
+@skipIfPY3
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
         StackedConfig.default_backends()
 
 
+@skipIfPY3
 class UnescapeTests(TestCase):
 
     def test_nothing(self):
@@ -227,6 +232,7 @@ class UnescapeTests(TestCase):
         self.assertEqual("\"foo\"", _unescape_value("\\\"foo\\\""))
 
 
+@skipIfPY3
 class EscapeValueTests(TestCase):
 
     def test_nothing(self):
@@ -239,6 +245,7 @@ class EscapeValueTests(TestCase):
         self.assertEqual("foo\\n", _escape_value("foo\n"))
 
 
+@skipIfPY3
 class FormatStringTests(TestCase):
 
     def test_quoted(self):
@@ -250,6 +257,7 @@ class FormatStringTests(TestCase):
         self.assertEqual('foo bar', _format_string("foo bar"))
 
 
+@skipIfPY3
 class ParseStringTests(TestCase):
 
     def test_quoted(self):
@@ -261,6 +269,7 @@ class ParseStringTests(TestCase):
         self.assertEqual('foo bar', _parse_string("foo bar"))
 
 
+@skipIfPY3
 class CheckVariableNameTests(TestCase):
 
     def test_invalid(self):
@@ -274,6 +283,7 @@ class CheckVariableNameTests(TestCase):
         self.assertTrue(_check_variable_name("foo-bar"))
 
 
+@skipIfPY3
 class CheckSectionNameTests(TestCase):
 
     def test_invalid(self):

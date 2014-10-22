@@ -26,9 +26,7 @@ import shutil
 import tempfile
 import time
 import types
-from unittest import (
-    SkipTest,
-    )
+
 import warnings
 
 from dulwich.index import (
@@ -49,6 +47,8 @@ from dulwich.pack import (
     create_delta,
     )
 from dulwich.repo import Repo
+from dulwich.tests import SkipTest
+
 
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0o100644  # Shorthand mode for Files.

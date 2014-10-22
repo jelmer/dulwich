@@ -29,7 +29,10 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from unittest import TestCase as _TestCase
+if sys.version_info < (2, 7):
+    from unittest2 import SkipTest, TestCase as _TestCase
+else:
+    from unittest import SkipTest, TestCase as _TestCase
 
 
 def get_safe_env(env=None):

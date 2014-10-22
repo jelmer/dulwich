@@ -19,7 +19,6 @@
 
 from io import BytesIO
 import stat
-from unittest import SkipTest
 
 
 from dulwich.object_store import (
@@ -34,6 +33,7 @@ from dulwich.repo import (
     MemoryRepo,
     )
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 from dulwich.tests.utils import (

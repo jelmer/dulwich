@@ -162,7 +162,7 @@ def load_conf(path=None, file=None):
     :param path: The path to the configuration file
     :param file: If provided read instead the file like object
     """
-    conf = ConfigParser(allow_no_value=True)
+    conf = ConfigParser()
     if file:
         conf.readfp(file)
         return conf

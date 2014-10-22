@@ -25,13 +25,15 @@ import os
 import re
 import shutil
 import tempfile
-from unittest import SkipTest
 
 from dulwich.pack import (
     write_pack,
     )
 from dulwich.objects import (
     Blob,
+    )
+from dulwich.tests import (
+    SkipTest,
     )
 from dulwich.tests.test_pack import (
     a_sha,

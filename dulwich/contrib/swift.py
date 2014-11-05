@@ -211,7 +211,7 @@ def pack_info_create(pack_data, pack_index):
             info[obj.id] = None
         # Tag
         elif obj.type_num == Tag.type_num:
-            info[obj.id] = (obj.type_num, obj._object_sha)
+            info[obj.id] = (obj.type_num, obj.object[1])
     return zlib.compress(json_dumps(info))
 
 

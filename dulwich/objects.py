@@ -298,12 +298,11 @@ class ShaFile(object):
     def set_raw_chunks(self, chunks, sha=None):
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
-        self._deserialize(chunks)
         if sha is None:
             self._sha = None
         else:
             self._sha = FixedSha(sha)
-        self._needs_parsing = False
+        self._needs_parsing = True
         self._needs_serialization = False
 
     @staticmethod
@@ -318,7 +317,7 @@ class ShaFile(object):
         return ret
 
     def _parse_object(self, map):
-        """Parse a new style object, setting self._text."""
+        """Parse a new style object, setting the raw string."""
         # skip type and size; type must have already been determined, and
         # we trust zlib to fail if it's otherwise corrupted
         byte = ord(map[0])

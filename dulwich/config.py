@@ -28,10 +28,16 @@ import errno
 import os
 import re
 
-from collections import (
-    OrderedDict,
-    MutableMapping,
-    )
+try:
+    from collections import (
+        OrderedDict,
+        MutableMapping,
+        )
+except ImportError:
+    from dulwich._compat import (
+        OrderedDict,
+        MutableMapping
+        )
 
 
 from dulwich.file import GitFile

@@ -35,7 +35,10 @@ from dulwich.objects import (
     parse_timezone,
     )
 
-from unittest import skipIf
+try:
+    from unittest import skipIf
+except ImportError:
+    from unittest2 import skipIf
 
 try:
     import gevent

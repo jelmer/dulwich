@@ -40,6 +40,12 @@ from collections import (
 import difflib
 
 from itertools import chain
+try:
+    from itertools import imap, izip
+except ImportError:
+    # Python3
+    imap = map
+    izip = zip
 
 try:
     import mmap
@@ -55,10 +61,8 @@ from os import (
     )
 import struct
 from struct import unpack_from
-import warnings
 import zlib
 
-from dulwich._compat import imap, izip
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,

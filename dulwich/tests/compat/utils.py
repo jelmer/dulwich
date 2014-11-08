@@ -25,13 +25,13 @@ import socket
 import subprocess
 import tempfile
 import time
-from unittest import SkipTest
 
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
     get_safe_env,
+    SkipTest,
     TestCase,
     )
 

@@ -22,10 +22,10 @@ import os
 import shutil
 import sys
 import tempfile
-from unittest import SkipTest
 
 from dulwich.file import GitFile, fancy_rename
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 

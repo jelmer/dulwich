@@ -28,10 +28,6 @@ import tempfile
 import time
 import types
 
-from unittest import (
-    SkipTest,
-    skipIf,
-    )
 import warnings
 
 from dulwich.index import (
@@ -52,7 +48,10 @@ from dulwich.pack import (
     create_delta,
     )
 from dulwich.repo import Repo
-from dulwich.tests import SkipTest
+from dulwich.tests import (
+    SkipTest,
+    skipIf,
+    )
 
 
 # Plain files are very frequently used in tests, so let the mode be very short.

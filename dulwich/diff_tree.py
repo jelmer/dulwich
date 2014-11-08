@@ -27,7 +27,11 @@ from io import BytesIO
 from itertools import chain
 import stat
 
-from dulwich._compat import izip
+try:
+    from itertools import izip
+except ImportError:
+    # Python3
+    izip = zip
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,

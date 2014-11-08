@@ -23,6 +23,7 @@
 import datetime
 import os
 import shutil
+import sys
 import tempfile
 import time
 import types
@@ -33,7 +34,6 @@ from unittest import (
     )
 import warnings
 
-from dulwich._compat import iteritems, PY2
 from dulwich.index import (
     commit_tree,
     )
@@ -103,7 +103,7 @@ def make_object(cls, **attrs):
         pass
 
     obj = TestObject()
-    for name, value in iteritems(attrs):
+    for name, value in attrs.items():
         if name == 'id':
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)
@@ -334,4 +334,4 @@ def setup_warning_catcher():
 
     return caught_warnings, restore_showwarning
 
-skipIfPY3 = skipIf(not PY2, "Feature not yet ported to python3.")
+skipIfPY3 = skipIf(sys.version_info[0] == 3, "Feature not yet ported to python3.")

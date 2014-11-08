@@ -32,6 +32,7 @@ from dulwich.repo import (
     )
 from dulwich.tests.utils import (
     tear_down_repo,
+    skipIfPY3,
     )
 
 from dulwich.tests.compat.utils import (
@@ -41,6 +42,7 @@ from dulwich.tests.compat.utils import (
     )
 
 
+@skipIfPY3
 class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 

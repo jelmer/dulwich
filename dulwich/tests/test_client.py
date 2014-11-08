@@ -56,6 +56,7 @@ from dulwich.objects import (
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import (
     open_repo,
+    skipIfPY3,
     )
 
 
@@ -72,6 +73,7 @@ class DummyClient(TraditionalGitClient):
 
 
 # TODO(durin42): add unit-level tests of GitClient
+@skipIfPY3
 class GitClientTests(TestCase):
 
     def setUp(self):
@@ -288,6 +290,7 @@ class GitClientTests(TestCase):
         self.assertEqual(self.rout.getvalue(), '0000')
 
 
+@skipIfPY3
 class TestGetTransportAndPath(TestCase):
 
     def test_tcp(self):
@@ -408,6 +411,7 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('/jelmer/dulwich', path)
 
 
+@skipIfPY3
 class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_tcp(self):
@@ -486,6 +490,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual('/home/jelmer/foo', path)
 
 
+@skipIfPY3
 class TestSSHVendor(object):
 
     def __init__(self):
@@ -508,6 +513,7 @@ class TestSSHVendor(object):
         return Subprocess()
 
 
+@skipIfPY3
 class SSHGitClientTests(TestCase):
 
     def setUp(self):
@@ -550,6 +556,7 @@ class SSHGitClientTests(TestCase):
                           server.command)
 
 
+@skipIfPY3
 class ReportStatusParserTests(TestCase):
 
     def test_invalid_pack(self):
@@ -574,6 +581,7 @@ class ReportStatusParserTests(TestCase):
         parser.check()
 
 
+@skipIfPY3
 class LocalGitClientTests(TestCase):
 
     def test_fetch_into_empty(self):

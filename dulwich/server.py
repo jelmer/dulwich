@@ -42,9 +42,13 @@ Currently supported capabilities:
 import collections
 import os
 import socket
-import SocketServer
 import sys
 import zlib
+
+try:
+    import SocketServer
+except ImportError:
+    import socketserver as SocketServer
 
 from dulwich.errors import (
     ApplyDeltaError,

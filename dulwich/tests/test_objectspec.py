@@ -35,9 +35,11 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
+    skipIfPY3,
     )
 
 
+@skipIfPY3
 class ParseObjectTests(TestCase):
     """Test parse_object."""
 
@@ -52,6 +54,7 @@ class ParseObjectTests(TestCase):
         self.assertEqual(b, parse_object(r, b.id))
 
 
+@skipIfPY3
 class ParseCommitRangeTests(TestCase):
     """Test parse_commit_range."""
 

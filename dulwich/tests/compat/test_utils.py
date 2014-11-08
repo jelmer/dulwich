@@ -43,19 +43,19 @@ class GitVersionTests(TestCase):
         utils.run_git = self._orig_run_git
 
     def test_git_version_none(self):
-        self._version_str = 'not a git version'
+        self._version_str = b'not a git version'
         self.assertEqual(None, utils.git_version())
 
     def test_git_version_3(self):
-        self._version_str = 'git version 1.6.6'
+        self._version_str = b'git version 1.6.6'
         self.assertEqual((1, 6, 6, 0), utils.git_version())
 
     def test_git_version_4(self):
-        self._version_str = 'git version 1.7.0.2'
+        self._version_str = b'git version 1.7.0.2'
         self.assertEqual((1, 7, 0, 2), utils.git_version())
 
     def test_git_version_extra(self):
-        self._version_str = 'git version 1.7.0.3.295.gd8fa2'
+        self._version_str = b'git version 1.7.0.3.295.gd8fa2'
         self.assertEqual((1, 7, 0, 3), utils.git_version())
 
     def assertRequireSucceeds(self, required_version):
@@ -70,7 +70,7 @@ class GitVersionTests(TestCase):
 
     def test_require_git_version(self):
         try:
-            self._version_str = 'git version 1.6.6'
+            self._version_str = b'git version 1.6.6'
             self.assertRequireSucceeds((1, 6, 6))
             self.assertRequireSucceeds((1, 6, 6, 0))
             self.assertRequireSucceeds((1, 6, 5))
@@ -80,7 +80,7 @@ class GitVersionTests(TestCase):
             self.assertRaises(ValueError, utils.require_git_version,
                               (1, 6, 6, 0, 0))
 
-            self._version_str = 'git version 1.7.0.2'
+            self._version_str = b'git version 1.7.0.2'
             self.assertRequireSucceeds((1, 6, 6))
             self.assertRequireSucceeds((1, 6, 6, 0))
             self.assertRequireSucceeds((1, 7, 0))

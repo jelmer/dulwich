@@ -44,8 +44,13 @@ import select
 import socket
 import subprocess
 import sys
-import urllib2
-import urlparse
+
+try:
+    import urllib2
+    import urlparse
+except ImportError:
+    import urllib.request as urllib2
+    import urllib.parse as urlparse
 
 from dulwich.errors import (
     GitProtocolError,

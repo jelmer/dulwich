@@ -23,10 +23,15 @@
 import datetime
 import os
 import shutil
+import sys
 import tempfile
 import time
 import types
 
+from unittest import (
+    SkipTest,
+    skipIf,
+    )
 import warnings
 
 from dulwich.index import (
@@ -98,7 +103,7 @@ def make_object(cls, **attrs):
         pass
 
     obj = TestObject()
-    for name, value in attrs.iteritems():
+    for name, value in attrs.items():
         if name == 'id':
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)
@@ -328,3 +333,5 @@ def setup_warning_catcher():
         warnings.showwarning = original_showwarning
 
     return caught_warnings, restore_showwarning
+
+skipIfPY3 = skipIf(sys.version_info[0] == 3, "Feature not yet ported to python3.")

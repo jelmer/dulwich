@@ -45,6 +45,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
+    skipIfPY3,
     )
 
 
@@ -79,6 +80,7 @@ TWOS = "2" * 40
 THREES = "3" * 40
 FOURS = "4" * 40
 
+@skipIfPY3
 class PackedRefsFileTests(TestCase):
 
     def test_split_ref_line_errors(self):
@@ -238,7 +240,7 @@ class RefsContainerTests(object):
 
 
 
-
+@skipIfPY3
 class DictRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
@@ -254,6 +256,7 @@ class DictRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(expected_refs, self._refs.as_dict())
 
 
+@skipIfPY3
 class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def setUp(self):
@@ -425,6 +428,7 @@ _TEST_REFS_SERIALIZED = (
 '3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8\trefs/tags/refs-0.2\n')
 
 
+@skipIfPY3
 class InfoRefsContainerTests(TestCase):
 
     def test_invalid_refname(self):

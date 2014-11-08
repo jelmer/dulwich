@@ -17,7 +17,6 @@ import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
 
-
 class DulwichDistribution(Distribution):
 
     def is_pure(self):
@@ -47,7 +46,12 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
 
-tests_require = ['fastimport', 'mock', 'gevent', 'geventhttpclient']
+if sys.version_info[0] == 2:
+    tests_require = ['fastimport', 'mock', 'gevent', 'geventhttpclient']
+else:
+    # fastimport, gevent, geventhttpclient are not available for PY3
+    # mock only used for test_swift, which requires gevent/geventhttpclient
+    tests_require = []
 if sys.version_info < (2, 7):
     tests_require.append('unittest2')
 
@@ -91,6 +95,4 @@ setup(name='dulwich',
       tests_require=tests_require,
       distclass=DulwichDistribution,
       include_package_data=True,
-      use_2to3=True,
-      convert_2to3_doctests=['../docs/*', '../docs/tutorial/*', ],
       )

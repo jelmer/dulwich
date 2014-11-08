@@ -26,8 +26,12 @@ from dulwich.repo import (
 from dulwich.tests import (
     BlackboxTestCase,
     )
+from dulwich.tests.utils import (
+    skipIfPY3,
+    )
 
 
+@skipIfPY3
 class GitReceivePackTests(BlackboxTestCase):
     """Blackbox tests for dul-receive-pack."""
 
@@ -51,6 +55,7 @@ class GitReceivePackTests(BlackboxTestCase):
         self.assertEqual(1, process.returncode)
 
 
+@skipIfPY3
 class GitUploadPackTests(BlackboxTestCase):
     """Blackbox tests for dul-upload-pack."""
 

@@ -42,11 +42,13 @@ from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
     setup_warning_catcher,
+    skipIfPY3,
     )
 
 missing_sha = 'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
+@skipIfPY3
 class CreateRepositoryTests(TestCase):
 
     def assertFileContentsEqual(self, expected, repo, path):
@@ -85,6 +87,7 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, True)
 
 
+@skipIfPY3
 class RepositoryTests(TestCase):
 
     def setUp(self):
@@ -494,6 +497,7 @@ exit 1
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
 
+@skipIfPY3
 class BuildRepoTests(TestCase):
     """Tests that build on-disk repos from scratch.
 

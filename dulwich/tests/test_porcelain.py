@@ -39,6 +39,7 @@ from dulwich.tests.compat.utils import require_git_version
 from dulwich.tests.utils import (
     build_commit_graph,
     make_object,
+    skipIfPY3,
     )
 
 
@@ -51,6 +52,7 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(repo_dir)
 
 
+@skipIfPY3
 class ArchiveTests(PorcelainTestCase):
     """Tests for the archive command."""
 
@@ -69,6 +71,7 @@ class ArchiveTests(PorcelainTestCase):
         self.assertEqual([], tf.getnames())
 
 
+@skipIfPY3
 class UpdateServerInfoTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -80,6 +83,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
             'info', 'refs')))
 
 
+@skipIfPY3
 class CommitTests(PorcelainTestCase):
 
     def test_custom_author(self):
@@ -92,6 +96,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
 
+@skipIfPY3
 class CloneTests(PorcelainTestCase):
 
     def test_simple_local(self):
@@ -168,6 +173,7 @@ class CloneTests(PorcelainTestCase):
             target_path, checkout=True, bare=True, outstream=outstream)
 
 
+@skipIfPY3
 class InitTests(TestCase):
 
     def test_non_bare(self):
@@ -181,6 +187,7 @@ class InitTests(TestCase):
         porcelain.init(repo_dir, bare=True)
 
 
+@skipIfPY3
 class AddTests(PorcelainTestCase):
 
     def test_add_default_paths(self):
@@ -210,6 +217,7 @@ class AddTests(PorcelainTestCase):
         porcelain.add(self.repo.path, paths=["foo"])
 
 
+@skipIfPY3
 class RemoveTests(PorcelainTestCase):
 
     def test_remove_file(self):
@@ -219,6 +227,7 @@ class RemoveTests(PorcelainTestCase):
         porcelain.rm(self.repo.path, paths=["foo"])
 
 
+@skipIfPY3
 class LogTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -238,6 +247,7 @@ class LogTests(PorcelainTestCase):
         self.assertEqual(1, outstream.getvalue().count("-" * 50))
 
 
+@skipIfPY3
 class ShowTests(PorcelainTestCase):
 
     def test_nolist(self):
@@ -264,6 +274,7 @@ class ShowTests(PorcelainTestCase):
         self.assertEqual(outstream.getvalue(), "The Foo\n")
 
 
+@skipIfPY3
 class SymbolicRefTests(PorcelainTestCase):
 
     def test_set_wrong_symbolic_ref(self):
@@ -306,6 +317,7 @@ class SymbolicRefTests(PorcelainTestCase):
         self.assertEqual(new_ref, b'ref: refs/heads/develop\n')
 
 
+@skipIfPY3
 class DiffTreeTests(PorcelainTestCase):
 
     def test_empty(self):
@@ -317,6 +329,7 @@ class DiffTreeTests(PorcelainTestCase):
         self.assertEqual(outstream.getvalue(), "")
 
 
+@skipIfPY3
 class CommitTreeTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -336,6 +349,7 @@ class CommitTreeTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
 
+@skipIfPY3
 class RevListTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -349,6 +363,7 @@ class RevListTests(PorcelainTestCase):
             outstream.getvalue())
 
 
+@skipIfPY3
 class TagCreateTests(PorcelainTestCase):
 
     def test_annotated(self):
@@ -379,6 +394,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertEqual(tags.values(), [self.repo.head()])
 
 
+@skipIfPY3
 class TagListTests(PorcelainTestCase):
 
     def test_empty(self):
@@ -393,6 +409,7 @@ class TagListTests(PorcelainTestCase):
         self.assertEqual(["bar/bla", "foo"], tags)
 
 
+@skipIfPY3
 class TagDeleteTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -404,6 +421,7 @@ class TagDeleteTests(PorcelainTestCase):
         self.assertFalse("foo" in porcelain.tag_list(self.repo))
 
 
+@skipIfPY3
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):
@@ -427,6 +445,7 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([], changes)
 
 
+@skipIfPY3
 class PushTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -471,6 +490,7 @@ class PushTests(PorcelainTestCase):
         self.assertEqual(os.path.basename(fullpath), change.new.path)
 
 
+@skipIfPY3
 class PullTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -504,6 +524,7 @@ class PullTests(PorcelainTestCase):
         self.assertEqual(r['HEAD'].id, self.repo['HEAD'].id)
 
 
+@skipIfPY3
 class StatusTests(PorcelainTestCase):
 
     def test_status(self):
@@ -601,6 +622,7 @@ class StatusTests(PorcelainTestCase):
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
 
+@skipIfPY3
 class UploadPackTests(PorcelainTestCase):
     """Tests for upload_pack."""
 
@@ -612,6 +634,7 @@ class UploadPackTests(PorcelainTestCase):
         self.assertEqual(0, exitcode)
 
 
+@skipIfPY3
 class ReceivePackTests(PorcelainTestCase):
     """Tests for receive_pack."""
 
@@ -634,6 +657,7 @@ class ReceivePackTests(PorcelainTestCase):
         self.assertEqual(0, exitcode)
 
 
+@skipIfPY3
 class BranchListTests(PorcelainTestCase):
 
     def test_standard(self):
@@ -648,6 +672,7 @@ class BranchListTests(PorcelainTestCase):
             set(porcelain.branch_list(self.repo)))
 
 
+@skipIfPY3
 class BranchCreateTests(PorcelainTestCase):
 
     def test_branch_exists(self):
@@ -666,6 +691,7 @@ class BranchCreateTests(PorcelainTestCase):
             set(porcelain.branch_list(self.repo)))
 
 
+@skipIfPY3
 class BranchDeleteTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -677,6 +703,7 @@ class BranchDeleteTests(PorcelainTestCase):
         self.assertFalse("foo" in porcelain.branch_list(self.repo))
 
 
+@skipIfPY3
 class FetchTests(PorcelainTestCase):
 
     def test_simple(self):

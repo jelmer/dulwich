@@ -27,13 +27,18 @@ import os
 import re
 import sys
 import time
-from urlparse import parse_qs
 from wsgiref.simple_server import (
     WSGIRequestHandler,
     ServerHandler,
     WSGIServer,
     make_server,
     )
+
+try:
+    from urlparse import parse_qs
+except ImportError:
+    from urllib.parse import parse_qs
+
 
 from dulwich import log_utils
 from dulwich.protocol import (

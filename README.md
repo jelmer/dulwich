@@ -1,5 +1,7 @@
 This is the Dulwich project.
 
+[![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
+
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 

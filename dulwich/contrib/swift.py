@@ -985,7 +985,7 @@ def cmd_daemon(args):
         sys.exit(1)
     import gevent.monkey
     gevent.monkey.patch_socket()
-    from dulwich.swift import load_conf
+    from dulwich.contrib.swift import load_conf
     from dulwich import log_utils
     logger = log_utils.getLogger(__name__)
     conf = load_conf(options.swift_config)

@@ -193,12 +193,9 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 	if (!entries2)
 		goto error;
 
-	result = PyList_New(n1 + n2);
+	result = PyList_New(0);
 	if (!result)
 		goto error;
-	/* PyList_New sets the len of the list, not its allocated size, so we
-	 * need to trim it to the size we actually use. */
-	Py_SIZE(result) = 0;
 
 	while (i1 < n1 && i2 < n2) {
 		cmp = entry_path_cmp(entries1[i1], entries2[i2]);
@@ -217,20 +214,23 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 		pair = PyTuple_Pack(2, e1, e2);
 		if (!pair)
 			goto error;
-		PyList_SET_ITEM(result, Py_SIZE(result)++, pair);
+		PyList_Append(result, pair);
+		Py_DECREF(pair);
 	}
 
 	while (i1 < n1) {
 		pair = PyTuple_Pack(2, entries1[i1++], null_entry);
 		if (!pair)
 			goto error;
-		PyList_SET_ITEM(result, Py_SIZE(result)++, pair);
+		PyList_Append(result, pair);
+		Py_DECREF(pair);
 	}
 	while (i2 < n2) {
 		pair = PyTuple_Pack(2, null_entry, entries2[i2++]);
 		if (!pair)
 			goto error;
-		PyList_SET_ITEM(result, Py_SIZE(result)++, pair);
+		PyList_Append(result, pair);
+		Py_DECREF(pair);
 	}
 	goto done;
 

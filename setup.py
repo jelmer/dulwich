@@ -47,7 +47,9 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
             os.environ['ARCHFLAGS'] = ''
 
 if sys.version_info[0] == 2:
-    tests_require = ['fastimport', 'mock', 'gevent', 'geventhttpclient']
+    tests_require = ['fastimport', 'mock']
+    if not '__pypy__' in sys.modules:
+        tests_require.extend(['gevent', 'geventhttpclient'])
 else:
     # fastimport, gevent, geventhttpclient are not available for PY3
     # mock only used for test_swift, which requires gevent/geventhttpclient

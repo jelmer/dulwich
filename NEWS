@@ -10,10 +10,8 @@
   * Strip newline from final ACKed SHA while fetching packs.
     (Michael Edgar)
 
-  * The C implementation of `dulwich._diff_tree._merge_entries` is broken
-    on pypy and causes it to segfault. Avoid importing it and fall back
-    to the native implementation for now.
-    (Jelmer Vernooij)
+  * Remove assignment to PyList_SIZE() that was causing segfaults on
+    pypy. (Jelmer Vernooij, #196)
 
  IMPROVEMENTS
 

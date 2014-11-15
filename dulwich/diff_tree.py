@@ -590,6 +590,9 @@ _merge_entries_py = _merge_entries
 _count_blocks_py = _count_blocks
 try:
     # Try to import C versions
-    from dulwich._diff_tree import _is_tree, _merge_entries, _count_blocks
+    from dulwich._diff_tree import _is_tree, _count_blocks
+    import sys
+    if not '__pypy__' in sys.builtin_module_names:
+        from dulwich._diff_tree import _merge_entries
 except ImportError:
     pass

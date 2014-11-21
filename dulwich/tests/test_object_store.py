@@ -58,7 +58,7 @@ from dulwich.tests.utils import (
     )
 
 
-testobject = make_object(Blob, data="yummy data")
+testobject = make_object(Blob, data=b"yummy data")
 
 
 class ObjectStoreTests(object):

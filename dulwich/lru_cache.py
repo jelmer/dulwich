@@ -17,7 +17,12 @@
 
 """A simple least-recently-used (LRU) cache."""
 
+from dulwich._py3_compat import (
+    items,
+)
+
 _null_key = object()
+
 
 class _LRUNode(object):
     """This maintains the linked-list which is the lru internals."""
@@ -181,7 +186,7 @@ class LRUCache(object):
 
     def items(self):
         """Get the key:value pairs as a dict."""
-        return dict((k, n.value) for k, n in self._cache.iteritems())
+        return dict((k, n.value) for k, n in items(self._cache))
 
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.

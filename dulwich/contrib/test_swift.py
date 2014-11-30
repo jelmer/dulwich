@@ -24,8 +24,11 @@
 import posixpath
 
 from time import time
-from cStringIO import StringIO
-from unittest import skipIf
+from io import BytesIO
+try:
+    from unittest import skipIf
+except ImportError:
+    from unittest2 import skipIf
 
 from dulwich.tests import (
     TestCase,
@@ -221,7 +224,7 @@ class FakeSwiftConnector(object):
         name = posixpath.join(self.root, name)
         if not range:
             try:
-                return StringIO(self.store[name])
+                return BytesIO(self.store[name])
             except KeyError:
                 return None
         else:
@@ -257,14 +260,14 @@ class TestSwiftObjectStore(TestCase):
 
     def setUp(self):
         super(TestSwiftObjectStore, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file %
+        self.conf = swift.load_conf(file=BytesIO(config_file %
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
 
     def _put_pack(self, sos, commit_amount=1, marker='Default'):
         odata = create_commits(length=commit_amount, marker=marker)
         data = [(d.type_num, d.as_raw_string()) for d in odata]
-        f = StringIO()
+        f = BytesIO()
         build_pack(f, data, store=sos)
         sos.add_thin_pack(f.read, None)
         return odata
@@ -365,7 +368,7 @@ class TestSwiftObjectStore(TestCase):
                 (tree.type_num, tree.as_raw_string()),
                 (cmt.type_num, cmt.as_raw_string()),
                 (tag.type_num, tag.as_raw_string())]
-        f = StringIO()
+        f = BytesIO()
         build_pack(f, data, store=sos)
         sos.add_thin_pack(f.read, None)
         self.assertEqual(len(self.fsc.store), 6)
@@ -376,7 +379,7 @@ class TestSwiftRepo(TestCase):
 
     def setUp(self):
         super(TestSwiftRepo, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file %
+        self.conf = swift.load_conf(file=BytesIO(config_file %
                                                   def_config_file))
 
     def test_init(self):
@@ -425,15 +428,15 @@ class TestSwiftRepo(TestCase):
 @skipIf(missing_libs, skipmsg)
 class TestPackInfoLoadDump(TestCase):
     def setUp(self):
-        conf = swift.load_conf(file=StringIO(config_file %
+        conf = swift.load_conf(file=BytesIO(config_file %
                                              def_config_file))
         sos = swift.SwiftObjectStore(
             FakeSwiftConnector('fakerepo', conf=conf))
         commit_amount = 10
         self.commits = create_commits(length=commit_amount, marker="m")
         data = [(d.type_num, d.as_raw_string()) for d in self.commits]
-        f = StringIO()
-        fi = StringIO()
+        f = BytesIO()
+        fi = BytesIO()
         expected = build_pack(f, data, store=sos)
         entries = [(sha, ofs, checksum) for
                    ofs, _, _, sha, checksum in expected]
@@ -452,14 +455,14 @@ class TestPackInfoLoadDump(TestCase):
 #            dump_time.append(time() - start)
 #        for i in xrange(0, 100):
 #            start = time()
-#            pack_infos = swift.load_pack_info('', file=StringIO(dumps))
+#            pack_infos = swift.load_pack_info('', file=BytesIO(dumps))
 #            load_time.append(time() - start)
 #        print sum(dump_time) / float(len(dump_time))
 #        print sum(load_time) / float(len(load_time))
 
     def test_pack_info(self):
         dumps = swift.pack_info_create(self.pack_data, self.pack_index)
-        pack_infos = swift.load_pack_info('', file=StringIO(dumps))
+        pack_infos = swift.load_pack_info('', file=BytesIO(dumps))
         for obj in self.commits:
             self.assertIn(obj.id, pack_infos)
 
@@ -473,7 +476,7 @@ class TestSwiftInfoRefsContainer(TestCase):
             "22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
             "cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         self.store = {'fakerepo/info/refs': content}
-        self.conf = swift.load_conf(file=StringIO(config_file %
+        self.conf = swift.load_conf(file=BytesIO(config_file %
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
         self.object_store = {}
@@ -507,7 +510,7 @@ class TestSwiftConnector(TestCase):
 
     def setUp(self):
         super(TestSwiftConnector, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file %
+        self.conf = swift.load_conf(file=BytesIO(config_file %
                                                   def_config_file))
         with patch('geventhttpclient.HTTPClient.request',
                    fake_auth_request_v1):
@@ -553,18 +556,18 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root(self):
         with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
-                lambda *args: None), \
-             patch('geventhttpclient.HTTPClient.request',
+                lambda *args: None):
+            with patch('geventhttpclient.HTTPClient.request',
                 lambda *args: Response()):
-            self.assertEqual(self.conn.create_root(), None)
+                self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
         with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
-                   lambda *args: None), \
-             patch('geventhttpclient.HTTPClient.request',
-                   lambda *args: Response(status=404)):
-            self.assertRaises(swift.SwiftException,
-                              lambda: self.conn.create_root())
+                   lambda *args: None):
+            with patch('geventhttpclient.HTTPClient.request',
+                       lambda *args: Response(status=404)):
+                self.assertRaises(swift.SwiftException,
+                                  lambda: self.conn.create_root())
 
     def test_get_container_objects(self):
         with patch('geventhttpclient.HTTPClient.request',
@@ -591,7 +594,7 @@ class TestSwiftConnector(TestCase):
     def test_put_object(self):
         with patch('geventhttpclient.HTTPClient.request',
                    lambda *args, **kwargs: Response()):
-            self.assertEqual(self.conn.put_object('a', StringIO('content')),
+            self.assertEqual(self.conn.put_object('a', BytesIO('content')),
                              None)
 
     def test_put_object_fails(self):
@@ -599,7 +602,7 @@ class TestSwiftConnector(TestCase):
                    lambda *args, **kwargs: Response(status=400)):
             self.assertRaises(swift.SwiftException,
                               lambda: self.conn.put_object(
-                                  'a', StringIO('content')))
+                                  'a', BytesIO('content')))
 
     def test_get_object(self):
         with patch('geventhttpclient.HTTPClient.request',
@@ -621,13 +624,13 @@ class TestSwiftConnector(TestCase):
 
     def test_del_root(self):
         with patch('dulwich.contrib.swift.SwiftConnector.del_object',
-                   lambda *args: None), \
-             patch('dulwich.contrib.swift.SwiftConnector.'
-                   'get_container_objects',
-                   lambda *args: ({'name': 'a'}, {'name': 'b'})), \
-             patch('geventhttpclient.HTTPClient.request',
-                    lambda *args: Response()):
-            self.assertEqual(self.conn.del_root(), None)
+                   lambda *args: None):
+            with patch('dulwich.contrib.swift.SwiftConnector.'
+                       'get_container_objects',
+                       lambda *args: ({'name': 'a'}, {'name': 'b'})):
+                with patch('geventhttpclient.HTTPClient.request',
+                           lambda *args: Response()):
+                    self.assertEqual(self.conn.del_root(), None)
 
 
 @skipIf(missing_libs, skipmsg)
@@ -635,7 +638,7 @@ class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        conf = swift.load_conf(file=StringIO(config_file %
+        conf = swift.load_conf(file=BytesIO(config_file %
                                def_config_file))
         fsc = FakeSwiftConnector('fakerepo', conf=conf)
         self.store = swift.SwiftObjectStore(fsc)

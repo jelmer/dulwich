@@ -402,6 +402,35 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
+def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
+    """Build a file or symlink on disk based on a Git object.
+
+    :param obj: The git object
+    :param mode: File mode
+    :param target_path: Path to write to
+    :param honor_filemode: An optional flag to honor core.filemode setting in
+        config file, default is core.filemode=True, change executable bit
+    """
+    if stat.S_ISLNK(mode):
+        # FIXME: This will fail on Windows. What should we do instead?
+        src_path = blob.as_raw_string()
+        try:
+            os.symlink(src_path, target_path)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                os.unlink(target_path)
+                os.symlink(src_path, target_path)
+            else:
+                raise
+    else:
+        with open(target_path, 'wb') as f:
+            # Write out file
+            f.write(blob.as_raw_string())
+
+        if honor_filemode:
+            os.chmod(target_path, mode)
+
+
 def build_index_from_tree(prefix, index_path, object_store, tree_id,
                           honor_filemode=True):
     """Generate and materialize index from a tree
@@ -426,28 +455,9 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
-        if stat.S_ISLNK(entry.mode):
-            # FIXME: This will fail on Windows. What should we do instead?
-            src_path = object_store[entry.sha].as_raw_string()
-            try:
-                os.symlink(src_path, full_path)
-            except OSError as e:
-                if e.errno == errno.EEXIST:
-                    os.unlink(full_path)
-                    os.symlink(src_path, full_path)
-                else:
-                    raise
-        else:
-            f = open(full_path, 'wb')
-            try:
-                # Write out file
-                f.write(object_store[entry.sha].as_raw_string())
-            finally:
-                f.close()
-
-            if honor_filemode:
-                os.chmod(full_path, entry.mode)
-
+        obj = object_store[entry.sha]
+        build_file_from_blob(obj, entry.mode, full_path,
+            honor_filemode=honor_filemode)
         # Add file to index
         st = os.lstat(full_path)
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
@@ -464,11 +474,8 @@ def blob_from_path_and_stat(path, st):
     """
     blob = Blob()
     if not stat.S_ISLNK(st.st_mode):
-        f = open(path, 'rb')
-        try:
+        with open(path, 'rb') as f:
             blob.data = f.read()
-        finally:
-            f.close()
     else:
         blob.data = os.readlink(path)
     return blob

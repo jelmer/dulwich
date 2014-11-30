@@ -36,17 +36,19 @@ Currently supported capabilities:
  * no-progress
  * report-status
  * delete-refs
-
-Known capabilities that are not supported:
- * shallow (http://pad.lv/909524)
+ * shallow
 """
 
 import collections
 import os
 import socket
-import SocketServer
 import sys
 import zlib
+
+try:
+    import SocketServer
+except ImportError:
+    import socketserver as SocketServer
 
 from dulwich.errors import (
     ApplyDeltaError,
@@ -162,9 +164,16 @@ class DictBackend(Backend):
 class FileSystemBackend(Backend):
     """Simple backend that looks up Git repositories in the local file system."""
 
+    def __init__(self, root="/"):
+        super(FileSystemBackend, self).__init__()
+        self.root = (os.path.abspath(root) + "/").replace("//", "/")
+
     def open_repository(self, path):
         logger.debug('opening repository at %s', path)
-        return Repo(path)
+        abspath = os.path.abspath(os.path.join(self.root, path)) + "/"
+        if not abspath.startswith(self.root):
+            raise NotGitRepository("Invalid path %r" % path)
+        return Repo(abspath)
 
 
 class Handler(object):
@@ -365,6 +374,46 @@ def _find_shallow(store, heads, depth):
     return shallow, not_shallow
 
 
+def _want_satisfied(store, haves, want, earliest):
+    o = store[want]
+    pending = collections.deque([o])
+    while pending:
+        commit = pending.popleft()
+        if commit.id in haves:
+            return True
+        if commit.type_name != "commit":
+            # non-commit wants are assumed to be satisfied
+            continue
+        for parent in commit.parents:
+            parent_obj = store[parent]
+            # TODO: handle parents with later commit times than children
+            if parent_obj.commit_time >= earliest:
+                pending.append(parent_obj)
+    return False
+
+
+def _all_wants_satisfied(store, haves, wants):
+    """Check whether all the current wants are satisfied by a set of haves.
+
+    :param store: Object store to retrieve objects from
+    :param haves: A set of commits we know the client has.
+    :param wants: A set of commits the client wants
+    :note: Wants are specified with set_wants rather than passed in since
+        in the current interface they are determined outside this class.
+    """
+    haves = set(haves)
+    if haves:
+        earliest = min([store[h].commit_time for h in haves])
+    else:
+        earliest = 0
+    unsatisfied_wants = set()
+    for want in wants:
+        if not _want_satisfied(store, haves, want, earliest):
+            return False
+
+    return True
+
+
 class ProtocolGraphWalker(object):
     """A graph walker that knows the git protocol.
 
@@ -464,6 +513,8 @@ class ProtocolGraphWalker(object):
         self.proto.unread_pkt_line('%s %s' % (command, value))
 
     def ack(self, have_ref):
+        if len(have_ref) != 40:
+            raise ValueError("invalid sha %r" % have_ref)
         return self._impl.ack(have_ref)
 
     def reset(self):
@@ -526,34 +577,6 @@ class ProtocolGraphWalker(object):
     def set_wants(self, wants):
         self._wants = wants
 
-    def _is_satisfied(self, haves, want, earliest):
-        """Check whether a want is satisfied by a set of haves.
-
-        A want, typically a branch tip, is "satisfied" only if there exists a
-        path back from that want to one of the haves.
-
-        :param haves: A set of commits we know the client has.
-        :param want: The want to check satisfaction for.
-        :param earliest: A timestamp beyond which the search for haves will be
-            terminated, presumably because we're searching too far down the
-            wrong branch.
-        """
-        o = self.store[want]
-        pending = collections.deque([o])
-        while pending:
-            commit = pending.popleft()
-            if commit.id in haves:
-                return True
-            if commit.type_name != "commit":
-                # non-commit wants are assumed to be satisfied
-                continue
-            for parent in commit.parents:
-                parent_obj = self.store[parent]
-                # TODO: handle parents with later commit times than children
-                if parent_obj.commit_time >= earliest:
-                    pending.append(parent_obj)
-        return False
-
     def all_wants_satisfied(self, haves):
         """Check whether all the current wants are satisfied by a set of haves.
 
@@ -561,12 +584,7 @@ class ProtocolGraphWalker(object):
         :note: Wants are specified with set_wants rather than passed in since
             in the current interface they are determined outside this class.
         """
-        haves = set(haves)
-        earliest = min([self.store[h].commit_time for h in haves])
-        for want in self._wants:
-            if not self._is_satisfied(haves, want, earliest):
-                return False
-        return True
+        return _all_wants_satisfied(self.store, haves, self._wants)
 
     def set_ack_type(self, ack_type):
         impl_classes = {
@@ -774,9 +792,9 @@ class ReceivePackHandler(Handler):
         flush()
 
     def handle(self):
-        refs = sorted(self.repo.get_refs().iteritems())
-
         if self.advertise_refs or not self.http_req:
+            refs = sorted(self.repo.get_refs().iteritems())
+
             if refs:
                 self.proto.write_pkt_line(
                   "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
@@ -880,7 +898,7 @@ def main(argv=sys.argv):
     options, args = parser.parse_args(argv)
 
     log_utils.default_logging_config()
-    if len(argv) > 1:
+    if len(args) > 1:
         gitdir = args[1]
     else:
         gitdir = '.'

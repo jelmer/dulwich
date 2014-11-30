@@ -54,6 +54,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_pack,
+    skipIfPY3,
     )
 
 
@@ -194,6 +195,7 @@ class ObjectStoreTests(object):
         self.store.close()
 
 
+@skipIfPY3
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
@@ -227,6 +229,16 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
                          o.get_raw(packed_blob_sha))
 
 
+    def test_add_thin_pack_empty(self):
+        o = MemoryObjectStore()
+
+        f = BytesIO()
+        entries = build_pack(f, [], store=o)
+        self.assertEquals([], entries)
+        o.add_thin_pack(f.read, None)
+
+
+@skipIfPY3
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def tearDown(self):
@@ -247,6 +259,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertEqual(0, self.store.pack_loose_objects())
 
 
+@skipIfPY3
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def setUp(self):
@@ -312,27 +325,36 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)
-        blob = make_object(Blob, data='yummy data')
-        o.add_object(blob)
-
-        f = BytesIO()
-        entries = build_pack(f, [
-          (REF_DELTA, (blob.id, 'more yummy data')),
-          ], store=o)
-        pack = o.add_thin_pack(f.read, None)
         try:
-            packed_blob_sha = sha_to_hex(entries[0][3])
-            pack.check_length_and_checksum()
-            self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
-            self.assertTrue(o.contains_packed(packed_blob_sha))
-            self.assertTrue(o.contains_packed(blob.id))
-            self.assertEqual((Blob.type_num, 'more yummy data'),
-                             o.get_raw(packed_blob_sha))
+            blob = make_object(Blob, data='yummy data')
+            o.add_object(blob)
+
+            f = BytesIO()
+            entries = build_pack(f, [
+              (REF_DELTA, (blob.id, 'more yummy data')),
+              ], store=o)
+
+            with o.add_thin_pack(f.read, None) as pack:
+                packed_blob_sha = sha_to_hex(entries[0][3])
+                pack.check_length_and_checksum()
+                self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
+                self.assertTrue(o.contains_packed(packed_blob_sha))
+                self.assertTrue(o.contains_packed(blob.id))
+                self.assertEqual((Blob.type_num, 'more yummy data'),
+                                 o.get_raw(packed_blob_sha))
         finally:
             o.close()
-            pack.close()
+
+    def test_add_thin_pack_empty(self):
+        o = DiskObjectStore(self.store_dir)
+
+        f = BytesIO()
+        entries = build_pack(f, [], store=o)
+        self.assertEquals([], entries)
+        o.add_thin_pack(f.read, None)
 
 
+@skipIfPY3
 class TreeLookupPathTests(TestCase):
 
     def setUp(self):
@@ -376,39 +398,46 @@ class TreeLookupPathTests(TestCase):
 
 # TODO: MissingObjectFinderTests
 
+@skipIfPY3
 class ObjectStoreGraphWalkerTests(TestCase):
 
     def get_walker(self, heads, parent_map):
-        return ObjectStoreGraphWalker(heads,
-            parent_map.__getitem__)
+        new_parent_map = dict([
+            (k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()])
+        return ObjectStoreGraphWalker([x * 40 for x in heads],
+            new_parent_map.__getitem__)
+
+    def test_ack_invalid_value(self):
+        gw = self.get_walker([], {})
+        self.assertRaises(ValueError, gw.ack, "tooshort")
 
     def test_empty(self):
         gw = self.get_walker([], {})
         self.assertIs(None, next(gw))
-        gw.ack("aa" * 20)
+        gw.ack("a" * 40)
         self.assertIs(None, next(gw))
 
     def test_descends(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", next(gw))
-        self.assertEqual("b", next(gw))
+        self.assertEqual("a" * 40, next(gw))
+        self.assertEqual("b" * 40, next(gw))
 
     def test_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        gw.ack("a")
+        gw.ack("a" * 40)
         self.assertIs(None, next(gw))
 
     def test_parent_present(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": []})
-        self.assertEqual("a", next(gw))
-        gw.ack("a")
+        self.assertEqual("a" * 40, next(gw))
+        gw.ack("a" * 40)
         self.assertIs(None, next(gw))
 
     def test_child_ack_later(self):
         gw = self.get_walker(["a"], {"a": ["b"], "b": ["c"], "c": []})
-        self.assertEqual("a", next(gw))
-        self.assertEqual("b", next(gw))
-        gw.ack("a")
+        self.assertEqual("a" * 40, next(gw))
+        self.assertEqual("b" * 40, next(gw))
+        gw.ack("a" * 40)
         self.assertIs(None, next(gw))
 
     def test_only_once(self):
@@ -430,18 +459,18 @@ class ObjectStoreGraphWalkerTests(TestCase):
         walk.append(next(gw))
         # A branch (a, c) or (b, d) may be done after 2 steps or 3 depending on
         # the order walked: 3-step walks include (a, b, c) and (b, a, d), etc.
-        if walk == ["a", "c"] or walk == ["b", "d"]:
+        if walk == ["a" * 40, "c" * 40] or walk == ["b" * 40, "d" * 40]:
           gw.ack(walk[0])
           acked = True
 
         walk.append(next(gw))
-        if not acked and walk[2] == "c":
-          gw.ack("a")
-        elif not acked and walk[2] == "d":
-          gw.ack("b")
+        if not acked and walk[2] == "c" * 40:
+          gw.ack("a" * 40)
+        elif not acked and walk[2] == "d" * 40:
+          gw.ack("b" * 40)
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 
-        self.assertEqual(["a", "b", "c", "d"], sorted(walk))
-        self.assertLess(walk.index("a"), walk.index("c"))
-        self.assertLess(walk.index("b"), walk.index("d"))
+        self.assertEqual(["a" * 40, "b" * 40, "c" * 40, "d" * 40], sorted(walk))
+        self.assertLess(walk.index("a" * 40), walk.index("c" * 40))
+        self.assertLess(walk.index("b" * 40), walk.index("d" * 40))

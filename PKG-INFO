@@ -1,6 +1,6 @@
-Metadata-Version: 1.0
+Metadata-Version: 1.1
 Name: dulwich
-Version: 0.9.7
+Version: 0.9.8
 Summary: Python Git Library
 Home-page: https://samba.org/~jelmer/dulwich
 Author: Jelmer Vernooij
@@ -18,3 +18,9 @@ Description:
               
 Keywords: git
 Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Operating System :: POSIX
+Classifier: Topic :: Software Development :: Version Control

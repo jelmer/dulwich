@@ -431,7 +431,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 return []
             raise
         ret = []
-        try:
+        with f:
             for l in f.readlines():
                 l = l.rstrip("\n")
                 if l[0] == "#":
@@ -441,8 +441,6 @@ class DiskObjectStore(PackBasedObjectStore):
                 else:
                     ret.append(os.path.join(self.path, l))
             return ret
-        finally:
-            f.close()
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
@@ -453,21 +451,16 @@ class DiskObjectStore(PackBasedObjectStore):
             if e.errno != errno.EEXIST:
                 raise
         alternates_path = os.path.join(self.path, "info/alternates")
-        f = GitFile(alternates_path, 'wb')
-        try:
+        with GitFile(alternates_path, 'wb') as f:
             try:
                 orig_f = open(alternates_path, 'rb')
             except (OSError, IOError) as e:
                 if e.errno != errno.ENOENT:
                     raise
             else:
-                try:
+                with orig_f:
                     f.write(orig_f.read())
-                finally:
-                    orig_f.close()
             f.write("%s\n" % path)
-        finally:
-            f.close()
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)
@@ -600,16 +593,12 @@ class DiskObjectStore(PackBasedObjectStore):
             objects/pack directory.
         """
         fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
-        f = os.fdopen(fd, 'w+b')
-
-        try:
+        with os.fdopen(fd, 'w+b') as f:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f,
                                       delta_iter=indexer)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
-        finally:
-            f.close()
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -619,18 +608,12 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param path: Path to the pack file.
         """
-        p = PackData(path)
-        try:
+        with PackData(path) as p:
             entries = p.sorted_entries()
             basename = os.path.join(self.pack_dir,
                 "pack-%s" % iter_sha1(entry[0] for entry in entries))
-            f = GitFile(basename+".idx", "wb")
-            try:
+            with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
-            finally:
-                f.close()
-        finally:
-            p.close()
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
@@ -672,11 +655,8 @@ class DiskObjectStore(PackBasedObjectStore):
         path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
-        f = GitFile(path, 'wb')
-        try:
+        with GitFile(path, 'wb') as f:
             f.write(obj.as_legacy_object())
-        finally:
-            f.close()
 
     @classmethod
     def init(cls, path):
@@ -1074,6 +1054,8 @@ class ObjectStoreGraphWalker(object):
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
+        if len(sha) != 40:
+            raise ValueError("unexpected sha %r received" % sha)
         ancestors = set([sha])
 
         # stop if we run out of heads to remove

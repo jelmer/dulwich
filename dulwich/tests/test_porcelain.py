@@ -39,6 +39,7 @@ from dulwich.tests.compat.utils import require_git_version
 from dulwich.tests.utils import (
     build_commit_graph,
     make_object,
+    skipIfPY3,
     )
 
 
@@ -51,6 +52,7 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(repo_dir)
 
 
+@skipIfPY3
 class ArchiveTests(PorcelainTestCase):
     """Tests for the archive command."""
 
@@ -69,6 +71,7 @@ class ArchiveTests(PorcelainTestCase):
         self.assertEqual([], tf.getnames())
 
 
+@skipIfPY3
 class UpdateServerInfoTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -80,6 +83,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
             'info', 'refs')))
 
 
+@skipIfPY3
 class CommitTests(PorcelainTestCase):
 
     def test_custom_author(self):
@@ -92,6 +96,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
 
+@skipIfPY3
 class CloneTests(PorcelainTestCase):
 
     def test_simple_local(self):
@@ -168,6 +173,7 @@ class CloneTests(PorcelainTestCase):
             target_path, checkout=True, bare=True, outstream=outstream)
 
 
+@skipIfPY3
 class InitTests(TestCase):
 
     def test_non_bare(self):
@@ -181,6 +187,7 @@ class InitTests(TestCase):
         porcelain.init(repo_dir, bare=True)
 
 
+@skipIfPY3
 class AddTests(PorcelainTestCase):
 
     def test_add_default_paths(self):
@@ -202,7 +209,7 @@ class AddTests(PorcelainTestCase):
 
         # Check that foo was added and nothing in .git was modified
         index = self.repo.open_index()
-        self.assertEqual(list(index), ['blah', 'foo', 'adir/afile'])
+        self.assertEqual(sorted(index), ['adir/afile', 'blah', 'foo'])
 
     def test_add_file(self):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
@@ -210,18 +217,17 @@ class AddTests(PorcelainTestCase):
         porcelain.add(self.repo.path, paths=["foo"])
 
 
+@skipIfPY3
 class RemoveTests(PorcelainTestCase):
 
     def test_remove_file(self):
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
-        finally:
-            f.close()
         porcelain.add(self.repo.path, paths=["foo"])
         porcelain.rm(self.repo.path, paths=["foo"])
 
 
+@skipIfPY3
 class LogTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -241,6 +247,7 @@ class LogTests(PorcelainTestCase):
         self.assertEqual(1, outstream.getvalue().count("-" * 50))
 
 
+@skipIfPY3
 class ShowTests(PorcelainTestCase):
 
     def test_nolist(self):
@@ -267,6 +274,7 @@ class ShowTests(PorcelainTestCase):
         self.assertEqual(outstream.getvalue(), "The Foo\n")
 
 
+@skipIfPY3
 class SymbolicRefTests(PorcelainTestCase):
 
     def test_set_wrong_symbolic_ref(self):
@@ -309,6 +317,7 @@ class SymbolicRefTests(PorcelainTestCase):
         self.assertEqual(new_ref, b'ref: refs/heads/develop\n')
 
 
+@skipIfPY3
 class DiffTreeTests(PorcelainTestCase):
 
     def test_empty(self):
@@ -320,6 +329,7 @@ class DiffTreeTests(PorcelainTestCase):
         self.assertEqual(outstream.getvalue(), "")
 
 
+@skipIfPY3
 class CommitTreeTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -339,6 +349,7 @@ class CommitTreeTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
 
+@skipIfPY3
 class RevListTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -352,15 +363,16 @@ class RevListTests(PorcelainTestCase):
             outstream.getvalue())
 
 
-class TagTests(PorcelainTestCase):
+@skipIfPY3
+class TagCreateTests(PorcelainTestCase):
 
     def test_annotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        porcelain.tag(self.repo.path, "tryme", 'foo <foo@bar.com>', 'bar',
-                annotated=True)
+        porcelain.tag_create(self.repo.path, "tryme", 'foo <foo@bar.com>',
+                'bar', annotated=True)
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
@@ -374,7 +386,7 @@ class TagTests(PorcelainTestCase):
             [3, 1, 2]])
         self.repo.refs["HEAD"] = c3.id
 
-        porcelain.tag(self.repo.path, "tryme", annotated=False)
+        porcelain.tag_create(self.repo.path, "tryme", annotated=False)
 
         tags = self.repo.refs.as_dict("refs/tags")
         self.assertEqual(tags.keys(), ["tryme"])
@@ -382,38 +394,46 @@ class TagTests(PorcelainTestCase):
         self.assertEqual(tags.values(), [self.repo.head()])
 
 
-class ListTagsTests(PorcelainTestCase):
+@skipIfPY3
+class TagListTests(PorcelainTestCase):
 
     def test_empty(self):
-        tags = porcelain.list_tags(self.repo.path)
+        tags = porcelain.tag_list(self.repo.path)
         self.assertEqual([], tags)
 
     def test_simple(self):
         self.repo.refs["refs/tags/foo"] = "aa" * 20
         self.repo.refs["refs/tags/bar/bla"] = "bb" * 20
-        tags = porcelain.list_tags(self.repo.path)
+        tags = porcelain.tag_list(self.repo.path)
 
         self.assertEqual(["bar/bla", "foo"], tags)
 
 
+@skipIfPY3
+class TagDeleteTests(PorcelainTestCase):
+
+    def test_simple(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.tag_create(self.repo, 'foo')
+        self.assertTrue("foo" in porcelain.tag_list(self.repo))
+        porcelain.tag_delete(self.repo, 'foo')
+        self.assertFalse("foo" in porcelain.tag_list(self.repo))
+
+
+@skipIfPY3
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
-        finally:
-            f.close()
         porcelain.add(self.repo.path, paths=["foo"])
         porcelain.commit(self.repo.path, message="Some message",
                 committer="Jane <jane@example.com>",
                 author="John <john@example.com>")
 
-        f = open(os.path.join(self.repo.path, 'foo'), 'w')
-        try:
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("OOH")
-        finally:
-            f.close()
 
         porcelain.reset(self.repo, "hard", "HEAD")
 
@@ -425,6 +445,7 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([], changes)
 
 
+@skipIfPY3
 class PushTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -469,6 +490,7 @@ class PushTests(PorcelainTestCase):
         self.assertEqual(os.path.basename(fullpath), change.new.path)
 
 
+@skipIfPY3
 class PullTests(PorcelainTestCase):
 
     def test_simple(self):
@@ -502,6 +524,7 @@ class PullTests(PorcelainTestCase):
         self.assertEqual(r['HEAD'].id, self.repo['HEAD'].id)
 
 
+@skipIfPY3
 class StatusTests(PorcelainTestCase):
 
     def test_status(self):
@@ -597,3 +620,121 @@ class StatusTests(PorcelainTestCase):
 
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
+
+
+@skipIfPY3
+class UploadPackTests(PorcelainTestCase):
+    """Tests for upload_pack."""
+
+    def test_upload_pack(self):
+        outf = BytesIO()
+        exitcode = porcelain.upload_pack(self.repo.path, BytesIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEqual(["0000"], outlines)
+        self.assertEqual(0, exitcode)
+
+
+@skipIfPY3
+class ReceivePackTests(PorcelainTestCase):
+    """Tests for receive_pack."""
+
+    def test_receive_pack(self):
+        filename = 'foo'
+        with open(os.path.join(self.repo.path, filename), 'w') as f:
+            f.write('stuff')
+        porcelain.add(repo=self.repo.path, paths=filename)
+        self.repo.do_commit(message='test status',
+            author='', committer='', author_timestamp=1402354300,
+            commit_timestamp=1402354300, author_timezone=0, commit_timezone=0)
+        outf = BytesIO()
+        exitcode = porcelain.receive_pack(self.repo.path, BytesIO("0000"), outf)
+        outlines = outf.getvalue().splitlines()
+        self.assertEqual([
+            '005a9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00report-status '
+            'delete-refs side-band-64k',
+            '003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
+            '0000'], outlines)
+        self.assertEqual(0, exitcode)
+
+
+@skipIfPY3
+class BranchListTests(PorcelainTestCase):
+
+    def test_standard(self):
+        self.assertEquals(set([]), set(porcelain.branch_list(self.repo)))
+
+    def test_new_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertEquals(
+            set(["master", "foo"]),
+            set(porcelain.branch_list(self.repo)))
+
+
+@skipIfPY3
+class BranchCreateTests(PorcelainTestCase):
+
+    def test_branch_exists(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertRaises(KeyError, porcelain.branch_create, self.repo, "foo")
+        porcelain.branch_create(self.repo, "foo", force=True)
+
+    def test_new_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, "foo")
+        self.assertEquals(
+            set(["master", "foo"]),
+            set(porcelain.branch_list(self.repo)))
+
+
+@skipIfPY3
+class BranchDeleteTests(PorcelainTestCase):
+
+    def test_simple(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo["HEAD"] = c1.id
+        porcelain.branch_create(self.repo, 'foo')
+        self.assertTrue("foo" in porcelain.branch_list(self.repo))
+        porcelain.branch_delete(self.repo, 'foo')
+        self.assertFalse("foo" in porcelain.branch_list(self.repo))
+
+
+@skipIfPY3
+class FetchTests(PorcelainTestCase):
+
+    def test_simple(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test',
+                         author='test', committer='test')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        target_repo = porcelain.clone(self.repo.path, target=target_path,
+            outstream=outstream)
+
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.commit(repo=self.repo.path, message='test2',
+            author='test2', committer='test2')
+
+        self.assertFalse(self.repo['HEAD'].id in target_repo)
+
+        # Fetch changes into the cloned repo
+        porcelain.fetch(target_path, self.repo.path, outstream=outstream,
+            errstream=errstream)
+
+        # Check the target repo for pushed changes
+        r = Repo(target_path)
+        self.assertTrue(self.repo['HEAD'].id in r)

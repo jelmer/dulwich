@@ -40,6 +40,7 @@ from dulwich.objects import (
     Commit,
     ShaFile,
     Tag,
+    TreeEntry,
     format_timezone,
     hex_to_sha,
     sha_to_hex,
@@ -47,7 +48,7 @@ from dulwich.objects import (
     check_hexsha,
     check_identity,
     parse_timezone,
-    TreeEntry,
+    object_class,
     parse_tree,
     _parse_tree_py,
     sorted_tree_items,
@@ -61,6 +62,7 @@ from dulwich.tests.utils import (
     make_object,
     functest_builder,
     ext_functest_builder,
+    skipIfPY3,
     )
 
 a_sha = '6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -70,6 +72,7 @@ tree_sha = '70c190eb48fa8bbb50ddc692a17b44cb781af7f6'
 tag_sha = '71033db03a03c6a36721efcf1968dd8f8e0cf023'
 
 
+@skipIfPY3
 class TestHexToSha(TestCase):
 
     def test_simple(self):
@@ -79,6 +82,7 @@ class TestHexToSha(TestCase):
         self.assertEqual("abcd" * 10, sha_to_hex("\xab\xcd" * 10))
 
 
+@skipIfPY3
 class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
@@ -216,6 +220,7 @@ class BlobReadTests(TestCase):
         self.assertNotEqual(sha, c._make_sha())
 
 
+@skipIfPY3
 class ShaFileCheckTests(TestCase):
 
     def assertCheckFails(self, cls, data):
@@ -245,6 +250,7 @@ small_buffer_zlib_object = (
  )
 
 
+@skipIfPY3
 class ShaFileTests(TestCase):
 
     def test_deflated_smaller_window_buffer(self):
@@ -256,6 +262,7 @@ class ShaFileTests(TestCase):
         self.assertEqual(sf.tagger, " <@localhost>")
 
 
+@skipIfPY3
 class CommitSerializationTests(TestCase):
 
     def make_commit(self, **kwargs):
@@ -313,6 +320,52 @@ class CommitSerializationTests(TestCase):
         d = Commit()
         d._deserialize(c.as_raw_chunks())
         self.assertEqual(c, d)
+
+    def test_serialize_gpgsig(self):
+        commit = self.make_commit(gpgsig="""-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
+vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
+NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
+xdBG2TojV0squj00GoH/euK6aX7GgZtwdtpTv44haCQdSuPGDcI4TORqR6YSqvy3
+GPE+3ZqXPFFb+KILtimkxitdwB7CpwmNse2vE3rONSwTvi8nq3ZoQYNY73CQGkUy
+qoFU0pDtw87U3niFin1ZccDgH0bB6624sLViqrjcbYJeg815Htsu4rmzVaZADEVC
+XhIO4MThebusdk0AcNGjgpf3HRHk0DPMDDlIjm+Oao0cqovvF6VyYmcb0C+RmhJj
+dodLXMNmbqErwTk3zEkW0yZvNIYXH7m9SokPCZa4eeIM7be62X6h1mbt0/IU6Th+
+v18fS0iTMP/Viug5und+05C/v04kgDo0CPphAbXwWMnkE4B6Tl9sdyUYXtvQsL7x
+0+WP1gL27ANqNZiI07Kz/BhbBAQI/+2TFT7oGr0AnFPQ5jHp+3GpUf6OKuT1wT3H
+ND189UFuRuubxb42vZhpcXRbqJVWnbECTKVUPsGZqat3enQUB63uM4i6/RdONDZA
+fDeF1m4qYs+cUXKNUZ03
+=X6RT
+-----END PGP SIGNATURE-----""")
+        self.maxDiff = None
+        self.assertMultiLineEqual("""\
+tree d80c186a03f423a81b39df39dc87fd269736ca86
+parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd
+parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6
+author James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+gpgsig -----BEGIN PGP SIGNATURE-----
+ Version: GnuPG v1
+ 
+ iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
+ vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
+ NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
+ xdBG2TojV0squj00GoH/euK6aX7GgZtwdtpTv44haCQdSuPGDcI4TORqR6YSqvy3
+ GPE+3ZqXPFFb+KILtimkxitdwB7CpwmNse2vE3rONSwTvi8nq3ZoQYNY73CQGkUy
+ qoFU0pDtw87U3niFin1ZccDgH0bB6624sLViqrjcbYJeg815Htsu4rmzVaZADEVC
+ XhIO4MThebusdk0AcNGjgpf3HRHk0DPMDDlIjm+Oao0cqovvF6VyYmcb0C+RmhJj
+ dodLXMNmbqErwTk3zEkW0yZvNIYXH7m9SokPCZa4eeIM7be62X6h1mbt0/IU6Th+
+ v18fS0iTMP/Viug5und+05C/v04kgDo0CPphAbXwWMnkE4B6Tl9sdyUYXtvQsL7x
+ 0+WP1gL27ANqNZiI07Kz/BhbBAQI/+2TFT7oGr0AnFPQ5jHp+3GpUf6OKuT1wT3H
+ ND189UFuRuubxb42vZhpcXRbqJVWnbECTKVUPsGZqat3enQUB63uM4i6/RdONDZA
+ fDeF1m4qYs+cUXKNUZ03
+ =X6RT
+ -----END PGP SIGNATURE-----
+
+Merge ../b
+""", commit.as_raw_string())
 
     def test_serialize_mergetag(self):
         tag = make_object(
@@ -426,6 +479,7 @@ Merge ../b
 
 default_committer = 'James Westby <jw+debian@jameswestby.net> 1174773719 +0000'
 
+@skipIfPY3
 class CommitParseTests(ShaFileCheckTests):
 
     def make_commit_lines(self,
@@ -531,6 +585,50 @@ class CommitParseTests(ShaFileCheckTests):
             else:
                 self.assertCheckFails(Commit, text)
 
+    def test_parse_gpgsig(self):
+        c = Commit.from_string("""tree aaff74984cccd156a469afa7d9ab10e4777beb24
+author Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
+committer Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
+gpgsig -----BEGIN PGP SIGNATURE-----
+ Version: GnuPG v1
+ 
+ iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
+ vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
+ NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
+ xdBG2TojV0squj00GoH/euK6aX7GgZtwdtpTv44haCQdSuPGDcI4TORqR6YSqvy3
+ GPE+3ZqXPFFb+KILtimkxitdwB7CpwmNse2vE3rONSwTvi8nq3ZoQYNY73CQGkUy
+ qoFU0pDtw87U3niFin1ZccDgH0bB6624sLViqrjcbYJeg815Htsu4rmzVaZADEVC
+ XhIO4MThebusdk0AcNGjgpf3HRHk0DPMDDlIjm+Oao0cqovvF6VyYmcb0C+RmhJj
+ dodLXMNmbqErwTk3zEkW0yZvNIYXH7m9SokPCZa4eeIM7be62X6h1mbt0/IU6Th+
+ v18fS0iTMP/Viug5und+05C/v04kgDo0CPphAbXwWMnkE4B6Tl9sdyUYXtvQsL7x
+ 0+WP1gL27ANqNZiI07Kz/BhbBAQI/+2TFT7oGr0AnFPQ5jHp+3GpUf6OKuT1wT3H
+ ND189UFuRuubxb42vZhpcXRbqJVWnbECTKVUPsGZqat3enQUB63uM4i6/RdONDZA
+ fDeF1m4qYs+cUXKNUZ03
+ =X6RT
+ -----END PGP SIGNATURE-----
+
+foo
+""")
+        self.assertEquals("foo\n", c.message)
+        self.assertEquals([], c.extra)
+        self.assertEquals("""-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
+vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
+NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
+xdBG2TojV0squj00GoH/euK6aX7GgZtwdtpTv44haCQdSuPGDcI4TORqR6YSqvy3
+GPE+3ZqXPFFb+KILtimkxitdwB7CpwmNse2vE3rONSwTvi8nq3ZoQYNY73CQGkUy
+qoFU0pDtw87U3niFin1ZccDgH0bB6624sLViqrjcbYJeg815Htsu4rmzVaZADEVC
+XhIO4MThebusdk0AcNGjgpf3HRHk0DPMDDlIjm+Oao0cqovvF6VyYmcb0C+RmhJj
+dodLXMNmbqErwTk3zEkW0yZvNIYXH7m9SokPCZa4eeIM7be62X6h1mbt0/IU6Th+
+v18fS0iTMP/Viug5und+05C/v04kgDo0CPphAbXwWMnkE4B6Tl9sdyUYXtvQsL7x
+0+WP1gL27ANqNZiI07Kz/BhbBAQI/+2TFT7oGr0AnFPQ5jHp+3GpUf6OKuT1wT3H
+ND189UFuRuubxb42vZhpcXRbqJVWnbECTKVUPsGZqat3enQUB63uM4i6/RdONDZA
+fDeF1m4qYs+cUXKNUZ03
+=X6RT
+-----END PGP SIGNATURE-----""", c.gpgsig)
+
 
 _TREE_ITEMS = {
   'a.c': (0o100755, 'd80c186a03f423a81b39df39dc87fd269736ca86'),
@@ -545,6 +643,7 @@ _SORTED_TREE_ITEMS = [
   ]
 
 
+@skipIfPY3
 class TreeTests(ShaFileCheckTests):
 
     def test_add(self):
@@ -691,6 +790,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEqual(set(["foo"]), set(t))
 
 
+@skipIfPY3
 class TagSerializeTests(TestCase):
 
     def test_serialize_simple(self):
@@ -723,6 +823,7 @@ OK2XeQOiEeXtT76rV4t2WR4=
 """
 
 
+@skipIfPY3
 class TagParseTests(ShaFileCheckTests):
 
     def make_tag_lines(self,
@@ -804,6 +905,7 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Tag, text)
 
 
+@skipIfPY3
 class CheckTests(TestCase):
 
     def test_check_hexsha(self):
@@ -835,6 +937,7 @@ class CheckTests(TestCase):
                           "trailing characters")
 
 
+@skipIfPY3
 class TimezoneTests(TestCase):
 
     def test_parse_timezone_utc(self):
@@ -878,3 +981,47 @@ class TimezoneTests(TestCase):
             (int(((7 * 60)) * 60), False), parse_timezone("+700"))
         self.assertEqual(
             (int(((7 * 60)) * 60), True), parse_timezone("--700"))
+
+
+@skipIfPY3
+class ShaFileCopyTests(TestCase):
+
+    def assert_copy(self, orig):
+        oclass = object_class(orig.type_num)
+
+        copy = orig.copy()
+        self.assertTrue(isinstance(copy, oclass))
+        self.assertEqual(copy, orig)
+        self.assertTrue(copy is not orig)
+
+    def test_commit_copy(self):
+        attrs = {'tree': 'd80c186a03f423a81b39df39dc87fd269736ca86',
+                 'parents': ['ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                             '4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                 'author': 'James Westby <jw+debian@jameswestby.net>',
+                 'committer': 'James Westby <jw+debian@jameswestby.net>',
+                 'commit_time': 1174773719,
+                 'author_time': 1174773719,
+                 'commit_timezone': 0,
+                 'author_timezone': 0,
+                 'message':  'Merge ../b\n'}
+        commit = make_commit(**attrs)
+        self.assert_copy(commit)
+
+    def test_blob_copy(self):
+        blob = make_object(Blob, data="i am a blob")
+        self.assert_copy(blob)
+
+    def test_tree_copy(self):
+        blob = make_object(Blob, data="i am a blob")
+        tree = Tree()
+        tree['blob'] = (stat.S_IFREG, blob.id)
+        self.assert_copy(tree)
+
+    def test_tag_copy(self):
+        tag = make_object(
+            Tag, name='tag', message='',
+            tagger='Tagger <test@example.com>',
+            tag_time=12345, tag_timezone=0,
+            object=(Commit, '0' * 40))
+        self.assert_copy(tag)

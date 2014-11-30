@@ -28,10 +28,16 @@ import errno
 import os
 import re
 
-from collections import (
-    OrderedDict,
-    MutableMapping,
-    )
+try:
+    from collections import (
+        OrderedDict,
+        MutableMapping,
+        )
+except ImportError:
+    from dulwich._compat import (
+        OrderedDict,
+        MutableMapping
+        )
 
 
 from dulwich.file import GitFile
@@ -305,23 +311,17 @@ class ConfigFile(ConfigDict):
     @classmethod
     def from_path(cls, path):
         """Read configuration from a file on disk."""
-        f = GitFile(path, 'rb')
-        try:
+        with GitFile(path, 'rb') as f:
             ret = cls.from_file(f)
             ret.path = path
             return ret
-        finally:
-            f.close()
 
     def write_to_path(self, path=None):
         """Write configuration to a file on disk."""
         if path is None:
             path = self.path
-        f = GitFile(path, 'wb')
-        try:
+        with GitFile(path, 'wb') as f:
             self.write_to_file(f)
-        finally:
-            f.close()
 
     def write_to_file(self, f):
         """Write configuration to a file-like object."""

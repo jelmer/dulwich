@@ -21,19 +21,22 @@
 Currently implemented:
  * archive
  * add
+ * branch{_create,_delete,_list}
  * clone
  * commit
  * commit-tree
  * daemon
  * diff-tree
+ * fetch
  * init
- * list-tags
  * pull
  * push
  * rm
+ * receive-pack
  * reset
  * rev-list
- * tag
+ * tag{_create,_delete,_list}
+ * upload-pack
  * update-server-info
  * status
  * symbolic-ref
@@ -62,8 +65,16 @@ from dulwich.objects import (
     )
 from dulwich.objectspec import parse_object
 from dulwich.patch import write_tree_diff
+from dulwich.protocol import Protocol
 from dulwich.repo import (BaseRepo, Repo)
-from dulwich.server import update_server_info as server_update_server_info
+from dulwich.server import (
+    FileSystemBackend,
+    TCPGitServer,
+    ReceivePackHandler,
+    UploadPackHandler,
+    update_server_info as server_update_server_info,
+    )
+
 
 # Module level tuple definition for status output
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
@@ -368,7 +379,13 @@ def rev_list(repo, commits, outstream=sys.stdout):
         outstream.write("%s\n" % entry.commit.id)
 
 
-def tag(repo, tag, author=None, message=None, annotated=False,
+def tag(*args, **kwargs):
+    import warnings
+    warnings.warn(DeprecationWarning, "tag has been deprecated in favour of tag_create.")
+    return tag_create(*args, **kwargs)
+
+
+def tag_create(repo, tag, author=None, message=None, annotated=False,
         objectish="HEAD", tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
@@ -412,7 +429,13 @@ def tag(repo, tag, author=None, message=None, annotated=False,
     r.refs['refs/tags/' + tag] = tag_id
 
 
-def list_tags(repo, outstream=sys.stdout):
+def list_tags(*args, **kwargs):
+    import warnings
+    warnings.warn(DeprecationWarning, "list_tags has been deprecated in favour of tag_list.")
+    return tag_list(*args, **kwargs)
+
+
+def tag_list(repo, outstream=sys.stdout):
     """List all tags.
 
     :param repo: Path to repository
@@ -422,6 +445,23 @@ def list_tags(repo, outstream=sys.stdout):
     tags = list(r.refs.as_dict("refs/tags"))
     tags.sort()
     return tags
+
+
+def tag_delete(repo, name):
+    """Remove a tag.
+
+    :param repo: Path to repository
+    :param name: Name of tag to remove
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected tag name type %r" % name)
+    for name in names:
+        del r.refs["refs/tags/" + name]
 
 
 def reset(repo, mode, committish="HEAD"):
@@ -497,19 +537,21 @@ def pull(repo, remote_location, refs_path,
     index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
 
 
-def status(repo):
+def status(repo="."):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
-    :param repo: Path to repository
+    :param repo: Path to repository or repository object
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """
+    r = open_repo(repo)
+
     # 1. Get status of staged
-    tracked_changes = get_tree_changes(repo)
+    tracked_changes = get_tree_changes(r)
     # 2. Get status of unstaged
-    unstaged_changes = list(get_unstaged_changes(repo.open_index(), repo.path))
+    unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
     # TODO - Status of untracked - add untracked changes, need gitignore.
     untracked_changes = []
     return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
@@ -526,6 +568,7 @@ def get_tree_changes(repo):
 
     # Compares the Index to the HEAD & determines changes
     # Iterate through the changes and report add/delete/modify
+    # TODO: call out to dulwich.diff_tree somehow.
     tracked_changes = {
         'add': [],
         'delete': [],
@@ -547,12 +590,132 @@ def daemon(path=".", address=None, port=None):
     """Run a daemon serving Git requests over TCP/IP.
 
     :param path: Path to the directory to serve.
+    :param address: Optional address to listen on (defaults to ::)
+    :param port: Optional port to listen on (defaults to TCP_GIT_PORT)
     """
     # TODO(jelmer): Support git-daemon-export-ok and --export-all.
-    from dulwich.server import (
-        FileSystemBackend,
-        TCPGitServer,
-        )
     backend = FileSystemBackend(path)
     server = TCPGitServer(backend, address, port)
     server.serve_forever()
+
+
+def web_daemon(path=".", address=None, port=None):
+    """Run a daemon serving Git requests over HTTP.
+
+    :param path: Path to the directory to serve
+    :param address: Optional address to listen on (defaults to ::)
+    :param port: Optional port to listen on (defaults to 80)
+    """
+    from dulwich.web import (
+        make_wsgi_chain,
+        make_server,
+        WSGIRequestHandlerLogger,
+        WSGIServerLogger)
+
+    backend = FileSystemBackend(path)
+    app = make_wsgi_chain(backend)
+    server = make_server(address, port, app,
+                         handler_class=WSGIRequestHandlerLogger,
+                         server_class=WSGIServerLogger)
+    server.serve_forever()
+
+
+def upload_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+    """Upload a pack file after negotiating its contents using smart protocol.
+
+    :param path: Path to the repository
+    :param inf: Input stream to communicate with client
+    :param outf: Output stream to communicate with client
+    """
+    backend = FileSystemBackend()
+    def send_fn(data):
+        outf.write(data)
+        outf.flush()
+    proto = Protocol(inf.read, send_fn)
+    handler = UploadPackHandler(backend, [path], proto)
+    # FIXME: Catch exceptions and write a single-line summary to outf.
+    handler.handle()
+    return 0
+
+
+def receive_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+    """Receive a pack file after negotiating its contents using smart protocol.
+
+    :param path: Path to the repository
+    :param inf: Input stream to communicate with client
+    :param outf: Output stream to communicate with client
+    """
+    backend = FileSystemBackend()
+    def send_fn(data):
+        outf.write(data)
+        outf.flush()
+    proto = Protocol(inf.read, send_fn)
+    handler = ReceivePackHandler(backend, [path], proto)
+    # FIXME: Catch exceptions and write a single-line summary to outf.
+    handler.handle()
+    return 0
+
+
+def branch_delete(repo, name):
+    """Delete a branch.
+
+    :param repo: Path to the repository
+    :param name: Name of the branch
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected branch name type %r" % name)
+    for name in names:
+        del r.refs["refs/heads/" + name]
+
+
+def branch_create(repo, name, objectish=None, force=False):
+    """Create a branch.
+
+    :param repo: Path to the repository
+    :param name: Name of the new branch
+    :param objectish: Target object to point new branch at (defaults to HEAD)
+    :param force: Force creation of branch, even if it already exists
+    """
+    r = open_repo(repo)
+    if isinstance(name, str):
+        names = [name]
+    elif isinstance(name, list):
+        names = name
+    else:
+        raise TypeError("Unexpected branch name type %r" % name)
+    if objectish is None:
+        objectish = "HEAD"
+    object = parse_object(r, objectish)
+    refname = "refs/heads/" + name
+    if refname in r.refs and not force:
+        raise KeyError("Branch with name %s already exists." % name)
+    r.refs[refname] = object.id
+
+
+def branch_list(repo):
+    """List all branches.
+
+    :param repo: Path to the repository
+    """
+    r = open_repo(repo)
+    return r.refs.keys(base="refs/heads/")
+
+
+def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+    """Fetch objects from a remote server.
+
+    :param repo: Path to the repository
+    :param remote_location: String identifying a remote server
+    :param outstream: Output stream (defaults to stdout)
+    :param errstream: Error stream (defaults to stderr)
+    :return: Dictionary with refs on the remote
+    """
+    r = open_repo(repo)
+    client, path = get_transport_and_path(remote_location)
+    remote_refs = client.fetch(path, r, progress=errstream.write)
+    return remote_refs

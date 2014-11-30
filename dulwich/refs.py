@@ -38,6 +38,7 @@ from dulwich.file import (
 
 
 SYMREF = 'ref: '
+LOCAL_BRANCH_PREFIX = 'refs/heads/'
 
 
 def check_ref_format(refname):
@@ -446,7 +447,7 @@ class DiskRefsContainer(RefsContainer):
                 if e.errno == errno.ENOENT:
                     return {}
                 raise
-            try:
+            with f:
                 first_line = next(iter(f)).rstrip()
                 if (first_line.startswith("# pack-refs") and " peeled" in
                         first_line):
@@ -458,8 +459,6 @@ class DiskRefsContainer(RefsContainer):
                     f.seek(0)
                     for sha, name in read_packed_refs(f):
                         self._packed_refs[name] = sha
-            finally:
-                f.close()
         return self._packed_refs
 
     def get_peeled(self, name):
@@ -493,8 +492,7 @@ class DiskRefsContainer(RefsContainer):
         """
         filename = self.refpath(name)
         try:
-            f = GitFile(filename, 'rb')
-            try:
+            with GitFile(filename, 'rb') as f:
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
                     # Read only the first line
@@ -502,8 +500,6 @@ class DiskRefsContainer(RefsContainer):
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
-            finally:
-                f.close()
         except IOError as e:
             if e.errno == errno.ENOENT:
                 return None
@@ -568,8 +564,7 @@ class DiskRefsContainer(RefsContainer):
             realname = name
         filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             if old_ref is not None:
                 try:
                     # read again while holding the lock
@@ -587,8 +582,6 @@ class DiskRefsContainer(RefsContainer):
             except (OSError, IOError):
                 f.abort()
                 raise
-        finally:
-            f.close()
         return True
 
     def add_if_new(self, name, ref):
@@ -610,8 +603,7 @@ class DiskRefsContainer(RefsContainer):
         self._check_refname(realname)
         filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             if os.path.exists(filename) or name in self.get_packed_refs():
                 f.abort()
                 return False
@@ -620,8 +612,6 @@ class DiskRefsContainer(RefsContainer):
             except (OSError, IOError):
                 f.abort()
                 raise
-        finally:
-            f.close()
         return True
 
     def remove_if_equals(self, name, old_ref):
@@ -763,3 +753,6 @@ def write_info_refs(refs, store):
         yield '%s\t%s\n' % (o.id, name)
         if o.id != peeled.id:
             yield '%s\t%s^{}\n' % (peeled.id, name)
+
+
+is_local_branch = lambda x: x.startswith("refs/heads/")

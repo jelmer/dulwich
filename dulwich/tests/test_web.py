@@ -61,6 +61,7 @@ from dulwich.web import (
 
 from dulwich.tests.utils import (
     make_object,
+    skipIfPY3,
     )
 
 
@@ -115,6 +116,7 @@ def _test_backend(objects, refs=None, named_files=None):
     return DictBackend({'/': repo})
 
 
+@skipIfPY3
 class DumbHandlersTestCase(WebTestCase):
 
     def test_send_file_not_found(self):
@@ -284,6 +286,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertFalse(self._req.cached)
 
 
+@skipIfPY3
 class SmartHandlersTestCase(WebTestCase):
 
     class _TestUploadPackHandler(object):
@@ -361,6 +364,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertFalse(self._req.cached)
 
 
+@skipIfPY3
 class LengthLimitedFileTestCase(TestCase):
     def test_no_cutoff(self):
         f = _LengthLimitedFile(BytesIO('foobar'), 1024)
@@ -419,6 +423,7 @@ class HTTPGitRequestTestCase(WebTestCase):
         self.assertEqual(402, self._status)
 
 
+@skipIfPY3
 class HTTPGitApplicationTestCase(TestCase):
 
     def setUp(self):

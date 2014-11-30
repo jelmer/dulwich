@@ -31,8 +31,10 @@ from dulwich.hooks import (
 )
 
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 
 
+@skipIfPY3
 class ShellHookTests(TestCase):
 
     def setUp(self):
@@ -55,20 +57,14 @@ exit 0
         pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)
 
-        f = open(pre_commit, 'wb')
-        try:
+        with open(pre_commit, 'wb') as f:
             f.write(pre_commit_fail)
-        finally:
-            f.close()
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        f = open(pre_commit, 'wb')
-        try:
+        with open(pre_commit, 'wb') as f:
             f.write(pre_commit_success)
-        finally:
-            f.close()
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute()
@@ -90,20 +86,14 @@ exit 0
         commit_msg = os.path.join(repo_dir, 'hooks', 'commit-msg')
         hook = CommitMsgShellHook(repo_dir)
 
-        f = open(commit_msg, 'wb')
-        try:
+        with open(commit_msg, 'wb') as f:
             f.write(commit_msg_fail)
-        finally:
-            f.close()
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute, 'failed commit')
 
-        f = open(commit_msg, 'wb')
-        try:
+        with open(commit_msg, 'wb') as f:
             f.write(commit_msg_success)
-        finally:
-            f.close()
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute('empty commit')
@@ -126,20 +116,14 @@ exit 1
         post_commit = os.path.join(repo_dir, 'hooks', 'post-commit')
         hook = PostCommitShellHook(repo_dir)
 
-        f = open(post_commit, 'wb')
-        try:
+        with open(post_commit, 'wb') as f:
             f.write(post_commit_msg_fail)
-        finally:
-            f.close()
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        f = open(post_commit, 'wb')
-        try:
+        with open(post_commit, 'wb') as f:
             f.write(post_commit_msg)
-        finally:
-            f.close()
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute()

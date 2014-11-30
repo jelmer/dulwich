@@ -27,7 +27,18 @@ import os
 import re
 import sys
 import time
-from urlparse import parse_qs
+from wsgiref.simple_server import (
+    WSGIRequestHandler,
+    ServerHandler,
+    WSGIServer,
+    make_server,
+    )
+
+try:
+    from urlparse import parse_qs
+except ImportError:
+    from urllib.parse import parse_qs
+
 
 from dulwich import log_utils
 from dulwich.protocol import (
@@ -408,89 +419,83 @@ def make_wsgi_chain(*args, **kwargs):
     return wrapped_app
 
 
-# The reference server implementation is based on wsgiref, which is not
-# distributed with python 2.4. If wsgiref is not present, users will not be
-# able to use the HTTP server without a little extra work.
-try:
-    from wsgiref.simple_server import (
-        WSGIRequestHandler,
-        ServerHandler,
-        WSGIServer,
-        make_server,
-    )
-    class ServerHandlerLogger(ServerHandler):
-        """ServerHandler that uses dulwich's logger for logging exceptions."""
+class ServerHandlerLogger(ServerHandler):
+    """ServerHandler that uses dulwich's logger for logging exceptions."""
 
-        def log_exception(self, exc_info):
-            logger.exception('Exception happened during processing of request',
-                             exc_info=exc_info)
-
-        def log_message(self, format, *args):
-            logger.info(format, *args)
-
-        def log_error(self, *args):
-            logger.error(*args)
-
-    class WSGIRequestHandlerLogger(WSGIRequestHandler):
-        """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
-
-        def log_exception(self, exc_info):
-            logger.exception('Exception happened during processing of request',
-                             exc_info=exc_info)
-
-        def log_message(self, format, *args):
-            logger.info(format, *args)
-
-        def log_error(self, *args):
-            logger.error(*args)
-
-        def handle(self):
-            """Handle a single HTTP request"""
-
-            self.raw_requestline = self.rfile.readline()
-            if not self.parse_request(): # An error code has been sent, just exit
-                return
-
-            handler = ServerHandlerLogger(
-                self.rfile, self.wfile, self.get_stderr(), self.get_environ()
-            )
-            handler.request_handler = self      # backpointer for logging
-            handler.run(self.server.get_app())
-
-    class WSGIServerLogger(WSGIServer):
-        def handle_error(self, request, client_address):
-            """Handle an error. """
-            logger.exception('Exception happened during processing of request from %s' % str(client_address))
-
-    def main(argv=sys.argv):
-        """Entry point for starting an HTTP git server."""
-        if len(argv) > 1:
-            gitdir = argv[1]
+    def log_exception(self, exc_info):
+        if sys.version < (2, 7):
+            logger.exception('Exception happened during processing of request')
         else:
-            gitdir = os.getcwd()
+            logger.exception('Exception happened during processing of request',
+                             exc_info=exc_info)
 
-        # TODO: allow serving on other addresses/ports via command-line flag
-        listen_addr = ''
-        port = 8000
+    def log_message(self, format, *args):
+        logger.info(format, *args)
 
-        log_utils.default_logging_config()
-        backend = DictBackend({'/': Repo(gitdir)})
-        app = make_wsgi_chain(backend)
-        server = make_server(listen_addr, port, app,
-                             handler_class=WSGIRequestHandlerLogger,
-                             server_class=WSGIServerLogger)
-        logger.info('Listening for HTTP connections on %s:%d', listen_addr,
-                    port)
-        server.serve_forever()
+    def log_error(self, *args):
+        logger.error(*args)
 
-except ImportError:
-    # No wsgiref found; don't provide the reference functionality, but leave
-    # the rest of the WSGI-based implementation.
-    def main(argv=sys.argv):
-        """Stub entry point for failing to start a server without wsgiref."""
-        sys.stderr.write(
-            'Sorry, the wsgiref module is required for dul-web.\n')
-        sys.exit(1)
+
+class WSGIRequestHandlerLogger(WSGIRequestHandler):
+    """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
+
+    def log_exception(self, exc_info):
+        logger.exception('Exception happened during processing of request',
+                         exc_info=exc_info)
+
+    def log_message(self, format, *args):
+        logger.info(format, *args)
+
+    def log_error(self, *args):
+        logger.error(*args)
+
+    def handle(self):
+        """Handle a single HTTP request"""
+
+        self.raw_requestline = self.rfile.readline()
+        if not self.parse_request(): # An error code has been sent, just exit
+            return
+
+        handler = ServerHandlerLogger(
+            self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+        )
+        handler.request_handler = self      # backpointer for logging
+        handler.run(self.server.get_app())
+
+
+class WSGIServerLogger(WSGIServer):
+
+    def handle_error(self, request, client_address):
+        """Handle an error. """
+        logger.exception('Exception happened during processing of request from %s' % str(client_address))
+
+
+def main(argv=sys.argv):
+    """Entry point for starting an HTTP git server."""
+    import optparse
+    parser = optparse.OptionParser()
+    parser.add_option("-l", "--listen_address", dest="listen_address",
+                      default="localhost",
+                      help="Binding IP address.")
+    parser.add_option("-p", "--port", dest="port", type=int,
+                      default=8000,
+                      help="Port to listen on.")
+    options, args = parser.parse_args(argv)
+
+    if len(args) > 1:
+        gitdir = args[1]
+    else:
+        gitdir = os.getcwd()
+
+    log_utils.default_logging_config()
+    backend = DictBackend({'/': Repo(gitdir)})
+    app = make_wsgi_chain(backend)
+    server = make_server(options.listen_address, options.port, app,
+                         handler_class=WSGIRequestHandlerLogger,
+                         server_class=WSGIServerLogger)
+    logger.info('Listening for HTTP connections on %s:%d',
+                options.listen_address, options.port)
+    server.serve_forever()
 
 
 if __name__ == '__main__':

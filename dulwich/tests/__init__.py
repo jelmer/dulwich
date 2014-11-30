@@ -29,7 +29,10 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from unittest import TestCase as _TestCase
+if sys.version_info < (2, 7):
+    from unittest2 import SkipTest, TestCase as _TestCase, skipIf
+else:
+    from unittest import SkipTest, TestCase as _TestCase, skipIf
 
 
 def get_safe_env(env=None):
@@ -101,7 +104,6 @@ class BlackboxTestCase(TestCase):
         return subprocess.Popen(argv,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True,
             env=env)
 
 
@@ -177,7 +179,8 @@ def compat_test_suite():
 def test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
-    result.addTests(tutorial_test_suite())
+    if sys.version_info[0] == 2:
+        result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())
     from dulwich.contrib import test_suite as contrib_test_suite

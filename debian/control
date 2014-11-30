@@ -3,7 +3,7 @@ Section: python
 Priority: optional
 Maintainer: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
-Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293)
+Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), pypy-dev, dh-python
 Standards-Version: 3.9.6
 X-Python-Version: >= 2.7
 Vcs-Git: git://anonscm.debian.org/users/jelmer/dulwich.git -b unstable
@@ -26,6 +26,8 @@ Description: Python Git library
  All functionality is available in pure Python, but for improved performance
  replacements of some modules written in C are also available. This package
  includes the high performance versions.
+ .
+ This package contains the module built for Python version 2.x.
 
 Package: python-dulwich-dbg
 Architecture: any
@@ -44,3 +46,19 @@ Description: Python Git library - Debug Extension
  includes the high performance versions.
  .
  This package contains the extensions built for the Python debug interpreter.
+
+Package: pypy-dulwich
+Architecture: any
+Provides: ${pypy:Provides}
+Depends: ${pypy:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Description: Python Git library - pypy module
+ Dulwich is a Python implementation of the file formats and protocols
+ used by the Git version control system. It can currently read from and write
+ to existing Git repositories and implements the protocol for pushing and
+ receiving packs from remote servers.
+ .
+ All functionality is available in pure Python, but for improved performance
+ replacements of some modules written in C are also available. This package
+ includes the high performance versions.
+ .
+ This package contains the module built for pypy.

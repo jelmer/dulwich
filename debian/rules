@@ -6,7 +6,7 @@ CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
 LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 # Get the supported Python versions
-PYVERS = $(shell pyversions -r -v)
+PYTHONS = $(shell pyversions -r) pypy
 # Get the default Python version
 PYVERSION = $(shell pyversions -d -v)
 
@@ -15,23 +15,33 @@ pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
 pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
 
 %:
-	dh $* --with python2 --buildsystem=python_distutils
+	dh $* --with python2,pypy --buildsystem=python_distutils
 
-override_dh_auto_install:
-	dh_auto_install --destdir=debian/tmp
-	# Install everything excluding the *_d.so debug extensions to python-dulwich
-	dh_install -X"*_d.so" "debian/tmp/*" -p python-dulwich
-	# Install the debug extensions to python-dulwich-dbg
-	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
-
-override_dh_installdocs:
-	dh_installdocs --link-doc=python-dulwich
-	dh_installdocs -ppython-dulwich docs/tutorial  -X.gitignore -XMakefile
+override_dh_auto_build:
+	dh_auto_build
+	pypy setup.py build -b build-pypy
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) check
+	PYTHONPATH=$(shell echo $(CURDIR)/build-pypy/lib*) pypy -m unittest dulwich.tests.test_suite
 endif
+
+override_dh_auto_install:
+	dh_auto_install
+	pypy setup.py build -b build-pypy install --root debian/tmp --install-layout deb
+	rm -rf debian/tmp/usr/lib/pypy/bin
+	# Install everything excluding the *_d.so debug extensions to python-dulwich
+	dh_install -X"*_d.so" "debian/tmp/usr/lib/python*/*-packages" -p python-dulwich
+	# Install the debug extensions to python-dulwich-dbg
+	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
+	# Install the pypy files to pypy-dulwich
+	dh_install "debian/tmp/usr/lib/pypy/" -p pypy-dulwich
+
+override_dh_installdocs:
+	dh_installdocs -ppython-dulwich-dbg --link-doc=python-dulwich
+	dh_installdocs -ppython-dulwich docs/tutorial -X.gitignore -XMakefile
+	dh_installdocs -ppypy-dulwich docs/tutorial -X.gitignore -XMakefile
 
 override_dh_strip:
 ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))

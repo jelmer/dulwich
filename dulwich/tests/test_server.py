@@ -59,6 +59,7 @@ from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_commit,
     make_object,
+    skipIfPY3,
     )
 from dulwich.protocol import (
     ZERO_SHA,
@@ -159,6 +160,7 @@ class HandlerTestCase(TestCase):
         self.assertFalse(self._handler.has_capability('capxxx'))
 
 
+@skipIfPY3
 class UploadPackHandlerTestCase(TestCase):
 
     def setUp(self):
@@ -212,6 +214,7 @@ class UploadPackHandlerTestCase(TestCase):
         self.assertEqual({}, self._handler.get_tagged(refs, repo=self._repo))
 
 
+@skipIfPY3
 class FindShallowTests(TestCase):
 
     def setUp(self):
@@ -292,6 +295,7 @@ class TestUploadPackHandler(UploadPackHandler):
     def required_capabilities(self):
         return ()
 
+@skipIfPY3
 class ReceivePackHandlerTestCase(TestCase):
 
     def setUp(self):
@@ -314,6 +318,7 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[1][1], 'ok')
 
 
+@skipIfPY3
 class ProtocolGraphWalkerEmptyTestCase(TestCase):
     def setUp(self):
         super(ProtocolGraphWalkerEmptyTestCase, self).setUp()
@@ -335,6 +340,7 @@ class ProtocolGraphWalkerEmptyTestCase(TestCase):
 
 
 
+@skipIfPY3
 class ProtocolGraphWalkerTestCase(TestCase):
 
     def setUp(self):
@@ -356,20 +362,28 @@ class ProtocolGraphWalkerTestCase(TestCase):
             TestUploadPackHandler(backend, ['/', 'host=lolcats'], TestProto()),
             self._repo.object_store, self._repo.get_peeled)
 
-    def test_is_satisfied_no_haves(self):
-        self.assertFalse(self._walker._is_satisfied([], ONE, 0))
-        self.assertFalse(self._walker._is_satisfied([], TWO, 0))
-        self.assertFalse(self._walker._is_satisfied([], THREE, 0))
+    def test_all_wants_satisfied_no_haves(self):
+        self._walker.set_wants([ONE])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
+        self._walker.set_wants([TWO])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
+        self._walker.set_wants([THREE])
+        self.assertFalse(self._walker.all_wants_satisfied([]))
 
-    def test_is_satisfied_have_root(self):
-        self.assertTrue(self._walker._is_satisfied([ONE], ONE, 0))
-        self.assertTrue(self._walker._is_satisfied([ONE], TWO, 0))
-        self.assertTrue(self._walker._is_satisfied([ONE], THREE, 0))
+    def test_all_wants_satisfied_have_root(self):
+        self._walker.set_wants([ONE])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
+        self._walker.set_wants([TWO])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
+        self._walker.set_wants([THREE])
+        self.assertTrue(self._walker.all_wants_satisfied([ONE]))
 
-    def test_is_satisfied_have_branch(self):
-        self.assertTrue(self._walker._is_satisfied([TWO], TWO, 0))
+    def test_all_wants_satisfied_have_branch(self):
+        self._walker.set_wants([TWO])
+        self.assertTrue(self._walker.all_wants_satisfied([TWO]))
         # wrong branch
-        self.assertFalse(self._walker._is_satisfied([TWO], THREE, 0))
+        self._walker.set_wants([THREE])
+        self.assertFalse(self._walker.all_wants_satisfied([TWO]))
 
     def test_all_wants_satisfied(self):
         self._walker.set_wants([FOUR, FIVE])
@@ -507,6 +521,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
           ])
 
 
+@skipIfPY3
 class TestProtocolGraphWalker(object):
 
     def __init__(self):
@@ -537,6 +552,7 @@ class TestProtocolGraphWalker(object):
         return self.acks.pop(0)
 
 
+@skipIfPY3
 class AckGraphWalkerImplTestCase(TestCase):
     """Base setup and asserts for AckGraphWalker tests."""
 
@@ -569,6 +585,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertEqual(sha, next(self._impl))
 
 
+@skipIfPY3
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     impl_cls = SingleAckGraphWalkerImpl
@@ -637,6 +654,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNak()
 
 
+@skipIfPY3
 class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     impl_cls = MultiAckGraphWalkerImpl
@@ -711,6 +729,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNak()
 
 
+@skipIfPY3
 class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     impl_cls = MultiAckDetailedGraphWalkerImpl
@@ -824,6 +843,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNak()
 
 
+@skipIfPY3
 class FileSystemBackendTests(TestCase):
     """Tests for FileSystemBackend."""
 
@@ -839,7 +859,7 @@ class FileSystemBackendTests(TestCase):
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
-        self.assertEqual(repo.path, self.repo.path)
+        self.assertEqual(os.path.abspath(repo.path), os.path.abspath(self.repo.path))
 
     def test_child(self):
         self.assertRaises(NotGitRepository,
@@ -852,6 +872,7 @@ class FileSystemBackendTests(TestCase):
                           lambda: backend.open_repository('/ups'))
 
 
+@skipIfPY3
 class DictBackendTests(TestCase):
     """Tests for DictBackend."""
 
@@ -869,6 +890,7 @@ class DictBackendTests(TestCase):
                           lambda: backend.open_repository('/ups'))
 
 
+@skipIfPY3
 class ServeCommandTests(TestCase):
     """Tests for serve_command."""
 
@@ -894,6 +916,7 @@ class ServeCommandTests(TestCase):
         self.assertEqual(0, exitcode)
 
 
+@skipIfPY3
 class UpdateServerInfoTests(TestCase):
     """Tests for update_server_info."""
 

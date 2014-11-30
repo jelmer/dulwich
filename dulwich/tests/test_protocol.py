@@ -37,6 +37,7 @@ from dulwich.protocol import (
     BufferedPktLineWriter,
     )
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 
 
 class BaseProtocolTests(object):
@@ -106,6 +107,7 @@ class BaseProtocolTests(object):
         self.assertRaises(AssertionError, self.proto.read_cmd)
 
 
+@skipIfPY3
 class ProtocolTests(BaseProtocolTests, TestCase):
 
     def setUp(self):
@@ -133,6 +135,7 @@ class ReceivableBytesIO(BytesIO):
         return self.read(size - 1)
 
 
+@skipIfPY3
 class ReceivableProtocolTests(BaseProtocolTests, TestCase):
 
     def setUp(self):
@@ -204,6 +207,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         self.assertEqual(all_data, data)
 
 
+@skipIfPY3
 class CapabilitiesTestCase(TestCase):
 
     def test_plain(self):
@@ -233,6 +237,7 @@ class CapabilitiesTestCase(TestCase):
                                     'multi_ack_detailed']))
 
 
+@skipIfPY3
 class BufferedPktLineWriterTests(TestCase):
 
     def setUp(self):
@@ -288,6 +293,7 @@ class BufferedPktLineWriterTests(TestCase):
         self.assertOutputEquals('0005z')
 
 
+@skipIfPY3
 class PktLineParserTests(TestCase):
 
     def test_none(self):

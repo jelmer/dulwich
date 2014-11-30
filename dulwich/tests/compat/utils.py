@@ -25,13 +25,13 @@ import socket
 import subprocess
 import tempfile
 import time
-from unittest import SkipTest
 
 from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
     get_safe_env,
+    SkipTest,
     TestCase,
     )
 
@@ -53,11 +53,11 @@ def git_version(git_path=_DEFAULT_GIT):
         output = run_git_or_fail(['--version'], git_path=git_path)
     except OSError:
         return None
-    version_prefix = 'git version '
+    version_prefix = b'git version '
     if not output.startswith(version_prefix):
         return None
 
-    parts = output[len(version_prefix):].split('.')
+    parts = output[len(version_prefix):].split(b'.')
     nums = []
     for part in parts:
         try:
@@ -194,6 +194,8 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
         try:
             s.connect(('localhost', port))
             return True
+        except socket.timeout:
+            pass
         except socket.error as e:
             if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
                 raise

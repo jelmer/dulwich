@@ -1,3 +1,50 @@
+0.9.8	2014-11-30
+
+ BUG FIXES
+
+  * Various fixes to improve test suite running on Windows.
+    (Gary van der Merwe)
+
+  * Limit delta copy length to 64K in v2 pack files. (Robert Brown)
+
+  * Strip newline from final ACKed SHA while fetching packs.
+    (Michael Edgar)
+
+  * Remove assignment to PyList_SIZE() that was causing segfaults on
+    pypy. (Jelmer Vernooij, #196)
+
+ IMPROVEMENTS
+
+  * Add porcelain 'receive-pack' and 'upload-pack'. (Jelmer Vernooij)
+
+  * Handle SIGINT signals in bin/dulwich. (Jelmer Vernooij)
+
+  * Add 'status' support to bin/dulwich. (Jelmer Vernooij)
+
+  * Add 'branch_create', 'branch_list', 'branch_delete' porcelain.
+    (Jelmer Vernooij)
+
+  * Add 'fetch' porcelain. (Jelmer Vernooij)
+
+  * Add 'tag_delete' porcelain. (Jelmer Vernooij)
+
+  * Add support for serializing/deserializing 'gpgsig' attributes in Commit.
+    (Jelmer Vernooij)
+
+ CHANGES
+
+  * dul-web is now available as 'dulwich web-daemon'.
+    (Jelmer Vernooij)
+
+  * dulwich.porcelain.tag has been renamed to tag_create.
+    dulwich.porcelain.list_tags has been renamed to tag_list.
+    (Jelmer Vernooij)
+
+ API CHANGES
+
+  * Restore support for Python 2.6. (Jelmer Vernooij, Gary van der Merwe)
+
+
 0.9.7	2014-06-08
 
  BUG FIXES

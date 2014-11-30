@@ -1,5 +1,7 @@
 This is the Dulwich project.
 
+[![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
+
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
@@ -25,3 +27,10 @@ Help
 
 There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
 https://launchpad.net/~dulwich-users.
+
+Python3
+-------
+
+The process of porting to Python3 is ongoing. Please not that although the
+test suite pass in python3, this is due to the tests of features that are not
+yet ported being skipped, and *not* an indication that the port is complete.

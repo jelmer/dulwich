@@ -33,13 +33,19 @@ a pointer in to the corresponding packfile.
 from collections import defaultdict
 
 import binascii
-from io import BytesIO
+from io import BytesIO, UnsupportedOperation
 from collections import (
     deque,
     )
 import difflib
 
-from itertools import chain, imap, izip
+from itertools import chain
+try:
+    from itertools import imap, izip
+except ImportError:
+    # Python3
+    imap = map
+    izip = zip
 
 try:
     import mmap
@@ -55,7 +61,6 @@ from os import (
     )
 import struct
 from struct import unpack_from
-import warnings
 import zlib
 
 from dulwich.errors import (
@@ -258,18 +263,17 @@ def load_pack_index(path):
     :param filename: Path to the index file
     :return: A PackIndex loaded from the given path
     """
-    f = GitFile(path, 'rb')
-    try:
+    with GitFile(path, 'rb') as f:
         return load_pack_index_file(path, f)
-    finally:
-        f.close()
 
 
 def _load_file_contents(f, size=None):
-    fileno = getattr(f, 'fileno', None)
-    # Attempt to use mmap if possible
-    if fileno is not None:
+    try:
         fd = f.fileno()
+    except (UnsupportedOperation, AttributeError):
+        fd = None
+    # Attempt to use mmap if possible
+    if fd is not None:
         if size is None:
             size = os.fstat(fd).st_size
         if has_mmap:
@@ -919,7 +923,13 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
     """
     sha = sha1()
     f.seek(0, SEEK_END)
-    todo = f.tell() + end_ofs - start_ofs
+    length = f.tell()
+    if (end_ofs < 0 and length + end_ofs < start_ofs) or end_ofs > length:
+        raise AssertionError(
+            "Attempt to read beyond file length. "
+            "start_ofs: %d, end_ofs: %d, file length: %d" % (
+                start_ofs, end_ofs, length))
+    todo = length + end_ofs - start_ofs
     f.seek(start_ofs)
     while todo:
         data = f.read(min(todo, buffer_size))
@@ -934,7 +944,7 @@ class PackData(object):
     Pack files can be accessed both sequentially for exploding a pack, and
     directly with the help of an index to retrieve a specific object.
 
-    The objects within are either complete or a delta aginst another.
+    The objects within are either complete or a delta against another.
 
     The header is variable length. If the MSB of each byte is set then it
     indicates that the subsequent byte is still part of the header.
@@ -1128,11 +1138,8 @@ class PackData(object):
         :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             return write_pack_index_v1(f, entries, self.calculate_checksum())
-        finally:
-            f.close()
 
     def create_index_v2(self, filename, progress=None):
         """Create a version 2 index file for this data file.
@@ -1142,11 +1149,8 @@ class PackData(object):
         :return: Checksum of index file
         """
         entries = self.sorted_entries(progress=progress)
-        f = GitFile(filename, 'wb')
-        try:
+        with GitFile(filename, 'wb') as f:
             return write_pack_index_v2(f, entries, self.calculate_checksum())
-        finally:
-            f.close()
 
     def create_index(self, filename, progress=None,
                      version=2):
@@ -1457,19 +1461,13 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     :param deltify: Whether to deltify pack objects
     :return: Tuple with checksum of pack file and index file
     """
-    f = GitFile(filename + '.pack', 'wb')
-    try:
+    with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(f, objects,
             delta_window_size=delta_window_size, deltify=deltify)
-    finally:
-        f.close()
     entries = [(k, v[0], v[1]) for (k, v) in entries.iteritems()]
     entries.sort()
-    f = GitFile(filename + '.idx', 'wb')
-    try:
+    with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
-    finally:
-        f.close()
 
 
 def write_pack_header(f, num_objects):
@@ -1602,9 +1600,10 @@ def _delta_encode_size(size):
     return ret
 
 
-# copy operations in git's delta format can be at most this long -
-# after this you have to decompose the copy into multiple operations.
-_MAX_COPY_LEN = 0xffffff
+# The length of delta compression copy operations in version 2 packs is limited
+# to 64K.  To copy more, we use several copy operations.  Version 3 packs allow
+# 24-bit lengths in copy operations, but we always make version 2 packs.
+_MAX_COPY_LEN = 0xffff
 
 def _encode_copy_operation(start, length):
     scratch = ''
@@ -1613,7 +1612,7 @@ def _encode_copy_operation(start, length):
         if start & 0xff << i*8:
             scratch += chr((start >> i*8) & 0xff)
             op |= 1 << i
-    for i in range(3):
+    for i in range(2):
         if length & 0xff << i*8:
             scratch += chr((length >> i*8) & 0xff)
             op |= 1 << (4+i)
@@ -1701,6 +1700,7 @@ def apply_delta(src_buf, delta):
                     index += 1
                     cp_off |= x << (i * 8)
             cp_size = 0
+            # Version 3 packs can contain copy sizes larger than 64K.
             for i in range(3):
                 if cmd & (1 << (4+i)):
                     x = ord(delta[index])
@@ -1918,13 +1918,10 @@ class Pack(object):
         :return: The path of the .keep file, as a string.
         """
         keepfile_name = '%s.keep' % self._basename
-        keepfile = GitFile(keepfile_name, 'wb')
-        try:
+        with GitFile(keepfile_name, 'wb') as keepfile:
             if msg:
                 keepfile.write(msg)
                 keepfile.write('\n')
-        finally:
-            keepfile.close()
         return keepfile_name
 
 

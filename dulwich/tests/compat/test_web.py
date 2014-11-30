@@ -25,13 +25,13 @@ warning: these tests should be fairly stable, but when writing/debugging new
 """
 
 import threading
-from unittest import (
-    SkipTest,
-    )
 from wsgiref import simple_server
 
 from dulwich.server import (
     DictBackend,
+    )
+from dulwich.tests import (
+    SkipTest,
     )
 from dulwich.web import (
     make_wsgi_chain,

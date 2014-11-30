@@ -17,6 +17,11 @@
 # MA  02110-1301, USA.
 
 from io import BytesIO
+import sys
+try:
+    from unittest import skipIf
+except ImportError:
+    from unittest2 import skipIf
 
 from dulwich import (
     client,
@@ -51,6 +56,7 @@ from dulwich.objects import (
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import (
     open_repo,
+    skipIfPY3,
     )
 
 
@@ -67,6 +73,7 @@ class DummyClient(TraditionalGitClient):
 
 
 # TODO(durin42): add unit-level tests of GitClient
+@skipIfPY3
 class GitClientTests(TestCase):
 
     def setUp(self):
@@ -283,6 +290,7 @@ class GitClientTests(TestCase):
         self.assertEqual(self.rout.getvalue(), '0000')
 
 
+@skipIfPY3
 class TestGetTransportAndPath(TestCase):
 
     def test_tcp(self):
@@ -384,6 +392,12 @@ class TestGetTransportAndPath(TestCase):
         self.assertTrue(isinstance(c, SubprocessGitClient))
         self.assertEqual('foo.bar/baz', path)
 
+    @skipIf(sys.platform != 'win32', 'Behaviour only happens on windows.')
+    def test_local_abs_windows_path(self):
+        c, path = get_transport_and_path('C:\\foo.bar\\baz')
+        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertEqual('C:\\foo.bar\\baz', path)
+
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
@@ -397,6 +411,7 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('/jelmer/dulwich', path)
 
 
+@skipIfPY3
 class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_tcp(self):
@@ -475,6 +490,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual('/home/jelmer/foo', path)
 
 
+@skipIfPY3
 class TestSSHVendor(object):
 
     def __init__(self):
@@ -497,6 +513,7 @@ class TestSSHVendor(object):
         return Subprocess()
 
 
+@skipIfPY3
 class SSHGitClientTests(TestCase):
 
     def setUp(self):
@@ -539,6 +556,7 @@ class SSHGitClientTests(TestCase):
                           server.command)
 
 
+@skipIfPY3
 class ReportStatusParserTests(TestCase):
 
     def test_invalid_pack(self):
@@ -563,6 +581,7 @@ class ReportStatusParserTests(TestCase):
         parser.check()
 
 
+@skipIfPY3
 class LocalGitClientTests(TestCase):
 
     def test_fetch_into_empty(self):

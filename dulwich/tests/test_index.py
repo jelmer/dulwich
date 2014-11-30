@@ -48,8 +48,10 @@ from dulwich.objects import (
     )
 from dulwich.repo import Repo
 from dulwich.tests import TestCase
+from dulwich.tests.utils import skipIfPY3
 
 
+@skipIfPY3
 class IndexTestCase(TestCase):
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/indexes')
@@ -58,6 +60,7 @@ class IndexTestCase(TestCase):
         return Index(os.path.join(self.datadir, name))
 
 
+@skipIfPY3
 class SimpleIndexTestCase(IndexTestCase):
 
     def test_len(self):
@@ -86,6 +89,7 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
 
 
+@skipIfPY3
 class SimpleIndexWriterTestCase(IndexTestCase):
 
     def setUp(self):
@@ -101,18 +105,14 @@ class SimpleIndexWriterTestCase(IndexTestCase):
                     33188, 1000, 1000, 0,
                     'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)]
         filename = os.path.join(self.tempdir, 'test-simple-write-index')
-        x = open(filename, 'w+')
-        try:
+        with open(filename, 'w+') as x:
             write_index(x, entries)
-        finally:
-            x.close()
-        x = open(filename, 'r')
-        try:
+
+        with open(filename, 'r') as x:
             self.assertEqual(entries, list(read_index(x)))
-        finally:
-            x.close()
 
 
+@skipIfPY3
 class ReadIndexDictTests(IndexTestCase):
 
     def setUp(self):
@@ -128,18 +128,14 @@ class ReadIndexDictTests(IndexTestCase):
                     33188, 1000, 1000, 0,
                     'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
         filename = os.path.join(self.tempdir, 'test-simple-write-index')
-        x = open(filename, 'w+')
-        try:
+        with open(filename, 'w+') as x:
             write_index_dict(x, entries)
-        finally:
-            x.close()
-        x = open(filename, 'r')
-        try:
+
+        with open(filename, 'r') as x:
             self.assertEqual(entries, read_index_dict(x))
-        finally:
-            x.close()
 
 
+@skipIfPY3
 class CommitTreeTests(TestCase):
 
     def setUp(self):
@@ -171,6 +167,7 @@ class CommitTreeTests(TestCase):
                           set(self.store._data.keys()))
 
 
+@skipIfPY3
 class CleanupModeTests(TestCase):
 
     def test_file(self):
@@ -189,6 +186,7 @@ class CleanupModeTests(TestCase):
         self.assertEqual(0o160000, cleanup_mode(0o160744))
 
 
+@skipIfPY3
 class WriteCacheTimeTests(TestCase):
 
     def test_write_string(self):
@@ -211,6 +209,7 @@ class WriteCacheTimeTests(TestCase):
         self.assertEqual(struct.pack(">LL", 434343, 21), f.getvalue())
 
 
+@skipIfPY3
 class IndexEntryFromStatTests(TestCase):
 
     def test_simple(self):
@@ -249,6 +248,7 @@ class IndexEntryFromStatTests(TestCase):
             0))
 
 
+@skipIfPY3
 class BuildIndexTests(TestCase):
 
     def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
@@ -260,11 +260,8 @@ class BuildIndexTests(TestCase):
         if symlink:
             self.assertEqual(os.readlink(path), contents)
         else:
-            f = open(path, 'rb')
-            try:
+            with open(path, 'rb') as f:
                 self.assertEqual(f.read(), contents)
-            finally:
-                f.close()
 
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
@@ -349,6 +346,7 @@ class BuildIndexTests(TestCase):
             sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
 
+@skipIfPY3
 class GetUnstagedChangesTests(TestCase):
 
     def test_get_unstaged_changes(self):

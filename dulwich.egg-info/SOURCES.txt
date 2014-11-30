@@ -9,7 +9,6 @@ setup.cfg
 setup.py
 bin/dul-receive-pack
 bin/dul-upload-pack
-bin/dul-web
 bin/dulwich
 docs/Makefile
 docs/conf.py
@@ -27,6 +26,7 @@ docs/tutorial/remote.txt
 docs/tutorial/repo.txt
 docs/tutorial/tag.txt
 dulwich/__init__.py
+dulwich/_compat.py
 dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c

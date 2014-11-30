@@ -32,6 +32,7 @@ from dulwich.server import (
     )
 from dulwich.tests.utils import (
     tear_down_repo,
+    skipIfPY3,
     )
 from dulwich.tests.compat.utils import (
     import_repo,
@@ -53,18 +54,17 @@ def _get_shallow(repo):
     if not shallow_file:
         return []
     shallows = []
-    try:
+    with shallow_file:
         for line in shallow_file:
             sha = line.strip()
             if not sha:
                 continue
             hex_to_sha(sha)
             shallows.append(sha)
-    finally:
-        shallow_file.close()
     return shallows
 
 
+@skipIfPY3
 class ServerTests(object):
     """Base tests for testing servers.
 

@@ -4,13 +4,11 @@
 
 try:
     from setuptools import setup, Extension
-    has_setuptools = True
 except ImportError:
     from distutils.core import setup, Extension
-    has_setuptools = False
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.7'
+dulwich_version_string = '0.9.8'
 
 include_dirs = []
 # Windows MSVC support
@@ -18,7 +16,6 @@ import os
 import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
-
 
 class DulwichDistribution(Distribution):
 
@@ -49,10 +46,16 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
 
-setup_kwargs = {}
-
-if has_setuptools:
-    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
+if sys.version_info[0] == 2:
+    tests_require = ['fastimport', 'mock']
+    if not '__pypy__' in sys.modules:
+        tests_require.extend(['gevent', 'geventhttpclient'])
+else:
+    # fastimport, gevent, geventhttpclient are not available for PY3
+    # mock only used for test_swift, which requires gevent/geventhttpclient
+    tests_require = []
+if sys.version_info < (2, 7):
+    tests_require.append('unittest2')
 
 setup(name='dulwich',
       description='Python Git Library',
@@ -73,7 +76,15 @@ setup(name='dulwich',
       in the particular Monty Python sketch.
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
-      scripts=['bin/dulwich', 'bin/dul-web', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      classifiers=[
+          'Development Status :: 4 - Beta',
+          'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+          'Programming Language :: Python :: 2.6',
+          'Programming Language :: Python :: 2.7',
+          'Operating System :: POSIX',
+          'Topic :: Software Development :: Version Control',
+      ],
       ext_modules=[
           Extension('dulwich._objects', ['dulwich/_objects.c'],
                     include_dirs=include_dirs),
@@ -82,9 +93,8 @@ setup(name='dulwich',
           Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
               include_dirs=include_dirs),
       ],
+      test_suite='dulwich.tests.test_suite',
+      tests_require=tests_require,
       distclass=DulwichDistribution,
       include_package_data=True,
-      use_2to3=True,
-      convert_2to3_doctests=['../docs/*', '../docs/tutorial/*', ],
-      **setup_kwargs
       )

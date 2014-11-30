@@ -73,6 +73,7 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_pack,
+    skipIfPY3,
     )
 
 pack1_sha = 'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -82,6 +83,7 @@ tree_sha = 'b2a2766a2879c209ab1176e7e778b81ae422eeaa'
 commit_sha = 'f18faa16531ac570a3fdc8c7ca16682548dafd12'
 
 
+@skipIfPY3
 class PackTests(TestCase):
     """Base class for testing packs"""
 
@@ -111,6 +113,7 @@ class PackTests(TestCase):
             self.fail(e)
 
 
+@skipIfPY3
 class PackIndexTests(PackTests):
     """Class that tests the index of packfiles"""
 
@@ -151,6 +154,7 @@ class PackIndexTests(PackTests):
         self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
 
 
+@skipIfPY3
 class TestPackDeltas(TestCase):
 
     test_string1 = 'The answer was flailing in the wind'
@@ -168,20 +172,27 @@ class TestPackDeltas(TestCase):
     def test_nochange(self):
         self._test_roundtrip(self.test_string1, self.test_string1)
 
+    def test_nochange_huge(self):
+        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
+
     def test_change(self):
         self._test_roundtrip(self.test_string1, self.test_string2)
 
     def test_rewrite(self):
         self._test_roundtrip(self.test_string1, self.test_string3)
 
-    def test_overflow(self):
+    def test_empty_to_big(self):
         self._test_roundtrip(self.test_string_empty, self.test_string_big)
 
-    def test_overflow_64k(self):
-        self.skipTest("big strings don't work yet")
-        self._test_roundtrip(self.test_string_huge, self.test_string_huge)
+    def test_empty_to_huge(self):
+        self._test_roundtrip(self.test_string_empty, self.test_string_huge)
+
+    def test_huge_copy(self):
+        self._test_roundtrip(self.test_string_huge + self.test_string1,
+                             self.test_string_huge + self.test_string2)
 
 
+@skipIfPY3
 class TestPackData(PackTests):
     """Tests getting the data from the packfile."""
 
@@ -259,7 +270,15 @@ class TestPackData(PackTests):
           sha1('1234').hexdigest(),
           compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest())
 
+    def test_compute_file_sha_short_file(self):
+        f = BytesIO('abcd1234wxyz')
+        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
+        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
+        self.assertRaises(AssertionError, compute_file_sha, f, start_ofs=10,
+            end_ofs=-12)
 
+
+@skipIfPY3
 class TestPack(PackTests):
 
     def test_len(self):
@@ -305,15 +324,12 @@ class TestPack(PackTests):
             self.assertEqual(obj.sha().hexdigest(), commit_sha)
 
     def test_copy(self):
-        origpack = self.get_pack(pack1_sha)
-
-        try:
+        with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, 'Elch')
             write_pack(basename, origpack.pack_tuples())
-            newpack = Pack(basename)
 
-            try:
+            with Pack(basename) as newpack:
                 self.assertEqual(origpack, newpack)
                 self.assertSucceeds(newpack.index.check)
                 self.assertEqual(origpack.name(), newpack.name())
@@ -324,10 +340,6 @@ class TestPack(PackTests):
                 orig_checksum = origpack.index.get_stored_checksum()
                 new_checksum = newpack.index.get_stored_checksum()
                 self.assertTrue(wrong_version or orig_checksum == new_checksum)
-            finally:
-                newpack.close()
-        finally:
-            origpack.close()
 
     def test_commit_obj(self):
         with self.get_pack(pack1_sha) as p:
@@ -351,12 +363,9 @@ class TestPack(PackTests):
         # file should exist
         self.assertTrue(os.path.exists(keepfile_name))
 
-        f = open(keepfile_name, 'r')
-        try:
+        with open(keepfile_name, 'r') as f:
             buf = f.read()
             self.assertEqual('', buf)
-        finally:
-            f.close()
 
     def test_keep_message(self):
         with self.get_pack(pack1_sha) as p:
@@ -370,12 +379,9 @@ class TestPack(PackTests):
         self.assertTrue(os.path.exists(keepfile_name))
 
         # and contain the right message, with a linefeed
-        f = open(keepfile_name, 'r')
-        try:
+        with open(keepfile_name, 'r') as f:
             buf = f.read()
             self.assertEqual(msg + '\n', buf)
-        finally:
-            f.close()
 
     def test_name(self):
         with self.get_pack(pack1_sha) as p:
@@ -420,6 +426,7 @@ class TestPack(PackTests):
             self.assertTrue(isinstance(objs[commit_sha], Commit))
 
 
+@skipIfPY3
 class TestThinPack(PackTests):
 
     def setUp(self):
@@ -437,15 +444,12 @@ class TestThinPack(PackTests):
         self.addCleanup(shutil.rmtree, self.pack_dir)
         self.pack_prefix = os.path.join(self.pack_dir, 'pack')
 
-        f = open(self.pack_prefix + '.pack', 'wb')
-        try:
+        with open(self.pack_prefix + '.pack', 'wb') as f:
             build_pack(f, [
                 (REF_DELTA, (self.blobs['foo'].id, 'foo1234')),
                 (Blob.type_num, 'bar'),
                 (REF_DELTA, (self.blobs['bar'].id, 'bar2468'))],
                 store=self.store)
-        finally:
-            f.close()
 
         # Index the new pack.
         with self.make_pack(True) as pack:
@@ -479,6 +483,7 @@ class TestThinPack(PackTests):
                 sorted(o.id for o in p.iterobjects()))
 
 
+@skipIfPY3
 class WritePackTests(TestCase):
 
     def test_write_pack_header(self):
@@ -595,13 +600,11 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
 
     def writeIndex(self, filename, entries, pack_checksum):
         # FIXME: Write to BytesIO instead rather than hitting disk ?
-        f = GitFile(filename, "wb")
-        try:
+        with GitFile(filename, "wb") as f:
             self._write_fn(f, entries, pack_checksum)
-        finally:
-            f.close()
 
 
+@skipIfPY3
 class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
 
     def setUp(self):
@@ -616,6 +619,7 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
         TestCase.tearDown(self)
 
 
+@skipIfPY3
 class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
 
     def setUp(self):
@@ -631,6 +635,7 @@ class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
         BaseTestFilePackIndexWriting.tearDown(self)
 
 
+@skipIfPY3
 class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
 
     def setUp(self):
@@ -646,6 +651,7 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
         BaseTestFilePackIndexWriting.tearDown(self)
 
 
+@skipIfPY3
 class ReadZlibTests(TestCase):
 
     decomp = (
@@ -727,6 +733,7 @@ class ReadZlibTests(TestCase):
         self.assertEqual(self.comp, ''.join(self.unpacked.comp_chunks))
 
 
+@skipIfPY3
 class DeltifyTests(TestCase):
 
     def test_empty(self):
@@ -749,6 +756,7 @@ class DeltifyTests(TestCase):
             list(deltify_pack_objects([(b1, ""), (b2, "")])))
 
 
+@skipIfPY3
 class TestPackStreamReader(TestCase):
 
     def test_read_objects_emtpy(self):
@@ -799,6 +807,7 @@ class TestPackStreamReader(TestCase):
         self.assertEqual([], list(reader.read_objects()))
 
 
+@skipIfPY3
 class TestPackIterator(DeltaChainIterator):
 
     _compute_crc32 = True
@@ -820,6 +829,7 @@ class TestPackIterator(DeltaChainIterator):
           offset, pack_type_num, base_chunks)
 
 
+@skipIfPY3
 class DeltaChainIteratorTests(TestCase):
 
     def setUp(self):
@@ -1031,6 +1041,7 @@ class DeltaChainIteratorTests(TestCase):
             self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.args[0]),))
 
 
+@skipIfPY3
 class DeltaEncodeSizeTests(TestCase):
 
     def test_basic(self):
@@ -1041,6 +1052,7 @@ class DeltaEncodeSizeTests(TestCase):
         self.assertEquals('\xa0\x8d\x06', _delta_encode_size(100000))
 
 
+@skipIfPY3
 class EncodeCopyOperationTests(TestCase):
 
     def test_basic(self):

@@ -17,7 +17,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from dulwich.server import serve_command, UploadPackHandler
+from dulwich.porcelain import upload_pack
 import os
 import sys
 
@@ -25,4 +25,4 @@ if len(sys.argv) < 2:
     sys.stderr.write("usage: %s <git-dir>\n" % os.path.basename(sys.argv[0]))
     sys.exit(1)
 
-sys.exit(serve_command(UploadPackHandler))
+sys.exit(upload_pack(sys.argv[1]))

@@ -1,4 +1,4 @@
-dulwich (0.9.8-2) UNRELEASED; urgency=medium
+dulwich (0.9.8-2) unstable; urgency=medium
 
   * Add pypy package.
   * Add patch 02_unpure_pypy to enable C bindings in pypy.

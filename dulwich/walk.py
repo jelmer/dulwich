@@ -251,7 +251,7 @@ class Walker(object):
             if changed_path == followed_path:
                 return True
             if (changed_path.startswith(followed_path) and
-                changed_path[len(followed_path)] == '/'):
+                    changed_path[len(followed_path)] == b'/'[0]):
                 return True
         return False
 

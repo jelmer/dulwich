@@ -1,3 +1,9 @@
+dulwich (0.9.8-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 Nov 2014 17:32:33 +0000
+
 dulwich (0.9.7-2) unstable; urgency=medium
 
   * Require at least Python 2.7. Closes: #753519

@@ -1,6 +1,7 @@
 dulwich (0.9.8-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Bump standards version to 3.9.6 (no changes).
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 Nov 2014 17:32:33 +0000
 

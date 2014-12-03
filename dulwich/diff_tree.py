@@ -17,7 +17,7 @@
 # MA  02110-1301, USA.
 
 """Utilities for diffing files and trees."""
-
+import sys
 from collections import (
     defaultdict,
     namedtuple,
@@ -27,15 +27,19 @@ from io import BytesIO
 from itertools import chain
 import stat
 
-try:
-    from itertools import izip
-except ImportError:
-    # Python3
+if sys.version_info[0] == 3:
+    xrange = range
     izip = zip
+    iteritems = lambda d: d.items()
+else:
+    from itertools import izip
+    iteritems = lambda d: d.iteritems()
+
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,
     )
+
 
 # TreeChange type constants.
 CHANGE_ADD = 'add'
@@ -140,7 +144,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     # case.
     mode1 = tree1_id and stat.S_IFDIR or None
     mode2 = tree2_id and stat.S_IFDIR or None
-    todo = [(TreeEntry('', mode1, tree1_id), TreeEntry('', mode2, tree2_id))]
+    todo = [(TreeEntry(b'', mode1, tree1_id), TreeEntry(b'', mode2, tree2_id))]
     while todo:
         entry1, entry2 = todo.pop()
         is_tree1 = _is_tree(entry1)
@@ -261,7 +265,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
     change_type = lambda c: c.type
 
     # Yield only conflicting changes.
-    for _, changes in sorted(changes_by_path.iteritems()):
+    for _, changes in sorted(iteritems(changes_by_path)):
         assert len(changes) == num_parents
         have = [c for c in changes if c is not None]
         if _all_eq(have, change_type, CHANGE_DELETE):
@@ -298,9 +302,11 @@ def _count_blocks(obj):
     block_getvalue = block.getvalue
 
     for c in chain(*obj.as_raw_chunks()):
+        if sys.version_info[0] == 3:
+            c = c.to_bytes(1, 'big')
         block_write(c)
         n += 1
-        if c == '\n' or n == _BLOCK_SIZE:
+        if c == b'\n' or n == _BLOCK_SIZE:
             value = block_getvalue()
             block_counts[hash(value)] += len(value)
             block_seek(0)
@@ -324,7 +330,7 @@ def _common_bytes(blocks1, blocks2):
     if len(blocks1) > len(blocks2):
         blocks1, blocks2 = blocks2, blocks1
     score = 0
-    for block, count1 in blocks1.iteritems():
+    for block, count1 in iteritems(blocks1):
         count2 = blocks2.get(block)
         if count2:
             score += min(count1, count2)
@@ -452,7 +458,7 @@ class RenameDetector(object):
 
         add_paths = set()
         delete_paths = set()
-        for sha, sha_deletes in delete_map.iteritems():
+        for sha, sha_deletes in iteritems(delete_map):
             sha_adds = add_map[sha]
             for (old, is_delete), new in izip(sha_deletes, sha_adds):
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):

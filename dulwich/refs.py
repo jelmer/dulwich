@@ -39,7 +39,6 @@ from dulwich.file import (
 from dulwich._py3_compat import (
     iterbytes,
     items,
-    keys,
     )
 
 
@@ -733,7 +732,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
         peeled_refs = {}
     else:
         f.write(b'# pack-refs with: peeled\n')
-    for refname in sorted(keys(packed_refs)):
+    for refname in sorted(packed_refs.keys()):
         f.write(git_line(packed_refs[refname], refname))
         if refname in peeled_refs:
             f.write(b'^' + peeled_refs[refname] + b'\n')

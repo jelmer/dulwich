@@ -41,7 +41,6 @@ from dulwich.file import GitFile
 from dulwich._py3_compat import (
     byte2int,
     indexbytes,
-    integer_types,
     iterbytes,
     items,
     text_type,
@@ -821,8 +820,6 @@ def sorted_tree_items(entries, name_order):
     for name, entry in sorted(items(entries), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
-        if not isinstance(mode, integer_types):
-            raise TypeError('Expected integer/long for mode, got %r' % mode)
         mode = int(mode)
         if not isinstance(hexsha, bytes):
             raise TypeError('Expected bytes for SHA, got %r' % hexsha)

@@ -25,18 +25,11 @@ PY3 = sys.version_info[0] == 3
 
 if PY2:
     text_type = unicode
-    #string_types = (str, unicode)
-    #unichr = unichr
-    integer_types = (int, long)
 else:
     text_type = str
-    #string_types = (str,)
-    #unichr = chr
-    integer_types = (int, )
 
 
 if PY2:
-    int2byte = chr
     def byte2int(bs):
         return ord(bs[0])
     def indexbytes(buf, i):
@@ -44,18 +37,13 @@ if PY2:
     def iterbytes(buf):
         return (ord(byte) for byte in buf)
 else:
-    int2byte = operator.methodcaller("to_bytes", 1, "big")
     byte2int = operator.itemgetter(0)
     indexbytes = operator.getitem
     iterbytes = iter
 
 
 if PY2:
-    keys = lambda d: d.iterkeys()
-    values = lambda d: d.itervalues()
     items = lambda d: d.iteritems()
 else:
-    keys = lambda d: d.keys()
-    values = lambda d: d.values()
     items = lambda d: d.items()
 

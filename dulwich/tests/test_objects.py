@@ -63,9 +63,6 @@ from dulwich.tests.utils import (
     functest_builder,
     ext_functest_builder,
     )
-from dulwich._py3_compat import (
-    items,
-    )
 
 a_sha = b'6f670c0fb53f9463760b7295fbb814e965fb20c8'
 b_sha = b'2969be3e8ee1c0222396a5611407e4769f14e54b'
@@ -500,7 +497,7 @@ class CommitParseTests(ShaFileCheckTests):
         if encoding is not None:
             lines.append(b'encoding ' + encoding)
         if extra is not None:
-            for name, value in sorted(items(extra)):
+            for name, value in sorted(extra.items()):
                 lines.append(name + b' ' + value)
         lines.append(b'')
         if message is not None:
@@ -678,13 +675,13 @@ class TreeTests(ShaFileCheckTests):
 
     def test_tree_iteritems_dir_sort(self):
         x = Tree()
-        for name, item in items(_TREE_ITEMS):
+        for name, item in _TREE_ITEMS.items():
             x[name] = item
-        self.assertEqual(_SORTED_TREE_ITEMS, list(items(x)))
+        self.assertEqual(_SORTED_TREE_ITEMS, x.items())
 
     def test_tree_items_dir_sort(self):
         x = Tree()
-        for name, item in items(_TREE_ITEMS):
+        for name, item in _TREE_ITEMS.items():
             x[name] = item
         self.assertEqual(_SORTED_TREE_ITEMS, x.items())
 

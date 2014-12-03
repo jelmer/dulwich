@@ -36,9 +36,6 @@ from dulwich.file import (
     GitFile,
     ensure_dir_exists,
     )
-from dulwich._py3_compat import (
-    items,
-    )
 
 
 SYMREF = b'ref: '
@@ -110,7 +107,7 @@ class RefsContainer(object):
         return None
 
     def import_refs(self, base, other):
-        for name, value in items(other):
+        for name, value in other.items():
             self[b'/'.join((base, name))] = value
 
     def allkeys(self):

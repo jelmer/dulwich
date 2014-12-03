@@ -27,21 +27,19 @@ from io import BytesIO
 from itertools import chain
 import stat
 
-try:
-    from itertools import izip
-except ImportError:
-    # Python3
+if sys.version_info[0] == 3:
+    xrange = range
     izip = zip
+    iteritems = lambda d: d.items()
+else:
+    from itertools import izip
+    iteritems = lambda d: d.iteritems()
+
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,
     )
-from dulwich._py3_compat import (
-    items,
-    )
 
-if sys.version_info[0] == 3:
-    xrange = range
 
 # TreeChange type constants.
 CHANGE_ADD = 'add'
@@ -267,7 +265,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
     change_type = lambda c: c.type
 
     # Yield only conflicting changes.
-    for _, changes in sorted(items(changes_by_path)):
+    for _, changes in sorted(iteritems(changes_by_path)):
         assert len(changes) == num_parents
         have = [c for c in changes if c is not None]
         if _all_eq(have, change_type, CHANGE_DELETE):
@@ -332,7 +330,7 @@ def _common_bytes(blocks1, blocks2):
     if len(blocks1) > len(blocks2):
         blocks1, blocks2 = blocks2, blocks1
     score = 0
-    for block, count1 in items(blocks1):
+    for block, count1 in iteritems(blocks1):
         count2 = blocks2.get(block)
         if count2:
             score += min(count1, count2)
@@ -460,7 +458,7 @@ class RenameDetector(object):
 
         add_paths = set()
         delete_paths = set()
-        for sha, sha_deletes in items(delete_map):
+        for sha, sha_deletes in iteritems(delete_map):
             sha_adds = add_map[sha]
             for (old, is_delete), new in izip(sha_deletes, sha_adds):
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):

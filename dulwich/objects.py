@@ -25,6 +25,7 @@ from collections import namedtuple
 import os
 import posixpath
 import stat
+import sys
 import warnings
 import zlib
 from hashlib import sha1
@@ -38,13 +39,12 @@ from dulwich.errors import (
     ObjectFormatException,
     )
 from dulwich.file import GitFile
-from dulwich._py3_compat import (
-    byte2int,
-    indexbytes,
-    iterbytes,
-    items,
-    text_type,
-    )
+
+if sys.version_info[0] == 2:
+    iteritems = lambda d: d.iteritems()
+else:
+    iteritems = lambda d: d.items()
+
 
 ZERO_SHA = b'0' * 40
 
@@ -106,7 +106,7 @@ def hex_to_filename(path, hex):
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
     # as path.
-    if isinstance(path, text_type):
+    if getattr(path, 'encode', None) is not None:
         hex = hex.decode('ascii')
     dir = hex[:2]
     file = hex[2:]
@@ -196,7 +196,7 @@ class FixedSha(object):
     __slots__ = ('_hexsha', '_sha')
 
     def __init__(self, hexsha):
-        if isinstance(hexsha, text_type):
+        if getattr(hexsha, 'encode', None) is not None:
             hexsha = hexsha.encode('ascii')
         if not isinstance(hexsha, bytes):
             raise TypeError('Expected bytes for hexsha, got %r' % hexsha)
@@ -330,7 +330,7 @@ class ShaFile(object):
     @staticmethod
     def _parse_object_header(magic, f):
         """Parse a new style object, creating it but not reading the file."""
-        num_type = (byte2int(magic) >> 4) & 7
+        num_type = (ord(magic[0:1]) >> 4) & 7
         obj_class = object_class(num_type)
         if not obj_class:
             raise ObjectFormatException("Not a known type %d" % num_type)
@@ -342,17 +342,18 @@ class ShaFile(object):
         """Parse a new style object, setting self._text."""
         # skip type and size; type must have already been determined, and
         # we trust zlib to fail if it's otherwise corrupted
-        byte = byte2int(map)
+        byte = ord(map[0:1])
         used = 1
         while (byte & 0x80) != 0:
-            byte = indexbytes(map, used)
+            byte = ord(map[used:used+1])
             used += 1
         raw = map[used:]
         self.set_raw_string(_decompress(raw))
 
     @classmethod
     def _is_legacy_object(cls, magic):
-        b0, b1 = iterbytes(magic)
+        b0 = ord(magic[0:1])
+        b1 = ord(magic[1:2])
         word = (b0 << 8) + b1
         return (b0 & 0x8F) == 0x08 and (word % 31) == 0
 
@@ -817,7 +818,7 @@ def sorted_tree_items(entries, name_order):
     :return: Iterator over (name, mode, hexsha)
     """
     key_func = name_order and key_entry_name_order or key_entry
-    for name, entry in sorted(items(entries), key=key_func):
+    for name, entry in sorted(iteritems(entries), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)

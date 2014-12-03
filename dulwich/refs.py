@@ -37,14 +37,13 @@ from dulwich.file import (
     ensure_dir_exists,
     )
 from dulwich._py3_compat import (
-    iterbytes,
     items,
     )
 
 
 SYMREF = b'ref: '
 LOCAL_BRANCH_PREFIX = b'refs/heads/'
-BAD_REF_CHARS = set(iterbytes(b'\177 ~^:?*['))
+BAD_REF_CHARS = set(b'\177 ~^:?*[')
 
 
 def check_ref_format(refname):
@@ -65,8 +64,8 @@ def check_ref_format(refname):
         return False
     if b'..' in refname:
         return False
-    for c in iterbytes(refname):
-        if c < 0o40 or c in BAD_REF_CHARS:
+    for i, c in enumerate(refname):
+        if ord(refname[i:i+1]) < 0o40 or c in BAD_REF_CHARS:
             return False
     if refname[-1] in b'/.':
         return False

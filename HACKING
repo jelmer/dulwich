@@ -25,3 +25,17 @@ will run the tests using unittest on Python 2.7 and higher, and using
 unittest2 (which you will need to have installed) on older versions of Python.
 
  $ make check
+
+String Types
+------------
+Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribed
+encoding for these strings, and although it is fairly common to use UTF-8, anything
+can and is used as encoding with Git.
+
+For this reason, Dulwich internally treats git-based filenames as bytestrings. It is up
+to the Dulwich API user to encode and decode them if necessary.
+
+* git-repository related filenames: bytes
+* object sha1 digests (20 bytes long): bytes
+* object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings on python3)
+

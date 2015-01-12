@@ -8,6 +8,9 @@
   * Fix running of testsuite when installed.
     (Jelmer Vernooij, #223)
 
+  * Use a block cache in _find_content_rename_candidates(),
+    improving performance. (Mike Williams)
+
 0.9.8	2014-11-30
 
  BUG FIXES

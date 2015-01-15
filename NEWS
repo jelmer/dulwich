@@ -6,6 +6,12 @@
     in both C extensions and native delta application code.
     (Jelmer Vernooij, #259)
 
+ SECURITY BUG FIXES
+
+  * In dulwich.index.build_index_from_tree, by default
+    refuse to create entries that start with .git/.
+    (CVE-2014-9706, Jelmer Vernooij)
+
 0.9.9	2015-03-20
 
  SECURITY BUG FIXES

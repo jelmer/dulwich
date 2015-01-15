@@ -431,14 +431,26 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
             os.chmod(target_path, mode)
 
 
-def validate_path_default(path):
+INVALID_DOTNAMES = (".git", ".", "..", "")
+
+
+def validate_path_element_default(element):
+    return element.lower() not in INVALID_DOTNAMES
+
+
+def validate_path(path, element_validator=validate_path_element_default):
     """Default path validator that just checks for .git/."""
-    return not path.startswith(".git/")
+    parts = path.split("/")
+    for p in parts:
+        if not element_validator(p):
+            return False
+    else:
+        return True
 
 
 def build_index_from_tree(prefix, index_path, object_store, tree_id,
                           honor_filemode=True,
-                          validate_path=validate_path_default):
+                          validate_path_element=validate_path_element_default):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
@@ -447,8 +459,8 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
-    :param validate_path: Function to validate paths to check out;
-        default just refuses filenames starting with .git/.
+    :param validate_path_element: Function to validate path elements to check out;
+        default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.

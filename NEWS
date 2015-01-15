@@ -1,5 +1,10 @@
 0.9.9	UNRELEASED
 
+ BUG FIXES
+
+  * In dulwich.index.build_index_from_tree, by default
+    refuse to create entries that start with .git/.
+
 0.9.8	2014-11-30
 
  BUG FIXES

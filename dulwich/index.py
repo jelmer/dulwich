@@ -438,6 +438,15 @@ def validate_path_element_default(element):
     return element.lower() not in INVALID_DOTNAMES
 
 
+def validate_path_element_ntfs(element):
+    stripped = element.rstrip(". ").lower()
+    if stripped in INVALID_DOTNAMES:
+        return False
+    if stripped == "git~1":
+        return False
+    return True
+
+
 def validate_path(path, element_validator=validate_path_element_default):
     """Default path validator that just checks for .git/."""
     parts = path.split("/")

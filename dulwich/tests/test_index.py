@@ -35,6 +35,8 @@ from dulwich.index import (
     index_entry_from_stat,
     read_index,
     read_index_dict,
+    validate_path_element_default,
+    validate_path_element_ntfs,
     write_cache_time,
     write_index,
     write_index_dict,
@@ -413,3 +415,22 @@ class GetUnstagedChangesTests(TestCase):
         changes = get_unstaged_changes(repo.open_index(), repo_dir)
 
         self.assertEqual(list(changes), ['foo1'])
+
+
+class TestValidatePathElement(TestCase):
+
+    def test_default(self):
+        self.assertTrue(validate_path_element_default("bla"))
+        self.assertTrue(validate_path_element_default(".bla"))
+        self.assertFalse(validate_path_element_default(".git"))
+        self.assertFalse(validate_path_element_default(".giT"))
+        self.assertFalse(validate_path_element_default(".."))
+        self.assertTrue(validate_path_element_default("git~1"))
+
+    def test_ntfs(self):
+        self.assertTrue(validate_path_element_ntfs("bla"))
+        self.assertTrue(validate_path_element_ntfs(".bla"))
+        self.assertFalse(validate_path_element_ntfs(".git"))
+        self.assertFalse(validate_path_element_ntfs(".giT"))
+        self.assertFalse(validate_path_element_ntfs(".."))
+        self.assertFalse(validate_path_element_ntfs("git~1"))

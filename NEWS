@@ -5,6 +5,9 @@
   * In dulwich.index.build_index_from_tree, by default
     refuse to create entries that start with .git/.
 
+  * Fix running of testsuite when installed.
+    (Jelmer Vernooij, #223)
+
 0.9.8	2014-11-30
 
  BUG FIXES

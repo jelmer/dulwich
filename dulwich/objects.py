@@ -272,7 +272,8 @@ class ShaFile(object):
         :return: List of strings, not necessarily one per line
         """
         if self._needs_parsing:
-            self._ensure_parsed()
+            if not self._chunked_text:
+                self._read_chunks()
         elif self._needs_serialization:
             self._chunked_text = self._serialize()
         return self._chunked_text
@@ -296,17 +297,21 @@ class ShaFile(object):
         """Return a string representing this object, fit for display."""
         return self.as_raw_string()
 
+    def _read_chunks(self):
+        """Read the raw chunks from file"""
+
+        if self._file is not None:
+            self._parse_file(self._file)
+            self._file = None
+        elif self._path is not None:
+            self._parse_path()
+        else:
+            raise AssertionError("ShaFile needs either text or filename")
+
     def _ensure_parsed(self):
         if self._needs_parsing:
             if not self._chunked_text:
-                if self._file is not None:
-                    self._parse_file(self._file)
-                    self._file = None
-                elif self._path is not None:
-                    self._parse_path()
-                else:
-                    raise AssertionError(
-                        "ShaFile needs either text or filename")
+                self._read_chunks()
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
@@ -319,12 +324,11 @@ class ShaFile(object):
     def set_raw_chunks(self, chunks, sha=None):
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
-        self._deserialize(chunks)
         if sha is None:
             self._sha = None
         else:
             self._sha = FixedSha(sha)
-        self._needs_parsing = False
+        self._needs_parsing = True
         self._needs_serialization = False
 
     @staticmethod
@@ -339,7 +343,7 @@ class ShaFile(object):
         return ret
 
     def _parse_object(self, map):
-        """Parse a new style object, setting self._text."""
+        """Parse a new style object, setting the raw string."""
         # skip type and size; type must have already been determined, and
         # we trust zlib to fail if it's otherwise corrupted
         byte = ord(map[0:1])

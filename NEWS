@@ -11,6 +11,13 @@
   * Use a block cache in _find_content_rename_candidates(),
     improving performance. (Mike Williams)
 
+  * Add support for ``core.protectNTFS`` setting.
+    (Jelmer Vernooij)
+
+ IMPROVEMENTS
+
+  * New public method `Repo.reset_index`. (Jelmer Vernooij)
+
 0.9.8	2014-11-30
 
  BUG FIXES

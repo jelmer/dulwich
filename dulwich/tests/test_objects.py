@@ -156,6 +156,21 @@ class BlobReadTests(TestCase):
         self.assertEqual(t.items()[0], (b'a', 33188, a_sha))
         self.assertEqual(t.items()[1], (b'b', 33188, b_sha))
 
+    def test_read_tree_from_file_parse_count(self):
+        old_deserialize = Tree._deserialize
+        def reset_deserialize():
+            Tree._deserialize = old_deserialize
+        self.addCleanup(reset_deserialize)
+        self.deserialize_count = 0
+        def counting_deserialize(*args, **kwargs):
+            self.deserialize_count += 1
+            return old_deserialize(*args, **kwargs)
+        Tree._deserialize = counting_deserialize
+        t = self.get_tree(tree_sha)
+        self.assertEqual(t.items()[0], (b'a', 33188, a_sha))
+        self.assertEqual(t.items()[1], (b'b', 33188, b_sha))
+        self.assertEquals(self.deserialize_count, 1)
+
     def test_read_tag_from_file(self):
         t = self.get_tag(tag_sha)
         self.assertEqual(t.object,

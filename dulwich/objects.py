@@ -215,8 +215,8 @@ class FixedSha(object):
 class ShaFile(object):
     """A git SHA file."""
 
-    __slots__ = ('_needs_parsing', '_chunked_text', '_file', '_path',
-                 '_sha', '_needs_serialization', '_magic')
+    __slots__ = ('_needs_parsing', '_chunked_text', '_sha',
+                 '_needs_serialization')
 
     @staticmethod
     def _parse_legacy_object_header(magic, f):
@@ -238,9 +238,7 @@ class ShaFile(object):
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)
-        ret = obj_class()
-        ret._magic = magic
-        return ret
+        return obj_class()
 
     def _parse_legacy_object(self, map):
         """Parse a legacy object, setting the raw string."""
@@ -299,14 +297,7 @@ class ShaFile(object):
     def _ensure_parsed(self):
         if self._needs_parsing:
             if not self._chunked_text:
-                if self._file is not None:
-                    self._parse_file(self._file)
-                    self._file = None
-                elif self._path is not None:
-                    self._parse_path()
-                else:
-                    raise AssertionError(
-                        "ShaFile needs either text or filename")
+                raise AssertionError("ShaFile needs chunked text")
             self._deserialize(self._chunked_text)
             self._needs_parsing = False
 
@@ -334,9 +325,7 @@ class ShaFile(object):
         obj_class = object_class(num_type)
         if not obj_class:
             raise ObjectFormatException("Not a known type %d" % num_type)
-        ret = obj_class()
-        ret._magic = magic
-        return ret
+        return obj_class()
 
     def _parse_object(self, map):
         """Parse a new style object, setting self._text."""
@@ -358,19 +347,19 @@ class ShaFile(object):
         return (b0 & 0x8F) == 0x08 and (word % 31) == 0
 
     @classmethod
-    def _parse_file_header(cls, f):
-        magic = f.read(2)
-        if cls._is_legacy_object(magic):
-            return cls._parse_legacy_object_header(magic, f)
+    def _parse_file(cls, f):
+        map = f.read()
+        if cls._is_legacy_object(map):
+            obj = cls._parse_legacy_object_header(map, f)
+            obj._parse_legacy_object(map)
         else:
-            return cls._parse_object_header(magic, f)
+            obj = cls._parse_object_header(map, f)
+            obj._parse_object(map)
+        return obj
 
     def __init__(self):
         """Don't call this directly"""
         self._sha = None
-        self._path = None
-        self._file = None
-        self._magic = None
         self._chunked_text = []
         self._needs_parsing = False
         self._needs_serialization = True
@@ -381,40 +370,18 @@ class ShaFile(object):
     def _serialize(self):
         raise NotImplementedError(self._serialize)
 
-    def _parse_path(self):
-        with GitFile(self._path, 'rb') as f:
-            self._parse_file(f)
-
-    def _parse_file(self, f):
-        magic = self._magic
-        if magic is None:
-            magic = f.read(2)
-        map = magic + f.read()
-        if self._is_legacy_object(magic[:2]):
-            self._parse_legacy_object(map)
-        else:
-            self._parse_object(map)
-
     @classmethod
     def from_path(cls, path):
         """Open a SHA file from disk."""
         with GitFile(path, 'rb') as f:
-            obj = cls.from_file(f)
-            obj._path = path
-            obj._sha = FixedSha(filename_to_hex(path))
-            obj._file = None
-            obj._magic = None
-            return obj
+            return cls.from_file(f)
 
     @classmethod
     def from_file(cls, f):
         """Get the contents of a SHA file on disk."""
         try:
-            obj = cls._parse_file_header(f)
+            obj = cls._parse_file(f)
             obj._sha = None
-            obj._needs_parsing = True
-            obj._needs_serialization = True
-            obj._file = f
             return obj
         except (IndexError, ValueError):
             raise ObjectFormatException("invalid object header")

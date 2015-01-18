@@ -18,6 +18,10 @@
 
   * New public method `Repo.reset_index`. (Jelmer Vernooij)
 
+  * Prevent duplicate parsing of loose files in objects
+    directory when reading. Thanks to David Keijser for the
+    report. (Jelmer Vernooij, #231)
+
 0.9.8	2014-11-30
 
  BUG FIXES

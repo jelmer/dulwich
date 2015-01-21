@@ -1094,6 +1094,10 @@ class PackData(object):
         # TODO(dborowitz): Merge this with iterobjects, if we can change its
         # return type.
         self._file.seek(self._header_size)
+
+        if self._num_objects is None:
+            return
+
         for _ in xrange(self._num_objects):
             offset = self._file.tell()
             unpacked, unused = unpack_object(

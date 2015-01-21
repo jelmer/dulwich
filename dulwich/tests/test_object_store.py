@@ -214,6 +214,11 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         else:
             commit()
 
+    def test_add_pack_emtpy(self):
+        o = MemoryObjectStore()
+        f, commit, abort = o.add_pack()
+        commit()
+
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
         blob = make_object(Blob, data='yummy data')

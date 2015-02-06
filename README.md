@@ -46,6 +46,6 @@ https://launchpad.net/~dulwich-users.
 Python3
 -------
 
-The process of porting to Python3 is ongoing. Please not that although the
+The process of porting to Python3 is ongoing. Please note that although the
 test suite pass in python3, this is due to the tests of features that are not
 yet ported being skipped, and *not* an indication that the port is complete.

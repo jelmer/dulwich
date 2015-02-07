@@ -1,13 +1,14 @@
 Source: dulwich
 Section: python
 Priority: optional
-Maintainer: Jelmer Vernooij <jelmer@debian.org>
+Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
+Uploaders: Jelmer Vernooij <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
 Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), pypy-dev, dh-python
 Standards-Version: 3.9.6
 X-Python-Version: >= 2.7
-Vcs-Git: git://anonscm.debian.org/users/jelmer/dulwich.git -b unstable
-Vcs-Browser: http://anonscm.debian.org/gitweb/?p=users/jelmer/dulwich.git
+Vcs-Git: git://anonscm.debian.org/python-modules/packages/dulwich.git -b unstable
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=python-modules/packages/dulwich.git
 XS-Testsuite: autopkgtest
 
 Package: python-dulwich

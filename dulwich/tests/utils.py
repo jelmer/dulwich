@@ -75,12 +75,20 @@ def open_repo(name):
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
     return Repo(temp_repo_dir)
 
+def init_repo(name):
+    """Init an empty bare repo in a temporary directory.
+
+    Use tear_down_repo to delete any temp files created.
+
+    :param name: The name of the repository
+    :returns: An initialized Repo object that lives in a temporary directory.
+    """
+    return Repo.init_bare(os.path.join(tempfile.mkdtemp(), name), mkdir = True)
 
 def tear_down_repo(repo):
     """Tear down a test repository."""
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
     shutil.rmtree(temp_dir)
-
 
 def make_object(cls, **attrs):
     """Make an object for testing and assign some members.

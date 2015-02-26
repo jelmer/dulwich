@@ -679,29 +679,7 @@ class LocalGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        from dulwich.repo import Repo
-        from dulwich.protocol import ZERO_SHA
-        
-        target = Repo(path)
-        old_refs = target.get_refs()
-        if not old_refs:
-            old_refs["capabilities^{}"] = ZERO_SHA
-        new_refs = determine_wants(old_refs)
-
-        have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
-        want = []
-        for refname in set(new_refs.keys() + old_refs.keys()):
-            old_sha1 = old_refs.get(refname, ZERO_SHA)
-            new_sha1 = new_refs.get(refname, ZERO_SHA)
-            if new_sha1 not in have and new_sha1 != ZERO_SHA:
-                want.append(new_sha1)
-        
-        if not want and old_refs == new_refs:
-            return new_refs
-
-        target.object_store.add_objects(generate_pack_contents(have, want))
-
-        return new_refs
+        raise NotImplementedError(self.send_pack)
 
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.

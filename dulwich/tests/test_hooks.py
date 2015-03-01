@@ -20,6 +20,7 @@
 import os
 import stat
 import shutil
+import sys
 import tempfile
 
 from dulwich import errors
@@ -31,10 +32,8 @@ from dulwich.hooks import (
 )
 
 from dulwich.tests import TestCase
-from dulwich.tests.utils import skipIfPY3
 
 
-@skipIfPY3
 class ShellHookTests(TestCase):
 
     def setUp(self):
@@ -42,11 +41,11 @@ class ShellHookTests(TestCase):
             self.skipTest('shell hook tests requires POSIX shell')
 
     def test_hook_pre_commit(self):
-        pre_commit_fail = """#!/bin/sh
+        pre_commit_fail = b"""#!/bin/sh
 exit 1
 """
 
-        pre_commit_success = """#!/bin/sh
+        pre_commit_success = b"""#!/bin/sh
 exit 0
 """
 
@@ -71,11 +70,11 @@ exit 0
 
     def test_hook_commit_msg(self):
 
-        commit_msg_fail = """#!/bin/sh
+        commit_msg_fail = b"""#!/bin/sh
 exit 1
 """
 
-        commit_msg_success = """#!/bin/sh
+        commit_msg_success = b"""#!/bin/sh
 exit 0
 """
 
@@ -90,22 +89,21 @@ exit 0
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute, 'failed commit')
+        self.assertRaises(errors.HookError, hook.execute, b'failed commit')
 
         with open(commit_msg, 'wb') as f:
             f.write(commit_msg_success)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute('empty commit')
+        hook.execute(b'empty commit')
 
     def test_hook_post_commit(self):
 
         (fd, path) = tempfile.mkstemp()
-        post_commit_msg = """#!/bin/sh
-rm %(file)s
-""" % {'file': path}
+        post_commit_msg = b"""#!/bin/sh
+rm """ + path.encode(sys.getfilesystemencoding()) + b"\n"
 
-        post_commit_msg_fail = """#!/bin/sh
+        post_commit_msg_fail = b"""#!/bin/sh
 exit 1
 """
 

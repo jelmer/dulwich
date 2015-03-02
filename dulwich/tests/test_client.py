@@ -18,6 +18,9 @@
 
 from io import BytesIO
 import sys
+import shutil
+import tempfile
+
 try:
     from unittest import skipIf
 except ImportError:
@@ -55,11 +58,10 @@ from dulwich.objects import (
     )
 from dulwich.repo import (
     MemoryRepo,
-    Repo
+    Repo,
     )
 from dulwich.tests.utils import (
     open_repo,
-    init_repo,
     skipIfPY3,
     )
 
@@ -622,7 +624,9 @@ class LocalGitClientTests(TestCase):
 
     def test_send_pack_with_changes(self):
         local = open_repo('a.git')
-        target = init_repo('a.git')
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target = Repo.init_bare(target_path)
         self.send_and_verify("master", local, target)
 
     def send_and_verify(self, branch, local, target):

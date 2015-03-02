@@ -888,7 +888,7 @@ class Repo(BaseRepo):
         return cls(path)
 
     @classmethod
-    def init_bare(cls, path, mkdir=False):
+    def init_bare(cls, path):
         """Create a new bare repository.
 
         ``path`` should already exist and be an emty directory.
@@ -896,8 +896,6 @@ class Repo(BaseRepo):
         :param path: Path to create bare repository in
         :return: a `Repo` instance
         """
-        if mkdir:
-            os.mkdir(path)
         return cls._init_maybe_bare(path, True)
 
     create = init_bare

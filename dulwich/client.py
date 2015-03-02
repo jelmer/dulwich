@@ -680,8 +680,7 @@ class LocalGitClient(GitClient):
                                  and rejects ref updates
         """
         from dulwich.repo import Repo
-        from dulwich.protocol import ZERO_SHA
-        
+
         target = Repo(path)
         old_refs = target.get_refs()
         new_refs = determine_wants(old_refs)
@@ -693,12 +692,12 @@ class LocalGitClient(GitClient):
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
-        
+
         if not want and old_refs == new_refs:
             return new_refs
 
         target.object_store.add_objects(generate_pack_contents(have, want))
-        
+
         for name, sha in new_refs.iteritems():
             target.refs[name] = sha
 

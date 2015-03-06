@@ -146,10 +146,14 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 				break;
 			memcpy(out+outindex, src_buf+cp_off, cp_size);
 			outindex += cp_size;
+			dest_size -= cp_size;
 		} else if (cmd != 0) {
+			if (cmd > dest_size)
+				break;
 			memcpy(out+outindex, delta+index, cmd);
 			outindex += cmd;
 			index += cmd;
+			dest_size -= cmd;
 		} else {
 			PyErr_SetString(PyExc_ValueError, "Invalid opcode 0");
 			Py_DECREF(ret);
@@ -167,7 +171,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (dest_size != outindex) {
+	if (dest_size != 0) {
 		PyErr_SetString(PyExc_ValueError, "dest size incorrect");
 		Py_DECREF(ret);
 		return NULL;

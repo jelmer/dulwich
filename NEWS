@@ -1,3 +1,14 @@
+0.9.9	UNRELEASED
+
+ SECURITY BUG FIXES
+
+  * Fix buffer overflow in C implementation of pack apply_delta().
+    (CVE-2015-0838)
+
+    Thanks to Ivan Fratric of the Google Security Team for
+    reporting this issue.
+    (Jelmer Vernooij)
+
 0.9.8	2014-11-30
 
  BUG FIXES

@@ -17,6 +17,9 @@
   * Fix TypeError when fetching empty updates.
     (Hwee Miin Koh)
 
+  * Resolve delta refs when pulling into a MemoryRepo.
+    (Max Shawabkeh, #256)
+
  IMPROVEMENTS
 
   * New public method `Repo.reset_index`. (Jelmer Vernooij)

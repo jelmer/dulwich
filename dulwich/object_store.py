@@ -745,7 +745,7 @@ class MemoryObjectStore(BaseObjectStore):
         def commit():
             p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
-            for obj in PackInflater.for_pack_data(p):
+            for obj in PackInflater.for_pack_data(p, self.get_raw):
                 self._data[obj.id] = obj
         def abort():
             pass

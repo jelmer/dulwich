@@ -61,6 +61,7 @@ from dulwich.web import (
 
 from dulwich.tests.utils import (
     make_object,
+    make_tag,
     skipIfPY3,
     )
 
@@ -229,12 +230,7 @@ class DumbHandlersTestCase(WebTestCase):
         blob2 = make_object(Blob, data='2')
         blob3 = make_object(Blob, data='3')
 
-        tag1 = make_object(Tag, name='tag-tag',
-                           tagger='Test <test@example.com>',
-                           tag_time=12345,
-                           tag_timezone=0,
-                           message='message',
-                           object=(Blob, blob2.id))
+        tag1 = make_tag(blob2, name='tag-tag')
 
         objects = [blob1, blob2, blob3, tag1]
         refs = {

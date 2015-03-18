@@ -20,6 +20,9 @@
   * Resolve delta refs when pulling into a MemoryRepo.
     (Max Shawabkeh, #256)
 
+  * Fix handling of tags of non-commits in missing object finder.
+    (Augie Fackler, #211)
+
  IMPROVEMENTS
 
   * New public method `Repo.reset_index`. (Jelmer Vernooij)

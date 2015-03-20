@@ -23,6 +23,9 @@
   * Fix handling of tags of non-commits in missing object finder.
     (Augie Fackler, #211)
 
+  * Explicitly disable mmap on plan9 where it doesn't work.
+    (Jeff Sickel)
+
  IMPROVEMENTS
 
   * New public method `Repo.reset_index`. (Jelmer Vernooij)

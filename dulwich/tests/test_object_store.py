@@ -32,9 +32,7 @@ from dulwich.errors import (
     )
 from dulwich.objects import (
     sha_to_hex,
-    object_class,
     Blob,
-    Tag,
     Tree,
     TreeEntry,
     )
@@ -237,7 +235,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
         f = BytesIO()
         entries = build_pack(f, [], store=o)
-        self.assertEquals([], entries)
+        self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
 
@@ -353,7 +351,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         f = BytesIO()
         entries = build_pack(f, [], store=o)
-        self.assertEquals([], entries)
+        self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
 

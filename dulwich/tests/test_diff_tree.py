@@ -96,7 +96,7 @@ class TreeChangesTest(DiffTestCase):
     def assertMergeFails(self, merge_entries, name, mode, sha):
         t = Tree()
         t[name] = (mode, sha)
-        self.assertRaises(TypeError, merge_entries, '', t, t)
+        self.assertRaises((TypeError, ValueError), merge_entries, '', t, t)
 
     def _do_test_merge_entries(self, merge_entries):
         blob_a1 = make_object(Blob, data=b'a1')

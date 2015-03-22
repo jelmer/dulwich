@@ -661,13 +661,13 @@ class ReceivePackTests(PorcelainTestCase):
 class BranchListTests(PorcelainTestCase):
 
     def test_standard(self):
-        self.assertEquals(set([]), set(porcelain.branch_list(self.repo)))
+        self.assertEqual(set([]), set(porcelain.branch_list(self.repo)))
 
     def test_new_branch(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo["HEAD"] = c1.id
         porcelain.branch_create(self.repo, "foo")
-        self.assertEquals(
+        self.assertEqual(
             set(["master", "foo"]),
             set(porcelain.branch_list(self.repo)))
 
@@ -686,7 +686,7 @@ class BranchCreateTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo["HEAD"] = c1.id
         porcelain.branch_create(self.repo, "foo")
-        self.assertEquals(
+        self.assertEqual(
             set(["master", "foo"]),
             set(porcelain.branch_list(self.repo)))
 

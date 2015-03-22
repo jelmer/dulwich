@@ -191,6 +191,14 @@ class TestPackDeltas(TestCase):
         self._test_roundtrip(self.test_string_huge + self.test_string1,
                              self.test_string_huge + self.test_string2)
 
+    def test_dest_overflow(self):
+        self.assertRaises(
+            ValueError,
+            apply_delta, 'a'*0x10000, '\x80\x80\x04\x80\x80\x04\x80' + 'a'*0x10000)
+        self.assertRaises(
+            ValueError,
+            apply_delta, '', '\x00\x80\x02\xb0\x11\x11')
+
 
 @skipIfPY3
 class TestPackData(PackTests):

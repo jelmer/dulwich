@@ -1,4 +1,4 @@
-0.9.9	UNRELEASED
+0.10.0	UNRELEASED
 
  BUG FIXES
 
@@ -33,6 +33,17 @@
   * Prevent duplicate parsing of loose files in objects
     directory when reading. Thanks to David Keijser for the
     report. (Jelmer Vernooij, #231)
+
+0.9.9	2015-03-20
+
+ SECURITY BUG FIXES
+
+  * Fix buffer overflow in C implementation of pack apply_delta().
+    (CVE-2015-0838)
+
+    Thanks to Ivan Fratric of the Google Security Team for
+    reporting this issue.
+    (Jelmer Vernooij)
 
 0.9.8	2014-11-30
 

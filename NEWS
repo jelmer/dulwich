@@ -1,5 +1,11 @@
 0.10.1  UNRELEASED
 
+ BUG FIXES
+
+  * Return `ApplyDeltaError` when encountering delta errors
+    in both C extensions and native delta application code.
+    (Jelmer Vernooij, #259)
+
 0.10.0	2015-03-22
 
  BUG FIXES

@@ -47,14 +47,20 @@ except ImportError:
     imap = map
     izip = zip
 
+import os
+
 try:
     import mmap
 except ImportError:
     has_mmap = False
 else:
     has_mmap = True
+
+# For some reason the above try, except fails to set has_mmap = False
+if os.uname()[0] == 'Plan9':
+    has_mmap = False
+
 from hashlib import sha1
-import os
 from os import (
     SEEK_CUR,
     SEEK_END,
@@ -1094,6 +1100,10 @@ class PackData(object):
         # TODO(dborowitz): Merge this with iterobjects, if we can change its
         # return type.
         self._file.seek(self._header_size)
+
+        if self._num_objects is None:
+            return
+
         for _ in xrange(self._num_objects):
             offset = self._file.tell()
             unpacked, unused = unpack_object(

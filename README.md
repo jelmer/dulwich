@@ -11,6 +11,21 @@ Author: Jelmer Vernooij <jelmer@samba.org>
 The project is named after the part of London that Mr. and Mrs. Git live in
 in the particular Monty Python sketch.
 
+Installation
+------------
+
+By default, Dulwich' setup.py will attempt to build and install the optional C
+extensions. The reason for this is that they significantly improve the performance
+since some low-level operations that are executed often are much slower in CPython.
+
+If you don't want to install the C bindings, specify the --pure argument to setup.py::
+
+    $ python setup.py --pure install
+
+or if you are installing from pip:
+
+    $ pip install dulwich --global-option="--pure"
+
 Further documentation
 ---------------------
 
@@ -31,6 +46,6 @@ https://launchpad.net/~dulwich-users.
 Python3
 -------
 
-The process of porting to Python3 is ongoing. Please not that although the
+The process of porting to Python3 is ongoing. Please note that although the
 test suite pass in python3, this is due to the tests of features that are not
 yet ported being skipped, and *not* an indication that the port is complete.

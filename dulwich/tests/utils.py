@@ -36,6 +36,8 @@ from dulwich.index import (
 from dulwich.objects import (
     FixedSha,
     Commit,
+    Tag,
+    object_class,
     )
 from dulwich.pack import (
     OFS_DELTA,
@@ -100,6 +102,7 @@ def make_object(cls, **attrs):
         __dict__ instead of __slots__.
         """
         pass
+    TestObject.__name__ = 'TestObject_' + cls.__name__
 
     obj = TestObject()
     for name, value in attrs.items():
@@ -119,17 +122,38 @@ def make_commit(**attrs):
     :return: A newly initialized Commit object.
     """
     default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
-    all_attrs = {'author': 'Test Author <test@nodomain.com>',
+    all_attrs = {'author': b'Test Author <test@nodomain.com>',
                  'author_time': default_time,
                  'author_timezone': 0,
-                 'committer': 'Test Committer <test@nodomain.com>',
+                 'committer': b'Test Committer <test@nodomain.com>',
                  'commit_time': default_time,
                  'commit_timezone': 0,
-                 'message': 'Test message.',
+                 'message': b'Test message.',
                  'parents': [],
-                 'tree': '0' * 40}
+                 'tree': b'0' * 40}
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)
+
+
+def make_tag(target, **attrs):
+    """Make a Tag object with a default set of values.
+
+    :param target: object to be tagged (Commit, Blob, Tree, etc)
+    :param attrs: dict of attributes to overwrite from the default values.
+    :return: A newly initialized Tag object.
+    """
+    target_id = target.id
+    target_type = object_class(target.type_name)
+    default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
+    all_attrs = {'tagger': 'Test Author <test@nodomain.com>',
+                 'tag_time': default_time,
+                 'tag_timezone': 0,
+                 'message': 'Test message.',
+                 'object': (target_type, target_id),
+                 'name': 'Test Tag',
+                 }
+    all_attrs.update(attrs)
+    return make_object(Tag, **all_attrs)
 
 
 def functest_builder(method, func):

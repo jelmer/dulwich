@@ -25,6 +25,7 @@ from dulwich.objects import (
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     make_object,
+    make_tag,
     build_commit_graph,
     skipIfPY3,
     )
@@ -91,13 +92,12 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id],
             self.missing_1_3)
 
-    def test_bogus_haves_failure(self):
-        """Ensure non-existent SHA in haves are not tolerated"""
+    def test_bogus_haves(self):
+        """Ensure non-existent SHA in haves are tolerated"""
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id, bogus_sha]
         wants = [self.cmt(3).id]
-        self.assertRaises(KeyError, self.store.find_missing_objects,
-            self.store, haves, wants)
+        self.assertMissingMatch(haves, wants, self.missing_1_3)
 
     def test_bogus_wants_failure(self):
         """Ensure non-existent SHA in wants are not tolerated"""
@@ -105,7 +105,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
         self.assertRaises(KeyError, self.store.find_missing_objects,
-            self.store, haves, wants)
+            haves, wants)
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
@@ -195,3 +195,58 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
               self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
               self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,
               self.f1_4_id])
+
+
+class MOFTagsTest(MissingObjectFinderTest):
+    def setUp(self):
+        super(MOFTagsTest, self).setUp()
+        f1_1 = make_object(Blob, data='f1')
+        commit_spec = [[1]]
+        trees = {1: [('f1', f1_1)]}
+        self.commits = build_commit_graph(self.store, commit_spec, trees)
+
+        self._normal_tag = make_tag(self.cmt(1))
+        self.store.add_object(self._normal_tag)
+
+        self._tag_of_tag = make_tag(self._normal_tag)
+        self.store.add_object(self._tag_of_tag)
+
+        self._tag_of_tree = make_tag(self.store[self.cmt(1).tree])
+        self.store.add_object(self._tag_of_tree)
+
+        self._tag_of_blob = make_tag(f1_1)
+        self.store.add_object(self._tag_of_blob)
+
+        self._tag_of_tag_of_blob = make_tag(self._tag_of_blob)
+        self.store.add_object(self._tag_of_tag_of_blob)
+
+        self.f1_1_id = f1_1.id
+
+    def test_tagged_commit(self):
+        # The user already has the tagged commit, all they want is the tag,
+        # so send them only the tag object.
+        self.assertMissingMatch([self.cmt(1).id], [self._normal_tag.id],
+                                [self._normal_tag.id])
+
+    # The remaining cases are unusual, but do happen in the wild.
+    def test_tagged_tag(self):
+        # User already has tagged tag, send only tag of tag
+        self.assertMissingMatch([self._normal_tag.id], [self._tag_of_tag.id],
+                                [self._tag_of_tag.id])
+        # User needs both tags, but already has commit
+        self.assertMissingMatch([self.cmt(1).id], [self._tag_of_tag.id],
+                                [self._normal_tag.id, self._tag_of_tag.id])
+
+    def test_tagged_tree(self):
+        self.assertMissingMatch(
+            [], [self._tag_of_tree.id],
+            [self._tag_of_tree.id, self.cmt(1).tree, self.f1_1_id])
+
+    def test_tagged_blob(self):
+        self.assertMissingMatch([], [self._tag_of_blob.id],
+                                [self._tag_of_blob.id, self.f1_1_id])
+
+    def test_tagged_tagged_blob(self):
+        self.assertMissingMatch([], [self._tag_of_tag_of_blob.id],
+                                [self._tag_of_tag_of_blob.id,
+                                 self._tag_of_blob.id, self.f1_1_id])

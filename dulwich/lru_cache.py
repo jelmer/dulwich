@@ -19,6 +19,7 @@
 
 _null_key = object()
 
+
 class _LRUNode(object):
     """This maintains the linked-list which is the lru internals."""
 
@@ -181,7 +182,7 @@ class LRUCache(object):
 
     def items(self):
         """Get the key:value pairs as a dict."""
-        return dict((k, n.value) for k, n in self._cache.iteritems())
+        return dict((k, n.value) for k, n in self._cache.items())
 
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.

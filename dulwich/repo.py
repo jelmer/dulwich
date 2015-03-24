@@ -793,17 +793,31 @@ class Repo(BaseRepo):
 
             if not bare:
                 # Checkout HEAD to target dir
-                target._build_tree()
+                target.reset_index()
 
         return target
 
-    def _build_tree(self):
-        from dulwich.index import build_index_from_tree
+    def reset_index(self, tree=None):
+        """Reset the index back to a specific tree.
+
+        :param tree: Tree SHA to reset to, None for current HEAD tree.
+        """
+        from dulwich.index import (
+            build_index_from_tree,
+            validate_path_element_default,
+            validate_path_element_ntfs,
+            )
+        if tree is None:
+            tree = self['HEAD'].tree
         config = self.get_config()
         honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
+            validate_path_element = validate_path_element_ntfs
+        else:
+            validate_path_element = validate_path_element_default
         return build_index_from_tree(self.path, self.index_path(),
-                self.object_store, self['HEAD'].tree,
-                honor_filemode=honor_filemode)
+                self.object_store, tree, honor_filemode=honor_filemode,
+                validate_path_element=validate_path_element)
 
     def get_config(self):
         """Retrieve the config object.

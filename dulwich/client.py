@@ -616,7 +616,8 @@ class SubprocessWrapper(object):
             from msvcrt import get_osfhandle
             from win32pipe import PeekNamedPipe
             handle = get_osfhandle(self.proc.stdout.fileno())
-            return PeekNamedPipe(handle, 0)[2] != 0
+            data, total_bytes_avail, msg_bytes_left = PeekNamedPipe(handle, 0)
+            return total_bytes_avail != 0
         else:
             return _fileno_can_read(self.proc.stdout.fileno())
 
@@ -679,7 +680,29 @@ class LocalGitClient(GitClient):
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
         """
-        raise NotImplementedError(self.send_pack)
+        from dulwich.repo import Repo
+
+        target = Repo(path)
+        old_refs = target.get_refs()
+        new_refs = determine_wants(old_refs)
+
+        have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
+        want = []
+        for refname in set(new_refs.keys() + old_refs.keys()):
+            old_sha1 = old_refs.get(refname, ZERO_SHA)
+            new_sha1 = new_refs.get(refname, ZERO_SHA)
+            if new_sha1 not in have and new_sha1 != ZERO_SHA:
+                want.append(new_sha1)
+
+        if not want and old_refs == new_refs:
+            return new_refs
+
+        target.object_store.add_objects(generate_pack_contents(have, want))
+
+        for name, sha in new_refs.iteritems():
+            target.refs[name] = sha
+
+        return new_refs
 
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.

@@ -1,3 +1,50 @@
+0.10.0	2015-03-22
+
+ BUG FIXES
+
+  * In dulwich.index.build_index_from_tree, by default
+    refuse to create entries that start with .git/.
+
+  * Fix running of testsuite when installed.
+    (Jelmer Vernooij, #223)
+
+  * Use a block cache in _find_content_rename_candidates(),
+    improving performance. (Mike Williams)
+
+  * Add support for ``core.protectNTFS`` setting.
+    (Jelmer Vernooij)
+
+  * Fix TypeError when fetching empty updates.
+    (Hwee Miin Koh)
+
+  * Resolve delta refs when pulling into a MemoryRepo.
+    (Max Shawabkeh, #256)
+
+  * Fix handling of tags of non-commits in missing object finder.
+    (Augie Fackler, #211)
+
+  * Explicitly disable mmap on plan9 where it doesn't work.
+    (Jeff Sickel)
+
+ IMPROVEMENTS
+
+  * New public method `Repo.reset_index`. (Jelmer Vernooij)
+
+  * Prevent duplicate parsing of loose files in objects
+    directory when reading. Thanks to David Keijser for the
+    report. (Jelmer Vernooij, #231)
+
+0.9.9	2015-03-20
+
+ SECURITY BUG FIXES
+
+  * Fix buffer overflow in C implementation of pack apply_delta().
+    (CVE-2015-0838)
+
+    Thanks to Ivan Fratric of the Google Security Team for
+    reporting this issue.
+    (Jelmer Vernooij)
+
 0.9.8	2014-11-30
 
  BUG FIXES

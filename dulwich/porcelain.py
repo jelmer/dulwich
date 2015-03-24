@@ -204,8 +204,7 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
     r["HEAD"] = remote_refs["HEAD"]
     if checkout:
         outstream.write('Checking out HEAD')
-        index.build_index_from_tree(r.path, r.index_path(),
-                                    r.object_store, r["HEAD"].tree)
+        r.reset_index()
 
     return r
 
@@ -476,9 +475,8 @@ def reset(repo, mode, committish="HEAD"):
 
     r = open_repo(repo)
 
-    indexfile = r.index_path()
     tree = r[committish].tree
-    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+    r.reset_index()
 
 
 def push(repo, remote_location, refs_path,
@@ -532,9 +530,8 @@ def pull(repo, remote_location, refs_path,
     r['HEAD'] = remote_refs[refs_path]
 
     # Perform 'git checkout .' - syncs staged changes
-    indexfile = r.index_path()
     tree = r["HEAD"].tree
-    index.build_index_from_tree(r.path, indexfile, r.object_store, tree)
+    r.reset_index()
 
 
 def status(repo="."):

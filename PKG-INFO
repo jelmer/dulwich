@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: dulwich
-Version: 0.9.8
+Version: 0.10.0
 Summary: Python Git Library
 Home-page: https://samba.org/~jelmer/dulwich
 Author: Jelmer Vernooij

@@ -1,8 +1,10 @@
 *~
 *.pyc
 build/
+build-pypy/
 dist/
 .testrepository
 *.swp
 *.swo
 *.so
+*.debhelper.log

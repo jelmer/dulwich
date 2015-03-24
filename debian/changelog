@@ -1,5 +1,6 @@
-dulwich (0.9.8-3) UNRELEASED; urgency=medium
+dulwich (0.10.0-1) UNRELEASED; urgency=medium
 
+  * New upstream release.
   * Update Vcs-Git, Vcs-Browser and Maintainer fields to reflect the
     dulwich package is now maintained by the Debian Python Modules
     packaging team.

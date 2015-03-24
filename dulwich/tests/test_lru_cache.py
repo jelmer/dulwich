@@ -22,12 +22,7 @@ from dulwich import (
 from dulwich.tests import (
     TestCase,
     )
-from dulwich.tests.utils import (
-    skipIfPY3,
-    )
 
-
-@skipIfPY3
 class TestLRUCache(TestCase):
     """Test that LRU cache properly keeps track of entries."""
 
@@ -291,7 +286,6 @@ class TestLRUCache(TestCase):
         self.assertEqual([6, 7, 8, 9, 10, 11], sorted(cache.keys()))
 
 
-@skipIfPY3
 class TestLRUSizeCache(TestCase):
 
     def test_basic_init(self):

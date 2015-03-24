@@ -35,6 +35,8 @@ from dulwich.index import (
     index_entry_from_stat,
     read_index,
     read_index_dict,
+    validate_path_element_default,
+    validate_path_element_ntfs,
     write_cache_time,
     write_index,
     write_index_dict,
@@ -49,7 +51,6 @@ from dulwich.objects import (
 from dulwich.repo import Repo
 from dulwich.tests import TestCase
 from dulwich.tests.utils import skipIfPY3
-
 
 @skipIfPY3
 class IndexTestCase(TestCase):
@@ -281,6 +282,43 @@ class BuildIndexTests(TestCase):
         # Verify no files
         self.assertEqual(['.git'], os.listdir(repo.path))
 
+    def test_git_dir(self):
+        if os.name != 'posix':
+            self.skipTest("test depends on POSIX shell")
+
+        repo_dir = tempfile.mkdtemp()
+        repo = Repo.init(repo_dir)
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        # Populate repo
+        filea = Blob.from_string('file a')
+        filee = Blob.from_string('d')
+
+        tree = Tree()
+        tree['.git/a'] = (stat.S_IFREG | 0o644, filea.id)
+        tree['c/e'] = (stat.S_IFREG | 0o644, filee.id)
+
+        repo.object_store.add_objects([(o, None)
+            for o in [filea, filee, tree]])
+
+        build_index_from_tree(repo.path, repo.index_path(),
+                repo.object_store, tree.id)
+
+        # Verify index entries
+        index = repo.open_index()
+        self.assertEqual(len(index), 1)
+
+        # filea
+        apath = os.path.join(repo.path, '.git', 'a')
+        self.assertFalse(os.path.exists(apath))
+
+        # filee
+        epath = os.path.join(repo.path, 'c', 'e')
+        self.assertTrue(os.path.exists(epath))
+        self.assertReasonableIndexEntry(index['c/e'],
+            stat.S_IFREG | 0o644, 1, filee.id)
+        self.assertFileContents(epath, 'd')
+
     def test_nonempty(self):
         if os.name != 'posix':
             self.skipTest("test depends on POSIX shell")
@@ -377,3 +415,22 @@ class GetUnstagedChangesTests(TestCase):
         changes = get_unstaged_changes(repo.open_index(), repo_dir)
 
         self.assertEqual(list(changes), ['foo1'])
+
+
+class TestValidatePathElement(TestCase):
+
+    def test_default(self):
+        self.assertTrue(validate_path_element_default("bla"))
+        self.assertTrue(validate_path_element_default(".bla"))
+        self.assertFalse(validate_path_element_default(".git"))
+        self.assertFalse(validate_path_element_default(".giT"))
+        self.assertFalse(validate_path_element_default(".."))
+        self.assertTrue(validate_path_element_default("git~1"))
+
+    def test_ntfs(self):
+        self.assertTrue(validate_path_element_ntfs("bla"))
+        self.assertTrue(validate_path_element_ntfs(".bla"))
+        self.assertFalse(validate_path_element_ntfs(".git"))
+        self.assertFalse(validate_path_element_ntfs(".giT"))
+        self.assertFalse(validate_path_element_ntfs(".."))
+        self.assertFalse(validate_path_element_ntfs("git~1"))

@@ -75,8 +75,9 @@ class TestCase(_TestCase):
 class BlackboxTestCase(TestCase):
     """Blackbox testing."""
 
-    bin_directory = os.path.abspath(os.path.join(os.path.dirname(__file__),
-        "..", "..", "bin"))
+    # TODO(jelmer): Include more possible binary paths.
+    bin_directories = [os.path.abspath(os.path.join(os.path.dirname(__file__),
+        "..", "..", "bin")), '/usr/bin', '/usr/local/bin']
 
     def bin_path(self, name):
         """Determine the full path of a binary.
@@ -84,7 +85,12 @@ class BlackboxTestCase(TestCase):
         :param name: Name of the script
         :return: Full path
         """
-        return os.path.join(self.bin_directory, name)
+        for d in self.bin_directories:
+            p = os.path.join(d, name)
+            if os.path.isfile(p):
+                return p
+        else:
+            raise SkipTest("Unable to find binary %s" % name)
 
     def run_command(self, name, args):
         """Run a Dulwich command.

@@ -431,8 +431,35 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
             os.chmod(target_path, mode)
 
 
+INVALID_DOTNAMES = (".git", ".", "..", "")
+
+
+def validate_path_element_default(element):
+    return element.lower() not in INVALID_DOTNAMES
+
+
+def validate_path_element_ntfs(element):
+    stripped = element.rstrip(". ").lower()
+    if stripped in INVALID_DOTNAMES:
+        return False
+    if stripped == "git~1":
+        return False
+    return True
+
+
+def validate_path(path, element_validator=validate_path_element_default):
+    """Default path validator that just checks for .git/."""
+    parts = path.split("/")
+    for p in parts:
+        if not element_validator(p):
+            return False
+    else:
+        return True
+
+
 def build_index_from_tree(prefix, index_path, object_store, tree_id,
-                          honor_filemode=True):
+                          honor_filemode=True,
+                          validate_path_element=validate_path_element_default):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
@@ -441,6 +468,8 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
+    :param validate_path_element: Function to validate path elements to check out;
+        default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suiteable only for fresh clones.
@@ -449,6 +478,8 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     index = Index(index_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
+        if not validate_path(entry.path):
+            continue
         full_path = os.path.join(prefix, entry.path)
 
         if not os.path.exists(os.path.dirname(full_path)):

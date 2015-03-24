@@ -745,7 +745,7 @@ class MemoryObjectStore(BaseObjectStore):
         def commit():
             p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
-            for obj in PackInflater.for_pack_data(p):
+            for obj in PackInflater.for_pack_data(p, self.get_raw):
                 self._data[obj.id] = obj
         def abort():
             pass
@@ -911,7 +911,7 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
-    """Split object id list into two list with commit SHA1s and tag SHA1s.
+    """Split object id list into three lists with commit, tag, and other SHAs.
 
     Commits referenced by tags are included into commits
     list as well. Only SHA1s known in this repository will get
@@ -922,10 +922,11 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     :param lst: Collection of commit and tag SHAs
     :param ignore_unknown: True to skip SHA1 missing in the repository
         silently.
-    :return: A tuple of (commits, tags) SHA1s
+    :return: A tuple of (commits, tags, others) SHA1s
     """
     commits = set()
     tags = set()
+    others = set()
     for e in lst:
         try:
             o = obj_store[e]
@@ -937,10 +938,15 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
                 commits.add(e)
             elif isinstance(o, Tag):
                 tags.add(e)
-                commits.add(o.object[1])
+                tagged = o.object[1]
+                c, t, o = _split_commits_and_tags(
+                    obj_store, [tagged], ignore_unknown=ignore_unknown)
+                commits |= c
+                tags |= t
+                others |= o
             else:
-                raise KeyError('Not a commit or a tag: %s' % e)
-    return (commits, tags)
+                others.add(e)
+    return (commits, tags, others)
 
 
 class MissingObjectFinder(object):
@@ -966,9 +972,9 @@ class MissingObjectFinder(object):
         # and such SHAs would get filtered out by _split_commits_and_tags,
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
-        have_commits, have_tags = (
+        have_commits, have_tags, have_others = (
             _split_commits_and_tags(object_store, haves, True))
-        want_commits, want_tags = (
+        want_commits, want_tags, want_others = (
             _split_commits_and_tags(object_store, wants, False))
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
@@ -993,9 +999,11 @@ class MissingObjectFinder(object):
             self.sha_done.add(t)
 
         missing_tags = want_tags.difference(have_tags)
-        # in fact, what we 'want' is commits and tags
+        missing_others = want_others.difference(have_others)
+        # in fact, what we 'want' is commits, tags, and others
         # we've found missing
         wants = missing_commits.union(missing_tags)
+        wants = wants.union(missing_others)
 
         self.objects_to_send = set([(w, None, False) for w in wants])
 

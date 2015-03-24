@@ -18,6 +18,9 @@
 
 from io import BytesIO
 import sys
+import shutil
+import tempfile
+
 try:
     from unittest import skipIf
 except ImportError:
@@ -53,7 +56,10 @@ from dulwich.objects import (
     Commit,
     Tree
     )
-from dulwich.repo import MemoryRepo
+from dulwich.repo import (
+    MemoryRepo,
+    Repo,
+    )
 from dulwich.tests.utils import (
     open_repo,
     skipIfPY3,
@@ -610,3 +616,31 @@ class LocalGitClientTests(TestCase):
             graph_walker=walker, pack_data=out.write)
         # Hardcoding is not ideal, but we'll fix that some other day..
         self.assertTrue(out.getvalue().startswith('PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
+
+    def test_send_pack_without_changes(self):
+        local = open_repo('a.git')
+        target = open_repo('a.git')
+        self.send_and_verify("master", local, target)
+
+    def test_send_pack_with_changes(self):
+        local = open_repo('a.git')
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target = Repo.init_bare(target_path)
+        self.send_and_verify("master", local, target)
+
+    def send_and_verify(self, branch, local, target):
+        client = LocalGitClient()
+        ref_name = "refs/heads/" + branch
+        new_refs = client.send_pack(target.path,
+                                    lambda _: { ref_name: local.refs[ref_name] },
+                                    local.object_store.generate_pack_contents)
+
+        self.assertEqual(local.refs[ref_name], new_refs[ref_name])
+
+        for name, sha in new_refs.iteritems():
+            self.assertEqual(new_refs[name], target.refs[name])
+
+        obj_local = local.get_object(new_refs[ref_name])
+        obj_target = target.get_object(new_refs[ref_name])
+        self.assertEqual(obj_local, obj_target)

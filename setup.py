@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.8'
+dulwich_version_string = '0.10.0'
 
 include_dirs = []
 # Windows MSVC support
@@ -76,6 +76,7 @@ setup(name='dulwich',
       in the particular Monty Python sketch.
       """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
+      package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       classifiers=[
           'Development Status :: 4 - Beta',

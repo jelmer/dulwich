@@ -53,12 +53,13 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     make_object,
+    make_tag,
     build_pack,
     skipIfPY3,
     )
 
 
-testobject = make_object(Blob, data="yummy data")
+testobject = make_object(Blob, data=b"yummy data")
 
 
 class ObjectStoreTests(object):
@@ -84,7 +85,7 @@ class ObjectStoreTests(object):
         self.store.add_objects([])
 
     def test_add_commit(self):
-        # TODO: Argh, no way to construct Git commit objects without 
+        # TODO: Argh, no way to construct Git commit objects without
         # access to a serialized form.
         self.store.add_objects([])
 
@@ -169,10 +170,7 @@ class ObjectStoreTests(object):
         self.assertEqual(expected, list(actual))
 
     def make_tag(self, name, obj):
-        tag = make_object(Tag, name=name, message='',
-                          tag_time=12345, tag_timezone=0,
-                          tagger='Test Tagger <test@example.com>',
-                          object=(object_class(obj.type_name), obj.id))
+        tag = make_tag(obj, name=name)
         self.store.add_object(tag)
         return tag
 
@@ -213,6 +211,11 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
             raise
         else:
             commit()
+
+    def test_add_pack_emtpy(self):
+        o = MemoryObjectStore()
+        f, commit, abort = o.add_pack()
+        commit()
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
@@ -395,8 +398,6 @@ class TreeLookupPathTests(TestCase):
 
     def test_lookup_not_tree(self):
         self.assertRaises(NotTreeError, tree_lookup_path, self.get_object, self.tree_id, 'ad/b/j')
-
-# TODO: MissingObjectFinderTests
 
 @skipIfPY3
 class ObjectStoreGraphWalkerTests(TestCase):

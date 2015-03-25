@@ -21,6 +21,10 @@ override_dh_auto_build:
 	dh_auto_build
 	pypy setup.py build -b build-pypy
 
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf build-pypy
+
 override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) check

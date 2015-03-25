@@ -38,6 +38,7 @@ from dulwich.tests.compat.utils import (
     import_repo,
     run_git_or_fail,
     )
+from dulwich.tests.compat.utils import require_git_version
 
 
 class _StubRepo(object):
@@ -70,6 +71,8 @@ class ServerTests(object):
 
     Does not inherit from TestCase so tests are not automatically run.
     """
+
+    min_single_branch_version = (1, 7, 10,)
 
     def import_repos(self):
         self._old_repo = import_repo('server_old.export')
@@ -171,6 +174,7 @@ class ServerTests(object):
         self.assertEqual(len(o.split('\n')), 4)
 
     def test_new_shallow_clone_from_dulwich(self):
+        require_git_version(self.min_single_branch_version)
         self._source_repo = import_repo('server_new.export')
         self.addCleanup(tear_down_repo, self._source_repo)
         self._stub_repo = _StubRepo('shallow')
@@ -187,6 +191,7 @@ class ServerTests(object):
         self.assertReposNotEqual(clone, self._source_repo)
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
+        require_git_version(self.min_single_branch_version)
         self._source_repo = import_repo('server_new.export')
         self.addCleanup(tear_down_repo, self._source_repo)
         self._stub_repo = _StubRepo('shallow')
@@ -208,6 +213,7 @@ class ServerTests(object):
         self.assertReposNotEqual(clone, self._source_repo)
 
     def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
+        require_git_version(self.min_single_branch_version)
         self._source_repo = import_repo('server_new.export')
         self.addCleanup(tear_down_repo, self._source_repo)
         self._stub_repo = _StubRepo('shallow')

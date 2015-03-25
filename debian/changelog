@@ -1,6 +1,7 @@
 dulwich (0.10.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+   + Drop 02_unpure_pypy: applied upstream.
   * Update Vcs-Git, Vcs-Browser and Maintainer fields to reflect the
     dulwich package is now maintained by the Debian Python Modules
     packaging team.

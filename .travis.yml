@@ -13,4 +13,4 @@ script:
 install:
   - sudo apt-get update
   - sudo apt-get install -qq git python-setuptools python-gevent python-fastimport python-mock
-  - sudo pip install unittest2
+  - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then pip install unittest2; fi

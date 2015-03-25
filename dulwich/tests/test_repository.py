@@ -122,7 +122,7 @@ class RepositoryTests(TestCase):
             self.assertEqual(k in r, contained)
 
         for k, _ in test_keys:
-            self.assertRaisesRegex(
+            self.assertRaisesRegexp(
                 TypeError, "'name' must be bytestring, not unicode",
                 r.__getitem__, unicode(k)
             )

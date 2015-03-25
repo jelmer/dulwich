@@ -20,6 +20,8 @@
 #include <Python.h>
 #include <stdint.h>
 
+static PyObject *PyExc_ApplyDeltaError = NULL;
+
 static int py_is_sha(PyObject *sha)
 {
 	if (!PyString_CheckExact(sha))
@@ -103,7 +105,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 	index = 0;
 	src_size = get_delta_header_size(delta, &index, delta_len);
 	if (src_size != src_buf_len) {
-		PyErr_Format(PyExc_ValueError, 
+		PyErr_Format(PyExc_ApplyDeltaError,
 					 "Unexpected source buffer size: %lu vs %d", src_size, src_buf_len);
 		Py_DECREF(py_src_buf);
 		Py_DECREF(py_delta);
@@ -155,7 +157,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 			index += cmd;
 			dest_size -= cmd;
 		} else {
-			PyErr_SetString(PyExc_ValueError, "Invalid opcode 0");
+			PyErr_SetString(PyExc_ApplyDeltaError, "Invalid opcode 0");
 			Py_DECREF(ret);
 			Py_DECREF(py_delta);
 			Py_DECREF(py_src_buf);
@@ -166,13 +168,13 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 	Py_DECREF(py_delta);
 
 	if (index != delta_len) {
-		PyErr_SetString(PyExc_ValueError, "delta not empty");
+		PyErr_SetString(PyExc_ApplyDeltaError, "delta not empty");
 		Py_DECREF(ret);
 		return NULL;
 	}
 
 	if (dest_size != 0) {
-		PyErr_SetString(PyExc_ValueError, "dest size incorrect");
+		PyErr_SetString(PyExc_ApplyDeltaError, "dest size incorrect");
 		Py_DECREF(ret);
 		return NULL;
 	}
@@ -240,6 +242,15 @@ static PyMethodDef py_pack_methods[] = {
 void init_pack(void)
 {
 	PyObject *m;
+	PyObject *errors_module;
+
+	errors_module = PyImport_ImportModule("dulwich.errors");
+	if (errors_module == NULL)
+		return;
+
+	PyExc_ApplyDeltaError = PyObject_GetAttrString(errors_module, "ApplyDeltaError");
+	if (PyExc_ApplyDeltaError == NULL)
+		return;
 
 	m = Py_InitModule3("_pack", py_pack_methods, NULL);
 	if (m == NULL)

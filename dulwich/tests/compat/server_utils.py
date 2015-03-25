@@ -237,6 +237,18 @@ class ServerTests(object):
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
+    def test_fetch_from_dulwich_issue_88(self):
+        self._source_repo = import_repo('issue88_expect_ack_nak_server.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_client.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        run_git_or_fail(['pull', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        self.assertReposEqual(self._source_repo, self._client_repo)
+
 
 # TODO(dborowitz): Come up with a better way of testing various permutations of
 # capabilities. The only reason it is the way it is now is that side-band-64k

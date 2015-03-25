@@ -8,3 +8,10 @@ dist/
 *.swo
 *.so
 *.debhelper.log
+debian/files
+debian/tmp
+debian/pypy-dulwich
+debian/python-dulwich
+debian/*.substvars
+debian/python-dulwich-dbg
+debian/*.debhelper

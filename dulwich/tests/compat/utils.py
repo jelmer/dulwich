@@ -144,7 +144,7 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     return stdout
 
 
-def import_repo_to_dir(name):
+def import_repo_to_dir(name, as_working_copy=False):
     """Import a repo from a fast-export file in a temporary directory.
 
     These are used rather than binary repos for compat tests because they are
@@ -152,27 +152,37 @@ def import_repo_to_dir(name):
 
     :param name: The name of the repository export file, relative to
         dulwich/tests/data/repos.
+    :param as_working_copy: Make this a working copy; defaults to False.
     :returns: The path to the imported repository.
     """
     temp_dir = tempfile.mkdtemp()
     export_path = os.path.join(_REPOS_DATA_DIR, name)
     temp_repo_dir = os.path.join(temp_dir, name)
     export_file = open(export_path, 'rb')
-    run_git_or_fail(['init', '--quiet', '--bare', temp_repo_dir])
+    init_args = ['init', '--quiet',]
+    if not as_working_copy:
+        # default was bare (for server); a working copy cannot be bare.
+        init_args.append('--bare')
+    run_git_or_fail(init_args + [temp_repo_dir])
     run_git_or_fail(['fast-import'], input=export_file.read(),
                     cwd=temp_repo_dir)
+    if as_working_copy:
+        # danger: cwd better not be set to some repo you are working on.
+        run_git_or_fail(['reset', '--hard',],
+                        cwd=temp_repo_dir)
     export_file.close()
     return temp_repo_dir
 
 
-def import_repo(name):
+def import_repo(name, as_working_copy=False):
     """Import a repo from a fast-export file in a temporary directory.
 
     :param name: The name of the repository export file, relative to
         dulwich/tests/data/repos.
+    :param as_working_copy: Make this a working copy; defaults to False.
     :returns: An initialized Repo object that lives in a temporary directory.
     """
-    return Repo(import_repo_to_dir(name))
+    return Repo(import_repo_to_dir(name, as_working_copy))
 
 
 def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):

@@ -2,6 +2,10 @@ dulwich (0.10.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
    + Drop 02_unpure_pypy: applied upstream.
+   + Fixes CVE-2015-0838: buffer overflow in C implementation of pack
+     apply_delta(). Closes: #780958
+   + Fixes CVE-2014-9706: does not prevent to write files in commits with
+     invalid paths to working tree. Closes: #780989
   * Update Vcs-Git, Vcs-Browser and Maintainer fields to reflect the
     dulwich package is now maintained by the Debian Python Modules
     packaging team.

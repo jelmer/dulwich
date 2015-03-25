@@ -1,4 +1,4 @@
-dulwich (0.10.1-1) UNRELEASED; urgency=medium
+dulwich (0.10.1-1) unstable; urgency=medium
 
   * New upstream release.
    + Drop 02_unpure_pypy: applied upstream.

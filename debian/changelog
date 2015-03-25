@@ -1,4 +1,4 @@
-dulwich (0.10.0-1) UNRELEASED; urgency=medium
+dulwich (0.10.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
   * Update Vcs-Git, Vcs-Browser and Maintainer fields to reflect the

@@ -237,7 +237,9 @@ class ServerTests(object):
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
-    def test_fetch_from_dulwich_issue_88(self):
+    def test_fetch_from_dulwich_issue_88_standard(self):
+        # Basically an integration test to see that the ACK/NAK
+        # generation works on repos with common head.
         self._source_repo = import_repo('issue88_expect_ack_nak_server.export')
         self.addCleanup(tear_down_repo, self._source_repo)
         self._client_repo = import_repo('issue88_expect_ack_nak_client.export',
@@ -248,6 +250,22 @@ class ServerTests(object):
         run_git_or_fail(['pull', self.url(port), 'master',],
                         cwd=self._client_repo.path)
         self.assertReposEqual(self._source_repo, self._client_repo)
+
+    def test_fetch_from_dulwich_issue_88_alternative(self):
+        # likewise, but the case where the two repos have no common parent
+        self._source_repo = import_repo('issue88_expect_ack_nak_other.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_client.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        run_git_or_fail(['pull', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        # the merge commit will be automatic so hashes are different,
+        # however it being a working directory and done with git it has
+        # a rather predictable result, assuming a default strategy.
+        self.assertEqual(len(os.listdir(self._client_repo.path)), 8)
 
 
 # TODO(dborowitz): Come up with a better way of testing various permutations of

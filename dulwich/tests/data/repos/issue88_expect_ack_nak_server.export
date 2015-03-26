@@ -47,7 +47,7 @@ commit refs/heads/master
 mark :7
 author User <user@localhost> 1427185245 +1300
 committer User <user@localhost> 1427185245 +1300
-data 23
+data 14
 replace a line
 from :5
 M 100644 :6 demo.txt

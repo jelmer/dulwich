@@ -184,6 +184,10 @@ class Handler(object):
         self.proto = proto
         self.http_req = http_req
         self._client_capabilities = None
+        # used for UploadPackHandler, leaving this here until it is 
+        # determined that it is the only user of this.
+        self._done_required = True
+        self._done_received = False
 
     @classmethod
     def capability_line(cls):
@@ -232,6 +236,10 @@ class UploadPackHandler(Handler):
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
+        # A state variable for denoting that the have list is still
+        # being processed, and the client is not accepting any other
+        # side-band data.
+        self._processing_have_lines = False
 
     @classmethod
     def capabilities(cls):
@@ -243,7 +251,7 @@ class UploadPackHandler(Handler):
         return ("side-band-64k", "thin-pack", "ofs-delta")
 
     def progress(self, message):
-        if self.has_capability("no-progress"):
+        if self.has_capability("no-progress") or self._processing_have_lines:
             return
         self.proto.write_sideband(2, message)
 
@@ -285,6 +293,11 @@ class UploadPackHandler(Handler):
             graph_walker.determine_wants, graph_walker, self.progress,
             get_tagged=self.get_tagged)
 
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
+
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
         # Also, if it also happens that the object_iter is instantiated
@@ -292,6 +305,15 @@ class UploadPackHandler(Handler):
         # wire (which is this instance of this class) this will actually
         # iterate through everything and write things out to the wire.
         if len(objects_iter) == 0:
+            return
+
+        # The provided haves are processed, and it is safe to send side-
+        # band data now.
+        self._processing_have_lines = False
+
+        if self._done_required and not self._done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request.
             return
 
         self.progress("dul-daemon says what\n")
@@ -672,17 +694,12 @@ class MultiAckDetailedGraphWalkerImpl(object):
 
     def __init__(self, walker):
         self.walker = walker
-        self._found_base = False
         self._common = []
 
     def ack(self, have_ref):
+        # Should only be called iff have_ref is common
         self._common.append(have_ref)
-        if not self._found_base:
-            self.walker.send_ack(have_ref, 'common')
-            if self.walker.all_wants_satisfied(self._common):
-                self._found_base = True
-                self.walker.send_ack(have_ref, 'ready')
-        # else we blind ack within next
+        self.walker.send_ack(have_ref, 'common')
 
     def next(self):
         while True:
@@ -696,21 +713,45 @@ class MultiAckDetailedGraphWalkerImpl(object):
                     # is a short circuit (also to make the test case
                     # as written happy).
                     return None
-                continue
             elif command == 'done':
-                # don't nak unless no common commits were found, even if not
-                # everything is satisfied
-                if self._common:
-                    self.walker.send_ack(self._common[-1])
-                else:
-                    self.walker.send_nak()
-                return None
+                # This whole mess really needs to be properly redefined
+                # in terms of flags and states and have a better way to
+                # signal things as required rather than poking these
+                # seemingly random variables outside of this class and
+                # hope things work in the intended manner.
+                # XXX walker should have a done notification method.
+                # XXX we don't know if handler will implement that.
+                try:
+                    self.walker.handler._done_received = True
+                except:
+                    pass
+                break
             elif command == 'have':
-                if self._found_base:
-                    # blind ack; can happen if the client has more requests
-                    # inflight
-                    self.walker.send_ack(sha, 'ready')
+                # return the sha and let the caller ACK it with the
+                # above ack method.
                 return sha
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        # XXX shouldn't we do this if "no-done"?
+        # TODO implement no-done.
+        if self.walker.all_wants_satisfied(self._common):
+            self.walker.send_ack(self._common[-1], 'ready')
+
+        # XXX if the next part after this can be done by walker.
+        try:
+            # XXX again, this should be handled in the walker
+            if (self.walker.handler._done_required and
+                    not self.walker.handler._done_received):
+                # do not ready.
+                return None
+        except:
+            pass
+
+        if self._common:
+            self.walker.send_ack(self._common[-1])
+        else:
+            self.walker.send_nak()
+        return None
 
     __next__ = next
 

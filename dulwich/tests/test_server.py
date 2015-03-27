@@ -739,14 +739,14 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(ONE)
         self._walker.done = True
         self._impl.ack(ONE)
-        self.assertAcks([(ONE, 'common'), (ONE, 'ready')])
+        self.assertAck(ONE, 'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, 'ready')
+        self.assertAck(THREE, 'common')
 
         self.assertNextEquals(None)
-        self.assertAck(THREE)
+        self.assertAcks([(THREE, 'ready'), (THREE, '')])
 
     def test_multi_ack_partial(self):
         self.assertNextEquals(TWO)
@@ -780,14 +780,14 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self._walker.done = True
         self._impl.ack(ONE)
-        self.assertAcks([(ONE, 'common'), (ONE, 'ready')])
+        self.assertAck(ONE, 'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, 'ready')
+        self.assertAck(THREE, 'common')
 
         self.assertNextEquals(None)
-        self.assertAck(THREE)
+        self.assertAcks([(THREE, 'ready'), (THREE, '')])
 
     def test_multi_ack_nak(self):
         self.assertNextEquals(TWO)

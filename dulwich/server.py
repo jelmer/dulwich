@@ -282,11 +282,15 @@ class UploadPackHandler(Handler):
         graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
             self.repo.get_peeled)
         objects_iter = self.repo.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress,
-          get_tagged=self.get_tagged)
+            graph_walker.determine_wants, graph_walker, self.progress,
+            get_tagged=self.get_tagged)
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
+        # Also, if it also happens that the object_iter is instantiated
+        # with a graph walker with an implementation that talks over the
+        # wire (which is this instance of this class) this will actually
+        # iterate through everything and write things out to the wire.
         if len(objects_iter) == 0:
             return
 
@@ -686,6 +690,11 @@ class MultiAckDetailedGraphWalkerImpl(object):
             if command is None:
                 self.walker.send_nak()
                 if self.walker.http_req:
+                    # why special case?  if this was "stateless" as in
+                    # HTTP there would be nothing left to be read and
+                    # None would have returned later... so I guess this
+                    # is a short circuit (also to make the test case
+                    # as written happy).
                     return None
                 continue
             elif command == 'done':

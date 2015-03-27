@@ -147,3 +147,7 @@ class DumbWebTestCase(WebTests, CompatTestCase):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest('Dumb web shallow cloning not supported.')
+
+    def test_push_to_dulwich_issue_88_standard(self):
+        raise SkipTest('Dumb web pushing not supported.')
+

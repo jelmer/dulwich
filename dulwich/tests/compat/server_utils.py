@@ -273,6 +273,20 @@ class ServerTests(object):
         # a rather predictable result, assuming a default strategy.
         self.assertEqual(len(os.listdir(self._client_repo.path)), 8)
 
+    def test_push_to_dulwich_issue_88_standard(self):
+        # Same thing, but we reverse the role of the server/client
+        # and do a push instead.
+        self._source_repo = import_repo('issue88_expect_ack_nak_client.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_server.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        run_git_or_fail(['push', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        self.assertReposEqual(self._source_repo, self._client_repo)
+
 
 # TODO(dborowitz): Come up with a better way of testing various permutations of
 # capabilities. The only reason it is the way it is now is that side-band-64k

@@ -203,6 +203,10 @@ class Handler(object):
         self.proto = proto
         self.http_req = http_req
         self._client_capabilities = None
+        # used for UploadPackHandler, leaving this here until it is 
+        # determined that it is the only user of this.
+        self._done_required = True
+        self._done_received = False
 
     @classmethod
     def capability_line(cls):
@@ -328,6 +332,11 @@ class UploadPackHandler(Handler):
         # The provided haves are processed, and it is safe to send side-
         # band data now.
         self._processing_have_lines = False
+
+        if self._done_required and not self._done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request.
+            return
 
         self.progress(b"dul-daemon says what\n")
         self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))
@@ -707,17 +716,12 @@ class MultiAckDetailedGraphWalkerImpl(object):
 
     def __init__(self, walker):
         self.walker = walker
-        self._found_base = False
         self._common = []
 
     def ack(self, have_ref):
+        # Should only be called iff have_ref is common
         self._common.append(have_ref)
-        if not self._found_base:
-            self.walker.send_ack(have_ref, b'common')
-            if self.walker.all_wants_satisfied(self._common):
-                self._found_base = True
-                self.walker.send_ack(have_ref, b'ready')
-        # else we blind ack within next
+        self.walker.send_ack(have_ref, b'common')
 
     def next(self):
         while True:
@@ -731,21 +735,45 @@ class MultiAckDetailedGraphWalkerImpl(object):
                     # is a short circuit (also to make the test case
                     # as written happy).
                     return None
-                continue
             elif command == COMMAND_DONE:
-                # don't nak unless no common commits were found, even if not
-                # everything is satisfied
-                if self._common:
-                    self.walker.send_ack(self._common[-1])
-                else:
-                    self.walker.send_nak()
-                return None
+                # This whole mess really needs to be properly redefined
+                # in terms of flags and states and have a better way to
+                # signal things as required rather than poking these
+                # seemingly random variables outside of this class and
+                # hope things work in the intended manner.
+                # XXX walker should have a done notification method.
+                # XXX we don't know if handler will implement that.
+                try:
+                    self.walker.handler._done_received = True
+                except:
+                    pass
+                break
             elif command == COMMAND_HAVE:
-                if self._found_base:
-                    # blind ack; can happen if the client has more requests
-                    # inflight
-                    self.walker.send_ack(sha, b'ready')
+                # return the sha and let the caller ACK it with the
+                # above ack method.
                 return sha
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        # XXX shouldn't we do this if "no-done"?
+        # TODO implement no-done.
+        if self.walker.all_wants_satisfied(self._common):
+            self.walker.send_ack(self._common[-1], b'ready')
+
+        # XXX if the next part after this can be done by walker.
+        try:
+            # XXX again, this should be handled in the walker
+            if (self.walker.handler._done_required and
+                    not self.walker.handler._done_received):
+                # do not ready.
+                return None
+        except:
+            pass
+
+        if self._common:
+            self.walker.send_ack(self._common[-1])
+        else:
+            self.walker.send_nak()
+        return None
 
     __next__ = next
 

@@ -263,6 +263,9 @@ class BaseRepo(object):
 
             return []
 
+        # If the graph walker is set up with an implementation that can
+        # ACK/NAK to the wire, it will write data to the client through
+        # this call as a side-effect.
         haves = self.object_store.find_common_revisions(graph_walker)
 
         # Deal with shallow requests separately because the haves do

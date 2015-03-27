@@ -725,6 +725,11 @@ class MultiAckDetailedGraphWalkerImpl(object):
             if command is None:
                 self.walker.send_nak()
                 if self.walker.http_req:
+                    # why special case?  if this was "stateless" as in
+                    # HTTP there would be nothing left to be read and
+                    # None would have returned later... so I guess this
+                    # is a short circuit (also to make the test case
+                    # as written happy).
                     return None
                 continue
             elif command == COMMAND_DONE:

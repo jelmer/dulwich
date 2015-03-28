@@ -613,7 +613,6 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE)
 
@@ -632,7 +631,6 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE)
 

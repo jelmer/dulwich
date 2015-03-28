@@ -339,22 +339,12 @@ class UploadPackHandler(Handler):
         # band data now.
         self._processing_have_lines = False
 
-        if self._done_required and not self._done_received:
-            # we are not done, especially when done is required; skip
-            # the pack for this request and especially do not handle
-            # the done.
+        if not graph_walker.handle_done(
+                self._done_required, self._done_received):
             return
-
-        if not self._done_received and not graph_walker._haves:
-            # Okay we are not actually done then since the walker picked
-            # up no haves.
-            return
-
-        graph_walker.handle_done()
 
         self.progress(b"dul-daemon says what\n")
-        self.progress(("counting objects: %d, done.\n" %
-            len(objects_iter)).encode('ascii'))
+        self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
         self.progress(b"how was that, then?\n")
         # we are done
@@ -497,7 +487,6 @@ class ProtocolGraphWalker(object):
         self.http_req = handler.http_req
         self.advertise_refs = handler.advertise_refs
         self._wants = []
-        self._haves = []
         self.shallow = set()
         self.client_shallow = set()
         self.unshallow = set()
@@ -642,9 +631,9 @@ class ProtocolGraphWalker(object):
     def send_nak(self):
         self.proto.write_pkt_line(b'NAK\n')
 
-    def handle_done(self):
-        # Now continue the process as if done was sent.
-        return self._impl.handle_done()
+    def handle_done(self, done_required, done_received):
+        # Delegate this to the implementation.
+        return self._impl.handle_done(done_required, done_received)
 
     def set_wants(self, wants):
         self._wants = wants
@@ -656,7 +645,6 @@ class ProtocolGraphWalker(object):
         :note: Wants are specified with set_wants rather than passed in since
             in the current interface they are determined outside this class.
         """
-        self._haves = haves
         return _all_wants_satisfied(self.store, haves, self._wants)
 
     def set_ack_type(self, ack_type):
@@ -671,17 +659,43 @@ class ProtocolGraphWalker(object):
 _GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
-class SingleAckGraphWalkerImpl(object):
-    """Graph walker implementation that speaks the single-ack protocol."""
+class BaseGraphWalkerImpl(object):
 
     def __init__(self, walker):
         self.walker = walker
-        self._sent_ack = False
+        self._common = []
+
+    def pre_nodone_check(self):
+        pass
+
+    def post_nodone_check(self):
+        pass
+
+    def handle_done(self, done_required, done_received):
+        self.pre_nodone_check()
+
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.
+            return False
+
+        self.post_nodone_check()
+        return True
+
+
+class SingleAckGraphWalkerImpl(BaseGraphWalkerImpl):
+    """Graph walker implementation that speaks the single-ack protocol."""
 
     def ack(self, have_ref):
-        if not self._sent_ack:
+        if not self._common:
             self.walker.send_ack(have_ref)
-            self._sent_ack = True
+            self._common.append(have_ref)
 
     def next(self):
         command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
@@ -694,18 +708,17 @@ class SingleAckGraphWalkerImpl(object):
 
     __next__ = next
 
-    def handle_done(self):
-        if not self._sent_ack:
+    def pre_nodone_check(self):
+        if not self._common:
             self.walker.send_nak()
 
 
-class MultiAckGraphWalkerImpl(object):
+class MultiAckGraphWalkerImpl(BaseGraphWalkerImpl):
     """Graph walker implementation that speaks the multi-ack protocol."""
 
     def __init__(self, walker):
-        self.walker = walker
+        super(MultiAckGraphWalkerImpl, self).__init__(walker)
         self._found_base = False
-        self._common = []
 
     def ack(self, have_ref):
         self._common.append(have_ref)
@@ -734,7 +747,7 @@ class MultiAckGraphWalkerImpl(object):
 
     __next__ = next
 
-    def handle_done(self):
+    def post_nodone_check(self):
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
         if self._common:
@@ -743,12 +756,8 @@ class MultiAckGraphWalkerImpl(object):
             self.walker.send_nak()
 
 
-class MultiAckDetailedGraphWalkerImpl(object):
+class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
-
-    def __init__(self, walker):
-        self.walker = walker
-        self._common = []
 
     def ack(self, have_ref):
         # Should only be called iff have_ref is common
@@ -782,7 +791,10 @@ class MultiAckDetailedGraphWalkerImpl(object):
 
     __next__ = next
 
-    def handle_done(self):
+    def pre_nodone_check(self):
+        pass
+
+    def post_nodone_check(self):
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
         if self._common:

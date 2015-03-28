@@ -266,6 +266,10 @@ class ServerTests(object):
         self.addCleanup(tear_down_repo, self._client_repo)
         port = self._start_server(self._source_repo)
 
+        run_git_or_fail(['config', 'user.email', 'user@example.com'],
+                        cwd=self._client_repo.path)
+        run_git_or_fail(['config', 'user.name', 'User Name'],
+                        cwd=self._client_repo.path)
         run_git_or_fail(['pull', self.url(port), 'master',],
                         cwd=self._client_repo.path)
         # the merge commit will be automatic so hashes are different,

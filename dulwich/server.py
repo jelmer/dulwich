@@ -72,6 +72,7 @@ from dulwich.protocol import (
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_MULTI_ACK,
+    CAPABILITY_NO_DONE,
     CAPABILITY_NO_PROGRESS,
     CAPABILITY_OFS_DELTA,
     CAPABILITY_REPORT_STATUS,
@@ -203,9 +204,7 @@ class Handler(object):
         self.proto = proto
         self.http_req = http_req
         self._client_capabilities = None
-        # used for UploadPackHandler, leaving this here until it is 
-        # determined that it is the only user of this.
-        self._done_required = True
+        # Flags needed for the no-done capability
         self._done_received = False
 
     @classmethod
@@ -246,6 +245,9 @@ class Handler(object):
                                    'before asking client' % cap)
         return cap in self._client_capabilities
 
+    def notify_done(self):
+        self._done_received = True
+
 
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
@@ -261,12 +263,16 @@ class UploadPackHandler(Handler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
+    @property
+    def _done_required(self):
+        return not self.has_capability("no-done")
+
     @classmethod
     def capabilities(cls):
         return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
                 CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
-                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
+                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW, CAPABILITY_NO_DONE)
 
     @classmethod
     def required_capabilities(cls):
@@ -335,11 +341,20 @@ class UploadPackHandler(Handler):
 
         if self._done_required and not self._done_received:
             # we are not done, especially when done is required; skip
-            # the pack for this request.
+            # the pack for this request and especially do not handle
+            # the done.
             return
 
+        if not self._done_received and not graph_walker._haves:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.
+            return
+
+        graph_walker.handle_done()
+
         self.progress(b"dul-daemon says what\n")
-        self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))
+        self.progress(("counting objects: %d, done.\n" %
+            len(objects_iter)).encode('ascii'))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
         self.progress(b"how was that, then?\n")
         # we are done
@@ -482,6 +497,7 @@ class ProtocolGraphWalker(object):
         self.http_req = handler.http_req
         self.advertise_refs = handler.advertise_refs
         self._wants = []
+        self._haves = []
         self.shallow = set()
         self.client_shallow = set()
         self.unshallow = set()
@@ -614,6 +630,10 @@ class ProtocolGraphWalker(object):
 
         self.proto.write_pkt_line(None)
 
+    def notify_done(self):
+        # relay the message down to the handler.
+        self.handler.notify_done()
+
     def send_ack(self, sha, ack_type=b''):
         if ack_type:
             ack_type = b' ' + ack_type
@@ -621,6 +641,10 @@ class ProtocolGraphWalker(object):
 
     def send_nak(self):
         self.proto.write_pkt_line(b'NAK\n')
+
+    def handle_done(self):
+        # Now continue the process as if done was sent.
+        return self._impl.handle_done()
 
     def set_wants(self, wants):
         self._wants = wants
@@ -632,6 +656,7 @@ class ProtocolGraphWalker(object):
         :note: Wants are specified with set_wants rather than passed in since
             in the current interface they are determined outside this class.
         """
+        self._haves = haves
         return _all_wants_satisfied(self.store, haves, self._wants)
 
     def set_ack_type(self, ack_type):
@@ -661,13 +686,17 @@ class SingleAckGraphWalkerImpl(object):
     def next(self):
         command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
         if command in (None, COMMAND_DONE):
-            if not self._sent_ack:
-                self.walker.send_nak()
+            # defer the handling of done
+            self.walker.notify_done()
             return None
         elif command == COMMAND_HAVE:
             return sha
 
     __next__ = next
+
+    def handle_done(self):
+        if not self._sent_ack:
+            self.walker.send_nak()
 
 
 class MultiAckGraphWalkerImpl(object):
@@ -695,12 +724,7 @@ class MultiAckGraphWalkerImpl(object):
                 # flush but more have lines are still coming
                 continue
             elif command == COMMAND_DONE:
-                # don't nak unless no common commits were found, even if not
-                # everything is satisfied
-                if self._common:
-                    self.walker.send_ack(self._common[-1])
-                else:
-                    self.walker.send_nak()
+                self.walker.notify_done()
                 return None
             elif command == COMMAND_HAVE:
                 if self._found_base:
@@ -709,6 +733,14 @@ class MultiAckGraphWalkerImpl(object):
                 return sha
 
     __next__ = next
+
+    def handle_done(self):
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        if self._common:
+            self.walker.send_ack(self._common[-1])
+        else:
+            self.walker.send_nak()
 
 
 class MultiAckDetailedGraphWalkerImpl(object):
@@ -727,6 +759,8 @@ class MultiAckDetailedGraphWalkerImpl(object):
         while True:
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
+                if self.walker.all_wants_satisfied(self._common):
+                    self.walker.send_ack(self._common[-1], 'ready')
                 self.walker.send_nak()
                 if self.walker.http_req:
                     # why special case?  if this was "stateless" as in
@@ -736,17 +770,8 @@ class MultiAckDetailedGraphWalkerImpl(object):
                     # as written happy).
                     return None
             elif command == COMMAND_DONE:
-                # This whole mess really needs to be properly redefined
-                # in terms of flags and states and have a better way to
-                # signal things as required rather than poking these
-                # seemingly random variables outside of this class and
-                # hope things work in the intended manner.
-                # XXX walker should have a done notification method.
-                # XXX we don't know if handler will implement that.
-                try:
-                    self.walker.handler._done_received = True
-                except:
-                    pass
+                # Let the walker know that we got a done.
+                self.walker.notify_done()
                 break
             elif command == COMMAND_HAVE:
                 # return the sha and let the caller ACK it with the
@@ -754,28 +779,16 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 return sha
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
-        # XXX shouldn't we do this if "no-done"?
-        # TODO implement no-done.
-        if self.walker.all_wants_satisfied(self._common):
-            self.walker.send_ack(self._common[-1], b'ready')
 
-        # XXX if the next part after this can be done by walker.
-        try:
-            # XXX again, this should be handled in the walker
-            if (self.walker.handler._done_required and
-                    not self.walker.handler._done_received):
-                # do not ready.
-                return None
-        except:
-            pass
+    __next__ = next
 
+    def handle_done(self):
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
         if self._common:
             self.walker.send_ack(self._common[-1])
         else:
             self.walker.send_nak()
-        return None
-
-    __next__ = next
 
 
 class ReceivePackHandler(Handler):
@@ -789,7 +802,8 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_SIDE_BAND_64K)
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
+                CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,

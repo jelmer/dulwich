@@ -553,13 +553,12 @@ class TestProtocolGraphWalker(object):
         return self.acks.pop(0)
 
     def handle_done(self):
-        pass
+        if self._notify_done and self._impl:
+            # assuming done is needed and done is provided.
+            self._impl.handle_done(True, True)
 
     def notify_done(self):
         self._notify_done = True
-        if self._impl:
-            # assuming done is needed and done is provided.
-            self._impl.handle_done()
 
 
 @skipIfPY3
@@ -595,6 +594,14 @@ class AckGraphWalkerImplTestCase(TestCase):
     def assertNextEquals(self, sha):
         self.assertEqual(sha, next(self._impl))
 
+    def assertNextEmpty(self):
+        # This is necessary because of no-done - the assumption that it
+        # it safe to immediately send out the final ACK is no longer
+        # true but the test is still needed for it.  TestProtocolWalker
+        # does implement the handle_done which will determine whether
+        # the final confirmation can be sent.
+        self.assertRaises(IndexError, next, self._impl)
+        self._walker.handle_done()
 
 @skipIfPY3
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
@@ -646,6 +653,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
     def test_single_ack_nak_flush(self):
@@ -662,6 +670,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
 
@@ -684,6 +693,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, 'continue')
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertAck(THREE)
 
     def test_multi_ack_partial(self):
@@ -699,6 +709,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(None)
         # done, re-send ack of last common
+        self.assertNextEmpty()
         self.assertAck(ONE)
 
     def test_multi_ack_flush(self):
@@ -724,6 +735,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, 'continue')
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertAck(THREE)
 
     def test_multi_ack_nak(self):
@@ -737,6 +749,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
 
@@ -746,9 +759,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     impl_cls = MultiAckDetailedGraphWalkerImpl
 
     def test_multi_ack(self):
-        # depend on the EOL that will give the blank command to trigger
-        # the ready
-        self._walker.lines.append((None, None))
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -762,7 +772,9 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, 'common')
 
         self.assertNextEquals(None)
-        self.assertAcks([(THREE, 'ready'), (THREE, '')])
+        self._walker.lines.append((None, None))
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
 
     def test_multi_ack_partial(self):
         self.assertNextEquals(TWO)
@@ -776,7 +788,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        # done, re-send ack of last common
+        self.assertNextEmpty()
         self.assertAck(ONE)
 
     def test_multi_ack_flush(self):
@@ -787,8 +799,8 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
           ('have', ONE),
           ('have', THREE),
           ('done', None),
+          (None, None),
           ]
-        self._walker.done = True
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -803,10 +815,9 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self._impl.ack(THREE)
         self.assertAck(THREE, 'common')
 
-        self._walker.done = True
         self.assertNextEquals(None)
-        self.assertTrue(self._walker._notify_done)
-        self.assertAcks([(THREE, 'ready'), (THREE, '')])
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
 
     def test_multi_ack_nak(self):
         self.assertNextEquals(TWO)
@@ -819,6 +830,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
     def test_multi_ack_nak_flush(self):
@@ -830,7 +842,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
           ('have', THREE),
           ('done', None),
           ]
-        self._walker.done = True
         self.assertNextEquals(TWO)
         self.assertNoAck()
 
@@ -841,6 +852,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
     def test_multi_ack_stateless(self):

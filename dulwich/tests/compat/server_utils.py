@@ -266,16 +266,12 @@ class ServerTests(object):
         self.addCleanup(tear_down_repo, self._client_repo)
         port = self._start_server(self._source_repo)
 
-        run_git_or_fail(['config', 'user.email', 'user@example.com'],
+        self.assertRaises(KeyError, self._client_repo.get_object,
+            '02a14da1fc1fc13389bbf32f0af7d8899f2b2323')
+        run_git_or_fail(['fetch', self.url(port), 'master',],
                         cwd=self._client_repo.path)
-        run_git_or_fail(['config', 'user.name', 'User Name'],
-                        cwd=self._client_repo.path)
-        run_git_or_fail(['pull', self.url(port), 'master',],
-                        cwd=self._client_repo.path)
-        # the merge commit will be automatic so hashes are different,
-        # however it being a working directory and done with git it has
-        # a rather predictable result, assuming a default strategy.
-        self.assertEqual(len(os.listdir(self._client_repo.path)), 8)
+        self.assertEqual('commit', self._client_repo.get_object(
+            '02a14da1fc1fc13389bbf32f0af7d8899f2b2323').type_name)
 
     def test_push_to_dulwich_issue_88_standard(self):
         # Same thing, but we reverse the role of the server/client

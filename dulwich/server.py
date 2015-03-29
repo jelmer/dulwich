@@ -681,7 +681,8 @@ class BaseGraphWalkerImpl(object):
 
         if not done_received and not self._common:
             # Okay we are not actually done then since the walker picked
-            # up no haves.
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
             return False
 
         self.post_nodone_check()

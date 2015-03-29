@@ -239,7 +239,7 @@ class UploadPackHandler(Handler):
         self.advertise_refs = advertise_refs
         # A state variable for denoting that the have list is still
         # being processed, and the client is not accepting any other
-        # side-band data.
+        # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
     @property
@@ -749,11 +749,13 @@ class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
                     self.walker.send_ack(self._common[-1], 'ready')
                 self.walker.send_nak()
                 if self.walker.http_req:
-                    # why special case?  if this was "stateless" as in
-                    # HTTP there would be nothing left to be read and
-                    # None would have returned later... so I guess this
-                    # is a short circuit (also to make the test case
-                    # as written happy).
+                    # The HTTP version of this request a flush-pkt always
+                    # signifies an end of request, so we also return
+                    # nothing here as if we are done (but not really, as
+                    # it depends on whether no-done capability was
+                    # specified and that's handled in handle_done which
+                    # may or may not call post_nodone_check depending on
+                    # that).
                     return None
             elif command == 'done':
                 # Let the walker know that we got a done.
@@ -767,9 +769,6 @@ class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
         # everything is satisfied
 
     __next__ = next
-
-    def pre_nodone_check(self):
-        pass
 
     def post_nodone_check(self):
         # don't nak unless no common commits were found, even if not

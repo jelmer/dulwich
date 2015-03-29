@@ -692,8 +692,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        # done, re-send ack of last common
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertAck(ONE)
 
@@ -711,7 +709,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(ONE)
         self.assertNak()  # nak the flush-pkt
 
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, b'continue')
 
@@ -734,7 +731,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertNak()
 
@@ -790,7 +786,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, 'common')
 
@@ -812,7 +807,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, 'common')
 
@@ -837,7 +831,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertAck(ONE)
 
@@ -857,7 +850,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(ONE)
         self.assertNak()  # nak the flush-pkt
 
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, b'common')
 
@@ -881,7 +873,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertNak()
 
@@ -896,7 +887,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertNak()
 
@@ -919,7 +909,6 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        self._walker.done = True
         self.assertNextEmpty()
         self.assertNak()
 

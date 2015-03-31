@@ -273,6 +273,7 @@ class ShaFile(object):
             self._ensure_parsed()
         elif self._needs_serialization:
             self._chunked_text = self._serialize()
+            self._needs_serialization = False
         return self._chunked_text
 
     def as_raw_string(self):
@@ -549,7 +550,6 @@ class Blob(ShaFile):
     def _serialize(self):
         if not self._chunked_text:
             self._ensure_parsed()
-        self._needs_serialization = False
         return self._chunked_text
 
     def _deserialize(self, chunks):

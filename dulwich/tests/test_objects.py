@@ -30,6 +30,7 @@ from itertools import (
 import os
 import stat
 import warnings
+from contextlib import contextmanager
 
 from dulwich.errors import (
     ObjectFormatException,
@@ -1029,3 +1030,64 @@ class ShaFileCopyTests(TestCase):
             tag_time=12345, tag_timezone=0,
             object=(Commit, b'0' * 40))
         self.assert_copy(tag)
+
+
+class ShaFileSerializeTests(TestCase):
+    """
+    Test that `ShaFile` objects only gets serialized once if they haven't changed.
+    """
+
+    @contextmanager
+    def assert_serialization_on_change(self, obj, needs_serialization_after_change=True):
+        old_id = obj.id
+        self.assertFalse(obj._needs_serialization)
+
+        yield obj
+
+        if needs_serialization_after_change:
+            self.assertTrue(obj._needs_serialization)
+        else:
+            self.assertFalse(obj._needs_serialization)
+        new_id = obj.id
+        self.assertFalse(obj._needs_serialization)
+        self.assertNotEqual(old_id, new_id)
+
+    def test_commit_serialize(self):
+        attrs = {'tree': b'd80c186a03f423a81b39df39dc87fd269736ca86',
+                 'parents': [b'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd',
+                             b'4cffe90e0a41ad3f5190079d7c8f036bde29cbe6'],
+                 'author': b'James Westby <jw+debian@jameswestby.net>',
+                 'committer': b'James Westby <jw+debian@jameswestby.net>',
+                 'commit_time': 1174773719,
+                 'author_time': 1174773719,
+                 'commit_timezone': 0,
+                 'author_timezone': 0,
+                 'message':  b'Merge ../b\n'}
+        commit = make_commit(**attrs)
+
+        with self.assert_serialization_on_change(commit):
+            commit.parents = [b'ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd']
+
+    def test_blob_serialize(self):
+        blob = make_object(Blob, data=b'i am a blob')
+
+        with self.assert_serialization_on_change(blob, needs_serialization_after_change=False):
+            blob.data = b'i am another blob'
+
+    def test_tree_serialize(self):
+        blob = make_object(Blob, data=b'i am a blob')
+        tree = Tree()
+        tree[b'blob'] = (stat.S_IFREG, blob.id)
+
+        with self.assert_serialization_on_change(tree):
+            tree[b'blob2'] = (stat.S_IFREG, blob.id)
+
+    def test_tag_serialize(self):
+        tag = make_object(
+            Tag, name=b'tag', message=b'',
+            tagger=b'Tagger <test@example.com>',
+            tag_time=12345, tag_timezone=0,
+            object=(Commit, b'0' * 40))
+
+        with self.assert_serialization_on_change(tag):
+            tag.message = b'new message'

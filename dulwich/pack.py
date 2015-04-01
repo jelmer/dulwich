@@ -57,7 +57,7 @@ else:
     has_mmap = True
 
 # For some reason the above try, except fails to set has_mmap = False
-if os.uname()[0] == 'Plan9':
+if hasattr(os, 'uname') and os.uname()[0] == 'Plan9':
     has_mmap = False
 
 from hashlib import sha1

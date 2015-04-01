@@ -48,6 +48,7 @@ except ImportError:
     izip = zip
 
 import os
+import sys
 
 try:
     import mmap
@@ -56,8 +57,8 @@ except ImportError:
 else:
     has_mmap = True
 
-# For some reason the above try, except fails to set has_mmap = False
-if os.uname()[0] == 'Plan9':
+# For some reason the above try, except fails to set has_mmap = False for plan9
+if sys.platform == 'Plan9':
     has_mmap = False
 
 from hashlib import sha1

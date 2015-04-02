@@ -237,6 +237,50 @@ class ServerTests(object):
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
+    def test_fetch_from_dulwich_issue_88_standard(self):
+        # Basically an integration test to see that the ACK/NAK
+        # generation works on repos with common head.
+        self._source_repo = import_repo('issue88_expect_ack_nak_server.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_client.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        run_git_or_fail(['pull', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        self.assertReposEqual(self._source_repo, self._client_repo)
+
+    def test_fetch_from_dulwich_issue_88_alternative(self):
+        # likewise, but the case where the two repos have no common parent
+        self._source_repo = import_repo('issue88_expect_ack_nak_other.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_client.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        self.assertRaises(KeyError, self._client_repo.get_object,
+            '02a14da1fc1fc13389bbf32f0af7d8899f2b2323')
+        run_git_or_fail(['fetch', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        self.assertEqual('commit', self._client_repo.get_object(
+            '02a14da1fc1fc13389bbf32f0af7d8899f2b2323').type_name)
+
+    def test_push_to_dulwich_issue_88_standard(self):
+        # Same thing, but we reverse the role of the server/client
+        # and do a push instead.
+        self._source_repo = import_repo('issue88_expect_ack_nak_client.export')
+        self.addCleanup(tear_down_repo, self._source_repo)
+        self._client_repo = import_repo('issue88_expect_ack_nak_server.export',
+                                        as_working_copy=True)
+        self.addCleanup(tear_down_repo, self._client_repo)
+        port = self._start_server(self._source_repo)
+
+        run_git_or_fail(['push', self.url(port), 'master',],
+                        cwd=self._client_repo.path)
+        self.assertReposEqual(self._source_repo, self._client_repo)
+
 
 # TODO(dborowitz): Come up with a better way of testing various permutations of
 # capabilities. The only reason it is the way it is now is that side-band-64k

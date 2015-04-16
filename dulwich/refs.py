@@ -425,7 +425,7 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        name = name.decode('ascii')
+        name = name
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)

@@ -158,6 +158,7 @@ _TEST_REFS = {
     }
 
 
+@skipIfPY3
 class RefsContainerTests(object):
 
     def test_keys(self):

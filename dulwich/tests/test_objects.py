@@ -63,6 +63,7 @@ from dulwich.tests.utils import (
     make_object,
     functest_builder,
     ext_functest_builder,
+    skipIfPY3,
     )
 
 a_sha = b'6f670c0fb53f9463760b7295fbb814e965fb20c8'
@@ -81,6 +82,7 @@ class TestHexToSha(TestCase):
         self.assertEqual(b'abcd' * 10, sha_to_hex(b'\xab\xcd' * 10))
 
 
+@skipIfPY3
 class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
@@ -653,6 +655,7 @@ _SORTED_TREE_ITEMS = [
 ]
 
 
+@skipIfPY3
 class TreeTests(ShaFileCheckTests):
 
     def test_add(self):

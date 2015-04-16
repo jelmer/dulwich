@@ -782,13 +782,8 @@ class PackStreamReader(object):
         else:
             to_pop = max(n + tn - 20, 0)
             to_add = n
-        for _ in xrange(to_pop):
-            self.sha.update(self._trailer.popleft())
-
-        if sys.version_info[0] == 2:
-            self._trailer.extend(data[-to_add:])
-        else:
-            self._trailer.extend(struct.Struct(">B").pack(b) for b in data[-to_add:])
+        self.sha.update(bytearray([self._trailer.popleft() for _ in xrange(to_pop)]))
+        self._trailer.extend(data[-to_add:])
 
         # hash everything but the trailer
         self.sha.update(data[:-to_add])
@@ -873,7 +868,7 @@ class PackStreamReader(object):
             # read buffer and (20 - N) come from the wire.
             self.read(20)
 
-        pack_sha = b''.join(self._trailer)
+        pack_sha = bytearray(self._trailer)
         if pack_sha != self.sha.digest():
             raise ChecksumMismatch(sha_to_hex(pack_sha), self.sha.hexdigest())
 

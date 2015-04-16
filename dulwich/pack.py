@@ -39,7 +39,6 @@ from collections import (
     )
 import difflib
 import struct
-import operator
 
 from itertools import chain
 try:
@@ -68,7 +67,6 @@ from os import (
     SEEK_CUR,
     SEEK_END,
     )
-import struct
 from struct import unpack_from
 import zlib
 
@@ -91,14 +89,10 @@ if sys.version_info[0] == 2:
     iteritems = lambda d: d.iteritems()
     int_types = (int, long)
     int2byte = chr
-
-    def indexbytes(buf, i):
-        return ord(buf[i])
 else:
     iteritems = lambda d: d.items()
     int_types = int
     int2byte = struct.Struct(">B").pack
-    indexbytes = operator.getitem
     xrange = range
 
 OFS_DELTA = 6
@@ -120,7 +114,7 @@ def take_msb_bytes(read, crc32=None):
         b = read(1)
         if crc32 is not None:
             crc32 = binascii.crc32(b, crc32)
-        ret.append(indexbytes(b, 0))
+        ret.append(ord(b[:1]))
     return ret, crc32
 
 
@@ -576,7 +570,7 @@ class FilePackIndex(PackIndex):
         :param sha: A *binary* SHA string. (20 characters long)_
         """
         assert len(sha) == 20
-        idx = indexbytes(sha, 0)
+        idx = ord(sha[:1])
         if idx == 0:
             start = 0
         else:
@@ -1608,7 +1602,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
-        fan_out_table[indexbytes(name, 0)] += 1
+        fan_out_table[ord(name[:1])] += 1
     # Fan-out table
     for i in range(0x100):
         f.write(struct.pack('>L', fan_out_table[i]))
@@ -1713,7 +1707,7 @@ def apply_delta(src_buf, delta):
         size = 0
         i = 0
         while delta:
-            cmd = indexbytes(delta, index)
+            cmd = ord(delta[index:index+1])
             index += 1
             size |= (cmd & ~0x80) << i
             i += 7
@@ -1724,20 +1718,20 @@ def apply_delta(src_buf, delta):
     dest_size, index = get_delta_header_size(delta, index)
     assert src_size == len(src_buf), '%d vs %d' % (src_size, len(src_buf))
     while index < delta_length:
-        cmd = indexbytes(delta, index)
+        cmd = ord(delta[index:index+1])
         index += 1
         if cmd & 0x80:
             cp_off = 0
             for i in range(4):
                 if cmd & (1 << i):
-                    x = indexbytes(delta, index)
+                    x = ord(delta[index:index+1])
                     index += 1
                     cp_off |= x << (i * 8)
             cp_size = 0
             # Version 3 packs can contain copy sizes larger than 64K.
             for i in range(3):
                 if cmd & (1 << (4+i)):
-                    x = indexbytes(delta, index)
+                    x = ord(delta[index:index+1])
                     index += 1
                     cp_size |= x << (i * 8)
             if cp_size == 0:
@@ -1776,7 +1770,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
     f.write(struct.pack('>L', 2))
     fan_out_table = defaultdict(lambda: 0)
     for (name, offset, entry_checksum) in entries:
-        fan_out_table[indexbytes(name, 0)] += 1
+        fan_out_table[ord(name[:1])] += 1
     # Fan-out table
     largetable = []
     for i in range(0x100):

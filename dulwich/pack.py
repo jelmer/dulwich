@@ -87,12 +87,8 @@ from dulwich.objects import (
 
 if sys.version_info[0] == 2:
     iteritems = lambda d: d.iteritems()
-    int_types = (int, long)
-    int2byte = chr
 else:
     iteritems = lambda d: d.items()
-    int_types = int
-    int2byte = struct.Struct(">B").pack
     xrange = range
 
 OFS_DELTA = 6
@@ -792,7 +788,7 @@ class PackStreamReader(object):
         if sys.version_info[0] == 2:
             self._trailer.extend(data[-to_add:])
         else:
-            self._trailer.extend(int2byte(b) for b in data[-to_add:])
+            self._trailer.extend(struct.Struct(">B").pack(b) for b in data[-to_add:])
 
         # hash everything but the trailer
         self.sha.update(data[:-to_add])
@@ -1219,7 +1215,6 @@ class PackData(object):
             return self._offset_cache[offset]
         except KeyError:
             pass
-        assert isinstance(offset, int_types), 'offset was %r' % offset
         assert offset >= self._header_size
         self._file.seek(offset)
         unpacked, _ = unpack_object(self._file.read)
@@ -1434,14 +1429,14 @@ def pack_object_header(type_num, delta_base, size):
     :param size: Uncompressed object size.
     :return: A header for a packed object.
     """
-    header = b''
+    header = []
     c = (type_num << 4) | (size & 15)
     size >>= 4
     while size:
-        header += (int2byte(c | 0x80))
+        header.append(c | 0x80)
         c = size & 0x7f
         size >>= 7
-    header += int2byte(c)
+    header.append(c)
     if type_num == OFS_DELTA:
         ret = [delta_base & 0x7f]
         delta_base >>= 7
@@ -1449,11 +1444,11 @@ def pack_object_header(type_num, delta_base, size):
             delta_base -= 1
             ret.insert(0, 0x80 | (delta_base & 0x7f))
             delta_base >>= 7
-        header += b''.join([int2byte(x) for x in ret])
+        header.extend(ret)
     elif type_num == REF_DELTA:
         assert len(delta_base) == 20
         header += delta_base
-    return header
+    return bytearray(header)
 
 
 def write_pack_object(f, type, object, sha=None):
@@ -1617,14 +1612,14 @@ def write_pack_index_v1(f, entries, pack_checksum):
 
 
 def _delta_encode_size(size):
-    ret = b''
+    ret = bytearray()
     c = size & 0x7f
     size >>= 7
     while size:
-        ret += int2byte(c | 0x80)
+        ret.append(c | 0x80)
         c = size & 0x7f
         size >>= 7
-    ret += int2byte(c)
+    ret.append(c)
     return ret
 
 
@@ -1634,17 +1629,17 @@ def _delta_encode_size(size):
 _MAX_COPY_LEN = 0xffff
 
 def _encode_copy_operation(start, length):
-    scratch = b''
+    scratch = []
     op = 0x80
     for i in range(4):
         if start & 0xff << i*8:
-            scratch += int2byte((start >> i*8) & 0xff)
+            scratch.append((start >> i*8) & 0xff)
             op |= 1 << i
     for i in range(2):
         if length & 0xff << i*8:
-            scratch += int2byte((length >> i*8) & 0xff)
+            scratch.append((length >> i*8) & 0xff)
             op |= 1 << (4+i)
-    return int2byte(op) + scratch
+    return bytearray([op] + scratch)
 
 
 def create_delta(base_buf, target_buf):
@@ -1655,7 +1650,7 @@ def create_delta(base_buf, target_buf):
     """
     assert isinstance(base_buf, bytes)
     assert isinstance(target_buf, bytes)
-    out_buf = b''
+    out_buf = bytearray()
     # write delta header
     out_buf += _delta_encode_size(len(base_buf))
     out_buf += _delta_encode_size(len(target_buf))
@@ -1681,13 +1676,13 @@ def create_delta(base_buf, target_buf):
             s = j2 - j1
             o = j1
             while s > 127:
-                out_buf += int2byte(127)
-                out_buf += target_buf[o:o+127]
+                out_buf.append(127)
+                out_buf += bytearray(target_buf[o:o+127])
                 s -= 127
                 o += 127
-            out_buf += int2byte(s)
-            out_buf += target_buf[o:o+s]
-    return out_buf
+            out_buf.append(s)
+            out_buf += bytearray(target_buf[o:o+s])
+    return bytes(out_buf)
 
 
 def apply_delta(src_buf, delta):

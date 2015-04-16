@@ -323,7 +323,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         tree_id = commit_tree(object_store, blobs)
 
         commit_attrs = {
-            'message': 'Commit %i' % commit_num,
+            'message': ('Commit %i' % commit_num).encode('ascii'),
             'parents': parent_ids,
             'tree': tree_id,
             'commit_time': commit_time,

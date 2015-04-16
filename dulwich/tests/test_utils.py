@@ -47,7 +47,7 @@ class BuildCommitGraphTest(TestCase):
         self.assertEqual([], c1.parents)
         self.assertEqual([c1.id], c2.parents)
         self.assertEqual(c1.tree, c2.tree)
-        self.assertEqual([], list(self.store[c1.tree].iteritems()))
+        self.assertEqual([], self.store[c1.tree].items())
         self.assertTrue(c2.commit_time > c1.commit_time)
 
     def test_merge(self):
@@ -62,19 +62,19 @@ class BuildCommitGraphTest(TestCase):
                           [[1], [3, 2], [2, 1]])
 
     def test_trees(self):
-        a1 = make_object(Blob, data='aaa1')
-        a2 = make_object(Blob, data='aaa2')
+        a1 = make_object(Blob, data=b'aaa1')
+        a2 = make_object(Blob, data=b'aaa2')
         c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],
-                                    trees={1: [('a', a1)],
-                                           2: [('a', a2, 0o100644)]})
-        self.assertEqual((0o100644, a1.id), self.store[c1.tree]['a'])
-        self.assertEqual((0o100644, a2.id), self.store[c2.tree]['a'])
+                                    trees={1: [(b'a', a1)],
+                                           2: [(b'a', a2, 0o100644)]})
+        self.assertEqual((0o100644, a1.id), self.store[c1.tree][b'a'])
+        self.assertEqual((0o100644, a2.id), self.store[c2.tree][b'a'])
 
     def test_attrs(self):
         c1, c2 = build_commit_graph(self.store, [[1], [2, 1]],
-                                    attrs={1: {'message': 'Hooray!'}})
-        self.assertEqual('Hooray!', c1.message)
-        self.assertEqual('Commit 2', c2.message)
+                                    attrs={1: {'message': b'Hooray!'}})
+        self.assertEqual(b'Hooray!', c1.message)
+        self.assertEqual(b'Commit 2', c2.message)
 
     def test_commit_time(self):
         c1, c2, c3 = build_commit_graph(self.store, [[1], [2, 1], [3, 2]],

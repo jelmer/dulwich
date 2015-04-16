@@ -24,6 +24,7 @@ import stat
 import shutil
 import tempfile
 import warnings
+import sys
 
 from dulwich import errors
 from dulwich.object_store import (
@@ -85,6 +86,13 @@ class CreateRepositoryTests(TestCase):
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})
         self._check_repo_contents(repo, True)
+
+    def test_create_disk_non_bare_unicode_path(self):
+        tmp_dir = tempfile.mkdtemp(suffix=u'd\xe9\u0142w\xed\xe7h'.encode(sys.getfilesystemencoding()))
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        self.assertEqual(os.path.join(tmp_dir, '.git'), repo._controldir)
+        self._check_repo_contents(repo, False)
 
 
 @skipIfPY3

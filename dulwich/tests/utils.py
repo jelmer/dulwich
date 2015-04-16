@@ -60,7 +60,7 @@ from dulwich.tests import (
 F = 0o100644  # Shorthand mode for Files.
 
 
-def open_repo(name):
+def open_repo(name, temp_dir=None):
     """Open a copy of a repo in a temporary directory.
 
     Use this function for accessing repos in dulwich/tests/data/repos to avoid
@@ -69,6 +69,8 @@ def open_repo(name):
 
     :param name: The name of the repository, relative to
         dulwich/tests/data/repos
+    :temp_dir: temporary directory to initialize to. If not provided, a
+        temporary directory will be created.
     :returns: An initialized Repo object that lives in a temporary directory.
     """
     temp_dir = tempfile.mkdtemp()

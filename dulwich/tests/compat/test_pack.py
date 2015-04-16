@@ -45,7 +45,7 @@ from dulwich.tests.compat.utils import (
     run_git_or_fail,
     )
 
-_NON_DELTA_RE = re.compile('non delta: (?P<non_delta>\d+) objects')
+_NON_DELTA_RE = re.compile(b'non delta: (?P<non_delta>\d+) objects')
 
 def _git_verify_pack_object_list(output):
     pack_shas = set()
@@ -81,7 +81,7 @@ class TestPack(PackTests):
         orig_pack = self.get_pack(pack1_sha)
         orig_blob = orig_pack[a_sha]
         new_blob = Blob()
-        new_blob.data = orig_blob.data + 'x'
+        new_blob.data = orig_blob.data + b'x'
         all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
@@ -102,9 +102,9 @@ class TestPack(PackTests):
         orig_pack = self.get_pack(pack1_sha)
         orig_blob = orig_pack[a_sha]
         new_blob = Blob()
-        new_blob.data = orig_blob.data + ('x' * 2 ** 20)
+        new_blob.data = orig_blob.data + (b'x' * 2 ** 20)
         new_blob_2 = Blob()
-        new_blob_2.data = new_blob.data + 'y'
+        new_blob_2.data = new_blob.data + b'y'
         all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
                                                        (new_blob_2, None)]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
@@ -121,7 +121,7 @@ class TestPack(PackTests):
             'Expected 3 non-delta objects, got %d' % got_non_delta)
         # We expect one object to have a delta chain length of two
         # (new_blob_2), so let's verify that actually happens:
-        self.assertIn('chain length = 2', output)
+        self.assertIn(b'chain length = 2', output)
 
     # This test is SUPER slow: over 80 seconds on a 2012-era
     # laptop. This is because SequenceMatcher is worst-case quadratic

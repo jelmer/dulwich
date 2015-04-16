@@ -26,6 +26,7 @@ import errno
 from itertools import chain
 import os
 import stat
+import sys
 import tempfile
 
 from dulwich.diff_tree import (
@@ -65,12 +66,16 @@ from dulwich.pack import (
 INFODIR = 'info'
 PACKDIR = 'pack'
 
+if sys.version_info[0] == 2:
+    iteritems = lambda d: d.iteritems()
+else:
+    iteritems = lambda d: d.items()
 
 class BaseObjectStore(object):
     """Object store interface."""
 
     def determine_wants_all(self, refs):
-        return [sha for (ref, sha) in refs.iteritems()
+        return [sha for (ref, sha) in iteritems(refs)
                 if not sha in self and not ref.endswith("^{}") and
                    not sha == ZERO_SHA]
 
@@ -695,7 +700,10 @@ class MemoryObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        return self._data.iterkeys()
+        if sys.version_info[0] == 2:
+            return self._data.iterkeys()
+        else:
+            return iter(self._data.keys())
 
     @property
     def packs(self):

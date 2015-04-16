@@ -1381,7 +1381,7 @@ class SHA1Reader(object):
 
     def __init__(self, f):
         self.f = f
-        self.sha1 = sha1('')
+        self.sha1 = sha1(b'')
 
     def read(self, num=None):
         data = self.f.read(num)

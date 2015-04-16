@@ -23,6 +23,7 @@ import errno
 import os
 import stat
 import struct
+import sys
 
 from dulwich.file import GitFile
 from dulwich.objects import (
@@ -38,6 +39,11 @@ from dulwich.pack import (
     SHA1Writer,
     )
 
+if sys.version_info[0] == 2:
+    iteritems = lambda d: d.iteritems()
+else:
+    iteritems = lambda d: d.items()
+
 
 IndexEntry = collections.namedtuple(
     'IndexEntry', [
@@ -52,9 +58,9 @@ def pathsplit(path):
     :return: Tuple with directory name and basename
     """
     try:
-        (dirname, basename) = path.rsplit("/", 1)
+        (dirname, basename) = path.rsplit(b"/", 1)
     except ValueError:
-        return ("", path)
+        return (b"", path)
     else:
         return (dirname, basename)
 
@@ -63,7 +69,7 @@ def pathjoin(*args):
     """Join a /-delimited path.
 
     """
-    return "/".join([p for p in args if p])
+    return b"/".join([p for p in args if p])
 
 
 def read_cache_time(f):
@@ -122,18 +128,18 @@ def write_cache_entry(f, entry):
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
     flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(">LLLLLL20sH", dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    f.write(struct.pack(b'>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
-    f.write("\0" * ((beginoffset + real_size) - f.tell()))
+    f.write(b'\0' * ((beginoffset + real_size) - f.tell()))
 
 
 def read_index(f):
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
-    if header != "DIRC":
+    if header != b'DIRC':
         raise AssertionError("Invalid index file header: %r" % header)
-    (version, num_entries) = struct.unpack(">LL", f.read(4 * 2))
+    (version, num_entries) = struct.unpack(b'>LL', f.read(4 * 2))
     assert version in (1, 2)
     for i in range(num_entries):
         yield read_cache_entry(f)
@@ -156,8 +162,8 @@ def write_index(f, entries):
     :param f: File-like object to write to
     :param entries: Iterable over the entries to write
     """
-    f.write("DIRC")
-    f.write(struct.pack(">LL", 2, len(entries)))
+    f.write(b'DIRC')
+    f.write(struct.pack(b'>LL', 2, len(entries)))
     for x in entries:
         write_cache_entry(f, x)
 
@@ -263,20 +269,20 @@ class Index(object):
         self._byname = {}
 
     def __setitem__(self, name, x):
-        assert isinstance(name, str)
+        assert isinstance(name, bytes)
         assert len(x) == 10
         # Remove the old entry if any
         self._byname[name] = x
 
     def __delitem__(self, name):
-        assert isinstance(name, str)
+        assert isinstance(name, bytes)
         del self._byname[name]
 
     def iteritems(self):
-        return self._byname.iteritems()
+        return iteritems(self._byname)
 
     def update(self, entries):
-        for name, value in entries.iteritems():
+        for name, value in iteritems(entries):
             self[name] = value
 
     def changes_from_tree(self, object_store, tree, want_unchanged=False):
@@ -312,14 +318,14 @@ def commit_tree(object_store, blobs):
     :return: SHA1 of the created tree.
     """
 
-    trees = {"": {}}
+    trees = {b'': {}}
 
     def add_tree(path):
         if path in trees:
             return trees[path]
         dirname, basename = pathsplit(path)
         t = add_tree(dirname)
-        assert isinstance(basename, str)
+        assert isinstance(basename, bytes)
         newtree = {}
         t[basename] = newtree
         trees[path] = newtree
@@ -332,7 +338,7 @@ def commit_tree(object_store, blobs):
 
     def build_tree(path):
         tree = Tree()
-        for basename, entry in trees[path].iteritems():
+        for basename, entry in iteritems(trees[path]):
             if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))
@@ -341,7 +347,7 @@ def commit_tree(object_store, blobs):
             tree.add(basename, mode, sha)
         object_store.add_object(tree)
         return tree.id
-    return build_tree("")
+    return build_tree(b'')
 
 
 def commit_index(object_store, index):

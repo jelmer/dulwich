@@ -145,12 +145,12 @@ def make_tag(target, **attrs):
     target_id = target.id
     target_type = object_class(target.type_name)
     default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
-    all_attrs = {'tagger': 'Test Author <test@nodomain.com>',
+    all_attrs = {'tagger': b'Test Author <test@nodomain.com>',
                  'tag_time': default_time,
                  'tag_timezone': 0,
-                 'message': 'Test message.',
+                 'message': b'Test message.',
                  'object': (target_type, target_id),
-                 'name': 'Test Tag',
+                 'name': b'Test Tag',
                  }
     all_attrs.update(attrs)
     return make_object(Tag, **all_attrs)

@@ -340,7 +340,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
+        iterables = list(self.packs) + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return chain(*iterables)
 
     def contains_loose(self, sha):
@@ -513,7 +513,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield base+rest
+                yield (base+rest).encode(sys.getfilesystemencoding())
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -705,10 +705,7 @@ class MemoryObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        if sys.version_info[0] == 2:
-            return self._data.iterkeys()
-        else:
-            return iter(self._data.keys())
+        return iter(self._data.keys())
 
     @property
     def packs(self):

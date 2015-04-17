@@ -347,7 +347,13 @@ class ConfigFile(ConfigDict):
             else:
                 f.write(b"[" + section_name + b" \"" + subsection_name + b"\"]\n")
             for key, value in values.items():
-                f.write(b"\t" + key + b" = " + _escape_value(value) + b"\n")
+                if value is True:
+                    value = b"true"
+                elif value is False:
+                    value = b"false"
+                else:
+                    value = _escape_value(value)
+                f.write(b"\t" + key + b" = " + value + b"\n")
 
 
 class StackedConfig(Config):

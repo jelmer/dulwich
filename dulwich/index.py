@@ -437,7 +437,7 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
             os.chmod(target_path, mode)
 
 
-INVALID_DOTNAMES = (".git", ".", "..", "")
+INVALID_DOTNAMES = (b".git", b".", b"..", b"")
 
 
 def validate_path_element_default(element):
@@ -445,10 +445,10 @@ def validate_path_element_default(element):
 
 
 def validate_path_element_ntfs(element):
-    stripped = element.rstrip(". ").lower()
+    stripped = element.rstrip(b". ").lower()
     if stripped in INVALID_DOTNAMES:
         return False
-    if stripped == "git~1":
+    if stripped == b"git~1":
         return False
     return True
 
@@ -527,7 +527,7 @@ def get_unstaged_changes(index, path):
     """
     # For each entry in the index check the sha1 & ensure not staged
     for name, entry in index.iteritems():
-        fp = os.path.join(path, name)
+        fp = os.path.join(path, name.decode(sys.getfilesystemencoding()))
         blob = blob_from_path_and_stat(fp, os.lstat(fp))
         if blob.id != entry.sha:
             yield name

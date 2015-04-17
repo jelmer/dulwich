@@ -455,7 +455,7 @@ def validate_path_element_ntfs(element):
 
 def validate_path(path, element_validator=validate_path_element_default):
     """Default path validator that just checks for .git/."""
-    parts = path.split("/")
+    parts = path.split(b"/")
     for p in parts:
         if not element_validator(p):
             return False
@@ -486,7 +486,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path):
             continue
-        full_path = os.path.join(prefix, entry.path)
+        full_path = os.path.join(prefix, entry.path.decode(sys.getfilesystemencoding()))
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))

@@ -175,16 +175,16 @@ class BaseRepo(object):
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
-        self._put_named_file('description', "Unnamed repository")
+        self._put_named_file('description', b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        cf.set("core", "repositoryformatversion", "0")
-        cf.set("core", "filemode", "true")
-        cf.set("core", "bare", str(bare).lower())
-        cf.set("core", "logallrefupdates", "true")
+        cf.set(b"core", b"repositoryformatversion", b"0")
+        cf.set(b"core", b"filemode", b"true")
+        cf.set(b"core", b"bare", bare)
+        cf.set(b"core", b"logallrefupdates", True)
         cf.write_to_file(f)
         self._put_named_file('config', f.getvalue())
-        self._put_named_file(os.path.join('info', 'exclude'), '')
+        self._put_named_file(os.path.join('info', 'exclude'), b'')
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -291,7 +291,7 @@ class BaseRepo(object):
         :return: A graph walker object
         """
         if heads is None:
-            heads = self.refs.as_dict('refs/heads').values()
+            heads = self.refs.as_dict(b'refs/heads').values()
         return ObjectStoreGraphWalker(heads, self.get_parents)
 
     def get_refs(self):
@@ -303,7 +303,7 @@ class BaseRepo(object):
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""
-        return self.refs['HEAD']
+        return self.refs[b'HEAD']
 
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
@@ -439,7 +439,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if not isinstance(name, str):
+        if not isinstance(name, bytes):
             raise TypeError("'name' must be bytestring, not %.80s" %
                     type(name).__name__)
         if len(name) in (20, 40):
@@ -468,10 +468,10 @@ class BaseRepo(object):
         :param name: ref name
         :param value: Ref value - either a ShaFile object, or a hex sha
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith(b"refs/") or name == b'HEAD':
             if isinstance(value, ShaFile):
                 self.refs[name] = value.id
-            elif isinstance(value, str):
+            elif isinstance(value, bytes):
                 self.refs[name] = value
             else:
                 raise TypeError(value)
@@ -483,7 +483,7 @@ class BaseRepo(object):
 
         :param name: Name of the ref to remove
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith(b"refs/") or name == b"HEAD":
             del self.refs[name]
         else:
             raise ValueError(name)
@@ -492,9 +492,8 @@ class BaseRepo(object):
         """Determine the identity to use for new commits.
         """
         config = self.get_config_stack()
-        return "%s <%s>" % (
-            config.get(("user", ), "name"),
-            config.get(("user", ), "email"))
+        return (config.get((b"user", ), b"name") + b" <" +
+                config.get((b"user", ), b"email") + b">")
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
@@ -521,7 +520,7 @@ class BaseRepo(object):
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None, encoding=None,
-                  ref='HEAD', merge_heads=None):
+                  ref=b'HEAD', merge_heads=None):
         """Create a new commit.
 
         :param message: Commit message
@@ -759,7 +758,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin="origin"):
+            origin=b"origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -775,21 +774,21 @@ class Repo(BaseRepo):
             target = self.init_bare(target_path)
         self.fetch(target)
         target.refs.import_refs(
-            'refs/remotes/' + origin, self.refs.as_dict('refs/heads'))
+            b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'))
         target.refs.import_refs(
-            'refs/tags', self.refs.as_dict('refs/tags'))
+            b'refs/tags', self.refs.as_dict(b'refs/tags'))
         try:
             target.refs.add_if_new(
-                'refs/heads/master',
-                self.refs['refs/heads/master'])
+                b'refs/heads/master',
+                self.refs[b'refs/heads/master'])
         except KeyError:
             pass
 
         # Update target head
-        head, head_sha = self.refs._follow('HEAD')
+        head, head_sha = self.refs._follow(b'HEAD')
         if head is not None and head_sha is not None:
-            target.refs.set_symbolic_ref('HEAD', head)
-            target['HEAD'] = head_sha
+            target.refs.set_symbolic_ref(b'HEAD', head)
+            target[b'HEAD'] = head_sha
 
             if not bare:
                 # Checkout HEAD to target dir
@@ -808,7 +807,7 @@ class Repo(BaseRepo):
             validate_path_element_ntfs,
             )
         if tree is None:
-            tree = self['HEAD'].tree
+            tree = self[b'HEAD'].tree
         config = self.get_config()
         honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
         if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
@@ -858,9 +857,7 @@ class Repo(BaseRepo):
         :param description: Text to set as description for this repository.
         """
 
-        path = os.path.join(self._controldir, 'description')
-        with open(path, 'w') as f:
-            f.write(description)
+        self._put_named_file('description', description)
 
     @classmethod
     def _init_maybe_bare(cls, path, bare):
@@ -868,7 +865,7 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref(b'HEAD', b"refs/heads/master")
         ret._init_files(bare)
         return ret
 

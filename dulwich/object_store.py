@@ -433,19 +433,17 @@ class DiskObjectStore(PackBasedObjectStore):
                     'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
-                return []
+                return
             raise
-        ret = []
         with f:
             for l in f.readlines():
-                l = l.rstrip("\n")
-                if l[0] == "#":
+                l = l.rstrip(b"\n")
+                if l[0] == b"#":
                     continue
                 if os.path.isabs(l):
-                    ret.append(l)
+                    yield l.decode(sys.getfilesystemencoding())
                 else:
-                    ret.append(os.path.join(self.path, l))
-            return ret
+                    yield os.path.join(self.path, l).decode(sys.getfilesystemencoding())
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
@@ -465,7 +463,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 with orig_f:
                     f.write(orig_f.read())
-            f.write("%s\n" % path)
+            f.write(path.encode(sys.getfilesystemencoding()) + b"\n")
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)

@@ -1135,7 +1135,7 @@ def get_transport_and_path(location, **kwargs):
         pass
 
     if (sys.platform == 'win32' and
-            location[0].isalpha() and location[1:2] == ':\\'):
+            location[0].isalpha() and location[1:3] == ':\\'):
         # Windows local path
         return default_local_git_client_cls(**kwargs), location
 

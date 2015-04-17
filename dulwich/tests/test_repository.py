@@ -43,13 +43,11 @@ from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
     setup_warning_catcher,
-    skipIfPY3,
     )
 
 missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
-@skipIfPY3
 class CreateRepositoryTests(TestCase):
 
     def assertFileContentsEqual(self, expected, repo, path):
@@ -62,10 +60,10 @@ class CreateRepositoryTests(TestCase):
 
     def _check_repo_contents(self, repo, expect_bare):
         self.assertEqual(expect_bare, repo.bare)
-        self.assertFileContentsEqual('Unnamed repository', repo, 'description')
-        self.assertFileContentsEqual('', repo, os.path.join('info', 'exclude'))
+        self.assertFileContentsEqual(b'Unnamed repository', repo, 'description')
+        self.assertFileContentsEqual(b'', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
-        barestr = 'bare = %s' % str(expect_bare).lower()
+        barestr = b'bare = ' + str(expect_bare).lower().encode('ascii')
         config_text = repo.get_named_file('config').read()
         self.assertTrue(barestr in config_text, "%r" % config_text)
 
@@ -497,7 +495,6 @@ exit 1
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
 
-@skipIfPY3
 class BuildRepoTests(TestCase):
     """Tests that build on-disk repos from scratch.
 
@@ -511,15 +508,15 @@ class BuildRepoTests(TestCase):
         os.makedirs(self._repo_dir)
         r = self._repo = Repo.init(self._repo_dir)
         self.assertFalse(r.bare)
-        self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
-        self.assertRaises(KeyError, lambda: r.refs['refs/heads/master'])
+        self.assertEqual(b'ref: refs/heads/master', r.refs.read_ref(b'HEAD'))
+        self.assertRaises(KeyError, lambda: r.refs[b'refs/heads/master'])
 
         with open(os.path.join(r.path, 'a'), 'wb') as f:
-            f.write('file contents')
+            f.write(b'file contents')
         r.stage(['a'])
-        commit_sha = r.do_commit('msg',
-                                 committer='Test Committer <test@nodomain.com>',
-                                 author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'msg',
+                                 committer=b'Test Committer <test@nodomain.com>',
+                                 author=b'Test Author <test@nodomain.com>',
                                  commit_timestamp=12345, commit_timezone=0,
                                  author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
@@ -531,39 +528,39 @@ class BuildRepoTests(TestCase):
 
     def test_build_repo(self):
         r = self._repo
-        self.assertEqual('ref: refs/heads/master', r.refs.read_ref('HEAD'))
-        self.assertEqual(self._root_commit, r.refs['refs/heads/master'])
-        expected_blob = objects.Blob.from_string('file contents')
+        self.assertEqual(b'ref: refs/heads/master', r.refs.read_ref(b'HEAD'))
+        self.assertEqual(self._root_commit, r.refs[b'refs/heads/master'])
+        expected_blob = objects.Blob.from_string(b'file contents')
         self.assertEqual(expected_blob.data, r[expected_blob.id].data)
         actual_commit = r[self._root_commit]
-        self.assertEqual('msg', actual_commit.message)
+        self.assertEqual(b'msg', actual_commit.message)
 
     def test_commit_modified(self):
         r = self._repo
         with open(os.path.join(r.path, 'a'), 'wb') as f:
-            f.write('new contents')
+            f.write(b'new contents')
         os.symlink('a', os.path.join(self._repo_dir, 'b'))
         r.stage(['a', 'b'])
-        commit_sha = r.do_commit('modified a',
-                                 committer='Test Committer <test@nodomain.com>',
-                                 author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'modified a',
+                                 committer=b'Test Committer <test@nodomain.com>',
+                                 author=b'Test Author <test@nodomain.com>',
                                  commit_timestamp=12395, commit_timezone=0,
                                  author_timestamp=12395, author_timezone=0)
         self.assertEqual([self._root_commit], r[commit_sha].parents)
-        a_mode, a_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'a')
+        a_mode, a_id = tree_lookup_path(r.get_object, r[commit_sha].tree, b'a')
         self.assertEqual(stat.S_IFREG | 0o644, a_mode)
-        self.assertEqual('new contents', r[a_id].data)
-        b_mode, b_id = tree_lookup_path(r.get_object, r[commit_sha].tree, 'b')
+        self.assertEqual(b'new contents', r[a_id].data)
+        b_mode, b_id = tree_lookup_path(r.get_object, r[commit_sha].tree, b'b')
         self.assertTrue(stat.S_ISLNK(b_mode))
-        self.assertEqual('a', r[b_id].data)
+        self.assertEqual(b'a', r[b_id].data)
 
     def test_commit_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
-        commit_sha = r.do_commit('deleted a',
-                                 committer='Test Committer <test@nodomain.com>',
-                                 author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'deleted a',
+                                 committer=b'Test Committer <test@nodomain.com>',
+                                 author=b'Test Author <test@nodomain.com>',
                                  commit_timestamp=12395, commit_timezone=0,
                                  author_timestamp=12395, author_timezone=0)
         self.assertEqual([self._root_commit], r[commit_sha].parents)
@@ -573,42 +570,42 @@ class BuildRepoTests(TestCase):
 
     def test_commit_encoding(self):
         r = self._repo
-        commit_sha = r.do_commit('commit with strange character \xee',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'commit with strange character \xee',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
-             encoding="iso8859-1")
-        self.assertEqual("iso8859-1", r[commit_sha].encoding)
+             encoding=b"iso8859-1")
+        self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
     def test_commit_config_identity(self):
         # commit falls back to the users' identity if it wasn't specified
         r = self._repo
         c = r.get_config()
-        c.set(("user", ), "name", "Jelmer")
-        c.set(("user", ), "email", "jelmer@apache.org")
+        c.set((b"user", ), b"name", b"Jelmer")
+        c.set((b"user", ), b"email", b"jelmer@apache.org")
         c.write_to_path()
-        commit_sha = r.do_commit('message')
+        commit_sha = r.do_commit(b'message')
         self.assertEqual(
-            "Jelmer <jelmer@apache.org>",
+            b"Jelmer <jelmer@apache.org>",
             r[commit_sha].author)
         self.assertEqual(
-            "Jelmer <jelmer@apache.org>",
+            b"Jelmer <jelmer@apache.org>",
             r[commit_sha].committer)
 
     def test_commit_config_identity_in_memoryrepo(self):
         # commit falls back to the users' identity if it wasn't specified
         r = MemoryRepo.init_bare([], {})
         c = r.get_config()
-        c.set(("user", ), "name", "Jelmer")
-        c.set(("user", ), "email", "jelmer@apache.org")
+        c.set((b"user", ), b"name", b"Jelmer")
+        c.set((b"user", ), b"email", b"jelmer@apache.org")
 
-        commit_sha = r.do_commit('message', tree=objects.Tree().id)
+        commit_sha = r.do_commit(b'message', tree=objects.Tree().id)
         self.assertEqual(
-            "Jelmer <jelmer@apache.org>",
+            b"Jelmer <jelmer@apache.org>",
             r[commit_sha].author)
         self.assertEqual(
-            "Jelmer <jelmer@apache.org>",
+            b"Jelmer <jelmer@apache.org>",
             r[commit_sha].committer)
 
     def test_commit_fail_ref(self):
@@ -623,9 +620,9 @@ class BuildRepoTests(TestCase):
         r.refs.add_if_new = add_if_new
 
         old_shas = set(r.object_store)
-        self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
-                          committer='Test Committer <test@nodomain.com>',
-                          author='Test Author <test@nodomain.com>',
+        self.assertRaises(errors.CommitError, r.do_commit, b'failed commit',
+                          committer=b'Test Committer <test@nodomain.com>',
+                          author=b'Test Author <test@nodomain.com>',
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
         new_shas = set(r.object_store) - old_shas
@@ -633,45 +630,45 @@ class BuildRepoTests(TestCase):
         # Check that the new commit (now garbage) was added.
         new_commit = r[new_shas.pop()]
         self.assertEqual(r[self._root_commit].tree, new_commit.tree)
-        self.assertEqual('failed commit', new_commit.message)
+        self.assertEqual(b'failed commit', new_commit.message)
 
     def test_commit_branch(self):
         r = self._repo
 
-        commit_sha = r.do_commit('commit to branch',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'commit to branch',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
-        self.assertEqual(self._root_commit, r["HEAD"].id)
-        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+             ref=b"refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r[b"HEAD"].id)
+        self.assertEqual(commit_sha, r[b"refs/heads/new_branch"].id)
         self.assertEqual([], r[commit_sha].parents)
-        self.assertTrue("refs/heads/new_branch" in r)
+        self.assertTrue(b"refs/heads/new_branch" in r)
 
         new_branch_head = commit_sha
 
-        commit_sha = r.do_commit('commit to branch 2',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'commit to branch 2',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
-        self.assertEqual(self._root_commit, r["HEAD"].id)
-        self.assertEqual(commit_sha, r["refs/heads/new_branch"].id)
+             ref=b"refs/heads/new_branch")
+        self.assertEqual(self._root_commit, r[b"HEAD"].id)
+        self.assertEqual(commit_sha, r[b"refs/heads/new_branch"].id)
         self.assertEqual([new_branch_head], r[commit_sha].parents)
 
     def test_commit_merge_heads(self):
         r = self._repo
-        merge_1 = r.do_commit('commit to branch 2',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        merge_1 = r.do_commit(b'commit to branch 2',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
-             ref="refs/heads/new_branch")
-        commit_sha = r.do_commit('commit with merge',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+             ref=b"refs/heads/new_branch")
+        commit_sha = r.do_commit(b'commit with merge',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
              merge_heads=[merge_1])
@@ -684,9 +681,9 @@ class BuildRepoTests(TestCase):
 
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
-        commit_sha = r.do_commit('commit with no ref',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'commit with no ref',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
              ref=None)
@@ -704,9 +701,9 @@ class BuildRepoTests(TestCase):
 
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
-        commit_sha = r.do_commit('commit with no ref',
-             committer='Test Committer <test@nodomain.com>',
-             author='Test Author <test@nodomain.com>',
+        commit_sha = r.do_commit(b'commit with no ref',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
              commit_timestamp=12395, commit_timezone=0,
              author_timestamp=12395, author_timezone=0,
              ref=None, merge_heads=[self._root_commit])

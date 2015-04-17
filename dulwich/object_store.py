@@ -76,7 +76,7 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in iteritems(refs)
-                if not sha in self and not ref.endswith("^{}") and
+                if not sha in self and not ref.endswith(b"^{}") and
                    not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -483,6 +483,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = os.stat(self.pack_dir).st_mtime
         pack_files = set()
         for name in pack_dir_contents:
+            assert type(name) is str
             # TODO: verify that idx exists first
             if name.startswith("pack-") and name.endswith(".pack"):
                 pack_files.add(name[:-len(".pack")])
@@ -526,6 +527,12 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
 
+    def _get_pack_basepath(self, entries):
+        suffix = iter_sha1(entry[0] for entry in entries)
+        # TODO: Handle self.pack_dir being bytes
+        suffix = suffix.decode('ascii')
+        return os.path.join(self.pack_dir, "pack-" + suffix)
+
     def _complete_thin_pack(self, f, path, copier, indexer):
         """Move a specific file containing a pack into the pack directory.
 
@@ -565,8 +572,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Move the pack in.
         entries.sort()
-        pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+        pack_base_name = self._get_pack_basepath(entries)
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -615,8 +621,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         with PackData(path) as p:
             entries = p.sorted_entries()
-            basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            basename = self._get_pack_basepath(entries)
             with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
@@ -651,13 +656,13 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param obj: Object to add
         """
-        dir = os.path.join(self.path, obj.id[:2])
+        path = self._get_shafile_path(obj.id)
+        dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
         with GitFile(path, 'wb') as f:

@@ -21,10 +21,6 @@ import sys
 import shutil
 import tempfile
 
-try:
-    from unittest import skipIf
-except ImportError:
-    from unittest2 import skipIf
 
 from dulwich import (
     client,
@@ -60,6 +56,7 @@ from dulwich.repo import (
     MemoryRepo,
     Repo,
     )
+from dulwich.tests import skipIf
 from dulwich.tests.utils import (
     open_repo,
     skipIfPY3,

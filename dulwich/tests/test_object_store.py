@@ -53,7 +53,6 @@ from dulwich.tests.utils import (
     make_object,
     make_tag,
     build_pack,
-    skipIfPY3,
     )
 
 
@@ -238,7 +237,6 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         o.add_thin_pack(f.read, None)
 
 
-@skipIfPY3
 class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def tearDown(self):
@@ -246,16 +244,16 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
             pack.close()
 
     def test_empty_packs(self):
-        self.assertEqual([], self.store.packs)
+        self.assertEqual([], list(self.store.packs))
 
     def test_pack_loose_objects(self):
         b1 = make_object(Blob, data=b"yummy data")
         self.store.add_object(b1)
         b2 = make_object(Blob, data=b"more yummy data")
         self.store.add_object(b2)
-        self.assertEqual([], self.store.packs)
+        self.assertEqual([], list(self.store.packs))
         self.assertEqual(2, self.store.pack_loose_objects())
-        self.assertNotEqual([], self.store.packs)
+        self.assertNotEqual([], list(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
 
 
@@ -285,13 +283,13 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
-        self.assertEqual([], store._read_alternate_paths())
+        self.assertEqual([], list(store._read_alternate_paths()))
         store.add_alternate_path("/foo/path")
-        self.assertEqual(["/foo/path"], store._read_alternate_paths())
+        self.assertEqual(["/foo/path"], list(store._read_alternate_paths()))
         store.add_alternate_path("/bar/path")
         self.assertEqual(
             ["/foo/path", "/bar/path"],
-            store._read_alternate_paths())
+            list(store._read_alternate_paths()))
 
     def test_rel_alternative_path(self):
         alternate_dir = tempfile.mkdtemp()
@@ -353,7 +351,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         o.add_thin_pack(f.read, None)
 
 
-@skipIfPY3
 class TreeLookupPathTests(TestCase):
 
     def setUp(self):

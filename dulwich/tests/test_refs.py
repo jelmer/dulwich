@@ -45,7 +45,6 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
-    skipIfPY3,
     )
 
 
@@ -348,7 +347,6 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(b'df6800012397fb85c56e7418dd4eb9405dee075c',
                          self._refs[b'refs/tags/refs-0.1'])
 
-    @skipIfPY3
     def test_add_if_new_symbolic(self):
         # Use an empty repo instead of the default.
         tear_down_repo(self._repo)

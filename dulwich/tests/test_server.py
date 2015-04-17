@@ -28,10 +28,6 @@ from dulwich.errors import (
     UnexpectedCommandError,
     HangupException,
     )
-from dulwich.objects import (
-    Commit,
-    Tag,
-    )
 from dulwich.object_store import (
     MemoryObjectStore,
     )

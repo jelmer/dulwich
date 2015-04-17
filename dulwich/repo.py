@@ -30,6 +30,7 @@ local disk (Repo).
 from io import BytesIO
 import errno
 import os
+import sys
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -729,12 +730,12 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, paths):
+    def stage(self, paths, fsencoding=sys.getfilesystemencoding()):
         """Stage a set of paths.
 
         :param paths: List of paths, relative to the repository path
         """
-        if isinstance(paths, basestring):
+        if not isinstance(paths, list):
             paths = [paths]
         from dulwich.index import (
             blob_from_path_and_stat,
@@ -748,13 +749,13 @@ class Repo(BaseRepo):
             except OSError:
                 # File no longer exists
                 try:
-                    del index[path]
+                    del index[path.encode(fsencoding)]
                 except KeyError:
                     pass  # already removed
             else:
                 blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
-                index[path] = index_entry_from_stat(st, blob.id, 0)
+                index[path.encode(fsencoding)] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
@@ -968,7 +969,7 @@ class MemoryRepo(BaseRepo):
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)
-        for refname, sha in refs.iteritems():
+        for refname, sha in refs.items():
             ret.refs[refname] = sha
         ret._init_files(bare=True)
         return ret

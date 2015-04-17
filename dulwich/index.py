@@ -514,7 +514,7 @@ def blob_from_path_and_stat(path, st):
         with open(path, 'rb') as f:
             blob.data = f.read()
     else:
-        blob.data = os.readlink(path)
+        blob.data = os.readlink(path).encode(sys.getfilesystemencoding())
     return blob
 
 

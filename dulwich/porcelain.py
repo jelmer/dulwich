@@ -49,6 +49,7 @@ __docformat__ = 'restructuredText'
 
 from collections import namedtuple
 import os
+import shutil
 import sys
 import time
 
@@ -194,13 +195,22 @@ def clone(source, target=None, bare=False, checkout=None, outstream=sys.stdout):
 
     if not os.path.exists(target):
         os.mkdir(target)
+        clean_on_fail = True
+    else:
+        clean_on_fail = False
     if bare:
         r = Repo.init_bare(target)
     else:
         r = Repo.init(target)
-    remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=outstream.write)
+    try:
+        remote_refs = client.fetch(host_path, r,
+            determine_wants=r.object_store.determine_wants_all,
+            progress=outstream.write)
+    except Exception:
+        if clean_on_fail:
+            shutil.rmtree(target, ignore_errors=True)
+        raise
+
     r["HEAD"] = remote_refs["HEAD"]
     if checkout:
         outstream.write('Checking out HEAD')

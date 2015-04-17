@@ -74,7 +74,6 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_pack,
-    skipIfPY3,
     )
 
 pack1_sha = b'bc63ddad95e7321ee734ea11a7a62d314e0d7481'
@@ -848,7 +847,6 @@ class DeltaChainIteratorTests(TestCase):
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)
 
-    @skipIfPY3
     def make_pack_iter(self, f, thin=None):
         if thin is None:
             thin = bool(list(self.store))

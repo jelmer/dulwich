@@ -782,7 +782,7 @@ class PackStreamReader(object):
         else:
             to_pop = max(n + tn - 20, 0)
             to_add = n
-        self.sha.update(bytearray([self._trailer.popleft() for _ in xrange(to_pop)]))
+        self.sha.update(bytes(bytearray([self._trailer.popleft() for _ in xrange(to_pop)])))
         self._trailer.extend(data[-to_add:])
 
         # hash everything but the trailer
@@ -1458,7 +1458,7 @@ def write_pack_object(f, type, object, sha=None):
         delta_base, object = object
     else:
         delta_base = None
-    header = pack_object_header(type, delta_base, len(object))
+    header = bytes(pack_object_header(type, delta_base, len(object)))
     comp_data = zlib.compress(object)
     crc32 = 0
     for data in (header, comp_data):

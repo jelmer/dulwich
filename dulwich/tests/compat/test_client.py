@@ -158,9 +158,9 @@ class DulwichClientTestBase(object):
         try:
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
         except errors.UpdateRefsError as e:
-            self.assertEqual('refs/heads/master failed to update', str(e))
-            self.assertEqual({'refs/heads/branch': 'ok',
-                              'refs/heads/master': 'non-fast-forward'},
+            self.assertEqual(b'refs/heads/master failed to update', str(e))
+            self.assertEqual({b'refs/heads/branch': b'ok',
+                              b'refs/heads/master': b'non-fast-forward'},
                              e.ref_status)
 
     def test_send_pack_multiple_errors(self):

@@ -141,12 +141,12 @@ def serialize_graftpoints(graftpoints):
 
     """
     graft_lines = []
-    for commit, parents in graftpoints.iteritems():
+    for commit, parents in graftpoints.items():
         if parents:
-            graft_lines.append('%s %s' % (commit, ' '.join(parents)))
+            graft_lines.append(commit + b' ' + b' '.join(parents))
         else:
             graft_lines.append(commit)
-    return '\n'.join(graft_lines)
+    return b'\n'.join(graft_lines)
 
 
 class BaseRepo(object):
@@ -503,7 +503,7 @@ class BaseRepo(object):
         """
 
         # Simple validation
-        for commit, parents in updated_graftpoints.iteritems():
+        for commit, parents in updated_graftpoints.items():
             for sha in [commit] + parents:
                 check_hexsha(sha, 'Invalid graftpoint')
 

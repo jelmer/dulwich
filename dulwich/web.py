@@ -139,7 +139,7 @@ def get_text_file(req, backend, mat):
 
 
 def get_loose_object(req, backend, mat):
-    sha = mat.group(1) + mat.group(2)
+    sha = (mat.group(1) + mat.group(2)).encode('ascii')
     logger.info('Sending loose object %s', sha)
     object_store = get_repo(backend, mat).object_store
     if not object_store.contains_loose(sha):
@@ -184,7 +184,7 @@ def get_info_refs(req, backend, mat):
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               http_req=req, advertise_refs=True)
-        handler.proto.write_pkt_line('# service=%s\n' % service)
+        handler.proto.write_pkt_line(b'# service=' + service.encode('ascii') + b'\n')
         handler.proto.write_pkt_line(None)
         handler.handle()
     else:
@@ -219,7 +219,7 @@ class _LengthLimitedFile(object):
 
     def read(self, size=-1):
         if self._bytes_avail <= 0:
-            return ''
+            return b''
         if size == -1 or size > self._bytes_avail:
             size = self._bytes_avail
         self._bytes_avail -= size
@@ -344,7 +344,7 @@ class HTTPGitApplication(object):
                              handlers=self.handlers)
         # environ['QUERY_STRING'] has qs args
         handler = None
-        for smethod, spath in self.services.iterkeys():
+        for smethod, spath in self.services.keys():
             if smethod != method:
                 continue
             mat = spath.search(path)

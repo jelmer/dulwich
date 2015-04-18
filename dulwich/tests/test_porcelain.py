@@ -162,10 +162,10 @@ class CloneTests(PorcelainTestCase):
         (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c1.id
         target_path = tempfile.mkdtemp()
-        outstream = BytesIO()
+        errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(ValueError, porcelain.clone, self.repo.path,
-            target_path, checkout=True, bare=True, outstream=outstream)
+            target_path, checkout=True, bare=True, errstream=errstream)
 
 
 class InitTests(TestCase):

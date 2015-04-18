@@ -185,7 +185,8 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
     """
     if outstream is not None:
         import warnings
-        warnings.warn("outstream= has been deprecated in favour of errstream=.", DeprecationWarning)
+        warnings.warn("outstream= has been deprecated in favour of errstream=.", DeprecationWarning,
+                stacklevel=3)
         errstream = outstream
 
     if checkout is None:

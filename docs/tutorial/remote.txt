@@ -6,8 +6,8 @@ Most of the tests in this file require a Dulwich server, so let's start one:
     >>> from dulwich.server import DictBackend, TCPGitServer
     >>> import threading
     >>> repo = Repo.init("remote", mkdir=True)
-    >>> cid = repo.do_commit("message", committer="Jelmer <jelmer@samba.org>")
-    >>> backend = DictBackend({'/': repo})
+    >>> cid = repo.do_commit(b"message", committer=b"Jelmer <jelmer@samba.org>")
+    >>> backend = DictBackend({b'/': repo})
     >>> dul_server = TCPGitServer(backend, 'localhost', 0)
     >>> threading.Thread(target=dul_server.serve).start()
     >>> server_address, server_port = dul_server.socket.getsockname()
@@ -59,7 +59,7 @@ which we will write to a ``BytesIO`` object::
 
    >>> from io import BytesIO
    >>> f = BytesIO()
-   >>> remote_refs = client.fetch_pack("/", determine_wants,
+   >>> remote_refs = client.fetch_pack(b"/", determine_wants,
    ...    DummyGraphWalker(), pack_data=f.write)
 
 ``f`` will now contain a full pack file::
@@ -76,7 +76,7 @@ importing the received pack file into the local repository::
 
    >>> from dulwich.repo import Repo
    >>> local = Repo.init("local", mkdir=True)
-   >>> remote_refs = client.fetch("/", local)
+   >>> remote_refs = client.fetch(b"/", local)
 
 Let's shut down the server now that all tests have been run::
 

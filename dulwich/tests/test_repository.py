@@ -64,8 +64,9 @@ class CreateRepositoryTests(TestCase):
         self.assertFileContentsEqual(b'', repo, os.path.join('info', 'exclude'))
         self.assertFileContentsEqual(None, repo, 'nonexistent file')
         barestr = b'bare = ' + str(expect_bare).lower().encode('ascii')
-        config_text = repo.get_named_file('config').read()
-        self.assertTrue(barestr in config_text, "%r" % config_text)
+        with repo.get_named_file('config') as f:
+            config_text = f.read()
+            self.assertTrue(barestr in config_text, "%r" % config_text)
 
     def test_create_disk_bare(self):
         tmp_dir = tempfile.mkdtemp()

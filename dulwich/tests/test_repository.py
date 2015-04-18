@@ -489,7 +489,7 @@ exit 1
             author=b'Test Author <test@nodomain.com>',
             commit_timestamp=12345, commit_timezone=0,
             author_timestamp=12345, author_timezone=0)
-        self.assertEqual(len(warnings_list), 1)
+        self.assertEqual(len(warnings_list), 1, warnings_list)
         self.assertIsInstance(warnings_list[-1], UserWarning)
         self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
         self.assertEqual([commit_sha], r[commit_sha2].parents)

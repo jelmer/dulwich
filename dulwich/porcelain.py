@@ -629,13 +629,17 @@ def web_daemon(path=".", address=None, port=None):
     server.serve_forever()
 
 
-def upload_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+def upload_pack(path=".", inf=None, outf=None):
     """Upload a pack file after negotiating its contents using smart protocol.
 
     :param path: Path to the repository
     :param inf: Input stream to communicate with client
     :param outf: Output stream to communicate with client
     """
+    if outf is None:
+        outf = getattr(sys.stdout, 'buffer', sys.stdout)
+    if inf is None:
+        inf = getattr(sys.stdin, 'buffer', sys.stdin)
     backend = FileSystemBackend()
     def send_fn(data):
         outf.write(data)
@@ -647,13 +651,17 @@ def upload_pack(path=".", inf=sys.stdin, outf=sys.stdout):
     return 0
 
 
-def receive_pack(path=".", inf=sys.stdin, outf=sys.stdout):
+def receive_pack(path=".", inf=None, outf=None):
     """Receive a pack file after negotiating its contents using smart protocol.
 
     :param path: Path to the repository
     :param inf: Input stream to communicate with client
     :param outf: Output stream to communicate with client
     """
+    if outf is None:
+        outf = getattr(sys.stdout, 'buffer', sys.stdout)
+    if inf is None:
+        inf = getattr(sys.stdin, 'buffer', sys.stdin)
     backend = FileSystemBackend()
     def send_fn(data):
         outf.write(data)

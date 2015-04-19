@@ -68,6 +68,16 @@ from dulwich.pack import (
     )
 from dulwich.protocol import (
     BufferedPktLineWriter,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_NO_PROGRESS,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_THIN_PACK,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
@@ -195,7 +205,8 @@ class Handler(object):
 
     @classmethod
     def innocuous_capabilities(cls):
-        return (b"include-tag", b"thin-pack", b"no-progress", b"ofs-delta")
+        return (CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
+                CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA)
 
     @classmethod
     def required_capabilities(cls):
@@ -235,15 +246,15 @@ class UploadPackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (b"multi_ack_detailed", b"multi_ack", b"side-band-64k", b"thin-pack",
-                b"ofs-delta", b"no-progress", b"include-tag", b"shallow")
+        return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK, CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
+                CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS, CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
 
     @classmethod
     def required_capabilities(cls):
-        return (b"side-band-64k", b"thin-pack", b"ofs-delta")
+        return (CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK, CAPABILITY_OFS_DELTA)
 
     def progress(self, message):
-        if self.has_capability(b"no-progress"):
+        if self.has_capability(CAPABILITY_NO_PROGRESS):
             return
         self.proto.write_sideband(2, message)
 
@@ -257,7 +268,7 @@ class UploadPackHandler(Handler):
         :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
             tag whose peeled value is peeled_sha.
         """
-        if not self.has_capability(b"include-tag"):
+        if not self.has_capability(CAPABILITY_INCLUDE_TAG):
             return {}
         if refs is None:
             refs = self.repo.get_refs()
@@ -716,7 +727,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (b"report-status", b"delete-refs", b"side-band-64k")
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_SIDE_BAND_64K)
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
@@ -748,7 +759,7 @@ class ReceivePackHandler(Handler):
             ref_status = b'ok'
             try:
                 if sha == ZERO_SHA:
-                    if not b'delete-refs' in self.capabilities():
+                    if not CAPABILITY_DELETE_REFS in self.capabilities():
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')
@@ -768,7 +779,7 @@ class ReceivePackHandler(Handler):
         return status
 
     def _report_status(self, status):
-        if self.has_capability(b'side-band-64k'):
+        if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
               lambda d: self.proto.write_sideband(1, d))
             write = writer.write
@@ -829,7 +840,7 @@ class ReceivePackHandler(Handler):
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
-        if self.has_capability(b'report-status'):
+        if self.has_capability(CAPABILITY_REPORT_STATUS):
             self._report_status(status)
 
 

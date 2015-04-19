@@ -243,6 +243,10 @@ class UploadPackHandler(Handler):
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
+        # A state variable for denoting that the have list is still
+        # being processed, and the client is not accepting any other
+        # data (such as side-band, see the progress method here).
+        self._processing_have_lines = False
 
     @classmethod
     def capabilities(cls):
@@ -254,7 +258,7 @@ class UploadPackHandler(Handler):
         return (CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK, CAPABILITY_OFS_DELTA)
 
     def progress(self, message):
-        if self.has_capability(CAPABILITY_NO_PROGRESS):
+        if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
             return
         self.proto.write_sideband(2, message)
 
@@ -293,13 +297,26 @@ class UploadPackHandler(Handler):
         graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
             self.repo.get_peeled)
         objects_iter = self.repo.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress,
-          get_tagged=self.get_tagged)
+            graph_walker.determine_wants, graph_walker, self.progress,
+            get_tagged=self.get_tagged)
+
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
+        # Also, if it also happens that the object_iter is instantiated
+        # with a graph walker with an implementation that talks over the
+        # wire (which is this instance of this class) this will actually
+        # iterate through everything and write things out to the wire.
         if len(objects_iter) == 0:
             return
+
+        # The provided haves are processed, and it is safe to send side-
+        # band data now.
+        self._processing_have_lines = False
 
         self.progress(b"dul-daemon says what\n")
         self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))

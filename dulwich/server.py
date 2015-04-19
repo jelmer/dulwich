@@ -336,7 +336,7 @@ class UploadPackHandler(Handler):
         self._processing_have_lines = False
 
         if not graph_walker.handle_done(
-                not self.has_capability("no-done"), self._done_received):
+                not self.has_capability(CAPABILITY_NO_DONE), self._done_received):
             return
 
         self.progress(b"dul-daemon says what\n")

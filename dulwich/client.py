@@ -67,6 +67,9 @@ from dulwich.protocol import (
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_WANT,
     SIDE_BAND_CHANNEL_DATA,
     SIDE_BAND_CHANNEL_PROGRESS,
     SIDE_BAND_CHANNEL_FATAL,
@@ -369,13 +372,13 @@ class GitClient(object):
             whether there is extra graph data to read on proto
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
-        proto.write_pkt_line(b'want ' + wants[0] + b' ' + b' '.join(capabilities) + b'\n')
+        proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' + b' '.join(capabilities) + b'\n')
         for want in wants[1:]:
-            proto.write_pkt_line(b'want ' + want + b'\n')
+            proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
         proto.write_pkt_line(None)
         have = next(graph_walker)
         while have:
-            proto.write_pkt_line(b'have ' + have + b'\n')
+            proto.write_pkt_line(COMMAND_HAVE + b' ' + have + b'\n')
             if can_read():
                 pkt = proto.read_pkt_line()
                 parts = pkt.rstrip(b'\n').split(b' ')
@@ -390,7 +393,7 @@ class GitClient(object):
                             "%s not in ('continue', 'ready', 'common)" %
                             parts[2])
             have = next(graph_walker)
-        proto.write_pkt_line(b'done\n')
+        proto.write_pkt_line(COMMAND_DONE + b'\n')
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
                                  pack_data, progress=None, rbufsize=_RBUFSIZE):

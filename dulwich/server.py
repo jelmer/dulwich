@@ -78,6 +78,12 @@ from dulwich.protocol import (
     CAPABILITY_SHALLOW,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
+    COMMAND_DEEPEN,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
+    COMMAND_WANT,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
@@ -253,8 +259,10 @@ class UploadPackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK, CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
-                CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS, CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
+        return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
+                CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
+                CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
+                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
 
     @classmethod
     def required_capabilities(cls):
@@ -353,14 +361,15 @@ def _split_proto_line(line, allowed):
     command = fields[0]
     if allowed is not None and command not in allowed:
         raise UnexpectedCommandError(command)
-    if len(fields) == 1 and command in (b'done', None):
+    if len(fields) == 1 and command in (COMMAND_DONE, None):
         return (command, None)
     elif len(fields) == 2:
-        if command in (b'want', b'have', b'shallow', b'unshallow'):
+        if command in (COMMAND_WANT, COMMAND_HAVE, COMMAND_SHALLOW,
+                       COMMAND_UNSHALLOW):
             if not valid_hexsha(fields[1]):
                 raise GitProtocolError("Invalid sha")
             return tuple(fields)
-        elif command == b'deepen':
+        elif command == COMMAND_DEEPEN:
             return command, int(fields[1])
     raise GitProtocolError('Received invalid line from client: %r' % line)
 
@@ -513,11 +522,11 @@ class ProtocolGraphWalker(object):
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        allowed = (b'want', b'shallow', b'deepen', None)
+        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
         command, sha = _split_proto_line(line, allowed)
 
         want_revs = []
-        while command == b'want':
+        while command == COMMAND_WANT:
             if sha not in values:
                 raise GitProtocolError(
                   'Client wants invalid object %s' % sha)
@@ -525,7 +534,7 @@ class ProtocolGraphWalker(object):
             command, sha = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
-        if command in (b'shallow', b'deepen'):
+        if command in (COMMAND_SHALLOW, COMMAND_DEEPEN):
             self.unread_proto_line(command, sha)
             self._handle_shallow_request(want_revs)
 
@@ -574,8 +583,8 @@ class ProtocolGraphWalker(object):
 
     def _handle_shallow_request(self, wants):
         while True:
-            command, val = self.read_proto_line((b'deepen', b'shallow'))
-            if command == b'deepen':
+            command, val = self.read_proto_line((COMMAND_DEEPEN, COMMAND_SHALLOW))
+            if command == COMMAND_DEEPEN:
                 depth = val
                 break
             self.client_shallow.add(val)
@@ -590,9 +599,9 @@ class ProtocolGraphWalker(object):
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
         for sha in sorted(new_shallow):
-            self.proto.write_pkt_line(b'shallow ' + sha)
+            self.proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha)
         for sha in sorted(unshallow):
-            self.proto.write_pkt_line(b'unshallow ' + sha)
+            self.proto.write_pkt_line(COMMAND_UNSHALLOW + b' ' + sha)
 
         self.proto.write_pkt_line(None)
 
@@ -625,7 +634,7 @@ class ProtocolGraphWalker(object):
         self._impl = impl_classes[ack_type](self)
 
 
-_GRAPH_WALKER_COMMANDS = (b'have', b'done', None)
+_GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
 class SingleAckGraphWalkerImpl(object):
@@ -642,11 +651,11 @@ class SingleAckGraphWalkerImpl(object):
 
     def next(self):
         command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
-        if command in (None, b'done'):
+        if command in (None, COMMAND_DONE):
             if not self._sent_ack:
                 self.walker.send_nak()
             return None
-        elif command == b'have':
+        elif command == COMMAND_HAVE:
             return sha
 
     __next__ = next
@@ -676,7 +685,7 @@ class MultiAckGraphWalkerImpl(object):
                 # in multi-ack mode, a flush-pkt indicates the client wants to
                 # flush but more have lines are still coming
                 continue
-            elif command == b'done':
+            elif command == COMMAND_DONE:
                 # don't nak unless no common commits were found, even if not
                 # everything is satisfied
                 if self._common:
@@ -684,7 +693,7 @@ class MultiAckGraphWalkerImpl(object):
                 else:
                     self.walker.send_nak()
                 return None
-            elif command == b'have':
+            elif command == COMMAND_HAVE:
                 if self._found_base:
                     # blind ack
                     self.walker.send_ack(sha, b'continue')
@@ -718,7 +727,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 if self.walker.http_req:
                     return None
                 continue
-            elif command == b'done':
+            elif command == COMMAND_DONE:
                 # don't nak unless no common commits were found, even if not
                 # everything is satisfied
                 if self._common:
@@ -726,7 +735,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 else:
                     self.walker.send_nak()
                 return None
-            elif command == b'have':
+            elif command == COMMAND_HAVE:
                 if self._found_base:
                     # blind ack; can happen if the client has more requests
                     # inflight

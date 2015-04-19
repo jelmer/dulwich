@@ -56,6 +56,14 @@ CAPABILITY_SHALLOW = b'shallow'
 CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
 CAPABILITY_THIN_PACK = b'thin-pack'
 
+COMMAND_DEEPEN = b'deepen'
+COMMAND_SHALLOW = b'shallow'
+COMMAND_UNSHALLOW = b'unshallow'
+COMMAND_DONE = b'done'
+COMMAND_WANT = b'want'
+COMMAND_HAVE = b'have'
+
+
 class ProtocolFile(object):
     """A dummy file for network ops that expect file-like objects."""
 

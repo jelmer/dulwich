@@ -132,10 +132,10 @@ class ReportStatusParser(object):
                 else:
                     ok.add(ref)
                 ref_status[ref] = status
-            raise UpdateRefsError(b', '.join([ref for ref in ref_status
-                                              if ref not in ok]) +
-                                              b' failed to update',
-                                  ref_status=ref_status)
+            # TODO(jelmer): don't assume encoding of refs is ascii.
+            raise UpdateRefsError(', '.join([
+                ref.decode('ascii') for ref in ref_status if ref not in ok]) +
+                ' failed to update', ref_status=ref_status)
 
     def handle_packet(self, pkt):
         """Handle a packet.
@@ -281,7 +281,7 @@ class GitClient(object):
                 else:
                     ok.add(ref)
                 ref_status[ref] = status
-            raise UpdateRefsError(b', '.join([ref for ref in ref_status
+            raise UpdateRefsError(', '.join([ref for ref in ref_status
                                              if ref not in ok]) +
                                              b' failed to update',
                                   ref_status=ref_status)

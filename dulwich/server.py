@@ -83,6 +83,9 @@ from dulwich.protocol import (
     Protocol,
     ProtocolFile,
     ReceivableProtocol,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    SIDE_BAND_CHANNEL_FATAL,
     SINGLE_ACK,
     TCP_GIT_PORT,
     ZERO_SHA,
@@ -260,7 +263,7 @@ class UploadPackHandler(Handler):
     def progress(self, message):
         if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
             return
-        self.proto.write_sideband(2, message)
+        self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
 
     def get_tagged(self, refs=None, repo=None):
         """Get a dict of peeled values of tags to their original tag shas.
@@ -292,7 +295,7 @@ class UploadPackHandler(Handler):
         return tagged
 
     def handle(self):
-        write = lambda x: self.proto.write_sideband(1, x)
+        write = lambda x: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
 
         graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
             self.repo.get_peeled)
@@ -798,7 +801,7 @@ class ReceivePackHandler(Handler):
     def _report_status(self, status):
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
-              lambda d: self.proto.write_sideband(1, d))
+              lambda d: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d))
             write = writer.write
 
             def flush():

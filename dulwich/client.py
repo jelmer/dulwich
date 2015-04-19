@@ -67,6 +67,9 @@ from dulwich.protocol import (
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    SIDE_BAND_CHANNEL_FATAL,
     PktLineParser,
     Protocol,
     ProtocolFile,
@@ -413,7 +416,10 @@ class GitClient(object):
             if progress is None:
                 # Just ignore progress data
                 progress = lambda x: None
-            self._read_side_band64k_data(proto, {1: pack_data, 2: progress})
+            self._read_side_band64k_data(proto, {
+                SIDE_BAND_CHANNEL_DATA: pack_data,
+                SIDE_BAND_CHANNEL_PROGRESS: progress}
+            )
         else:
             while True:
                 data = proto.read(rbufsize)
@@ -562,7 +568,9 @@ class TraditionalGitClient(GitClient):
             if ret is not None:
                 raise AssertionError("expected pkt tail")
             self._read_side_band64k_data(proto, {
-                1: write_data, 2: progress, 3: write_error})
+                SIDE_BAND_CHANNEL_DATA: write_data,
+                SIDE_BAND_CHANNEL_PROGRESS: progress,
+                SIDE_BAND_CHANNEL_FATAL: write_error})
 
 
 class TCPGitClient(TraditionalGitClient):

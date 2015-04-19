@@ -38,16 +38,16 @@ SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
 
-CAPABILITY_NO_PROGRESS = b'no-progress'
+CAPABILITY_DELETE_REFS = b'delete-refs'
 CAPABILITY_INCLUDE_TAG = b'include-tag'
-CAPABILITY_OFS_DELTA = b'ofs-delta'
-CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
-CAPABILITY_THIN_PACK = b'thin-pack'
 CAPABILITY_MULTI_ACK = b'multi_ack'
 CAPABILITY_MULTI_ACK_DETAILED = b'multi_ack_detailed'
+CAPABILITY_NO_PROGRESS = b'no-progress'
+CAPABILITY_OFS_DELTA = b'ofs-delta'
 CAPABILITY_REPORT_STATUS = b'report-status'
-CAPABILITY_DELETE_REFS = b'delete-refs'
 CAPABILITY_SHALLOW = b'shallow'
+CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
+CAPABILITY_THIN_PACK = b'thin-pack'
 
 class ProtocolFile(object):
     """A dummy file for network ops that expect file-like objects."""

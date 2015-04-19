@@ -597,6 +597,7 @@ class AckGraphWalkerImplTestCase(TestCase):
         self.assertRaises(IndexError, next, self._impl)
         self._walker.handle_done()
 
+
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
     impl_cls = SingleAckGraphWalkerImpl
@@ -761,7 +762,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(None)
         self._walker.lines.append((None, None))
         self.assertNextEmpty()
-        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
         # PACK is sent
         self.assertTrue(self._walker.pack_sent)
 
@@ -772,18 +773,18 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(ONE)
         self._impl.ack(ONE)
-        self.assertAck(ONE, 'common')
+        self.assertAck(ONE, b'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, 'common')
+        self.assertAck(THREE, b'common')
 
         # done is read.
         self._walker.wants_satisified = True
         self.assertNextEquals(None)
         self._walker.lines.append((None, None))
         self.assertNextEmpty()
-        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
         # PACK is sent
         self.assertTrue(self._walker.pack_sent)
 
@@ -796,16 +797,16 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(ONE)
         self._impl.ack(ONE)
-        self.assertAck(ONE, 'common')
+        self.assertAck(ONE, b'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, 'common')
+        self.assertAck(THREE, b'common')
 
         # no done is read
         self._walker.wants_satisified = True
         self.assertNextEmpty()
-        self.assertAcks([(THREE, 'ready'), (None, 'nak')])
+        self.assertAcks([(THREE, b'ready'), (None, b'nak')])
         # PACK is NOT sent
         self.assertFalse(self._walker.pack_sent)
 
@@ -819,16 +820,16 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
         self.assertNextEquals(ONE)
         self._impl.ack(ONE)
-        self.assertAck(ONE, 'common')
+        self.assertAck(ONE, b'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, 'common')
+        self.assertAck(THREE, b'common')
 
         # no done is read, but pretend it is (last 'ACK 'commit_id' '')
         self._walker.wants_satisified = True
         self.assertNextEmpty()
-        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
         # PACK is sent
         self.assertTrue(self._walker.pack_sent)
 
@@ -873,7 +874,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self._walker.wants_satisified = True
         self.assertNextEquals(None)
         self.assertNextEmpty()
-        self.assertAcks([(THREE, 'ready'), (None, 'nak'), (THREE, '')])
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
 
     def test_multi_ack_nak(self):
         self.assertNextEquals(TWO)

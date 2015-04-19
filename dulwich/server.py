@@ -771,7 +771,7 @@ class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
                 if self.walker.all_wants_satisfied(self._common):
-                    self.walker.send_ack(self._common[-1], 'ready')
+                    self.walker.send_ack(self._common[-1], b'ready')
                 self.walker.send_nak()
                 if self.walker.http_req:
                     # The HTTP version of this request a flush-pkt always

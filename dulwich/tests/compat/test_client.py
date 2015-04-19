@@ -248,7 +248,6 @@ class DulwichClientTestBase(object):
         self.assertFalse(b"refs/heads/abranch" in dest.refs)
 
 
-@skipIfPY3
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def setUp(self):
@@ -292,10 +291,10 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.TCPGitClient('localhost')
+        return client.TCPGitClient(b'localhost')
 
     def _build_path(self, path):
-        return path
+        return path.encode(sys.getfilesystemencoding())
 
 
 class TestSSHVendor(object):

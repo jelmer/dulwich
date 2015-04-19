@@ -655,41 +655,12 @@ class ProtocolGraphWalker(object):
 _GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
-class BaseGraphWalkerImpl(object):
+class SingleAckGraphWalkerImpl(object):
+    """Graph walker implementation that speaks the single-ack protocol."""
 
     def __init__(self, walker):
         self.walker = walker
         self._common = []
-
-    def pre_nodone_check(self):
-        pass
-
-    def post_nodone_check(self):
-        pass
-
-    def handle_done(self, done_required, done_received):
-        self.pre_nodone_check()
-
-        if done_required and not done_received:
-            # we are not done, especially when done is required; skip
-            # the pack for this request and especially do not handle
-            # the done.
-            return False
-
-        if not done_received and not self._common:
-            # Okay we are not actually done then since the walker picked
-            # up no haves.  This is usually triggered when client attempts
-            # to pull from a source that has no common base_commit.
-            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
-            #          test_multi_ack_stateless_nodone
-            return False
-
-        self.post_nodone_check()
-        return True
-
-
-class SingleAckGraphWalkerImpl(BaseGraphWalkerImpl):
-    """Graph walker implementation that speaks the single-ack protocol."""
 
     def ack(self, have_ref):
         if not self._common:
@@ -707,17 +678,34 @@ class SingleAckGraphWalkerImpl(BaseGraphWalkerImpl):
 
     __next__ = next
 
-    def pre_nodone_check(self):
+    def handle_done(self, done_required, done_received):
         if not self._common:
             self.walker.send_nak()
 
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
 
-class MultiAckGraphWalkerImpl(BaseGraphWalkerImpl):
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        return True
+
+
+class MultiAckGraphWalkerImpl(object):
     """Graph walker implementation that speaks the multi-ack protocol."""
 
     def __init__(self, walker):
-        super(MultiAckGraphWalkerImpl, self).__init__(walker)
+        self.walker = walker
         self._found_base = False
+        self._common = []
 
     def ack(self, have_ref):
         self._common.append(have_ref)
@@ -746,17 +734,36 @@ class MultiAckGraphWalkerImpl(BaseGraphWalkerImpl):
 
     __next__ = next
 
-    def post_nodone_check(self):
+    def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
         if self._common:
             self.walker.send_ack(self._common[-1])
         else:
             self.walker.send_nak()
+        return True
 
 
-class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
+class MultiAckDetailedGraphWalkerImpl(object):
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._common = []
 
     def ack(self, have_ref):
         # Should only be called iff have_ref is common
@@ -792,13 +799,28 @@ class MultiAckDetailedGraphWalkerImpl(BaseGraphWalkerImpl):
 
     __next__ = next
 
-    def post_nodone_check(self):
+    def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
         if self._common:
             self.walker.send_ack(self._common[-1])
         else:
             self.walker.send_nak()
+        return True
 
 
 class ReceivePackHandler(Handler):

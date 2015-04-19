@@ -60,6 +60,13 @@ from dulwich.errors import (
     )
 from dulwich.protocol import (
     _RBUFSIZE,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_THIN_PACK,
     PktLineParser,
     Protocol,
     ProtocolFile,
@@ -79,10 +86,11 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
-COMMON_CAPABILITIES = [b'ofs-delta', b'side-band-64k']
-FETCH_CAPABILITIES = ([b'thin-pack', b'multi_ack', b'multi_ack_detailed'] +
+COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
+FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
+                       CAPABILITY_MULTI_ACK_DETAILED] +
                       COMMON_CAPABILITIES)
-SEND_CAPABILITIES = [b'report-status'] + COMMON_CAPABILITIES
+SEND_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
 
 
 class ReportStatusParser(object):
@@ -180,7 +188,7 @@ class GitClient(object):
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
         self._send_capabilities = set(SEND_CAPABILITIES)
         if not thin_packs:
-            self._fetch_capabilities.remove(b'thin-pack')
+            self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -335,12 +343,12 @@ class GitClient(object):
             if progress is None:
                 progress = lambda x: None
             channel_callbacks = {2: progress}
-            if b'report-status' in capabilities:
+            if CAPABILITY_REPORT_STATUS in capabilities:
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet).parse
             self._read_side_band64k_data(proto, channel_callbacks)
         else:
-            if b'report-status' in capabilities:
+            if CAPABILITY_REPORT_STATUS in capabilities:
                 for pkt in proto.read_pkt_seq():
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
@@ -401,7 +409,7 @@ class GitClient(object):
                     b'ready', b'continue', b'common'):
                 break
             pkt = proto.read_pkt_line()
-        if b"side-band-64k" in capabilities:
+        if CAPABILITY_SIDE_BAND_64K in capabilities:
             if progress is None:
                 # Just ignore progress data
                 progress = lambda x: None
@@ -451,7 +459,7 @@ class TraditionalGitClient(GitClient):
             old_refs, server_capabilities = read_pkt_refs(proto)
             negotiated_capabilities = self._send_capabilities & server_capabilities
 
-            if b'report-status' in negotiated_capabilities:
+            if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
             report_status_parser = self._report_status_parser
 
@@ -461,12 +469,12 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 raise
 
-            if not b'delete-refs' in server_capabilities:
+            if not CAPABILITY_DELETE_REFS in server_capabilities:
                 # Server does not support deletions. Fail later.
                 new_refs = dict(orig_new_refs)
                 for ref, sha in orig_new_refs.items():
                     if sha == ZERO_SHA:
-                        if b'report-status' in negotiated_capabilities:
+                        if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                             report_status_parser._ref_statuses.append(
                                 b'ng ' + sha + b' remote does not support deleting refs')
                             report_status_parser._ref_status_ok = False
@@ -1023,7 +1031,7 @@ class HttpGitClient(GitClient):
             b"git-receive-pack", url)
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
-        if b'report-status' in negotiated_capabilities:
+        if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
             self._report_status_parser = ReportStatusParser()
 
         new_refs = determine_wants(dict(old_refs))

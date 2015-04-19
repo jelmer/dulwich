@@ -32,7 +32,6 @@ from dulwich.repo import (
     )
 from dulwich.tests.utils import (
     tear_down_repo,
-    skipIfPY3,
     )
 
 from dulwich.tests.compat.utils import (
@@ -42,7 +41,6 @@ from dulwich.tests.compat.utils import (
     )
 
 
-@skipIfPY3
 class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 
@@ -57,7 +55,7 @@ class ObjectStoreTestCase(CompatTestCase):
     def _parse_refs(self, output):
         refs = {}
         for line in BytesIO(output):
-            fields = line.rstrip('\n').split(' ')
+            fields = line.rstrip(b'\n').split(b' ')
             self.assertEqual(3, len(fields))
             refname, type_name, sha = fields
             check_ref_format(refname[5:])
@@ -66,7 +64,7 @@ class ObjectStoreTestCase(CompatTestCase):
         return refs
 
     def _parse_objects(self, output):
-        return set(s.rstrip('\n').split(' ')[0] for s in BytesIO(output))
+        return set(s.rstrip(b'\n').split(b' ')[0] for s in BytesIO(output))
 
     def test_bare(self):
         self.assertTrue(self._repo.bare)
@@ -74,9 +72,9 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def test_head(self):
         output = self._run_git(['rev-parse', 'HEAD'])
-        head_sha = output.rstrip('\n')
+        head_sha = output.rstrip(b'\n')
         hex_to_sha(head_sha)
-        self.assertEqual(head_sha, self._repo.refs['HEAD'])
+        self.assertEqual(head_sha, self._repo.refs[b'HEAD'])
 
     def test_refs(self):
         output = self._run_git(
@@ -84,8 +82,8 @@ class ObjectStoreTestCase(CompatTestCase):
         expected_refs = self._parse_refs(output)
 
         actual_refs = {}
-        for refname, sha in self._repo.refs.as_dict().iteritems():
-            if refname == 'HEAD':
+        for refname, sha in self._repo.refs.as_dict().items():
+            if refname == b'HEAD':
                 continue  # handled in test_head
             obj = self._repo[sha]
             self.assertEqual(sha, obj.id)

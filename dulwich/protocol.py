@@ -38,6 +38,13 @@ SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
 
+# pack data
+SIDE_BAND_CHANNEL_DATA = 1
+# progress messages
+SIDE_BAND_CHANNEL_PROGRESS = 2
+# fatal error message just before stream aborts
+SIDE_BAND_CHANNEL_FATAL = 3
+
 CAPABILITY_DELETE_REFS = b'delete-refs'
 CAPABILITY_INCLUDE_TAG = b'include-tag'
 CAPABILITY_MULTI_ACK = b'multi_ack'

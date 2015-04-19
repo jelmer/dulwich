@@ -263,9 +263,6 @@ class UploadPackHandler(Handler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
-    def _done_required(self):
-        return not self.has_capability("no-done")
-
     @classmethod
     def capabilities(cls):
         return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
@@ -339,7 +336,7 @@ class UploadPackHandler(Handler):
         self._processing_have_lines = False
 
         if not graph_walker.handle_done(
-                self._done_required(), self._done_received):
+                not self.has_capability("no-done"), self._done_received):
             return
 
         self.progress(b"dul-daemon says what\n")

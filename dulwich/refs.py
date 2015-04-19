@@ -31,6 +31,7 @@ from dulwich.errors import (
 from dulwich.objects import (
     hex_to_sha,
     git_line,
+    valid_hexsha,
     )
 from dulwich.file import (
     GitFile,
@@ -659,10 +660,8 @@ def _split_ref_line(line):
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line %r" % line)
     sha, name = fields
-    try:
-        hex_to_sha(sha)
-    except (AssertionError, TypeError) as e:
-        raise PackedRefsException(e)
+    if not valid_hexsha(sha):
+        raise PackedRefsException("Invalid hex sha %r" % sha)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name %r" % name)
     return (sha, name)
@@ -700,10 +699,8 @@ def read_packed_refs_with_peeled(f):
         if l.startswith(b'^'):
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
-            try:
-                hex_to_sha(l[1:])
-            except (AssertionError, TypeError) as e:
-                raise PackedRefsException(e)
+            if not valid_hexsha(l[1:]):
+                raise PackedRefsException("Invalid hex sha %r" % l[1:])
             sha, name = _split_ref_line(last)
             last = None
             yield (sha, name, l[1:])

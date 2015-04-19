@@ -120,12 +120,13 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, 'read')
             pkt_contents = read(size-4)
-            if len(pkt_contents) + 4 != size:
-                raise AssertionError('Length of pkt read %04x does not match length prefix %04x.'
-                                     % (len(pkt_contents) + 4, size))
-            return pkt_contents
         except socket.error as e:
             raise GitProtocolError(e)
+        else:
+            if len(pkt_contents) + 4 != size:
+                raise GitProtocolError(
+                    'Length of pkt read %04x does not match length prefix %04x' % (len(pkt_contents) + 4, size))
+            return pkt_contents
 
     def eof(self):
         """Test whether the protocol stream has reached EOF.

@@ -326,7 +326,7 @@ class UploadPackHandler(Handler):
         write_pack_objects(ProtocolFile(None, write), objects_iter)
         self.progress(b"how was that, then?\n")
         # we are done
-        self.proto.write(b"0000")
+        self.proto.write_pkt_line(None)
 
 
 def _split_proto_line(line, allowed):
@@ -836,7 +836,7 @@ class ReceivePackHandler(Handler):
                 self.proto.write_pkt_line(ZERO_SHA + b" capabilities^{}\0" +
                     self.capability_line())
 
-            self.proto.write(b"0000")
+            self.proto.write_pkt_line(None)
             if self.advertise_refs:
                 return
 

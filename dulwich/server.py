@@ -60,8 +60,8 @@ from dulwich.errors import (
     )
 from dulwich import log_utils
 from dulwich.objects import (
-    hex_to_sha,
     Commit,
+    valid_hexsha,
     )
 from dulwich.pack import (
     write_pack_objects,
@@ -322,17 +322,15 @@ def _split_proto_line(line, allowed):
     command = fields[0]
     if allowed is not None and command not in allowed:
         raise UnexpectedCommandError(command)
-    try:
-        if len(fields) == 1 and command in (b'done', None):
-            return (command, None)
-        elif len(fields) == 2:
-            if command in (b'want', b'have', b'shallow', b'unshallow'):
-                hex_to_sha(fields[1])
-                return tuple(fields)
-            elif command == b'deepen':
-                return command, int(fields[1])
-    except (TypeError, AssertionError) as e:
-        raise GitProtocolError(e)
+    if len(fields) == 1 and command in (b'done', None):
+        return (command, None)
+    elif len(fields) == 2:
+        if command in (b'want', b'have', b'shallow', b'unshallow'):
+            if not valid_hexsha(fields[1]):
+                raise GitProtocolError("Invalid sha")
+            return tuple(fields)
+        elif command == b'deepen':
+            return command, int(fields[1])
     raise GitProtocolError('Received invalid line from client: %r' % line)
 
 

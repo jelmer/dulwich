@@ -25,6 +25,7 @@ from dulwich.errors import (
     HangupException,
     )
 from dulwich.protocol import (
+    GitProtocolError,
     PktLineParser,
     Protocol,
     ReceivableProtocol,
@@ -85,7 +86,7 @@ class BaseProtocolTests(object):
     def test_read_pkt_line_wrong_size(self):
         self.rin.write(b'0100too short')
         self.rin.seek(0)
-        self.assertRaises(AssertionError, self.proto.read_pkt_line)
+        self.assertRaises(GitProtocolError, self.proto.read_pkt_line)
 
     def test_write_sideband(self):
         self.proto.write_sideband(3, b'bloe')
@@ -126,7 +127,7 @@ class ReceivableBytesIO(BytesIO):
         # fail fast if no bytes are available; in a real socket, this would
         # block forever
         if self.tell() == len(self.getvalue()) and not self.allow_read_past_eof:
-            raise AssertionError('Blocking read past end of socket')
+            raise GitProtocolError('Blocking read past end of socket')
         if size == 1:
             return self.read(1)
         # calls shouldn't return quite as much as asked for
@@ -159,7 +160,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         for _ in range(10):
             data += self.proto.recv(10)
         # any more reads would block
-        self.assertRaises(AssertionError, self.proto.recv, 10)
+        self.assertRaises(GitProtocolError, self.proto.recv, 10)
         self.assertEqual(all_data, data)
 
     def test_recv_read(self):
@@ -168,7 +169,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         self.rin.seek(0)
         self.assertEqual(b'1234', self.proto.recv(4))
         self.assertEqual(b'567', self.proto.read(3))
-        self.assertRaises(AssertionError, self.proto.recv, 10)
+        self.assertRaises(GitProtocolError, self.proto.recv, 10)
 
     def test_read_recv(self):
         all_data = b'12345678abcdefg'
@@ -177,7 +178,7 @@ class ReceivableProtocolTests(BaseProtocolTests, TestCase):
         self.assertEqual(b'1234', self.proto.read(4))
         self.assertEqual(b'5678abc', self.proto.recv(8))
         self.assertEqual(b'defg', self.proto.read(4))
-        self.assertRaises(AssertionError, self.proto.recv, 10)
+        self.assertRaises(GitProtocolError, self.proto.recv, 10)
 
     def test_mixed(self):
         # arbitrary non-repeating string

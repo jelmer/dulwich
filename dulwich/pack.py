@@ -85,11 +85,6 @@ from dulwich.objects import (
     object_header,
     )
 
-if sys.version_info[0] == 2:
-    iteritems = lambda d: d.iteritems()
-else:
-    iteritems = lambda d: d.items()
-    xrange = range
 
 OFS_DELTA = 6
 REF_DELTA = 7
@@ -782,7 +777,7 @@ class PackStreamReader(object):
         else:
             to_pop = max(n + tn - 20, 0)
             to_add = n
-        self.sha.update(bytes(bytearray([self._trailer.popleft() for _ in xrange(to_pop)])))
+        self.sha.update(bytes(bytearray([self._trailer.popleft() for _ in range(to_pop)])))
         self._trailer.extend(data[-to_add:])
 
         # hash everything but the trailer
@@ -845,7 +840,7 @@ class PackStreamReader(object):
         if pack_version is None:
             return
 
-        for i in xrange(self._num_objects):
+        for i in range(self._num_objects):
             offset = self.offset
             unpacked, unused = unpack_object(
               self.read, read_some=self.recv, compute_crc32=compute_crc32,
@@ -1096,7 +1091,7 @@ class PackData(object):
 
     def iterobjects(self, progress=None, compute_crc32=True):
         self._file.seek(self._header_size)
-        for i in xrange(1, self._num_objects + 1):
+        for i in range(1, self._num_objects + 1):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
               self._file.read, compute_crc32=compute_crc32)
@@ -1114,7 +1109,7 @@ class PackData(object):
         if self._num_objects is None:
             return
 
-        for _ in xrange(self._num_objects):
+        for _ in range(self._num_objects):
             offset = self._file.tell()
             unpacked, unused = unpack_object(
               self._file.read, compute_crc32=False)
@@ -1288,7 +1283,7 @@ class DeltaChainIterator(object):
             self._ensure_no_pending()
             return
 
-        for base_sha, pending in sorted(iteritems(self._pending_ref)):
+        for base_sha, pending in sorted(self._pending_ref.items()):
             if base_sha not in self._pending_ref:
                 continue
             try:
@@ -1482,7 +1477,7 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(f, objects,
             delta_window_size=delta_window_size, deltify=deltify)
-    entries = [(k, v[0], v[1]) for (k, v) in iteritems(entries)]
+    entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
     entries.sort()
     with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)

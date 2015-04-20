@@ -40,11 +40,6 @@ from dulwich.errors import (
     )
 from dulwich.file import GitFile
 
-if sys.version_info[0] == 2:
-    iteritems = lambda d: d.iteritems()
-else:
-    iteritems = lambda d: d.items()
-
 
 ZERO_SHA = b'0' * 40
 
@@ -794,7 +789,7 @@ def sorted_tree_items(entries, name_order):
     :return: Iterator over (name, mode, hexsha)
     """
     key_func = name_order and key_entry_name_order or key_entry
-    for name, entry in sorted(iteritems(entries), key=key_func):
+    for name, entry in sorted(entries.items(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)

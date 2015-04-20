@@ -132,7 +132,7 @@ class GreenThreadsObjectStoreIterator(ObjectStoreIterator):
             return len(self._shas)
         while len(self.finder.objects_to_send):
             jobs = []
-            for _ in xrange(0, len(self.finder.objects_to_send)):
+            for _ in range(0, len(self.finder.objects_to_send)):
                 jobs.append(self.p.spawn(self.finder.next))
             gevent.joinall(jobs)
             for j in jobs:

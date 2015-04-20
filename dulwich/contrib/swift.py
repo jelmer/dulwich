@@ -126,7 +126,7 @@ class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
 
     def __len__(self):
         while len(self.finder.objects_to_send):
-            for _ in xrange(0, len(self.finder.objects_to_send)):
+            for _ in range(0, len(self.finder.objects_to_send)):
                 sha = self.finder.next()
                 self._shas.append(sha)
         return len(self._shas)

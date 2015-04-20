@@ -66,16 +66,12 @@ from dulwich.pack import (
 INFODIR = 'info'
 PACKDIR = 'pack'
 
-if sys.version_info[0] == 2:
-    iteritems = lambda d: d.iteritems()
-else:
-    iteritems = lambda d: d.items()
 
 class BaseObjectStore(object):
     """Object store interface."""
 
     def determine_wants_all(self, refs):
-        return [sha for (ref, sha) in iteritems(refs)
+        return [sha for (ref, sha) in refs.items()
                 if not sha in self and not ref.endswith(b"^{}") and
                    not sha == ZERO_SHA]
 

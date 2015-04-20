@@ -39,11 +39,6 @@ from dulwich.pack import (
     SHA1Writer,
     )
 
-if sys.version_info[0] == 2:
-    iteritems = lambda d: d.iteritems()
-else:
-    iteritems = lambda d: d.items()
-
 
 IndexEntry = collections.namedtuple(
     'IndexEntry', [
@@ -279,10 +274,10 @@ class Index(object):
         del self._byname[name]
 
     def iteritems(self):
-        return iteritems(self._byname)
+        return self._byname.items()
 
     def update(self, entries):
-        for name, value in iteritems(entries):
+        for name, value in entries.items():
             self[name] = value
 
     def changes_from_tree(self, object_store, tree, want_unchanged=False):
@@ -338,7 +333,7 @@ def commit_tree(object_store, blobs):
 
     def build_tree(path):
         tree = Tree()
-        for basename, entry in iteritems(trees[path]):
+        for basename, entry in trees[path].items():
             if isinstance(entry, dict):
                 mode = stat.S_IFDIR
                 sha = build_tree(pathjoin(path, basename))

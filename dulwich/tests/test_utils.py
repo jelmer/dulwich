@@ -31,9 +31,11 @@ from dulwich.tests import (
 from dulwich.tests.utils import (
     make_object,
     build_commit_graph,
+    skipIfPY3,
     )
 
 
+@skipIfPY3
 class BuildCommitGraphTest(TestCase):
 
     def setUp(self):

@@ -26,12 +26,14 @@ warning: these tests should be fairly stable, but when writing/debugging new
 
 import threading
 from wsgiref import simple_server
+import sys
 
 from dulwich.server import (
     DictBackend,
     )
 from dulwich.tests import (
     SkipTest,
+    skipIf,
     )
 from dulwich.web import (
     make_wsgi_chain,
@@ -49,6 +51,7 @@ from dulwich.tests.compat.utils import (
     )
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class WebTests(ServerTests):
     """Base tests for web server tests.
 
@@ -72,6 +75,7 @@ class WebTests(ServerTests):
         return port
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class SmartWebTestCase(WebTests, CompatTestCase):
     """Test cases for smart HTTP server.
 
@@ -98,6 +102,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
         return app
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class SmartWebSideBand64kTestCase(SmartWebTestCase):
     """Test cases for smart HTTP server with side-band-64k support."""
 
@@ -113,6 +118,7 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
         self.assertTrue('side-band-64k' in caps)
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class DumbWebTestCase(WebTests, CompatTestCase):
     """Test cases for dumb HTTP server."""
 

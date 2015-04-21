@@ -48,7 +48,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 
 if sys.version_info[0] == 2:
     tests_require = ['fastimport', 'mock']
-    if not '__pypy__' in sys.modules:
+    if not '__pypy__' in sys.modules and not sys.platform == 'win32':
         tests_require.extend(['gevent', 'geventhttpclient'])
 else:
     # fastimport, gevent, geventhttpclient are not available for PY3

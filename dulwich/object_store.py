@@ -63,8 +63,8 @@ from dulwich.pack import (
     PackStreamCopier,
     )
 
-INFODIR = 'info'
-PACKDIR = 'pack'
+INFODIR = b'info'
+PACKDIR = b'pack'
 
 
 class BaseObjectStore(object):
@@ -425,7 +425,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _read_alternate_paths(self):
         try:
-            f = GitFile(os.path.join(self.path, "info", "alternates"),
+            f = GitFile(os.path.join(self.path, INFODIR, b'alternates'),
                     'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
@@ -437,19 +437,19 @@ class DiskObjectStore(PackBasedObjectStore):
                 if l[0] == b"#":
                     continue
                 if os.path.isabs(l):
-                    yield l.decode(sys.getfilesystemencoding())
+                    yield l
                 else:
-                    yield os.path.join(self.path, l).decode(sys.getfilesystemencoding())
+                    yield os.path.join(self.path, l)
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
         """
         try:
-            os.mkdir(os.path.join(self.path, "info"))
+            os.mkdir(os.path.join(self.path, INFODIR))
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        alternates_path = os.path.join(self.path, "info/alternates")
+        alternates_path = os.path.join(self.path, INFODIR, b'alternates')
         with GitFile(alternates_path, 'wb') as f:
             try:
                 orig_f = open(alternates_path, 'rb')
@@ -459,7 +459,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 with orig_f:
                     f.write(orig_f.read())
-            f.write(path.encode(sys.getfilesystemencoding()) + b"\n")
+            f.write(path + b"\n")
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)
@@ -477,10 +477,10 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = os.stat(self.pack_dir).st_mtime
         pack_files = set()
         for name in pack_dir_contents:
-            assert type(name) is str
+            assert type(name) is bytes
             # TODO: verify that idx exists first
-            if name.startswith("pack-") and name.endswith(".pack"):
-                pack_files.add(name[:-len(".pack")])
+            if name.startswith(b'pack-') and name.endswith(b'.pack'):
+                pack_files.add(name[:-len(b'.pack')])
 
         # Open newly appeared pack files
         for f in pack_files:
@@ -507,7 +507,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield (base+rest).encode(sys.getfilesystemencoding())
+                yield (base+rest)
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -524,8 +524,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)
         # TODO: Handle self.pack_dir being bytes
-        suffix = suffix.decode('ascii')
-        return os.path.join(self.pack_dir, "pack-" + suffix)
+        return os.path.join(self.pack_dir, b"pack-" + suffix)
 
     def _complete_thin_pack(self, f, path, copier, indexer):
         """Move a specific file containing a pack into the pack directory.
@@ -567,10 +566,10 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = self._get_pack_basepath(entries)
-        os.rename(path, pack_base_name + '.pack')
+        os.rename(path, pack_base_name + b'.pack')
 
         # Write the index.
-        index_file = GitFile(pack_base_name + '.idx', 'wb')
+        index_file = GitFile(pack_base_name + b'.idx', 'wb')
         try:
             write_pack_index_v2(index_file, entries, pack_sha)
             index_file.close()
@@ -597,7 +596,10 @@ class DiskObjectStore(PackBasedObjectStore):
         :return: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
         """
-        fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
+        fd, path = tempfile.mkstemp(
+            dir=self.path.decode(sys.getfilesystemencoding()),
+            prefix='tmp_pack_')
+        path = path.encode(sys.getfilesystemencoding())
         with os.fdopen(fd, 'w+b') as f:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f,
@@ -616,9 +618,9 @@ class DiskObjectStore(PackBasedObjectStore):
         with PackData(path) as p:
             entries = p.sorted_entries()
             basename = self._get_pack_basepath(entries)
-            with GitFile(basename+".idx", "wb") as f:
+            with GitFile(basename+b'.idx', "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
-        os.rename(path, basename + ".pack")
+        os.rename(path, basename + b'.pack')
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
         return final_pack
@@ -630,7 +632,8 @@ class DiskObjectStore(PackBasedObjectStore):
             call when the pack is finished and an abort
             function.
         """
-        fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
+        pack_dir_str = self.pack_dir.decode(sys.getfilesystemencoding())
+        fd, path = tempfile.mkstemp(dir=pack_dir_str, suffix='.pack')
         f = os.fdopen(fd, 'wb')
         def commit():
             os.fsync(fd)
@@ -669,7 +672,7 @@ class DiskObjectStore(PackBasedObjectStore):
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        os.mkdir(os.path.join(path, "info"))
+        os.mkdir(os.path.join(path, INFODIR))
         os.mkdir(os.path.join(path, PACKDIR))
         return cls(path)
 

@@ -48,7 +48,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 
 if sys.version_info[0] == 2:
     tests_require = ['fastimport', 'mock']
-    if not '__pypy__' in sys.modules:
+    if not '__pypy__' in sys.modules and not sys.platform == 'win32':
         tests_require.extend(['gevent', 'geventhttpclient'])
 else:
     # fastimport, gevent, geventhttpclient are not available for PY3
@@ -56,6 +56,20 @@ else:
     tests_require = []
 if sys.version_info < (2, 7):
     tests_require.append('unittest2')
+
+if sys.version_info[0] > 2 and sys.platform == 'win32':
+    # C Modules don't build for python3 windows, and prevent tests from running
+    ext_modules = []
+else:
+    ext_modules = [
+        Extension('dulwich._objects', ['dulwich/_objects.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._pack', ['dulwich/_pack.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+                  include_dirs=include_dirs),
+    ]
+
 
 setup(name='dulwich',
       description='Python Git Library',
@@ -86,14 +100,7 @@ setup(name='dulwich',
           'Operating System :: POSIX',
           'Topic :: Software Development :: Version Control',
       ],
-      ext_modules=[
-          Extension('dulwich._objects', ['dulwich/_objects.c'],
-                    include_dirs=include_dirs),
-          Extension('dulwich._pack', ['dulwich/_pack.c'],
-              include_dirs=include_dirs),
-          Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-              include_dirs=include_dirs),
-      ],
+      ext_modules=ext_modules,
       test_suite='dulwich.tests.test_suite',
       tests_require=tests_require,
       distclass=DulwichDistribution,

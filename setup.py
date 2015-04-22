@@ -57,6 +57,20 @@ else:
 if sys.version_info < (2, 7):
     tests_require.append('unittest2')
 
+if sys.version_info[0] > 2 and sys.platform == 'win32':
+    # C Modules don't build for python3 windows, and prevent tests from running
+    ext_modules = []
+else:
+    ext_modules = [
+        Extension('dulwich._objects', ['dulwich/_objects.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._pack', ['dulwich/_pack.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+                  include_dirs=include_dirs),
+    ]
+
+
 setup(name='dulwich',
       description='Python Git Library',
       keywords='git',
@@ -86,14 +100,7 @@ setup(name='dulwich',
           'Operating System :: POSIX',
           'Topic :: Software Development :: Version Control',
       ],
-      ext_modules=[
-          Extension('dulwich._objects', ['dulwich/_objects.c'],
-                    include_dirs=include_dirs),
-          Extension('dulwich._pack', ['dulwich/_pack.c'],
-              include_dirs=include_dirs),
-          Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-              include_dirs=include_dirs),
-      ],
+      ext_modules=ext_modules,
       test_suite='dulwich.tests.test_suite',
       tests_require=tests_require,
       distclass=DulwichDistribution,

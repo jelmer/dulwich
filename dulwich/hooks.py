@@ -100,7 +100,7 @@ class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'pre-commit')
+        filepath = os.path.join(controldir, b'hooks', b'pre-commit')
 
         ShellHook.__init__(self, 'pre-commit', filepath, 0)
 
@@ -109,7 +109,7 @@ class PostCommitShellHook(ShellHook):
     """post-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'post-commit')
+        filepath = os.path.join(controldir, b'hooks', b'post-commit')
 
         ShellHook.__init__(self, 'post-commit', filepath, 0)
 
@@ -122,7 +122,7 @@ class CommitMsgShellHook(ShellHook):
     """
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'commit-msg')
+        filepath = os.path.join(controldir, b'hooks', b'commit-msg')
 
         def prepare_msg(*args):
             (fd, path) = tempfile.mkstemp()

@@ -24,6 +24,7 @@ from io import BytesIO
 from hashlib import sha1
 import os
 import shutil
+import sys
 import tempfile
 import zlib
 
@@ -89,21 +90,24 @@ class PackTests(TestCase):
     def setUp(self):
         super(PackTests, self).setUp()
         self.tempdir = tempfile.mkdtemp()
+        if not isinstance(self.tempdir, bytes):
+            self.tempdir = self.tempdir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__),
-        'data/packs'))
+    datadir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__.encode(sys.getfilesystemencoding())),
+        b'data/packs'))
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""
-        return load_pack_index(os.path.join(self.datadir, 'pack-%s.idx' % sha.decode('ascii')))
+        return load_pack_index(os.path.join(self.datadir, b'pack-' + sha + b'.idx'))
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha"""
-        return PackData(os.path.join(self.datadir, 'pack-%s.pack' % sha.decode('ascii')))
+        return PackData(os.path.join(self.datadir, b'pack-' + sha + b'.pack'))
 
     def get_pack(self, sha):
-        return Pack(os.path.join(self.datadir, 'pack-%s' % sha.decode('ascii')))
+        return Pack(os.path.join(self.datadir, b'pack-' + sha))
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -204,7 +208,7 @@ class TestPackData(PackTests):
         self.get_pack_data(pack1_sha).close()
 
     def test_from_file(self):
-        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha.decode('ascii'))
+        path = os.path.join(self.datadir, b'pack-' + pack1_sha + b'.pack')
         with open(path, 'rb') as f:
             PackData.from_file(f, os.path.getsize(path))
 
@@ -247,7 +251,7 @@ class TestPackData(PackTests):
 
     def test_create_index_v1(self):
         with self.get_pack_data(pack1_sha) as p:
-            filename = os.path.join(self.tempdir, 'v1test.idx')
+            filename = os.path.join(self.tempdir, b'v1test.idx')
             p.create_index_v1(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
@@ -255,7 +259,7 @@ class TestPackData(PackTests):
 
     def test_create_index_v2(self):
         with self.get_pack_data(pack1_sha) as p:
-            filename = os.path.join(self.tempdir, 'v2test.idx')
+            filename = os.path.join(self.tempdir, b'v2test.idx')
             p.create_index_v2(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
@@ -330,7 +334,7 @@ class TestPack(PackTests):
     def test_copy(self):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
-            basename = os.path.join(self.tempdir, 'Elch')
+            basename = os.path.join(self.tempdir, b'Elch')
             write_pack(basename, origpack.pack_tuples())
 
             with Pack(basename) as newpack:
@@ -353,7 +357,7 @@ class TestPack(PackTests):
             self.assertEqual([], commit.parents)
 
     def _copy_pack(self, origpack):
-        basename = os.path.join(self.tempdir, 'somepack')
+        basename = os.path.join(self.tempdir, b'somepack')
         write_pack(basename, origpack.pack_tuples())
         return Pack(basename)
 
@@ -401,7 +405,7 @@ class TestPack(PackTests):
             write_pack_header(bad_file, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
-            bad_data = PackData('', file=bad_file)
+            bad_data = PackData(b'', file=bad_file)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(AssertionError,
@@ -414,7 +418,7 @@ class TestPack(PackTests):
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b'\xff' * 20))
-            bad_data = PackData('', file=bad_file)
+            bad_data = PackData(b'', file=bad_file)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(ChecksumMismatch, lambda:
@@ -444,10 +448,12 @@ class TestThinPack(PackTests):
         # Build a thin pack. 'foo' is as an external reference, 'bar' an
         # internal reference.
         self.pack_dir = tempfile.mkdtemp()
+        if not isinstance(self.pack_dir, bytes):
+            self.pack_dir = self.pack_dir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, self.pack_dir)
-        self.pack_prefix = os.path.join(self.pack_dir, 'pack')
+        self.pack_prefix = os.path.join(self.pack_dir, b'pack')
 
-        with open(self.pack_prefix + '.pack', 'wb') as f:
+        with open(self.pack_prefix + b'.pack', 'wb') as f:
             build_pack(f, [
                 (REF_DELTA, (self.blobs[b'foo'].id, b'foo1234')),
                 (Blob.type_num, b'bar'),
@@ -458,7 +464,7 @@ class TestThinPack(PackTests):
         with self.make_pack(True) as pack:
             with PackData(pack._data_path) as data:
                 data.pack = pack
-                data.create_index(self.pack_prefix + '.idx')
+                data.create_index(self.pack_prefix + b'.idx')
 
         del self.store[self.blobs[b'bar'].id]
 
@@ -537,7 +543,7 @@ class BaseTestPackIndexWriting(object):
         raise NotImplementedError(self.index)
 
     def test_empty(self):
-        idx = self.index('empty.idx', [], pack_checksum)
+        idx = self.index(b'empty.idx', [], pack_checksum)
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
         self.assertEqual(0, len(idx))
 
@@ -550,7 +556,7 @@ class BaseTestPackIndexWriting(object):
             self.assertRaises(TypeError, self.index, 'single.idx',
                 entries, pack_checksum)
             return
-        idx = self.index('single.idx', entries, pack_checksum)
+        idx = self.index(b'single.idx', entries, pack_checksum)
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
         self.assertEqual(2, len(idx))
         actual_entries = list(idx.iterentries())
@@ -568,7 +574,7 @@ class BaseTestPackIndexWriting(object):
     def test_single(self):
         entry_sha = hex_to_sha('6f670c0fb53f9463760b7295fbb814e965fb20c8')
         my_entries = [(entry_sha, 178, 42)]
-        idx = self.index('single.idx', my_entries, pack_checksum)
+        idx = self.index(b'single.idx', my_entries, pack_checksum)
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
         self.assertEqual(1, len(idx))
         actual_entries = list(idx.iterentries())
@@ -588,6 +594,8 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
 
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
+        if not isinstance(self.tempdir, bytes):
+            self.tempdir = self.tempdir.encode(sys.getfilesystemencoding())
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)

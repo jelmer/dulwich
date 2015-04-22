@@ -515,12 +515,16 @@ def push(repo, remote_location, refs_path,
         return refs
 
     err_encoding = getattr(errstream, 'encoding', 'utf-8')
+    if not isinstance(remote_location, bytes):
+        remote_location_bytes = remote_location.encode(err_encoding)
+    else:
+        remote_location_bytes = remote_location
     try:
         client.send_pack(path, update_refs,
             r.object_store.generate_pack_contents, progress=errstream.write)
-        errstream.write(b"Push to " + remote_location.encode(err_encoding) + b" successful.\n")
+        errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
     except (UpdateRefsError, SendPackError) as e:
-        errstream.write(b"Push to " + remote_location.encode(err_encoding) + b" failed -> " + e.message.encode(err_encoding) + b"\n")
+        errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
 
 
 def pull(repo, remote_location, refs_path,

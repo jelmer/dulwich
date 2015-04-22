@@ -92,7 +92,9 @@ class GitFileTests(TestCase):
     def setUp(self):
         super(GitFileTests, self).setUp()
         self._tempdir = tempfile.mkdtemp()
-        f = open(self.path('foo'), 'wb')
+        if not isinstance(self._tempdir, bytes):
+            self._tempdir = self._tempdir.encode(sys.getfilesystemencoding())
+        f = open(self.path(b'foo'), 'wb')
         f.write(b'foo contents')
         f.close()
 
@@ -104,7 +106,7 @@ class GitFileTests(TestCase):
         return os.path.join(self._tempdir, filename)
 
     def test_invalid(self):
-        foo = self.path('foo')
+        foo = self.path(b'foo')
         self.assertRaises(IOError, GitFile, foo, mode='r')
         self.assertRaises(IOError, GitFile, foo, mode='ab')
         self.assertRaises(IOError, GitFile, foo, mode='r+b')
@@ -112,7 +114,7 @@ class GitFileTests(TestCase):
         self.assertRaises(IOError, GitFile, foo, mode='a+bU')
 
     def test_readonly(self):
-        f = GitFile(self.path('foo'), 'rb')
+        f = GitFile(self.path(b'foo'), 'rb')
         self.assertTrue(isinstance(f, io.IOBase))
         self.assertEqual(b'foo contents', f.read())
         self.assertEqual(b'', f.read())
@@ -121,13 +123,13 @@ class GitFileTests(TestCase):
         f.close()
 
     def test_default_mode(self):
-        f = GitFile(self.path('foo'))
+        f = GitFile(self.path(b'foo'))
         self.assertEqual(b'foo contents', f.read())
         f.close()
 
     def test_write(self):
-        foo = self.path('foo')
-        foo_lock = '%s.lock' % foo
+        foo = self.path(b'foo')
+        foo_lock = foo + b'.lock'
 
         orig_f = open(foo, 'rb')
         self.assertEqual(orig_f.read(), b'foo contents')
@@ -150,7 +152,7 @@ class GitFileTests(TestCase):
         new_f.close()
 
     def test_open_twice(self):
-        foo = self.path('foo')
+        foo = self.path(b'foo')
         f1 = GitFile(foo, 'wb')
         f1.write(b'new')
         try:
@@ -169,8 +171,8 @@ class GitFileTests(TestCase):
         f.close()
 
     def test_abort(self):
-        foo = self.path('foo')
-        foo_lock = '%s.lock' % foo
+        foo = self.path(b'foo')
+        foo_lock = foo + b'.lock'
 
         orig_f = open(foo, 'rb')
         self.assertEqual(orig_f.read(), b'foo contents')
@@ -187,7 +189,7 @@ class GitFileTests(TestCase):
         new_orig_f.close()
 
     def test_abort_close(self):
-        foo = self.path('foo')
+        foo = self.path(b'foo')
         f = GitFile(foo, 'wb')
         f.abort()
         try:
@@ -203,11 +205,11 @@ class GitFileTests(TestCase):
             self.fail()
 
     def test_abort_close_removed(self):
-        foo = self.path('foo')
+        foo = self.path(b'foo')
         f = GitFile(foo, 'wb')
 
         f._file.close()
-        os.remove(foo+".lock")
+        os.remove(foo + b'.lock')
 
         f.abort()
         self.assertTrue(f._closed)

@@ -79,11 +79,11 @@ class CreateRepositoryTests(TestCase):
 
     def _check_repo_contents(self, repo, expect_bare):
         self.assertEqual(expect_bare, repo.bare)
-        self.assertFileContentsEqual(b'Unnamed repository', repo, 'description')
-        self.assertFileContentsEqual(b'', repo, os.path.join('info', 'exclude'))
-        self.assertFileContentsEqual(None, repo, 'nonexistent file')
+        self.assertFileContentsEqual(b'Unnamed repository', repo, b'description')
+        self.assertFileContentsEqual(b'', repo, os.path.join(b'info', b'exclude'))
+        self.assertFileContentsEqual(None, repo, b'nonexistent file')
         barestr = b'bare = ' + str(expect_bare).lower().encode('ascii')
-        with repo.get_named_file('config') as f:
+        with repo.get_named_file(b'config') as f:
             config_text = f.read()
             self.assertTrue(barestr in config_text, "%r" % config_text)
 
@@ -423,7 +423,7 @@ exit 0
         r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        pre_commit = os.path.join(r.controldir(), 'hooks', 'pre-commit')
+        pre_commit = os.path.join(r.controldir(), b'hooks', b'pre-commit')
 
         with open(pre_commit, 'wb') as f:
             f.write(pre_commit_fail)
@@ -463,7 +463,7 @@ exit 0
         r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        commit_msg = os.path.join(r.controldir(), 'hooks', 'commit-msg')
+        commit_msg = os.path.join(r.controldir(), b'hooks', b'commit-msg')
 
         with open(commit_msg, 'wb') as f:
             f.write(commit_msg_fail)
@@ -501,8 +501,8 @@ exit 0
         self.addCleanup(shutil.rmtree, repo_dir)
 
         (fd, path) = tempfile.mkstemp(dir=repo_dir_str)
-        post_commit_msg = b"""#!/bin/sh
-rm """ + path.encode(sys.getfilesystemencoding()) + b"""
+        post_commit_msg = """#!/bin/sh
+rm """ + path + """
 """
 
         root_sha = r.do_commit(
@@ -513,9 +513,9 @@ rm """ + path.encode(sys.getfilesystemencoding()) + b"""
             author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[root_sha].parents)
 
-        post_commit = os.path.join(r.controldir(), 'hooks', 'post-commit')
+        post_commit = os.path.join(r.controldir(), b'hooks', b'post-commit')
 
-        with open(post_commit, 'wb') as f:
+        with open(post_commit, 'w') as f:
             f.write(post_commit_msg)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -529,10 +529,10 @@ rm """ + path.encode(sys.getfilesystemencoding()) + b"""
 
         self.assertFalse(os.path.exists(path))
 
-        post_commit_msg_fail = b"""#!/bin/sh
+        post_commit_msg_fail = """#!/bin/sh
 exit 1
 """
-        with open(post_commit, 'wb') as f:
+        with open(post_commit, 'w') as f:
             f.write(post_commit_msg_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -569,6 +569,9 @@ class BuildRepoBytesRootTests(TestCase):
     def get_repo_dir(self):
         return os.path.join(mkdtemp_bytes(), b'test')
 
+    def get_a_filename(self):
+        return b'a'
+
     def setUp(self):
         super(BuildRepoBytesRootTests, self).setUp()
         self._repo_dir = self.get_repo_dir()
@@ -578,7 +581,7 @@ class BuildRepoBytesRootTests(TestCase):
         self.assertEqual(b'ref: refs/heads/master', r.refs.read_ref(b'HEAD'))
         self.assertRaises(KeyError, lambda: r.refs[b'refs/heads/master'])
 
-        with open(os.path.join(r.path, 'a'), 'wb') as f:
+        with open(os.path.join(r._path_bytes, b'a'), 'wb') as f:
             f.write(b'file contents')
         r.stage(['a'])
         commit_sha = r.do_commit(b'msg',
@@ -604,9 +607,9 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_commit_modified(self):
         r = self._repo
-        with open(os.path.join(r.path, 'a'), 'wb') as f:
+        with open(os.path.join(r._path_bytes, b'a'), 'wb') as f:
             f.write(b'new contents')
-        os.symlink('a', os.path.join(self._repo_dir, 'b'))
+        os.symlink('a', os.path.join(r._path_bytes, b'b'))
         r.stage(['a', 'b'])
         commit_sha = r.do_commit(b'modified a',
                                  committer=b'Test Committer <test@nodomain.com>',
@@ -623,7 +626,7 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_commit_deleted(self):
         r = self._repo
-        os.remove(os.path.join(r.path, 'a'))
+        os.remove(os.path.join(r._path_bytes, b'a'))
         r.stage(['a'])
         commit_sha = r.do_commit(b'deleted a',
                                  committer=b'Test Committer <test@nodomain.com>',
@@ -785,7 +788,7 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_stage_deleted(self):
         r = self._repo
-        os.remove(os.path.join(r.path, 'a'))
+        os.remove(os.path.join(r._path_bytes, b'a'))
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
 

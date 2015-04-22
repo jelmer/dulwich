@@ -77,7 +77,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/foo"] = c3.id
         porcelain.update_server_info(self.repo.path)
         self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(),
-            'info', 'refs')))
+            b'info', b'refs')))
 
 
 class CommitTests(PorcelainTestCase):
@@ -281,7 +281,7 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, b'force_foobar', force=True)
 
         #test if we actually changed the file
-        with self.repo.get_named_file('HEAD') as f:
+        with self.repo.get_named_file(b'HEAD') as f:
             new_ref = f.read()
         self.assertEqual(new_ref, b'ref: refs/heads/force_foobar\n')
 
@@ -301,7 +301,7 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, b'develop')
 
         #test if we actually changed the file
-        with self.repo.get_named_file('HEAD') as f:
+        with self.repo.get_named_file(b'HEAD') as f:
             new_ref = f.read()
         self.assertEqual(new_ref, b'ref: refs/heads/develop\n')
 

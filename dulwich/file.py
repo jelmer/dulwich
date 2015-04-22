@@ -104,7 +104,7 @@ class _GitFile(object):
                      'truncate', 'write', 'writelines')
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
-        self._lockfilename = '%s.lock' % self._filename
+        self._lockfilename = self._filename + b'.lock'
         fd = os.open(self._lockfilename,
             os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
         self._file = os.fdopen(fd, mode, bufsize)

@@ -38,7 +38,7 @@ Known capabilities that are not supported:
 
 __docformat__ = 'restructuredText'
 
-from io import BytesIO
+from io import BytesIO, BufferedReader
 import dulwich
 import select
 import socket
@@ -625,7 +625,10 @@ class SubprocessWrapper(object):
 
     def __init__(self, proc):
         self.proc = proc
-        self.read = proc.stdout.read
+        if sys.version_info[0] == 2:
+            self.read = proc.stdout.read
+        else:
+            self.read = BufferedReader(proc.stdout).read
         self.write = proc.stdin.write
 
     def can_read(self):

@@ -163,7 +163,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
     def test_init_with_empty_info_grafts(self):
         r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), b'')
+        r._put_named_file(os.path.join(b'info', b'grafts'), b'')
 
         r = Repo(self._repo_dir)
         self.assertEqual({}, r._graftpoints)
@@ -171,7 +171,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
     def test_init_with_info_grafts(self):
         r = self._repo
         r._put_named_file(
-            os.path.join('info', 'grafts'),
+            os.path.join(b'info', b'grafts'),
             self._shas[-1] + b' ' + self._shas[0])
 
         r = Repo(self._repo_dir)

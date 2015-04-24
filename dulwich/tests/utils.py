@@ -69,7 +69,7 @@ def open_repo(name, temp_dir=None):
 
     :param name: The name of the repository, relative to
         dulwich/tests/data/repos
-    :temp_dir: temporary directory to initialize to. If not provided, a
+    :param temp_dir: temporary directory to initialize to. If not provided, a
         temporary directory will be created.
     :returns: An initialized Repo object that lives in a temporary directory.
     """

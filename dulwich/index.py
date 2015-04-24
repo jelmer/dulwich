@@ -203,6 +203,10 @@ class Index(object):
         self.clear()
         self.read()
 
+    @property
+    def path(self):
+        return self._filename
+
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._filename)
 

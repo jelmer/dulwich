@@ -291,8 +291,8 @@ def cmd_web_daemon(args):
     else:
         gitdir = '.'
     from dulwich import porcelain
-    porcelain.daemon(gitdir, address=options.listen_address,
-                     port=options.port)
+    porcelain.web_daemon(gitdir, address=options.listen_address,
+                         port=options.port)
 
 
 def cmd_receive_pack(args):

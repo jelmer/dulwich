@@ -1,4 +1,4 @@
-dulwich (0.10.1+git20150425-1) unstable; urgency=medium
+dulwich (0.10.1+git20150425-1) experimental; urgency=medium
 
   * New upstream snapshot.
   * Add Python3 binary package.

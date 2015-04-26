@@ -18,7 +18,7 @@
 
 """Tests for patch.py."""
 
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from dulwich.objects import (
     Blob,
@@ -55,7 +55,7 @@ class WriteCommitPatchTests(TestCase):
         c.commit_timezone = c.author_timezone = 0
         c.message = b"This is the first line\nAnd this is the second line.\n"
         c.tree = Tree().id
-        write_commit_patch(f, c, "CONTENTS", (1, 1), version="custom")
+        write_commit_patch(f, c, b"CONTENTS", (1, 1), version="custom")
         f.seek(0)
         lines = f.readlines()
         self.assertTrue(lines[0].startswith(b"From 0b0d34d1b5b596c928adc9a727a4b9e03d025298"))
@@ -75,11 +75,36 @@ class WriteCommitPatchTests(TestCase):
             self.assertEqual(lines[8], b" 0 files changed\n")
 
 
-@skipIfPY3
 class ReadGitAmPatch(TestCase):
 
-    def test_extract(self):
-        text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+    def test_extract_string(self):
+        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+From: Jelmer Vernooij <jelmer@samba.org>
+Date: Thu, 15 Apr 2010 15:40:28 +0200
+Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian warning).
+
+---
+ pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+ 1 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100755 => 100644 pixmaps/prey.ico
+
+-- 
+1.7.0.4
+"""
+        c, diff, version = git_am_patch_split(StringIO(text.decode("utf-8")), "utf-8")
+        self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
+        self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
+        self.assertEqual(b"Remove executable bit from prey.ico "
+            b"(triggers a lintian warning).\n", c.message)
+        self.assertEqual(b""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+ 1 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100755 => 100644 pixmaps/prey.ico
+
+""", diff)
+        self.assertEqual(b"1.7.0.4", version)
+
+    def test_extract_bytes(self):
+        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian warning).
@@ -93,19 +118,19 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
 1.7.0.4
 """
         c, diff, version = git_am_patch_split(BytesIO(text))
-        self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.committer)
-        self.assertEqual("Jelmer Vernooij <jelmer@samba.org>", c.author)
-        self.assertEqual("Remove executable bit from prey.ico "
-            "(triggers a lintian warning).\n", c.message)
-        self.assertEqual(""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
+        self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
+        self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
+        self.assertEqual(b"Remove executable bit from prey.ico "
+            b"(triggers a lintian warning).\n", c.message)
+        self.assertEqual(b""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
 
 """, diff)
-        self.assertEqual("1.7.0.4", version)
+        self.assertEqual(b"1.7.0.4", version)
 
     def test_extract_spaces(self):
-        text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
@@ -122,11 +147,11 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(BytesIO(text))
-        self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
+        self.assertEqual(b'Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
     def test_extract_pseudo_from_header(self):
-        text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
@@ -145,12 +170,12 @@ From: Jelmer Vernooy <jelmer@debian.org>
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(BytesIO(text))
-        self.assertEqual("Jelmer Vernooy <jelmer@debian.org>", c.author)
-        self.assertEqual('Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
+        self.assertEqual(b"Jelmer Vernooy <jelmer@debian.org>", c.author)
+        self.assertEqual(b'Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
 
     def test_extract_no_version_tail(self):
-        text = """From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
@@ -164,7 +189,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
  mode change 100755 => 100644 pixmaps/prey.ico
 
 """
-        c, diff, version = git_am_patch_split(BytesIO(text))
+        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(None, version)
 
     def test_extract_mercurial(self):

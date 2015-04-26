@@ -22,7 +22,6 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-from io import BytesIO
 from difflib import SequenceMatcher
 import email.parser
 import time
@@ -42,7 +41,7 @@ def write_commit_patch(f, commit, contents, progress, version=None, encoding=Non
     :param progress: Tuple with current patch number and total.
     :return: tuple with filename and contents
     """
-    encoding = getattr(f, "encoding", encoding) or "ascii"
+    encoding = encoding or getattr(f, "encoding", "ascii")
     if type(contents) is str:
         contents = contents.encode(encoding)
     (num, total) = progress
@@ -239,17 +238,34 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
                                     diff_binary=diff_binary)
 
 
-def git_am_patch_split(f):
+def git_am_patch_split(f, encoding=None):
     """Parse a git-am-style patch and split it up into bits.
 
     :param f: File-like object to parse
+    :param encoding: Encoding to use when creating Git objects
     :return: Tuple with commit object, diff contents and git version
     """
-    parser = email.parser.Parser()
-    msg = parser.parse(f)
+    encoding = encoding or getattr(f, "encoding", "ascii")
+    contents = f.read()
+    if type(contents) is bytes and getattr(email.parser, "BytesParser", None):
+        parser = email.parser.BytesParser()
+        msg = parser.parsebytes(contents)
+    else:
+        parser = email.parser.Parser()
+        msg = parser.parsestr(contents)
+    return parse_patch_message(msg, encoding)
+
+
+def parse_patch_message(msg, encoding=None):
+    """Extract a Commit object and patch from an e-mail message.
+
+    :param msg: An email message (email.message.Message)
+    :param encoding: Encoding to use to encode Git commits
+    :return: Tuple with commit object, diff contents and git version
+    """
     c = Commit()
-    c.author = msg["from"]
-    c.committer = msg["from"]
+    c.author = msg["from"].encode(encoding)
+    c.committer = msg["from"].encode(encoding)
     try:
         patch_tag_start = msg["subject"].index("[PATCH")
     except ValueError:
@@ -257,29 +273,31 @@ def git_am_patch_split(f):
     else:
         close = msg["subject"].index("] ", patch_tag_start)
         subject = msg["subject"][close+2:]
-    c.message = subject.replace("\n", "") + "\n"
+    c.message = (subject.replace("\n", "") + "\n").encode(encoding)
     first = True
 
-    body = BytesIO(msg.get_payload())
+    body = msg.get_payload(decode=True)
+    lines = body.splitlines(True)
+    line_iter = iter(lines)
 
-    for l in body:
-        if l == "---\n":
+    for l in line_iter:
+        if l == b"---\n":
             break
         if first:
-            if l.startswith("From: "):
-                c.author = l[len("From: "):].rstrip()
+            if l.startswith(b"From: "):
+                c.author = l[len(b"From: "):].rstrip()
             else:
-                c.message += "\n" + l
+                c.message += b"\n" + l
             first = False
         else:
             c.message += l
-    diff = ""
-    for l in body:
-        if l == "-- \n":
+    diff = b""
+    for l in line_iter:
+        if l == b"-- \n":
             break
         diff += l
     try:
-        version = next(body).rstrip("\n")
+        version = next(line_iter).rstrip(b"\n")
     except StopIteration:
         version = None
     return c, diff, version

@@ -35,20 +35,23 @@ from dulwich.objects import (
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None):
+def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
     """Write a individual file patch.
 
     :param commit: Commit object
     :param progress: Tuple with current patch number and total.
     :return: tuple with filename and contents
     """
+    encoding = getattr(f, "encoding", encoding) or "ascii"
+    if type(contents) is str:
+        contents = contents.encode(encoding)
     (num, total) = progress
-    f.write("From %s %s\n" % (commit.id, time.ctime(commit.commit_time)))
-    f.write("From: %s\n" % commit.author)
-    f.write("Date: %s\n" % time.strftime("%a, %d %b %Y %H:%M:%S %Z"))
-    f.write("Subject: [PATCH %d/%d] %s\n" % (num, total, commit.message))
-    f.write("\n")
-    f.write("---\n")
+    f.write(b"From " + commit.id + b" " + time.ctime(commit.commit_time).encode(encoding) + b"\n")
+    f.write(b"From: " + commit.author + b"\n")
+    f.write(b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n")
+    f.write(("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding) + commit.message + b"\n")
+    f.write(b"\n")
+    f.write(b"---\n")
     try:
         import subprocess
         p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
@@ -58,14 +61,14 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     else:
         (diffstat, _) = p.communicate(contents)
         f.write(diffstat)
-        f.write("\n")
+        f.write(b"\n")
     f.write(contents)
-    f.write("-- \n")
+    f.write(b"-- \n")
     if version is None:
         from dulwich import __version__ as dulwich_version
-        f.write("Dulwich %d.%d.%d\n" % dulwich_version)
+        f.write(b"Dulwich %d.%d.%d\n" % dulwich_version)
     else:
-        f.write("%s\n" % version)
+        f.write(version.encode(encoding) + b"\n")
 
 
 def get_summary(commit):

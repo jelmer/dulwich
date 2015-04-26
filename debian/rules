@@ -48,6 +48,8 @@ override_dh_installdocs:
 override_dh_strip:
 	dh_strip -p python-dulwich --dbg-package=python-dulwich-dbg
 	dh_strip -p python3-dulwich --dbg-package=python3-dulwich-dbg
+	# For the moment, there is no dbg package for pypy-dulwich.
+	dh_strip -p pypy-dulwich
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS

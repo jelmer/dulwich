@@ -29,10 +29,14 @@ endif
 
 override_dh_auto_install:
 	dh_auto_install
-	pypy setup.py build -b build-pypy install --root debian/tmp --install-layout deb
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb; \
+	done;
+	pypy setup.py build -b build-pypy install --root=$(CURDIR)/debian/tmp --install-layout deb
 	rm -rf debian/tmp/usr/lib/pypy/bin
-	# Install everything excluding the *_d.so debug extensions to python-dulwich
+	# Install everything excluding the *_d.so debug extensions to python-dulwich and python3-dulwich
 	dh_install -X"*_d.so" "debian/tmp/usr/lib/python2*/*-packages" -p python-dulwich
+	dh_install -X"*_d.so" "debian/tmp/usr/lib/python3*/*-packages" -p python3-dulwich
 	# Install the debug extensions to python-dulwich-dbg
 	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
 	# Install the pypy files to pypy-dulwich

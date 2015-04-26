@@ -139,8 +139,8 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     returncode, stdout = run_git(args, git_path=git_path, input=input,
                                  capture_stdout=True, **popen_kwargs)
     if returncode != 0:
-        raise AssertionError("git with args %r failed with %d" % (
-            args, returncode))
+        raise AssertionError("git with args %r failed with %d: %r" % (
+            args, returncode, stdout))
     return stdout
 
 

@@ -27,6 +27,8 @@ def parse_object(repo, objectish):
     :return: A git object
     :raise KeyError: If the object can not be found
     """
+    if getattr(objectish, "encode", None) is not None:
+        objectish = objectish.encode('ascii')
     return repo[objectish]
 
 
@@ -39,4 +41,6 @@ def parse_commit_range(repo, committishs):
     :raise KeyError: When the reference commits can not be found
     :raise ValueError: If the range can not be parsed
     """
+    if getattr(committishs, "encode", None) is not None:
+        committishs = committishs.encode('ascii')
     return iter([repo[committishs]])

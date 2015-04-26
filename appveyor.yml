@@ -1,0 +1,14 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python27"
+      PYTHON_ARCH: "32"
+
+    - PYTHON: "C:\\Python34"
+      PYTHON_ARCH: "32"
+
+build: off
+
+test_script:
+  - "%WITH_COMPILER% %PYTHON%/python setup.py test"
+
+

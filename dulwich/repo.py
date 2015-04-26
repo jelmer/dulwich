@@ -30,6 +30,7 @@ local disk (Repo).
 from io import BytesIO
 import errno
 import os
+import sys
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -81,19 +82,19 @@ from dulwich.refs import (
 import warnings
 
 
-OBJECTDIR = 'objects'
-REFSDIR = 'refs'
-REFSDIR_TAGS = 'tags'
-REFSDIR_HEADS = 'heads'
-INDEX_FILENAME = "index"
+OBJECTDIR = b'objects'
+REFSDIR = b'refs'
+REFSDIR_TAGS = b'tags'
+REFSDIR_HEADS = b'heads'
+INDEX_FILENAME = b'index'
 
 BASE_DIRECTORIES = [
-    ["branches"],
+    [b'branches'],
     [REFSDIR],
     [REFSDIR, REFSDIR_TAGS],
     [REFSDIR, REFSDIR_HEADS],
-    ["hooks"],
-    ["info"]
+    [b'hooks'],
+    [b'info']
     ]
 
 
@@ -140,12 +141,12 @@ def serialize_graftpoints(graftpoints):
 
     """
     graft_lines = []
-    for commit, parents in graftpoints.iteritems():
+    for commit, parents in graftpoints.items():
         if parents:
-            graft_lines.append('%s %s' % (commit, ' '.join(parents)))
+            graft_lines.append(commit + b' ' + b' '.join(parents))
         else:
             graft_lines.append(commit)
-    return '\n'.join(graft_lines)
+    return b'\n'.join(graft_lines)
 
 
 class BaseRepo(object):
@@ -175,16 +176,16 @@ class BaseRepo(object):
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
-        self._put_named_file('description', "Unnamed repository")
+        self._put_named_file(b'description', b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        cf.set("core", "repositoryformatversion", "0")
-        cf.set("core", "filemode", "true")
-        cf.set("core", "bare", str(bare).lower())
-        cf.set("core", "logallrefupdates", "true")
+        cf.set(b"core", b"repositoryformatversion", b"0")
+        cf.set(b"core", b"filemode", b"true")
+        cf.set(b"core", b"bare", bare)
+        cf.set(b"core", b"logallrefupdates", True)
         cf.write_to_file(f)
-        self._put_named_file('config', f.getvalue())
-        self._put_named_file(os.path.join('info', 'exclude'), '')
+        self._put_named_file(b'config', f.getvalue())
+        self._put_named_file(os.path.join(b'info', b'exclude'), b'')
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
@@ -291,7 +292,7 @@ class BaseRepo(object):
         :return: A graph walker object
         """
         if heads is None:
-            heads = self.refs.as_dict('refs/heads').values()
+            heads = self.refs.as_dict(b'refs/heads').values()
         return ObjectStoreGraphWalker(heads, self.get_parents)
 
     def get_refs(self):
@@ -303,7 +304,7 @@ class BaseRepo(object):
 
     def head(self):
         """Return the SHA1 pointed at by HEAD."""
-        return self.refs['HEAD']
+        return self.refs[b'HEAD']
 
     def _get_object(self, sha, cls):
         assert len(sha) in (20, 40)
@@ -439,7 +440,7 @@ class BaseRepo(object):
         :return: A `ShaFile` object, such as a Commit or Blob
         :raise KeyError: when the specified ref or object does not exist
         """
-        if not isinstance(name, str):
+        if not isinstance(name, bytes):
             raise TypeError("'name' must be bytestring, not %.80s" %
                     type(name).__name__)
         if len(name) in (20, 40):
@@ -468,10 +469,10 @@ class BaseRepo(object):
         :param name: ref name
         :param value: Ref value - either a ShaFile object, or a hex sha
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith(b"refs/") or name == b'HEAD':
             if isinstance(value, ShaFile):
                 self.refs[name] = value.id
-            elif isinstance(value, str):
+            elif isinstance(value, bytes):
                 self.refs[name] = value
             else:
                 raise TypeError(value)
@@ -483,7 +484,7 @@ class BaseRepo(object):
 
         :param name: Name of the ref to remove
         """
-        if name.startswith("refs/") or name == "HEAD":
+        if name.startswith(b"refs/") or name == b"HEAD":
             del self.refs[name]
         else:
             raise ValueError(name)
@@ -492,9 +493,8 @@ class BaseRepo(object):
         """Determine the identity to use for new commits.
         """
         config = self.get_config_stack()
-        return "%s <%s>" % (
-            config.get(("user", ), "name"),
-            config.get(("user", ), "email"))
+        return (config.get((b"user", ), b"name") + b" <" +
+                config.get((b"user", ), b"email") + b">")
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
@@ -503,7 +503,7 @@ class BaseRepo(object):
         """
 
         # Simple validation
-        for commit, parents in updated_graftpoints.iteritems():
+        for commit, parents in updated_graftpoints.items():
             for sha in [commit] + parents:
                 check_hexsha(sha, 'Invalid graftpoint')
 
@@ -521,7 +521,7 @@ class BaseRepo(object):
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None, encoding=None,
-                  ref='HEAD', merge_heads=None):
+                  ref=b'HEAD', merge_heads=None):
         """Create a new commit.
 
         :param message: Commit message
@@ -627,6 +627,7 @@ class BaseRepo(object):
 
         return c.id
 
+path_sep_bytes = os.path.sep.encode(sys.getfilesystemencoding())
 
 class Repo(BaseRepo):
     """A git repository backed by local disk.
@@ -637,36 +638,40 @@ class Repo(BaseRepo):
     To create a new repository, use the Repo.init class method.
     """
 
-    def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
+    def __init__(self, path):
+        self.path = path
+        if not isinstance(path, bytes):
+            self._path_bytes = path.encode(sys.getfilesystemencoding())
+        else:
+            self._path_bytes = path
+        if os.path.isdir(os.path.join(self._path_bytes, b'.git', OBJECTDIR)):
             self.bare = False
-            self._controldir = os.path.join(root, ".git")
-        elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
-              os.path.isdir(os.path.join(root, REFSDIR))):
+            self._controldir = os.path.join(self._path_bytes, b'.git')
+        elif (os.path.isdir(os.path.join(self._path_bytes, OBJECTDIR)) and
+              os.path.isdir(os.path.join(self._path_bytes, REFSDIR))):
             self.bare = True
-            self._controldir = root
-        elif (os.path.isfile(os.path.join(root, ".git"))):
+            self._controldir = self._path_bytes
+        elif (os.path.isfile(os.path.join(self._path_bytes, b'.git'))):
             import re
-            with open(os.path.join(root, ".git"), 'r') as f:
-                _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
+            with open(os.path.join(self._path_bytes, b'.git'), 'rb') as f:
+                _, gitdir = re.match(b'(gitdir: )(.+$)', f.read()).groups()
             self.bare = False
-            self._controldir = os.path.join(root, path)
+            self._controldir = os.path.join(self._path_bytes, gitdir)
         else:
             raise NotGitRepository(
-                "No git repository was found at %(path)s" % dict(path=root)
+                "No git repository was found at %(path)s" % dict(path=path)
             )
-        self.path = root
         object_store = DiskObjectStore(os.path.join(self.controldir(),
                                                     OBJECTDIR))
         refs = DiskRefsContainer(self.controldir())
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
-        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        graft_file = self.get_named_file(os.path.join(b'info', b'grafts'))
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
-        graft_file = self.get_named_file("shallow")
+        graft_file = self.get_named_file(b'shallow')
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
@@ -685,7 +690,7 @@ class Repo(BaseRepo):
         :param path: The path to the file, relative to the control dir.
         :param contents: A string to write to the file.
         """
-        path = path.lstrip(os.path.sep)
+        path = path.lstrip(path_sep_bytes)
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
@@ -701,7 +706,7 @@ class Repo(BaseRepo):
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
-        path = path.lstrip(os.path.sep)
+        path = path.lstrip(path_sep_bytes)
         try:
             return open(os.path.join(self.controldir(), path), 'rb')
         except (IOError, OSError) as e:
@@ -730,12 +735,12 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, paths):
+    def stage(self, paths, fsencoding=sys.getfilesystemencoding()):
         """Stage a set of paths.
 
         :param paths: List of paths, relative to the repository path
         """
-        if isinstance(paths, basestring):
+        if not isinstance(paths, list):
             paths = [paths]
         from dulwich.index import (
             blob_from_path_and_stat,
@@ -743,23 +748,28 @@ class Repo(BaseRepo):
             )
         index = self.open_index()
         for path in paths:
-            full_path = os.path.join(self.path, path)
+            if not isinstance(path, bytes):
+                disk_path_bytes = path.encode(sys.getfilesystemencoding())
+                repo_path_bytes = path.encode(fsencoding)
+            else:
+                disk_path_bytes, repo_path_bytes = path, path
+            full_path = os.path.join(self._path_bytes, disk_path_bytes)
             try:
                 st = os.lstat(full_path)
             except OSError:
                 # File no longer exists
                 try:
-                    del index[path]
+                    del index[repo_path_bytes]
                 except KeyError:
                     pass  # already removed
             else:
                 blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
-                index[path] = index_entry_from_stat(st, blob.id, 0)
+                index[repo_path_bytes] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin="origin"):
+            origin=b"origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -775,21 +785,21 @@ class Repo(BaseRepo):
             target = self.init_bare(target_path)
         self.fetch(target)
         target.refs.import_refs(
-            'refs/remotes/' + origin, self.refs.as_dict('refs/heads'))
+            b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'))
         target.refs.import_refs(
-            'refs/tags', self.refs.as_dict('refs/tags'))
+            b'refs/tags', self.refs.as_dict(b'refs/tags'))
         try:
             target.refs.add_if_new(
-                'refs/heads/master',
-                self.refs['refs/heads/master'])
+                b'refs/heads/master',
+                self.refs[b'refs/heads/master'])
         except KeyError:
             pass
 
         # Update target head
-        head, head_sha = self.refs._follow('HEAD')
+        head, head_sha = self.refs._follow(b'HEAD')
         if head is not None and head_sha is not None:
-            target.refs.set_symbolic_ref('HEAD', head)
-            target['HEAD'] = head_sha
+            target.refs.set_symbolic_ref(b'HEAD', head)
+            target[b'HEAD'] = head_sha
 
             if not bare:
                 # Checkout HEAD to target dir
@@ -808,14 +818,14 @@ class Repo(BaseRepo):
             validate_path_element_ntfs,
             )
         if tree is None:
-            tree = self['HEAD'].tree
+            tree = self[b'HEAD'].tree
         config = self.get_config()
         honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
         if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default
-        return build_index_from_tree(self.path, self.index_path(),
+        return build_index_from_tree(self._path_bytes, self.index_path(),
                 self.object_store, tree, honor_filemode=honor_filemode,
                 validate_path_element=validate_path_element)
 
@@ -825,7 +835,7 @@ class Repo(BaseRepo):
         :return: `ConfigFile` object for the ``.git/config`` file.
         """
         from dulwich.config import ConfigFile
-        path = os.path.join(self._controldir, 'config')
+        path = os.path.join(self._controldir, b'config')
         try:
             return ConfigFile.from_path(path)
         except (IOError, OSError) as e:
@@ -840,7 +850,7 @@ class Repo(BaseRepo):
 
         :return: A string describing the repository or None.
         """
-        path = os.path.join(self._controldir, 'description')
+        path = os.path.join(self._controldir, b'description')
         try:
             with GitFile(path, 'rb') as f:
                 return f.read()
@@ -858,17 +868,19 @@ class Repo(BaseRepo):
         :param description: Text to set as description for this repository.
         """
 
-        path = os.path.join(self._controldir, 'description')
-        with open(path, 'w') as f:
-            f.write(description)
+        self._put_named_file(b'description', description)
 
     @classmethod
     def _init_maybe_bare(cls, path, bare):
+        if not isinstance(path, bytes):
+            path_bytes = path.encode(sys.getfilesystemencoding())
+        else:
+            path_bytes = path
         for d in BASE_DIRECTORIES:
-            os.mkdir(os.path.join(path, *d))
-        DiskObjectStore.init(os.path.join(path, OBJECTDIR))
+            os.mkdir(os.path.join(path_bytes, *d))
+        DiskObjectStore.init(os.path.join(path_bytes, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_symbolic_ref("HEAD", "refs/heads/master")
+        ret.refs.set_symbolic_ref(b'HEAD', b"refs/heads/master")
         ret._init_files(bare)
         return ret
 
@@ -880,9 +892,13 @@ class Repo(BaseRepo):
         :param mkdir: Whether to create the directory
         :return: `Repo` instance
         """
+        if not isinstance(path, bytes):
+            path_bytes = path.encode(sys.getfilesystemencoding())
+        else:
+            path_bytes = path
         if mkdir:
-            os.mkdir(path)
-        controldir = os.path.join(path, ".git")
+            os.mkdir(path_bytes)
+        controldir = os.path.join(path_bytes, b'.git')
         os.mkdir(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)
@@ -971,7 +987,7 @@ class MemoryRepo(BaseRepo):
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)
-        for refname, sha in refs.iteritems():
+        for refname, sha in refs.items():
             ret.refs[refname] = sha
         ret._init_files(bare=True)
         return ret

@@ -40,11 +40,6 @@ from dulwich.errors import (
     )
 from dulwich.file import GitFile
 
-if sys.version_info[0] == 2:
-    iteritems = lambda d: d.iteritems()
-else:
-    iteritems = lambda d: d.items()
-
 
 ZERO_SHA = b'0' * 40
 
@@ -92,7 +87,7 @@ def sha_to_hex(sha):
 
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha"""
-    assert len(hex) == 40, "Incorrent length of hexsha: %s" % hex
+    assert len(hex) == 40, "Incorrect length of hexsha: %s" % hex
     try:
         return binascii.unhexlify(hex)
     except TypeError as exc:
@@ -101,17 +96,26 @@ def hex_to_sha(hex):
         raise ValueError(exc.args[0])
 
 
+def valid_hexsha(hex):
+    if len(hex) != 40:
+        return False
+    try:
+        binascii.unhexlify(hex)
+    except (TypeError, binascii.Error):
+        return False
+    else:
+        return True
+
+
 def hex_to_filename(path, hex):
     """Takes a hex sha and returns its filename relative to the given path."""
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
     # as path.
-    if getattr(path, 'encode', None) is not None:
-        hex = hex.decode('ascii')
-    dir = hex[:2]
+    directory = hex[:2]
     file = hex[2:]
     # Check from object dir
-    return os.path.join(path, dir, file)
+    return os.path.join(path, directory, file)
 
 
 def filename_to_hex(filename):
@@ -162,9 +166,7 @@ def check_hexsha(hex, error_msg):
     :param error_msg: Error message to use in exception
     :raise ObjectFormatException: Raised when the string is not valid
     """
-    try:
-        hex_to_sha(hex)
-    except (TypeError, AssertionError, ValueError):
+    if not valid_hexsha(hex):
         raise ObjectFormatException("%s %s" % (error_msg, hex))
 
 
@@ -273,6 +275,7 @@ class ShaFile(object):
             self._ensure_parsed()
         elif self._needs_serialization:
             self._chunked_text = self._serialize()
+            self._needs_serialization = False
         return self._chunked_text
 
     def as_raw_string(self):
@@ -549,7 +552,6 @@ class Blob(ShaFile):
     def _serialize(self):
         if not self._chunked_text:
             self._ensure_parsed()
-        self._needs_serialization = False
         return self._chunked_text
 
     def _deserialize(self, chunks):
@@ -785,7 +787,7 @@ def sorted_tree_items(entries, name_order):
     :return: Iterator over (name, mode, hexsha)
     """
     key_func = name_order and key_entry_name_order or key_entry
-    for name, entry in sorted(iteritems(entries), key=key_func):
+    for name, entry in sorted(entries.items(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)

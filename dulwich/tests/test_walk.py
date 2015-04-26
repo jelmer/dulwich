@@ -49,7 +49,6 @@ from dulwich.tests.utils import (
     F,
     make_object,
     build_commit_graph,
-    skipIfPY3,
     )
 
 
@@ -71,7 +70,6 @@ class TestWalkEntry(object):
         return self.changes == other.changes()
 
 
-@skipIfPY3
 class WalkerTest(TestCase):
 
     def setUp(self):

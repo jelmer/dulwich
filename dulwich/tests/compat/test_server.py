@@ -26,11 +26,13 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 
 import threading
 import os
+import sys
 
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
     )
+from dulwich.tests import skipIf
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
@@ -40,7 +42,7 @@ from dulwich.tests.compat.utils import (
     require_git_version,
     )
 
-
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
@@ -70,6 +72,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class GitServerSideBand64kTestCase(GitServerTestCase):
     """Tests for client/server compatibility with side-band-64k support."""
 

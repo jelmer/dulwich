@@ -23,6 +23,7 @@
 """
 import errno
 import os
+import sys
 
 from dulwich.errors import (
     PackedRefsException,
@@ -31,6 +32,7 @@ from dulwich.errors import (
 from dulwich.objects import (
     hex_to_sha,
     git_line,
+    valid_hexsha,
     )
 from dulwich.file import (
     GitFile,
@@ -41,6 +43,8 @@ from dulwich.file import (
 SYMREF = b'ref: '
 LOCAL_BRANCH_PREFIX = b'refs/heads/'
 BAD_REF_CHARS = set(b'\177 ~^:?*[')
+
+path_sep_bytes = os.path.sep.encode(sys.getfilesystemencoding())
 
 
 def check_ref_format(refname):
@@ -394,10 +398,9 @@ class DiskRefsContainer(RefsContainer):
         subkeys = set()
         path = self.refpath(base)
         for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+            dir = root[len(path):].strip(path_sep_bytes).replace(path_sep_bytes, b'/')
             for filename in files:
-                refname = (("%s/%s" % (dir, filename))
-                           .strip("/").encode('ascii'))
+                refname = (dir + b'/' + filename).strip(b'/')
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format(base + b'/' + refname):
@@ -413,9 +416,9 @@ class DiskRefsContainer(RefsContainer):
             allkeys.add(b'HEAD')
         path = self.refpath(b'')
         for root, dirs, files in os.walk(self.refpath(b'refs')):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+            dir = root[len(path):].strip(path_sep_bytes).replace(path_sep_bytes, b'/')
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/").encode('ascii')
+                refname = (dir + b'/' + filename).strip(b'/')
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())
@@ -425,9 +428,8 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        name = name.decode('ascii')
-        if os.path.sep != "/":
-            name = name.replace("/", os.path.sep)
+        if path_sep_bytes != b'/':
+            name = name.replace(b'/', path_sep_bytes)
         return os.path.join(self.path, name)
 
     def get_packed_refs(self):
@@ -444,7 +446,7 @@ class DiskRefsContainer(RefsContainer):
             # None if and only if _packed_refs is also None.
             self._packed_refs = {}
             self._peeled_refs = {}
-            path = os.path.join(self.path, 'packed-refs')
+            path = os.path.join(self.path, b'packed-refs')
             try:
                 f = GitFile(path, 'rb')
             except IOError as e:
@@ -512,7 +514,7 @@ class DiskRefsContainer(RefsContainer):
     def _remove_packed_ref(self, name):
         if self._packed_refs is None:
             return
-        filename = os.path.join(self.path, 'packed-refs')
+        filename = os.path.join(self.path, b'packed-refs')
         # reread cached refs from disk, while holding the lock
         f = GitFile(filename, 'wb')
         try:
@@ -659,10 +661,8 @@ def _split_ref_line(line):
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line %r" % line)
     sha, name = fields
-    try:
-        hex_to_sha(sha)
-    except (AssertionError, TypeError) as e:
-        raise PackedRefsException(e)
+    if not valid_hexsha(sha):
+        raise PackedRefsException("Invalid hex sha %r" % sha)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name %r" % name)
     return (sha, name)
@@ -700,10 +700,8 @@ def read_packed_refs_with_peeled(f):
         if l.startswith(b'^'):
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
-            try:
-                hex_to_sha(l[1:])
-            except (AssertionError, TypeError) as e:
-                raise PackedRefsException(e)
+            if not valid_hexsha(l[1:]):
+                raise PackedRefsException("Invalid hex sha %r" % l[1:])
             sha, name = _split_ref_line(last)
             last = None
             yield (sha, name, l[1:])

@@ -1,3 +1,10 @@
+0.10.2  UNRELEASED
+
+ IMPROVEMENTS
+
+  * Extended Python3 support to most of the codebase.
+    (Gary van der Merwe, Jelmer Vernooij)
+
 0.10.1  2015-03-25
 
  BUG FIXES

@@ -32,11 +32,36 @@ from dulwich.errors import (
 
 TCP_GIT_PORT = 9418
 
-ZERO_SHA = "0" * 40
+ZERO_SHA = b"0" * 40
 
 SINGLE_ACK = 0
 MULTI_ACK = 1
 MULTI_ACK_DETAILED = 2
+
+# pack data
+SIDE_BAND_CHANNEL_DATA = 1
+# progress messages
+SIDE_BAND_CHANNEL_PROGRESS = 2
+# fatal error message just before stream aborts
+SIDE_BAND_CHANNEL_FATAL = 3
+
+CAPABILITY_DELETE_REFS = b'delete-refs'
+CAPABILITY_INCLUDE_TAG = b'include-tag'
+CAPABILITY_MULTI_ACK = b'multi_ack'
+CAPABILITY_MULTI_ACK_DETAILED = b'multi_ack_detailed'
+CAPABILITY_NO_PROGRESS = b'no-progress'
+CAPABILITY_OFS_DELTA = b'ofs-delta'
+CAPABILITY_REPORT_STATUS = b'report-status'
+CAPABILITY_SHALLOW = b'shallow'
+CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
+CAPABILITY_THIN_PACK = b'thin-pack'
+
+COMMAND_DEEPEN = b'deepen'
+COMMAND_SHALLOW = b'shallow'
+COMMAND_UNSHALLOW = b'unshallow'
+COMMAND_DONE = b'done'
+COMMAND_WANT = b'want'
+COMMAND_HAVE = b'have'
 
 
 class ProtocolFile(object):
@@ -61,8 +86,8 @@ def pkt_line(data):
         None, returns the flush-pkt ('0000').
     """
     if data is None:
-        return '0000'
-    return '%04x%s' % (len(data) + 4, data)
+        return b'0000'
+    return ('%04x' % (len(data) + 4)).encode('ascii') + data
 
 
 class Protocol(object):
@@ -120,12 +145,13 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, 'read')
             pkt_contents = read(size-4)
-            if len(pkt_contents) + 4 != size:
-                raise AssertionError('Length of pkt read %04x does not match length prefix %04x.'
-                                     .format(len(pkt_contents) + 4, size))
-            return pkt_contents
         except socket.error as e:
             raise GitProtocolError(e)
+        else:
+            if len(pkt_contents) + 4 != size:
+                raise GitProtocolError(
+                    'Length of pkt read %04x does not match length prefix %04x' % (len(pkt_contents) + 4, size))
+            return pkt_contents
 
     def eof(self):
         """Test whether the protocol stream has reached EOF.
@@ -209,7 +235,7 @@ class Protocol(object):
         # 65520-5 = 65515
         # WTF: Why have the len in ASCII, but the channel in binary.
         while blob:
-            self.write_pkt_line("%s%s" % (chr(channel), blob[:65515]))
+            self.write_pkt_line(bytes(bytearray([channel])) + blob[:65515])
             blob = blob[65515:]
 
     def send_cmd(self, cmd, *args):
@@ -220,7 +246,7 @@ class Protocol(object):
         :param cmd: The remote service to access.
         :param args: List of arguments to send to remove service.
         """
-        self.write_pkt_line("%s %s" % (cmd, "".join(["%s\0" % a for a in args])))
+        self.write_pkt_line(cmd + b" " + b"".join([(a + b"\0") for a in args]))
 
     def read_cmd(self):
         """Read a command and some arguments from the git client
@@ -230,10 +256,10 @@ class Protocol(object):
         :return: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
-        splice_at = line.find(" ")
+        splice_at = line.find(b" ")
         cmd, args = line[:splice_at], line[splice_at+1:]
-        assert args[-1] == "\x00"
-        return cmd, args[:-1].split(chr(0))
+        assert args[-1:] == b"\x00"
+        return cmd, args[:-1].split(b"\0")
 
 
 _RBUFSIZE = 8192  # Default read buffer size.
@@ -348,10 +374,10 @@ def extract_capabilities(text):
     :param text: String to extract from
     :return: Tuple with text with capabilities removed and list of capabilities
     """
-    if not "\0" in text:
+    if not b"\0" in text:
         return text, []
-    text, capabilities = text.rstrip().split("\0")
-    return (text, capabilities.strip().split(" "))
+    text, capabilities = text.rstrip().split(b"\0")
+    return (text, capabilities.strip().split(b" "))
 
 
 def extract_want_line_capabilities(text):
@@ -365,17 +391,17 @@ def extract_want_line_capabilities(text):
     :param text: Want line to extract from
     :return: Tuple with text with capabilities removed and list of capabilities
     """
-    split_text = text.rstrip().split(" ")
+    split_text = text.rstrip().split(b" ")
     if len(split_text) < 3:
         return text, []
-    return (" ".join(split_text[:2]), split_text[2:])
+    return (b" ".join(split_text[:2]), split_text[2:])
 
 
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
-    if 'multi_ack_detailed' in capabilities:
+    if b'multi_ack_detailed' in capabilities:
         return MULTI_ACK_DETAILED
-    elif 'multi_ack' in capabilities:
+    elif b'multi_ack' in capabilities:
         return MULTI_ACK
     return SINGLE_ACK
 

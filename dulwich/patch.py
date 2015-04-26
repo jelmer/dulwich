@@ -115,6 +115,20 @@ def is_binary(content):
     return '\0' in content[:FIRST_FEW_BYTES]
 
 
+def shortid(hexsha):
+    if hexsha is None:
+        return "0" * 7
+    else:
+        return hexsha[:7]
+
+
+def patch_filename(p, root):
+    if p is None:
+        return "/dev/null"
+    else:
+        return root + "/" + p
+
+
 def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """Write the diff for an object.
 
@@ -129,12 +143,8 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file
-    def shortid(hexsha):
-        if hexsha is None:
-            return "0" * 7
-        else:
-            return hexsha[:7]
-
+    old_path = patch_filename(old_path, "a")
+    new_path = patch_filename(new_path, "b")
     def content(mode, hexsha):
         if hexsha is None:
             return ''
@@ -148,27 +158,8 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
             return []
         else:
             return content.splitlines(True)
-
-    if old_path is None:
-        old_path = "/dev/null"
-    else:
-        old_path = "a/%s" % old_path
-    if new_path is None:
-        new_path = "/dev/null"
-    else:
-        new_path = "b/%s" % new_path
-    f.write("diff --git %s %s\n" % (old_path, new_path))
-    if old_mode != new_mode:
-        if new_mode is not None:
-            if old_mode is not None:
-                f.write("old mode %o\n" % old_mode)
-            f.write("new mode %o\n" % new_mode)
-        else:
-            f.write("deleted mode %o\n" % old_mode)
-    f.write("index %s..%s" % (shortid(old_id), shortid(new_id)))
-    if new_mode is not None:
-        f.write(" %o" % new_mode)
-    f.write("\n")
+    f.writelines(gen_diff_header(
+        (old_path, new_path), (old_mode, new_mode), (old_id, new_id)))
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
     if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
@@ -178,8 +169,32 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
             old_path, new_path))
 
 
+def gen_diff_header(paths, modes, shas):
+    """Write a blob diff header.
+
+    :param paths: Tuple with old and new path
+    :param modes: Tuple with old and new modes
+    :param shas: Tuple with old and new shas
+    """
+    (old_path, new_path) = paths
+    (old_mode, new_mode) = modes
+    (old_sha, new_sha) = shas
+    yield "diff --git %s %s\n" % (old_path, new_path)
+    if old_mode != new_mode:
+        if new_mode is not None:
+            if old_mode is not None:
+                yield "old mode %o\n" % old_mode
+            yield "new mode %o\n" % new_mode
+        else:
+            yield "deleted mode %o\n" % old_mode
+    yield "index " + shortid(old_sha) + ".." + shortid(new_sha)
+    if new_mode is not None:
+        yield " %o" % new_mode
+    yield "\n"
+
+
 def write_blob_diff(f, old_file, new_file):
-    """Write diff file header.
+    """Write blob diff.
 
     :param f: File-like object to write to
     :param old_file: (path, mode, hexsha) tuple (None if nonexisting)
@@ -189,36 +204,16 @@ def write_blob_diff(f, old_file, new_file):
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file
-    def blob_id(blob):
-        if blob is None:
-            return "0" * 7
-        else:
-            return blob.id[:7]
+    old_path = patch_filename(old_path, "a")
+    new_path = patch_filename(new_path, "b")
     def lines(blob):
         if blob is not None:
             return blob.data.splitlines(True)
         else:
             return []
-    if old_path is None:
-        old_path = "/dev/null"
-    else:
-        old_path = "a/%s" % old_path
-    if new_path is None:
-        new_path = "/dev/null"
-    else:
-        new_path = "b/%s" % new_path
-    f.write("diff --git %s %s\n" % (old_path, new_path))
-    if old_mode != new_mode:
-        if new_mode is not None:
-            if old_mode is not None:
-                f.write("old mode %o\n" % old_mode)
-            f.write("new mode %o\n" % new_mode)
-        else:
-            f.write("deleted mode %o\n" % old_mode)
-    f.write("index %s..%s" % (blob_id(old_blob), blob_id(new_blob)))
-    if new_mode is not None:
-        f.write(" %o" % new_mode)
-    f.write("\n")
+    f.writelines(gen_diff_header(
+        (old_path, new_path), (old_mode, new_mode),
+        (getattr(old_blob, "id", None), getattr(new_blob, "id", None))))
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,

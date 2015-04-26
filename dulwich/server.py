@@ -60,19 +60,38 @@ from dulwich.errors import (
     )
 from dulwich import log_utils
 from dulwich.objects import (
-    hex_to_sha,
     Commit,
+    valid_hexsha,
     )
 from dulwich.pack import (
     write_pack_objects,
     )
 from dulwich.protocol import (
     BufferedPktLineWriter,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_NO_PROGRESS,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_THIN_PACK,
+    COMMAND_DEEPEN,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
+    COMMAND_WANT,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
     ProtocolFile,
     ReceivableProtocol,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    SIDE_BAND_CHANNEL_FATAL,
     SINGLE_ACK,
     TCP_GIT_PORT,
     ZERO_SHA,
@@ -187,7 +206,7 @@ class Handler(object):
 
     @classmethod
     def capability_line(cls):
-        return " ".join(cls.capabilities())
+        return b" ".join(cls.capabilities())
 
     @classmethod
     def capabilities(cls):
@@ -195,7 +214,8 @@ class Handler(object):
 
     @classmethod
     def innocuous_capabilities(cls):
-        return ("include-tag", "thin-pack", "no-progress", "ofs-delta")
+        return (CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
+                CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA)
 
     @classmethod
     def required_capabilities(cls):
@@ -232,20 +252,26 @@ class UploadPackHandler(Handler):
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
+        # A state variable for denoting that the have list is still
+        # being processed, and the client is not accepting any other
+        # data (such as side-band, see the progress method here).
+        self._processing_have_lines = False
 
     @classmethod
     def capabilities(cls):
-        return ("multi_ack_detailed", "multi_ack", "side-band-64k", "thin-pack",
-                "ofs-delta", "no-progress", "include-tag", "shallow")
+        return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
+                CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
+                CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
+                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
 
     @classmethod
     def required_capabilities(cls):
-        return ("side-band-64k", "thin-pack", "ofs-delta")
+        return (CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK, CAPABILITY_OFS_DELTA)
 
     def progress(self, message):
-        if self.has_capability("no-progress"):
+        if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
             return
-        self.proto.write_sideband(2, message)
+        self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
 
     def get_tagged(self, refs=None, repo=None):
         """Get a dict of peeled values of tags to their original tag shas.
@@ -257,7 +283,7 @@ class UploadPackHandler(Handler):
         :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
             tag whose peeled value is peeled_sha.
         """
-        if not self.has_capability("include-tag"):
+        if not self.has_capability(CAPABILITY_INCLUDE_TAG):
             return {}
         if refs is None:
             refs = self.repo.get_refs()
@@ -270,32 +296,45 @@ class UploadPackHandler(Handler):
                 # TODO: fix behavior when missing
                 return {}
         tagged = {}
-        for name, sha in refs.iteritems():
+        for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
             if peeled_sha != sha:
                 tagged[peeled_sha] = sha
         return tagged
 
     def handle(self):
-        write = lambda x: self.proto.write_sideband(1, x)
+        write = lambda x: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
 
         graph_walker = ProtocolGraphWalker(self, self.repo.object_store,
             self.repo.get_peeled)
         objects_iter = self.repo.fetch_objects(
-          graph_walker.determine_wants, graph_walker, self.progress,
-          get_tagged=self.get_tagged)
+            graph_walker.determine_wants, graph_walker, self.progress,
+            get_tagged=self.get_tagged)
+
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
+        # Also, if it also happens that the object_iter is instantiated
+        # with a graph walker with an implementation that talks over the
+        # wire (which is this instance of this class) this will actually
+        # iterate through everything and write things out to the wire.
         if len(objects_iter) == 0:
             return
 
-        self.progress("dul-daemon says what\n")
-        self.progress("counting objects: %d, done.\n" % len(objects_iter))
+        # The provided haves are processed, and it is safe to send side-
+        # band data now.
+        self._processing_have_lines = False
+
+        self.progress(b"dul-daemon says what\n")
+        self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress("how was that, then?\n")
+        self.progress(b"how was that, then?\n")
         # we are done
-        self.proto.write("0000")
+        self.proto.write_pkt_line(None)
 
 
 def _split_proto_line(line, allowed):
@@ -318,22 +357,21 @@ def _split_proto_line(line, allowed):
     if not line:
         fields = [None]
     else:
-        fields = line.rstrip('\n').split(' ', 1)
+        fields = line.rstrip(b'\n').split(b' ', 1)
     command = fields[0]
     if allowed is not None and command not in allowed:
         raise UnexpectedCommandError(command)
-    try:
-        if len(fields) == 1 and command in ('done', None):
-            return (command, None)
-        elif len(fields) == 2:
-            if command in ('want', 'have', 'shallow', 'unshallow'):
-                hex_to_sha(fields[1])
-                return tuple(fields)
-            elif command == 'deepen':
-                return command, int(fields[1])
-    except (TypeError, AssertionError) as e:
-        raise GitProtocolError(e)
-    raise GitProtocolError('Received invalid line from client: %s' % line)
+    if len(fields) == 1 and command in (COMMAND_DONE, None):
+        return (command, None)
+    elif len(fields) == 2:
+        if command in (COMMAND_WANT, COMMAND_HAVE, COMMAND_SHALLOW,
+                       COMMAND_UNSHALLOW):
+            if not valid_hexsha(fields[1]):
+                raise GitProtocolError("Invalid sha")
+            return tuple(fields)
+        elif command == COMMAND_DEEPEN:
+            return command, int(fields[1])
+    raise GitProtocolError('Received invalid line from client: %r' % line)
 
 
 def _find_shallow(store, heads, depth):
@@ -381,7 +419,7 @@ def _want_satisfied(store, haves, want, earliest):
         commit = pending.popleft()
         if commit.id in haves:
             return True
-        if commit.type_name != "commit":
+        if commit.type_name != b"commit":
             # non-commit wants are assumed to be satisfied
             continue
         for parent in commit.parents:
@@ -460,17 +498,16 @@ class ProtocolGraphWalker(object):
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
         """
-        values = set(heads.itervalues())
+        values = set(heads.values())
         if self.advertise_refs or not self.http_req:
-            for i, (ref, sha) in enumerate(sorted(heads.iteritems())):
-                line = "%s %s" % (sha, ref)
+            for i, (ref, sha) in enumerate(sorted(heads.items())):
+                line = sha + b' ' + ref
                 if not i:
-                    line = "%s\x00%s" % (line, self.handler.capability_line())
-                self.proto.write_pkt_line("%s\n" % line)
+                    line += b'\x00' + self.handler.capability_line()
+                self.proto.write_pkt_line(line + b'\n')
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
-                    self.proto.write_pkt_line('%s %s^{}\n' %
-                                              (peeled_sha, ref))
+                    self.proto.write_pkt_line(peeled_sha + b' ' + ref + b'^{}\n')
 
             # i'm done..
             self.proto.write_pkt_line(None)
@@ -485,11 +522,11 @@ class ProtocolGraphWalker(object):
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        allowed = ('want', 'shallow', 'deepen', None)
+        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
         command, sha = _split_proto_line(line, allowed)
 
         want_revs = []
-        while command == 'want':
+        while command == COMMAND_WANT:
             if sha not in values:
                 raise GitProtocolError(
                   'Client wants invalid object %s' % sha)
@@ -497,7 +534,7 @@ class ProtocolGraphWalker(object):
             command, sha = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
-        if command in ('shallow', 'deepen'):
+        if command in (COMMAND_SHALLOW, COMMAND_DEEPEN):
             self.unread_proto_line(command, sha)
             self._handle_shallow_request(want_revs)
 
@@ -510,7 +547,9 @@ class ProtocolGraphWalker(object):
         return want_revs
 
     def unread_proto_line(self, command, value):
-        self.proto.unread_pkt_line('%s %s' % (command, value))
+        if isinstance(value, int):
+            value = str(value).encode('ascii')
+        self.proto.unread_pkt_line(command + b' ' + value)
 
     def ack(self, have_ref):
         if len(have_ref) != 40:
@@ -544,8 +583,8 @@ class ProtocolGraphWalker(object):
 
     def _handle_shallow_request(self, wants):
         while True:
-            command, val = self.read_proto_line(('deepen', 'shallow'))
-            if command == 'deepen':
+            command, val = self.read_proto_line((COMMAND_DEEPEN, COMMAND_SHALLOW))
+            if command == COMMAND_DEEPEN:
                 depth = val
                 break
             self.client_shallow.add(val)
@@ -560,19 +599,19 @@ class ProtocolGraphWalker(object):
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
         for sha in sorted(new_shallow):
-            self.proto.write_pkt_line('shallow %s' % sha)
+            self.proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha)
         for sha in sorted(unshallow):
-            self.proto.write_pkt_line('unshallow %s' % sha)
+            self.proto.write_pkt_line(COMMAND_UNSHALLOW + b' ' + sha)
 
         self.proto.write_pkt_line(None)
 
-    def send_ack(self, sha, ack_type=''):
+    def send_ack(self, sha, ack_type=b''):
         if ack_type:
-            ack_type = ' %s' % ack_type
-        self.proto.write_pkt_line('ACK %s%s\n' % (sha, ack_type))
+            ack_type = b' ' + ack_type
+        self.proto.write_pkt_line(b'ACK ' + sha + ack_type + b'\n')
 
     def send_nak(self):
-        self.proto.write_pkt_line('NAK\n')
+        self.proto.write_pkt_line(b'NAK\n')
 
     def set_wants(self, wants):
         self._wants = wants
@@ -595,7 +634,7 @@ class ProtocolGraphWalker(object):
         self._impl = impl_classes[ack_type](self)
 
 
-_GRAPH_WALKER_COMMANDS = ('have', 'done', None)
+_GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
 class SingleAckGraphWalkerImpl(object):
@@ -612,11 +651,11 @@ class SingleAckGraphWalkerImpl(object):
 
     def next(self):
         command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
-        if command in (None, 'done'):
+        if command in (None, COMMAND_DONE):
             if not self._sent_ack:
                 self.walker.send_nak()
             return None
-        elif command == 'have':
+        elif command == COMMAND_HAVE:
             return sha
 
     __next__ = next
@@ -633,7 +672,7 @@ class MultiAckGraphWalkerImpl(object):
     def ack(self, have_ref):
         self._common.append(have_ref)
         if not self._found_base:
-            self.walker.send_ack(have_ref, 'continue')
+            self.walker.send_ack(have_ref, b'continue')
             if self.walker.all_wants_satisfied(self._common):
                 self._found_base = True
         # else we blind ack within next
@@ -646,7 +685,7 @@ class MultiAckGraphWalkerImpl(object):
                 # in multi-ack mode, a flush-pkt indicates the client wants to
                 # flush but more have lines are still coming
                 continue
-            elif command == 'done':
+            elif command == COMMAND_DONE:
                 # don't nak unless no common commits were found, even if not
                 # everything is satisfied
                 if self._common:
@@ -654,10 +693,10 @@ class MultiAckGraphWalkerImpl(object):
                 else:
                     self.walker.send_nak()
                 return None
-            elif command == 'have':
+            elif command == COMMAND_HAVE:
                 if self._found_base:
                     # blind ack
-                    self.walker.send_ack(sha, 'continue')
+                    self.walker.send_ack(sha, b'continue')
                 return sha
 
     __next__ = next
@@ -674,10 +713,10 @@ class MultiAckDetailedGraphWalkerImpl(object):
     def ack(self, have_ref):
         self._common.append(have_ref)
         if not self._found_base:
-            self.walker.send_ack(have_ref, 'common')
+            self.walker.send_ack(have_ref, b'common')
             if self.walker.all_wants_satisfied(self._common):
                 self._found_base = True
-                self.walker.send_ack(have_ref, 'ready')
+                self.walker.send_ack(have_ref, b'ready')
         # else we blind ack within next
 
     def next(self):
@@ -688,7 +727,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 if self.walker.http_req:
                     return None
                 continue
-            elif command == 'done':
+            elif command == COMMAND_DONE:
                 # don't nak unless no common commits were found, even if not
                 # everything is satisfied
                 if self._common:
@@ -696,11 +735,11 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 else:
                     self.walker.send_nak()
                 return None
-            elif command == 'have':
+            elif command == COMMAND_HAVE:
                 if self._found_base:
                     # blind ack; can happen if the client has more requests
                     # inflight
-                    self.walker.send_ack(sha, 'ready')
+                    self.walker.send_ack(sha, b'ready')
                 return sha
 
     __next__ = next
@@ -717,7 +756,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return ("report-status", "delete-refs", "side-band-64k")
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_SIDE_BAND_64K)
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
@@ -735,43 +774,43 @@ class ReceivePackHandler(Handler):
             try:
                 recv = getattr(self.proto, "recv", None)
                 self.repo.object_store.add_thin_pack(self.proto.read, recv)
-                status.append(('unpack', 'ok'))
+                status.append((b'unpack', b'ok'))
             except all_exceptions as e:
-                status.append(('unpack', str(e).replace('\n', '')))
+                status.append((b'unpack', str(e).replace('\n', '')))
                 # The pack may still have been moved in, but it may contain broken
                 # objects. We trust a later GC to clean it up.
         else:
             # The git protocol want to find a status entry related to unpack process
             # even if no pack data has been sent.
-            status.append(('unpack', 'ok'))
+            status.append((b'unpack', b'ok'))
 
         for oldsha, sha, ref in refs:
-            ref_status = 'ok'
+            ref_status = b'ok'
             try:
                 if sha == ZERO_SHA:
-                    if not 'delete-refs' in self.capabilities():
+                    if not CAPABILITY_DELETE_REFS in self.capabilities():
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')
                     try:
                         del self.repo.refs[ref]
                     except all_exceptions:
-                        ref_status = 'failed to delete'
+                        ref_status = b'failed to delete'
                 else:
                     try:
                         self.repo.refs[ref] = sha
                     except all_exceptions:
-                        ref_status = 'failed to write'
+                        ref_status = b'failed to write'
             except KeyError as e:
-                ref_status = 'bad ref'
+                ref_status = b'bad ref'
             status.append((ref, ref_status))
 
         return status
 
     def _report_status(self, status):
-        if self.has_capability('side-band-64k'):
+        if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
-              lambda d: self.proto.write_sideband(1, d))
+              lambda d: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d))
             write = writer.write
 
             def flush():
@@ -782,31 +821,31 @@ class ReceivePackHandler(Handler):
             flush = lambda: None
 
         for name, msg in status:
-            if name == 'unpack':
-                write('unpack %s\n' % msg)
-            elif msg == 'ok':
-                write('ok %s\n' % name)
+            if name == b'unpack':
+                write(b'unpack ' + msg + b'\n')
+            elif msg == b'ok':
+                write(b'ok ' + name + b'\n')
             else:
-                write('ng %s %s\n' % (name, msg))
+                write(b'ng ' + name + b' ' + msg + b'\n')
         write(None)
         flush()
 
     def handle(self):
         if self.advertise_refs or not self.http_req:
-            refs = sorted(self.repo.get_refs().iteritems())
+            refs = sorted(self.repo.get_refs().items())
 
             if refs:
                 self.proto.write_pkt_line(
-                  "%s %s\x00%s\n" % (refs[0][1], refs[0][0],
-                                     self.capability_line()))
+                  refs[0][1] + b' ' + refs[0][0] + b'\0' +
+                  self.capability_line() + b'\n')
                 for i in range(1, len(refs)):
                     ref = refs[i]
-                    self.proto.write_pkt_line("%s %s\n" % (ref[1], ref[0]))
+                    self.proto.write_pkt_line(ref[1] + b' ' + ref[0] + b'\n')
             else:
-                self.proto.write_pkt_line("%s capabilities^{}\0%s" % (
-                  ZERO_SHA, self.capability_line()))
+                self.proto.write_pkt_line(ZERO_SHA + b" capabilities^{}\0" +
+                    self.capability_line())
 
-            self.proto.write("0000")
+            self.proto.write_pkt_line(None)
             if self.advertise_refs:
                 return
 
@@ -830,14 +869,14 @@ class ReceivePackHandler(Handler):
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
-        if self.has_capability('report-status'):
+        if self.has_capability(CAPABILITY_REPORT_STATUS):
             self._report_status(status)
 
 
 # Default handler classes for git services.
 DEFAULT_HANDLERS = {
-  'git-upload-pack': UploadPackHandler,
-  'git-receive-pack': ReceivePackHandler,
+  b'git-upload-pack': UploadPackHandler,
+  b'git-receive-pack': ReceivePackHandler,
   }
 
 
@@ -941,7 +980,7 @@ def generate_info_refs(repo):
 def generate_objects_info_packs(repo):
     """Generate an index for for packs."""
     for pack in repo.object_store.packs:
-        yield 'P %s\n' % pack.data.filename
+        yield b'P ' + pack.data.filename.encode(sys.getfilesystemencoding()) + b'\n'
 
 
 def update_server_info(repo):
@@ -950,11 +989,11 @@ def update_server_info(repo):
     This generates info/refs and objects/info/packs,
     similar to "git update-server-info".
     """
-    repo._put_named_file(os.path.join('info', 'refs'),
-        "".join(generate_info_refs(repo)))
+    repo._put_named_file(os.path.join(b'info', b'refs'),
+        b"".join(generate_info_refs(repo)))
 
-    repo._put_named_file(os.path.join('objects', 'info', 'packs'),
-        "".join(generate_objects_info_packs(repo)))
+    repo._put_named_file(os.path.join(b'objects', b'info', b'packs'),
+        b"".join(generate_objects_info_packs(repo)))
 
 
 if __name__ == '__main__':

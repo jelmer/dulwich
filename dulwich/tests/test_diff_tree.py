@@ -57,11 +57,9 @@ from dulwich.tests.utils import (
     make_object,
     functest_builder,
     ext_functest_builder,
-    skipIfPY3,
     )
 
 
-@skipIfPY3
 class DiffTestCase(TestCase):
 
     def setUp(self):
@@ -86,7 +84,6 @@ class DiffTestCase(TestCase):
         return self.store[commit_tree(self.store, commit_blobs)]
 
 
-@skipIfPY3
 class TreeChangesTest(DiffTestCase):
 
     def setUp(self):
@@ -470,7 +467,6 @@ class TreeChangesTest(DiffTestCase):
             [parent1, parent2], merge, rename_detector=self.detector)
 
 
-@skipIfPY3
 class RenameDetectionTest(DiffTestCase):
 
     def _do_test_count_blocks(self, count_blocks):
@@ -759,15 +755,16 @@ class RenameDetectionTest(DiffTestCase):
             self.detect_renames(tree1, tree2))
 
     def test_content_rename_with_more_deletions(self):
-        blob1 = make_object(Blob, data='')
-        tree1 = self.commit_tree([('a', blob1), ('b', blob1), ('c', blob1), ('d', blob1)])
-        tree2 = self.commit_tree([('e', blob1), ('f', blob1), ('g', blob1)])
+        blob1 = make_object(Blob, data=b'')
+        tree1 = self.commit_tree([(b'a', blob1), (b'b', blob1), (b'c', blob1),
+                                  (b'd', blob1)])
+        tree2 = self.commit_tree([(b'e', blob1), (b'f', blob1), (b'g', blob1)])
         self.maxDiff = None
         self.assertEqual(
-          [TreeChange(CHANGE_RENAME, ('a', F, blob1.id), ('e', F, blob1.id)),
-           TreeChange(CHANGE_RENAME, ('b', F, blob1.id), ('f', F, blob1.id)),
-           TreeChange(CHANGE_RENAME, ('c', F, blob1.id), ('g', F, blob1.id)),
-           TreeChange.delete(('d', F, blob1.id))],
+          [TreeChange(CHANGE_RENAME, (b'a', F, blob1.id), (b'e', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, (b'b', F, blob1.id), (b'f', F, blob1.id)),
+           TreeChange(CHANGE_RENAME, (b'c', F, blob1.id), (b'g', F, blob1.id)),
+           TreeChange.delete((b'd', F, blob1.id))],
           self.detect_renames(tree1, tree2))
 
     def test_content_rename_gitlink(self):

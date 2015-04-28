@@ -917,6 +917,7 @@ class Repo(BaseRepo):
     create = init_bare
 
     def close(self):
+        """Close any files opened by this repository."""
         self.object_store.close()
 
     def __enter__(self):

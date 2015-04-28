@@ -81,11 +81,11 @@ class TestPack(PackTests):
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
 
     def test_deltas_work(self):
-        orig_pack = self.get_pack(pack1_sha)
-        orig_blob = orig_pack[a_sha]
-        new_blob = Blob()
-        new_blob.data = orig_blob.data + b'x'
-        all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
+        with self.get_pack(pack1_sha) as orig_pack:
+            orig_blob = orig_pack[a_sha]
+            new_blob = Blob()
+            new_blob.data = orig_blob.data + b'x'
+            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
         pack_path = os.path.join(self._tempdir, b'pack_with_deltas')
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(['verify-pack', '-v', pack_path])
@@ -102,14 +102,14 @@ class TestPack(PackTests):
     def test_delta_medium_object(self):
         # This tests an object set that will have a copy operation
         # 2**20 in size.
-        orig_pack = self.get_pack(pack1_sha)
-        orig_blob = orig_pack[a_sha]
-        new_blob = Blob()
-        new_blob.data = orig_blob.data + (b'x' * 2 ** 20)
-        new_blob_2 = Blob()
-        new_blob_2.data = new_blob.data + b'y'
-        all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
-                                                       (new_blob_2, None)]
+        with self.get_pack(pack1_sha) as orig_pack:
+            orig_blob = orig_pack[a_sha]
+            new_blob = Blob()
+            new_blob.data = orig_blob.data + (b'x' * 2 ** 20)
+            new_blob_2 = Blob()
+            new_blob_2.data = new_blob.data + b'y'
+            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
+                                                           (new_blob_2, None)]
         pack_path = os.path.join(self._tempdir, b'pack_with_deltas')
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(['verify-pack', '-v', pack_path])
@@ -136,14 +136,14 @@ class TestPack(PackTests):
         # 2**25 in size. This is a copy large enough that it requires
         # two copy operations in git's binary delta format.
         raise SkipTest('skipping slow, large test')
-        orig_pack = self.get_pack(pack1_sha)
-        orig_blob = orig_pack[a_sha]
-        new_blob = Blob()
-        new_blob.data = 'big blob' + ('x' * 2 ** 25)
-        new_blob_2 = Blob()
-        new_blob_2.data = new_blob.data + 'y'
-        all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
-                                                       (new_blob_2, None)]
+        with self.get_pack(pack1_sha) as orig_pack:
+            orig_blob = orig_pack[a_sha]
+            new_blob = Blob()
+            new_blob.data = 'big blob' + ('x' * 2 ** 25)
+            new_blob_2 = Blob()
+            new_blob_2.data = new_blob.data + 'y'
+            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
+                                                           (new_blob_2, None)]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(['verify-pack', '-v', pack_path])

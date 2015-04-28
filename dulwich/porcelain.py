@@ -48,6 +48,10 @@ Differences in behaviour are considered bugs.
 __docformat__ = 'restructuredText'
 
 from collections import namedtuple
+from contextlib import (
+    closing,
+    contextmanager,
+)
 import os
 import sys
 import time
@@ -86,6 +90,22 @@ def open_repo(path_or_repo):
     return Repo(path_or_repo)
 
 
+@contextmanager
+def _noop_context_manager(obj):
+    """Context manager that has the same api as closing but does nothing."""
+    yield obj
+
+
+def open_repo_closing(path_or_repo):
+    """Open an argument that can be a repository or a path for a repository.
+    returns a context manager that will close the repo on exit if the argument
+    is a path, else does nothing if the argument is a repo.
+    """
+    if isinstance(path_or_repo, BaseRepo):
+        return _noop_context_manager(path_or_repo)
+    return closing(Repo(path_or_repo))
+
+
 def archive(location, committish=None, outstream=sys.stdout,
             errstream=sys.stderr):
     """Create an archive.
@@ -110,8 +130,8 @@ def update_server_info(repo="."):
 
     :param repo: path to the repository
     """
-    r = open_repo(repo)
-    server_update_server_info(r)
+    with open_repo_closing(repo) as r:
+        server_update_server_info(r)
 
 
 def symbolic_ref(repo, ref_name, force=False):
@@ -121,11 +141,11 @@ def symbolic_ref(repo, ref_name, force=False):
     :param ref_name: short name of the new ref
     :param force: force settings without checking if it exists in refs/heads
     """
-    repo_obj = open_repo(repo)
-    ref_path = b'refs/heads/' + ref_name
-    if not force and ref_path not in repo_obj.refs.keys():
-        raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
-    repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
+    with open_repo_closing(repo) as repo_obj:
+        ref_path = b'refs/heads/' + ref_name
+        if not force and ref_path not in repo_obj.refs.keys():
+            raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
+        repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
 def commit(repo=".", message=None, author=None, committer=None):
@@ -139,9 +159,9 @@ def commit(repo=".", message=None, author=None, committer=None):
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
-    r = open_repo(repo)
-    return r.do_commit(message=message, author=author,
-        committer=committer)
+    with open_repo_closing(repo) as r:
+        return r.do_commit(message=message, author=author,
+            committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -152,9 +172,9 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     :param author: Optional author name and email
     :param committer: Optional committer name and email
     """
-    r = open_repo(repo)
-    return r.do_commit(message=message, tree=tree, committer=committer,
-            author=author)
+    with open_repo_closing(repo) as r:
+        return r.do_commit(message=message, tree=tree, committer=committer,
+                author=author)
 
 
 def init(path=".", bare=False):
@@ -200,17 +220,22 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
 
     if not os.path.exists(target):
         os.mkdir(target)
+
     if bare:
         r = Repo.init_bare(target)
     else:
         r = Repo.init(target)
-    remote_refs = client.fetch(host_path, r,
-        determine_wants=r.object_store.determine_wants_all,
-        progress=errstream.write)
-    r[b"HEAD"] = remote_refs[b"HEAD"]
-    if checkout:
-        errstream.write(b'Checking out HEAD')
-        r.reset_index()
+    try:
+        remote_refs = client.fetch(host_path, r,
+            determine_wants=r.object_store.determine_wants_all,
+            progress=errstream.write)
+        r[b"HEAD"] = remote_refs[b"HEAD"]
+        if checkout:
+            errstream.write(b'Checking out HEAD')
+            r.reset_index()
+    except Exception:
+        r.close()
+        raise
 
     return r
 
@@ -222,17 +247,17 @@ def add(repo=".", paths=None):
     :param paths: Paths to add.  No value passed stages all modified files.
     """
     # FIXME: Support patterns, directories.
-    r = open_repo(repo)
-    if not paths:
-        # If nothing is specified, add all non-ignored files.
-        paths = []
-        for dirpath, dirnames, filenames in os.walk(r.path):
-            # Skip .git and below.
-            if '.git' in dirnames:
-                dirnames.remove('.git')
-            for filename in filenames:
-                paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-    r.stage(paths)
+    with open_repo_closing(repo) as r:
+        if not paths:
+            # If nothing is specified, add all non-ignored files.
+            paths = []
+            for dirpath, dirnames, filenames in os.walk(r.path):
+                # Skip .git and below.
+                if '.git' in dirnames:
+                    dirnames.remove('.git')
+                for filename in filenames:
+                    paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
+        r.stage(paths)
 
 
 def rm(repo=".", paths=None):
@@ -241,11 +266,11 @@ def rm(repo=".", paths=None):
     :param repo: Repository for the files
     :param paths: Paths to remove
     """
-    r = open_repo(repo)
-    index = r.open_index()
-    for p in paths:
-        del index[p.encode(sys.getfilesystemencoding())]
-    index.write()
+    with open_repo_closing(repo) as r:
+        index = r.open_index()
+        for p in paths:
+            del index[p.encode(sys.getfilesystemencoding())]
+        index.write()
 
 
 def commit_decode(commit, contents):
@@ -344,10 +369,10 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
     :param outstream: Stream to write log output to
     :param max_entries: Optional maximum number of entries to display
     """
-    r = open_repo(repo)
-    walker = r.get_walker(max_entries=max_entries)
-    for entry in walker:
-        print_commit(entry.commit, outstream)
+    with open_repo_closing(repo) as r:
+        walker = r.get_walker(max_entries=max_entries)
+        for entry in walker:
+            print_commit(entry.commit, outstream)
 
 
 def show(repo=".", objects=None, outstream=sys.stdout):
@@ -361,9 +386,9 @@ def show(repo=".", objects=None, outstream=sys.stdout):
         objects = ["HEAD"]
     if not isinstance(objects, list):
         objects = [objects]
-    r = open_repo(repo)
-    for objectish in objects:
-        show_object(r, parse_object(r, objectish), outstream)
+    with open_repo_closing(repo) as r:
+        for objectish in objects:
+            show_object(r, parse_object(r, objectish), outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
@@ -374,8 +399,8 @@ def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
     :param new_tree: Id of new tree
     :param outstream: Stream to write to
     """
-    r = open_repo(repo)
-    write_tree_diff(outstream, r.object_store, old_tree, new_tree)
+    with open_repo_closing(repo) as r:
+        write_tree_diff(outstream, r.object_store, old_tree, new_tree)
 
 
 def rev_list(repo, commits, outstream=sys.stdout):
@@ -385,9 +410,9 @@ def rev_list(repo, commits, outstream=sys.stdout):
     :param commits: Commits over which to iterate
     :param outstream: Stream to write to
     """
-    r = open_repo(repo)
-    for entry in r.get_walker(include=[r[c].id for c in commits]):
-        outstream.write(entry.commit.id + b"\n")
+    with open_repo_closing(repo) as r:
+        for entry in r.get_walker(include=[r[c].id for c in commits]):
+            outstream.write(entry.commit.id + b"\n")
 
 
 def tag(*args, **kwargs):
@@ -410,34 +435,34 @@ def tag_create(repo, tag, author=None, message=None, annotated=False,
     :param tag_timezone: Optional timezone for annotated tag
     """
 
-    r = open_repo(repo)
-    object = parse_object(r, objectish)
+    with open_repo_closing(repo) as r:
+        object = parse_object(r, objectish)
 
-    if annotated:
-        # Create the tag object
-        tag_obj = Tag()
-        if author is None:
-            # TODO(jelmer): Don't use repo private method.
-            author = r._get_user_identity()
-        tag_obj.tagger = author
-        tag_obj.message = message
-        tag_obj.name = tag
-        tag_obj.object = (type(object), object.id)
-        tag_obj.tag_time = tag_time
-        if tag_time is None:
-            tag_time = int(time.time())
-        if tag_timezone is None:
-            # TODO(jelmer) Use current user timezone rather than UTC
-            tag_timezone = 0
-        elif isinstance(tag_timezone, str):
-            tag_timezone = parse_timezone(tag_timezone)
-        tag_obj.tag_timezone = tag_timezone
-        r.object_store.add_object(tag_obj)
-        tag_id = tag_obj.id
-    else:
-        tag_id = object.id
+        if annotated:
+            # Create the tag object
+            tag_obj = Tag()
+            if author is None:
+                # TODO(jelmer): Don't use repo private method.
+                author = r._get_user_identity()
+            tag_obj.tagger = author
+            tag_obj.message = message
+            tag_obj.name = tag
+            tag_obj.object = (type(object), object.id)
+            tag_obj.tag_time = tag_time
+            if tag_time is None:
+                tag_time = int(time.time())
+            if tag_timezone is None:
+                # TODO(jelmer) Use current user timezone rather than UTC
+                tag_timezone = 0
+            elif isinstance(tag_timezone, str):
+                tag_timezone = parse_timezone(tag_timezone)
+            tag_obj.tag_timezone = tag_timezone
+            r.object_store.add_object(tag_obj)
+            tag_id = tag_obj.id
+        else:
+            tag_id = object.id
 
-    r.refs[b'refs/tags/' + tag] = tag_id
+        r.refs[b'refs/tags/' + tag] = tag_id
 
 
 def list_tags(*args, **kwargs):
@@ -452,10 +477,10 @@ def tag_list(repo, outstream=sys.stdout):
     :param repo: Path to repository
     :param outstream: Stream to write tags to
     """
-    r = open_repo(repo)
-    tags = list(r.refs.as_dict(b"refs/tags"))
-    tags.sort()
-    return tags
+    with open_repo_closing(repo) as r:
+        tags = list(r.refs.as_dict(b"refs/tags"))
+        tags.sort()
+        return tags
 
 
 def tag_delete(repo, name):
@@ -464,15 +489,15 @@ def tag_delete(repo, name):
     :param repo: Path to repository
     :param name: Name of tag to remove
     """
-    r = open_repo(repo)
-    if isinstance(name, bytes):
-        names = [name]
-    elif isinstance(name, list):
-        names = name
-    else:
-        raise TypeError("Unexpected tag name type %r" % name)
-    for name in names:
-        del r.refs[b"refs/tags/" + name]
+    with open_repo_closing(repo) as r:
+        if isinstance(name, bytes):
+            names = [name]
+        elif isinstance(name, list):
+            names = name
+        else:
+            raise TypeError("Unexpected tag name type %r" % name)
+        for name in names:
+            del r.refs[b"refs/tags/" + name]
 
 
 def reset(repo, mode, committish="HEAD"):
@@ -485,10 +510,9 @@ def reset(repo, mode, committish="HEAD"):
     if mode != "hard":
         raise ValueError("hard is the only mode currently supported")
 
-    r = open_repo(repo)
-
-    tree = r[committish].tree
-    r.reset_index()
+    with open_repo_closing(repo) as r:
+        tree = r[committish].tree
+        r.reset_index()
 
 
 def push(repo, remote_location, refs_path,
@@ -503,28 +527,28 @@ def push(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    with open_repo_closing(repo) as r:
 
-    # Get the client and path
-    client, path = get_transport_and_path(remote_location)
+        # Get the client and path
+        client, path = get_transport_and_path(remote_location)
 
-    def update_refs(refs):
-        new_refs = r.get_refs()
-        refs[refs_path] = new_refs[b'HEAD']
-        del new_refs[b'HEAD']
-        return refs
+        def update_refs(refs):
+            new_refs = r.get_refs()
+            refs[refs_path] = new_refs[b'HEAD']
+            del new_refs[b'HEAD']
+            return refs
 
-    err_encoding = getattr(errstream, 'encoding', 'utf-8')
-    if not isinstance(remote_location, bytes):
-        remote_location_bytes = remote_location.encode(err_encoding)
-    else:
-        remote_location_bytes = remote_location
-    try:
-        client.send_pack(path, update_refs,
-            r.object_store.generate_pack_contents, progress=errstream.write)
-        errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
-    except (UpdateRefsError, SendPackError) as e:
-        errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
+        err_encoding = getattr(errstream, 'encoding', 'utf-8')
+        if not isinstance(remote_location, bytes):
+            remote_location_bytes = remote_location.encode(err_encoding)
+        else:
+            remote_location_bytes = remote_location
+        try:
+            client.send_pack(path, update_refs,
+                r.object_store.generate_pack_contents, progress=errstream.write)
+            errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
+        except (UpdateRefsError, SendPackError) as e:
+            errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
 
 
 def pull(repo, remote_location, refs_path,
@@ -539,15 +563,14 @@ def pull(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    with open_repo_closing(repo) as r:
+        client, path = get_transport_and_path(remote_location)
+        remote_refs = client.fetch(path, r, progress=errstream.write)
+        r[b'HEAD'] = remote_refs[refs_path]
 
-    client, path = get_transport_and_path(remote_location)
-    remote_refs = client.fetch(path, r, progress=errstream.write)
-    r[b'HEAD'] = remote_refs[refs_path]
-
-    # Perform 'git checkout .' - syncs staged changes
-    tree = r[b"HEAD"].tree
-    r.reset_index()
+        # Perform 'git checkout .' - syncs staged changes
+        tree = r[b"HEAD"].tree
+        r.reset_index()
 
 
 def status(repo="."):
@@ -559,15 +582,14 @@ def status(repo="."):
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """
-    r = open_repo(repo)
-
-    # 1. Get status of staged
-    tracked_changes = get_tree_changes(r)
-    # 2. Get status of unstaged
-    unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
-    # TODO - Status of untracked - add untracked changes, need gitignore.
-    untracked_changes = []
-    return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
+    with open_repo_closing(repo) as r:
+        # 1. Get status of staged
+        tracked_changes = get_tree_changes(r)
+        # 2. Get status of unstaged
+        unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
+        # TODO - Status of untracked - add untracked changes, need gitignore.
+        untracked_changes = []
+        return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
 def get_tree_changes(repo):
@@ -576,27 +598,27 @@ def get_tree_changes(repo):
     :param repo: repo path or object
     :return: dict with lists for each type of change
     """
-    r = open_repo(repo)
-    index = r.open_index()
+    with open_repo_closing(repo) as r:
+        index = r.open_index()
 
-    # Compares the Index to the HEAD & determines changes
-    # Iterate through the changes and report add/delete/modify
-    # TODO: call out to dulwich.diff_tree somehow.
-    tracked_changes = {
-        'add': [],
-        'delete': [],
-        'modify': [],
-    }
-    for change in index.changes_from_tree(r.object_store, r[b'HEAD'].tree):
-        if not change[0][0]:
-            tracked_changes['add'].append(change[0][1])
-        elif not change[0][1]:
-            tracked_changes['delete'].append(change[0][0])
-        elif change[0][0] == change[0][1]:
-            tracked_changes['modify'].append(change[0][0])
-        else:
-            raise AssertionError('git mv ops not yet supported')
-    return tracked_changes
+        # Compares the Index to the HEAD & determines changes
+        # Iterate through the changes and report add/delete/modify
+        # TODO: call out to dulwich.diff_tree somehow.
+        tracked_changes = {
+            'add': [],
+            'delete': [],
+            'modify': [],
+        }
+        for change in index.changes_from_tree(r.object_store, r[b'HEAD'].tree):
+            if not change[0][0]:
+                tracked_changes['add'].append(change[0][1])
+            elif not change[0][1]:
+                tracked_changes['delete'].append(change[0][0])
+            elif change[0][0] == change[0][1]:
+                tracked_changes['modify'].append(change[0][0])
+            else:
+                raise AssertionError('git mv ops not yet supported')
+        return tracked_changes
 
 
 def daemon(path=".", address=None, port=None):
@@ -683,15 +705,15 @@ def branch_delete(repo, name):
     :param repo: Path to the repository
     :param name: Name of the branch
     """
-    r = open_repo(repo)
-    if isinstance(name, bytes):
-        names = [name]
-    elif isinstance(name, list):
-        names = name
-    else:
-        raise TypeError("Unexpected branch name type %r" % name)
-    for name in names:
-        del r.refs[b"refs/heads/" + name]
+    with open_repo_closing(repo) as r:
+        if isinstance(name, bytes):
+            names = [name]
+        elif isinstance(name, list):
+            names = name
+        else:
+            raise TypeError("Unexpected branch name type %r" % name)
+        for name in names:
+            del r.refs[b"refs/heads/" + name]
 
 
 def branch_create(repo, name, objectish=None, force=False):
@@ -702,20 +724,20 @@ def branch_create(repo, name, objectish=None, force=False):
     :param objectish: Target object to point new branch at (defaults to HEAD)
     :param force: Force creation of branch, even if it already exists
     """
-    r = open_repo(repo)
-    if isinstance(name, bytes):
-        names = [name]
-    elif isinstance(name, list):
-        names = name
-    else:
-        raise TypeError("Unexpected branch name type %r" % name)
-    if objectish is None:
-        objectish = "HEAD"
-    object = parse_object(r, objectish)
-    refname = b"refs/heads/" + name
-    if refname in r.refs and not force:
-        raise KeyError("Branch with name %s already exists." % name)
-    r.refs[refname] = object.id
+    with open_repo_closing(repo) as r:
+        if isinstance(name, bytes):
+            names = [name]
+        elif isinstance(name, list):
+            names = name
+        else:
+            raise TypeError("Unexpected branch name type %r" % name)
+        if objectish is None:
+            objectish = "HEAD"
+        object = parse_object(r, objectish)
+        refname = b"refs/heads/" + name
+        if refname in r.refs and not force:
+            raise KeyError("Branch with name %s already exists." % name)
+        r.refs[refname] = object.id
 
 
 def branch_list(repo):
@@ -723,8 +745,8 @@ def branch_list(repo):
 
     :param repo: Path to the repository
     """
-    r = open_repo(repo)
-    return r.refs.keys(base=b"refs/heads/")
+    with open_repo_closing(repo) as r:
+        return r.refs.keys(base=b"refs/heads/")
 
 
 def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
@@ -736,7 +758,7 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
     :param errstream: Error stream (defaults to stderr)
     :return: Dictionary with refs on the remote
     """
-    r = open_repo(repo)
-    client, path = get_transport_and_path(remote_location)
-    remote_refs = client.fetch(path, r, progress=errstream.write)
+    with open_repo_closing(repo) as r:
+        client, path = get_transport_and_path(remote_location)
+        remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs

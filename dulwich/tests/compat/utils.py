@@ -233,8 +233,12 @@ class CompatTestCase(TestCase):
         :returns: An initialized Repo object that lives in a temporary directory.
         """
         path = import_repo_to_dir(name)
-        self.addCleanup(rmtree_ro, path)
-        return Repo(path)
+        repo = Repo(path)
+        def cleanup():
+            repo.close()
+            rmtree_ro(path)
+        self.addCleanup(cleanup)
+        return repo
 
 
 if sys.platform == 'win32':

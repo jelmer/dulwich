@@ -82,6 +82,7 @@ def open_repo(name, temp_dir=None):
 
 def tear_down_repo(repo):
     """Tear down a test repository."""
+    repo.close()
     temp_dir = os.path.dirname(repo._path_bytes.rstrip(os.sep.encode(sys.getfilesystemencoding())))
     shutil.rmtree(temp_dir)
 

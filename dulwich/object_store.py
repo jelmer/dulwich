@@ -248,12 +248,6 @@ class BaseObjectStore(object):
         """Close any files opened by this object store."""
         # Default implementation is a NO-OP
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
 
 class PackBasedObjectStore(BaseObjectStore):
 

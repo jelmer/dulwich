@@ -20,10 +20,13 @@
 """Utilities for interacting with cgit."""
 
 import errno
+import functools
 import os
 import shutil
 import socket
+import stat
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -230,5 +233,15 @@ class CompatTestCase(TestCase):
         :returns: An initialized Repo object that lives in a temporary directory.
         """
         path = import_repo_to_dir(name)
-        self.addCleanup(shutil.rmtree, path)
+        self.addCleanup(rmtree_ro, path)
         return Repo(path)
+
+
+if sys.platform == 'win32':
+    def remove_ro(action, name, exc):
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
+
+    rmtree_ro = functools.partial(shutil.rmtree, onerror=remove_ro)
+else:
+    rmtree_ro = shutil.rmtree

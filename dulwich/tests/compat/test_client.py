@@ -23,7 +23,6 @@ from io import BytesIO
 import copy
 import os
 import select
-import shutil
 import signal
 import subprocess
 import sys
@@ -63,6 +62,7 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     skipIfPY3,
+    rmtree_ro,
     )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
@@ -83,7 +83,7 @@ class DulwichClientTestBase(object):
         run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
 
     def tearDown(self):
-        shutil.rmtree(self.gitroot)
+        rmtree_ro(self.gitroot)
 
     def assertDestEqualsSrc(self):
         src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))

@@ -45,7 +45,7 @@ from dulwich.tests.utils import (
 class PorcelainTestCase(TestCase):
 
     def setUp(self):
-        super(TestCase, self).setUp()
+        super(PorcelainTestCase, self).setUp()
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         self.repo = Repo.init(repo_dir)

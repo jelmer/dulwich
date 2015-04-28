@@ -211,6 +211,7 @@ class UploadPackHandlerTestCase(TestCase):
 class FindShallowTests(TestCase):
 
     def setUp(self):
+        super(FindShallowTests, self).setUp()
         self._store = MemoryObjectStore()
 
     def make_commit(self, **attrs):

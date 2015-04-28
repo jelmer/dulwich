@@ -19,6 +19,7 @@
 """Tests for the index."""
 
 
+from contextlib import closing
 from io import BytesIO
 import os
 import shutil
@@ -255,122 +256,122 @@ class BuildIndexTests(TestCase):
 
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
-        repo = Repo.init(repo_dir)
-        self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
+            self.addCleanup(shutil.rmtree, repo_dir)
 
-        tree = Tree()
-        repo.object_store.add_object(tree)
+            tree = Tree()
+            repo.object_store.add_object(tree)
 
-        build_index_from_tree(repo.path, repo.index_path(),
-                repo.object_store, tree.id)
+            build_index_from_tree(repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
 
-        # Verify index entries
-        index = repo.open_index()
-        self.assertEqual(len(index), 0)
+            # Verify index entries
+            index = repo.open_index()
+            self.assertEqual(len(index), 0)
 
-        # Verify no files
-        self.assertEqual(['.git'], os.listdir(repo.path))
+            # Verify no files
+            self.assertEqual(['.git'], os.listdir(repo.path))
 
     def test_git_dir(self):
         if os.name != 'posix':
             self.skipTest("test depends on POSIX shell")
 
         repo_dir = tempfile.mkdtemp()
-        repo = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
 
-        # Populate repo
-        filea = Blob.from_string(b'file a')
-        filee = Blob.from_string(b'd')
+            # Populate repo
+            filea = Blob.from_string(b'file a')
+            filee = Blob.from_string(b'd')
 
-        tree = Tree()
-        tree[b'.git/a'] = (stat.S_IFREG | 0o644, filea.id)
-        tree[b'c/e'] = (stat.S_IFREG | 0o644, filee.id)
+            tree = Tree()
+            tree[b'.git/a'] = (stat.S_IFREG | 0o644, filea.id)
+            tree[b'c/e'] = (stat.S_IFREG | 0o644, filee.id)
 
-        repo.object_store.add_objects([(o, None)
-            for o in [filea, filee, tree]])
+            repo.object_store.add_objects([(o, None)
+                for o in [filea, filee, tree]])
 
-        build_index_from_tree(repo.path, repo.index_path(),
-                repo.object_store, tree.id)
+            build_index_from_tree(repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
 
-        # Verify index entries
-        index = repo.open_index()
-        self.assertEqual(len(index), 1)
+            # Verify index entries
+            index = repo.open_index()
+            self.assertEqual(len(index), 1)
 
-        # filea
-        apath = os.path.join(repo.path, '.git', 'a')
-        self.assertFalse(os.path.exists(apath))
+            # filea
+            apath = os.path.join(repo.path, '.git', 'a')
+            self.assertFalse(os.path.exists(apath))
 
-        # filee
-        epath = os.path.join(repo.path, 'c', 'e')
-        self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index[b'c/e'],
-            stat.S_IFREG | 0o644, 1, filee.id)
-        self.assertFileContents(epath, b'd')
+            # filee
+            epath = os.path.join(repo.path, 'c', 'e')
+            self.assertTrue(os.path.exists(epath))
+            self.assertReasonableIndexEntry(index[b'c/e'],
+                stat.S_IFREG | 0o644, 1, filee.id)
+            self.assertFileContents(epath, b'd')
 
     def test_nonempty(self):
         if os.name != 'posix':
             self.skipTest("test depends on POSIX shell")
 
         repo_dir = tempfile.mkdtemp()
-        repo = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
 
-        # Populate repo
-        filea = Blob.from_string(b'file a')
-        fileb = Blob.from_string(b'file b')
-        filed = Blob.from_string(b'file d')
-        filee = Blob.from_string(b'd')
+            # Populate repo
+            filea = Blob.from_string(b'file a')
+            fileb = Blob.from_string(b'file b')
+            filed = Blob.from_string(b'file d')
+            filee = Blob.from_string(b'd')
 
-        tree = Tree()
-        tree[b'a'] = (stat.S_IFREG | 0o644, filea.id)
-        tree[b'b'] = (stat.S_IFREG | 0o644, fileb.id)
-        tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
-        tree[b'c/e'] = (stat.S_IFLNK, filee.id)  # symlink
+            tree = Tree()
+            tree[b'a'] = (stat.S_IFREG | 0o644, filea.id)
+            tree[b'b'] = (stat.S_IFREG | 0o644, fileb.id)
+            tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
+            tree[b'c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
-        repo.object_store.add_objects([(o, None)
-            for o in [filea, fileb, filed, filee, tree]])
+            repo.object_store.add_objects([(o, None)
+                for o in [filea, fileb, filed, filee, tree]])
 
-        build_index_from_tree(repo.path, repo.index_path(),
-                repo.object_store, tree.id)
+            build_index_from_tree(repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
 
-        # Verify index entries
-        index = repo.open_index()
-        self.assertEqual(len(index), 4)
+            # Verify index entries
+            index = repo.open_index()
+            self.assertEqual(len(index), 4)
 
-        # filea
-        apath = os.path.join(repo.path, 'a')
-        self.assertTrue(os.path.exists(apath))
-        self.assertReasonableIndexEntry(index[b'a'],
-            stat.S_IFREG | 0o644, 6, filea.id)
-        self.assertFileContents(apath, b'file a')
+            # filea
+            apath = os.path.join(repo.path, 'a')
+            self.assertTrue(os.path.exists(apath))
+            self.assertReasonableIndexEntry(index[b'a'],
+                stat.S_IFREG | 0o644, 6, filea.id)
+            self.assertFileContents(apath, b'file a')
 
-        # fileb
-        bpath = os.path.join(repo.path, 'b')
-        self.assertTrue(os.path.exists(bpath))
-        self.assertReasonableIndexEntry(index[b'b'],
-            stat.S_IFREG | 0o644, 6, fileb.id)
-        self.assertFileContents(bpath, b'file b')
+            # fileb
+            bpath = os.path.join(repo.path, 'b')
+            self.assertTrue(os.path.exists(bpath))
+            self.assertReasonableIndexEntry(index[b'b'],
+                stat.S_IFREG | 0o644, 6, fileb.id)
+            self.assertFileContents(bpath, b'file b')
 
-        # filed
-        dpath = os.path.join(repo.path, 'c', 'd')
-        self.assertTrue(os.path.exists(dpath))
-        self.assertReasonableIndexEntry(index[b'c/d'],
-            stat.S_IFREG | 0o644, 6, filed.id)
-        self.assertFileContents(dpath, b'file d')
+            # filed
+            dpath = os.path.join(repo.path, 'c', 'd')
+            self.assertTrue(os.path.exists(dpath))
+            self.assertReasonableIndexEntry(index[b'c/d'],
+                stat.S_IFREG | 0o644, 6, filed.id)
+            self.assertFileContents(dpath, b'file d')
 
-        # symlink to d
-        epath = os.path.join(repo.path, 'c', 'e')
-        self.assertTrue(os.path.exists(epath))
-        self.assertReasonableIndexEntry(index[b'c/e'],
-            stat.S_IFLNK, 1, filee.id)
-        self.assertFileContents(epath, 'd', symlink=True)
+            # symlink to d
+            epath = os.path.join(repo.path, 'c', 'e')
+            self.assertTrue(os.path.exists(epath))
+            self.assertReasonableIndexEntry(index[b'c/e'],
+                stat.S_IFLNK, 1, filee.id)
+            self.assertFileContents(epath, 'd', symlink=True)
 
-        # Verify no extra files
-        self.assertEqual(['.git', 'a', 'b', 'c'],
-            sorted(os.listdir(repo.path)))
-        self.assertEqual(['d', 'e'],
-            sorted(os.listdir(os.path.join(repo.path, 'c'))))
+            # Verify no extra files
+            self.assertEqual(['.git', 'a', 'b', 'c'],
+                sorted(os.listdir(repo.path)))
+            self.assertEqual(['d', 'e'],
+                sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
 
 class GetUnstagedChangesTests(TestCase):
@@ -379,30 +380,30 @@ class GetUnstagedChangesTests(TestCase):
         """Unit test for get_unstaged_changes."""
 
         repo_dir = tempfile.mkdtemp()
-        repo = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
 
-        # Commit a dummy file then modify it
-        foo1_fullpath = os.path.join(repo_dir, 'foo1')
-        with open(foo1_fullpath, 'wb') as f:
-            f.write(b'origstuff')
+            # Commit a dummy file then modify it
+            foo1_fullpath = os.path.join(repo_dir, 'foo1')
+            with open(foo1_fullpath, 'wb') as f:
+                f.write(b'origstuff')
 
-        foo2_fullpath = os.path.join(repo_dir, 'foo2')
-        with open(foo2_fullpath, 'wb') as f:
-            f.write(b'origstuff')
+            foo2_fullpath = os.path.join(repo_dir, 'foo2')
+            with open(foo2_fullpath, 'wb') as f:
+                f.write(b'origstuff')
 
-        repo.stage(['foo1', 'foo2'])
-        repo.do_commit(b'test status', author=b'', committer=b'')
+            repo.stage(['foo1', 'foo2'])
+            repo.do_commit(b'test status', author=b'', committer=b'')
 
-        with open(foo1_fullpath, 'wb') as f:
-            f.write(b'newstuff')
+            with open(foo1_fullpath, 'wb') as f:
+                f.write(b'newstuff')
 
-        # modify access and modify time of path
-        os.utime(foo1_fullpath, (0, 0))
+            # modify access and modify time of path
+            os.utime(foo1_fullpath, (0, 0))
 
-        changes = get_unstaged_changes(repo.open_index(), repo_dir)
+            changes = get_unstaged_changes(repo.open_index(), repo_dir)
 
-        self.assertEqual(list(changes), [b'foo1'])
+            self.assertEqual(list(changes), [b'foo1'])
 
 
 class TestValidatePathElement(TestCase):

@@ -55,6 +55,9 @@ class _StubRepo(object):
 
         os.mkdir(self.path)
 
+    def close(self):
+        pass
+
 
 def _get_shallow(repo):
     shallow_file = repo.get_named_file('shallow')

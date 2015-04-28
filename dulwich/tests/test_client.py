@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+from contextlib import closing
 from io import BytesIO
 import sys
 import shutil
@@ -585,36 +586,36 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_empty(self):
         c = LocalGitClient()
-        s = open_repo('a.git')
-        out = BytesIO()
-        walker = {}
-        c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
-            pack_data=out.write)
-        self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
-            b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
+        with closing(open_repo('a.git')) as s:
+            out = BytesIO()
+            walker = {}
+            c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
+                pack_data=out.write)
+            self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
+                b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
     def test_fetch_pack_none(self):
         c = LocalGitClient()
-        s = open_repo('a.git')
-        out = BytesIO()
-        walker = MemoryRepo().get_graph_walker()
-        c.fetch_pack(s.path,
-            lambda heads: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
-            graph_walker=walker, pack_data=out.write)
-        # Hardcoding is not ideal, but we'll fix that some other day..
-        self.assertTrue(out.getvalue().startswith(b'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
+        with closing(open_repo('a.git')) as s:
+            out = BytesIO()
+            walker = MemoryRepo().get_graph_walker()
+            c.fetch_pack(s.path,
+                lambda heads: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+                graph_walker=walker, pack_data=out.write)
+            # Hardcoding is not ideal, but we'll fix that some other day..
+            self.assertTrue(out.getvalue().startswith(b'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
 
     def test_send_pack_without_changes(self):
-        local = open_repo('a.git')
-        target = open_repo('a.git')
-        self.send_and_verify(b"master", local, target)
+        with closing(open_repo('a.git')) as local:
+            with closing(open_repo('a.git')) as target:
+                self.send_and_verify(b"master", local, target)
 
     def test_send_pack_with_changes(self):
-        local = open_repo('a.git')
-        target_path = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, target_path)
-        target = Repo.init_bare(target_path)
-        self.send_and_verify(b"master", local, target)
+        with closing(open_repo('a.git')) as local:
+            target_path = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, target_path)
+            with closing(Repo.init_bare(target_path)) as target:
+                self.send_and_verify(b"master", local, target)
 
     def send_and_verify(self, branch, local, target):
         client = LocalGitClient()

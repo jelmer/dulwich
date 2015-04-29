@@ -449,6 +449,7 @@ class PushTests(PorcelainTestCase):
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
         porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
         porcelain.commit(repo=clone_path, message=b'push',
             author=b'', committer=b'')
@@ -481,6 +482,7 @@ class PullTests(PorcelainTestCase):
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test',
@@ -492,6 +494,7 @@ class PullTests(PorcelainTestCase):
 
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test2',
@@ -687,6 +690,7 @@ class FetchTests(PorcelainTestCase):
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test',
@@ -699,6 +703,7 @@ class FetchTests(PorcelainTestCase):
 
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test2',

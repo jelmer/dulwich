@@ -106,6 +106,7 @@ exit 0
     def test_hook_post_commit(self):
 
         (fd, path) = tempfile.mkstemp()
+        os.close(fd)
 
         post_commit_msg = """#!/bin/sh
 rm """ + path + "\n"

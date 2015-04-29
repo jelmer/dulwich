@@ -501,6 +501,7 @@ exit 0
         self.addCleanup(shutil.rmtree, repo_dir)
 
         (fd, path) = tempfile.mkstemp(dir=repo_dir_str)
+        os.close(fd)
         post_commit_msg = """#!/bin/sh
 rm """ + path + """
 """

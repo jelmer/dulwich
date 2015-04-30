@@ -56,7 +56,10 @@ import os
 import sys
 import time
 
-from dulwich.client import get_transport_and_path
+from dulwich.client import (
+    get_transport_and_path,
+    SubprocessGitClient,
+    )
 from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
@@ -106,17 +109,17 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def archive(location, committish=None, outstream=sys.stdout,
+def archive(path, committish=None, outstream=sys.stdout,
             errstream=sys.stderr):
     """Create an archive.
 
-    :param location: Location of repository for which to generate an archive.
+    :param path: Path of repository for which to generate an archive.
     :param committish: Commit SHA1 or ref to use
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     """
 
-    client, path = get_transport_and_path(location)
+    client = SubprocessGitClient()
     if committish is None:
         committish = "HEAD"
     # TODO(jelmer): This invokes C git; this introduces a dependency.

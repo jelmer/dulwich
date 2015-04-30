@@ -725,7 +725,7 @@ class LocalGitClient(GitClient):
 
         with closing(Repo(path)) as target:
             old_refs = target.get_refs()
-            new_refs = determine_wants(old_refs)
+            new_refs = determine_wants(dict(old_refs))
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
@@ -782,7 +782,7 @@ class LocalGitClient(GitClient):
 
 
 # What Git client to use for local access
-default_local_git_client_cls = SubprocessGitClient
+default_local_git_client_cls = LocalGitClient
 
 
 class SSHVendor(object):

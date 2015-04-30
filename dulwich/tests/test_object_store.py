@@ -350,12 +350,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             o.close()
 
     def test_add_thin_pack_empty(self):
-        o = DiskObjectStore(self.store_dir)
-
-        f = BytesIO()
-        entries = build_pack(f, [], store=o)
-        self.assertEqual([], entries)
-        o.add_thin_pack(f.read, None)
+        with DiskObjectStore(self.store_dir) as o:
+            f = BytesIO()
+            entries = build_pack(f, [], store=o)
+            self.assertEqual([], entries)
+            o.add_thin_pack(f.read, None)
 
 
 class TreeLookupPathTests(TestCase):

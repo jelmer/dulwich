@@ -139,9 +139,9 @@ def commit(repo=".", message=None, author=None, committer=None):
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
-    r = open_repo(repo)
-    return r.do_commit(message=message, author=author,
-        committer=committer)
+    with open_repo(repo) as r:
+        return r.do_commit(message=message, author=author,
+            committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -200,6 +200,11 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
 
     if not os.path.exists(target):
         os.mkdir(target)
+
+    # XXX This is a bit messy. Who must close this repo, and what happens if
+    # an exception happens during the clone? Maybe this is to be fixed by
+    # https://github.com/jelmer/dulwich/pull/252/ , or maybe we should close
+    # here, and not return the repo, like most porcelain methods. -- GaryvdM
     if bare:
         r = Repo.init_bare(target)
     else:
@@ -222,17 +227,17 @@ def add(repo=".", paths=None):
     :param paths: Paths to add.  No value passed stages all modified files.
     """
     # FIXME: Support patterns, directories.
-    r = open_repo(repo)
-    if not paths:
-        # If nothing is specified, add all non-ignored files.
-        paths = []
-        for dirpath, dirnames, filenames in os.walk(r.path):
-            # Skip .git and below.
-            if '.git' in dirnames:
-                dirnames.remove('.git')
-            for filename in filenames:
-                paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-    r.stage(paths)
+    with open_repo(repo) as r:
+        if not paths:
+            # If nothing is specified, add all non-ignored files.
+            paths = []
+            for dirpath, dirnames, filenames in os.walk(r.path):
+                # Skip .git and below.
+                if '.git' in dirnames:
+                    dirnames.remove('.git')
+                for filename in filenames:
+                    paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
+        r.stage(paths)
 
 
 def rm(repo=".", paths=None):
@@ -503,28 +508,28 @@ def push(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    with open_repo(repo) as r:
 
-    # Get the client and path
-    client, path = get_transport_and_path(remote_location)
+        # Get the client and path
+        client, path = get_transport_and_path(remote_location)
 
-    def update_refs(refs):
-        new_refs = r.get_refs()
-        refs[refs_path] = new_refs[b'HEAD']
-        del new_refs[b'HEAD']
-        return refs
+        def update_refs(refs):
+            new_refs = r.get_refs()
+            refs[refs_path] = new_refs[b'HEAD']
+            del new_refs[b'HEAD']
+            return refs
 
-    err_encoding = getattr(errstream, 'encoding', 'utf-8')
-    if not isinstance(remote_location, bytes):
-        remote_location_bytes = remote_location.encode(err_encoding)
-    else:
-        remote_location_bytes = remote_location
-    try:
-        client.send_pack(path, update_refs,
-            r.object_store.generate_pack_contents, progress=errstream.write)
-        errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
-    except (UpdateRefsError, SendPackError) as e:
-        errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
+        err_encoding = getattr(errstream, 'encoding', 'utf-8')
+        if not isinstance(remote_location, bytes):
+            remote_location_bytes = remote_location.encode(err_encoding)
+        else:
+            remote_location_bytes = remote_location
+        try:
+            client.send_pack(path, update_refs,
+                r.object_store.generate_pack_contents, progress=errstream.write)
+            errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
+        except (UpdateRefsError, SendPackError) as e:
+            errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
 
 
 def pull(repo, remote_location, refs_path,
@@ -539,15 +544,14 @@ def pull(repo, remote_location, refs_path,
     """
 
     # Open the repo
-    r = open_repo(repo)
+    with open_repo(repo) as r:
+        client, path = get_transport_and_path(remote_location)
+        remote_refs = client.fetch(path, r, progress=errstream.write)
+        r[b'HEAD'] = remote_refs[refs_path]
 
-    client, path = get_transport_and_path(remote_location)
-    remote_refs = client.fetch(path, r, progress=errstream.write)
-    r[b'HEAD'] = remote_refs[refs_path]
-
-    # Perform 'git checkout .' - syncs staged changes
-    tree = r[b"HEAD"].tree
-    r.reset_index()
+        # Perform 'git checkout .' - syncs staged changes
+        tree = r[b"HEAD"].tree
+        r.reset_index()
 
 
 def status(repo="."):
@@ -736,7 +740,7 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
     :param errstream: Error stream (defaults to stderr)
     :return: Dictionary with refs on the remote
     """
-    r = open_repo(repo)
-    client, path = get_transport_and_path(remote_location)
-    remote_refs = client.fetch(path, r, progress=errstream.write)
+    with open_repo(repo) as r:
+        client, path = get_transport_and_path(remote_location)
+        remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs

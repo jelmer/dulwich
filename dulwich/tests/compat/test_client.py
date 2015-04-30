@@ -86,9 +86,9 @@ class DulwichClientTestBase(object):
         shutil.rmtree(self.gitroot)
 
     def assertDestEqualsSrc(self):
-        src = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        self.assertReposEqual(src, dest)
+        with repo.Repo(os.path.join(self.gitroot, 'server_new.export')) as src:
+            with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+                self.assertReposEqual(src, dest)
 
     def _client(self):
         raise NotImplementedError()
@@ -99,11 +99,11 @@ class DulwichClientTestBase(object):
     def _do_send_pack(self):
         c = self._client()
         srcpath = os.path.join(self.gitroot, 'server_new.export')
-        src = repo.Repo(srcpath)
-        sendrefs = dict(src.get_refs())
-        del sendrefs[b'HEAD']
-        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                    src.object_store.generate_pack_contents)
+        with repo.Repo(srcpath) as src:
+            sendrefs = dict(src.get_refs())
+            del sendrefs[b'HEAD']
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                        src.object_store.generate_pack_contents)
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -119,12 +119,12 @@ class DulwichClientTestBase(object):
         c = self._client()
         c._send_capabilities.remove(b'report-status')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
-        src = repo.Repo(srcpath)
-        sendrefs = dict(src.get_refs())
-        del sendrefs[b'HEAD']
-        c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                    src.object_store.generate_pack_contents)
-        self.assertDestEqualsSrc()
+        with repo.Repo(srcpath) as src:
+            sendrefs = dict(src.get_refs())
+            del sendrefs[b'HEAD']
+            c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                        src.object_store.generate_pack_contents)
+            self.assertDestEqualsSrc()
 
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string(b'hi')
@@ -147,9 +147,7 @@ class DulwichClientTestBase(object):
         commit_id = self.make_dummy_commit(dest)
         return dest, commit_id
 
-    def compute_send(self):
-        srcpath = os.path.join(self.gitroot, 'server_new.export')
-        src = repo.Repo(srcpath)
+    def compute_send(self, src):
         sendrefs = dict(src.get_refs())
         del sendrefs[b'HEAD']
         return sendrefs, src.object_store.generate_pack_contents
@@ -157,35 +155,37 @@ class DulwichClientTestBase(object):
     def test_send_pack_one_error(self):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
         dest.refs[b'refs/heads/master'] = dummy_commit
-        sendrefs, gen_pack = self.compute_send()
-        c = self._client()
-        try:
-            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError as e:
-            self.assertEqual('refs/heads/master failed to update',
-                             e.args[0])
-            self.assertEqual({b'refs/heads/branch': b'ok',
-                              b'refs/heads/master': b'non-fast-forward'},
-                             e.ref_status)
+        with repo.Repo(os.path.join(self.gitroot, 'server_new.export')) as src:
+            sendrefs, gen_pack = self.compute_send(src)
+            c = self._client()
+            try:
+                c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+            except errors.UpdateRefsError as e:
+                self.assertEqual('refs/heads/master failed to update',
+                                 e.args[0])
+                self.assertEqual({b'refs/heads/branch': b'ok',
+                                  b'refs/heads/master': b'non-fast-forward'},
+                                 e.ref_status)
 
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         # set up for two non-ff errors
         branch, master = b'refs/heads/branch', b'refs/heads/master'
         dest.refs[branch] = dest.refs[master] = dummy
-        sendrefs, gen_pack = self.compute_send()
-        c = self._client()
-        try:
-            c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
-        except errors.UpdateRefsError as e:
-            self.assertIn(str(e),
-                          ['{0}, {1} failed to update'.format(
-                              branch.decode('ascii'), master.decode('ascii')),
-                           '{1}, {0} failed to update'.format(
-                               branch.decode('ascii'), master.decode('ascii'))])
-            self.assertEqual({branch: b'non-fast-forward',
-                              master: b'non-fast-forward'},
-                             e.ref_status)
+        with repo.Repo(os.path.join(self.gitroot, 'server_new.export')) as src:
+            sendrefs, gen_pack = self.compute_send(src)
+            c = self._client()
+            try:
+                c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+            except errors.UpdateRefsError as e:
+                self.assertIn(str(e),
+                              ['{0}, {1} failed to update'.format(
+                                  branch.decode('ascii'), master.decode('ascii')),
+                               '{1}, {0} failed to update'.format(
+                                   branch.decode('ascii'), master.decode('ascii'))])
+                self.assertEqual({branch: b'non-fast-forward',
+                                  master: b'non-fast-forward'},
+                                 e.ref_status)
 
     def test_archive(self):
         c = self._client()
@@ -197,41 +197,41 @@ class DulwichClientTestBase(object):
 
     def test_fetch_pack(self):
         c = self._client()
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        refs = c.fetch(self._build_path('/server_new.export'), dest)
-        for r in refs.items():
-            dest.refs.set_if_equals(r[0], None, r[1])
-        self.assertDestEqualsSrc()
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+            refs = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
 
     def test_incremental_fetch_pack(self):
         self.test_fetch_pack()
         dest, dummy = self.disable_ff_and_make_dummy_commit()
         dest.refs[b'refs/heads/master'] = dummy
         c = self._client()
-        dest = repo.Repo(os.path.join(self.gitroot, 'server_new.export'))
-        refs = c.fetch(self._build_path('/dest'), dest)
-        for r in refs.items():
-            dest.refs.set_if_equals(r[0], None, r[1])
-        self.assertDestEqualsSrc()
+        with repo.Repo(os.path.join(self.gitroot, 'server_new.export')) as dest:
+            refs = c.fetch(self._build_path('/dest'), dest)
+            for r in refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
 
     def test_fetch_pack_no_side_band_64k(self):
         c = self._client()
         c._fetch_capabilities.remove(b'side-band-64k')
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        refs = c.fetch(self._build_path('/server_new.export'), dest)
-        for r in refs.items():
-            dest.refs.set_if_equals(r[0], None, r[1])
-        self.assertDestEqualsSrc()
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+            refs = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
 
     def test_fetch_pack_zero_sha(self):
         # zero sha1s are already present on the client, and should
         # be ignored
         c = self._client()
-        dest = repo.Repo(os.path.join(self.gitroot, 'dest'))
-        refs = c.fetch(self._build_path('/server_new.export'), dest,
-            lambda refs: [protocol.ZERO_SHA])
-        for r in refs.items():
-            dest.refs.set_if_equals(r[0], None, r[1])
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+            refs = c.fetch(self._build_path('/server_new.export'), dest,
+                lambda refs: [protocol.ZERO_SHA])
+            for r in refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
 
     def test_send_remove_branch(self):
         dest = repo.Repo(os.path.join(self.gitroot, 'dest'))

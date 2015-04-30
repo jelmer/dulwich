@@ -8,6 +8,11 @@
     open resources. (Gary van der Merwe)
   * Support 'git.bat' in SubprocessGitClient on Windows.
     (Stefan Zimmermann)
+  * Switched `default_local_git_client_cls` to `LocalGitClient`.
+    (Gary van der Merwe)
+  * `get_transport_and_path_from_url` and `get_transport_and_path` now accept
+    a new `local_git_client_cls` argument that can be used to override the
+    `default_local_git_client_cls`. (Gary van der Merwe)
 
 0.10.1  2015-03-25
 

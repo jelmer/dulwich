@@ -473,13 +473,12 @@ class PushTests(PorcelainTestCase):
 
         # Check that the target and source
         with closing(Repo(clone_path)) as r_clone:
+            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
 
             # Get the change in the target repo corresponding to the add
             # this will be in the foo branch.
             change = list(tree_changes(self.repo, self.repo[b'HEAD'].tree,
                                        self.repo[b'refs/heads/foo'].tree))[0]
-
-            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
             self.assertEqual(os.path.basename(fullpath), change.new.path.decode('ascii'))
 
 

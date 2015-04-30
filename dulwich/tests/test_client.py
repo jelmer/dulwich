@@ -387,15 +387,15 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('user', c.username)
         self.assertEqual('bar/baz', path)
 
-    def test_subprocess(self):
+    def test_local(self):
         c, path = get_transport_and_path('foo.bar/baz')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('foo.bar/baz', path)
 
     @skipIf(sys.platform != 'win32', 'Behaviour only happens on windows.')
     def test_local_abs_windows_path(self):
         c, path = get_transport_and_path('C:\\foo.bar\\baz')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('C:\\foo.bar\\baz', path)
 
     def test_error(self):
@@ -485,7 +485,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_file(self):
         c, path = get_transport_and_path_from_url('file:///home/jelmer/foo')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('/home/jelmer/foo', path)
 
 

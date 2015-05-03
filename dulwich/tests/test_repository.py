@@ -40,6 +40,7 @@ from dulwich.repo import (
     )
 from dulwich.tests import (
     TestCase,
+    skipIf,
     )
 from dulwich.tests.utils import (
     open_repo,
@@ -344,6 +345,7 @@ class RepositoryBytesRootTests(TestCase):
         r = self._repo = self.open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
 
+    @skipIf(sys.platform == 'win32', 'Requires symlink support')
     def test_submodule(self):
         temp_dir = self.mkdtemp()
         repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
@@ -610,8 +612,7 @@ class BuildRepoBytesRootTests(TestCase):
         r = self._repo
         with open(os.path.join(r._path_bytes, b'a'), 'wb') as f:
             f.write(b'new contents')
-        os.symlink('a', os.path.join(r._path_bytes, b'b'))
-        r.stage(['a', 'b'])
+        r.stage(['a'])
         commit_sha = r.do_commit(b'modified a',
                                  committer=b'Test Committer <test@nodomain.com>',
                                  author=b'Test Author <test@nodomain.com>',
@@ -621,6 +622,18 @@ class BuildRepoBytesRootTests(TestCase):
         a_mode, a_id = tree_lookup_path(r.get_object, r[commit_sha].tree, b'a')
         self.assertEqual(stat.S_IFREG | 0o644, a_mode)
         self.assertEqual(b'new contents', r[a_id].data)
+
+    @skipIf(sys.platform == 'win32', 'Requires symlink support')
+    def test_commit_symlink(self):
+        r = self._repo
+        os.symlink('a', os.path.join(r._path_bytes, b'b'))
+        r.stage(['a', 'b'])
+        commit_sha = r.do_commit(b'Symlink b',
+                                 committer=b'Test Committer <test@nodomain.com>',
+                                 author=b'Test Author <test@nodomain.com>',
+                                 commit_timestamp=12395, commit_timezone=0,
+                                 author_timestamp=12395, author_timezone=0)
+        self.assertEqual([self._root_commit], r[commit_sha].parents)
         b_mode, b_id = tree_lookup_path(r.get_object, r[commit_sha].tree, b'b')
         self.assertTrue(stat.S_ISLNK(b_mode))
         self.assertEqual(b'a', r[b_id].data)

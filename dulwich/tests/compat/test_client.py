@@ -287,6 +287,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
                 os.unlink(self.pidfile)
             except (OSError, IOError):
                 pass
+        self.process.stdout.close()
+        self.process.stderr.close()
         DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 

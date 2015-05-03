@@ -183,15 +183,17 @@ class DictBackend(Backend):
 class FileSystemBackend(Backend):
     """Simple backend that looks up Git repositories in the local file system."""
 
-    def __init__(self, root="/"):
+    def __init__(self, root=os.sep):
         super(FileSystemBackend, self).__init__()
-        self.root = (os.path.abspath(root) + "/").replace("//", "/")
+        self.root = os.path.normcase(
+            (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep))
 
     def open_repository(self, path):
         logger.debug('opening repository at %s', path)
-        abspath = os.path.abspath(os.path.join(self.root, path)) + "/"
+        abspath = os.path.normcase(
+            os.path.abspath(os.path.join(self.root, path)) + os.sep)
         if not abspath.startswith(self.root):
-            raise NotGitRepository("Invalid path %r" % path)
+            raise NotGitRepository("Path %r not inside root %r" % (path, self.root))
         return Repo(abspath)
 
 

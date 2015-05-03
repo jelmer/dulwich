@@ -644,7 +644,7 @@ def upload_pack(path=".", inf=None, outf=None):
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
     if inf is None:
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
-    backend = FileSystemBackend()
+    backend = FileSystemBackend(path)
     def send_fn(data):
         outf.write(data)
         outf.flush()
@@ -666,7 +666,7 @@ def receive_pack(path=".", inf=None, outf=None):
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
     if inf is None:
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
-    backend = FileSystemBackend()
+    backend = FileSystemBackend(path)
     def send_fn(data):
         outf.write(data)
         outf.flush()

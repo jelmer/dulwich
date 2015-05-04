@@ -32,7 +32,6 @@ from dulwich.server import (
     ReceivePackHandler,
     )
 from dulwich.tests.utils import (
-    tear_down_repo,
     skipIfPY3,
     )
 from dulwich.tests.compat.utils import (
@@ -149,10 +148,9 @@ class ServerTests(object):
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_clone_from_dulwich_empty(self):
-        old_repo_dir = os.path.join(tempfile.mkdtemp(), 'empty_old')
-        run_git_or_fail(['init', '--quiet', '--bare', old_repo_dir])
-        self._old_repo = Repo(old_repo_dir)
-        self.addCleanup(tear_down_repo, self._old_repo)
+        old_repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, old_repo_dir)
+        self._old_repo = Repo.init_bare(old_repo_dir)
         port = self._start_server(self._old_repo)
 
         new_repo_base_dir = tempfile.mkdtemp()
@@ -177,7 +175,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(tear_down_repo, self._stub_repo)
+        self.addCleanup(shutil.rmtree, self._stub_repo.path)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
@@ -193,7 +191,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(tear_down_repo, self._stub_repo)
+        self.addCleanup(shutil.rmtree, self._stub_repo.path)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
@@ -214,7 +212,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(tear_down_repo, self._stub_repo)
+        self.addCleanup(shutil.rmtree, self._stub_repo.path)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1

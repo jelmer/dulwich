@@ -30,13 +30,9 @@ from dulwich.objects import (
 from dulwich.repo import (
     check_ref_format,
     )
-from dulwich.tests.utils import (
-    tear_down_repo,
-    )
 
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
-    import_repo,
     CompatTestCase,
     )
 
@@ -46,8 +42,7 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def setUp(self):
         super(ObjectStoreTestCase, self).setUp()
-        self._repo = import_repo('server_new.export')
-        self.addCleanup(tear_down_repo, self._repo)
+        self._repo = self.import_repo('server_new.export')
 
     def _run_git(self, args):
         return run_git_or_fail(args, cwd=self._repo.path)

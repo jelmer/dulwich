@@ -21,6 +21,7 @@
 
 import errno
 import os
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -165,16 +166,6 @@ def import_repo_to_dir(name):
     return temp_repo_dir
 
 
-def import_repo(name):
-    """Import a repo from a fast-export file in a temporary directory.
-
-    :param name: The name of the repository export file, relative to
-        dulwich/tests/data/repos.
-    :returns: An initialized Repo object that lives in a temporary directory.
-    """
-    return Repo(import_repo_to_dir(name))
-
-
 def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
     """Check for a running TCP daemon.
 
@@ -230,3 +221,14 @@ class CompatTestCase(TestCase):
         refs2 = repo2.get_refs()
         objs2 = set(repo2.object_store)
         self.assertFalse(refs1 == refs2 and objs1 == objs2)
+
+    def import_repo(self, name):
+        """Import a repo from a fast-export file in a temporary directory.
+
+        :param name: The name of the repository export file, relative to
+            dulwich/tests/data/repos.
+        :returns: An initialized Repo object that lives in a temporary directory.
+        """
+        path = import_repo_to_dir(name)
+        self.addCleanup(shutil.rmtree, path)
+        return Repo(path)

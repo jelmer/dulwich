@@ -36,7 +36,6 @@ from dulwich.tests.utils import (
     skipIfPY3,
     )
 from dulwich.tests.compat.utils import (
-    import_repo,
     run_git_or_fail,
     )
 from dulwich.tests.compat.utils import require_git_version
@@ -84,10 +83,8 @@ class ServerTests(object):
     min_single_branch_version = (1, 7, 10,)
 
     def import_repos(self):
-        self._old_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._old_repo)
-        self._new_repo = import_repo('server_new.export')
-        self.addCleanup(tear_down_repo, self._new_repo)
+        self._old_repo = self.import_repo('server_old.export')
+        self._new_repo = self.import_repo('server_new.export')
 
     def url(self, port):
         return '%s://localhost:%s/' % (self.protocol, port)
@@ -107,10 +104,8 @@ class ServerTests(object):
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_push_to_dulwich_no_op(self):
-        self._old_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._old_repo)
-        self._new_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._new_repo)
+        self._old_repo = self.import_repo('server_old.export')
+        self._new_repo = self.import_repo('server_old.export')
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -119,10 +114,8 @@ class ServerTests(object):
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_push_to_dulwich_remove_branch(self):
-        self._old_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._old_repo)
-        self._new_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._new_repo)
+        self._old_repo = self.import_repo('server_old.export')
+        self._new_repo = self.import_repo('server_old.export')
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
@@ -144,10 +137,8 @@ class ServerTests(object):
         self.assertReposEqual(self._old_repo, self._new_repo)
 
     def test_fetch_from_dulwich_no_op(self):
-        self._old_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._old_repo)
-        self._new_repo = import_repo('server_old.export')
-        self.addCleanup(tear_down_repo, self._new_repo)
+        self._old_repo = self.import_repo('server_old.export')
+        self._new_repo = self.import_repo('server_old.export')
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
@@ -177,15 +168,14 @@ class ServerTests(object):
             shutil.rmtree(new_repo_base_dir)
 
     def test_lsremote_from_dulwich(self):
-        self._repo = import_repo('server_old.export')
+        self._repo = self.import_repo('server_old.export')
         port = self._start_server(self._repo)
         o = run_git_or_fail(['ls-remote', self.url(port)])
         self.assertEqual(len(o.split('\n')), 4)
 
     def test_new_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
-        self._source_repo = import_repo('server_new.export')
-        self.addCleanup(tear_down_repo, self._source_repo)
+        self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
         self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
@@ -201,8 +191,7 @@ class ServerTests(object):
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
-        self._source_repo = import_repo('server_new.export')
-        self.addCleanup(tear_down_repo, self._source_repo)
+        self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
         self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
@@ -223,8 +212,7 @@ class ServerTests(object):
 
     def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
-        self._source_repo = import_repo('server_new.export')
-        self.addCleanup(tear_down_repo, self._source_repo)
+        self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
         self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)

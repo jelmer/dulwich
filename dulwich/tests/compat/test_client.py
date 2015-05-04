@@ -62,7 +62,6 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     skipIfPY3,
-    rmtree_ro,
     )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
@@ -70,6 +69,7 @@ from dulwich.tests.compat.utils import (
     import_repo_to_dir,
     run_git_or_fail,
     _DEFAULT_GIT,
+    rmtree_ro,
     )
 
 

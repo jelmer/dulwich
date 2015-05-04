@@ -979,6 +979,9 @@ class HttpGitClient(GitClient):
             self.opener = opener
         GitClient.__init__(self, *args, **kwargs)
 
+    def __repr__(self):
+        return "%s(%r, dumb=%r)" % (type(self).__name__, self.base_url, self.dumb)
+
     def _get_url(self, path):
         return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
 

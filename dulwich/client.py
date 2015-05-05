@@ -661,9 +661,13 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
+    git = ['git']
+    if sys.platform == 'win32': # support .exe, .bat and .cmd
+        git = ['cmd', '/c'] + git
+
     def _connect(self, service, path):
         import subprocess
-        argv = ['git', service, path]
+        argv = self.git + [service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

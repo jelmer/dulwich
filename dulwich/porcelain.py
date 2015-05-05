@@ -233,7 +233,7 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
         if checkout:
             errstream.write(b'Checking out HEAD')
             r.reset_index()
-    except Exception:
+    except:
         r.close()
         raise
 

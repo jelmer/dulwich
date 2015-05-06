@@ -23,7 +23,6 @@ import errno
 import os
 import shutil
 import socket
-import sys
 import tempfile
 
 from dulwich.repo import Repo
@@ -46,11 +45,6 @@ class _StubRepo(object):
     def __init__(self, name):
         temp_dir = tempfile.mkdtemp()
         self.path = os.path.join(temp_dir, name)
-        if not isinstance(self.path, bytes):
-            self._path_bytes = self.path.encode(sys.getfilesystemencoding())
-        else:
-            self._path_bytes = self.path
-
         os.mkdir(self.path)
 
     def close(self):

@@ -23,7 +23,6 @@ from contextlib import closing
 from io import BytesIO
 import os
 import shutil
-import sys
 import tempfile
 
 from dulwich.index import (
@@ -264,8 +263,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
-        if not isinstance(self.store_dir, bytes):
-            self.store_dir = self.store_dir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, self.store_dir)
         self.store = DiskObjectStore.init(self.store_dir)
 
@@ -275,8 +272,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_alternates(self):
         alternate_dir = tempfile.mkdtemp()
-        if not isinstance(alternate_dir, bytes):
-            alternate_dir = alternate_dir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
         b2 = make_object(Blob, data=b"yummy data")
@@ -290,17 +285,15 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
         self.assertEqual([], list(store._read_alternate_paths()))
-        store.add_alternate_path(b'/foo/path')
-        self.assertEqual([b'/foo/path'], list(store._read_alternate_paths()))
-        store.add_alternate_path(b'/bar/path')
+        store.add_alternate_path("/foo/path")
+        self.assertEqual(["/foo/path"], list(store._read_alternate_paths()))
+        store.add_alternate_path("/bar/path")
         self.assertEqual(
-            [b'/foo/path', b'/bar/path'],
+            ["/foo/path", "/bar/path"],
             list(store._read_alternate_paths()))
 
     def test_rel_alternative_path(self):
         alternate_dir = tempfile.mkdtemp()
-        if not isinstance(alternate_dir, bytes):
-            alternate_dir = alternate_dir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
         b2 = make_object(Blob, data=b"yummy data")
@@ -314,7 +307,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_pack_dir(self):
         o = DiskObjectStore(self.store_dir)
-        self.assertEqual(os.path.join(self.store_dir, b'pack'), o.pack_dir)
+        self.assertEqual(os.path.join(self.store_dir, "pack"), o.pack_dir)
 
     def test_add_pack(self):
         o = DiskObjectStore(self.store_dir)

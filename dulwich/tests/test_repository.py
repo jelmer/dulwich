@@ -21,6 +21,7 @@
 """Tests for the repository."""
 
 from contextlib import closing
+import locale
 import os
 import stat
 import shutil
@@ -51,21 +52,9 @@ from dulwich.tests.utils import (
 missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
-def mkdtemp_bytes():
-    tmp_dir = tempfile.mkdtemp()
-    if sys.version_info[0] > 2:
-        tmp_dir = tmp_dir.encode(sys.getfilesystemencoding())
-    return tmp_dir
-
 def mkdtemp_unicode():
     suffix = u'déłwíçh'
-    if sys.version_info[0] == 2:
-        suffix = suffix.encode(sys.getfilesystemencoding())
-    tmp_dir = tempfile.mkdtemp(suffix=suffix)
-    if sys.version_info[0] == 2:
-        tmp_dir = tmp_dir.decode(sys.getfilesystemencoding())
-    return tmp_dir
-
+    return tempfile.mkdtemp(suffix=suffix)
 
 
 class CreateRepositoryTests(TestCase):
@@ -80,64 +69,46 @@ class CreateRepositoryTests(TestCase):
 
     def _check_repo_contents(self, repo, expect_bare):
         self.assertEqual(expect_bare, repo.bare)
-        self.assertFileContentsEqual(b'Unnamed repository', repo, b'description')
-        self.assertFileContentsEqual(b'', repo, os.path.join(b'info', b'exclude'))
-        self.assertFileContentsEqual(None, repo, b'nonexistent file')
+        self.assertFileContentsEqual(b'Unnamed repository', repo, 'description')
+        self.assertFileContentsEqual(b'', repo, os.path.join('info', 'exclude'))
+        self.assertFileContentsEqual(None, repo, 'nonexistent file')
         barestr = b'bare = ' + str(expect_bare).lower().encode('ascii')
-        with repo.get_named_file(b'config') as f:
+        with repo.get_named_file('config') as f:
             config_text = f.read()
             self.assertTrue(barestr in config_text, "%r" % config_text)
-
-
-class CreateMemoryRepositoryTests(CreateRepositoryTests):
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})
         self._check_repo_contents(repo, True)
 
-
-class CreateRepositoryBytesRootTests(CreateRepositoryTests):
-
-    def mkdtemp(self):
-        tmp_dir = mkdtemp_bytes()
-        return tmp_dir, tmp_dir
-
     def test_create_disk_bare(self):
-        tmp_dir, tmp_dir_bytes = self.mkdtemp()
+        tmp_dir = mkdtemp_unicode()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init_bare(tmp_dir)
-        self.assertEqual(tmp_dir_bytes, repo._controldir)
+        self.assertEqual(tmp_dir, repo._controldir)
         self._check_repo_contents(repo, True)
 
     def test_create_disk_non_bare(self):
-        tmp_dir, tmp_dir_bytes = self.mkdtemp()
+        tmp_dir = mkdtemp_unicode()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
-        self.assertEqual(os.path.join(tmp_dir_bytes, b'.git'), repo._controldir)
+        self.assertEqual(os.path.join(tmp_dir, '.git'), repo._controldir)
         self._check_repo_contents(repo, False)
 
 
-class CreateRepositoryUnicodeRootTests(CreateRepositoryBytesRootTests):
-
-    def mktemp(self):
-        tmp_dir = mkdtemp_unicode()
-        tmp_dir_bytes = tmp_dir.encode(sys.getfilesystemencoding())
-        return tmp_dir, tmp_dir_bytes
-
-
-class RepositoryBytesRootTests(TestCase):
+class RepositoryRootTests(TestCase):
 
     def setUp(self):
-        super(RepositoryBytesRootTests, self).setUp()
+        super(RepositoryRootTests, self).setUp()
         self._repo = None
 
     def tearDown(self):
         if self._repo is not None:
             tear_down_repo(self._repo)
-        super(RepositoryBytesRootTests, self).tearDown()
+        super(RepositoryRootTests, self).tearDown()
 
     def mkdtemp(self):
-        return mkdtemp_bytes()
+        return mkdtemp_unicode()
 
     def open_repo(self, name):
         temp_dir = self.mkdtemp()
@@ -145,7 +116,7 @@ class RepositoryBytesRootTests(TestCase):
 
     def test_simple_props(self):
         r = self._repo = self.open_repo('a.git')
-        self.assertEqual(r.controldir(), r._path_bytes)
+        self.assertEqual(r.controldir(), r.path)
 
     def test_setitem(self):
         r = self._repo = self.open_repo('a.git')
@@ -413,11 +384,11 @@ class RepositoryBytesRootTests(TestCase):
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
 
-        pre_commit_fail = b"""#!/bin/sh
+        pre_commit_fail = """#!/bin/sh
 exit 1
 """
 
-        pre_commit_success = b"""#!/bin/sh
+        pre_commit_success = """#!/bin/sh
 exit 0
 """
 
@@ -425,9 +396,9 @@ exit 0
         r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        pre_commit = os.path.join(r.controldir(), b'hooks', b'pre-commit')
+        pre_commit = os.path.join(r.controldir(), 'hooks', 'pre-commit')
 
-        with open(pre_commit, 'wb') as f:
+        with open(pre_commit, 'w') as f:
             f.write(pre_commit_fail)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -437,7 +408,7 @@ exit 0
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
 
-        with open(pre_commit, 'wb') as f:
+        with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -453,11 +424,11 @@ exit 0
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
 
-        commit_msg_fail = b"""#!/bin/sh
+        commit_msg_fail = """#!/bin/sh
 exit 1
 """
 
-        commit_msg_success = b"""#!/bin/sh
+        commit_msg_success = """#!/bin/sh
 exit 0
 """
 
@@ -465,9 +436,9 @@ exit 0
         r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        commit_msg = os.path.join(r.controldir(), b'hooks', b'commit-msg')
+        commit_msg = os.path.join(r.controldir(), 'hooks', 'commit-msg')
 
-        with open(commit_msg, 'wb') as f:
+        with open(commit_msg, 'w') as f:
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -477,7 +448,7 @@ exit 0
                           commit_timestamp=12345, commit_timezone=0,
                           author_timestamp=12345, author_timezone=0)
 
-        with open(commit_msg, 'wb') as f:
+        with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -494,15 +465,11 @@ exit 0
             self.skipTest('shell hook tests requires POSIX shell')
 
         repo_dir = self.mkdtemp()
-        if isinstance(repo_dir, bytes):
-            repo_dir_str = repo_dir.decode(sys.getfilesystemencoding())
-        else:
-            repo_dir_str = repo_dir
 
         r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        (fd, path) = tempfile.mkstemp(dir=repo_dir_str)
+        (fd, path) = tempfile.mkstemp(dir=repo_dir)
         os.close(fd)
         post_commit_msg = """#!/bin/sh
 rm """ + path + """
@@ -516,10 +483,10 @@ rm """ + path + """
             author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[root_sha].parents)
 
-        post_commit = os.path.join(r.controldir(), b'hooks', b'post-commit')
+        post_commit = os.path.join(r.controldir(), 'hooks', 'post-commit')
 
-        with open(post_commit, 'w') as f:
-            f.write(post_commit_msg)
+        with open(post_commit, 'wb') as f:
+            f.write(post_commit_msg.encode(locale.getpreferredencoding()))
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         commit_sha = r.do_commit(
@@ -556,13 +523,7 @@ exit 1
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
 
-class RepositoryUnicodeRootTests(RepositoryBytesRootTests):
-
-    def mktemp(self):
-        return mkdtemp_unicode()
-
-
-class BuildRepoBytesRootTests(TestCase):
+class BuildRepoRootTests(TestCase):
     """Tests that build on-disk repos from scratch.
 
     Repos live in a temp dir and are torn down after each test. They start with
@@ -570,13 +531,10 @@ class BuildRepoBytesRootTests(TestCase):
     """
 
     def get_repo_dir(self):
-        return os.path.join(mkdtemp_bytes(), b'test')
-
-    def get_a_filename(self):
-        return b'a'
+        return os.path.join(mkdtemp_unicode(), 'test')
 
     def setUp(self):
-        super(BuildRepoBytesRootTests, self).setUp()
+        super(BuildRepoRootTests, self).setUp()
         self._repo_dir = self.get_repo_dir()
         os.makedirs(self._repo_dir)
         r = self._repo = Repo.init(self._repo_dir)
@@ -584,7 +542,7 @@ class BuildRepoBytesRootTests(TestCase):
         self.assertEqual(b'ref: refs/heads/master', r.refs.read_ref(b'HEAD'))
         self.assertRaises(KeyError, lambda: r.refs[b'refs/heads/master'])
 
-        with open(os.path.join(r._path_bytes, b'a'), 'wb') as f:
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
             f.write(b'file contents')
         r.stage(['a'])
         commit_sha = r.do_commit(b'msg',
@@ -597,7 +555,7 @@ class BuildRepoBytesRootTests(TestCase):
 
     def tearDown(self):
         tear_down_repo(self._repo)
-        super(BuildRepoBytesRootTests, self).tearDown()
+        super(BuildRepoRootTests, self).tearDown()
 
     def test_build_repo(self):
         r = self._repo
@@ -610,7 +568,7 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_commit_modified(self):
         r = self._repo
-        with open(os.path.join(r._path_bytes, b'a'), 'wb') as f:
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
             f.write(b'new contents')
         r.stage(['a'])
         commit_sha = r.do_commit(b'modified a',
@@ -626,7 +584,7 @@ class BuildRepoBytesRootTests(TestCase):
     @skipIf(sys.platform == 'win32', 'Requires symlink support')
     def test_commit_symlink(self):
         r = self._repo
-        os.symlink('a', os.path.join(r._path_bytes, b'b'))
+        os.symlink('a', os.path.join(r.path, 'b'))
         r.stage(['a', 'b'])
         commit_sha = r.do_commit(b'Symlink b',
                                  committer=b'Test Committer <test@nodomain.com>',
@@ -640,7 +598,7 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_commit_deleted(self):
         r = self._repo
-        os.remove(os.path.join(r._path_bytes, b'a'))
+        os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
         commit_sha = r.do_commit(b'deleted a',
                                  committer=b'Test Committer <test@nodomain.com>',
@@ -802,17 +760,6 @@ class BuildRepoBytesRootTests(TestCase):
 
     def test_stage_deleted(self):
         r = self._repo
-        os.remove(os.path.join(r._path_bytes, b'a'))
+        os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
-
-
-class BuildRepoUnicodeRootTests(TestCase):
-    """Tests that build on-disk repos from scratch.
-
-    Repos live in a temp dir and are torn down after each test. They start with
-    a single commit in master having single file named 'a'.
-    """
-
-    def get_repo_dir(self):
-        return os.path.join(mkdtemp_unicode(), 'test')

@@ -29,7 +29,6 @@ from itertools import (
     )
 import os
 import stat
-import sys
 import warnings
 from contextlib import contextmanager
 
@@ -86,23 +85,21 @@ class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
     def get_sha_file(self, cls, base, sha):
-        dir = os.path.join(
-            os.path.dirname(__file__.encode(sys.getfilesystemencoding())),
-            b'data', base)
+        dir = os.path.join(os.path.dirname(__file__), 'data', base)
         return cls.from_path(hex_to_filename(dir, sha))
 
     def get_blob(self, sha):
         """Return the blob named sha from the test data dir"""
-        return self.get_sha_file(Blob, b'blobs', sha)
+        return self.get_sha_file(Blob, 'blobs', sha)
 
     def get_tree(self, sha):
-        return self.get_sha_file(Tree, b'trees', sha)
+        return self.get_sha_file(Tree, 'trees', sha)
 
     def get_tag(self, sha):
-        return self.get_sha_file(Tag, b'tags', sha)
+        return self.get_sha_file(Tag, 'tags', sha)
 
     def commit(self, sha):
-        return self.get_sha_file(Commit, b'commits', sha)
+        return self.get_sha_file(Commit, 'commits', sha)
 
     def test_decompress_simple_blob(self):
         b = self.get_blob(a_sha)
@@ -705,9 +702,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEqual(_SORTED_TREE_ITEMS, x.items())
 
     def _do_test_parse_tree(self, parse_tree):
-        dir = os.path.join(
-            os.path.dirname(__file__.encode(sys.getfilesystemencoding())),
-            b'data', b'trees')
+        dir = os.path.join(os.path.dirname(__file__), 'data', 'trees')
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
         self.assertEqual([(b'a', 0o100644, a_sha), (b'b', 0o100644, b_sha)],
                          list(parse_tree(o.as_raw_string())))

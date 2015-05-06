@@ -50,14 +50,11 @@ exit 1
 exit 0
 """
 
-        repo_dir = tempfile.mkdtemp()
-        if not isinstance(repo_dir, bytes):
-            repo_dir = repo_dir.encode(sys.getfilesystemencoding())
-
-        os.mkdir(os.path.join(repo_dir, b'hooks'))
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, 'hooks'))
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        pre_commit = os.path.join(repo_dir, b'hooks', b'pre-commit')
+        pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)
 
         with open(pre_commit, 'w') as f:
@@ -83,13 +80,10 @@ exit 0
 """
 
         repo_dir = os.path.join(tempfile.mkdtemp())
-        if not isinstance(repo_dir, bytes):
-            repo_dir = repo_dir.encode(sys.getfilesystemencoding())
-
-        os.mkdir(os.path.join(repo_dir, b'hooks'))
+        os.mkdir(os.path.join(repo_dir, 'hooks'))
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        commit_msg = os.path.join(repo_dir, b'hooks', b'commit-msg')
+        commit_msg = os.path.join(repo_dir, 'hooks', 'commit-msg')
         hook = CommitMsgShellHook(repo_dir)
 
         with open(commit_msg, 'w') as f:
@@ -117,13 +111,10 @@ exit 1
 """
 
         repo_dir = os.path.join(tempfile.mkdtemp())
-        if not isinstance(repo_dir, bytes):
-            repo_dir = repo_dir.encode(sys.getfilesystemencoding())
-
-        os.mkdir(os.path.join(repo_dir, b'hooks'))
+        os.mkdir(os.path.join(repo_dir, 'hooks'))
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        post_commit = os.path.join(repo_dir, b'hooks', b'post-commit')
+        post_commit = os.path.join(repo_dir, 'hooks', 'post-commit')
         hook = PostCommitShellHook(repo_dir)
 
         with open(post_commit, 'w') as f:

@@ -1474,12 +1474,12 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     :param deltify: Whether to deltify pack objects
     :return: Tuple with checksum of pack file and index file
     """
-    with GitFile(filename + b'.pack', 'wb') as f:
+    with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(f, objects,
             delta_window_size=delta_window_size, deltify=deltify)
     entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
     entries.sort()
-    with GitFile(filename + b'.idx', 'wb') as f:
+    with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
 
 
@@ -1785,8 +1785,8 @@ class Pack(object):
         self._basename = basename
         self._data = None
         self._idx = None
-        self._idx_path = self._basename + b'.idx'
-        self._data_path = self._basename + b'.pack'
+        self._idx_path = self._basename + '.idx'
+        self._data_path = self._basename + '.pack'
         self._data_load = lambda: PackData(self._data_path)
         self._idx_load = lambda: load_pack_index(self._idx_path)
         self.resolve_ext_ref = resolve_ext_ref
@@ -1795,7 +1795,7 @@ class Pack(object):
     def from_lazy_objects(self, data_fn, idx_fn):
         """Create a new pack object from callables to load pack data and
         index objects."""
-        ret = Pack(b'')
+        ret = Pack('')
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
@@ -1803,7 +1803,7 @@ class Pack(object):
     @classmethod
     def from_objects(self, data, idx):
         """Create a new pack object from pack data and index objects."""
-        ret = Pack(b'')
+        ret = Pack('')
         ret._data_load = lambda: data
         ret._idx_load = lambda: idx
         return ret
@@ -1930,7 +1930,7 @@ class Pack(object):
                     determine whether or not a .keep file is obsolete.
         :return: The path of the .keep file, as a string.
         """
-        keepfile_name = self._basename + b'.keep'
+        keepfile_name = '%s.keep' % self._basename
         with GitFile(keepfile_name, 'wb') as keepfile:
             if msg:
                 keepfile.write(msg)

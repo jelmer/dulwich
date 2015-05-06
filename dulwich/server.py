@@ -991,10 +991,10 @@ def update_server_info(repo):
     This generates info/refs and objects/info/packs,
     similar to "git update-server-info".
     """
-    repo._put_named_file(os.path.join(b'info', b'refs'),
+    repo._put_named_file(os.path.join('info', 'refs'),
         b"".join(generate_info_refs(repo)))
 
-    repo._put_named_file(os.path.join(b'objects', b'info', b'packs'),
+    repo._put_named_file(os.path.join('objects', 'info', 'packs'),
         b"".join(generate_objects_info_packs(repo)))
 
 

@@ -539,10 +539,7 @@ def push(repo, remote_location, refs_path,
             return refs
 
         err_encoding = getattr(errstream, 'encoding', 'utf-8')
-        if not isinstance(remote_location, bytes):
-            remote_location_bytes = remote_location.encode(err_encoding)
-        else:
-            remote_location_bytes = remote_location
+        remote_location_bytes = remote_location.encode(err_encoding)
         try:
             client.send_pack(path, update_refs,
                 r.object_store.generate_pack_contents, progress=errstream.write)

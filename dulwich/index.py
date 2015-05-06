@@ -480,15 +480,12 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         in a working dir. Suiteable only for fresh clones.
     """
 
-    if not isinstance(prefix, bytes):
-        prefix = prefix.encode(sys.getfilesystemencoding())
-
     index = Index(index_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path):
             continue
-        full_path = os.path.join(prefix, entry.path)
+        full_path = os.path.join(prefix, entry.path.decode(sys.getfilesystemencoding()))
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -516,11 +513,7 @@ def blob_from_path_and_stat(path, st):
         with open(path, 'rb') as f:
             blob.data = f.read()
     else:
-        if not isinstance(path, bytes):
-            blob.data = os.readlink(path.encode(sys.getfilesystemencoding()))
-        else:
-            blob.data = os.readlink(path)
-
+        blob.data = os.readlink(path).encode(sys.getfilesystemencoding())
     return blob
 
 
@@ -532,11 +525,8 @@ def get_unstaged_changes(index, path):
     :return: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
-    if not isinstance(path, bytes):
-        path = path.encode(sys.getfilesystemencoding())
-
     for name, entry in index.iteritems():
-        fp = os.path.join(path, name)
+        fp = os.path.join(path, name.decode(sys.getfilesystemencoding()))
         blob = blob_from_path_and_stat(fp, os.lstat(fp))
         if blob.id != entry.sha:
             yield name

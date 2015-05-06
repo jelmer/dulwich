@@ -46,8 +46,6 @@ import socket
 import subprocess
 import sys
 
-WIN = sys.platform.startswith('win')
-
 try:
     import urllib2
     import urlparse
@@ -663,11 +661,13 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
+    git = ['git']
+    if sys.platform == 'win32': # support .exe, .bat and .cmd
+        git = ['cmd', '/c'] + git
+
     def _connect(self, service, path):
         import subprocess
-        argv = ['git', service, path]
-        if WIN: # support git.exe and git.bat
-            argv = ['cmd', '/c'] + argv
+        argv = self.git + [service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

@@ -8,6 +8,13 @@
     open resources. (Gary van der Merwe)
   * Support 'git.bat' in SubprocessGitClient on Windows.
     (Stefan Zimmermann)
+  * For methods that deal with the transition between checkout files and tree
+    entries, the unicode handling of paths has changed. By default, on unix
+    systems, the path in bytes form is simply copied (this is unchanged), and
+    Windows system, the tree path encoding is assumed to be utf-8. On all
+    systems, the encoding of tree paths can be specified by the tree_encoding
+    argument. This can be use to translate a tree with path encoding different
+    to that of the filesystem. (Gary van der Merwe)
 
 0.10.1  2015-03-25
 

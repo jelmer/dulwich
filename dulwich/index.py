@@ -25,6 +25,7 @@ import platform
 import stat
 import struct
 import sys
+import locale
 
 from dulwich.file import GitFile
 from dulwich.objects import (
@@ -463,30 +464,38 @@ def validate_path(path, element_validator=validate_path_element_default):
         return True
 
 
-def build_index_from_tree(prefix, index_path, object_store, tree_id,
+def build_index_from_tree(root_path, index_path, object_store, tree_id,
                           honor_filemode=True,
-                          validate_path_element=validate_path_element_default):
+                          validate_path_element=validate_path_element_default,
+                          tree_encoding=None):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
-    :param prefix: Target dir for materialized index files
+    :param root_path: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
     :param validate_path_element: Function to validate path elements to check out;
         default just refuses .git and .. directories.
+    :param tree_encoding: Unicode encoding of the Git tree.
 
     :note:: existing index is wiped and contents are not merged
-        in a working dir. Suiteable only for fresh clones.
+        in a working dir. Suitable only for fresh clones.
     """
 
     index = Index(index_path)
 
+    if tree_encoding is None and sys.platform == 'win32':
+        tree_encoding = 'utf-8'
+    if not tree_encoding:
+        root_path = root_path.encode(sys.getfilesystemencoding())
+
     for entry in object_store.iter_tree_contents(tree_id):
-        if not validate_path(entry.path):
+        if not validate_path(entry.path, validate_path_element):
             continue
-        full_path = os.path.join(prefix, entry.path.decode(sys.getfilesystemencoding()))
+        fs_path = tree_to_fs_path(entry.path, tree_encoding)
+        full_path = os.path.join(root_path, fs_path)
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -502,37 +511,88 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     index.write()
 
 
-def blob_from_path_and_stat(path, st):
+def blob_from_path_and_stat(fs_path, st):
     """Create a blob from a path and a stat object.
 
-    :param path: Full path to file
+    :param fs_path: Full file system path to file
     :param st: A stat object
     :return: A `Blob` object
     """
     blob = Blob()
     if not stat.S_ISLNK(st.st_mode):
-        with open(path, 'rb') as f:
+        with open(fs_path, 'rb') as f:
             blob.data = f.read()
     else:
         if platform.python_implementation() == 'PyPy':
             # os.readlink on pypy seems to require bytes
             # TODO: GaryvdM: test on other pypy configurations,
             # e.g. windows, pypy3.
-            path = path.encode(sys.getfilesystemencoding())
-        blob.data = os.readlink(path).encode(sys.getfilesystemencoding())
+            fs_path = fs_path.encode(sys.getfilesystemencoding())
+        blob.data = os.readlink(fs_path).encode(sys.getfilesystemencoding())
     return blob
 
 
-def get_unstaged_changes(index, path):
+def get_unstaged_changes(index, root_path, tree_encoding=None):
     """Walk through an index and check for differences against working tree.
 
     :param index: index to check
-    :param path: path in which to find files
+    :param prefix: path in which to find files
+    :param tree_encoding: Unicode encoding of the Git tree.
+
     :return: iterator over paths with unstaged changes
     """
+    if tree_encoding is None and sys.platform == 'win32':
+        tree_encoding = 'utf-8'
+    if not tree_encoding:
+        root_path = root_path.encode(sys.getfilesystemencoding())
     # For each entry in the index check the sha1 & ensure not staged
-    for name, entry in index.iteritems():
-        fp = os.path.join(path, name.decode(sys.getfilesystemencoding()))
-        blob = blob_from_path_and_stat(fp, os.lstat(fp))
+    for tree_path, entry in index.iteritems():
+        fs_path = tree_to_fs_path(tree_path, tree_encoding)
+        full_path = os.path.join(root_path, fs_path)
+        blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         if blob.id != entry.sha:
-            yield name
+            yield tree_path
+
+os_sep_bytes = os.sep.encode('ascii')
+
+def tree_to_fs_path(tree_path, tree_encoding=None):
+    """Convert a git tree path to a file system path.
+
+    :param tree_path: Git tree path as bytes
+    :param tree_encoding: Unicode encoding of the Git tree.
+
+    :return: File system path.
+    """
+    assert isinstance(tree_path, bytes)
+    if os.sep != b'/':
+        sep_corrected_path = tree_path.replace(b'/', os_sep_bytes)
+    else:
+        sep_corrected_path = tree_path
+    if tree_encoding is None and sys.platform == 'win32':
+        tree_encoding = 'utf-8'
+    if tree_encoding:
+        fs_path = sep_corrected_path.decode(tree_encoding)
+    else:
+        fs_path = sep_corrected_path
+    return fs_path
+
+
+def fs_to_tree_path(fs_path, tree_encoding=None):
+    """Convert a git tree path to a file system path.
+
+    :param fs_path: File system path.
+    :param tree_encoding: Unicode encoding of the Git tree.
+
+    :return:  Git tree path as bytes
+    """
+    if not isinstance(fs_path, bytes):
+        if tree_encoding is None:
+            tree_encoding = 'utf-8' if sys.platform == 'win32' else sys.getfilesystemencoding()
+        bytes_path = fs_path.encode(tree_encoding)
+    else:
+        bytes_path = fs_path
+    if os.sep != b'/':
+        tree_path = bytes_path.replace(os_sep_bytes, b'/')
+    else:
+        tree_path = bytes_path
+    return tree_path

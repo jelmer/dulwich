@@ -240,11 +240,12 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
     return r
 
 
-def add(repo=".", paths=None):
+def add(repo=".", paths=None, tree_encoding=None):
     """Add files to the staging area.
 
     :param repo: Repository for the files
     :param paths: Paths to add.  No value passed stages all modified files.
+    :param tree_encoding: Unicode encoding of the Git tree.
     """
     # FIXME: Support patterns, directories.
     with open_repo_closing(repo) as r:
@@ -257,7 +258,7 @@ def add(repo=".", paths=None):
                     dirnames.remove('.git')
                 for filename in filenames:
                     paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-        r.stage(paths)
+        r.stage(paths, tree_encoding)
 
 
 def rm(repo=".", paths=None):
@@ -570,10 +571,11 @@ def pull(repo, remote_location, refs_path,
         r.reset_index()
 
 
-def status(repo="."):
+def status(repo=".", tree_encoding=None):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository or repository object
+    :param tree_encoding: Unicode encoding of the Git tree.
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -583,7 +585,7 @@ def status(repo="."):
         # 1. Get status of staged
         tracked_changes = get_tree_changes(r)
         # 2. Get status of unstaged
-        unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
+        unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path, tree_encoding))
         # TODO - Status of untracked - add untracked changes, need gitignore.
         untracked_changes = []
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)

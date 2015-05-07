@@ -53,7 +53,7 @@ so only non-bare repositories will have an index, too. To open the index, simply
 call::
 
     >>> index = repo.open_index()
-    >>> print(index.path.decode(sys.getfilesystemencoding()))
+    >>> print(index.path)
     myrepo/.git/index
 
 Since the repository was just created, the index will be empty::
@@ -71,11 +71,11 @@ aren't tracked explicitly by git. Let's create a simple text file and stage it::
     >>> _ = f.write(b"monty")
     >>> f.close()
 
-    >>> repo.stage([b"foo"])
+    >>> repo.stage(["foo"])
 
 It will now show up in the index::
 
-    >>> print(",".join([f.decode(sys.getfilesystemencoding()) for f in repo.open_index()]))
+    >>> print(b",".join(repo.open_index()))
     foo
 
 

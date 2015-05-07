@@ -6,6 +6,8 @@
     (Gary van der Merwe, Jelmer Vernooij)
   * The `Repo` object has a new `close` method that can be called to close any
     open resources. (Gary van der Merwe)
+  * Support 'git.bat' in SubprocessGitClient on Windows.
+    (Stefan Zimmermann)
 
 0.10.1  2015-03-25
 

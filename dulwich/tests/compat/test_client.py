@@ -304,6 +304,12 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return path.encode(sys.getfilesystemencoding())
+    
+    def test_fetch_pack_no_side_band_64k(self):
+        if sys.platform == 'win32':
+            self.skipTest('No side_band_64k over tcp broken in msysgit.')
+        else:
+            super(DulwichTCPClientTest, self).test_fetch_pack_no_side_band_64k()
 
 
 class TestSSHVendor(object):

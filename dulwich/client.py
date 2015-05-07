@@ -661,9 +661,20 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
+    git = ['git']
+    if sys.platform == 'win32': # support .exe, .bat and .cmd
+        try: # to avoid overhead
+            import win32api
+        except ImportError: # run through cmd.exe with some overhead
+            git = ['cmd', '/c'] + git
+        else:
+            status, git = win32api.FindExecutable('git')
+            #TODO: need to check status? (exc is raised if not found)
+            git = [git]
+
     def _connect(self, service, path):
         import subprocess
-        argv = ['git', service, path]
+        argv = self.git + [service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

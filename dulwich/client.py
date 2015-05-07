@@ -663,7 +663,14 @@ class SubprocessGitClient(TraditionalGitClient):
 
     git = ['git']
     if sys.platform == 'win32': # support .exe, .bat and .cmd
-        git = ['cmd', '/c'] + git
+        try: # to avoid overhead
+            import win32api
+        except ImportError: # run through cmd.exe with some overhead
+            git = ['cmd', '/c'] + git
+        else:
+            status, git = win32api.FindExecutable('git')
+            #TODO: need to check status? (exc is raised if not found)
+            git = [git]
 
     def _connect(self, service, path):
         import subprocess

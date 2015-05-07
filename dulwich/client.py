@@ -650,6 +650,21 @@ class SubprocessWrapper(object):
         self.proc.wait()
 
 
+def find_git_command():
+    """Find command to run for system Git (usually C Git).
+    """
+    if sys.platform == 'win32': # support .exe, .bat and .cmd
+        try: # to avoid overhead
+            import win32api
+        except ImportError: # run through cmd.exe with some overhead
+            return ['cmd', '/c', 'git']
+        else:
+            status, git = win32api.FindExecutable('git')
+            return [git]
+    else:
+        return ['git']
+
+
 class SubprocessGitClient(TraditionalGitClient):
     """Git client that talks to a server using a subprocess."""
 
@@ -661,20 +676,13 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
-    git = ['git']
-    if sys.platform == 'win32': # support .exe, .bat and .cmd
-        try: # to avoid overhead
-            import win32api
-        except ImportError: # run through cmd.exe with some overhead
-            git = ['cmd', '/c'] + git
-        else:
-            status, git = win32api.FindExecutable('git')
-            #TODO: need to check status? (exc is raised if not found)
-            git = [git]
+    git_command = None
 
     def _connect(self, service, path):
         import subprocess
-        argv = self.git + [service, path]
+        if self.git_command is None:
+            git_command = find_git_command()
+        argv = git_command + [service, path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

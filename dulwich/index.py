@@ -21,6 +21,7 @@
 import collections
 import errno
 import os
+import platform
 import stat
 import struct
 import sys
@@ -513,6 +514,11 @@ def blob_from_path_and_stat(path, st):
         with open(path, 'rb') as f:
             blob.data = f.read()
     else:
+        if platform.python_implementation() == 'PyPy':
+            # os.readlink on pypy seems to require bytes
+            # TODO: GaryvdM: test on other pypy configurations,
+            # e.g. windows, pypy3.
+            path = path.encode(sys.getfilesystemencoding())
         blob.data = os.readlink(path).encode(sys.getfilesystemencoding())
     return blob
 

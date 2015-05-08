@@ -185,14 +185,14 @@ class FileSystemBackend(Backend):
 
     def __init__(self, root=os.sep):
         super(FileSystemBackend, self).__init__()
-        self.root = os.path.normcase(
-            (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep))
+        self.root = (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep)
 
     def open_repository(self, path):
         logger.debug('opening repository at %s', path)
-        abspath = os.path.normcase(
-            os.path.abspath(os.path.join(self.root, path)) + os.sep)
-        if not abspath.startswith(self.root):
+        abspath = os.path.abspath(os.path.join(self.root, path)) + os.sep
+        normcase_abspath = os.path.normcase(abspath)
+        normcase_root = os.path.normcase(self.root)
+        if not normcase_abspath.startswith(normcase_root):
             raise NotGitRepository("Path %r not inside root %r" % (path, self.root))
         return Repo(abspath)
 

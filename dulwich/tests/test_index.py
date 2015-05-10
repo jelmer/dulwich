@@ -1,4 +1,5 @@
-# test_index.py -- Tests for the git index
+# -*- coding: utf-8 -*-
+#  test_index.py -- Tests for the git index
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -25,6 +26,7 @@ import os
 import shutil
 import stat
 import struct
+import sys
 import tempfile
 
 from dulwich.index import (
@@ -41,6 +43,8 @@ from dulwich.index import (
     write_cache_time,
     write_index,
     write_index_dict,
+    tree_to_fs_path,
+    fs_to_tree_path,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -50,7 +54,10 @@ from dulwich.objects import (
     Tree,
     )
 from dulwich.repo import Repo
-from dulwich.tests import TestCase
+from dulwich.tests import (
+    TestCase,
+    skipIf,
+    )
 
 class IndexTestCase(TestCase):
 
@@ -423,3 +430,42 @@ class TestValidatePathElement(TestCase):
         self.assertFalse(validate_path_element_ntfs(b".giT"))
         self.assertFalse(validate_path_element_ntfs(b".."))
         self.assertFalse(validate_path_element_ntfs(b"git~1"))
+
+
+class TestTreeFSPathConversion(TestCase):
+
+    @skipIf(sys.platform == 'win32', 'Non windows behavior.')
+    def test_tree_to_fs_path_not_win32(self):
+        # No decoding.
+        tree_path = b'd\xc3\xa9lw\xc3\xad\xc3\xa7h/foo'
+        fs_path = tree_to_fs_path(tree_path)
+        self.assertEqual(fs_path, os.path.join(b'd\xc3\xa9lw\xc3\xad\xc3\xa7h', b'foo'))
+
+    @skipIf(sys.platform != 'win32', 'Windows behavior.')
+    def test_tree_to_fs_path_win32(self):
+        # decode with assumed utf-8
+        tree_path = b'd\xc3\xa9lw\xc3\xad\xc3\xa7h/foo'
+        fs_path = tree_to_fs_path(tree_path)
+        self.assertEqual(fs_path, os.path.join(u'délwíçh', u'foo'))
+
+    def test_tree_to_fs_path_spec_encoding(self):
+        tree_path = b'd\xe9lw\xed\xe7h/foo'
+        fs_path = tree_to_fs_path(tree_path, 'latin1')
+        self.assertEqual(fs_path, os.path.join(u'délwíçh', u'foo'))
+
+    def test_fs_to_tree_path_bytes(self):
+        fs_path = os.path.join(b'd\xc3\xa9lw\xc3\xad\xc3\xa7h', b'foo')
+        tree_path = fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, b'd\xc3\xa9lw\xc3\xad\xc3\xa7h/foo')
+
+    @skipIf(sys.platform != 'win32', 'Windows behavior.')
+    def test_fs_to_tree_path_win32(self):
+        # decode with assumed utf-8
+        fs_path = os.path.join(u'délwíçh', u'foo')
+        tree_path = fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, b'd\xc3\xa9lw\xc3\xad\xc3\xa7h/foo')
+
+    def test_fs_to_tree_path_spec_encoding(self):
+        fs_path = os.path.join(u'délwíçh', u'foo')
+        tree_path = fs_to_tree_path(fs_path, 'latin1')
+        self.assertEqual(tree_path, b'd\xe9lw\xed\xe7h/foo')

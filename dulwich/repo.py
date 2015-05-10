@@ -730,32 +730,45 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, paths, fsencoding=sys.getfilesystemencoding()):
+    def stage(self, fs_paths, tree_encoding=None):
         """Stage a set of paths.
 
-        :param paths: List of paths, relative to the repository path
+        :param fs_paths: List of paths, relative to the repository path
+        :param tree_encoding: Unicode encoding of the Git tree.
         """
-        if not isinstance(paths, list):
-            paths = [paths]
+        str_type = basestring if sys.version_info[0] == 2 else str
+        all_bytes = all((isinstance(fs_path, bytes) for fs_path in fs_paths))
+        all_str = all((isinstance(fs_path, str_type) for fs_path in fs_paths))
+        assert all_bytes or all_str
+
+        if not all_str:
+            root_path = self.path.encode(sys.getfilesystemencoding())
+        else:
+            root_path = self.path
+
+        if not isinstance(fs_paths, list):
+            fs_paths = [fs_paths]
         from dulwich.index import (
             blob_from_path_and_stat,
             index_entry_from_stat,
+            fs_to_tree_path,
             )
         index = self.open_index()
-        for path in paths:
-            full_path = os.path.join(self.path, path)
+        for fs_path in fs_paths:
+            tree_path = fs_to_tree_path(fs_path, tree_encoding)
+            full_path = os.path.join(root_path, fs_path)
             try:
                 st = os.lstat(full_path)
             except OSError:
                 # File no longer exists
                 try:
-                    del index[path.encode(fsencoding)]
+                    del index[tree_path]
                 except KeyError:
                     pass  # already removed
             else:
                 blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
-                index[path.encode(fsencoding)] = index_entry_from_stat(st, blob.id, 0)
+                index[tree_path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
@@ -797,10 +810,11 @@ class Repo(BaseRepo):
 
         return target
 
-    def reset_index(self, tree=None):
+    def reset_index(self, tree=None, tree_encoding=None):
         """Reset the index back to a specific tree.
 
         :param tree: Tree SHA to reset to, None for current HEAD tree.
+        :param tree_encoding: Unicode encoding of the Git tree.
         """
         from dulwich.index import (
             build_index_from_tree,
@@ -817,7 +831,8 @@ class Repo(BaseRepo):
             validate_path_element = validate_path_element_default
         return build_index_from_tree(self.path, self.index_path(),
                 self.object_store, tree, honor_filemode=honor_filemode,
-                validate_path_element=validate_path_element)
+                validate_path_element=validate_path_element,
+                tree_encoding=tree_encoding)
 
     def get_config(self):
         """Retrieve the config object.

@@ -730,11 +730,14 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, paths, fsencoding=sys.getfilesystemencoding()):
+    def stage(self, paths):
         """Stage a set of paths.
 
         :param paths: List of paths, relative to the repository path
         """
+
+        root_path_bytes = self.path.encode(sys.getfilesystemencoding())
+
         if not isinstance(paths, list):
             paths = [paths]
         from dulwich.index import (
@@ -743,19 +746,21 @@ class Repo(BaseRepo):
             )
         index = self.open_index()
         for path in paths:
-            full_path = os.path.join(self.path, path)
+            if not isinstance(path, bytes):
+                path = path.encode(sys.getfilesystemencoding())
+            full_path = os.path.join(root_path_bytes, path)
             try:
                 st = os.lstat(full_path)
             except OSError:
                 # File no longer exists
                 try:
-                    del index[path.encode(fsencoding)]
+                    del index[path]
                 except KeyError:
                     pass  # already removed
             else:
                 blob = blob_from_path_and_stat(full_path, st)
                 self.object_store.add_object(blob)
-                index[path.encode(fsencoding)] = index_entry_from_stat(st, blob.id, 0)
+                index[path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,

@@ -78,7 +78,7 @@ class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 
     def setUp(self):
-        self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export'))
+        self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export').rstrip(os.sep))
         self.dest = os.path.join(self.gitroot, 'dest')
         file.ensure_dir_exists(self.dest)
         run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)

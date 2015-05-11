@@ -256,9 +256,8 @@ class BuildIndexTests(TestCase):
 
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
         with closing(Repo.init(repo_dir)) as repo:
-            self.addCleanup(shutil.rmtree, repo_dir)
-
             tree = Tree()
             repo.object_store.add_object(tree)
 

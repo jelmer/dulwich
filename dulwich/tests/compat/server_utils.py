@@ -32,6 +32,7 @@ from dulwich.server import (
     )
 from dulwich.tests.utils import (
     skipIfPY3,
+    tear_down_repo,
     )
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
@@ -148,16 +149,12 @@ class ServerTests(object):
         port = self._start_server(self._old_repo)
 
         new_repo_base_dir = tempfile.mkdtemp()
-        try:
-            new_repo_dir = os.path.join(new_repo_base_dir, 'empty_new')
-            run_git_or_fail(['clone', self.url(port), new_repo_dir],
-                            cwd=new_repo_base_dir)
-            new_repo = Repo(new_repo_dir)
-            self.assertReposEqual(self._old_repo, new_repo)
-        finally:
-            # We don't create a Repo from new_repo_dir until after some errors
-            # may have occurred, so don't depend on tearDown to clean it up.
-            shutil.rmtree(new_repo_base_dir)
+        self.addCleanup(shutil.rmtree, new_repo_base_dir)
+        new_repo_dir = os.path.join(new_repo_base_dir, 'empty_new')
+        run_git_or_fail(['clone', self.url(port), new_repo_dir],
+                        cwd=new_repo_base_dir)
+        new_repo = Repo(new_repo_dir)
+        self.assertReposEqual(self._old_repo, new_repo)
 
     def test_lsremote_from_dulwich(self):
         self._repo = self.import_repo('server_old.export')
@@ -169,7 +166,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(shutil.rmtree, self._stub_repo.path)
+        self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
@@ -185,7 +182,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(shutil.rmtree, self._stub_repo.path)
+        self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1
@@ -206,7 +203,7 @@ class ServerTests(object):
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo('server_new.export')
         self._stub_repo = _StubRepo('shallow')
-        self.addCleanup(shutil.rmtree, self._stub_repo.path)
+        self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
 
         # Fetch at depth 1

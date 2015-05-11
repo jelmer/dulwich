@@ -478,7 +478,7 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
-        in a working dir. Suiteable only for fresh clones.
+        in a working dir. Suitable only for fresh clones.
     """
 
     index = Index(index_path)

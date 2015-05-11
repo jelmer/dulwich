@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # test_index.py -- Tests for the git index
 # encoding: utf-8
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
@@ -53,7 +54,6 @@ from dulwich.objects import (
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
-    expectedFailure,
     TestCase,
     skipIf,
     )
@@ -395,7 +395,6 @@ class BuildIndexTests(TestCase):
                 filee.id)
             self.assertFileContents(epath, 'd', symlink=True)
 
-    @expectedFailure
     def test_no_decode_encode(self):
         repo_dir = tempfile.mkdtemp()
         repo_dir_bytes = repo_dir.encode(sys.getfilesystemencoding())

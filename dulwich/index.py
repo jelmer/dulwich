@@ -482,12 +482,13 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     """
 
     index = Index(index_path)
+    if not isinstance(prefix, bytes):
+        prefix = prefix.encode(sys.getfilesystemencoding())
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
-        full_path = os.path.join(prefix,
-            entry.path.decode(sys.getfilesystemencoding()))
+        full_path = os.path.join(prefix, entry.path)
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -510,17 +511,13 @@ def blob_from_path_and_stat(path, st):
     :param st: A stat object
     :return: A `Blob` object
     """
+    assert isinstance(path, bytes)
     blob = Blob()
     if not stat.S_ISLNK(st.st_mode):
         with open(path, 'rb') as f:
             blob.data = f.read()
     else:
-        if platform.python_implementation() == 'PyPy':
-            # os.readlink on pypy seems to require bytes
-            # TODO: GaryvdM: test on other pypy configurations,
-            # e.g. windows, pypy3.
-            path = path.encode(sys.getfilesystemencoding())
-        blob.data = os.readlink(path).encode(sys.getfilesystemencoding())
+        blob.data = os.readlink(path)
     return blob
 
 
@@ -532,8 +529,11 @@ def get_unstaged_changes(index, path):
     :return: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
+    if not isinstance(path, bytes):
+        path = path.encode(sys.getfilesystemencoding())
+
     for name, entry in index.iteritems():
-        fp = os.path.join(path, name.decode(sys.getfilesystemencoding()))
+        fp = os.path.join(path, name)
         blob = blob_from_path_and_stat(fp, os.lstat(fp))
         if blob.id != entry.sha:
             yield name

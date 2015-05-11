@@ -452,6 +452,7 @@ class PushTests(PorcelainTestCase):
 
         # Setup target repo cloned from temp test repo
         clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
         target_repo = porcelain.clone(self.repo.path, target=clone_path, errstream=errstream)
         target_repo.close()
 
@@ -498,6 +499,7 @@ class PullTests(PorcelainTestCase):
 
         # Setup target repo
         target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
         target_repo = porcelain.clone(self.repo.path, target=target_path,
                                       errstream=errstream)
         target_repo.close()
@@ -708,6 +710,7 @@ class FetchTests(PorcelainTestCase):
 
         # Setup target repo
         target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
         target_repo = porcelain.clone(self.repo.path, target=target_path,
             errstream=errstream)
 

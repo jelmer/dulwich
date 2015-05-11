@@ -25,9 +25,9 @@ import locale
 import os
 import stat
 import shutil
+import sys
 import tempfile
 import warnings
-import sys
 
 from dulwich import errors
 from dulwich.object_store import (
@@ -40,6 +40,7 @@ from dulwich.repo import (
     MemoryRepo,
     )
 from dulwich.tests import (
+    expectedFailure,
     TestCase,
     skipIf,
     )
@@ -522,6 +523,7 @@ class BuildRepoRootTests(TestCase):
         self._repo_dir = self.get_repo_dir()
         os.makedirs(self._repo_dir)
         r = self._repo = Repo.init(self._repo_dir)
+        self.addCleanup(tear_down_repo, r)
         self.assertFalse(r.bare)
         self.assertEqual(b'ref: refs/heads/master', r.refs.read_ref(b'HEAD'))
         self.assertRaises(KeyError, lambda: r.refs[b'refs/heads/master'])
@@ -536,10 +538,6 @@ class BuildRepoRootTests(TestCase):
                                  author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
         self._root_commit = commit_sha
-
-    def tearDown(self):
-        tear_down_repo(self._repo)
-        super(BuildRepoRootTests, self).tearDown()
 
     def test_build_repo(self):
         r = self._repo
@@ -747,3 +745,30 @@ class BuildRepoRootTests(TestCase):
         os.remove(os.path.join(r.path, 'a'))
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
+
+    @expectedFailure
+    def test_commit_no_encode_decode(self):
+        r = self._repo
+        repo_path_bytes = r.path.encode(sys.getfilesystemencoding())
+        encodings = ('utf8', 'latin1')
+        names = [u'À'.encode(encoding) for encoding in encodings]
+        for name, encoding in zip(names, encodings):
+            full_path = os.path.join(repo_path_bytes, name)
+            with open(full_path, 'wb') as f:
+                f.write(encoding.encode('ascii'))
+            # These files are break tear_down_repo, so cleanup these files
+            # ourselves.
+            self.addCleanup(os.remove, full_path)
+
+        r.stage(names)
+        commit_sha = r.do_commit(b'Files with different encodings',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=None, merge_heads=[self._root_commit])
+
+        for name, encoding in zip(names, encodings):
+            mode, id = tree_lookup_path(r.get_object, r[commit_sha].tree, name)
+            self.assertEqual(stat.S_IFREG | 0o644, mode)
+            self.assertEqual(encoding.encode('ascii'), r[id].data)

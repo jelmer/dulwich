@@ -1,4 +1,5 @@
 # test_index.py -- Tests for the git index
+# encoding: utf-8
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -52,9 +53,10 @@ from dulwich.objects import (
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
+    expectedFailure,
     TestCase,
     skipIf,
-)
+    )
 
 class IndexTestCase(TestCase):
 
@@ -392,6 +394,39 @@ class BuildIndexTests(TestCase):
                 0 if sys.platform == 'win32' else 1,
                 filee.id)
             self.assertFileContents(epath, 'd', symlink=True)
+
+    @expectedFailure
+    def test_no_decode_encode(self):
+        repo_dir = tempfile.mkdtemp()
+        repo_dir_bytes = repo_dir.encode(sys.getfilesystemencoding())
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
+
+            # Populate repo
+            file = Blob.from_string(b'foo')
+
+            tree = Tree()
+            latin1_name = u'À'.encode('latin1')
+            utf8_name = u'À'.encode('utf8')
+            tree[latin1_name] = (stat.S_IFREG | 0o644, file.id)
+            tree[utf8_name] = (stat.S_IFREG | 0o644, file.id)
+
+            repo.object_store.add_objects(
+                [(o, None) for o in [file, tree]])
+
+            build_index_from_tree(
+                repo.path, repo.index_path(),
+                repo.object_store, tree.id)
+
+            # Verify index entries
+            index = repo.open_index()
+
+            latin1_path = os.path.join(repo_dir_bytes, latin1_name)
+            self.assertTrue(os.path.exists(latin1_path))
+
+            utf8_path = os.path.join(repo_dir_bytes, utf8_name)
+            self.assertTrue(os.path.exists(utf8_path))
+
 
 class GetUnstagedChangesTests(TestCase):
 

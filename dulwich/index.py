@@ -463,13 +463,13 @@ def validate_path(path, element_validator=validate_path_element_default):
         return True
 
 
-def build_index_from_tree(prefix, index_path, object_store, tree_id,
+def build_index_from_tree(root_path, index_path, object_store, tree_id,
                           honor_filemode=True,
                           validate_path_element=validate_path_element_default):
     """Generate and materialize index from a tree
 
     :param tree_id: Tree to materialize
-    :param prefix: Target dir for materialized index files
+    :param root_path: Target dir for materialized index files
     :param index_path: Target path for generated index
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
@@ -482,13 +482,14 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     """
 
     index = Index(index_path)
-    if not isinstance(prefix, bytes):
-        prefix = prefix.encode(sys.getfilesystemencoding())
+    if not isinstance(root_path, bytes):
+        root_path = root_path.encode(sys.getfilesystemencoding())
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
-        full_path = os.path.join(prefix, entry.path)
+        fs_path = tree_to_fs_path(entry.path)
+        full_path = os.path.join(root_path, fs_path)
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -504,36 +505,73 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
     index.write()
 
 
-def blob_from_path_and_stat(path, st):
+def blob_from_path_and_stat(fs_path, st):
     """Create a blob from a path and a stat object.
 
-    :param path: Full path to file
+    :param fs_path: Full file system path to file
     :param st: A stat object
     :return: A `Blob` object
     """
-    assert isinstance(path, bytes)
+    assert isinstance(fs_path, bytes)
     blob = Blob()
     if not stat.S_ISLNK(st.st_mode):
-        with open(path, 'rb') as f:
+        with open(fs_path, 'rb') as f:
             blob.data = f.read()
     else:
-        blob.data = os.readlink(path)
+        blob.data = os.readlink(fs_path)
     return blob
 
 
-def get_unstaged_changes(index, path):
+def get_unstaged_changes(index, root_path):
     """Walk through an index and check for differences against working tree.
 
     :param index: index to check
-    :param path: path in which to find files
+    :param root_path: path in which to find files
     :return: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
-    if not isinstance(path, bytes):
-        path = path.encode(sys.getfilesystemencoding())
+    if not isinstance(root_path, bytes):
+        root_path = root_path.encode(sys.getfilesystemencoding())
 
-    for name, entry in index.iteritems():
-        fp = os.path.join(path, name)
-        blob = blob_from_path_and_stat(fp, os.lstat(fp))
+    for tree_path, entry in index.iteritems():
+        fs_path = tree_to_fs_path(tree_path)
+        full_path = os.path.join(root_path, fs_path)
+        blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         if blob.id != entry.sha:
-            yield name
+            yield tree_path
+
+
+os_sep_bytes = os.sep.encode('ascii')
+
+
+def tree_to_fs_path(tree_path):
+    """Convert a git tree path to a file system path.
+
+    :param tree_path: Git tree path as bytes
+
+    :return: File system path.
+    """
+    assert isinstance(tree_path, bytes)
+    if os_sep_bytes != b'/':
+        sep_corrected_path = tree_path.replace(b'/', os_sep_bytes)
+    else:
+        sep_corrected_path = tree_path
+    return sep_corrected_path
+
+
+def fs_to_tree_path(fs_path):
+    """Convert a file system path to a git tree path.
+
+    :param fs_path: File system path.
+
+    :return:  Git tree path as bytes
+    """
+    if not isinstance(fs_path, bytes):
+        fs_path_bytes = fs_path.encode(sys.getfilesystemencoding())
+    else:
+        fs_path_bytes = fs_path
+    if os_sep_bytes != b'/':
+        tree_path = fs_path_bytes.replace(os_sep_bytes, b'/')
+    else:
+        tree_path = fs_path_bytes
+    return tree_path

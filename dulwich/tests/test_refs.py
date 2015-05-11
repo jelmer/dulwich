@@ -280,11 +280,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self._repo = open_repo('refs.git')
+        self.addCleanup(tear_down_repo, self._repo)
         self._refs = self._repo.refs
-
-    def tearDown(self):
-        tear_down_repo(self._repo)
-        TestCase.tearDown(self)
 
     def test_get_packed_refs(self):
         self.assertEqual({
@@ -349,11 +346,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_add_if_new_symbolic(self):
         # Use an empty repo instead of the default.
-        tear_down_repo(self._repo)
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
-        self._repo = Repo.init(repo_dir)
-        refs = self._repo.refs
+        repo = Repo.init(repo_dir)
+        self.addCleanup(tear_down_repo, repo)
+        refs = repo.refs
 
         nines = b'9' * 40
         self.assertEqual(b'ref: refs/heads/master', refs.read_ref(b'HEAD'))

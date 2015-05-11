@@ -19,6 +19,7 @@
 """Blackbox tests for Dulwich commands."""
 
 import tempfile
+import shutil
 
 from dulwich.repo import (
     Repo,
@@ -34,6 +35,7 @@ class GitReceivePackTests(BlackboxTestCase):
     def setUp(self):
         super(GitReceivePackTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
     def test_basic(self):
@@ -57,6 +59,7 @@ class GitUploadPackTests(BlackboxTestCase):
     def setUp(self):
         super(GitUploadPackTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
     def test_missing_arg(self):

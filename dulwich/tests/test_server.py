@@ -20,6 +20,7 @@
 
 from io import BytesIO
 import os
+import shutil
 import tempfile
 
 from dulwich.errors import (
@@ -832,6 +833,7 @@ class FileSystemBackendTests(TestCase):
     def setUp(self):
         super(FileSystemBackendTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
         self.backend = FileSystemBackend()
 
@@ -904,6 +906,7 @@ class UpdateServerInfoTests(TestCase):
     def setUp(self):
         super(UpdateServerInfoTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
     def test_empty(self):

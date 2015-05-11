@@ -236,7 +236,7 @@ class CompatTestCase(TestCase):
         repo = Repo(path)
         def cleanup():
             repo.close()
-            rmtree_ro(path)
+            rmtree_ro(os.path.dirname(path.rstrip(os.sep)))
         self.addCleanup(cleanup)
         return repo
 

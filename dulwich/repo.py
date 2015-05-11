@@ -730,11 +730,15 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, fs_paths, fsencoding=sys.getfilesystemencoding()):
+    def stage(self, fs_paths):
         """Stage a set of paths.
 
         :param fs_paths: List of paths, relative to the repository path
         """
+
+        root_path_bytes = self.path.encode(sys.getfilesystemencoding())
+        root_path_str = self.path
+
         if not isinstance(fs_paths, list):
             fs_paths = [fs_paths]
         from dulwich.index import (
@@ -744,8 +748,10 @@ class Repo(BaseRepo):
             )
         index = self.open_index()
         for fs_path in fs_paths:
-            tree_path = fs_to_tree_path(fs_path).encode(fsencoding)
-            full_path = os.path.join(self.path, fs_path)
+            tree_path = fs_to_tree_path(fs_path)
+            full_path = os.path.join(
+                root_path_bytes if isinstance(fs_path, bytes) else root_path_str,
+                fs_path)
             try:
                 st = os.lstat(full_path)
             except OSError:

@@ -53,7 +53,7 @@ missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
 def mkdtemp_unicode():
-    suffix = u'déłwíçh'
+    suffix = u'délwíçh'
     return tempfile.mkdtemp(suffix=suffix)
 
 

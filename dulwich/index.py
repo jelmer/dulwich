@@ -482,11 +482,13 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     """
 
     index = Index(index_path)
+    if not isinstance(root_path, bytes):
+        root_path = root_path.encode(sys.getfilesystemencoding())
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
-        fs_path = tree_to_fs_path(entry.path.decode(sys.getfilesystemencoding()))
+        fs_path = tree_to_fs_path(entry.path)
         full_path = os.path.join(root_path, fs_path)
 
         if not os.path.exists(os.path.dirname(full_path)):
@@ -515,11 +517,6 @@ def blob_from_path_and_stat(fs_path, st):
         with open(fs_path, 'rb') as f:
             blob.data = f.read()
     else:
-        if platform.python_implementation() == 'PyPy':
-            # os.readlink on pypy seems to require bytes
-            # TODO: GaryvdM: test on other pypy configurations,
-            # e.g. windows, pypy3.
-            fs_path = fs_path.encode(sys.getfilesystemencoding())
         blob.data = os.readlink(fs_path).encode(sys.getfilesystemencoding())
     return blob
 
@@ -532,12 +529,18 @@ def get_unstaged_changes(index, root_path):
     :return: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
+    if not isinstance(root_path, bytes):
+        root_path = root_path.encode(sys.getfilesystemencoding())
+
     for tree_path, entry in index.iteritems():
-        fs_path = tree_to_fs_path(tree_path.decode(sys.getfilesystemencoding()))
+        fs_path = tree_to_fs_path(tree_path)
         full_path = os.path.join(root_path, fs_path)
         blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         if blob.id != entry.sha:
             yield tree_path
+
+
+os_sep_bytes = os.sep.encode('ascii')
 
 
 def tree_to_fs_path(tree_path):
@@ -547,8 +550,9 @@ def tree_to_fs_path(tree_path):
 
     :return: File system path.
     """
-    if os.sep != '/':
-        sep_corrected_path = tree_path.replace(b'/', os.sep)
+    assert isinstance(tree_path, bytes)
+    if os_sep_bytes != b'/':
+        sep_corrected_path = tree_path.replace(b'/', os_sep_bytes)
     else:
         sep_corrected_path = tree_path
     return sep_corrected_path
@@ -561,8 +565,12 @@ def fs_to_tree_path(fs_path):
 
     :return:  Git tree path as bytes
     """
-    if os.sep != '/':
-        tree_path = fs_path.replace(os.sep, '/')
+    if not isinstance(fs_path, bytes):
+        fs_path_bytes = fs_path.encode(sys.getfilesystemencoding())
     else:
-        tree_path = fs_path
+        fs_path_bytes = fs_path
+    if os_sep_bytes != b'/':
+        tree_path = fs_path_bytes.replace(os_sep_bytes, b'/')
+    else:
+        tree_path = fs_path_bytes
     return tree_path

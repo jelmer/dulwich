@@ -79,7 +79,7 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
-def unified_diff(a, b, fromfile='', tofile='', n=3):
+def unified_diff(a, b, fromfile, tofile, n=3):
     """difflib.unified_diff that doesn't write any dates or trailing spaces.
 
     Based on the same function in Python2.6.5-rc2's difflib.py
@@ -87,26 +87,27 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
     started = False
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
-            yield '--- %s\n' % fromfile
-            yield '+++ %s\n' % tofile
+            yield b'--- ' + fromfile + b'\n'
+            yield b'+++ ' + tofile + b'\n'
             started = True
         i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        yield "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        sizes = "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        yield sizes.encode('ascii')
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
-                    yield ' ' + line
+                    yield b' ' + line
                 continue
             if tag == 'replace' or tag == 'delete':
                 for line in a[i1:i2]:
-                    if not line[-1] == '\n':
-                        line += '\n\\ No newline at end of file\n'
-                    yield '-' + line
+                    if not line[-1:] == b'\n':
+                        line += b'\n\\ No newline at end of file\n'
+                    yield b'-' + line
             if tag == 'replace' or tag == 'insert':
                 for line in b[j1:j2]:
-                    if not line[-1] == '\n':
-                        line += '\n\\ No newline at end of file\n'
-                    yield '+' + line
+                    if not line[-1:] == b'\n':
+                        line += b'\n\\ No newline at end of file\n'
+                    yield b'+' + line
 
 
 def is_binary(content):
@@ -114,21 +115,21 @@ def is_binary(content):
 
     :param content: Bytestring to check for binary content
     """
-    return '\0' in content[:FIRST_FEW_BYTES]
+    return b'\0' in content[:FIRST_FEW_BYTES]
 
 
 def shortid(hexsha):
     if hexsha is None:
-        return "0" * 7
+        return b"0" * 7
     else:
         return hexsha[:7]
 
 
 def patch_filename(p, root):
     if p is None:
-        return "/dev/null"
+        return b"/dev/null"
     else:
-        return root + "/" + p
+        return root + b"/" + p
 
 
 def write_object_diff(f, store, old_file, new_file, diff_binary=False):
@@ -145,13 +146,13 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file
-    old_path = patch_filename(old_path, "a")
-    new_path = patch_filename(new_path, "b")
+    old_path = patch_filename(old_path, b"a")
+    new_path = patch_filename(new_path, b"b")
     def content(mode, hexsha):
         if hexsha is None:
-            return ''
+            return b''
         elif S_ISGITLINK(mode):
-            return "Submodule commit " + hexsha + "\n"
+            return b"Submodule commit " + hexsha + b"\n"
         else:
             return store[hexsha].data
 
@@ -165,12 +166,13 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
     if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
-        f.write("Binary files %s and %s differ\n" % (old_path, new_path))
+        f.write(b"Binary files " + old_path + b" and " + new_path + b" differ\n")
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
             old_path, new_path))
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def gen_diff_header(paths, modes, shas):
     """Write a blob diff header.
 
@@ -181,20 +183,21 @@ def gen_diff_header(paths, modes, shas):
     (old_path, new_path) = paths
     (old_mode, new_mode) = modes
     (old_sha, new_sha) = shas
-    yield "diff --git %s %s\n" % (old_path, new_path)
+    yield b"diff --git " + old_path + b" " + new_path + b"\n"
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                yield "old mode %o\n" % old_mode
-            yield "new mode %o\n" % new_mode
+                yield ("old mode %o\n" % old_mode).encode('ascii')
+            yield ("new mode %o\n" % new_mode).encode('ascii')
         else:
-            yield "deleted mode %o\n" % old_mode
-    yield "index " + shortid(old_sha) + ".." + shortid(new_sha)
+            yield ("deleted mode %o\n" % old_mode).encode('ascii')
+    yield b"index " + shortid(old_sha) + b".." + shortid(new_sha)
     if new_mode is not None:
-        yield " %o" % new_mode
-    yield "\n"
+        yield (" %o" % new_mode).encode('ascii')
+    yield b"\n"
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def write_blob_diff(f, old_file, new_file):
     """Write blob diff.
 
@@ -206,8 +209,8 @@ def write_blob_diff(f, old_file, new_file):
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file
-    old_path = patch_filename(old_path, "a")
-    new_path = patch_filename(new_path, "b")
+    old_path = patch_filename(old_path, b"a")
+    new_path = patch_filename(new_path, b"b")
     def lines(blob):
         if blob is not None:
             return blob.data.splitlines(True)
@@ -222,6 +225,7 @@ def write_blob_diff(f, old_file, new_file):
         old_path, new_path))
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """Write tree diff.
 

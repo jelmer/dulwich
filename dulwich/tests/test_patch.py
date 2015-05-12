@@ -41,9 +41,6 @@ from dulwich.tests import (
     SkipTest,
     TestCase,
     )
-from dulwich.tests.utils import (
-    skipIfPY3,
-    )
 
 
 class WriteCommitPatchTests(TestCase):
@@ -234,7 +231,6 @@ More help   : https://help.launchpad.net/ListHelp
         self.assertEqual(None, version)
 
 
-@skipIfPY3
 class DiffTests(TestCase):
     """Tests for write_blob_diff and write_tree_diff."""
 
@@ -243,14 +239,14 @@ class DiffTests(TestCase):
         write_blob_diff(f, (b"foo.txt", 0o644, Blob.from_string(b"old\nsame\n")),
                            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
-            "diff --git a/foo.txt b/bar.txt",
-            "index 3b0f961..a116b51 644",
-            "--- a/foo.txt",
-            "+++ b/bar.txt",
-            "@@ -1,2 +1,2 @@",
-            "-old",
-            "+new",
-            " same"
+            b"diff --git a/foo.txt b/bar.txt",
+            b"index 3b0f961..a116b51 644",
+            b"--- a/foo.txt",
+            b"+++ b/bar.txt",
+            b"@@ -1,2 +1,2 @@",
+            b"-old",
+            b"+new",
+            b" same"
             ], f.getvalue().splitlines())
 
     def test_blob_add(self):
@@ -258,14 +254,14 @@ class DiffTests(TestCase):
         write_blob_diff(f, (None, None, None),
                            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
-            'diff --git /dev/null b/bar.txt',
-             'new mode 644',
-             'index 0000000..a116b51 644',
-             '--- /dev/null',
-             '+++ b/bar.txt',
-             '@@ -1,0 +1,2 @@',
-             '+new',
-             '+same'
+             b'diff --git /dev/null b/bar.txt',
+             b'new mode 644',
+             b'index 0000000..a116b51 644',
+             b'--- /dev/null',
+             b'+++ b/bar.txt',
+             b'@@ -1,0 +1,2 @@',
+             b'+new',
+             b'+same'
             ], f.getvalue().splitlines())
 
     def test_blob_remove(self):
@@ -273,14 +269,14 @@ class DiffTests(TestCase):
         write_blob_diff(f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
                            (None, None, None))
         self.assertEqual([
-            'diff --git a/bar.txt /dev/null',
-            'deleted mode 644',
-            'index a116b51..0000000',
-            '--- a/bar.txt',
-            '+++ /dev/null',
-            '@@ -1,2 +1,0 @@',
-            '-new',
-            '-same'
+            b'diff --git a/bar.txt /dev/null',
+            b'deleted mode 644',
+            b'index a116b51..0000000',
+            b'--- a/bar.txt',
+            b'+++ /dev/null',
+            b'@@ -1,2 +1,0 @@',
+            b'-new',
+            b'-same'
             ], f.getvalue().splitlines())
 
     def test_tree_diff(self):
@@ -303,28 +299,28 @@ class DiffTests(TestCase):
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEqual([
-            'diff --git /dev/null b/added.txt',
-            'new mode 644',
-            'index 0000000..76d4bb8 644',
-            '--- /dev/null',
-            '+++ b/added.txt',
-            '@@ -1,0 +1,1 @@',
-            '+add',
-            'diff --git a/changed.txt b/changed.txt',
-            'index bf84e48..1be2436 644',
-            '--- a/changed.txt',
-            '+++ b/changed.txt',
-            '@@ -1,2 +1,2 @@',
-            ' unchanged',
-            '-removed',
-            '+added',
-            'diff --git a/removed.txt /dev/null',
-            'deleted mode 644',
-            'index 2c3f0b3..0000000',
-            '--- a/removed.txt',
-            '+++ /dev/null',
-            '@@ -1,1 +1,0 @@',
-            '-removed',
+            b'diff --git /dev/null b/added.txt',
+            b'new mode 644',
+            b'index 0000000..76d4bb8 644',
+            b'--- /dev/null',
+            b'+++ b/added.txt',
+            b'@@ -1,0 +1,1 @@',
+            b'+add',
+            b'diff --git a/changed.txt b/changed.txt',
+            b'index bf84e48..1be2436 644',
+            b'--- a/changed.txt',
+            b'+++ b/changed.txt',
+            b'@@ -1,2 +1,2 @@',
+            b' unchanged',
+            b'-removed',
+            b'+added',
+            b'diff --git a/removed.txt /dev/null',
+            b'deleted mode 644',
+            b'index 2c3f0b3..0000000',
+            b'--- a/removed.txt',
+            b'+++ /dev/null',
+            b'@@ -1,1 +1,0 @@',
+            b'-removed',
             ], f.getvalue().splitlines())
 
     def test_tree_diff_submodule(self):
@@ -339,13 +335,13 @@ class DiffTests(TestCase):
         store.add_objects([(o, None) for o in [tree1, tree2]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEqual([
-            'diff --git a/asubmodule b/asubmodule',
-            'index 06d0bdd..cc97564 160000',
-            '--- a/asubmodule',
-            '+++ b/asubmodule',
-            '@@ -1,1 +1,1 @@',
-            '-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
-            '+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
+            b'diff --git a/asubmodule b/asubmodule',
+            b'index 06d0bdd..cc97564 160000',
+            b'--- a/asubmodule',
+            b'+++ b/asubmodule',
+            b'@@ -1,1 +1,1 @@',
+            b'-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            b'+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
             ], f.getvalue().splitlines())
 
     def test_object_diff_blob(self):
@@ -357,14 +353,14 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b"foo.txt", 0o644, b1.id),
                                     (b"bar.txt", 0o644, b2.id))
         self.assertEqual([
-            "diff --git a/foo.txt b/bar.txt",
-            "index 3b0f961..a116b51 644",
-            "--- a/foo.txt",
-            "+++ b/bar.txt",
-            "@@ -1,2 +1,2 @@",
-            "-old",
-            "+new",
-            " same"
+            b"diff --git a/foo.txt b/bar.txt",
+            b"index 3b0f961..a116b51 644",
+            b"--- a/foo.txt",
+            b"+++ b/bar.txt",
+            b"@@ -1,2 +1,2 @@",
+            b"-old",
+            b"+new",
+            b" same"
             ], f.getvalue().splitlines())
 
     def test_object_diff_add_blob(self):
@@ -373,16 +369,16 @@ class DiffTests(TestCase):
         b2 = Blob.from_string(b"new\nsame\n")
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
-                                    ("bar.txt", 0o644, b2.id))
+                                    (b"bar.txt", 0o644, b2.id))
         self.assertEqual([
-            'diff --git /dev/null b/bar.txt',
-             'new mode 644',
-             'index 0000000..a116b51 644',
-             '--- /dev/null',
-             '+++ b/bar.txt',
-             '@@ -1,0 +1,2 @@',
-             '+new',
-             '+same'
+             b'diff --git /dev/null b/bar.txt',
+             b'new mode 644',
+             b'index 0000000..a116b51 644',
+             b'--- /dev/null',
+             b'+++ b/bar.txt',
+             b'@@ -1,0 +1,2 @@',
+             b'+new',
+             b'+same'
             ], f.getvalue().splitlines())
 
     def test_object_diff_remove_blob(self):
@@ -393,14 +389,14 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
-            'diff --git a/bar.txt /dev/null',
-            'deleted mode 644',
-            'index a116b51..0000000',
-            '--- a/bar.txt',
-            '+++ /dev/null',
-            '@@ -1,2 +1,0 @@',
-            '-new',
-            '-same'
+            b'diff --git a/bar.txt /dev/null',
+            b'deleted mode 644',
+            b'index a116b51..0000000',
+            b'--- a/bar.txt',
+            b'+++ /dev/null',
+            b'@@ -1,2 +1,0 @@',
+            b'-new',
+            b'-same'
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob_force(self):
@@ -417,18 +413,18 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
                                     (b'bar.png', 0o644, b2.id), diff_binary=True)
         self.assertEqual([
-            'diff --git a/foo.png b/bar.png',
-            'index f73e47d..06364b7 644',
-            '--- a/foo.png',
-            '+++ b/bar.png',
-            '@@ -1,4 +1,4 @@',
-            ' \x89PNG',
-            ' \x1a',
-            ' \x00\x00\x00',
-            '-IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
-            '\\ No newline at end of file',
-            '+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3',
-            '\\ No newline at end of file'
+            b'diff --git a/foo.png b/bar.png',
+            b'index f73e47d..06364b7 644',
+            b'--- a/foo.png',
+            b'+++ b/bar.png',
+            b'@@ -1,4 +1,4 @@',
+            b' \x89PNG',
+            b' \x1a',
+            b' \x00\x00\x00',
+            b'-IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
+            b'\\ No newline at end of file',
+            b'+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3',
+            b'\\ No newline at end of file'
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob(self):
@@ -445,9 +441,9 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
                                     (b'bar.png', 0o644, b2.id))
         self.assertEqual([
-            'diff --git a/foo.png b/bar.png',
-            'index f73e47d..06364b7 644',
-            'Binary files a/foo.png and b/bar.png differ'
+            b'diff --git a/foo.png b/bar.png',
+            b'index f73e47d..06364b7 644',
+            b'Binary files a/foo.png and b/bar.png differ'
             ], f.getvalue().splitlines())
 
     def test_object_diff_add_bin_blob(self):
@@ -460,10 +456,10 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (None, None, None),
                                     (b'bar.png', 0o644, b2.id))
         self.assertEqual([
-            'diff --git /dev/null b/bar.png',
-            'new mode 644',
-            'index 0000000..06364b7 644',
-            'Binary files /dev/null and b/bar.png differ'
+            b'diff --git /dev/null b/bar.png',
+            b'new mode 644',
+            b'index 0000000..06364b7 644',
+            b'Binary files /dev/null and b/bar.png differ'
             ], f.getvalue().splitlines())
 
     def test_object_diff_remove_bin_blob(self):
@@ -476,10 +472,10 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
-            'diff --git a/foo.png /dev/null',
-            'deleted mode 644',
-            'index f73e47d..0000000',
-            'Binary files a/foo.png and /dev/null differ'
+            b'diff --git a/foo.png /dev/null',
+            b'deleted mode 644',
+            b'index f73e47d..0000000',
+            b'Binary files a/foo.png and /dev/null differ'
             ], f.getvalue().splitlines())
 
     def test_object_diff_kind_change(self):
@@ -490,14 +486,14 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
             (b"bar.txt", 0o160000, b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
         self.assertEqual([
-            'diff --git a/bar.txt b/bar.txt',
-            'old mode 644',
-            'new mode 160000',
-            'index a116b51..06d0bdd 160000',
-            '--- a/bar.txt',
-            '+++ b/bar.txt',
-            '@@ -1,2 +1,1 @@',
-            '-new',
-            '-same',
-            '+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            b'diff --git a/bar.txt b/bar.txt',
+            b'old mode 644',
+            b'new mode 160000',
+            b'index a116b51..06d0bdd 160000',
+            b'--- a/bar.txt',
+            b'+++ b/bar.txt',
+            b'@@ -1,2 +1,1 @@',
+            b'-new',
+            b'-same',
+            b'+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
             ], f.getvalue().splitlines())

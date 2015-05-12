@@ -25,6 +25,7 @@ import os
 import shutil
 import stat
 import struct
+import sys
 import tempfile
 
 from dulwich.index import (
@@ -386,8 +387,10 @@ class BuildIndexTests(TestCase):
             # symlink to d
             epath = os.path.join(repo.path, 'c', 'e')
             self.assertTrue(os.path.exists(epath))
-            self.assertReasonableIndexEntry(index[b'c/e'],
-                stat.S_IFLNK, 1, filee.id)
+            self.assertReasonableIndexEntry(
+                index[b'c/e'], stat.S_IFLNK,
+                0 if sys.platform == 'win32' else 1,
+                filee.id)
             self.assertFileContents(epath, 'd', symlink=True)
 
 class GetUnstagedChangesTests(TestCase):

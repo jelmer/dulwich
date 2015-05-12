@@ -305,7 +305,7 @@ class RepositoryRootTests(TestCase):
         r = self.open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
 
-    @skipIf(sys.platform == 'win32', 'Requires symlink support')
+    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_submodule(self):
         temp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, temp_dir)
@@ -565,7 +565,7 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual(stat.S_IFREG | 0o644, a_mode)
         self.assertEqual(b'new contents', r[a_id].data)
 
-    @skipIf(sys.platform == 'win32', 'Requires symlink support')
+    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_commit_symlink(self):
         r = self._repo
         os.symlink('a', os.path.join(r.path, 'b'))

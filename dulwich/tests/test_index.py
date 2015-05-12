@@ -50,7 +50,10 @@ from dulwich.objects import (
     Tree,
     )
 from dulwich.repo import Repo
-from dulwich.tests import TestCase
+from dulwich.tests import (
+    TestCase,
+    skipIf,
+)
 
 class IndexTestCase(TestCase):
 
@@ -271,10 +274,8 @@ class BuildIndexTests(TestCase):
             # Verify no files
             self.assertEqual(['.git'], os.listdir(repo.path))
 
+    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_git_dir(self):
-        if os.name != 'posix':
-            self.skipTest("test depends on POSIX shell")
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with closing(Repo.init(repo_dir)) as repo:
@@ -308,10 +309,8 @@ class BuildIndexTests(TestCase):
                 stat.S_IFREG | 0o644, 1, filee.id)
             self.assertFileContents(epath, b'd')
 
+    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_nonempty(self):
-        if os.name != 'posix':
-            self.skipTest("test depends on POSIX shell")
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with closing(Repo.init(repo_dir)) as repo:

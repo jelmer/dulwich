@@ -309,14 +309,13 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 class TestSSHVendor(object):
     @staticmethod
     def run_command(host, command, username=None, port=None):
-        cmd, path = command[0].replace("'", '').split(' ')
-        cmd = cmd.split('-', 1)
-        p = subprocess.Popen(cmd + [path], env=get_safe_env(), stdin=subprocess.PIPE,
+        cmd, path = command[0].replace(b"'", b'').split(b' ')
+        cmd = cmd.split(b'-', 1)
+        p = subprocess.Popen(cmd + [path], bufsize=0, env=get_safe_env(), stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 
 
-@skipIfPY3
 class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
 
     def setUp(self):
@@ -331,10 +330,10 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         client.get_ssh_vendor = self.real_vendor
 
     def _client(self):
-        return client.SSHGitClient('localhost')
+        return client.SSHGitClient(b'localhost')
 
     def _build_path(self, path):
-        return self.gitroot + path
+        return (self.gitroot + path).encode(sys.getfilesystemencoding())
 
 
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):

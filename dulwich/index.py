@@ -478,13 +478,13 @@ def build_index_from_tree(prefix, index_path, object_store, tree_id,
         default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
-        in a working dir. Suiteable only for fresh clones.
+        in a working dir. Suitable only for fresh clones.
     """
 
     index = Index(index_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
-        if not validate_path(entry.path):
+        if not validate_path(entry.path, validate_path_element):
             continue
         full_path = os.path.join(prefix, entry.path.decode(sys.getfilesystemencoding()))
 

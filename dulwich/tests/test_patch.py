@@ -240,8 +240,8 @@ class DiffTests(TestCase):
 
     def test_blob_diff(self):
         f = BytesIO()
-        write_blob_diff(f, ("foo.txt", 0o644, Blob.from_string("old\nsame\n")),
-                           ("bar.txt", 0o644, Blob.from_string("new\nsame\n")))
+        write_blob_diff(f, (b"foo.txt", 0o644, Blob.from_string(b"old\nsame\n")),
+                           (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
@@ -256,7 +256,7 @@ class DiffTests(TestCase):
     def test_blob_add(self):
         f = BytesIO()
         write_blob_diff(f, (None, None, None),
-                           ("bar.txt", 0o644, Blob.from_string("new\nsame\n")))
+                           (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
             'diff --git /dev/null b/bar.txt',
              'new mode 644',
@@ -270,7 +270,7 @@ class DiffTests(TestCase):
 
     def test_blob_remove(self):
         f = BytesIO()
-        write_blob_diff(f, ("bar.txt", 0o644, Blob.from_string("new\nsame\n")),
+        write_blob_diff(f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
                            (None, None, None))
         self.assertEqual([
             'diff --git a/bar.txt /dev/null',
@@ -286,19 +286,19 @@ class DiffTests(TestCase):
     def test_tree_diff(self):
         f = BytesIO()
         store = MemoryObjectStore()
-        added = Blob.from_string("add\n")
-        removed = Blob.from_string("removed\n")
-        changed1 = Blob.from_string("unchanged\nremoved\n")
-        changed2 = Blob.from_string("unchanged\nadded\n")
-        unchanged = Blob.from_string("unchanged\n")
+        added = Blob.from_string(b"add\n")
+        removed = Blob.from_string(b"removed\n")
+        changed1 = Blob.from_string(b"unchanged\nremoved\n")
+        changed2 = Blob.from_string(b"unchanged\nadded\n")
+        unchanged = Blob.from_string(b"unchanged\n")
         tree1 = Tree()
-        tree1.add("removed.txt", 0o644, removed.id)
-        tree1.add("changed.txt", 0o644, changed1.id)
-        tree1.add("unchanged.txt", 0o644, changed1.id)
+        tree1.add(b"removed.txt", 0o644, removed.id)
+        tree1.add(b"changed.txt", 0o644, changed1.id)
+        tree1.add(b"unchanged.txt", 0o644, changed1.id)
         tree2 = Tree()
-        tree2.add("added.txt", 0o644, added.id)
-        tree2.add("changed.txt", 0o644, changed2.id)
-        tree2.add("unchanged.txt", 0o644, changed1.id)
+        tree2.add(b"added.txt", 0o644, added.id)
+        tree2.add(b"changed.txt", 0o644, changed2.id)
+        tree2.add(b"unchanged.txt", 0o644, changed1.id)
         store.add_objects([(o, None) for o in [
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
@@ -331,11 +331,11 @@ class DiffTests(TestCase):
         f = BytesIO()
         store = MemoryObjectStore()
         tree1 = Tree()
-        tree1.add("asubmodule", S_IFGITLINK,
-            "06d0bdd9e2e20377b3180e4986b14c8549b393e4")
+        tree1.add(b"asubmodule", S_IFGITLINK,
+            b"06d0bdd9e2e20377b3180e4986b14c8549b393e4")
         tree2 = Tree()
-        tree2.add("asubmodule", S_IFGITLINK,
-            "cc975646af69f279396d4d5e1379ac6af80ee637")
+        tree2.add(b"asubmodule", S_IFGITLINK,
+            b"cc975646af69f279396d4d5e1379ac6af80ee637")
         store.add_objects([(o, None) for o in [tree1, tree2]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEqual([
@@ -350,12 +350,12 @@ class DiffTests(TestCase):
 
     def test_object_diff_blob(self):
         f = BytesIO()
-        b1 = Blob.from_string("old\nsame\n")
-        b2 = Blob.from_string("new\nsame\n")
+        b1 = Blob.from_string(b"old\nsame\n")
+        b2 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ("foo.txt", 0o644, b1.id),
-                                    ("bar.txt", 0o644, b2.id))
+        write_object_diff(f, store, (b"foo.txt", 0o644, b1.id),
+                                    (b"bar.txt", 0o644, b2.id))
         self.assertEqual([
             "diff --git a/foo.txt b/bar.txt",
             "index 3b0f961..a116b51 644",
@@ -370,7 +370,7 @@ class DiffTests(TestCase):
     def test_object_diff_add_blob(self):
         f = BytesIO()
         store = MemoryObjectStore()
-        b2 = Blob.from_string("new\nsame\n")
+        b2 = Blob.from_string(b"new\nsame\n")
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
                                     ("bar.txt", 0o644, b2.id))
@@ -387,10 +387,10 @@ class DiffTests(TestCase):
 
     def test_object_diff_remove_blob(self):
         f = BytesIO()
-        b1 = Blob.from_string("new\nsame\n")
+        b1 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ("bar.txt", 0o644, b1.id),
+        write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
             'diff --git a/bar.txt /dev/null',
@@ -407,15 +407,15 @@ class DiffTests(TestCase):
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
-            "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
         b2 = Blob.from_string(
-            "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
-                                    ('bar.png', 0o644, b2.id), diff_binary=True)
+        write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
+                                    (b'bar.png', 0o644, b2.id), diff_binary=True)
         self.assertEqual([
             'diff --git a/foo.png b/bar.png',
             'index f73e47d..06364b7 644',
@@ -435,15 +435,15 @@ class DiffTests(TestCase):
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
-            "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
         b2 = Blob.from_string(
-            "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            "\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
-                                    ('bar.png', 0o644, b2.id))
+        write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
+                                    (b'bar.png', 0o644, b2.id))
         self.assertEqual([
             'diff --git a/foo.png b/bar.png',
             'index f73e47d..06364b7 644',
@@ -453,12 +453,12 @@ class DiffTests(TestCase):
     def test_object_diff_add_bin_blob(self):
         f = BytesIO()
         b2 = Blob.from_string(
-            '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
-            '\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3')
+            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
+            b'\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3')
         store = MemoryObjectStore()
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
-                                    ('bar.png', 0o644, b2.id))
+                                    (b'bar.png', 0o644, b2.id))
         self.assertEqual([
             'diff --git /dev/null b/bar.png',
             'new mode 644',
@@ -469,11 +469,11 @@ class DiffTests(TestCase):
     def test_object_diff_remove_bin_blob(self):
         f = BytesIO()
         b1 = Blob.from_string(
-            '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
-            '\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b')
+            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
+            b'\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b')
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ('foo.png', 0o644, b1.id),
+        write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
             'diff --git a/foo.png /dev/null',
@@ -484,11 +484,11 @@ class DiffTests(TestCase):
 
     def test_object_diff_kind_change(self):
         f = BytesIO()
-        b1 = Blob.from_string("new\nsame\n")
+        b1 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, ("bar.txt", 0o644, b1.id),
-            ("bar.txt", 0o160000, "06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
+        write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
+            (b"bar.txt", 0o160000, b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
         self.assertEqual([
             'diff --git a/bar.txt b/bar.txt',
             'old mode 644',

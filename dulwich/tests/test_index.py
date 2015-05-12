@@ -274,7 +274,6 @@ class BuildIndexTests(TestCase):
             # Verify no files
             self.assertEqual(['.git'], os.listdir(repo.path))
 
-    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_git_dir(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -309,7 +308,6 @@ class BuildIndexTests(TestCase):
                 stat.S_IFREG | 0o644, 1, filee.id)
             self.assertFileContents(epath, b'd')
 
-    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_nonempty(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -319,23 +317,21 @@ class BuildIndexTests(TestCase):
             filea = Blob.from_string(b'file a')
             fileb = Blob.from_string(b'file b')
             filed = Blob.from_string(b'file d')
-            filee = Blob.from_string(b'd')
 
             tree = Tree()
             tree[b'a'] = (stat.S_IFREG | 0o644, filea.id)
             tree[b'b'] = (stat.S_IFREG | 0o644, fileb.id)
             tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
-            tree[b'c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
             repo.object_store.add_objects([(o, None)
-                for o in [filea, fileb, filed, filee, tree]])
+                for o in [filea, fileb, filed, tree]])
 
             build_index_from_tree(repo.path, repo.index_path(),
                     repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()
-            self.assertEqual(len(index), 4)
+            self.assertEqual(len(index), 3)
 
             # filea
             apath = os.path.join(repo.path, 'a')
@@ -358,19 +354,41 @@ class BuildIndexTests(TestCase):
                 stat.S_IFREG | 0o644, 6, filed.id)
             self.assertFileContents(dpath, b'file d')
 
+            # Verify no extra files
+            self.assertEqual(['.git', 'a', 'b', 'c'],
+                sorted(os.listdir(repo.path)))
+            self.assertEqual(['d'],
+                sorted(os.listdir(os.path.join(repo.path, 'c'))))
+
+    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
+    def test_symlink(self):
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with closing(Repo.init(repo_dir)) as repo:
+
+            # Populate repo
+            filed = Blob.from_string(b'file d')
+            filee = Blob.from_string(b'd')
+
+            tree = Tree()
+            tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
+            tree[b'c/e'] = (stat.S_IFLNK, filee.id)  # symlink
+
+            repo.object_store.add_objects([(o, None)
+                for o in [filed, filee, tree]])
+
+            build_index_from_tree(repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
+
+            # Verify index entries
+            index = repo.open_index()
+
             # symlink to d
             epath = os.path.join(repo.path, 'c', 'e')
             self.assertTrue(os.path.exists(epath))
             self.assertReasonableIndexEntry(index[b'c/e'],
                 stat.S_IFLNK, 1, filee.id)
             self.assertFileContents(epath, 'd', symlink=True)
-
-            # Verify no extra files
-            self.assertEqual(['.git', 'a', 'b', 'c'],
-                sorted(os.listdir(repo.path)))
-            self.assertEqual(['d', 'e'],
-                sorted(os.listdir(os.path.join(repo.path, 'c'))))
-
 
 class GetUnstagedChangesTests(TestCase):
 

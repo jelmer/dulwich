@@ -951,13 +951,14 @@ class SSHGitClient(TraditionalGitClient):
         self.alternative_paths = {}
 
     def _get_cmd_path(self, cmd):
-        return self.alternative_paths.get(cmd, b'git-' + cmd)
+        cmd = cmd.decode('ascii')
+        return self.alternative_paths.get(cmd, 'git-' + cmd)
 
     def _connect(self, cmd, path):
-        if path.startswith(b"/~"):
+        if path.startswith("/~"):
             path = path[1:]
         con = get_ssh_vendor().run_command(
-            self.host, [self._get_cmd_path(cmd) + b" '" + path + b"'"],
+            self.host, [self._get_cmd_path(cmd), path],
             port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),

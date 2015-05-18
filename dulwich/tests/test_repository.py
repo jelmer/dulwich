@@ -40,7 +40,6 @@ from dulwich.repo import (
     MemoryRepo,
     )
 from dulwich.tests import (
-    expectedFailure,
     TestCase,
     skipIf,
     )
@@ -54,7 +53,7 @@ missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
 def mkdtemp_unicode():
-    suffix = u'déłwíçh'
+    suffix = u'délwíçh'
     return tempfile.mkdtemp(suffix=suffix)
 
 
@@ -746,7 +745,6 @@ class BuildRepoRootTests(TestCase):
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
 
-    @expectedFailure
     def test_commit_no_encode_decode(self):
         r = self._repo
         repo_path_bytes = r.path.encode(sys.getfilesystemencoding())

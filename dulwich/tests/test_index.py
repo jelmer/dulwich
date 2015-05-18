@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # test_index.py -- Tests for the git index
 # encoding: utf-8
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
@@ -43,6 +44,8 @@ from dulwich.index import (
     write_cache_time,
     write_index,
     write_index_dict,
+    tree_to_fs_path,
+    fs_to_tree_path,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -53,7 +56,6 @@ from dulwich.objects import (
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
-    expectedFailure,
     TestCase,
     skipIf,
     )
@@ -395,7 +397,6 @@ class BuildIndexTests(TestCase):
                 filee.id)
             self.assertFileContents(epath, 'd', symlink=True)
 
-    @expectedFailure
     def test_no_decode_encode(self):
         repo_dir = tempfile.mkdtemp()
         repo_dir_bytes = repo_dir.encode(sys.getfilesystemencoding())
@@ -477,3 +478,21 @@ class TestValidatePathElement(TestCase):
         self.assertFalse(validate_path_element_ntfs(b".giT"))
         self.assertFalse(validate_path_element_ntfs(b".."))
         self.assertFalse(validate_path_element_ntfs(b"git~1"))
+
+
+class TestTreeFSPathConversion(TestCase):
+
+    def test_tree_to_fs_path(self):
+        tree_path = u'délwíçh/foo'.encode('utf8')
+        fs_path = tree_to_fs_path(tree_path)
+        self.assertEqual(fs_path, os.path.join(u'délwíçh', u'foo').encode('utf8'))
+
+    def test_fs_to_tree_path_str(self):
+        fs_path = os.path.join(os.path.join(u'délwíçh', u'foo'))
+        tree_path = fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, u'délwíçh/foo'.encode(sys.getfilesystemencoding()))
+
+    def test_fs_to_tree_path_bytes(self):
+        fs_path = os.path.join(os.path.join(u'délwíçh', u'foo').encode('utf8'))
+        tree_path = fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, u'délwíçh/foo'.encode('utf8'))

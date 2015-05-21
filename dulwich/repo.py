@@ -743,13 +743,13 @@ class Repo(BaseRepo):
         from dulwich.index import (
             blob_from_path_and_stat,
             index_entry_from_stat,
-            fs_to_tree_path,
+            _fs_to_tree_path,
             )
         index = self.open_index()
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
                 fs_path = fs_path.encode(sys.getfilesystemencoding())
-            tree_path = fs_to_tree_path(fs_path)
+            tree_path = _fs_to_tree_path(fs_path)
             full_path = os.path.join(root_path_bytes, fs_path)
             try:
                 st = os.lstat(full_path)

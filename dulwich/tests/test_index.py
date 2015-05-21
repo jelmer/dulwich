@@ -44,8 +44,8 @@ from dulwich.index import (
     write_cache_time,
     write_index,
     write_index_dict,
-    tree_to_fs_path,
-    fs_to_tree_path,
+    _tree_to_fs_path,
+    _fs_to_tree_path,
     )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -484,15 +484,15 @@ class TestTreeFSPathConversion(TestCase):
 
     def test_tree_to_fs_path(self):
         tree_path = u'délwíçh/foo'.encode('utf8')
-        fs_path = tree_to_fs_path(tree_path)
+        fs_path = _tree_to_fs_path(tree_path)
         self.assertEqual(fs_path, os.path.join(u'délwíçh', u'foo').encode('utf8'))
 
     def test_fs_to_tree_path_str(self):
         fs_path = os.path.join(os.path.join(u'délwíçh', u'foo'))
-        tree_path = fs_to_tree_path(fs_path)
+        tree_path = _fs_to_tree_path(fs_path)
         self.assertEqual(tree_path, u'délwíçh/foo'.encode(sys.getfilesystemencoding()))
 
     def test_fs_to_tree_path_bytes(self):
         fs_path = os.path.join(os.path.join(u'délwíçh', u'foo').encode('utf8'))
-        tree_path = fs_to_tree_path(fs_path)
+        tree_path = _fs_to_tree_path(fs_path)
         self.assertEqual(tree_path, u'délwíçh/foo'.encode('utf8'))

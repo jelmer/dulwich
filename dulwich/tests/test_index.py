@@ -484,8 +484,10 @@ class TestTreeFSPathConversion(TestCase):
 
     def test_tree_to_fs_path(self):
         tree_path = u'délwíçh/foo'.encode('utf8')
-        fs_path = _tree_to_fs_path(tree_path)
-        self.assertEqual(fs_path, os.path.join(u'délwíçh', u'foo').encode('utf8'))
+        fs_path = _tree_to_fs_path('/prefix/path', tree_path)
+        self.assertEqual(
+            fs_path,
+            os.path.join(u'/prefix/path', u'délwíçh', u'foo').encode('utf8'))
 
     def test_fs_to_tree_path_str(self):
         fs_path = os.path.join(os.path.join(u'délwíçh', u'foo'))

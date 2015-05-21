@@ -487,8 +487,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
-        fs_path = _tree_to_fs_path(entry.path)
-        full_path = os.path.join(root_path, fs_path)
+        full_path = _tree_to_fs_path(root_path, entry.path)
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -533,8 +532,7 @@ def get_unstaged_changes(index, root_path):
         root_path = root_path.encode(sys.getfilesystemencoding())
 
     for tree_path, entry in index.iteritems():
-        fs_path = _tree_to_fs_path(tree_path)
-        full_path = os.path.join(root_path, fs_path)
+        full_path = _tree_to_fs_path(root_path, tree_path)
         blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         if blob.id != entry.sha:
             yield tree_path
@@ -543,9 +541,10 @@ def get_unstaged_changes(index, root_path):
 os_sep_bytes = os.sep.encode('ascii')
 
 
-def _tree_to_fs_path(tree_path):
+def _tree_to_fs_path(root_path, tree_path):
     """Convert a git tree path to a file system path.
 
+    :param root_path: Root filesystem path
     :param tree_path: Git tree path as bytes
 
     :return: File system path.
@@ -555,7 +554,7 @@ def _tree_to_fs_path(tree_path):
         sep_corrected_path = tree_path.replace(b'/', os_sep_bytes)
     else:
         sep_corrected_path = tree_path
-    return sep_corrected_path
+    return os.path.join(root_path, sep_corrected_path)
 
 
 def _fs_to_tree_path(fs_path):

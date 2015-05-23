@@ -43,11 +43,8 @@ Help
 There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
 https://launchpad.net/~dulwich-users.
 
-Python3
--------
+Supported versions of Python
+----------------------------
 
-The process of porting to Python3 is ongoing. At the moment most of Dulwich runs
-on Python3, with the exception of some of ``dulwich.patch`` and some of
-the C git compatibility tetsts. Relevant tests are currently being skipped on
-Python 3, and the full testsuite passing is *not* an indication that the port
-is complete.
+At the moment, Dulwich supports (and is tested on) CPython 2.6, 2.7, 3.4, 3.5 and Pypy.
+The ``dulwich.web`` module is currently broken on Python 3 (issue #295).

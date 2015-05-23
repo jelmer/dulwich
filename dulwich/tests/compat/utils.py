@@ -213,10 +213,12 @@ class CompatTestCase(TestCase):
         super(CompatTestCase, self).setUp()
         require_git_version(self.min_git_version)
 
+    def assertObjectStoreEqual(self, store1, store2):
+        self.assertEqual(sorted(set(store1)), sorted(set(store2)))
+
     def assertReposEqual(self, repo1, repo2):
         self.assertEqual(repo1.get_refs(), repo2.get_refs())
-        self.assertEqual(sorted(set(repo1.object_store)),
-                         sorted(set(repo2.object_store)))
+        self.assertObjectStoreEqual(repo1.object_store, repo2.object_store)
 
     def assertReposNotEqual(self, repo1, repo2):
         refs1 = repo1.get_refs()

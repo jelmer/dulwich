@@ -38,3 +38,14 @@ to the Dulwich API user to encode and decode them if necessary.
 * git-repository related filenames: bytes
 * object sha1 digests (20 bytes long): bytes
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings on python3)
+
+Merge requests
+--------------
+Please either send pull requests to the author (jelmer@jelmer.uk) or create new pull
+requests on GitHub.
+
+Licensing
+---------
+Dulwich is currently licensed under the GNU General Public License, version 2
+or later. We would like to change the license to Apachev2 or later eventually;
+new contributions should be made under dual GPLv2+/Apachev2+.

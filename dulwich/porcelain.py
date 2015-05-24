@@ -56,7 +56,10 @@ import os
 import sys
 import time
 
-from dulwich.client import get_transport_and_path
+from dulwich.client import (
+    get_transport_and_path,
+    SubprocessGitClient,
+    )
 from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
@@ -116,7 +119,8 @@ def archive(location, committish=None, outstream=sys.stdout,
     :param errstream: Error stream (defaults to stderr)
     """
 
-    client, path = get_transport_and_path(location)
+    client, path = get_transport_and_path(
+        location, local_git_client_cls=SubprocessGitClient)
     if committish is None:
         committish = "HEAD"
     # TODO(jelmer): This invokes C git; this introduces a dependency.

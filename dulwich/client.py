@@ -725,7 +725,7 @@ class LocalGitClient(GitClient):
 
         with closing(Repo(path)) as target:
             old_refs = target.get_refs()
-            new_refs = determine_wants(old_refs)
+            new_refs = determine_wants(dict(old_refs))
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
@@ -779,10 +779,6 @@ class LocalGitClient(GitClient):
             if objects_iter is None:
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
-
-
-# What Git client to use for local access
-default_local_git_client_cls = SubprocessGitClient
 
 
 class SSHVendor(object):
@@ -1134,17 +1130,23 @@ class HttpGitClient(GitClient):
         finally:
             resp.close()
 
+# What Git client to use for local access
+default_local_git_client_cls = LocalGitClient
 
-def get_transport_and_path_from_url(url, config=None, **kwargs):
+def get_transport_and_path_from_url(url, local_git_client_cls=None, config=None, **kwargs):
     """Obtain a git client from a URL.
 
     :param url: URL to open
+    :param local_git_client_cls: Class to use for local (file) urls.
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.
     :return: Tuple with client instance and relative path.
     """
+    if local_git_client_cls is None:
+        local_git_client_cls = default_local_git_client_cls
+
     parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
@@ -1159,31 +1161,37 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
         return HttpGitClient(urlparse.urlunparse(parsed), config=config,
                 **kwargs), parsed.path
     elif parsed.scheme == 'file':
-        return default_local_git_client_cls(**kwargs), parsed.path
+        return local_git_client_cls(**kwargs), parsed.path
 
     raise ValueError("unknown scheme '%s'" % parsed.scheme)
 
 
-def get_transport_and_path(location, **kwargs):
+def get_transport_and_path(location, local_git_client_cls=None, **kwargs):
     """Obtain a git client from a URL.
 
     :param location: URL or path
+    :param local_git_client_cls: Class to use for local locations.
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
         activity.
     :return: Tuple with client instance and relative path.
     """
+
+    if local_git_client_cls is None:
+        local_git_client_cls = default_local_git_client_cls
+
     # First, try to parse it as a URL
     try:
-        return get_transport_and_path_from_url(location, **kwargs)
+        return get_transport_and_path_from_url(
+            location, local_git_client_cls=local_git_client_cls, **kwargs)
     except ValueError:
         pass
 
     if (sys.platform == 'win32' and
             location[0].isalpha() and location[1:3] == ':\\'):
         # Windows local path
-        return default_local_git_client_cls(**kwargs), location
+        return local_git_client_cls(**kwargs), location
 
     if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.
@@ -1196,4 +1204,4 @@ def get_transport_and_path(location, **kwargs):
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.
-    return default_local_git_client_cls(**kwargs), location
+    return local_git_client_cls(**kwargs), location

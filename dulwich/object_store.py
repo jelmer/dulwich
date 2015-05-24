@@ -1041,7 +1041,7 @@ class MissingObjectFinder(object):
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress("counting objects: %d\r" % len(self.sha_done))
+        self.progress(("counting objects: %d\r" % len(self.sha_done)).encode('ascii'))
         return (sha, name)
 
     __next__ = next

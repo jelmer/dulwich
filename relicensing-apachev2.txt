@@ -67,7 +67,6 @@ James Westby <jw+debian@jameswestby.net>
 Jason R. Coombs <jaraco@jaraco.com>
 John Arbash Meinel <john@arbash-meinel.com>
 John Carr <john.carr@unrouted.co.uk>
-Jonas Haag <jonas@lophus.org>
 Jonathan Chu <jchonphoenix@gmail.com>
 kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>

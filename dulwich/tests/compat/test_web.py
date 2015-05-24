@@ -30,6 +30,8 @@ import sys
 
 from dulwich.server import (
     DictBackend,
+    UploadPackHandler,
+    ReceivePackHandler,
     )
 from dulwich.tests import (
     SkipTest,
@@ -106,6 +108,18 @@ class SmartWebTestCase(WebTests, CompatTestCase):
         return app
 
 
+def patch_capabilities(handler, caps_removed):
+    # Patch a handler's capabilities by specifying a list of them to be
+    # removed, and return the original classmethod for restoration.
+    original_capabilities = handler.capabilities
+    filtered_capabilities = tuple(
+        i for i in original_capabilities() if i not in caps_removed)
+    def capabilities(cls):
+        return filtered_capabilities
+    handler.capabilities = classmethod(capabilities)
+    return original_capabilities
+
+
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 @skipIfPY3
 class SmartWebSideBand64kTestCase(SmartWebTestCase):
@@ -114,6 +128,16 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
     min_git_version = (1, 7, 0, 2)
 
+    def setUp(self):
+        self.o_uph_cap = patch_capabilities(UploadPackHandler, ("no-done",))
+        self.o_rph_cap = patch_capabilities(ReceivePackHandler, ("no-done",))
+        super(SmartWebSideBand64kTestCase, self).setUp()
+
+    def tearDown(self):
+        super(SmartWebSideBand64kTestCase, self).tearDown()
+        UploadPackHandler.capabilities = self.o_uph_cap
+        ReceivePackHandler.capabilities = self.o_rph_cap
+
     def _handlers(self):
         return None  # default handlers include side-band-64k
 
@@ -121,6 +145,25 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
         receive_pack_handler_cls = app.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
         self.assertTrue(b'side-band-64k' in caps)
+        self.assertFalse(b'no-done' in caps)
+
+
+class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
+    """Test cases for smart HTTP server with side-band-64k and no-done
+    support.
+    """
+
+    # no-done was introduced in git 1.7.4
+    min_git_version = (1, 7, 4)
+
+    def _handlers(self):
+        return None  # default handlers include side-band-64k
+
+    def _check_app(self, app):
+        receive_pack_handler_cls = app.handlers[b'git-receive-pack']
+        caps = receive_pack_handler_cls.capabilities()
+        self.assertTrue(b'side-band-64k' in caps)
+        self.assertTrue(b'no-done' in caps)
 
 
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
@@ -153,3 +196,7 @@ class DumbWebTestCase(WebTests, CompatTestCase):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest('Dumb web shallow cloning not supported.')
+
+    def test_push_to_dulwich_issue_88_standard(self):
+        raise SkipTest('Dumb web pushing not supported.')
+

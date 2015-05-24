@@ -152,7 +152,7 @@ def import_repo_to_dir(name):
     """Import a repo from a fast-export file in a temporary directory.
 
     These are used rather than binary repos for compat tests because they are
-    more compact an human-editable, and we already depend on git.
+    more compact and human-editable, and we already depend on git.
 
     :param name: The name of the repository export file, relative to
         dulwich/tests/data/repos.

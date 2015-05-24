@@ -127,7 +127,7 @@ class HandlerTestCase(TestCase):
             self.fail(e)
 
     def test_capability_line(self):
-        self.assertEqual(b'cap1 cap2 cap3', self._handler.capability_line())
+        self.assertEqual(b' cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities

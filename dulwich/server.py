@@ -211,7 +211,7 @@ class Handler(object):
 
     @classmethod
     def capability_line(cls):
-        return b" ".join(cls.capabilities())
+        return b"".join([b" " + c for c in cls.capabilities()])
 
     @classmethod
     def capabilities(cls):

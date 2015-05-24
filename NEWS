@@ -9,6 +9,11 @@
   * Support 'git.bat' in SubprocessGitClient on Windows.
     (Stefan Zimmermann)
 
+ BUG FIXES
+
+  * Fix handling of 'done' in graph walker and implement the
+    'no-done' capability. (Tommy Yu, #88)
+
 0.10.1  2015-03-25
 
  BUG FIXES

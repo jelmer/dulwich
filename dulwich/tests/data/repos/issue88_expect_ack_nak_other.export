@@ -1,0 +1,293 @@
+blob
+mark :1
+data 33
+We will sneak in a blob like so.
+
+reset refs/heads/master
+commit refs/heads/master
+mark :2
+author User <user@localhost> 1427183369 +1300
+committer User <user@localhost> 1427183369 +1300
+data 7
+sneaky
+M 100644 :1 problem.questionmark
+
+blob
+mark :3
+data 35
+We will introduce a problem here.
+
+
+commit refs/heads/master
+mark :4
+author User <user@localhost> 1427183376 +1300
+committer User <user@localhost> 1427183376 +1300
+data 11
+demo file.
+from :2
+M 100644 :3 demo.rst
+
+blob
+mark :5
+data 62
+We will introduce a problem here.
+
+This will take some time.
+
+
+commit refs/heads/master
+mark :6
+author User <user@localhost> 1427185135 +1300
+committer User <user@localhost> 1427185135 +1300
+data 13
+added a line
+from :4
+M 100644 :5 demo.rst
+
+blob
+mark :7
+data 57
+We will introduce a problem here.
+
+We will change these.
+
+commit refs/heads/master
+mark :8
+author User <user@localhost> 1427185245 +1300
+committer User <user@localhost> 1427185245 +1300
+data 14
+replace a linefrom :6
+M 100644 :7 demo.rst
+
+blob
+mark :9
+data 52
+We will change these.
+
+Then issues will be proven.
+
+
+commit refs/heads/master
+mark :10
+author User <user@localhost> 1427185343 +1300
+committer User <user@localhost> 1427185343 +1300
+data 13
+Yes we will.
+from :8
+M 100644 :9 demo.rst
+
+blob
+mark :11
+data 72
+We will change these. 
+
+Then issues will be construed once and for all.
+
+commit refs/heads/master
+mark :12
+author User <user@localhost> 1427185440 +1300
+committer User <user@localhost> 1427185440 +1300
+data 6
+sure.
+from :10
+M 100644 :11 demo.rst
+
+blob
+mark :13
+data 0
+
+commit refs/heads/master
+mark :14
+author User <user@localhost> 1427185512 +1300
+committer User <user@localhost> 1427185516 +1300
+data 26
+not an actual readme, yet
+from :12
+M 100644 :13 emdaer.txt
+
+blob
+mark :15
+data 58
+This will for sure we will prove issues exist somewhere.
+
+
+blob
+mark :16
+data 49
+okay fine add something here this is only a test
+
+commit refs/heads/master
+mark :17
+author User <user@localhost> 1427185569 +1300
+committer User <user@localhost> 1427185569 +1300
+data 12
+more things
+from :14
+M 100644 :15 demo.rst
+M 100644 :16 emdaer.txt
+
+blob
+mark :18
+data 97
+This will for sure prove issue exist somewhere.
+
+Just that we need a few more commits as usual.
+
+
+commit refs/heads/master
+mark :19
+author User <user@localhost> 1427185659 +1300
+committer User <user@localhost> 1427185659 +1300
+data 13
+one more try
+from :17
+M 100644 :18 demo.rst
+
+blob
+mark :20
+data 54
+It might have something to do with number of commits?
+
+commit refs/heads/master
+mark :21
+author User <user@localhost> 1427185905 +1300
+committer User <user@localhost> 1427185905 +1300
+data 18
+is this number 9?
+from :19
+M 100644 :20 count
+
+blob
+mark :22
+data 119
+This will for sure we will prove issues exist somewhere.
+
+Just that we need a few more commits.
+
+Hey look we need more
+
+commit refs/heads/master
+mark :23
+author User <user@localhost> 1427185922 +1300
+committer User <user@localhost> 1427185922 +1300
+data 5
+cool
+from :21
+M 100644 :22 demo.rst
+
+blob
+mark :24
+data 50
+Okay fine add something here this is only a test.
+
+commit refs/heads/master
+mark :25
+author User <user@localhost> 1427185936 +1300
+committer User <user@localhost> 1427185936 +1300
+data 7
+readme
+from :23
+M 100644 :24 emdaer.txt
+
+blob
+mark :26
+data 74
+Okay come on this is getting boring.
+
+Yes I went and edit all the things.
+
+commit refs/heads/master
+mark :27
+author User <user@localhost> 1427185954 +1300
+committer User <user@localhost> 1427185954 +1300
+data 14
+remove a line
+from :25
+M 100644 :26 demo.rst
+
+blob
+mark :28
+data 186
+Okay come on this is getting boring. 
+
+Yes I went and edit all the things. 
+
+Of course, making test data can be somewhat tedious, especially a
+minimum set that can be easily reproduced.
+
+commit refs/heads/master
+mark :29
+author User <user@localhost> 1427185996 +1300
+committer User <user@localhost> 1427185996 +1300
+data 25
+Getting serious mode on.
+from :27
+M 100644 :28 demo.rst
+
+blob
+mark :30
+data 48
+This is taking a bit longer than I remembered.
+
+
+commit refs/heads/master
+mark :31
+author User <user@localhost> 1427186065 +1300
+committer User <user@localhost> 1427186065 +1300
+data 40
+At least we will have things minimized.
+from :29
+M 100644 :30 demo.rst
+
+blob
+mark :32
+data 11
+there yet?
+
+commit refs/heads/master
+mark :33
+author User <user@localhost> 1427186080 +1300
+committer User <user@localhost> 1427186080 +1300
+data 7
+are we
+from :31
+M 100644 :32 demo.rst
+
+blob
+mark :34
+data 237
+This should be the head commit for the client repo for testing out
+the failure case reported in issue 88.  Just do a git pull from the
+repo that includes the following commit that is hosted with dulwich.
+The issue should be reproduced.
+
+
+commit refs/heads/master
+mark :35
+author User <user@localhost> 1427186109 +1300
+committer User <user@localhost> 1427186109 +1300
+data 6
+okay?
+from :33
+M 100644 :34 emdaer.txt
+
+blob
+mark :36
+data 394
+This should be the commit that will trigger the bug noted in issue 88
+(https://github.com/jelmer/dulwich/issues/88).  To reproduce, run git
+fast-import using this fast-export and host this using dulwich, and
+then make a copy of this, strip out this blob and the following commit
+block, import to another git repo and then git clone from the previous.
+
+Naturally, this is part of the test case.
+
+commit refs/heads/master
+mark :37
+author User <user@localhost> 1427244891 +1300
+committer User <user@localhost> 1427248186 +1300
+data 49
+Added instructions on how to use this to readme.
+from :35
+M 100644 :36 emdaer.txt
+

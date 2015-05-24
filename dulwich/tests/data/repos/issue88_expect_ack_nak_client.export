@@ -1,0 +1,260 @@
+reset refs/heads/master
+commit refs/heads/master
+mark :1
+author User <user@localhost> 1427183369 +1300
+committer User <user@localhost> 1427183369 +1300
+data 6
+empty
+
+blob
+mark :2
+data 35
+We will reproduce a problem here.
+
+commit refs/heads/master
+mark :3
+author User <user@localhost> 1427183376 +1300
+committer User <user@localhost> 1427183376 +1300
+data 11
+demo file.
+from :1
+M 100644 :2 demo.txt
+
+blob
+mark :4
+data 62
+We will reproduce a problem here.
+
+This will take some time.
+
+commit refs/heads/master
+mark :5
+author User <user@localhost> 1427185135 +1300
+committer User <user@localhost> 1427185135 +1300
+data 13
+added a line
+from :3
+M 100644 :4 demo.txt
+
+blob
+mark :6
+data 57
+We will reproduce a problem here.
+
+We will change these.
+
+commit refs/heads/master
+mark :7
+author User <user@localhost> 1427185245 +1300
+committer User <user@localhost> 1427185245 +1300
+data 14
+replace a line
+from :5
+M 100644 :6 demo.txt
+
+blob
+mark :8
+data 52
+We will change these.
+
+Then issues will be proven.
+
+commit refs/heads/master
+mark :9
+author User <user@localhost> 1427185343 +1300
+committer User <user@localhost> 1427185343 +1300
+data 13
+Yes we will.
+from :7
+M 100644 :8 demo.txt
+
+blob
+mark :10
+data 69
+We will change these. 
+
+Then issues will be proven once and for all.
+
+commit refs/heads/master
+mark :11
+author User <user@localhost> 1427185440 +1300
+committer User <user@localhost> 1427185440 +1300
+data 6
+sure.
+from :9
+M 100644 :10 demo.txt
+
+blob
+mark :12
+data 0
+
+commit refs/heads/master
+mark :13
+author User <user@localhost> 1427185512 +1300
+committer User <user@localhost> 1427185516 +1300
+data 26
+not an actual readme, yet
+from :11
+M 100644 :12 readme.txt
+
+blob
+mark :14
+data 61
+This will for sure we will prove a problem exist somewhere.
+
+blob
+mark :15
+data 49
+okay fine add something here this is only a test
+
+commit refs/heads/master
+mark :16
+author User <user@localhost> 1427185569 +1300
+committer User <user@localhost> 1427185569 +1300
+data 12
+more things
+from :13
+M 100644 :14 demo.txt
+M 100644 :15 readme.txt
+
+blob
+mark :17
+data 100
+This will for sure we will prove a problem exist somewhere. 
+
+Just that we need a few more commits.
+
+commit refs/heads/master
+mark :18
+author User <user@localhost> 1427185659 +1300
+committer User <user@localhost> 1427185659 +1300
+data 13
+one more try
+from :16
+M 100644 :17 demo.txt
+
+blob
+mark :19
+data 54
+It might have something to do with number of commits?
+
+commit refs/heads/master
+mark :20
+author User <user@localhost> 1427185905 +1300
+committer User <user@localhost> 1427185905 +1300
+data 18
+is this number 9?
+from :18
+M 100644 :19 commitcount
+
+blob
+mark :21
+data 123
+This will for sure we will prove a problem exist somewhere. 
+
+Just that we need a few more commits.
+
+Hey look we need more
+
+commit refs/heads/master
+mark :22
+author User <user@localhost> 1427185922 +1300
+committer User <user@localhost> 1427185922 +1300
+data 5
+cool
+from :20
+M 100644 :21 demo.txt
+
+blob
+mark :23
+data 50
+Okay fine add something here this is only a test.
+
+commit refs/heads/master
+mark :24
+author User <user@localhost> 1427185936 +1300
+committer User <user@localhost> 1427185936 +1300
+data 7
+readme
+from :22
+M 100644 :23 readme.txt
+
+blob
+mark :25
+data 74
+Okay come on this is getting boring.
+
+Yes I went and edit all the things.
+
+commit refs/heads/master
+mark :26
+author User <user@localhost> 1427185954 +1300
+committer User <user@localhost> 1427185954 +1300
+data 14
+remove a line
+from :24
+M 100644 :25 demo.txt
+
+blob
+mark :27
+data 186
+Okay come on this is getting boring. 
+
+Yes I went and edit all the things. 
+
+Of course, making test data can be somewhat tedious, especially a
+minimum set that can be easily reproduced.
+
+commit refs/heads/master
+mark :28
+author User <user@localhost> 1427185996 +1300
+committer User <user@localhost> 1427185996 +1300
+data 25
+Getting serious mode on.
+from :26
+M 100644 :27 demo.txt
+
+blob
+mark :29
+data 48
+This is taking a bit longer than I remembered.
+
+commit refs/heads/master
+mark :30
+author User <user@localhost> 1427186065 +1300
+committer User <user@localhost> 1427186065 +1300
+data 40
+At least we will have things minimized.
+from :28
+M 100644 :29 demo.txt
+
+blob
+mark :31
+data 11
+there yet?
+
+commit refs/heads/master
+mark :32
+author User <user@localhost> 1427186080 +1300
+committer User <user@localhost> 1427186080 +1300
+data 7
+are we
+from :30
+M 100644 :31 demo.txt
+
+blob
+mark :33
+data 237
+This should be the head commit for the client repo for testing out
+the failure case reported in issue 88.  Just do a git pull from the
+repo that includes the following commit that is hosted with dulwich.
+The issue should be reproduced.
+
+commit refs/heads/master
+mark :34
+author User <user@localhost> 1427186109 +1300
+committer User <user@localhost> 1427186109 +1300
+data 6
+okay?
+from :32
+M 100644 :33 readme.txt

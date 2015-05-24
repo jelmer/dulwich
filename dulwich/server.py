@@ -72,6 +72,7 @@ from dulwich.protocol import (
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_MULTI_ACK,
+    CAPABILITY_NO_DONE,
     CAPABILITY_NO_PROGRESS,
     CAPABILITY_OFS_DELTA,
     CAPABILITY_REPORT_STATUS,
@@ -205,6 +206,8 @@ class Handler(object):
         self.proto = proto
         self.http_req = http_req
         self._client_capabilities = None
+        # Flags needed for the no-done capability
+        self._done_received = False
 
     @classmethod
     def capability_line(cls):
@@ -244,6 +247,9 @@ class Handler(object):
                                    'before asking client' % cap)
         return cap in self._client_capabilities
 
+    def notify_done(self):
+        self._done_received = True
+
 
 class UploadPackHandler(Handler):
     """Protocol handler for uploading a pack to the server."""
@@ -264,7 +270,7 @@ class UploadPackHandler(Handler):
         return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
                 CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
-                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW)
+                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW, CAPABILITY_NO_DONE)
 
     @classmethod
     def required_capabilities(cls):
@@ -330,6 +336,10 @@ class UploadPackHandler(Handler):
         # The provided haves are processed, and it is safe to send side-
         # band data now.
         self._processing_have_lines = False
+
+        if not graph_walker.handle_done(
+                not self.has_capability(CAPABILITY_NO_DONE), self._done_received):
+            return
 
         self.progress(b"dul-daemon says what\n")
         self.progress(("counting objects: %d, done.\n" % len(objects_iter)).encode('ascii'))
@@ -607,6 +617,10 @@ class ProtocolGraphWalker(object):
 
         self.proto.write_pkt_line(None)
 
+    def notify_done(self):
+        # relay the message down to the handler.
+        self.handler.notify_done()
+
     def send_ack(self, sha, ack_type=b''):
         if ack_type:
             ack_type = b' ' + ack_type
@@ -614,6 +628,10 @@ class ProtocolGraphWalker(object):
 
     def send_nak(self):
         self.proto.write_pkt_line(b'NAK\n')
+
+    def handle_done(self, done_required, done_received):
+        # Delegate this to the implementation.
+        return self._impl.handle_done(done_required, done_received)
 
     def set_wants(self, wants):
         self._wants = wants
@@ -644,23 +662,43 @@ class SingleAckGraphWalkerImpl(object):
 
     def __init__(self, walker):
         self.walker = walker
-        self._sent_ack = False
+        self._common = []
 
     def ack(self, have_ref):
-        if not self._sent_ack:
+        if not self._common:
             self.walker.send_ack(have_ref)
-            self._sent_ack = True
+            self._common.append(have_ref)
 
     def next(self):
         command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
         if command in (None, COMMAND_DONE):
-            if not self._sent_ack:
-                self.walker.send_nak()
+            # defer the handling of done
+            self.walker.notify_done()
             return None
         elif command == COMMAND_HAVE:
             return sha
 
     __next__ = next
+
+    def handle_done(self, done_required, done_received):
+        if not self._common:
+            self.walker.send_nak()
+
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        return True
 
 
 class MultiAckGraphWalkerImpl(object):
@@ -688,12 +726,7 @@ class MultiAckGraphWalkerImpl(object):
                 # flush but more have lines are still coming
                 continue
             elif command == COMMAND_DONE:
-                # don't nak unless no common commits were found, even if not
-                # everything is satisfied
-                if self._common:
-                    self.walker.send_ack(self._common[-1])
-                else:
-                    self.walker.send_nak()
+                self.walker.notify_done()
                 return None
             elif command == COMMAND_HAVE:
                 if self._found_base:
@@ -703,48 +736,93 @@ class MultiAckGraphWalkerImpl(object):
 
     __next__ = next
 
+    def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        if self._common:
+            self.walker.send_ack(self._common[-1])
+        else:
+            self.walker.send_nak()
+        return True
+
 
 class MultiAckDetailedGraphWalkerImpl(object):
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
 
     def __init__(self, walker):
         self.walker = walker
-        self._found_base = False
         self._common = []
 
     def ack(self, have_ref):
+        # Should only be called iff have_ref is common
         self._common.append(have_ref)
-        if not self._found_base:
-            self.walker.send_ack(have_ref, b'common')
-            if self.walker.all_wants_satisfied(self._common):
-                self._found_base = True
-                self.walker.send_ack(have_ref, b'ready')
-        # else we blind ack within next
+        self.walker.send_ack(have_ref, b'common')
 
     def next(self):
         while True:
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
+                if self.walker.all_wants_satisfied(self._common):
+                    self.walker.send_ack(self._common[-1], b'ready')
                 self.walker.send_nak()
                 if self.walker.http_req:
+                    # The HTTP version of this request a flush-pkt always
+                    # signifies an end of request, so we also return
+                    # nothing here as if we are done (but not really, as
+                    # it depends on whether no-done capability was
+                    # specified and that's handled in handle_done which
+                    # may or may not call post_nodone_check depending on
+                    # that).
                     return None
-                continue
             elif command == COMMAND_DONE:
-                # don't nak unless no common commits were found, even if not
-                # everything is satisfied
-                if self._common:
-                    self.walker.send_ack(self._common[-1])
-                else:
-                    self.walker.send_nak()
-                return None
+                # Let the walker know that we got a done.
+                self.walker.notify_done()
+                break
             elif command == COMMAND_HAVE:
-                if self._found_base:
-                    # blind ack; can happen if the client has more requests
-                    # inflight
-                    self.walker.send_ack(sha, b'ready')
+                # return the sha and let the caller ACK it with the
+                # above ack method.
                 return sha
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
 
     __next__ = next
+
+    def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        if self._common:
+            self.walker.send_ack(self._common[-1])
+        else:
+            self.walker.send_nak()
+        return True
 
 
 class ReceivePackHandler(Handler):
@@ -758,7 +836,8 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_SIDE_BAND_64K)
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
+                CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,

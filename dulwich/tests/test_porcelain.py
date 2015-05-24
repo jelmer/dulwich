@@ -644,7 +644,7 @@ class ReceivePackTests(PorcelainTestCase):
         exitcode = porcelain.receive_pack(self.repo.path, BytesIO(b"0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual([
-            b'00629e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00report-status '
+            b'00639e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00 report-status '
             b'delete-refs side-band-64k no-done',
             b'003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
             b'0000'], outlines)

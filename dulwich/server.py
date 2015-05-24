@@ -837,7 +837,7 @@ class ReceivePackHandler(Handler):
     @classmethod
     def capabilities(cls):
         return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
-                CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
+                CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,

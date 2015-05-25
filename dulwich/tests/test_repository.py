@@ -52,11 +52,6 @@ from dulwich.tests.utils import (
 missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
 
 
-def mkdtemp_unicode():
-    suffix = u'délwíçh'
-    return tempfile.mkdtemp(suffix=suffix)
-
-
 class CreateRepositoryTests(TestCase):
 
     def assertFileContentsEqual(self, expected, repo, path):
@@ -82,14 +77,14 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, True)
 
     def test_create_disk_bare(self):
-        tmp_dir = mkdtemp_unicode()
+        tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init_bare(tmp_dir)
         self.assertEqual(tmp_dir, repo._controldir)
         self._check_repo_contents(repo, True)
 
     def test_create_disk_non_bare(self):
-        tmp_dir = mkdtemp_unicode()
+        tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
         self.assertEqual(os.path.join(tmp_dir, '.git'), repo._controldir)
@@ -99,7 +94,7 @@ class CreateRepositoryTests(TestCase):
 class RepositoryRootTests(TestCase):
 
     def mkdtemp(self):
-        return mkdtemp_unicode()
+        return tempfile.mkdtemp()
 
     def open_repo(self, name):
         temp_dir = self.mkdtemp()
@@ -515,7 +510,7 @@ class BuildRepoRootTests(TestCase):
     """
 
     def get_repo_dir(self):
-        return os.path.join(mkdtemp_unicode(), 'test')
+        return os.path.join(tempfile.mkdtemp(), 'test')
 
     def setUp(self):
         super(BuildRepoRootTests, self).setUp()

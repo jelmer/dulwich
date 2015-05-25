@@ -60,6 +60,7 @@ from dulwich import (
 from dulwich.tests import (
     get_safe_env,
     SkipTest,
+    expectedFailure,
     )
 from dulwich.tests.utils import (
     skipIfPY3,
@@ -304,6 +305,11 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return path.encode(sys.getfilesystemencoding())
+
+    if sys.platform == 'win32':
+        @expectedFailure
+        def test_fetch_pack_no_side_band_64k(self):
+            DulwichClientTestBase.test_fetch_pack_no_side_band_64k(self)
 
 
 class TestSSHVendor(object):

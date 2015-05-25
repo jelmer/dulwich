@@ -1,4 +1,4 @@
-dulwich (0.10.1+git20150525-1) UNRELEASED; urgency=medium
+dulwich (0.10.1+git20150525-1) experimental; urgency=medium
 
   * New upstream snapshot.
 

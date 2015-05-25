@@ -73,7 +73,8 @@ def open_repo(name, temp_dir=None):
         temporary directory will be created.
     :returns: An initialized Repo object that lives in a temporary directory.
     """
-    temp_dir = tempfile.mkdtemp()
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp()
     repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
     temp_repo_dir = os.path.join(temp_dir, name)
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
@@ -82,7 +83,8 @@ def open_repo(name, temp_dir=None):
 
 def tear_down_repo(repo):
     """Tear down a test repository."""
-    temp_dir = os.path.dirname(repo._path_bytes.rstrip(os.sep.encode(sys.getfilesystemencoding())))
+    repo.close()
+    temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
     shutil.rmtree(temp_dir)
 
 

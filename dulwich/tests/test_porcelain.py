@@ -18,6 +18,7 @@
 
 """Tests for dulwich.porcelain."""
 
+from contextlib import closing
 from io import BytesIO
 import os
 import shutil
@@ -45,10 +46,14 @@ from dulwich.tests.utils import (
 class PorcelainTestCase(TestCase):
 
     def setUp(self):
-        super(TestCase, self).setUp()
+        super(PorcelainTestCase, self).setUp()
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         self.repo = Repo.init(repo_dir)
+
+    def tearDown(self):
+        super(PorcelainTestCase, self).tearDown()
+        self.repo.close()
 
 
 class ArchiveTests(PorcelainTestCase):
@@ -77,7 +82,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/foo"] = c3.id
         porcelain.update_server_info(self.repo.path)
         self.assertTrue(os.path.exists(os.path.join(self.repo.controldir(),
-            b'info', b'refs')))
+            'info', 'refs')))
 
 
 class CommitTests(PorcelainTestCase):
@@ -127,10 +132,12 @@ class CloneTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
-        r = porcelain.clone(self.repo.path, target_path,
-                            checkout=True, errstream=errstream)
-        self.assertEqual(r.path, target_path)
-        self.assertEqual(Repo(target_path).head(), c3.id)
+        with closing(porcelain.clone(self.repo.path, target_path,
+                                     checkout=True,
+                                     errstream=errstream)) as r:
+            self.assertEqual(r.path, target_path)
+        with closing(Repo(target_path)) as r:
+            self.assertEqual(r.head(), c3.id)
         self.assertTrue('f1' in os.listdir(target_path))
         self.assertTrue('f2' in os.listdir(target_path))
 
@@ -281,7 +288,7 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, b'force_foobar', force=True)
 
         #test if we actually changed the file
-        with self.repo.get_named_file(b'HEAD') as f:
+        with self.repo.get_named_file('HEAD') as f:
             new_ref = f.read()
         self.assertEqual(new_ref, b'ref: refs/heads/force_foobar\n')
 
@@ -301,7 +308,7 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, b'develop')
 
         #test if we actually changed the file
-        with self.repo.get_named_file(b'HEAD') as f:
+        with self.repo.get_named_file('HEAD') as f:
             new_ref = f.read()
         self.assertEqual(new_ref, b'ref: refs/heads/develop\n')
 
@@ -445,10 +452,13 @@ class PushTests(PorcelainTestCase):
 
         # Setup target repo cloned from temp test repo
         clone_path = tempfile.mkdtemp()
-        porcelain.clone(self.repo.path, target=clone_path, errstream=errstream)
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(self.repo.path, target=clone_path, errstream=errstream)
+        target_repo.close()
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
         porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
         porcelain.commit(repo=clone_path, message=b'push',
             author=b'', committer=b'')
@@ -462,15 +472,14 @@ class PushTests(PorcelainTestCase):
                 errstream=errstream)
 
         # Check that the target and source
-        r_clone = Repo(clone_path)
+        with closing(Repo(clone_path)) as r_clone:
+            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
 
-        # Get the change in the target repo corresponding to the add
-        # this will be in the foo branch.
-        change = list(tree_changes(self.repo, self.repo[b'HEAD'].tree,
-                                   self.repo[b'refs/heads/foo'].tree))[0]
-
-        self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
-        self.assertEqual(os.path.basename(fullpath), change.new.path.decode('ascii'))
+            # Get the change in the target repo corresponding to the add
+            # this will be in the foo branch.
+            change = list(tree_changes(self.repo, self.repo[b'HEAD'].tree,
+                                       self.repo[b'refs/heads/foo'].tree))[0]
+            self.assertEqual(os.path.basename(fullpath), change.new.path.decode('ascii'))
 
 
 class PullTests(PorcelainTestCase):
@@ -481,6 +490,7 @@ class PullTests(PorcelainTestCase):
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test',
@@ -488,10 +498,14 @@ class PullTests(PorcelainTestCase):
 
         # Setup target repo
         target_path = tempfile.mkdtemp()
-        porcelain.clone(self.repo.path, target=target_path, errstream=errstream)
+        self.addCleanup(shutil.rmtree, target_path)
+        target_repo = porcelain.clone(self.repo.path, target=target_path,
+                                      errstream=errstream)
+        target_repo.close()
 
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test2',
@@ -502,8 +516,8 @@ class PullTests(PorcelainTestCase):
             outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
-        r = Repo(target_path)
-        self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
+        with closing(Repo(target_path)) as r:
+            self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
 
 class StatusTests(PorcelainTestCase):
@@ -629,8 +643,8 @@ class ReceivePackTests(PorcelainTestCase):
         exitcode = porcelain.receive_pack(self.repo.path, BytesIO(b"0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual([
-            b'005a9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00report-status '
-            b'delete-refs side-band-64k',
+            b'006d9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00 report-status '
+            b'delete-refs ofs-delta side-band-64k no-done',
             b'003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
             b'0000'], outlines)
         self.assertEqual(0, exitcode)
@@ -687,6 +701,7 @@ class FetchTests(PorcelainTestCase):
 
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test',
@@ -694,22 +709,25 @@ class FetchTests(PorcelainTestCase):
 
         # Setup target repo
         target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
         target_repo = porcelain.clone(self.repo.path, target=target_path,
             errstream=errstream)
 
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test2',
             author=b'test2', committer=b'test2')
 
         self.assertFalse(self.repo[b'HEAD'].id in target_repo)
+        target_repo.close()
 
         # Fetch changes into the cloned repo
         porcelain.fetch(target_path, self.repo.path, outstream=outstream,
             errstream=errstream)
 
         # Check the target repo for pushed changes
-        r = Repo(target_path)
-        self.assertTrue(self.repo[b'HEAD'].id in r)
+        with closing(Repo(target_path)) as r:
+            self.assertTrue(self.repo[b'HEAD'].id in r)

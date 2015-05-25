@@ -20,9 +20,13 @@
 """Utilities for interacting with cgit."""
 
 import errno
+import functools
 import os
+import shutil
 import socket
+import stat
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -148,7 +152,7 @@ def import_repo_to_dir(name):
     """Import a repo from a fast-export file in a temporary directory.
 
     These are used rather than binary repos for compat tests because they are
-    more compact an human-editable, and we already depend on git.
+    more compact and human-editable, and we already depend on git.
 
     :param name: The name of the repository export file, relative to
         dulwich/tests/data/repos.
@@ -163,16 +167,6 @@ def import_repo_to_dir(name):
                     cwd=temp_repo_dir)
     export_file.close()
     return temp_repo_dir
-
-
-def import_repo(name):
-    """Import a repo from a fast-export file in a temporary directory.
-
-    :param name: The name of the repository export file, relative to
-        dulwich/tests/data/repos.
-    :returns: An initialized Repo object that lives in a temporary directory.
-    """
-    return Repo(import_repo_to_dir(name))
 
 
 def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
@@ -219,10 +213,12 @@ class CompatTestCase(TestCase):
         super(CompatTestCase, self).setUp()
         require_git_version(self.min_git_version)
 
+    def assertObjectStoreEqual(self, store1, store2):
+        self.assertEqual(sorted(set(store1)), sorted(set(store2)))
+
     def assertReposEqual(self, repo1, repo2):
         self.assertEqual(repo1.get_refs(), repo2.get_refs())
-        self.assertEqual(sorted(set(repo1.object_store)),
-                         sorted(set(repo2.object_store)))
+        self.assertObjectStoreEqual(repo1.object_store, repo2.object_store)
 
     def assertReposNotEqual(self, repo1, repo2):
         refs1 = repo1.get_refs()
@@ -230,3 +226,28 @@ class CompatTestCase(TestCase):
         refs2 = repo2.get_refs()
         objs2 = set(repo2.object_store)
         self.assertFalse(refs1 == refs2 and objs1 == objs2)
+
+    def import_repo(self, name):
+        """Import a repo from a fast-export file in a temporary directory.
+
+        :param name: The name of the repository export file, relative to
+            dulwich/tests/data/repos.
+        :returns: An initialized Repo object that lives in a temporary directory.
+        """
+        path = import_repo_to_dir(name)
+        repo = Repo(path)
+        def cleanup():
+            repo.close()
+            rmtree_ro(os.path.dirname(path.rstrip(os.sep)))
+        self.addCleanup(cleanup)
+        return repo
+
+
+if sys.platform == 'win32':
+    def remove_ro(action, name, exc):
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
+
+    rmtree_ro = functools.partial(shutil.rmtree, onerror=remove_ro)
+else:
+    rmtree_ro = shutil.rmtree

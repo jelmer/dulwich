@@ -4,6 +4,19 @@
 
   * Extended Python3 support to most of the codebase.
     (Gary van der Merwe, Jelmer Vernooij)
+  * The `Repo` object has a new `close` method that can be called to close any
+    open resources. (Gary van der Merwe)
+  * Support 'git.bat' in SubprocessGitClient on Windows.
+    (Stefan Zimmermann)
+  * Advertise 'ofs-delta' capability in receive-pack server side
+    capabilities. (Jelmer Vernooij)
+  * Switched `default_local_git_client_cls` to `LocalGitClient`.
+    (Gary van der Merwe)
+
+ BUG FIXES
+
+  * Fix handling of 'done' in graph walker and implement the
+    'no-done' capability. (Tommy Yu, #88)
 
 0.10.1  2015-03-25
 

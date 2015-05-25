@@ -22,7 +22,6 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-from io import BytesIO
 from difflib import SequenceMatcher
 import email.parser
 import time
@@ -35,20 +34,23 @@ from dulwich.objects import (
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None):
+def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
     """Write a individual file patch.
 
     :param commit: Commit object
     :param progress: Tuple with current patch number and total.
     :return: tuple with filename and contents
     """
+    encoding = encoding or getattr(f, "encoding", "ascii")
+    if type(contents) is str:
+        contents = contents.encode(encoding)
     (num, total) = progress
-    f.write("From %s %s\n" % (commit.id, time.ctime(commit.commit_time)))
-    f.write("From: %s\n" % commit.author)
-    f.write("Date: %s\n" % time.strftime("%a, %d %b %Y %H:%M:%S %Z"))
-    f.write("Subject: [PATCH %d/%d] %s\n" % (num, total, commit.message))
-    f.write("\n")
-    f.write("---\n")
+    f.write(b"From " + commit.id + b" " + time.ctime(commit.commit_time).encode(encoding) + b"\n")
+    f.write(b"From: " + commit.author + b"\n")
+    f.write(b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n")
+    f.write(("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding) + commit.message + b"\n")
+    f.write(b"\n")
+    f.write(b"---\n")
     try:
         import subprocess
         p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
@@ -58,14 +60,14 @@ def write_commit_patch(f, commit, contents, progress, version=None):
     else:
         (diffstat, _) = p.communicate(contents)
         f.write(diffstat)
-        f.write("\n")
+        f.write(b"\n")
     f.write(contents)
-    f.write("-- \n")
+    f.write(b"-- \n")
     if version is None:
         from dulwich import __version__ as dulwich_version
-        f.write("Dulwich %d.%d.%d\n" % dulwich_version)
+        f.write(b"Dulwich %d.%d.%d\n" % dulwich_version)
     else:
-        f.write("%s\n" % version)
+        f.write(version.encode(encoding) + b"\n")
 
 
 def get_summary(commit):
@@ -77,7 +79,7 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
-def unified_diff(a, b, fromfile='', tofile='', n=3):
+def unified_diff(a, b, fromfile, tofile, n=3):
     """difflib.unified_diff that doesn't write any dates or trailing spaces.
 
     Based on the same function in Python2.6.5-rc2's difflib.py
@@ -85,26 +87,27 @@ def unified_diff(a, b, fromfile='', tofile='', n=3):
     started = False
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
-            yield '--- %s\n' % fromfile
-            yield '+++ %s\n' % tofile
+            yield b'--- ' + fromfile + b'\n'
+            yield b'+++ ' + tofile + b'\n'
             started = True
         i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        yield "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        sizes = "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
+        yield sizes.encode('ascii')
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
-                    yield ' ' + line
+                    yield b' ' + line
                 continue
             if tag == 'replace' or tag == 'delete':
                 for line in a[i1:i2]:
-                    if not line[-1] == '\n':
-                        line += '\n\\ No newline at end of file\n'
-                    yield '-' + line
+                    if not line[-1:] == b'\n':
+                        line += b'\n\\ No newline at end of file\n'
+                    yield b'-' + line
             if tag == 'replace' or tag == 'insert':
                 for line in b[j1:j2]:
-                    if not line[-1] == '\n':
-                        line += '\n\\ No newline at end of file\n'
-                    yield '+' + line
+                    if not line[-1:] == b'\n':
+                        line += b'\n\\ No newline at end of file\n'
+                    yield b'+' + line
 
 
 def is_binary(content):
@@ -112,21 +115,21 @@ def is_binary(content):
 
     :param content: Bytestring to check for binary content
     """
-    return '\0' in content[:FIRST_FEW_BYTES]
+    return b'\0' in content[:FIRST_FEW_BYTES]
 
 
 def shortid(hexsha):
     if hexsha is None:
-        return "0" * 7
+        return b"0" * 7
     else:
         return hexsha[:7]
 
 
 def patch_filename(p, root):
     if p is None:
-        return "/dev/null"
+        return b"/dev/null"
     else:
-        return root + "/" + p
+        return root + b"/" + p
 
 
 def write_object_diff(f, store, old_file, new_file, diff_binary=False):
@@ -143,13 +146,13 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file
-    old_path = patch_filename(old_path, "a")
-    new_path = patch_filename(new_path, "b")
+    old_path = patch_filename(old_path, b"a")
+    new_path = patch_filename(new_path, b"b")
     def content(mode, hexsha):
         if hexsha is None:
-            return ''
+            return b''
         elif S_ISGITLINK(mode):
-            return "Submodule commit " + hexsha + "\n"
+            return b"Submodule commit " + hexsha + b"\n"
         else:
             return store[hexsha].data
 
@@ -163,12 +166,13 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
     if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
-        f.write("Binary files %s and %s differ\n" % (old_path, new_path))
+        f.write(b"Binary files " + old_path + b" and " + new_path + b" differ\n")
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
             old_path, new_path))
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def gen_diff_header(paths, modes, shas):
     """Write a blob diff header.
 
@@ -179,20 +183,21 @@ def gen_diff_header(paths, modes, shas):
     (old_path, new_path) = paths
     (old_mode, new_mode) = modes
     (old_sha, new_sha) = shas
-    yield "diff --git %s %s\n" % (old_path, new_path)
+    yield b"diff --git " + old_path + b" " + new_path + b"\n"
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                yield "old mode %o\n" % old_mode
-            yield "new mode %o\n" % new_mode
+                yield ("old mode %o\n" % old_mode).encode('ascii')
+            yield ("new mode %o\n" % new_mode).encode('ascii')
         else:
-            yield "deleted mode %o\n" % old_mode
-    yield "index " + shortid(old_sha) + ".." + shortid(new_sha)
+            yield ("deleted mode %o\n" % old_mode).encode('ascii')
+    yield b"index " + shortid(old_sha) + b".." + shortid(new_sha)
     if new_mode is not None:
-        yield " %o" % new_mode
-    yield "\n"
+        yield (" %o" % new_mode).encode('ascii')
+    yield b"\n"
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def write_blob_diff(f, old_file, new_file):
     """Write blob diff.
 
@@ -204,8 +209,8 @@ def write_blob_diff(f, old_file, new_file):
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file
-    old_path = patch_filename(old_path, "a")
-    new_path = patch_filename(new_path, "b")
+    old_path = patch_filename(old_path, b"a")
+    new_path = patch_filename(new_path, b"b")
     def lines(blob):
         if blob is not None:
             return blob.data.splitlines(True)
@@ -220,6 +225,7 @@ def write_blob_diff(f, old_file, new_file):
         old_path, new_path))
 
 
+# TODO(jelmer): Support writing unicode, rather than bytes.
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """Write tree diff.
 
@@ -236,17 +242,34 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
                                     diff_binary=diff_binary)
 
 
-def git_am_patch_split(f):
+def git_am_patch_split(f, encoding=None):
     """Parse a git-am-style patch and split it up into bits.
 
     :param f: File-like object to parse
+    :param encoding: Encoding to use when creating Git objects
     :return: Tuple with commit object, diff contents and git version
     """
-    parser = email.parser.Parser()
-    msg = parser.parse(f)
+    encoding = encoding or getattr(f, "encoding", "ascii")
+    contents = f.read()
+    if type(contents) is bytes and getattr(email.parser, "BytesParser", None):
+        parser = email.parser.BytesParser()
+        msg = parser.parsebytes(contents)
+    else:
+        parser = email.parser.Parser()
+        msg = parser.parsestr(contents)
+    return parse_patch_message(msg, encoding)
+
+
+def parse_patch_message(msg, encoding=None):
+    """Extract a Commit object and patch from an e-mail message.
+
+    :param msg: An email message (email.message.Message)
+    :param encoding: Encoding to use to encode Git commits
+    :return: Tuple with commit object, diff contents and git version
+    """
     c = Commit()
-    c.author = msg["from"]
-    c.committer = msg["from"]
+    c.author = msg["from"].encode(encoding)
+    c.committer = msg["from"].encode(encoding)
     try:
         patch_tag_start = msg["subject"].index("[PATCH")
     except ValueError:
@@ -254,29 +277,31 @@ def git_am_patch_split(f):
     else:
         close = msg["subject"].index("] ", patch_tag_start)
         subject = msg["subject"][close+2:]
-    c.message = subject.replace("\n", "") + "\n"
+    c.message = (subject.replace("\n", "") + "\n").encode(encoding)
     first = True
 
-    body = BytesIO(msg.get_payload())
+    body = msg.get_payload(decode=True)
+    lines = body.splitlines(True)
+    line_iter = iter(lines)
 
-    for l in body:
-        if l == "---\n":
+    for l in line_iter:
+        if l == b"---\n":
             break
         if first:
-            if l.startswith("From: "):
-                c.author = l[len("From: "):].rstrip()
+            if l.startswith(b"From: "):
+                c.author = l[len(b"From: "):].rstrip()
             else:
-                c.message += "\n" + l
+                c.message += b"\n" + l
             first = False
         else:
             c.message += l
-    diff = ""
-    for l in body:
-        if l == "-- \n":
+    diff = b""
+    for l in line_iter:
+        if l == b"-- \n":
             break
         diff += l
     try:
-        version = next(body).rstrip("\n")
+        version = next(line_iter).rstrip(b"\n")
     except StopIteration:
         version = None
     return c, diff, version

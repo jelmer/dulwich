@@ -20,6 +20,7 @@
 
 import os
 import subprocess
+import sys
 import tempfile
 
 from dulwich.errors import (
@@ -71,6 +72,11 @@ class ShellHook(Hook):
         self.pre_exec_callback = pre_exec_callback
         self.post_exec_callback = post_exec_callback
 
+        if sys.version_info[0] == 2 and sys.platform == 'win32':
+            # Python 2 on windows does not support unicode file paths
+            # http://bugs.python.org/issue1759845
+            self.filepath = self.filepath.encode(sys.getfilesystemencoding())
+
     def execute(self, *args):
         """Execute the hook with given args"""
 
@@ -100,7 +106,7 @@ class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, b'hooks', b'pre-commit')
+        filepath = os.path.join(controldir, 'hooks', 'pre-commit')
 
         ShellHook.__init__(self, 'pre-commit', filepath, 0)
 
@@ -109,7 +115,7 @@ class PostCommitShellHook(ShellHook):
     """post-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, b'hooks', b'post-commit')
+        filepath = os.path.join(controldir, 'hooks', 'post-commit')
 
         ShellHook.__init__(self, 'post-commit', filepath, 0)
 
@@ -122,7 +128,7 @@ class CommitMsgShellHook(ShellHook):
     """
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, b'hooks', b'commit-msg')
+        filepath = os.path.join(controldir, 'hooks', 'commit-msg')
 
         def prepare_msg(*args):
             (fd, path) = tempfile.mkstemp()

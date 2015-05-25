@@ -1,6 +1,6 @@
-This is the Dulwich project.
-
 [![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
+
+This is the Dulwich project.
 
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
@@ -43,9 +43,8 @@ Help
 There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
 https://launchpad.net/~dulwich-users.
 
-Python3
--------
+Supported versions of Python
+----------------------------
 
-The process of porting to Python3 is ongoing. Please note that although the
-test suite pass in python3, this is due to the tests of features that are not
-yet ported being skipped, and *not* an indication that the port is complete.
+At the moment, Dulwich supports (and is tested on) CPython 2.6, 2.7, 3.4, 3.5 and Pypy.
+The ``dulwich.web`` module is currently broken on Python 3 (issue #295).

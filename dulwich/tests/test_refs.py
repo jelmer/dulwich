@@ -280,11 +280,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self._repo = open_repo('refs.git')
+        self.addCleanup(tear_down_repo, self._repo)
         self._refs = self._repo.refs
-
-    def tearDown(self):
-        tear_down_repo(self._repo)
-        TestCase.tearDown(self)
 
     def test_get_packed_refs(self):
         self.assertEqual({
@@ -308,7 +305,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_setitem(self):
         RefsContainerTests.test_setitem(self)
-        f = open(os.path.join(self._refs.path, b'refs', b'some', b'ref'), 'rb')
+        f = open(os.path.join(self._refs.path, 'refs', 'some', 'ref'), 'rb')
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          f.read()[:40])
         f.close()
@@ -319,12 +316,12 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(ones, self._refs[b'HEAD'])
 
         # ensure HEAD was not modified
-        f = open(os.path.join(self._refs.path, b'HEAD'), 'rb')
+        f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
         self.assertEqual(b'ref: refs/heads/master', next(iter(f)).rstrip(b'\n'))
         f.close()
 
         # ensure the symbolic link was written through
-        f = open(os.path.join(self._refs.path, b'refs', b'heads', b'master'), 'rb')
+        f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'), 'rb')
         self.assertEqual(ones, f.read()[:40])
         f.close()
 
@@ -336,9 +333,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # ensure lockfile was deleted
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, b'refs', b'heads', b'master.lock')))
+            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, b'HEAD.lock')))
+            os.path.join(self._refs.path, 'HEAD.lock')))
 
     def test_add_if_new_packed(self):
         # don't overwrite packed ref
@@ -349,11 +346,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_add_if_new_symbolic(self):
         # Use an empty repo instead of the default.
-        tear_down_repo(self._repo)
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
-        self._repo = Repo.init(repo_dir)
-        refs = self._repo.refs
+        repo = Repo.init(repo_dir)
+        self.addCleanup(tear_down_repo, repo)
+        refs = repo.refs
 
         nines = b'9' * 40
         self.assertEqual(b'ref: refs/heads/master', refs.read_ref(b'HEAD'))
@@ -377,7 +374,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
-        ref_file = os.path.join(self._refs.path, b'refs', b'heads', b'master')
+        ref_file = os.path.join(self._refs.path, 'refs', 'heads', 'master')
         self.assertFalse(os.path.exists(ref_file))
         self.assertFalse(b'refs/heads/master' in self._refs.get_packed_refs())
 
@@ -388,7 +385,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertRaises(KeyError, lambda: self._refs[b'HEAD'])
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'refs/heads/master'])
-        self.assertFalse(os.path.exists(os.path.join(self._refs.path, b'HEAD')))
+        self.assertFalse(os.path.exists(os.path.join(self._refs.path, 'HEAD')))
 
     def test_remove_if_equals_symref(self):
         # HEAD is a symref, so shouldn't equal its dereferenced value
@@ -404,12 +401,12 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_loose_ref(b'HEAD'))
 
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, b'refs', b'heads', b'master.lock')))
+            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, b'HEAD.lock')))
+            os.path.join(self._refs.path, 'HEAD.lock')))
 
     def test_remove_packed_without_peeled(self):
-        refs_file = os.path.join(self._repo._controldir, b'packed-refs')
+        refs_file = os.path.join(self._repo.path, 'packed-refs')
         f = GitFile(refs_file)
         refs_data = f.read()
         f.close()

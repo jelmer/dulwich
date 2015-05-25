@@ -20,6 +20,7 @@
 
 from io import BytesIO
 import os
+import shutil
 import tempfile
 
 from dulwich.errors import (
@@ -126,7 +127,7 @@ class HandlerTestCase(TestCase):
             self.fail(e)
 
     def test_capability_line(self):
-        self.assertEqual(b'cap1 cap2 cap3', self._handler.capability_line())
+        self.assertEqual(b' cap1 cap2 cap3', self._handler.capability_line())
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
@@ -211,6 +212,7 @@ class UploadPackHandlerTestCase(TestCase):
 class FindShallowTests(TestCase):
 
     def setUp(self):
+        super(FindShallowTests, self).setUp()
         self._store = MemoryObjectStore()
 
     def make_commit(self, **attrs):
@@ -513,9 +515,14 @@ class TestProtocolGraphWalker(object):
     def __init__(self):
         self.acks = []
         self.lines = []
-        self.done = False
+        self.wants_satisified = False
         self.http_req = None
         self.advertise_refs = False
+        self._impl = None
+        self.done_required = True
+        self.done_received = False
+        self._empty = False
+        self.pack_sent = False
 
     def read_proto_line(self, allowed):
         command, sha = self.lines.pop(0)
@@ -530,12 +537,25 @@ class TestProtocolGraphWalker(object):
         self.acks.append((None, b'nak'))
 
     def all_wants_satisfied(self, haves):
-        return self.done
+        if haves:
+            return self.wants_satisified
 
     def pop_ack(self):
         if not self.acks:
             return None
         return self.acks.pop(0)
+
+    def handle_done(self):
+        if not self._impl:
+            return
+        # Whether or not PACK is sent after is determined by this, so
+        # record this value.
+        self.pack_sent = self._impl.handle_done(self.done_required,
+            self.done_received)
+        return self.pack_sent
+
+    def notify_done(self):
+        self.done_received = True
 
 
 class AckGraphWalkerImplTestCase(TestCase):
@@ -551,6 +571,7 @@ class AckGraphWalkerImplTestCase(TestCase):
           (b'done', None),
           ]
         self._impl = self.impl_cls(self._walker)
+        self._walker._impl = self._impl
 
     def assertNoAck(self):
         self.assertEqual(None, self._walker.pop_ack())
@@ -569,6 +590,15 @@ class AckGraphWalkerImplTestCase(TestCase):
     def assertNextEquals(self, sha):
         self.assertEqual(sha, next(self._impl))
 
+    def assertNextEmpty(self):
+        # This is necessary because of no-done - the assumption that it
+        # it safe to immediately send out the final ACK is no longer
+        # true but the test is still needed for it.  TestProtocolWalker
+        # does implement the handle_done which will determine whether
+        # the final confirmation can be sent.
+        self.assertRaises(IndexError, next, self._impl)
+        self._walker.handle_done()
+
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
@@ -579,7 +609,6 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE)
 
@@ -598,7 +627,6 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE)
 
@@ -619,6 +647,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
     def test_single_ack_nak_flush(self):
@@ -635,6 +664,7 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
 
@@ -647,7 +677,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, b'continue')
 
@@ -656,6 +685,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, b'continue')
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertAck(THREE)
 
     def test_multi_ack_partial(self):
@@ -670,7 +700,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        # done, re-send ack of last common
+        self.assertNextEmpty()
         self.assertAck(ONE)
 
     def test_multi_ack_flush(self):
@@ -687,7 +717,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(ONE)
         self.assertNak()  # nak the flush-pkt
 
-        self._walker.done = True
         self._impl.ack(ONE)
         self.assertAck(ONE, b'continue')
 
@@ -696,6 +725,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertAck(THREE, b'continue')
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertAck(THREE)
 
     def test_multi_ack_nak(self):
@@ -709,6 +739,7 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
 
@@ -721,16 +752,88 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(ONE)
-        self._walker.done = True
         self._impl.ack(ONE)
-        self.assertAcks([(ONE, b'common'), (ONE, b'ready')])
+        self.assertAck(ONE, b'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, b'ready')
+        self.assertAck(THREE, b'common')
 
+        # done is read.
+        self._walker.wants_satisified = True
         self.assertNextEquals(None)
-        self.assertAck(THREE)
+        self._walker.lines.append((None, None))
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
+        # PACK is sent
+        self.assertTrue(self._walker.pack_sent)
+
+    def test_multi_ack_nodone(self):
+        self._walker.done_required = False
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self._impl.ack(ONE)
+        self.assertAck(ONE, b'common')
+
+        self.assertNextEquals(THREE)
+        self._impl.ack(THREE)
+        self.assertAck(THREE, b'common')
+
+        # done is read.
+        self._walker.wants_satisified = True
+        self.assertNextEquals(None)
+        self._walker.lines.append((None, None))
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
+        # PACK is sent
+        self.assertTrue(self._walker.pack_sent)
+
+    def test_multi_ack_flush_end(self):
+        # transmission ends with a flush-pkt without a done but no-done is
+        # assumed.
+        self._walker.lines[-1] = (None, None)
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self._impl.ack(ONE)
+        self.assertAck(ONE, b'common')
+
+        self.assertNextEquals(THREE)
+        self._impl.ack(THREE)
+        self.assertAck(THREE, b'common')
+
+        # no done is read
+        self._walker.wants_satisified = True
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, b'ready'), (None, b'nak')])
+        # PACK is NOT sent
+        self.assertFalse(self._walker.pack_sent)
+
+    def test_multi_ack_flush_end_nodone(self):
+        # transmission ends with a flush-pkt without a done but no-done is
+        # assumed.
+        self._walker.lines[-1] = (None, None)
+        self._walker.done_required = False
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self._impl.ack(ONE)
+        self.assertAck(ONE, b'common')
+
+        self.assertNextEquals(THREE)
+        self._impl.ack(THREE)
+        self.assertAck(THREE, b'common')
+
+        # no done is read, but pretend it is (last 'ACK 'commit_id' '')
+        self._walker.wants_satisified = True
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
+        # PACK is sent
+        self.assertTrue(self._walker.pack_sent)
 
     def test_multi_ack_partial(self):
         self.assertNextEquals(TWO)
@@ -744,7 +847,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
-        # done, re-send ack of last common
+        self.assertNextEmpty()
         self.assertAck(ONE)
 
     def test_multi_ack_flush(self):
@@ -755,6 +858,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
           (b'have', ONE),
           (b'have', THREE),
           (b'done', None),
+          (None, None),
           ]
         self.assertNextEquals(TWO)
         self.assertNoAck()
@@ -762,16 +866,17 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(ONE)
         self.assertNak()  # nak the flush-pkt
 
-        self._walker.done = True
         self._impl.ack(ONE)
-        self.assertAcks([(ONE, b'common'), (ONE, b'ready')])
+        self.assertAck(ONE, b'common')
 
         self.assertNextEquals(THREE)
         self._impl.ack(THREE)
-        self.assertAck(THREE, b'ready')
+        self.assertAck(THREE, b'common')
 
+        self._walker.wants_satisified = True
         self.assertNextEquals(None)
-        self.assertAck(THREE)
+        self.assertNextEmpty()
+        self.assertAcks([(THREE, b'ready'), (None, b'nak'), (THREE, b'')])
 
     def test_multi_ack_nak(self):
         self.assertNextEquals(TWO)
@@ -783,8 +888,31 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(THREE)
         self.assertNoAck()
 
+        # Done is sent here.
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
+        self.assertNextEmpty()
+        self.assertTrue(self._walker.pack_sent)
+
+    def test_multi_ack_nak_nodone(self):
+        self._walker.done_required = False
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNoAck()
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        # Done is sent here.
+        self.assertFalse(self._walker.pack_sent)
+        self.assertNextEquals(None)
+        self.assertNextEmpty()
+        self.assertTrue(self._walker.pack_sent)
+        self.assertNak()
+        self.assertNextEmpty()
 
     def test_multi_ack_nak_flush(self):
         # same as nak test but contains a flush-pkt in the middle
@@ -805,6 +933,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNoAck()
 
         self.assertNextEquals(None)
+        self.assertNextEmpty()
         self.assertNak()
 
     def test_multi_ack_stateless(self):
@@ -821,8 +950,37 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self.assertNextEquals(THREE)
         self.assertNoAck()
 
+        self.assertFalse(self._walker.pack_sent)
         self.assertNextEquals(None)
         self.assertNak()
+
+        self.assertNextEmpty()
+        self.assertNoAck()
+        self.assertFalse(self._walker.pack_sent)
+
+    def test_multi_ack_stateless_nodone(self):
+        self._walker.done_required = False
+        # transmission ends with a flush-pkt
+        self._walker.lines[-1] = (None, None)
+        self._walker.http_req = True
+
+        self.assertNextEquals(TWO)
+        self.assertNoAck()
+
+        self.assertNextEquals(ONE)
+        self.assertNoAck()
+
+        self.assertNextEquals(THREE)
+        self.assertNoAck()
+
+        self.assertFalse(self._walker.pack_sent)
+        self.assertNextEquals(None)
+        self.assertNak()
+
+        self.assertNextEmpty()
+        self.assertNoAck()
+        # PACK will still not be sent.
+        self.assertFalse(self._walker.pack_sent)
 
 
 class FileSystemBackendTests(TestCase):
@@ -831,6 +989,7 @@ class FileSystemBackendTests(TestCase):
     def setUp(self):
         super(FileSystemBackendTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
         self.backend = FileSystemBackend()
 
@@ -840,7 +999,9 @@ class FileSystemBackendTests(TestCase):
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
-        self.assertEqual(os.path.abspath(repo.path), os.path.abspath(self.repo.path))
+        self.assertEqual(
+            os.path.normcase(os.path.abspath(repo.path)),
+            os.path.normcase(os.path.abspath(self.repo.path)))
 
     def test_child(self):
         self.assertRaises(NotGitRepository,
@@ -901,6 +1062,7 @@ class UpdateServerInfoTests(TestCase):
     def setUp(self):
         super(UpdateServerInfoTests, self).setUp()
         self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
     def test_empty(self):

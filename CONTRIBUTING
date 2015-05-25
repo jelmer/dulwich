@@ -5,7 +5,7 @@ kernel/git coding style.
 
 Where possible include updates to NEWS along with your improvements.
 
-New functionality and bug fixes should be accompanied with matching unit tests.
+New functionality and bug fixes should be accompanied by matching unit tests.
 
 Coding style
 ------------
@@ -29,8 +29,8 @@ unittest2 (which you will need to have installed) on older versions of Python.
 String Types
 ------------
 Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribed
-encoding for these strings, and although it is fairly common to use UTF-8, anything
-can and is used as encoding with Git.
+encoding for these strings, and although it is fairly common to use UTF-8, any
+raw byte strings are supported.
 
 For this reason, Dulwich internally treats git-based filenames as bytestrings. It is up
 to the Dulwich API user to encode and decode them if necessary.
@@ -39,3 +39,13 @@ to the Dulwich API user to encode and decode them if necessary.
 * object sha1 digests (20 bytes long): bytes
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings on python3)
 
+Merge requests
+--------------
+Please either send pull requests to the author (jelmer@jelmer.uk) or create new pull
+requests on GitHub.
+
+Licensing
+---------
+Dulwich is currently licensed under the GNU General Public License, version 2
+or later. We would like to change the license to Apachev2 or later eventually;
+new contributions should be made under dual GPLv2+/Apachev2+.

@@ -16,6 +16,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+from contextlib import closing
 from io import BytesIO
 import sys
 import shutil
@@ -59,6 +60,7 @@ from dulwich.repo import (
 from dulwich.tests import skipIf
 from dulwich.tests.utils import (
     open_repo,
+    tear_down_repo,
     )
 
 
@@ -385,15 +387,15 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('user', c.username)
         self.assertEqual('bar/baz', path)
 
-    def test_subprocess(self):
+    def test_local(self):
         c, path = get_transport_and_path('foo.bar/baz')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('foo.bar/baz', path)
 
     @skipIf(sys.platform != 'win32', 'Behaviour only happens on windows.')
     def test_local_abs_windows_path(self):
         c, path = get_transport_and_path('C:\\foo.bar\\baz')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('C:\\foo.bar\\baz', path)
 
     def test_error(self):
@@ -483,7 +485,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_file(self):
         c, path = get_transport_and_path_from_url('file:///home/jelmer/foo')
-        self.assertTrue(isinstance(c, SubprocessGitClient))
+        self.assertTrue(isinstance(c, LocalGitClient))
         self.assertEqual('/home/jelmer/foo', path)
 
 
@@ -525,13 +527,13 @@ class SSHGitClientTests(TestCase):
         client.get_ssh_vendor = self.real_vendor
 
     def test_default_command(self):
-        self.assertEqual(b'git-upload-pack',
+        self.assertEqual('git-upload-pack',
                 self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path(self):
-        self.client.alternative_paths[b'upload-pack'] = (
-            b'/usr/lib/git/git-upload-pack')
-        self.assertEqual(b'/usr/lib/git/git-upload-pack',
+        self.client.alternative_paths['upload-pack'] = (
+            '/usr/lib/git/git-upload-pack')
+        self.assertEqual('/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path(b'upload-pack'))
 
     def test_connect(self):
@@ -541,13 +543,13 @@ class SSHGitClientTests(TestCase):
         client.username = b"username"
         client.port = 1337
 
-        client._connect(b"command", b"/path/to/repo")
+        client._connect(b"command", "/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual([b"git-command '/path/to/repo'"], server.command)
+        self.assertEqual(["git-command", "/path/to/repo"], server.command)
 
-        client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual([b"git-relative-command '~/path/to/repo'"],
+        client._connect(b"relative-command", "/~/path/to/repo")
+        self.assertEqual(["git-relative-command",  "~/path/to/repo"],
                           server.command)
 
 
@@ -581,11 +583,13 @@ class LocalGitClientTests(TestCase):
         c = LocalGitClient()
         t = MemoryRepo()
         s = open_repo('a.git')
+        self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t))
 
     def test_fetch_empty(self):
         c = LocalGitClient()
         s = open_repo('a.git')
+        self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = {}
         c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
@@ -596,6 +600,7 @@ class LocalGitClientTests(TestCase):
     def test_fetch_pack_none(self):
         c = LocalGitClient()
         s = open_repo('a.git')
+        self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = MemoryRepo().get_graph_walker()
         c.fetch_pack(s.path,
@@ -606,15 +611,21 @@ class LocalGitClientTests(TestCase):
 
     def test_send_pack_without_changes(self):
         local = open_repo('a.git')
+        self.addCleanup(tear_down_repo, local)
+
         target = open_repo('a.git')
+        self.addCleanup(tear_down_repo, target)
+
         self.send_and_verify(b"master", local, target)
 
     def test_send_pack_with_changes(self):
         local = open_repo('a.git')
+        self.addCleanup(tear_down_repo, local)
+
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
-        target = Repo.init_bare(target_path)
-        self.send_and_verify(b"master", local, target)
+        with closing(Repo.init_bare(target_path)) as target:
+            self.send_and_verify(b"master", local, target)
 
     def send_and_verify(self, branch, local, target):
         client = LocalGitClient()

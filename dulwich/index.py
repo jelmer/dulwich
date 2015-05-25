@@ -516,7 +516,12 @@ def blob_from_path_and_stat(fs_path, st):
         with open(fs_path, 'rb') as f:
             blob.data = f.read()
     else:
-        blob.data = os.readlink(fs_path)
+        if sys.platform == 'win32':
+            fs_encoding = sys.getfilesystemencoding()
+            blob.data = (os.readlink(fs_path.decode(fs_encoding))
+                         .encode(fs_encoding))
+        else:
+            blob.data = os.readlink(fs_path)
     return blob
 
 

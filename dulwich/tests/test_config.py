@@ -150,6 +150,14 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
+    def test_quoted(self):
+        cf = self.from_file(b"""[gui]
+	fontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -weight normal -slant roman -underline 0 -overstrike 0
+""")
+        self.assertEqual(ConfigFile({(b'gui', ): {
+            b'fontdiff': b'-family "Ubuntu Mono" -size 11 -weight normal -slant roman -underline 0 -overstrike 0',
+        }}), cf)
+
 
 class ConfigDictTests(TestCase):
 

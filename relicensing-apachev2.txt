@@ -108,3 +108,7 @@ Víðir Valberg Guðmundsson <vidir.valberg@orn.li>
 William Grant <william.grant@canonical.com>
 Yifan Zhang <yifan@wavii.com>
 Yuval Langer <yuval.langer@gmail.com>
+
+If your name is in this list and you'd be happy to relicense your contribution
+under dual GPLv2/Apachev2, then please send me an e-mail (jelmer@samba.org) or
+a pull request on GitHub removing your name from the list above.

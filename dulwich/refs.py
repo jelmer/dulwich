@@ -23,13 +23,13 @@
 """
 import errno
 import os
+import sys
 
 from dulwich.errors import (
     PackedRefsException,
     RefFormatError,
     )
 from dulwich.objects import (
-    hex_to_sha,
     git_line,
     valid_hexsha,
     )
@@ -416,7 +416,7 @@ class DiskRefsContainer(RefsContainer):
         for root, dirs, files in os.walk(self.refpath(b'refs')):
             dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/").encode('ascii')
+                refname = ("%s/%s" % (dir, filename)).encode(sys.getfilesystemencoding())
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())
@@ -426,7 +426,8 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        name = name.decode('ascii')
+        if getattr(self.path, "encode", None) and getattr(name, "decode", None):
+            name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)

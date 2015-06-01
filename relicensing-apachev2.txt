@@ -26,7 +26,6 @@ Andi McClure <andi.m.mcclure@gmail.com>
 André Roth <neolynx@gmail.com>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Augie Fackler <durin42@gmail.com> <raf@durin42.com>
 Benjamin Pollack <benjamin@bitquabit.com> <benjamin@fogcreek.com>
 Brendan Cully <brendan@kublai.com>
 Brian Visel <eode@eptitude.net>

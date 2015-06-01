@@ -41,7 +41,6 @@ dak180 <dak180@users.sourceforge.net>
 Damien Tournoud <damien@commerceguys.com>
 Dan Callaghan <dcallagh@redhat.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
-David Bennett <davbennett@google.com>
 David Blewett <davidb@sixfeetup.com>
 David Borowitz <dborowitz@google.com>
 David Carr <david@carrclan.us>

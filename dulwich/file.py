@@ -23,6 +23,7 @@ import io
 import os
 import sys
 import tempfile
+import time
 
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
@@ -31,6 +32,21 @@ def ensure_dir_exists(dirname):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+
+def safe_remove(filename, max_time=5.0):
+    """Remove file "safe" to prevent access denied issues (e.g. rude virus scanner)"""
+    while True:
+        try:
+            return os.remove(filename)
+        except OSError as e:
+            # could not be deleted and time out
+            if e.errno != errno.EACCES or max_time <= 0:
+                raise
+            # sleep in intervals and try again up to max_time
+            st = min(1, 0.5 / max_time)
+            time.sleep(st);
+            max_time -= st
 
 
 def _fancy_rename(oldname, newname):
@@ -46,7 +62,7 @@ def _fancy_rename(oldname, newname):
     try:
         (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
         os.close(fd)
-        os.remove(tmpfile)
+        safe_remove(tmpfile)
     except OSError:
         # either file could not be created (e.g. permission problem)
         # or could not be deleted (e.g. rude virus scanner)
@@ -60,7 +76,7 @@ def _fancy_rename(oldname, newname):
     except OSError:
         os.rename(tmpfile, newname)
         raise
-    os.remove(tmpfile)
+    safe_remove(tmpfile)
 
 
 def GitFile(filename, mode='rb', bufsize=-1):
@@ -123,7 +139,7 @@ class _GitFile(object):
             return
         self._file.close()
         try:
-            os.remove(self._lockfilename)
+            safe_remove(self._lockfilename)
             self._closed = True
         except OSError as e:
             # The file may have been removed already, which is ok.
@@ -150,7 +166,7 @@ class _GitFile(object):
                 os.rename(self._lockfilename, self._filename)
             except OSError as e:
                 if sys.platform == 'win32' and e.errno == errno.EEXIST:
-                    # Windows versions prior to Vista don't support atomic renames
+                # Windows versions prior to Vista don't support atomic renames
                     _fancy_rename(self._lockfilename, self._filename)
                 else:
                     raise

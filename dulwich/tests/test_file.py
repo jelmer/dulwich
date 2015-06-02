@@ -23,7 +23,7 @@ import shutil
 import sys
 import tempfile
 
-from dulwich.file import GitFile, fancy_rename
+from dulwich.file import GitFile, _fancy_rename
 from dulwich.tests import (
     SkipTest,
     TestCase,
@@ -53,7 +53,7 @@ class FancyRenameTests(TestCase):
 
     def test_no_dest_exists(self):
         self.assertFalse(os.path.exists(self.bar))
-        fancy_rename(self.foo, self.bar)
+        _fancy_rename(self.foo, self.bar)
         self.assertFalse(os.path.exists(self.foo))
 
         new_f = open(self.bar, 'rb')
@@ -62,7 +62,7 @@ class FancyRenameTests(TestCase):
 
     def test_dest_exists(self):
         self.create(self.bar, b'bar contents')
-        fancy_rename(self.foo, self.bar)
+        _fancy_rename(self.foo, self.bar)
         self.assertFalse(os.path.exists(self.foo))
 
         new_f = open(self.bar, 'rb')
@@ -74,7 +74,7 @@ class FancyRenameTests(TestCase):
             raise SkipTest("platform allows overwriting open files")
         self.create(self.bar, b'bar contents')
         dest_f = open(self.bar, 'rb')
-        self.assertRaises(OSError, fancy_rename, self.foo, self.bar)
+        self.assertRaises(OSError, _fancy_rename, self.foo, self.bar)
         dest_f.close()
         self.assertTrue(os.path.exists(self.path('foo')))
 

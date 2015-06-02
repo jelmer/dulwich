@@ -67,7 +67,6 @@ Jonathan Chu <jchonphoenix@gmail.com>
 kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>
-Marcin Kuźmiński <marcin@python-blog.com> <marcin@python-works.com>
 Martin Packman <gzlist@googlemail.com>
 Max Bowsher <maxb@f2s.com>
 max <max0d41@github.com>

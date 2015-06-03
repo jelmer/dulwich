@@ -41,7 +41,7 @@ from dulwich.refs import (
 from dulwich.repo import Repo
 
 from dulwich.tests import (
-    skipIf,
+    SkipTest,
     TestCase,
     )
 
@@ -438,15 +438,16 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
 
-    @skipIf(sys.getfilesystemencoding() == 'ascii',
-            "filesystem encoding doesn't support non-ascii characters")
     def test_non_ascii(self):
+        try:
+            encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
+        except UnicodeDecodeError:
+            raise SkipTest("filesystem encoding doesn't support special character")
         p = os.path.join(self._repo.path, 'refs', 'tags', 'schön')
         with open(p, 'w') as f:
             f.write('00' * 20)
 
         expected_refs = dict(_TEST_REFS)
-        encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
         expected_refs[encoded_ref] = b'00' * 20
 
         self.assertEqual(expected_refs, self._repo.get_refs())

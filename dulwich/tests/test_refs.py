@@ -438,7 +438,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
 
-    @skipIf(sys.getfilesystemencoding() == 'ascii',
+    @skipIf(sys.getfilesystemencoding() == 'ANSI_X3.4-1968',
             "filesystem encoding doesn't support non-ascii characters")
     def test_non_ascii(self):
         p = os.path.join(self._repo.path, 'refs', 'tags', 'schön')

@@ -67,7 +67,6 @@ Max Shawabkeh <max99x@gmail.com>
 Nick Stenning <nick@whiteink.com>
 Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
-Pascal Quantin <pascal.quantin@gmail.com>
 Paul Hummer <paul@eventuallyanyway.com>
 rfaulk <rfaulkner@wikimedia.org>
 Ricardo Salveti <ricardo.salveti@openbossa.org>

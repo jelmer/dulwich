@@ -35,7 +35,6 @@ Chow Loong Jin <hyperair@debian.org>
 Chris Eberle <eberle1080@gmail.com>
 Chris Reid <chris@reidsy.com>
 codingtony <tony.bussieres@gmail.com>
-dak180 <dak180@users.sourceforge.net>
 Damien Tournoud <damien@commerceguys.com>
 Dan Callaghan <dcallagh@redhat.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>

@@ -95,7 +95,6 @@ Timo Schmid <info@bluec0re.eu>
 Tommy Yu <tommy.yu@auckland.ac.nz>
 Travis Cline <travis.cline@gmail.com>
 Víðir Valberg Guðmundsson <vidir.valberg@orn.li>
-William Grant <william.grant@canonical.com>
 Yifan Zhang <yifan@wavii.com>
 Yuval Langer <yuval.langer@gmail.com>
 

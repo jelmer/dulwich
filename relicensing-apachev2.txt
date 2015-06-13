@@ -46,7 +46,6 @@ DeeKey <dkomarov@gmail.com>
 Dirk <dirk@opani.com>
 diryboy <lancevdance@gmail.com>
 D-Key <dkomarov@gmail.com>
-Dmitrij D. Czarkoff <czarkoff@gmail.com>
 Dmitriy <dkomarov@gmail.com>
 Dov Feldstern <dovdevel@gmail.com>
 Fabien Boucher <fabien.boucher@enovance.com>

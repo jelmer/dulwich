@@ -41,7 +41,6 @@ Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
 David Carr <david@carrclan.us>
 David Keijser <david.keijser@klarna.com>
-David Ostrovsky <david@ostrovsky.org>
 David Pursehouse <david.pursehouse@gmail.com>
 DeeKey <dkomarov@gmail.com>
 Dirk <dirk@opani.com>

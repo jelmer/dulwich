@@ -90,7 +90,6 @@ Siddharth Agarwal <sid0@fb.com>
 Stefan Zimmermann <zimmermann.code@gmail.com>
 Takeshi Kanemoto <tak.kanemoto@gmail.com>
 Tay Ray Chuan <rctay89@gmail.com>
-Ted Horst <ted.horst@earthlink.net>
 Timo Schmid <info@bluec0re.eu>
 Tommy Yu <tommy.yu@auckland.ac.nz>
 Travis Cline <travis.cline@gmail.com>

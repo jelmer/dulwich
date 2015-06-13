@@ -54,7 +54,6 @@ Hans Kolek <hkolek@gmail.com>
 Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
 Hwee Miin Koh <hwee-miin.koh@ubisoft.com>
 Jameson Nash <jameson@mit.edu>
-Jason R. Coombs <jaraco@jaraco.com>
 John Arbash Meinel <john@arbash-meinel.com>
 John Carr <john.carr@unrouted.co.uk>
 Jonathan Chu <jchonphoenix@gmail.com>

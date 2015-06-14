@@ -67,7 +67,6 @@ Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
 Paul Hummer <paul@eventuallyanyway.com>
 rfaulk <rfaulkner@wikimedia.org>
-Ricardo Salveti <ricardo.salveti@openbossa.org>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Rod Cloutier <rodcloutier@gmail.com>
 Roland Mas <lolando@debian.org>

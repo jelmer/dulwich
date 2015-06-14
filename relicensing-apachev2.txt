@@ -21,7 +21,6 @@ Adam "Cezar" Jenkins <emperorcezar@gmail.com>
 Alberto Ruiz <aruiz@gnome.org>
 Alexander Belchenko <bialix@ukr.net>
 Ali Sabil <ali.sabil@gmail.com>
-André Roth <neolynx@gmail.com>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Benjamin Pollack <benjamin@bitquabit.com> <benjamin@fogcreek.com>

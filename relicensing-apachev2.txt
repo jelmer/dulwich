@@ -57,7 +57,6 @@ kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>
 Martin Packman <gzlist@googlemail.com>
-Max Bowsher <maxb@f2s.com>
 max <max0d41@github.com>
 Max Shawabkeh <max99x@gmail.com>
 Nick Stenning <nick@whiteink.com>

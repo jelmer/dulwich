@@ -23,7 +23,6 @@ Alexander Belchenko <bialix@ukr.net>
 Ali Sabil <ali.sabil@gmail.com>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Benjamin Pollack <benjamin@bitquabit.com> <benjamin@fogcreek.com>
 Brendan Cully <brendan@kublai.com>
 Brian Visel <eode@eptitude.net>
 Bruce Duncan <Bruce.Duncan@ed.ac.uk>

@@ -24,7 +24,6 @@ Ali Sabil <ali.sabil@gmail.com>
 André Roth <neolynx@gmail.com>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Benjamin Pollack <benjamin@bitquabit.com> <benjamin@fogcreek.com>
 Brendan Cully <brendan@kublai.com>
 Brian Visel <eode@eptitude.net>
 Bruce Duncan <Bruce.Duncan@ed.ac.uk>

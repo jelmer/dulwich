@@ -53,7 +53,6 @@ Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
 Hwee Miin Koh <hwee-miin.koh@ubisoft.com>
 Jameson Nash <jameson@mit.edu>
 John Arbash Meinel <john@arbash-meinel.com>
-John Carr <john.carr@unrouted.co.uk>
 kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>

@@ -52,7 +52,6 @@ Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>
 Martin Packman <gzlist@googlemail.com>
 max <max0d41@github.com>
-Nick Stenning <nick@whiteink.com>
 Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
 Paul Hummer <paul@eventuallyanyway.com>

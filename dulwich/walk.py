@@ -226,6 +226,8 @@ class Walker(object):
         if order not in ALL_ORDERS:
             raise ValueError('Unknown walk order %s' % order)
         self.store = store
+        if not isinstance(include, list):
+            include = [include]
         self.include = include
         self.excluded = set(exclude or [])
         self.order = order

@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.9.9'
+dulwich_version_string = '0.10.2'
 
 include_dirs = []
 # Windows MSVC support
@@ -24,7 +24,7 @@ class DulwichDistribution(Distribution):
             return True
 
     def has_ext_modules(self):
-        return not self.pure and not '__pypy__' in sys.modules
+        return not self.pure
 
     global_options = Distribution.global_options + [
         ('pure', None, "use pure Python code instead of C "
@@ -48,14 +48,28 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 
 if sys.version_info[0] == 2:
     tests_require = ['fastimport', 'mock']
-    if not '__pypy__' in sys.modules:
+    if not '__pypy__' in sys.modules and not sys.platform == 'win32':
         tests_require.extend(['gevent', 'geventhttpclient'])
+    if sys.version_info < (2, 7):
+        tests_require.append('unittest2')
 else:
     # fastimport, gevent, geventhttpclient are not available for PY3
     # mock only used for test_swift, which requires gevent/geventhttpclient
     tests_require = []
-if sys.version_info < (2, 7):
-    tests_require.append('unittest2')
+
+if sys.version_info[0] > 2 and sys.platform == 'win32':
+    # C Modules don't build for python3 windows, and prevent tests from running
+    ext_modules = []
+else:
+    ext_modules = [
+        Extension('dulwich._objects', ['dulwich/_objects.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._pack', ['dulwich/_pack.c'],
+                  include_dirs=include_dirs),
+        Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+                  include_dirs=include_dirs),
+    ]
+
 
 setup(name='dulwich',
       description='Python Git Library',
@@ -83,17 +97,13 @@ setup(name='dulwich',
           'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
           'Programming Language :: Python :: 2.6',
           'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: Implementation :: CPython',
+          'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX',
           'Topic :: Software Development :: Version Control',
       ],
-      ext_modules=[
-          Extension('dulwich._objects', ['dulwich/_objects.c'],
-                    include_dirs=include_dirs),
-          Extension('dulwich._pack', ['dulwich/_pack.c'],
-              include_dirs=include_dirs),
-          Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-              include_dirs=include_dirs),
-      ],
+      ext_modules=ext_modules,
       test_suite='dulwich.tests.test_suite',
       tests_require=tests_require,
       distclass=DulwichDistribution,

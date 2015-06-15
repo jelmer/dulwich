@@ -24,6 +24,7 @@ Creating a repository
 Let's create a folder and turn it into a repository, like ``git init`` would::
 
   >>> from os import mkdir
+  >>> import sys
   >>> mkdir("myrepo")
   >>> repo = Repo.init("myrepo")
   >>> repo
@@ -52,8 +53,8 @@ so only non-bare repositories will have an index, too. To open the index, simply
 call::
 
     >>> index = repo.open_index()
-    >>> repr(index).replace('\\\\', '/')
-    "Index('myrepo/.git/index')"
+    >>> print(index.path.decode(sys.getfilesystemencoding()))
+    myrepo/.git/index
 
 Since the repository was just created, the index will be empty::
 
@@ -66,16 +67,16 @@ Staging new files
 The repository allows "staging" files. Only files can be staged - directories
 aren't tracked explicitly by git. Let's create a simple text file and stage it::
 
-    >>> f = open('myrepo/foo', 'w')
-    >>> f.write("monty")
+    >>> f = open('myrepo/foo', 'wb')
+    >>> _ = f.write(b"monty")
     >>> f.close()
 
-    >>> repo.stage(["foo"])
+    >>> repo.stage([b"foo"])
 
 It will now show up in the index::
 
-    >>> list(repo.open_index())
-    ['foo']
+    >>> print(",".join([f.decode(sys.getfilesystemencoding()) for f in repo.open_index()]))
+    foo
 
 
 Creating new commits
@@ -91,7 +92,7 @@ to specify the message. The committer and author will be retrieved from the
 repository configuration or global configuration if they are not specified::
 
     >>> commit_id = repo.do_commit(
-    ...     "The first commit", committer="Jelmer Vernooij <jelmer@samba.org>")
+    ...     b"The first commit", committer=b"Jelmer Vernooij <jelmer@samba.org>")
 
 ``do_commit`` returns the SHA1 of the commit. Since the commit was to the 
 default branch, the repository's head will now be set to that commit::

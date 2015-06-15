@@ -35,11 +35,9 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
-    skipIfPY3,
     )
 
 
-@skipIfPY3
 class ParseObjectTests(TestCase):
     """Test parse_object."""
 
@@ -49,12 +47,11 @@ class ParseObjectTests(TestCase):
 
     def test_blob_by_sha(self):
         r = MemoryRepo()
-        b = Blob.from_string("Blah")
+        b = Blob.from_string(b"Blah")
         r.object_store.add_object(b)
         self.assertEqual(b, parse_object(r, b.id))
 
 
-@skipIfPY3
 class ParseCommitRangeTests(TestCase):
     """Test parse_commit_range."""
 

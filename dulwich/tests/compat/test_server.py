@@ -26,11 +26,13 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 
 import threading
 import os
+import sys
 
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
     )
+from dulwich.tests import skipIf
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
@@ -40,7 +42,7 @@ from dulwich.tests.compat.utils import (
     require_git_version,
     )
 
-
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
@@ -50,16 +52,16 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     protocol = 'git'
 
     def _handlers(self):
-        return {'git-receive-pack': NoSideBand64kReceivePackHandler}
+        return {b'git-receive-pack': NoSideBand64kReceivePackHandler}
 
     def _check_server(self, dul_server):
-        receive_pack_handler_cls = dul_server.handlers['git-receive-pack']
+        receive_pack_handler_cls = dul_server.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
-        self.assertFalse('side-band-64k' in caps)
+        self.assertFalse(b'side-band-64k' in caps)
 
     def _start_server(self, repo):
-        backend = DictBackend({'/': repo})
-        dul_server = TCPGitServer(backend, 'localhost', 0,
+        backend = DictBackend({b'/': repo})
+        dul_server = TCPGitServer(backend, b'localhost', 0,
                                   handlers=self._handlers())
         self._check_server(dul_server)
         self.addCleanup(dul_server.shutdown)
@@ -70,6 +72,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
 
+@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
 class GitServerSideBand64kTestCase(GitServerTestCase):
     """Tests for client/server compatibility with side-band-64k support."""
 
@@ -89,6 +92,6 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_server(self, server):
-        receive_pack_handler_cls = server.handlers['git-receive-pack']
+        receive_pack_handler_cls = server.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue('side-band-64k' in caps)
+        self.assertTrue(b'side-band-64k' in caps)

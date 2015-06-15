@@ -20,6 +20,7 @@
 import os
 import stat
 import shutil
+import sys
 import tempfile
 
 from dulwich import errors
@@ -31,13 +32,12 @@ from dulwich.hooks import (
 )
 
 from dulwich.tests import TestCase
-from dulwich.tests.utils import skipIfPY3
 
 
-@skipIfPY3
 class ShellHookTests(TestCase):
 
     def setUp(self):
+        super(ShellHookTests, self).setUp()
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
 
@@ -57,13 +57,13 @@ exit 0
         pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)
 
-        with open(pre_commit, 'wb') as f:
+        with open(pre_commit, 'w') as f:
             f.write(pre_commit_fail)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(pre_commit, 'wb') as f:
+        with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -86,24 +86,25 @@ exit 0
         commit_msg = os.path.join(repo_dir, 'hooks', 'commit-msg')
         hook = CommitMsgShellHook(repo_dir)
 
-        with open(commit_msg, 'wb') as f:
+        with open(commit_msg, 'w') as f:
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute, 'failed commit')
+        self.assertRaises(errors.HookError, hook.execute, b'failed commit')
 
-        with open(commit_msg, 'wb') as f:
+        with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute('empty commit')
+        hook.execute(b'empty commit')
 
     def test_hook_post_commit(self):
 
         (fd, path) = tempfile.mkstemp()
+        os.close(fd)
+
         post_commit_msg = """#!/bin/sh
-rm %(file)s
-""" % {'file': path}
+rm """ + path + "\n"
 
         post_commit_msg_fail = """#!/bin/sh
 exit 1
@@ -116,13 +117,13 @@ exit 1
         post_commit = os.path.join(repo_dir, 'hooks', 'post-commit')
         hook = PostCommitShellHook(repo_dir)
 
-        with open(post_commit, 'wb') as f:
+        with open(post_commit, 'w') as f:
             f.write(post_commit_msg_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(post_commit, 'wb') as f:
+        with open(post_commit, 'w') as f:
             f.write(post_commit_msg)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 

@@ -193,7 +193,7 @@ def create_commit(data, marker='Default', blob=None):
 
 def create_commits(length=1, marker='Default'):
     data = []
-    for i in xrange(0, length):
+    for i in range(0, length):
         _marker = "%s_%s" % (marker, i)
         blob, tree, tag, cmt = create_commit(data, _marker)
         data.extend([blob, tree, tag, cmt])
@@ -449,11 +449,11 @@ class TestPackInfoLoadDump(TestCase):
 #    def test_pack_info_perf(self):
 #        dump_time = []
 #        load_time = []
-#        for i in xrange(0, 100):
+#        for i in range(0, 100):
 #            start = time()
 #            dumps = swift.pack_info_create(self.pack_data, self.pack_index)
 #            dump_time.append(time() - start)
-#        for i in xrange(0, 100):
+#        for i in range(0, 100):
 #            start = time()
 #            pack_infos = swift.load_pack_info('', file=BytesIO(dumps))
 #            load_time.append(time() - start)

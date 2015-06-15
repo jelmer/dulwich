@@ -23,7 +23,6 @@ import shutil
 
 from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
-from dulwich.tests.utils import skipIfPY3
 from dulwich.objects import (
     Tree,
     )
@@ -36,10 +35,9 @@ from dulwich.repo import (
 
 
 def makesha(digit):
-    return (str(digit) * 40)[:40]
+    return (str(digit).encode('ascii') * 40)[:40]
 
 
-@skipIfPY3
 class GraftParserTests(TestCase):
 
     def assertParse(self, expected, graftpoints):
@@ -53,7 +51,7 @@ class GraftParserTests(TestCase):
 
     def test_parents(self):
         self.assertParse({makesha(0): [makesha(1), makesha(2)]},
-                         [' '.join([makesha(0), makesha(1), makesha(2)])])
+                         [b' '.join([makesha(0), makesha(1), makesha(2)])])
 
     def test_multiple_hybrid(self):
         self.assertParse(
@@ -61,11 +59,10 @@ class GraftParserTests(TestCase):
              makesha(1): [makesha(2)],
              makesha(3): [makesha(4), makesha(5)]},
             [makesha(0),
-             ' '.join([makesha(1), makesha(2)]),
-             ' '.join([makesha(3), makesha(4), makesha(5)])])
+             b' '.join([makesha(1), makesha(2)]),
+             b' '.join([makesha(3), makesha(4), makesha(5)])])
 
 
-@skipIfPY3
 class GraftSerializerTests(TestCase):
 
     def assertSerialize(self, expected, graftpoints):
@@ -74,27 +71,26 @@ class GraftSerializerTests(TestCase):
             sorted(serialize_graftpoints(graftpoints)))
 
     def test_no_grafts(self):
-        self.assertSerialize('', {})
+        self.assertSerialize(b'', {})
 
     def test_no_parents(self):
         self.assertSerialize(makesha(0), {makesha(0): []})
 
     def test_parents(self):
-        self.assertSerialize(' '.join([makesha(0), makesha(1), makesha(2)]),
+        self.assertSerialize(b' '.join([makesha(0), makesha(1), makesha(2)]),
                              {makesha(0): [makesha(1), makesha(2)]})
 
     def test_multiple_hybrid(self):
         self.assertSerialize(
-            '\n'.join([
+            b'\n'.join([
                 makesha(0),
-                ' '.join([makesha(1), makesha(2)]),
-                ' '.join([makesha(3), makesha(4), makesha(5)])]),
+                b' '.join([makesha(1), makesha(2)]),
+                b' '.join([makesha(3), makesha(4), makesha(5)])]),
             {makesha(0): [],
              makesha(1): [makesha(2)],
              makesha(3): [makesha(4), makesha(5)]})
 
 
-@skipIfPY3
 class GraftsInRepositoryBase(object):
 
     def tearDown(self):
@@ -139,7 +135,6 @@ class GraftsInRepositoryBase(object):
             {self._shas[-1]: ['1']})
 
 
-@skipIfPY3
 class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
     def setUp(self):
@@ -151,8 +146,8 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         self._shas = []
 
         commit_kwargs = {
-            'committer': 'Test Committer <test@nodomain.com>',
-            'author': 'Test Author <test@nodomain.com>',
+            'committer': b'Test Committer <test@nodomain.com>',
+            'author': b'Test Author <test@nodomain.com>',
             'commit_timestamp': 12395,
             'commit_timezone': 0,
             'author_timestamp': 12395,
@@ -160,15 +155,15 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         }
 
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))
 
     def test_init_with_empty_info_grafts(self):
         r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), '')
+        r._put_named_file(os.path.join('info', 'grafts'), b'')
 
         r = Repo(self._repo_dir)
         self.assertEqual({}, r._graftpoints)
@@ -177,13 +172,12 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         r = self._repo
         r._put_named_file(
             os.path.join('info', 'grafts'),
-            "%s %s" % (self._shas[-1], self._shas[0]))
+            self._shas[-1] + b' ' + self._shas[0])
 
         r = Repo(self._repo_dir)
         self.assertEqual({self._shas[-1]: [self._shas[0]]}, r._graftpoints)
 
 
-@skipIfPY3
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
 
     def setUp(self):
@@ -195,8 +189,8 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
         tree = Tree()
 
         commit_kwargs = {
-            'committer': 'Test Committer <test@nodomain.com>',
-            'author': 'Test Author <test@nodomain.com>',
+            'committer': b'Test Committer <test@nodomain.com>',
+            'author': b'Test Author <test@nodomain.com>',
             'commit_timestamp': 12395,
             'commit_timezone': 0,
             'author_timestamp': 12395,
@@ -205,8 +199,8 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
         }
 
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))
         self._shas.append(r.do_commit(
-            'empty commit', **commit_kwargs))
+            b'empty commit', **commit_kwargs))

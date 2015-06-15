@@ -22,6 +22,7 @@
 import time
 
 from dulwich.tests import (
+    skipIf,
     TestCase,
     )
 from dulwich.object_store import (
@@ -34,11 +35,6 @@ from dulwich.objects import (
     Tree,
     parse_timezone,
     )
-
-try:
-    from unittest import skipIf
-except ImportError:
-    from unittest2 import skipIf
 
 try:
     import gevent
@@ -70,7 +66,7 @@ def create_commit(marker=None):
 
 def init_store(store, count=1):
     ret = []
-    for i in xrange(0, count):
+    for i in range(0, count):
         objs = create_commit(marker=i)
         for obj in objs:
             ret.append(obj)

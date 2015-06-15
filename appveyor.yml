@@ -1,0 +1,29 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python27"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20219/pywin32-219.win32-py2.7.exe"
+
+    - PYTHON: "C:\\Python34"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20219/pywin32-219.win32-py3.4.exe"
+
+    - PYTHON: "C:\\Python27-x64"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20219/pywin32-219.win-amd64-py2.7.exe"
+
+    - PYTHON: "C:\\Python34-x64"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20219/pywin32-219.win-amd64-py3.4.exe"
+
+install:
+  - ps: (new-object net.webclient).DownloadFile($env:PYWIN32_URL, 'c:\\pywin32.exe')
+  - "%PYTHON%/Scripts/easy_install.exe c:\\pywin32.exe"
+  - "%PYTHON%/Scripts/easy_install.exe wheel"
+
+build: off
+
+test_script:
+  - "%WITH_COMPILER% %PYTHON%/python setup.py test"
+
+after_test:
+  - "%WITH_COMPILER% %PYTHON%/python setup.py bdist_wheel"
+
+artifacts:
+  - path: dist\*

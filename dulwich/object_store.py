@@ -26,6 +26,7 @@ import errno
 from itertools import chain
 import os
 import stat
+import sys
 import tempfile
 
 from dulwich.diff_tree import (
@@ -70,8 +71,8 @@ class BaseObjectStore(object):
     """Object store interface."""
 
     def determine_wants_all(self, refs):
-        return [sha for (ref, sha) in refs.iteritems()
-                if not sha in self and not ref.endswith("^{}") and
+        return [sha for (ref, sha) in refs.items()
+                if not sha in self and not ref.endswith(b"^{}") and
                    not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -335,7 +336,7 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = self.packs + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
+        iterables = list(self.packs) + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
         return chain(*iterables)
 
     def contains_loose(self, sha):
@@ -424,33 +425,31 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _read_alternate_paths(self):
         try:
-            f = GitFile(os.path.join(self.path, "info", "alternates"),
+            f = GitFile(os.path.join(self.path, INFODIR, "alternates"),
                     'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
-                return []
+                return
             raise
-        ret = []
         with f:
             for l in f.readlines():
-                l = l.rstrip("\n")
-                if l[0] == "#":
+                l = l.rstrip(b"\n")
+                if l[0] == b"#":
                     continue
                 if os.path.isabs(l):
-                    ret.append(l)
+                    yield l.decode(sys.getfilesystemencoding())
                 else:
-                    ret.append(os.path.join(self.path, l))
-            return ret
+                    yield os.path.join(self.path, l).decode(sys.getfilesystemencoding())
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
         """
         try:
-            os.mkdir(os.path.join(self.path, "info"))
+            os.mkdir(os.path.join(self.path, INFODIR))
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        alternates_path = os.path.join(self.path, "info/alternates")
+        alternates_path = os.path.join(self.path, INFODIR, "alternates")
         with GitFile(alternates_path, 'wb') as f:
             try:
                 orig_f = open(alternates_path, 'rb')
@@ -460,7 +459,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 with orig_f:
                     f.write(orig_f.read())
-            f.write("%s\n" % path)
+            f.write(path.encode(sys.getfilesystemencoding()) + b"\n")
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)
@@ -478,6 +477,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = os.stat(self.pack_dir).st_mtime
         pack_files = set()
         for name in pack_dir_contents:
+            assert isinstance(name, basestring if sys.version_info[0] == 2 else str)
             # TODO: verify that idx exists first
             if name.startswith("pack-") and name.endswith(".pack"):
                 pack_files.add(name[:-len(".pack")])
@@ -507,7 +507,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield base+rest
+                yield (base+rest).encode(sys.getfilesystemencoding())
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -520,6 +520,12 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
+
+    def _get_pack_basepath(self, entries):
+        suffix = iter_sha1(entry[0] for entry in entries)
+        # TODO: Handle self.pack_dir being bytes
+        suffix = suffix.decode('ascii')
+        return os.path.join(self.pack_dir, "pack-" + suffix)
 
     def _complete_thin_pack(self, f, path, copier, indexer):
         """Move a specific file containing a pack into the pack directory.
@@ -560,8 +566,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Move the pack in.
         entries.sort()
-        pack_base_name = os.path.join(
-          self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+        pack_base_name = self._get_pack_basepath(entries)
         os.rename(path, pack_base_name + '.pack')
 
         # Write the index.
@@ -610,8 +615,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         with PackData(path) as p:
             entries = p.sorted_entries()
-            basename = os.path.join(self.pack_dir,
-                "pack-%s" % iter_sha1(entry[0] for entry in entries))
+            basename = self._get_pack_basepath(entries)
             with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
         os.rename(path, basename + ".pack")
@@ -646,13 +650,13 @@ class DiskObjectStore(PackBasedObjectStore):
 
         :param obj: Object to add
         """
-        dir = os.path.join(self.path, obj.id[:2])
+        path = self._get_shafile_path(obj.id)
+        dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        path = os.path.join(dir, obj.id[2:])
         if os.path.exists(path):
             return # Already there, no need to write again
         with GitFile(path, 'wb') as f:
@@ -695,7 +699,7 @@ class MemoryObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        return self._data.iterkeys()
+        return iter(self._data.keys())
 
     @property
     def packs(self):
@@ -745,7 +749,7 @@ class MemoryObjectStore(BaseObjectStore):
         def commit():
             p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
-            for obj in PackInflater.for_pack_data(p):
+            for obj in PackInflater.for_pack_data(p, self.get_raw):
                 self._data[obj.id] = obj
         def abort():
             pass
@@ -911,7 +915,7 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
 
 
 def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
-    """Split object id list into two list with commit SHA1s and tag SHA1s.
+    """Split object id list into three lists with commit, tag, and other SHAs.
 
     Commits referenced by tags are included into commits
     list as well. Only SHA1s known in this repository will get
@@ -922,10 +926,11 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     :param lst: Collection of commit and tag SHAs
     :param ignore_unknown: True to skip SHA1 missing in the repository
         silently.
-    :return: A tuple of (commits, tags) SHA1s
+    :return: A tuple of (commits, tags, others) SHA1s
     """
     commits = set()
     tags = set()
+    others = set()
     for e in lst:
         try:
             o = obj_store[e]
@@ -937,10 +942,15 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
                 commits.add(e)
             elif isinstance(o, Tag):
                 tags.add(e)
-                commits.add(o.object[1])
+                tagged = o.object[1]
+                c, t, o = _split_commits_and_tags(
+                    obj_store, [tagged], ignore_unknown=ignore_unknown)
+                commits |= c
+                tags |= t
+                others |= o
             else:
-                raise KeyError('Not a commit or a tag: %s' % e)
-    return (commits, tags)
+                others.add(e)
+    return (commits, tags, others)
 
 
 class MissingObjectFinder(object):
@@ -966,9 +976,9 @@ class MissingObjectFinder(object):
         # and such SHAs would get filtered out by _split_commits_and_tags,
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
-        have_commits, have_tags = (
+        have_commits, have_tags, have_others = (
             _split_commits_and_tags(object_store, haves, True))
-        want_commits, want_tags = (
+        want_commits, want_tags, want_others = (
             _split_commits_and_tags(object_store, wants, False))
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
@@ -993,9 +1003,11 @@ class MissingObjectFinder(object):
             self.sha_done.add(t)
 
         missing_tags = want_tags.difference(have_tags)
-        # in fact, what we 'want' is commits and tags
+        missing_others = want_others.difference(have_others)
+        # in fact, what we 'want' is commits, tags, and others
         # we've found missing
         wants = missing_commits.union(missing_tags)
+        wants = wants.union(missing_others)
 
         self.objects_to_send = set([(w, None, False) for w in wants])
 
@@ -1029,7 +1041,7 @@ class MissingObjectFinder(object):
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress("counting objects: %d\r" % len(self.sha_done))
+        self.progress(("counting objects: %d\r" % len(self.sha_done)).encode('ascii'))
         return (sha, name)
 
     __next__ = next

@@ -23,14 +23,15 @@
 """
 import errno
 import os
+import sys
 
 from dulwich.errors import (
     PackedRefsException,
     RefFormatError,
     )
 from dulwich.objects import (
-    hex_to_sha,
     git_line,
+    valid_hexsha,
     )
 from dulwich.file import (
     GitFile,
@@ -415,7 +416,7 @@ class DiskRefsContainer(RefsContainer):
         for root, dirs, files in os.walk(self.refpath(b'refs')):
             dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).strip("/").encode('ascii')
+                refname = ("%s/%s" % (dir, filename)).encode(sys.getfilesystemencoding())
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())
@@ -425,7 +426,8 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        name = name.decode('ascii')
+        if getattr(self.path, "encode", None) and getattr(name, "decode", None):
+            name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         return os.path.join(self.path, name)
@@ -659,10 +661,8 @@ def _split_ref_line(line):
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line %r" % line)
     sha, name = fields
-    try:
-        hex_to_sha(sha)
-    except (AssertionError, TypeError) as e:
-        raise PackedRefsException(e)
+    if not valid_hexsha(sha):
+        raise PackedRefsException("Invalid hex sha %r" % sha)
     if not check_ref_format(name):
         raise PackedRefsException("invalid ref name %r" % name)
     return (sha, name)
@@ -700,10 +700,8 @@ def read_packed_refs_with_peeled(f):
         if l.startswith(b'^'):
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
-            try:
-                hex_to_sha(l[1:])
-            except (AssertionError, TypeError) as e:
-                raise PackedRefsException(e)
+            if not valid_hexsha(l[1:]):
+                raise PackedRefsException("Invalid hex sha %r" % l[1:])
             sha, name = _split_ref_line(last)
             last = None
             yield (sha, name, l[1:])

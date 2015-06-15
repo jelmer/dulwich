@@ -1,0 +1,85 @@
+At the moment, Dulwich is licensed under the GNU General Public License,
+version 2 or later.
+
+We'd like to relicense Dulwich under the Apache v2 (or later) license, as
+the GPL is problematic for many free software Python projects that are under
+BSD-style licenses. See also https://github.com/jelmer/dulwich/issues/153
+
+For reference, a full copy of the Apachev2 license can be found here:
+https://www.apache.org/licenses/LICENSE-2.0
+
+New contributions to Dulwich should be dual licensed under the GNU GPLv2 (or
+later) and the Apachev2 (or later) licenses.
+
+Contributions made prior were contributed under the GPLv2 (or later) license
+alone. The following contributors have not (yet) relicensed their code under
+dual Apachev2/GPLv2:
+
+Aaron O'Mullan <aaron.omullan@friendco.de>
+Abderrahim Kitouni <a.kitouni@gmail.com>
+Alberto Ruiz <aruiz@gnome.org>
+Alexander Belchenko <bialix@ukr.net>
+Ali Sabil <ali.sabil@gmail.com>
+Andres Lowrie <andres.lowrie@gmail.com>
+Artem Tikhomirov <artem.tikhomirov@syntevo.com>
+Brendan Cully <brendan@kublai.com>
+Brian Visel <eode@eptitude.net>
+Bruce Duncan <Bruce.Duncan@ed.ac.uk>
+Bruno Renié <buburno@gmail.com>
+Chaiwat Suttipongsakul <cwt@bashell.com>
+Chow Loong Jin <hyperair@debian.org>
+Chris Eberle <eberle1080@gmail.com>
+Chris Reid <chris@reidsy.com>
+codingtony <tony.bussieres@gmail.com>
+Damien Tournoud <damien@commerceguys.com>
+Daniele Sluijters <daniele.sluijters@gmail.com>
+David Blewett <davidb@sixfeetup.com>
+David Carr <david@carrclan.us>
+David Keijser <david.keijser@klarna.com>
+David Pursehouse <david.pursehouse@gmail.com>
+DeeKey <dkomarov@gmail.com>
+Dirk <dirk@opani.com>
+diryboy <lancevdance@gmail.com>
+D-Key <dkomarov@gmail.com>
+Dmitriy <dkomarov@gmail.com>
+Dov Feldstern <dovdevel@gmail.com>
+Fabien Boucher <fabien.boucher@enovance.com>
+Gary van der Merwé <garyvdm@gmail.com>
+Hal Wine <hal.wine@gmail.com>
+Hans Kolek <hkolek@gmail.com>
+Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
+Hwee Miin Koh <hwee-miin.koh@ubisoft.com>
+Jameson Nash <jameson@mit.edu>
+John Arbash Meinel <john@arbash-meinel.com>
+kwatters <kwatters@tagged.com>
+Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
+Marc Brinkmann <git@marcbrinkmann.de>
+Martin Packman <gzlist@googlemail.com>
+max <max0d41@github.com>
+Max Shawabkeh <max99x@gmail.com>
+Nick Stenning <nick@whiteink.com>
+Nick Ward <ward.nickjames@gmail.com>
+Nix <nix@esperi.co.uk>
+Paul Hummer <paul@eventuallyanyway.com>
+rfaulk <rfaulkner@wikimedia.org>
+Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
+Rod Cloutier <rodcloutier@gmail.com>
+Roland Mas <lolando@debian.org>
+Ronald Blaschke <ron@rblasch.org>
+Ross Light <rlight2@gmail.com> <ross@zombiezen.com>
+Ryan Faulkner <rfaulk@yahoo-inc.com>
+Ryan McKern <ryan@orangefort.com>
+Sam Vilain <svilain@saymedia.com>
+Siddharth Agarwal <sid0@fb.com>
+Stefan Zimmermann <zimmermann.code@gmail.com>
+Takeshi Kanemoto <tak.kanemoto@gmail.com>
+Tay Ray Chuan <rctay89@gmail.com>
+Timo Schmid <info@bluec0re.eu>
+Tommy Yu <tommy.yu@auckland.ac.nz>
+Travis Cline <travis.cline@gmail.com>
+Yifan Zhang <yifan@wavii.com>
+Yuval Langer <yuval.langer@gmail.com>
+
+If your name is in this list and you'd be happy to relicense your contribution
+under dual GPLv2/Apachev2, then please send me an e-mail (jelmer@samba.org) or
+a pull request on GitHub removing your name from the list above.

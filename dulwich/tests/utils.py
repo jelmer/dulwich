@@ -36,6 +36,8 @@ from dulwich.index import (
 from dulwich.objects import (
     FixedSha,
     Commit,
+    Tag,
+    object_class,
     )
 from dulwich.pack import (
     OFS_DELTA,
@@ -58,7 +60,7 @@ from dulwich.tests import (
 F = 0o100644  # Shorthand mode for Files.
 
 
-def open_repo(name):
+def open_repo(name, temp_dir=None):
     """Open a copy of a repo in a temporary directory.
 
     Use this function for accessing repos in dulwich/tests/data/repos to avoid
@@ -67,9 +69,12 @@ def open_repo(name):
 
     :param name: The name of the repository, relative to
         dulwich/tests/data/repos
+    :param temp_dir: temporary directory to initialize to. If not provided, a
+        temporary directory will be created.
     :returns: An initialized Repo object that lives in a temporary directory.
     """
-    temp_dir = tempfile.mkdtemp()
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp()
     repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
     temp_repo_dir = os.path.join(temp_dir, name)
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
@@ -78,6 +83,7 @@ def open_repo(name):
 
 def tear_down_repo(repo):
     """Tear down a test repository."""
+    repo.close()
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
     shutil.rmtree(temp_dir)
 
@@ -100,6 +106,7 @@ def make_object(cls, **attrs):
         __dict__ instead of __slots__.
         """
         pass
+    TestObject.__name__ = 'TestObject_' + cls.__name__
 
     obj = TestObject()
     for name, value in attrs.items():
@@ -130,6 +137,27 @@ def make_commit(**attrs):
                  'tree': b'0' * 40}
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)
+
+
+def make_tag(target, **attrs):
+    """Make a Tag object with a default set of values.
+
+    :param target: object to be tagged (Commit, Blob, Tree, etc)
+    :param attrs: dict of attributes to overwrite from the default values.
+    :return: A newly initialized Tag object.
+    """
+    target_id = target.id
+    target_type = object_class(target.type_name)
+    default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
+    all_attrs = {'tagger': b'Test Author <test@nodomain.com>',
+                 'tag_time': default_time,
+                 'tag_timezone': 0,
+                 'message': b'Test message.',
+                 'object': (target_type, target_id),
+                 'name': b'Test Tag',
+                 }
+    all_attrs.update(attrs)
+    return make_object(Tag, **all_attrs)
 
 
 def functest_builder(method, func):
@@ -299,7 +327,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         tree_id = commit_tree(object_store, blobs)
 
         commit_attrs = {
-            'message': 'Commit %i' % commit_num,
+            'message': ('Commit %i' % commit_num).encode('ascii'),
             'parents': parent_ids,
             'tree': tree_id,
             'commit_time': commit_time,

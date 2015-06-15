@@ -1,4 +1,5 @@
 # test_refs.py -- tests for refs.py
+# encoding: utf-8
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -21,6 +22,7 @@
 
 from io import BytesIO
 import os
+import sys
 import tempfile
 
 from dulwich import errors
@@ -39,13 +41,13 @@ from dulwich.refs import (
 from dulwich.repo import Repo
 
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
-    skipIfPY3,
     )
 
 
@@ -281,11 +283,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def setUp(self):
         TestCase.setUp(self)
         self._repo = open_repo('refs.git')
+        self.addCleanup(tear_down_repo, self._repo)
         self._refs = self._repo.refs
-
-    def tearDown(self):
-        tear_down_repo(self._repo)
-        TestCase.tearDown(self)
 
     def test_get_packed_refs(self):
         self.assertEqual({
@@ -348,14 +347,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(b'df6800012397fb85c56e7418dd4eb9405dee075c',
                          self._refs[b'refs/tags/refs-0.1'])
 
-    @skipIfPY3
     def test_add_if_new_symbolic(self):
         # Use an empty repo instead of the default.
-        tear_down_repo(self._repo)
         repo_dir = os.path.join(tempfile.mkdtemp(), 'test')
         os.makedirs(repo_dir)
-        self._repo = Repo.init(repo_dir)
-        refs = self._repo.refs
+        repo = Repo.init(repo_dir)
+        self.addCleanup(tear_down_repo, repo)
+        refs = repo.refs
 
         nines = b'9' * 40
         self.assertEqual(b'ref: refs/heads/master', refs.read_ref(b'HEAD'))
@@ -439,6 +437,20 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
+
+    def test_non_ascii(self):
+        try:
+            encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
+        except UnicodeDecodeError:
+            raise SkipTest("filesystem encoding doesn't support special character")
+        p = os.path.join(self._repo.path, 'refs', 'tags', 'schön')
+        with open(p, 'w') as f:
+            f.write('00' * 20)
+
+        expected_refs = dict(_TEST_REFS)
+        expected_refs[encoded_ref] = b'00' * 20
+
+        self.assertEqual(expected_refs, self._repo.get_refs())
 
 
 _TEST_REFS_SERIALIZED = (

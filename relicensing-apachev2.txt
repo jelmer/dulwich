@@ -48,7 +48,6 @@ Gary van der Merwé <garyvdm@gmail.com>
 Hal Wine <hal.wine@gmail.com>
 Hans Kolek <hkolek@gmail.com>
 Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
-Hwee Miin Koh <hwee-miin.koh@ubisoft.com>
 Jameson Nash <jameson@mit.edu>
 John Arbash Meinel <john@arbash-meinel.com>
 kwatters <kwatters@tagged.com>

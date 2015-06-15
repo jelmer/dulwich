@@ -25,7 +25,6 @@ Chris Eberle <eberle1080@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
-David Pursehouse <david.pursehouse@gmail.com>
 Dirk <dirk@opani.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>

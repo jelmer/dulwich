@@ -40,7 +40,6 @@ diryboy <lancevdance@gmail.com>
 D-Key <dkomarov@gmail.com>
 Dmitriy <dkomarov@gmail.com>
 Dov Feldstern <dovdevel@gmail.com>
-Fabien Boucher <fabien.boucher@enovance.com>
 Gary van der Merwé <garyvdm@gmail.com>
 Hal Wine <hal.wine@gmail.com>
 Hans Kolek <hkolek@gmail.com>

@@ -32,7 +32,6 @@ Chris Eberle <eberle1080@gmail.com>
 Chris Reid <chris@reidsy.com>
 codingtony <tony.bussieres@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
-Dan Callaghan <dcallagh@redhat.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
 David Carr <david@carrclan.us>

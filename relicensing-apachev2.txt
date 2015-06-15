@@ -25,7 +25,6 @@ Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Brendan Cully <brendan@kublai.com>
 Brian Visel <eode@eptitude.net>
 Bruce Duncan <Bruce.Duncan@ed.ac.uk>
-Bruno Renié <buburno@gmail.com>
 Chaiwat Suttipongsakul <cwt@bashell.com>
 Chow Loong Jin <hyperair@debian.org>
 Chris Eberle <eberle1080@gmail.com>

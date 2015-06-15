@@ -34,7 +34,6 @@ codingtony <tony.bussieres@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
-David Carr <david@carrclan.us>
 David Keijser <david.keijser@klarna.com>
 David Pursehouse <david.pursehouse@gmail.com>
 DeeKey <dkomarov@gmail.com>

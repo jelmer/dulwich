@@ -19,7 +19,6 @@ Aaron O'Mullan <aaron.omullan@friendco.de>
 Abderrahim Kitouni <a.kitouni@gmail.com>
 Alberto Ruiz <aruiz@gnome.org>
 Alexander Belchenko <bialix@ukr.net>
-Ali Sabil <ali.sabil@gmail.com>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Brendan Cully <brendan@kublai.com>

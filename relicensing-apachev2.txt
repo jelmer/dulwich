@@ -51,12 +51,11 @@ max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
 Paul Hummer <paul@eventuallyanyway.com>
-rfaulk <rfaulkner@wikimedia.org>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Rod Cloutier <rodcloutier@gmail.com>
 Roland Mas <lolando@debian.org>
 Ronald Blaschke <ron@rblasch.org>
-Ryan Faulkner <rfaulk@yahoo-inc.com>
+Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
 Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>
 Siddharth Agarwal <sid0@fb.com>

@@ -26,7 +26,6 @@ Brian Visel <eode@eptitude.net>
 Chaiwat Suttipongsakul <cwt@bashell.com>
 Chow Loong Jin <hyperair@debian.org>
 Chris Eberle <eberle1080@gmail.com>
-codingtony <tony.bussieres@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>

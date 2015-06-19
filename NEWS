@@ -18,6 +18,8 @@
   * Fix handling of 'done' in graph walker and implement the
     'no-done' capability. (Tommy Yu, #88)
 
+  * Avoid recursion limit issues resolving deltas. (William Grant, #81)
+
 0.10.1  2015-03-25
 
  BUG FIXES

@@ -56,7 +56,6 @@ Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Rod Cloutier <rodcloutier@gmail.com>
 Roland Mas <lolando@debian.org>
 Ronald Blaschke <ron@rblasch.org>
-Ross Light <rlight2@gmail.com> <ross@zombiezen.com>
 Ryan Faulkner <rfaulk@yahoo-inc.com>
 Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>

@@ -342,6 +342,16 @@ def cmd_status(args):
         sys.stdout.write("\n")
 
 
+def cmd_ls_remote(args):
+    opts, args = getopt(args, '', [])
+    if len(args) < 1:
+        print('Usage: dulwich ls-remote URL')
+        sys.exit(1)
+    refs = porcelain.ls_remote(args[0])
+    for ref in sorted(refs):
+        sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
+
+
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
@@ -357,6 +367,7 @@ commands = {
     "fetch": cmd_fetch,
     "init": cmd_init,
     "log": cmd_log,
+    "ls-remote": cmd_ls_remote,
     "receive-pack": cmd_receive_pack,
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,

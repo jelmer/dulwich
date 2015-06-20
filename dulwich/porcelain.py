@@ -29,6 +29,7 @@ Currently implemented:
  * diff-tree
  * fetch
  * init
+ * ls-remote
  * pull
  * push
  * rm
@@ -762,3 +763,8 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
         client, path = get_transport_and_path(remote_location)
         remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs
+
+
+def ls_remote(remote):
+    client, host_path = get_transport_and_path(remote)
+    return client.get_refs(host_path)

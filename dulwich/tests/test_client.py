@@ -627,6 +627,14 @@ class LocalGitClientTests(TestCase):
         with closing(Repo.init_bare(target_path)) as target:
             self.send_and_verify(b"master", local, target)
 
+    def test_get_refs(self):
+        local = open_repo('refs.git')
+        self.addCleanup(tear_down_repo, local)
+
+        client = LocalGitClient()
+        refs = client.get_refs(local.path)
+        self.assertDictEqual(local.refs.as_dict(), refs)
+
     def send_and_verify(self, branch, local, target):
         client = LocalGitClient()
         ref_name = b"refs/heads/" + branch

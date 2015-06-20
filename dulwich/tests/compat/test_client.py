@@ -254,6 +254,14 @@ class DulwichClientTestBase(object):
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
             self.assertFalse(b"refs/heads/abranch" in dest.refs)
 
+    def test_get_refs(self):
+        c = self._client()
+        refs = c.get_refs(self._build_path('/server_new.export'))
+
+        repo_dir = os.path.join(self.gitroot, 'server_new.export')
+        with closing(repo.Repo(repo_dir)) as dest:
+            self.assertDictEqual(dest.refs.as_dict(), refs)
+
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 

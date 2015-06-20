@@ -249,6 +249,13 @@ class GitClient(object):
         """
         raise NotImplementedError(self.fetch_pack)
 
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server.
+
+        :param path: Path to the repo to fetch from.
+        """
+        raise NotImplementedError(self.get_refs)
+
     def _parse_status_report(self, proto):
         unpack = proto.read_pkt_line().strip()
         if unpack != b'unpack ok':
@@ -553,6 +560,14 @@ class TraditionalGitClient(GitClient):
                 proto, negotiated_capabilities, graph_walker, pack_data, progress)
             return refs
 
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        # stock `git ls-remote` uses upload-pack
+        proto, _ = self._connect(b'upload-pack', path)
+        with proto:
+            refs, _ = read_pkt_refs(proto)
+            return refs
+
     def archive(self, path, committish, write_data, progress=None,
                 write_error=None):
         proto, can_read = self._connect(b'upload-archive', path)
@@ -779,6 +794,13 @@ class LocalGitClient(GitClient):
             if objects_iter is None:
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
+
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        from dulwich.repo import Repo
+
+        with closing(Repo(path)) as target:
+            return target.get_refs()
 
 
 # What Git client to use for local access
@@ -1133,6 +1155,13 @@ class HttpGitClient(GitClient):
             return refs
         finally:
             resp.close()
+
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        url = self._get_url(path)
+        refs, _ = self._discover_references(
+            b"git-upload-pack", url)
+        return refs
 
 
 def get_transport_and_path_from_url(url, config=None, **kwargs):

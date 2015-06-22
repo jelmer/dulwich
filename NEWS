@@ -12,6 +12,8 @@
     capabilities. (Jelmer Vernooij)
   * Switched `default_local_git_client_cls` to `LocalGitClient`.
     (Gary van der Merwe)
+  * Add `porcelain.ls_remote` and `GitClient.get_refs`.
+    (Michael Edgar)
 
  BUG FIXES
 

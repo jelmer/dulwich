@@ -30,10 +30,7 @@ Damien Tournoud <damien@commerceguys.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
 David Pursehouse <david.pursehouse@gmail.com>
-DeeKey <dkomarov@gmail.com>
 Dirk <dirk@opani.com>
-diryboy <lancevdance@gmail.com>
-D-Key <dkomarov@gmail.com>
 Dmitriy <dkomarov@gmail.com>
 Dov Feldstern <dovdevel@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>

@@ -57,7 +57,6 @@ Ronald Blaschke <ron@rblasch.org>
 Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
 Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>
-Siddharth Agarwal <sid0@fb.com>
 Stefan Zimmermann <zimmermann.code@gmail.com>
 Takeshi Kanemoto <tak.kanemoto@gmail.com>
 Tay Ray Chuan <rctay89@gmail.com>

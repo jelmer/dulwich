@@ -18,7 +18,6 @@ dual Apachev2/GPLv2:
 Aaron O'Mullan <aaron.omullan@friendco.de>
 Abderrahim Kitouni <a.kitouni@gmail.com>
 Alberto Ruiz <aruiz@gnome.org>
-Alexander Belchenko <bialix@ukr.net>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Brendan Cully <brendan@kublai.com>

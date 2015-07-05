@@ -16,7 +16,6 @@ alone. The following contributors have not (yet) relicensed their code under
 dual Apachev2/GPLv2:
 
 Aaron O'Mullan <aaron.omullan@friendco.de>
-Abderrahim Kitouni <a.kitouni@gmail.com>
 Alberto Ruiz <aruiz@gnome.org>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>

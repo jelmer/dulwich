@@ -39,7 +39,6 @@ John Arbash Meinel <john@arbash-meinel.com>
 kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>
-Martin Packman <gzlist@googlemail.com>
 max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>

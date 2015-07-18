@@ -20,7 +20,6 @@ Alberto Ruiz <aruiz@gnome.org>
 Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Brendan Cully <brendan@kublai.com>
-Brian Visel <eode@eptitude.net>
 Chaiwat Suttipongsakul <cwt@bashell.com>
 Chow Loong Jin <hyperair@debian.org>
 Chris Eberle <eberle1080@gmail.com>

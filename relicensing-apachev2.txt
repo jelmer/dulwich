@@ -29,7 +29,6 @@ David Blewett <davidb@sixfeetup.com>
 David Pursehouse <david.pursehouse@gmail.com>
 Dirk <dirk@opani.com>
 Dmitriy <dkomarov@gmail.com>
-Dov Feldstern <dovdevel@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
 Hal Wine <hal.wine@gmail.com>
 Hans Kolek <hkolek@gmail.com>

@@ -35,7 +35,6 @@ Hal Wine <hal.wine@gmail.com>
 Hans Kolek <hkolek@gmail.com>
 Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
 Jameson Nash <jameson@mit.edu>
-John Arbash Meinel <john@arbash-meinel.com>
 kwatters <kwatters@tagged.com>
 Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>

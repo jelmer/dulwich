@@ -35,7 +35,6 @@ Hans Kolek <hkolek@gmail.com>
 Hervé Cauwelier <herve@oursours.net> <herve@itaapy.com>
 Jameson Nash <jameson@mit.edu>
 kwatters <kwatters@tagged.com>
-Lukasz Balcerzak <lukasz.balcerzak@python-center.org>
 Marc Brinkmann <git@marcbrinkmann.de>
 max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>

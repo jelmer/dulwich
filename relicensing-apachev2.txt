@@ -41,7 +41,6 @@ Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Rod Cloutier <rodcloutier@gmail.com>
-Ronald Blaschke <ron@rblasch.org>
 Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
 Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>

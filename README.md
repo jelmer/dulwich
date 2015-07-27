@@ -5,7 +5,7 @@ This is the Dulwich project.
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
-Homepage: https://samba.org/~jelmer/dulwich/
+Homepage: https://www.dulwich.io/
 Author: Jelmer Vernooij <jelmer@samba.org>
 
 The project is named after the part of London that Mr. and Mrs. Git live in
@@ -31,11 +31,11 @@ Further documentation
 
 The dulwich documentation can be found in doc/ and on the web:
 
-http://www.samba.org/~jelmer/dulwich/docs/
+https://www.dulwich.io/docs/
 
 The API reference can be generated using pydoctor, by running "make pydoctor", or on the web:
 
-http://www.samba.org/~jelmer/dulwich/apidocs
+https://www.dulwich.io/apidocs
 
 Help
 ----

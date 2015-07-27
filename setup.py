@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Setup file for dulwich
-# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
 
 try:
     from setuptools import setup, Extension
@@ -78,7 +78,7 @@ setup(name='dulwich',
       url='https://www.dulwich.io/',
       license='GPLv2 or later',
       author='Jelmer Vernooij',
-      author_email='jelmer@samba.org',
+      author_email='jelmer@jelmer.uk',
       long_description="""
       Python implementation of the Git file formats and protocols,
       without the need to have git installed.

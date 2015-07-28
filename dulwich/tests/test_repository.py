@@ -765,3 +765,8 @@ class BuildRepoRootTests(TestCase):
             mode, id = tree_lookup_path(r.get_object, r[commit_sha].tree, name)
             self.assertEqual(stat.S_IFREG | 0o644, mode)
             self.assertEqual(encoding.encode('ascii'), r[id].data)
+
+    def test_discover(self):
+        path = os.path.join(self._repo_dir, 'b/c')
+        r = Repo.discover(path)
+        self.assertEqual(r.head(), self._repo.head())

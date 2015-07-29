@@ -398,7 +398,7 @@ class DiskRefsContainer(RefsContainer):
             dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
                 refname = (("%s/%s" % (dir, filename))
-                           .strip("/").encode('ascii'))
+                           .strip("/").encode(sys.getfilesystemencoding()))
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format(base + b'/' + refname):

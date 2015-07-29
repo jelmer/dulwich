@@ -777,4 +777,5 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual(r.head(), self._repo.head())
 
     def test_discover_notrepo(self):
-        self.assertRaises(NotGitRepository, Repo.discover('/'))
+        with self.assertRaises(NotGitRepository):
+            Repo.discover('/')

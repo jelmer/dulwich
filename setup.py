@@ -47,7 +47,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
             os.environ['ARCHFLAGS'] = ''
 
 if sys.version_info[0] == 2:
-    tests_require = ['fastimport', 'mock']
+    tests_require = ['fastimport', 'mock', 'setuptools>=17.1']
     if not '__pypy__' in sys.modules and not sys.platform == 'win32':
         tests_require.extend(['gevent', 'geventhttpclient'])
     if sys.version_info < (2, 7):

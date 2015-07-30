@@ -687,12 +687,13 @@ class Repo(BaseRepo):
 
         :param start: The directory to start discovery from (defaults to '.')
         """
+        remaining = True
         path = os.path.abspath(start)
-        while path != '/':
+        while remaining:
             try:
                 return cls(path)
             except NotGitRepository:
-                path, _ = os.path.split(path)
+                path, remaining = os.path.split(path)
         raise NotGitRepository(
             "No git repository was found at %(path)s" % dict(path=start)
         )

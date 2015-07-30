@@ -697,8 +697,7 @@ class SubprocessGitClient(TraditionalGitClient):
         import subprocess
         if self.git_command is None:
             git_command = find_git_command()
-        argv = git_command + [service, path]
-        argv = ['git', service.decode('ascii'), path]
+        argv = git_command + [service.decode('ascii'), path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

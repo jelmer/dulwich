@@ -47,9 +47,10 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
             os.environ['ARCHFLAGS'] = ''
 
 if sys.version_info[0] == 2:
-    tests_require = ['fastimport', 'mock', 'setuptools>=17.1']
+    tests_require = ['fastimport']
     if not '__pypy__' in sys.modules and not sys.platform == 'win32':
-        tests_require.extend(['gevent', 'geventhttpclient'])
+        tests_require.extend([
+            'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
     if sys.version_info < (2, 7):
         tests_require.append('unittest2')
 else:

@@ -29,7 +29,6 @@ David Pursehouse <david.pursehouse@gmail.com>
 Dirk <dirk@opani.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
-Hal Wine <hal.wine@gmail.com>
 Hans Kolek <hkolek@gmail.com>
 Jameson Nash <jameson@mit.edu>
 kwatters <kwatters@tagged.com>

@@ -678,6 +678,26 @@ class Repo(BaseRepo):
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
 
+    @classmethod
+    def discover(cls, start='.'):
+        """Iterate parent directories to discover a repository
+
+        Return a Repo object for the first parent directory that looks like a
+        Git repository.
+
+        :param start: The directory to start discovery from (defaults to '.')
+        """
+        remaining = True
+        path = os.path.abspath(start)
+        while remaining:
+            try:
+                return cls(path)
+            except NotGitRepository:
+                path, remaining = os.path.split(path)
+        raise NotGitRepository(
+            "No git repository was found at %(path)s" % dict(path=start)
+        )
+
     def controldir(self):
         """Return the path of the control directory."""
         return self._controldir

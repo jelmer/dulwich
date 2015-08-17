@@ -35,6 +35,7 @@ from dulwich.object_store import (
     )
 from dulwich import objects
 from dulwich.config import Config
+from dulwich.errors import NotGitRepository
 from dulwich.repo import (
     Repo,
     MemoryRepo,
@@ -765,3 +766,16 @@ class BuildRepoRootTests(TestCase):
             mode, id = tree_lookup_path(r.get_object, r[commit_sha].tree, name)
             self.assertEqual(stat.S_IFREG | 0o644, mode)
             self.assertEqual(encoding.encode('ascii'), r[id].data)
+
+    def test_discover_intended(self):
+        path = os.path.join(self._repo_dir, 'b/c')
+        r = Repo.discover(path)
+        self.assertEqual(r.head(), self._repo.head())
+
+    def test_discover_isrepo(self):
+        r = Repo.discover(self._repo_dir)
+        self.assertEqual(r.head(), self._repo.head())
+
+    def test_discover_notrepo(self):
+        with self.assertRaises(NotGitRepository):
+            Repo.discover('/')

@@ -23,6 +23,9 @@
 
   * Avoid recursion limit issues resolving deltas. (William Grant, #81)
 
+  * Allow arguments in local client binary path overrides.
+    (Jelmer Vernooij)
+
 0.10.1  2015-03-25
 
  BUG FIXES

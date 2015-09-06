@@ -42,6 +42,7 @@ from contextlib import closing
 from io import BytesIO, BufferedReader
 import dulwich
 import select
+import shlex
 import socket
 import subprocess
 import sys
@@ -976,13 +977,13 @@ class SSHGitClient(TraditionalGitClient):
 
     def _get_cmd_path(self, cmd):
         cmd = cmd.decode('ascii')
-        return self.alternative_paths.get(cmd, 'git-' + cmd)
+        return shlex.split(self.alternative_paths.get(cmd, 'git-' + cmd))
 
     def _connect(self, cmd, path):
         if path.startswith("/~"):
             path = path[1:]
         con = get_ssh_vendor().run_command(
-            self.host, [self._get_cmd_path(cmd), path],
+            self.host, self._get_cmd_path(cmd) + [path],
             port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),

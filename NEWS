@@ -26,6 +26,9 @@
   * Allow arguments in local client binary path overrides.
     (Jelmer Vernooij)
 
+  * Fix handling of commands with arguments in paramiko SSH
+    client. (Andreas Klöckner, Jelmer Vernooij, #363)
+
 0.10.1  2015-03-25
 
  BUG FIXES

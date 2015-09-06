@@ -823,7 +823,7 @@ class SSHVendor(object):
         with the remote command.
 
         :param host: Host name
-        :param command: Command to run
+        :param command: Command to run (as argv array)
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
         """
@@ -834,6 +834,8 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
+        if type(command) is not list:
+            raise TypeError(command)
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -936,7 +938,8 @@ else:
 
         def run_command(self, host, command, username=None, port=None,
                         progress_stderr=None):
-
+            if type(command) is not list:
+                raise TypeError(command)
             # Paramiko needs an explicit port. None is not valid
             if port is None:
                 port = 22

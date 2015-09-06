@@ -956,7 +956,7 @@ else:
             channel = client.get_transport().open_session()
 
             # Run commands
-            channel.exec_command(*command)
+            channel.exec_command(subprocess.list2cmdline(command))
 
             return ParamikoWrapper(
                 client, channel, progress_stderr=progress_stderr)

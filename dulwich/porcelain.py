@@ -519,13 +519,13 @@ def reset(repo, mode, committish="HEAD"):
         r.reset_index()
 
 
-def push(repo, remote_location, refs_path,
+def push(repo, remote_location, refspec,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refs_path: relative path to the refs to push to remote
+    :param refspec: relative path to the refs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """
@@ -538,7 +538,7 @@ def push(repo, remote_location, refs_path,
 
         def update_refs(refs):
             new_refs = r.get_refs()
-            refs[refs_path] = new_refs[b'HEAD']
+            refs[refspec] = new_refs[b'HEAD']
             del new_refs[b'HEAD']
             return refs
 
@@ -552,13 +552,13 @@ def push(repo, remote_location, refs_path,
             errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
 
 
-def pull(repo, remote_location, refs_path,
+def pull(repo, remote_location, refspec,
          outstream=sys.stdout, errstream=sys.stderr):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refs_path: relative path to the fetched refs
+    :param refspec: relative path to the fetched refs
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
     """
@@ -567,7 +567,7 @@ def pull(repo, remote_location, refs_path,
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(remote_location)
         remote_refs = client.fetch(path, r, progress=errstream.write)
-        r[b'HEAD'] = remote_refs[refs_path]
+        r[b'HEAD'] = remote_refs[refspec]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree

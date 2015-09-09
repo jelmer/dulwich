@@ -15,6 +15,7 @@
   * Add `porcelain.ls_remote` and `GitClient.get_refs`.
     (Michael Edgar)
   * Add `Repo.discover` method. (B. M. Corser)
+  * Add `dulwich.objectspec.parse_refspec`. (Jelmer Vernooij)
 
  BUG FIXES
 

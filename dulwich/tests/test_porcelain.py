@@ -513,6 +513,9 @@ class PullTests(PorcelainTestCase):
         porcelain.commit(repo=self.repo.path, message=b'test2',
             author=b'test2', committer=b'test2')
 
+        self.assertTrue(b'refs/heads/master' in self.repo.refs)
+        self.assertTrue(b'refs/heads/master' in target_repo.refs)
+
         # Pull changes into the cloned repo
         porcelain.pull(target_path, self.repo.path, b'refs/heads/master',
             outstream=outstream, errstream=errstream)

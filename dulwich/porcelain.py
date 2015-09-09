@@ -70,7 +70,10 @@ from dulwich.objects import (
     Tag,
     parse_timezone,
     )
-from dulwich.objectspec import parse_object
+from dulwich.objectspec import (
+    parse_object,
+    parse_reftuples,
+    )
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import Protocol
 from dulwich.repo import (BaseRepo, Repo)
@@ -519,13 +522,13 @@ def reset(repo, mode, committish="HEAD"):
         r.reset_index()
 
 
-def push(repo, remote_location, refspec,
+def push(repo, remote_location, refspecs=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refspec: relative path to the refs to push to remote
+    :param refspecs: relative path to the refs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """
@@ -536,10 +539,16 @@ def push(repo, remote_location, refspec,
         # Get the client and path
         client, path = get_transport_and_path(remote_location)
 
+        selected_refs = []
+
         def update_refs(refs):
-            new_refs = r.get_refs()
-            refs[refspec] = new_refs[b'HEAD']
-            del new_refs[b'HEAD']
+            selected_refs.extend(parse_reftuples(r.refs, refs, refspecs))
+            # TODO: Handle selected_refs == {None: None}
+            for (lh, rh, force) in selected_refs:
+                if lh is None:
+                    del refs[rh]
+                else:
+                    refs[rh] = r.refs[lh]
             return refs
 
         err_encoding = getattr(errstream, 'encoding', 'utf-8')
@@ -547,27 +556,37 @@ def push(repo, remote_location, refspec,
         try:
             client.send_pack(path, update_refs,
                 r.object_store.generate_pack_contents, progress=errstream.write)
-            errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" successful.\n")
         except (UpdateRefsError, SendPackError) as e:
-            errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" failed -> " + e.message.encode(err_encoding) +
+                            b"\n")
 
 
-def pull(repo, remote_location, refspec,
+def pull(repo, remote_location, refspecs=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refspec: relative path to the fetched refs
+    :param refspec: refspecs to fetch
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
     """
-
     # Open the repo
     with open_repo_closing(repo) as r:
+        selected_refs = []
+        def determine_wants(remote_refs):
+            selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
+            return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(remote_location)
-        remote_refs = client.fetch(path, r, progress=errstream.write)
-        r[b'HEAD'] = remote_refs[refspec]
+        remote_refs = client.fetch(path, r, progress=errstream.write,
+                determine_wants=determine_wants)
+        for (lh, rh, force) in selected_refs:
+            r.refs[rh] = remote_refs[lh]
+        if selected_refs:
+            r[b'HEAD'] = remote_refs[selected_refs[0][1]]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree

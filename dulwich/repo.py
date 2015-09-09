@@ -227,8 +227,8 @@ class BaseRepo(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         target.object_store.add_objects(
-          self.fetch_objects(determine_wants, target.get_graph_walker(),
-                             progress))
+            self.fetch_objects(determine_wants, target.get_graph_walker(),
+                               progress))
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress,

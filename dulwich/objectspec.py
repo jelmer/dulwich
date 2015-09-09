@@ -32,6 +32,23 @@ def parse_object(repo, objectish):
     return repo[objectish]
 
 
+def parse_refspec(container, refspec):
+    """Parse a string referring to an reference.
+
+    :param container: A RefsContainer object
+    :param refspec: A string referring to a ref
+    :return: A ref
+    :raise KeyError: If the ref can not be found
+    """
+    if getattr(refspec, "encode", None) is not None:
+        refspec = refspec.encode('ascii')
+    for ref in [refspec, b"refs/heads/" + refspec]:
+        if ref in container:
+            return ref
+    else:
+        raise KeyError(refspec)
+
+
 def parse_commit_range(repo, committishs):
     """Parse a string referring to a range of commits.
 

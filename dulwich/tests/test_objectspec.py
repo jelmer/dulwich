@@ -28,6 +28,7 @@ from dulwich.objects import (
 from dulwich.objectspec import (
     parse_object,
     parse_commit_range,
+    parse_refspec,
     )
 from dulwich.repo import MemoryRepo
 from dulwich.tests import (
@@ -64,3 +65,18 @@ class ParseCommitRangeTests(TestCase):
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
+
+
+class ParseRefspecTests(TestCase):
+
+    def test_nonexistent(self):
+        r = {}
+        self.assertRaises(KeyError, parse_refspec, r, "thisdoesnotexist")
+
+    def test_head(self):
+        r = {"refs/heads/foo": "bla"}
+        self.assertEquals("refs/heads/foo", parse_refspec(r, "foo"))
+
+    def test_full(self):
+        r = {"refs/heads/foo": "bla"}
+        self.assertEquals("refs/heads/foo", parse_refspec(r, "refs/heads/foo"))

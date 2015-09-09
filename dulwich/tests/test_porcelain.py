@@ -453,7 +453,8 @@ class PushTests(PorcelainTestCase):
         # Setup target repo cloned from temp test repo
         clone_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, clone_path)
-        target_repo = porcelain.clone(self.repo.path, target=clone_path, errstream=errstream)
+        target_repo = porcelain.clone(self.repo.path, target=clone_path,
+            errstream=errstream)
         target_repo.close()
 
         # create a second file to be pushed back to origin
@@ -465,11 +466,11 @@ class PushTests(PorcelainTestCase):
 
         # Setup a non-checked out branch in the remote
         refs_path = b"refs/heads/foo"
-        self.repo[refs_path] = self.repo[b'HEAD']
+        self.repo.refs[refs_path] = self.repo[b'HEAD'].id
 
         # Push to the remote
-        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream,
-                errstream=errstream)
+        porcelain.push(clone_path, self.repo.path, b"HEAD:" + refs_path, outstream=outstream,
+            errstream=errstream)
 
         # Check that the target and source
         with closing(Repo(clone_path)) as r_clone:
@@ -479,7 +480,8 @@ class PushTests(PorcelainTestCase):
             # this will be in the foo branch.
             change = list(tree_changes(self.repo, self.repo[b'HEAD'].tree,
                                        self.repo[b'refs/heads/foo'].tree))[0]
-            self.assertEqual(os.path.basename(fullpath), change.new.path.decode('ascii'))
+            self.assertEqual(os.path.basename(fullpath),
+                change.new.path.decode('ascii'))
 
 
 class PullTests(PorcelainTestCase):

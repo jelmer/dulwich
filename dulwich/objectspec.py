@@ -62,7 +62,7 @@ def parse_reftuple(lh_container, rh_container, refspec):
     :return: A tuple with left and right ref
     :raise KeyError: If one of the refs can not be found
     """
-    if refspec.startswith("+"):
+    if refspec.startswith(b"+"):
         force = True
         refspec = refspec[1:]
     else:
@@ -72,11 +72,11 @@ def parse_reftuple(lh_container, rh_container, refspec):
         (lh, rh) = refspec.split(b":")
     else:
         lh = rh = refspec
-    if rh == "":
+    if rh == b"":
         lh = None
     else:
         lh = parse_ref(lh_container, lh)
-    if rh == "":
+    if rh == b"":
         rh = None
     else:
         try:

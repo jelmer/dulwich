@@ -493,11 +493,14 @@ class TestSSHVendor(object):
 
     def __init__(self):
         self.host = None
-        self.command = ""
+        self.command = None
         self.username = None
         self.port = None
 
     def run_command(self, host, command, username=None, port=None):
+        if type(command) is not list:
+            raise TypeError(command)
+
         self.host = host
         self.command = command
         self.username = username
@@ -549,10 +552,10 @@ class SSHGitClientTests(TestCase):
         client.username = b"username"
         client.port = 1337
 
-        client._connect(b"command", "/path/to/repo")
+        client._connect(b"command", b"/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual(["git-command", "/path/to/repo"], server.command)
+        self.assertEqual([b"git-command", b"/path/to/repo"], server.command)
 
         client._connect(b"relative-command", "/~/path/to/repo")
         self.assertEqual(["git-relative-command",  "~/path/to/repo"],

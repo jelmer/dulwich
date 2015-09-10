@@ -976,7 +976,7 @@ class SSHGitClient(TraditionalGitClient):
         self.alternative_paths = {}
 
     def _get_cmd_path(self, cmd):
-        cmd = self.alternative_paths.get(cmd, 'git-' + cmd)
+        cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
         cmd = shlex.split(cmd)
         cmd = [x.decode('ascii') for x in cmd]
         return cmd

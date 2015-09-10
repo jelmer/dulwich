@@ -49,7 +49,7 @@ class GitReceivePackTests(BlackboxTestCase):
         (stdout, stderr) = process.communicate()
         self.assertEqual(
             [b'usage: dul-receive-pack <git-dir>'],
-            stderr.splitlines()[:-1])
+            stderr.splitlines()[-1:])
         self.assertEqual(b'', stdout)
         self.assertEqual(1, process.returncode)
 
@@ -68,6 +68,6 @@ class GitUploadPackTests(BlackboxTestCase):
         (stdout, stderr) = process.communicate()
         self.assertEqual(
             [b'usage: dul-upload-pack <git-dir>'],
-            stderr.splitlines()[:-1])
+            stderr.splitlines()[-1:])
         self.assertEqual(b'', stdout)
         self.assertEqual(1, process.returncode)

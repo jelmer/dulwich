@@ -74,51 +74,51 @@ class ParseRefTests(TestCase):
 
     def test_nonexistent(self):
         r = {}
-        self.assertRaises(KeyError, parse_ref, r, "thisdoesnotexist")
+        self.assertRaises(KeyError, parse_ref, r, b"thisdoesnotexist")
 
     def test_head(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals("refs/heads/foo", parse_ref(r, "foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals(b"refs/heads/foo", parse_ref(r, b"foo"))
 
     def test_full(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals("refs/heads/foo", parse_ref(r, "refs/heads/foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals(b"refs/heads/foo", parse_ref(r, b"refs/heads/foo"))
 
 
 class ParseRefsTests(TestCase):
 
     def test_nonexistent(self):
         r = {}
-        self.assertRaises(KeyError, parse_refs, r, ["thisdoesnotexist"])
+        self.assertRaises(KeyError, parse_refs, r, [b"thisdoesnotexist"])
 
     def test_head(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals(["refs/heads/foo"], parse_refs(r, ["foo"]))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals([b"refs/heads/foo"], parse_refs(r, [b"foo"]))
 
     def test_full(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals(["refs/heads/foo"], parse_refs(r, "refs/heads/foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals([b"refs/heads/foo"], parse_refs(r, b"refs/heads/foo"))
 
 
 class ParseReftupleTests(TestCase):
 
     def test_nonexistent(self):
         r = {}
-        self.assertRaises(KeyError, parse_reftuple, r, r, "thisdoesnotexist")
+        self.assertRaises(KeyError, parse_reftuple, r, r, b"thisdoesnotexist")
 
     def test_head(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals(("refs/heads/foo", "refs/heads/foo", False),
-            parse_reftuple(r, r, "foo"))
-        self.assertEquals(("refs/heads/foo", "refs/heads/foo", True),
-            parse_reftuple(r, r, "+foo"))
-        self.assertEquals(("refs/heads/foo", "refs/heads/foo", True),
-            parse_reftuple(r, {}, "+foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"foo"))
+        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, r, b"+foo"))
+        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, {}, b"+foo"))
 
     def test_full(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals(("refs/heads/foo", "refs/heads/foo", False),
-            parse_reftuple(r, r, "refs/heads/foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"refs/heads/foo"))
 
 
 class ParseReftuplesTests(TestCase):
@@ -126,14 +126,14 @@ class ParseReftuplesTests(TestCase):
     def test_nonexistent(self):
         r = {}
         self.assertRaises(KeyError, parse_reftuples, r, r,
-            ["thisdoesnotexist"])
+            [b"thisdoesnotexist"])
 
     def test_head(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals([("refs/heads/foo", "refs/heads/foo", False)],
-            parse_reftuples(r, r, ["foo"]))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals([(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, [b"foo"]))
 
     def test_full(self):
-        r = {"refs/heads/foo": "bla"}
-        self.assertEquals([("refs/heads/foo", "refs/heads/foo", False)],
-            parse_reftuples(r, r, "refs/heads/foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEquals([(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, b"refs/heads/foo"))

@@ -78,11 +78,11 @@ class ParseRefTests(TestCase):
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals(b"refs/heads/foo", parse_ref(r, b"foo"))
+        self.assertEqual(b"refs/heads/foo", parse_ref(r, b"foo"))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals(b"refs/heads/foo", parse_ref(r, b"refs/heads/foo"))
+        self.assertEqual(b"refs/heads/foo", parse_ref(r, b"refs/heads/foo"))
 
 
 class ParseRefsTests(TestCase):
@@ -93,11 +93,11 @@ class ParseRefsTests(TestCase):
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals([b"refs/heads/foo"], parse_refs(r, [b"foo"]))
+        self.assertEqual([b"refs/heads/foo"], parse_refs(r, [b"foo"]))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals([b"refs/heads/foo"], parse_refs(r, b"refs/heads/foo"))
+        self.assertEqual([b"refs/heads/foo"], parse_refs(r, b"refs/heads/foo"))
 
 
 class ParseReftupleTests(TestCase):
@@ -108,16 +108,16 @@ class ParseReftupleTests(TestCase):
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", False),
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
             parse_reftuple(r, r, b"foo"))
-        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", True),
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
             parse_reftuple(r, r, b"+foo"))
-        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", True),
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
             parse_reftuple(r, {}, b"+foo"))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals((b"refs/heads/foo", b"refs/heads/foo", False),
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
             parse_reftuple(r, r, b"refs/heads/foo"))
 
 
@@ -130,10 +130,10 @@ class ParseReftuplesTests(TestCase):
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals([(b"refs/heads/foo", b"refs/heads/foo", False)],
+        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
             parse_reftuples(r, r, [b"foo"]))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEquals([(b"refs/heads/foo", b"refs/heads/foo", False)],
+        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
             parse_reftuples(r, r, b"refs/heads/foo"))

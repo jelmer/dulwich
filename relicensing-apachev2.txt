@@ -20,7 +20,6 @@ Andres Lowrie <andres.lowrie@gmail.com>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Brendan Cully <brendan@kublai.com>
 Chaiwat Suttipongsakul <cwt@bashell.com>
-Chow Loong Jin <hyperair@debian.org>
 Chris Eberle <eberle1080@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
 Daniele Sluijters <daniele.sluijters@gmail.com>

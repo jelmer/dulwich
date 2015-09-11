@@ -34,7 +34,6 @@ Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
-Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>
 Stefan Zimmermann <zimmermann.code@gmail.com>
 Takeshi Kanemoto <tak.kanemoto@gmail.com>

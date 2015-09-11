@@ -17,7 +17,6 @@ dual Apachev2/GPLv2:
 
 Alberto Ruiz <aruiz@gnome.org>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Brendan Cully <brendan@kublai.com>
 Chaiwat Suttipongsakul <cwt@bashell.com>
 Chris Eberle <eberle1080@gmail.com>
 Damien Tournoud <damien@commerceguys.com>

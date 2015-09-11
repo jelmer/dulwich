@@ -531,14 +531,14 @@ class SSHGitClientTests(TestCase):
                 self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path(self):
-        self.client.alternative_paths['upload-pack'] = (
-            '/usr/lib/git/git-upload-pack')
+        self.client.alternative_paths[b'upload-pack'] = (
+            b'/usr/lib/git/git-upload-pack')
         self.assertEqual(['/usr/lib/git/git-upload-pack'],
             self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path_spaces(self):
-        self.client.alternative_paths['upload-pack'] = (
-            '/usr/lib/git/git-upload-pack -ibla')
+        self.client.alternative_paths[b'upload-pack'] = (
+            b'/usr/lib/git/git-upload-pack -ibla')
         self.assertEqual(['/usr/lib/git/git-upload-pack', '-ibla'],
             self.client._get_cmd_path(b'upload-pack'))
 

@@ -977,9 +977,10 @@ class SSHGitClient(TraditionalGitClient):
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
-        cmd = shlex.split(cmd)
-        cmd = [x.decode('ascii') for x in cmd]
-        return cmd
+        if sys.version == 2:
+            return [x.decode('ascii') for x in shlex.split(cmd)]
+        else:
+            return shlex.split(cmd.decode('ascii'))
 
     def _connect(self, cmd, path):
         if path.startswith("/~"):

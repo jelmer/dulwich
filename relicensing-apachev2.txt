@@ -38,7 +38,6 @@ Nix <nix@esperi.co.uk>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Rod Cloutier <rodcloutier@gmail.com>
 Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
-Ryan McKern <ryan@orangefort.com>
 Sam Vilain <svilain@saymedia.com>
 Stefan Zimmermann <zimmermann.code@gmail.com>
 Takeshi Kanemoto <tak.kanemoto@gmail.com>

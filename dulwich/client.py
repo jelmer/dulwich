@@ -835,8 +835,10 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
-        if type(command) is not list:
+        if (type(command) is not list or
+            not all([isinstance(b, bytes) for b in command])):
             raise TypeError(command)
+
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -939,7 +941,8 @@ else:
 
         def run_command(self, host, command, username=None, port=None,
                         progress_stderr=None):
-            if type(command) is not list:
+            if (type(command) is not list or
+                not all([isinstance(b, bytes) for b in command])):
                 raise TypeError(command)
             # Paramiko needs an explicit port. None is not valid
             if port is None:
@@ -977,8 +980,8 @@ class SSHGitClient(TraditionalGitClient):
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
-        if sys.version == 2:
-            return [x.decode('ascii') for x in shlex.split(cmd)]
+        if sys.version_info[0:2] >= (2, 7):
+            return [b.decode('ascii') for b in shlex.split(cmd)]
         else:
             return shlex.split(cmd.decode('ascii'))
 

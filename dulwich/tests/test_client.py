@@ -498,6 +498,10 @@ class TestSSHVendor(object):
         self.port = None
 
     def run_command(self, host, command, username=None, port=None):
+        if (type(command) is not list or
+            not all([isinstance(b, bytes) for b in command])):
+            raise TypeError(command)
+
         self.host = host
         self.command = command
         self.username = username

@@ -35,7 +35,6 @@ Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
 Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
 Sam Vilain <svilain@saymedia.com>
 Stefan Zimmermann <zimmermann.code@gmail.com>
-Takeshi Kanemoto <tak.kanemoto@gmail.com>
 Timo Schmid <info@bluec0re.eu>
 Travis Cline <travis.cline@gmail.com>
 Yifan Zhang <yifan@wavii.com>

@@ -30,7 +30,6 @@ Gary van der Merwé <garyvdm@gmail.com>
 Hans Kolek <hkolek@gmail.com>
 Jameson Nash <jameson@mit.edu>
 kwatters <kwatters@tagged.com>
-Marc Brinkmann <git@marcbrinkmann.de>
 max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>
 Nix <nix@esperi.co.uk>

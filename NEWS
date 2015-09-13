@@ -16,6 +16,8 @@
     (Michael Edgar)
   * Add `Repo.discover` method. (B. M. Corser)
   * Add `dulwich.objectspec.parse_refspec`. (Jelmer Vernooij)
+  * Add `porcelain.pack_objects` and `porcelain.repack`.
+    (Jelmer Vernooij)
 
  BUG FIXES
 

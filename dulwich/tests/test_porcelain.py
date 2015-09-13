@@ -740,3 +740,16 @@ class FetchTests(PorcelainTestCase):
         # Check the target repo for pushed changes
         with closing(Repo(target_path)) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
+
+
+class RepackTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.repack(self.repo)
+
+    def test_simple(self):
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.repack(self.repo)

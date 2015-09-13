@@ -637,7 +637,8 @@ class TCPGitClient(TraditionalGitClient):
                          report_activity=self._report_activity)
         if path.startswith(b"/~"):
             path = path[1:]
-        proto.send_cmd(b'git-' + cmd, path, b'host=' + self._host)
+        # TODO(jelmer): Alternative to ascii?
+        proto.send_cmd(b'git-' + cmd, path, b'host=' + self._host.encode('ascii'))
         return proto, lambda: _fileno_can_read(s)
 
 

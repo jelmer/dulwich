@@ -15,6 +15,10 @@ DESTDIR=/
 all: build
 
 doc:: pydoctor
+doc:: sphinx
+
+sphinx::
+	$(MAKE) -C docs html
 
 pydoctor::
 	$(PYDOCTOR) --make-html -c dulwich.cfg

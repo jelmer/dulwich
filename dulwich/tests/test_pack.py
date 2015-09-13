@@ -924,7 +924,7 @@ class DeltaChainIteratorTests(TestCase):
             (OFS_DELTA, (1, b'blob3')),
             (OFS_DELTA, (0, b'bob')),
         ])
-        self.assertEntriesMatch([0, 2, 1, 3, 4], entries,
+        self.assertEntriesMatch([0, 2, 4, 1, 3], entries,
                                 self.make_pack_iter(f))
 
     def test_long_chain(self):

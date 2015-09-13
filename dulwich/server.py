@@ -391,7 +391,8 @@ def _find_shallow(store, heads, depth):
 
     :param store: An ObjectStore for looking up objects.
     :param heads: Iterable of head SHAs to start walking from.
-    :param depth: The depth of ancestors to include.
+    :param depth: The depth of ancestors to include. A depth of one includes
+        only the heads themselves.
     :return: A tuple of (shallow, not_shallow), sets of SHAs that should be
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
@@ -408,7 +409,7 @@ def _find_shallow(store, heads, depth):
     for head_sha in heads:
         obj = store.peel_sha(head_sha)
         if isinstance(obj, Commit):
-            todo.append((obj.id, 0))
+            todo.append((obj.id, 1))
 
     not_shallow = set()
     shallow = set()

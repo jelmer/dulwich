@@ -1,3 +1,9 @@
+dulwich (0.11.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 13 Sep 2015 18:15:59 +0000
+
 dulwich (0.10.1+git20150525-1) experimental; urgency=medium
 
   * New upstream snapshot.

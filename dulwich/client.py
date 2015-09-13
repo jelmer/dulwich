@@ -42,6 +42,7 @@ from contextlib import closing
 from io import BytesIO, BufferedReader
 import dulwich
 import select
+import shlex
 import socket
 import subprocess
 import sys
@@ -201,7 +202,7 @@ class GitClient(object):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -217,7 +218,7 @@ class GitClient(object):
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from
+        :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
         :param determine_wants: Optional function to determine what refs
             to fetch
@@ -226,6 +227,7 @@ class GitClient(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
+
         f, commit, abort = target.object_store.add_pack()
         try:
             result = self.fetch_pack(
@@ -248,6 +250,13 @@ class GitClient(object):
         :param progress: Callback for progress reports (strings)
         """
         raise NotImplementedError(self.fetch_pack)
+
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server.
+
+        :param path: Path to the repo to fetch from. (as bytestring)
+        """
+        raise NotImplementedError(self.get_refs)
 
     def _parse_status_report(self, proto):
         unpack = proto.read_pkt_line().strip()
@@ -445,7 +454,7 @@ class TraditionalGitClient(GitClient):
         reads would block.
 
         :param cmd: The git service name to which we should connect.
-        :param path: The path we should pass to the service.
+        :param path: The path we should pass to the service. (as bytestirng)
         """
         raise NotImplementedError()
 
@@ -453,7 +462,7 @@ class TraditionalGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
@@ -553,6 +562,14 @@ class TraditionalGitClient(GitClient):
                 proto, negotiated_capabilities, graph_walker, pack_data, progress)
             return refs
 
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        # stock `git ls-remote` uses upload-pack
+        proto, _ = self._connect(b'upload-pack', path)
+        with proto:
+            refs, _ = read_pkt_refs(proto)
+            return refs
+
     def archive(self, path, committish, write_data, progress=None,
                 write_error=None):
         proto, can_read = self._connect(b'upload-archive', path)
@@ -588,6 +605,10 @@ class TCPGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
+        if type(cmd) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
@@ -617,7 +638,8 @@ class TCPGitClient(TraditionalGitClient):
                          report_activity=self._report_activity)
         if path.startswith(b"/~"):
             path = path[1:]
-        proto.send_cmd(b'git-' + cmd, path, b'host=' + self._host)
+        # TODO(jelmer): Alternative to ascii?
+        proto.send_cmd(b'git-' + cmd, path, b'host=' + self._host.encode('ascii'))
         return proto, lambda: _fileno_can_read(s)
 
 
@@ -679,11 +701,14 @@ class SubprocessGitClient(TraditionalGitClient):
     git_command = None
 
     def _connect(self, service, path):
+        if type(service) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
         import subprocess
         if self.git_command is None:
             git_command = find_git_command()
-        argv = git_command + [service, path]
-        argv = ['git', service.decode('ascii'), path]
+        argv = git_command + [service.decode('ascii'), path]
         p = SubprocessWrapper(
             subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
@@ -698,7 +723,6 @@ class LocalGitClient(GitClient):
     def __init__(self, thin_packs=True, report_activity=None):
         """Create a new LocalGitClient instance.
 
-        :param path: Path to the local repository
         :param thin_packs: Whether or not thin packs should be retrieved
         :param report_activity: Optional callback for reporting transport
             activity.
@@ -710,7 +734,7 @@ class LocalGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -749,7 +773,7 @@ class LocalGitClient(GitClient):
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from
+        :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
         :param determine_wants: Optional function to determine what refs
             to fetch
@@ -780,6 +804,13 @@ class LocalGitClient(GitClient):
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
 
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        from dulwich.repo import Repo
+
+        with closing(Repo(path)) as target:
+            return target.get_refs()
+
 
 # What Git client to use for local access
 default_local_git_client_cls = LocalGitClient
@@ -802,7 +833,7 @@ class SSHVendor(object):
         with the remote command.
 
         :param host: Host name
-        :param command: Command to run
+        :param command: Command to run (as argv array)
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
         """
@@ -813,6 +844,10 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
+        if (type(command) is not list or
+            not all([isinstance(b, bytes) for b in command])):
+            raise TypeError(command)
+
         import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
@@ -915,7 +950,9 @@ else:
 
         def run_command(self, host, command, username=None, port=None,
                         progress_stderr=None):
-
+            if (type(command) is not list or
+                not all([isinstance(b, bytes) for b in command])):
+                raise TypeError(command)
             # Paramiko needs an explicit port. None is not valid
             if port is None:
                 port = 22
@@ -931,7 +968,7 @@ else:
             channel = client.get_transport().open_session()
 
             # Run commands
-            channel.exec_command(*command)
+            channel.exec_command(subprocess.list2cmdline(command))
 
             return ParamikoWrapper(
                 client, channel, progress_stderr=progress_stderr)
@@ -951,15 +988,24 @@ class SSHGitClient(TraditionalGitClient):
         self.alternative_paths = {}
 
     def _get_cmd_path(self, cmd):
-        cmd = cmd.decode('ascii')
-        return self.alternative_paths.get(cmd, 'git-' + cmd)
+        cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
+        assert isinstance(cmd, bytes)
+        if sys.version_info[:2] <= (2, 6):
+            return shlex.split(cmd)
+        else:
+            # TODO(jelmer): Don't decode/encode here
+            return [x.encode('ascii') for x in shlex.split(cmd.decode('ascii'))]
 
     def _connect(self, cmd, path):
-        if path.startswith("/~"):
+        if type(cmd) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
+        if path.startswith(b"/~"):
             path = path[1:]
+        argv = self._get_cmd_path(cmd) + [path]
         con = get_ssh_vendor().run_command(
-            self.host, [self._get_cmd_path(cmd), path],
-            port=self.port, username=self.username)
+            self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
                 con.can_read)
@@ -1054,7 +1100,7 @@ class HttpGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -1134,11 +1180,18 @@ class HttpGitClient(GitClient):
         finally:
             resp.close()
 
+    def get_refs(self, path):
+        """Retrieve the current refs from a git smart server."""
+        url = self._get_url(path)
+        refs, _ = self._discover_references(
+            b"git-upload-pack", url)
+        return refs
+
 
 def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
-    :param url: URL to open
+    :param url: URL to open (a unicode string)
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
@@ -1167,7 +1220,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
 def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
-    :param location: URL or path
+    :param location: URL or path (a string)
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport

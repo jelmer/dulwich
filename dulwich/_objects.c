@@ -199,7 +199,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 		}
 
 		py_mode = PyTuple_GET_ITEM(value, 0);
-		if (!PyInt_Check(py_mode)) {
+		if (!PyInt_Check(py_mode) && !PyLong_Check(py_mode)) {
 			PyErr_SetString(PyExc_TypeError, "Mode is not an integral type");
 			goto error;
 		}
@@ -210,7 +210,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 			goto error;
 		}
 		qsort_entries[n].name = PyString_AS_STRING(key);
-		qsort_entries[n].mode = PyInt_AS_LONG(py_mode);
+		qsort_entries[n].mode = PyInt_AsLong(py_mode);
 
 		qsort_entries[n].tuple = PyObject_CallFunctionObjArgs(
 		                tree_entry_cls, key, py_mode, py_sha, NULL);

@@ -35,6 +35,7 @@ from dulwich.object_store import (
     )
 from dulwich import objects
 from dulwich.config import Config
+from dulwich.errors import NotGitRepository
 from dulwich.repo import (
     Repo,
     MemoryRepo,
@@ -586,6 +587,17 @@ class BuildRepoRootTests(TestCase):
         tree = r[r[commit_sha].tree]
         self.assertEqual([], list(tree.iteritems()))
 
+    def test_commit_follows(self):
+        r = self._repo
+        r.refs.set_symbolic_ref(b'HEAD', b'refs/heads/bla')
+        commit_sha = r.do_commit(b'commit with strange character',
+             committer=b'Test Committer <test@nodomain.com>',
+             author=b'Test Author <test@nodomain.com>',
+             commit_timestamp=12395, commit_timezone=0,
+             author_timestamp=12395, author_timezone=0,
+             ref=b'HEAD')
+        self.assertEqual(commit_sha, r[b'refs/heads/bla'].id)
+
     def test_commit_encoding(self):
         r = self._repo
         commit_sha = r.do_commit(b'commit with strange character \xee',
@@ -765,3 +777,16 @@ class BuildRepoRootTests(TestCase):
             mode, id = tree_lookup_path(r.get_object, r[commit_sha].tree, name)
             self.assertEqual(stat.S_IFREG | 0o644, mode)
             self.assertEqual(encoding.encode('ascii'), r[id].data)
+
+    def test_discover_intended(self):
+        path = os.path.join(self._repo_dir, 'b/c')
+        r = Repo.discover(path)
+        self.assertEqual(r.head(), self._repo.head())
+
+    def test_discover_isrepo(self):
+        r = Repo.discover(self._repo_dir)
+        self.assertEqual(r.head(), self._repo.head())
+
+    def test_discover_notrepo(self):
+        with self.assertRaises(NotGitRepository):
+            Repo.discover('/')

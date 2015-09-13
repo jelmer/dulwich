@@ -1,4 +1,5 @@
 # test_refs.py -- tests for refs.py
+# encoding: utf-8
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
 #
 # This program is free software; you can redistribute it and/or
@@ -21,6 +22,7 @@
 
 from io import BytesIO
 import os
+import sys
 import tempfile
 
 from dulwich import errors
@@ -39,6 +41,7 @@ from dulwich.refs import (
 from dulwich.repo import Repo
 
 from dulwich.tests import (
+    SkipTest,
     TestCase,
     )
 
@@ -434,6 +437,20 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
+
+    def test_non_ascii(self):
+        try:
+            encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
+        except UnicodeDecodeError:
+            raise SkipTest("filesystem encoding doesn't support special character")
+        p = os.path.join(self._repo.path, 'refs', 'tags', 'schön')
+        with open(p, 'w') as f:
+            f.write('00' * 20)
+
+        expected_refs = dict(_TEST_REFS)
+        expected_refs[encoded_ref] = b'00' * 20
+
+        self.assertEqual(expected_refs, self._repo.get_refs())
 
 
 _TEST_REFS_SERIALIZED = (

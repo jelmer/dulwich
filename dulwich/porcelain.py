@@ -238,7 +238,7 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
             progress=errstream.write)
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:
-            errstream.write(b'Checking out HEAD')
+            errstream.write(b'Checking out HEAD\n')
             r.reset_index()
     except:
         r.close()

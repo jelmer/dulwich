@@ -25,6 +25,7 @@ from os import (
     )
 import socket
 
+import dulwich
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
@@ -57,6 +58,16 @@ CAPABILITY_REPORT_STATUS = b'report-status'
 CAPABILITY_SHALLOW = b'shallow'
 CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
 CAPABILITY_THIN_PACK = b'thin-pack'
+CAPABILITY_AGENT = b'agent'
+
+
+def agent_string():
+    return ('dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')
+
+
+def capability_agent():
+    return CAPABILITY_AGENT + b'=' + agent_string()
+
 
 COMMAND_DEEPEN = b'deepen'
 COMMAND_SHALLOW = b'shallow'

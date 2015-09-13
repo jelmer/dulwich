@@ -604,12 +604,12 @@ class TraditionalGitClient(GitClient):
 class TCPGitClient(TraditionalGitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
-    def __init__(self, host, port=None, *args, **kwargs):
+    def __init__(self, host, port=None, **kwargs):
         if port is None:
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        TraditionalGitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, **kwargs)
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
@@ -697,13 +697,13 @@ def find_git_command():
 class SubprocessGitClient(TraditionalGitClient):
     """Git client that talks to a server using a subprocess."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         self._connection = None
         self._stderr = None
         self._stderr = kwargs.get('stderr')
         if 'stderr' in kwargs:
             del kwargs['stderr']
-        TraditionalGitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, **kwargs)
 
     git_command = None
 
@@ -869,13 +869,13 @@ class SubprocessSSHVendor(SSHVendor):
         return SubprocessWrapper(proc)
 
 
-def ParamikoSSHVendor(*args, **kwargs):
+def ParamikoSSHVendor(**kwargs):
     import warnings
     warnings.warn(
         "ParamikoSSHVendor has been moved to dulwich.contrib.paramiko.",
         DeprecationWarning)
     from dulwich.contrib.paramiko import ParamikoSSHVendor
-    return ParamikoSSHVendor(*args, **kwargs)
+    return ParamikoSSHVendor(**kwargs)
 
 
 # Can be overridden by users
@@ -884,12 +884,16 @@ get_ssh_vendor = SubprocessSSHVendor
 
 class SSHGitClient(TraditionalGitClient):
 
-    def __init__(self, host, port=None, username=None, *args, **kwargs):
+    def __init__(self, host, port=None, username=None, vendor=None, **kwargs):
         self.host = host
         self.port = port
         self.username = username
-        TraditionalGitClient.__init__(self, *args, **kwargs)
+        TraditionalGitClient.__init__(self, **kwargs)
         self.alternative_paths = {}
+        if vendor is not None:
+            self.vendor = vendor
+        else:
+            self.vendor = get_ssh_vendor()
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
@@ -908,7 +912,7 @@ class SSHGitClient(TraditionalGitClient):
         if path.startswith(b"/~"):
             path = path[1:]
         argv = self._get_cmd_path(cmd) + [path]
-        con = get_ssh_vendor().run_command(
+        con = self.vendor.run_command(
             self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
@@ -940,15 +944,14 @@ def default_urllib2_opener(config):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, config=None, *args,
-                 **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, config=None, **kwargs):
         self.base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
             self.opener = default_urllib2_opener(config)
         else:
             self.opener = opener
-        GitClient.__init__(self, *args, **kwargs)
+        GitClient.__init__(self, **kwargs)
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (type(self).__name__, self.base_url, self.dumb)

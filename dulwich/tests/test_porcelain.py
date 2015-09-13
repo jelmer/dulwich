@@ -20,6 +20,10 @@
 
 from contextlib import closing
 from io import BytesIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 import os
 import shutil
 import tarfile
@@ -232,17 +236,17 @@ class LogTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertEqual(3, outstream.getvalue().count(b"-" * 50))
+        self.assertEqual(3, outstream.getvalue().count("-" * 50))
 
     def test_max_entries(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
-        self.assertEqual(1, outstream.getvalue().count(b"-" * 50))
+        self.assertEqual(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):
@@ -251,24 +255,24 @@ class ShowTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith(b"-" * 50))
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith(b"-" * 50))
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_blob(self):
         b = Blob.from_string(b"The Foo\n")
         self.repo.object_store.add_object(b)
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
-        self.assertEqual(outstream.getvalue(), b"The Foo\n")
+        self.assertEqual(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):

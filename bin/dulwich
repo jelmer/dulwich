@@ -358,6 +358,27 @@ def cmd_ls_remote(args):
         sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
 
 
+def cmd_pack_objects(args):
+    opts, args = getopt(args, '', ['stdout'])
+    opts = dict(opts)
+    if len(args) < 1 and not '--stdout' in args:
+        print('Usage: dulwich pack-objects basename')
+        sys.exit(1)
+    object_ids = [l.strip() for l in sys.stdin.readlines()]
+    basename = args[0]
+    if '--stdout' in opts:
+        packf = getattr(sys.stdout, 'buffer', sys.stdout)
+        idxf = None
+        close = []
+    else:
+        packf = open(basename + '.pack', 'w')
+        idxf = open(basename + '.idx', 'w')
+        close = [packf, idxf]
+    porcelain.pack_objects('.', object_ids, packf, idxf)
+    for f in close:
+        f.close()
+
+
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
@@ -374,6 +395,7 @@ commands = {
     "init": cmd_init,
     "log": cmd_log,
     "ls-remote": cmd_ls_remote,
+    "pack-objects": cmd_pack_objects,
     "receive-pack": cmd_receive_pack,
     "repack": cmd_repack,
     "reset": cmd_reset,

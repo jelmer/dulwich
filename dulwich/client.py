@@ -872,9 +872,9 @@ class SubprocessSSHVendor(SSHVendor):
 def ParamikoSSHVendor(**kwargs):
     import warnings
     warnings.warn(
-        "ParamikoSSHVendor has been moved to dulwich.contrib.paramiko.",
+        "ParamikoSSHVendor has been moved to dulwich.contrib.paramiko_vendor.",
         DeprecationWarning)
-    from dulwich.contrib.paramiko import ParamikoSSHVendor
+    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
     return ParamikoSSHVendor(**kwargs)
 
 
@@ -891,9 +891,9 @@ class SSHGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, **kwargs)
         self.alternative_paths = {}
         if vendor is not None:
-            self.vendor = vendor
+            self.ssh_vendor = vendor
         else:
-            self.vendor = get_ssh_vendor()
+            self.ssh_vendor = get_ssh_vendor()
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
@@ -912,7 +912,7 @@ class SSHGitClient(TraditionalGitClient):
         if path.startswith(b"/~"):
             path = path[1:]
         argv = self._get_cmd_path(cmd) + [path]
-        con = self.vendor.run_command(
+        con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),

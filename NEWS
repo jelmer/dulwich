@@ -4,6 +4,8 @@
 
   * Add support for agent= capability. (Jelmer Vernooij, #298)
 
+  * Add support for quiet capability. (Jelmer Vernooij)
+
 0.11.1	2015-09-13
 
  Fix-up release to exclude broken blame.py file.

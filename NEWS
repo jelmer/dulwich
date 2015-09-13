@@ -30,6 +30,8 @@
   * Fix handling of commands with arguments in paramiko SSH
     client. (Andreas Klöckner, Jelmer Vernooij, #363)
 
+  * Fix parsing of quoted strings in configs. (Jelmer Vernooij, #305)
+
 0.10.1  2015-03-25
 
  BUG FIXES

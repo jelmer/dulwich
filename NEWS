@@ -8,8 +8,9 @@
 
  CHANGES
 
-  * The ParamikoSSHVendor class has been moved to dulwich.contrib.paramiko,
-    as it's currently untested. (Jelmer Vernooij, #364)
+  * The ParamikoSSHVendor class has been moved to
+  * dulwich.contrib.paramiko_vendor, as it's currently untested.
+    (Jelmer Vernooij, #364)
 
 0.11.1	2015-09-13
 

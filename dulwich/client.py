@@ -604,6 +604,10 @@ class TCPGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, *args, **kwargs)
 
     def _connect(self, cmd, path):
+        if type(cmd) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
@@ -695,6 +699,10 @@ class SubprocessGitClient(TraditionalGitClient):
     git_command = None
 
     def _connect(self, service, path):
+        if type(service) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
         import subprocess
         if self.git_command is None:
             git_command = find_git_command()
@@ -980,17 +988,23 @@ class SSHGitClient(TraditionalGitClient):
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
-        if sys.version_info[0:2] >= (2, 7):
-            return [b.decode('ascii') for b in shlex.split(cmd)]
+        assert isinstance(cmd, bytes)
+        if sys.version_info[:2] <= (2, 6):
+            return shlex.split(cmd)
         else:
-            return shlex.split(cmd.decode('ascii'))
+            # TODO(jelmer): Don't decode/encode here
+            return [x.encode('ascii') for x in shlex.split(cmd.decode('ascii'))]
 
     def _connect(self, cmd, path):
-        if path.startswith("/~"):
+        if type(cmd) is not bytes:
+            raise TypeError(path)
+        if type(path) is not bytes:
+            raise TypeError(path)
+        if path.startswith(b"/~"):
             path = path[1:]
+        argv = self._get_cmd_path(cmd) + [path]
         con = get_ssh_vendor().run_command(
-            self.host, self._get_cmd_path(cmd) + [path],
-            port=self.port, username=self.username)
+            self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
                 con.can_read)

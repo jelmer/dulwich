@@ -126,6 +126,8 @@ def archive(path, committish=None, outstream=sys.stdout,
     client = SubprocessGitClient()
     if committish is None:
         committish = "HEAD"
+    if not isinstance(path, bytes):
+        path = path.encode(sys.getfilesystemencoding())
     # TODO(jelmer): This invokes C git; this introduces a dependency.
     # Instead, dulwich should have its own archiver implementation.
     client.archive(path, committish, outstream.write, errstream.write,

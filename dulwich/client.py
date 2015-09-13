@@ -202,7 +202,7 @@ class GitClient(object):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -218,7 +218,7 @@ class GitClient(object):
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from
+        :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
         :param determine_wants: Optional function to determine what refs
             to fetch
@@ -254,7 +254,7 @@ class GitClient(object):
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server.
 
-        :param path: Path to the repo to fetch from.
+        :param path: Path to the repo to fetch from. (as bytestring)
         """
         raise NotImplementedError(self.get_refs)
 
@@ -454,7 +454,7 @@ class TraditionalGitClient(GitClient):
         reads would block.
 
         :param cmd: The git service name to which we should connect.
-        :param path: The path we should pass to the service.
+        :param path: The path we should pass to the service. (as bytestirng)
         """
         raise NotImplementedError()
 
@@ -462,7 +462,7 @@ class TraditionalGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
@@ -723,7 +723,6 @@ class LocalGitClient(GitClient):
     def __init__(self, thin_packs=True, report_activity=None):
         """Create a new LocalGitClient instance.
 
-        :param path: Path to the local repository
         :param thin_packs: Whether or not thin packs should be retrieved
         :param report_activity: Optional callback for reporting transport
             activity.
@@ -735,7 +734,7 @@ class LocalGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -774,7 +773,7 @@ class LocalGitClient(GitClient):
     def fetch(self, path, target, determine_wants=None, progress=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from
+        :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
         :param determine_wants: Optional function to determine what refs
             to fetch
@@ -1101,7 +1100,7 @@ class HttpGitClient(GitClient):
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path
+        :param path: Repository path (as bytestring)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -1192,7 +1191,7 @@ class HttpGitClient(GitClient):
 def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
-    :param url: URL to open
+    :param url: URL to open (a unicode string)
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport
@@ -1221,7 +1220,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
 def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
-    :param location: URL or path
+    :param location: URL or path (a string)
     :param config: Optional config object
     :param thin_packs: Whether or not thin packs should be retrieved
     :param report_activity: Optional callback for reporting transport

@@ -519,6 +519,21 @@ class ShaFile(object):
         """
         return isinstance(other, ShaFile) and self.id == other.id
 
+    def __lt__(self, other):
+        if not isinstance(other, ShaFile):
+            raise TypeError
+        return self.id < other.id
+
+    def __le__(self, other):
+        if not isinstance(other, ShaFile):
+            raise TypeError
+        return self.id <= other.id
+
+    def __cmp__(self, other):
+        if not isinstance(other, ShaFile):
+            raise TypeError
+        return cmp(self.id, other.id)
+
 
 class Blob(ShaFile):
     """A Git Blob object."""

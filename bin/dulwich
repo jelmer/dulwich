@@ -239,6 +239,12 @@ def cmd_tag(args):
     porcelain.tag('.', args[0])
 
 
+def cmd_repack(args):
+    opts, args = getopt(args, "", [])
+    opts = dict(opts)
+    porcelain.repack('.')
+
+
 def cmd_reset(args):
     opts, args = getopt(args, "", ["hard", "soft", "mixed"])
     opts = dict(opts)
@@ -369,6 +375,7 @@ commands = {
     "log": cmd_log,
     "ls-remote": cmd_ls_remote,
     "receive-pack": cmd_receive_pack,
+    "repack": cmd_repack,
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,

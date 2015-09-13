@@ -812,3 +812,14 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
 def ls_remote(remote):
     client, host_path = get_transport_and_path(remote)
     return client.get_refs(encode_path(host_path))
+
+
+def repack(repo):
+    """Repack loose files in a repository.
+
+    Currently this only packs loose objects.
+
+    :param repo: Path to the repository
+    """
+    with open_repo_closing(repo) as r:
+        r.object_store.pack_loose_objects()

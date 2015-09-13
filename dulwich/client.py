@@ -227,6 +227,7 @@ class GitClient(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
+
         f, commit, abort = target.object_store.add_pack()
         try:
             result = self.fetch_pack(

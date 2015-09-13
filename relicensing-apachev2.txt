@@ -15,30 +15,16 @@ Contributions made prior were contributed under the GPLv2 (or later) license
 alone. The following contributors have not (yet) relicensed their code under
 dual Apachev2/GPLv2:
 
-Alberto Ruiz <aruiz@gnome.org>
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Chaiwat Suttipongsakul <cwt@bashell.com>
 Chris Eberle <eberle1080@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
-Daniele Sluijters <daniele.sluijters@gmail.com>
 David Blewett <davidb@sixfeetup.com>
-Dirk <dirk@opani.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
-Hans Kolek <hkolek@gmail.com>
 Jameson Nash <jameson@mit.edu>
-kwatters <kwatters@tagged.com>
 max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>
-Nix <nix@esperi.co.uk>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
-Ryan Faulkner <rfaulk@yahoo-inc.com> <rfaulkner@wikimedia.org>
-Sam Vilain <svilain@saymedia.com>
-Stefan Zimmermann <zimmermann.code@gmail.com>
-Timo Schmid <info@bluec0re.eu>
-Travis Cline <travis.cline@gmail.com>
-Yifan Zhang <yifan@wavii.com>
-Yuval Langer <yuval.langer@gmail.com>
 
 If your name is in this list and you'd be happy to relicense your contribution
 under dual GPLv2/Apachev2, then please send me an e-mail (jelmer@jelmer.uk) or

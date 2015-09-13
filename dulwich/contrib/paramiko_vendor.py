@@ -1,4 +1,4 @@
-# paramako.py -- paramiko implementation of the Dulwich SSHVendor interface
+# paramiko_vendor.py -- paramiko implementation of the SSHVendor interface
 # Copyright (C) 2013 Aaron O'Mullan <aaron.omullan@friendco.de>
 #
 # This program is free software; you can redistribute it and/or
@@ -22,13 +22,14 @@ To use this implementation as the SSH implementation in Dulwich, override
 the dulwich.client.get_ssh_vendor attribute:
 
   >>> from dulwich import client as _mod_client
-  >>> from dulwich.contrib.paramiko import ParamikoSSHVendor
+  >>> from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
   >>> _mod_client.get_ssh_vendor = ParamikoSSHVendor
 
 This implementation is experimental and does not have any tests.
 """
 
 import paramiko
+import paramiko.client
 import subprocess
 import threading
 

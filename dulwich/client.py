@@ -62,6 +62,7 @@ from dulwich.errors import (
     )
 from dulwich.protocol import (
     _RBUFSIZE,
+    capability_agent,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -94,10 +95,7 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
-CAPABILITY_AGENT = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode('ascii')
-
-COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K,
-                       CAPABILITY_AGENT]
+COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
 FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
                        CAPABILITY_MULTI_ACK_DETAILED] +
                       COMMON_CAPABILITIES)
@@ -197,7 +195,9 @@ class GitClient(object):
         self._report_activity = report_activity
         self._report_status_parser = None
         self._fetch_capabilities = set(FETCH_CAPABILITIES)
+        self._fetch_capabilities.add(capability_agent())
         self._send_capabilities = set(SEND_CAPABILITIES)
+        self._send_capabilities.add(capability_agent())
         if not thin_packs:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
 

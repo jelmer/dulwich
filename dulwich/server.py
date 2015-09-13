@@ -76,6 +76,7 @@ from dulwich.protocol import (
     CAPABILITY_NO_DONE,
     CAPABILITY_NO_PROGRESS,
     CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SHALLOW,
     CAPABILITY_SIDE_BAND_64K,
@@ -839,7 +840,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_QUIET,
                 CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
 
     def _apply_pack(self, refs):

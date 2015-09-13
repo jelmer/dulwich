@@ -26,6 +26,7 @@ The Dulwich client supports the following capabilities:
  * multi_ack
  * side-band-64k
  * ofs-delta
+ * quiet
  * report-status
  * delete-refs
 
@@ -67,6 +68,7 @@ from dulwich.protocol import (
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
@@ -185,7 +187,7 @@ class GitClient(object):
 
     """
 
-    def __init__(self, thin_packs=True, report_activity=None):
+    def __init__(self, thin_packs=True, report_activity=None, quiet=False):
         """Create a new GitClient instance.
 
         :param thin_packs: Whether or not thin packs should be retrieved
@@ -198,6 +200,8 @@ class GitClient(object):
         self._fetch_capabilities.add(capability_agent())
         self._send_capabilities = set(SEND_CAPABILITIES)
         self._send_capabilities.add(capability_agent())
+        if quiet:
+            self._send_capabilities.add(CAPABILITY_QUIET)
         if not thin_packs:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
 

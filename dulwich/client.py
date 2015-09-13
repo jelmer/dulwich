@@ -881,7 +881,7 @@ else:
             self.progress_stderr = progress_stderr
             self.should_monitor = bool(progress_stderr) or True
             self.monitor_thread = None
-            self.stderr = ''
+            self.stderr = b''
 
             # Channel must block
             self.channel.setblocking(True)

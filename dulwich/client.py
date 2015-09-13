@@ -1,6 +1,5 @@
-# client.py -- Implementation of the server side git protocols
+# client.py -- Implementation of the client side git protocols
 # Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
-# Copyright (C) 2008 John Carr
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -96,6 +95,7 @@ from dulwich.refs import (
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
+
 
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
 FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
@@ -869,116 +869,13 @@ class SubprocessSSHVendor(SSHVendor):
         return SubprocessWrapper(proc)
 
 
-try:
-    import paramiko
-except ImportError:
-    pass
-else:
-    import threading
-
-    class ParamikoWrapper(object):
-        STDERR_READ_N = 2048  # 2k
-
-        def __init__(self, client, channel, progress_stderr=None):
-            self.client = client
-            self.channel = channel
-            self.progress_stderr = progress_stderr
-            self.should_monitor = bool(progress_stderr) or True
-            self.monitor_thread = None
-            self.stderr = b''
-
-            # Channel must block
-            self.channel.setblocking(True)
-
-            # Start
-            if self.should_monitor:
-                self.monitor_thread = threading.Thread(
-                    target=self.monitor_stderr)
-                self.monitor_thread.start()
-
-        def monitor_stderr(self):
-            while self.should_monitor:
-                # Block and read
-                data = self.read_stderr(self.STDERR_READ_N)
-
-                # Socket closed
-                if not data:
-                    self.should_monitor = False
-                    break
-
-                # Emit data
-                if self.progress_stderr:
-                    self.progress_stderr(data)
-
-                # Append to buffer
-                self.stderr += data
-
-        def stop_monitoring(self):
-            # Stop StdErr thread
-            if self.should_monitor:
-                self.should_monitor = False
-                self.monitor_thread.join()
-
-                # Get left over data
-                data = self.channel.in_stderr_buffer.empty()
-                self.stderr += data
-
-        def can_read(self):
-            return self.channel.recv_ready()
-
-        def write(self, data):
-            return self.channel.sendall(data)
-
-        def read_stderr(self, n):
-            return self.channel.recv_stderr(n)
-
-        def read(self, n=None):
-            data = self.channel.recv(n)
-            data_len = len(data)
-
-            # Closed socket
-            if not data:
-                return
-
-            # Read more if needed
-            if n and data_len < n:
-                diff_len = n - data_len
-                return data + self.read(diff_len)
-            return data
-
-        def close(self):
-            self.channel.close()
-            self.stop_monitoring()
-
-    class ParamikoSSHVendor(object):
-
-        def __init__(self):
-            self.ssh_kwargs = {}
-
-        def run_command(self, host, command, username=None, port=None,
-                        progress_stderr=None):
-            if (type(command) is not list or
-                not all([isinstance(b, bytes) for b in command])):
-                raise TypeError(command)
-            # Paramiko needs an explicit port. None is not valid
-            if port is None:
-                port = 22
-
-            client = paramiko.SSHClient()
-
-            policy = paramiko.client.MissingHostKeyPolicy()
-            client.set_missing_host_key_policy(policy)
-            client.connect(host, username=username, port=port,
-                           **self.ssh_kwargs)
-
-            # Open SSH session
-            channel = client.get_transport().open_session()
-
-            # Run commands
-            channel.exec_command(subprocess.list2cmdline(command))
-
-            return ParamikoWrapper(
-                client, channel, progress_stderr=progress_stderr)
+def ParamikoSSHVendor(*args, **kwargs):
+    import warnings
+    warnings.warn(
+        "ParamikoSSHVendor has been moved to dulwich.contrib.paramiko.",
+        DeprecationWarning)
+    from dulwich.contrib.paramiko import ParamikoSSHVendor
+    return ParamikoSSHVendor(*args, **kwargs)
 
 
 # Can be overridden by users

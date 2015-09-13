@@ -1,4 +1,8 @@
-0.10.2  UNRELEASED
+0.11.1	2015-09-13
+
+ Fix-up release to exclude broken blame.py file.
+
+0.11.0	2015-09-13
 
  IMPROVEMENTS
 
@@ -12,11 +16,27 @@
     capabilities. (Jelmer Vernooij)
   * Switched `default_local_git_client_cls` to `LocalGitClient`.
     (Gary van der Merwe)
+  * Add `porcelain.ls_remote` and `GitClient.get_refs`.
+    (Michael Edgar)
+  * Add `Repo.discover` method. (B. M. Corser)
+  * Add `dulwich.objectspec.parse_refspec`. (Jelmer Vernooij)
+  * Add `porcelain.pack_objects` and `porcelain.repack`.
+    (Jelmer Vernooij)
 
  BUG FIXES
 
   * Fix handling of 'done' in graph walker and implement the
     'no-done' capability. (Tommy Yu, #88)
+
+  * Avoid recursion limit issues resolving deltas. (William Grant, #81)
+
+  * Allow arguments in local client binary path overrides.
+    (Jelmer Vernooij)
+
+  * Fix handling of commands with arguments in paramiko SSH
+    client. (Andreas Klöckner, Jelmer Vernooij, #363)
+
+  * Fix parsing of quoted strings in configs. (Jelmer Vernooij, #305)
 
 0.10.1  2015-03-25
 

@@ -7,7 +7,7 @@ dulwich - Python implementation of Git
 Overview
 ========
 
-.. include:: ../README
+.. include:: ../README.md
 
 Documentation
 =============

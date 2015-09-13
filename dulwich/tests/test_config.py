@@ -30,7 +30,9 @@ from dulwich.config import (
     _parse_string,
     _unescape_value,
     )
-from dulwich.tests import TestCase
+from dulwich.tests import (
+    TestCase,
+    )
 
 
 class ConfigFileTests(TestCase):
@@ -150,6 +152,15 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
+    #@expectedFailure
+    def test_quoted(self):
+        cf = self.from_file(b"""[gui]
+	fontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -weight normal -slant roman -underline 0 -overstrike 0
+""")
+        self.assertEqual(ConfigFile({(b'gui', ): {
+            b'fontdiff': b'-family "Ubuntu Mono" -size 11 -weight normal -slant roman -underline 0 -overstrike 0',
+        }}), cf)
+
 
 class ConfigDictTests(TestCase):
 
@@ -205,26 +216,10 @@ class ConfigDictTests(TestCase):
             list(cd.itersections()))
 
 
-
 class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
         StackedConfig.default_backends()
-
-
-class UnescapeTests(TestCase):
-
-    def test_nothing(self):
-        self.assertEqual(b"", bytes(_unescape_value(bytearray())))
-
-    def test_tab(self):
-        self.assertEqual(b"\tbar\t", bytes(_unescape_value(bytearray(b"\\tbar\\t"))))
-
-    def test_newline(self):
-        self.assertEqual(b"\nbar\t", bytes(_unescape_value(bytearray(b"\\nbar\\t"))))
-
-    def test_quote(self):
-        self.assertEqual(b"\"foo\"", bytes(_unescape_value(bytearray(b"\\\"foo\\\""))))
 
 
 class EscapeValueTests(TestCase):
@@ -259,6 +254,18 @@ class ParseStringTests(TestCase):
     def test_not_quoted(self):
         self.assertEqual(b'foo', _parse_string(b"foo"))
         self.assertEqual(b'foo bar', _parse_string(b"foo bar"))
+
+    def test_nothing(self):
+        self.assertEqual(b"", _parse_string(b''))
+
+    def test_tab(self):
+        self.assertEqual(b"\tbar\t", _parse_string(b"\\tbar\\t"))
+
+    def test_newline(self):
+        self.assertEqual(b"\nbar\t", _parse_string(b"\\nbar\\t\t"))
+
+    def test_quote(self):
+        self.assertEqual(b"\"foo\"", _parse_string(b"\\\"foo\\\""))
 
 
 class CheckVariableNameTests(TestCase):

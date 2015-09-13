@@ -171,50 +171,65 @@ def _format_string(value):
     return _escape_value(value)
 
 
+_ESCAPE_TABLE = {
+    ord(b"\\"): ord(b"\\"),
+    ord(b"\""): ord(b"\""),
+    ord(b"n"): ord(b"\n"),
+    ord(b"t"): ord(b"\t"),
+    ord(b"b"): ord(b"\b"),
+    }
+_COMMENT_CHARS = [ord(b"#"), ord(b";")]
+_WHITESPACE_CHARS = [ord(b"\t"), ord(b" ")]
+
 def _parse_string(value):
     value = bytearray(value.strip())
     ret = bytearray()
-    block = bytearray()
+    whitespace = bytearray()
     in_quotes = False
-    for c in value:
-        if c == ord(b"\""):
+    i = 0
+    while i < len(value):
+        c = value[i]
+        if c == ord(b"\\"):
+            i += 1
+            try:
+                v = _ESCAPE_TABLE[value[i]]
+            except IndexError:
+                raise ValueError(
+                    "escape character in %r at %d before end of string" %
+                    (value, i))
+            except KeyError:
+                raise ValueError(
+                    "escape character followed by unknown character %s at %d in %r" %
+                    (value[i], i, value))
+            if whitespace:
+                ret.extend(whitespace)
+                whitespace = bytearray()
+            ret.append(v)
+        elif c == ord(b"\""):
             in_quotes = (not in_quotes)
-            ret.extend(_unescape_value(block))
-            block = bytearray()
-        elif c in (ord(b"#"), ord(b";")) and not in_quotes:
+        elif c in _COMMENT_CHARS and not in_quotes:
             # the rest of the line is a comment
             break
+        elif c in _WHITESPACE_CHARS:
+            whitespace.append(c)
         else:
-            block.append(c)
+            if whitespace:
+                ret.extend(whitespace)
+                whitespace = bytearray()
+            ret.append(c)
+        i += 1
 
     if in_quotes:
-        raise ValueError("value starts with quote but lacks end quote")
-
-    ret.extend(_unescape_value(block).rstrip())
+        raise ValueError("missing end quote")
 
     return bytes(ret)
 
 
 def _unescape_value(value):
     """Unescape a value."""
-    if type(value) != bytearray:
-        raise TypeError("expected: bytearray")
-    table = {
-        ord(b"\\"): ord(b"\\"),
-        ord(b"\""): ord(b"\""),
-        ord(b"n"): ord(b"\n"),
-        ord(b"t"): ord(b"\t"),
-        ord(b"b"): ord(b"\b"),
-        }
     ret = bytearray()
     i = 0
-    while i < len(value):
-        if value[i] == ord(b"\\"):
-            i += 1
-            ret.append(table[value[i]])
-        else:
-            ret.append(value[i])
-        i += 1
+
     return ret
 
 
@@ -258,6 +273,7 @@ class ConfigFile(ConfigDict):
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
+                # Parse section header ("[bla]")
                 if len(line) > 0 and line[:1] == b"[":
                     line = _strip_comments(line).rstrip()
                     last = line.index(b"]")

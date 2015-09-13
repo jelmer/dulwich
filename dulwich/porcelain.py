@@ -29,6 +29,7 @@ Currently implemented:
  * diff-tree
  * fetch
  * init
+ * ls-remote
  * pull
  * push
  * rm
@@ -66,10 +67,18 @@ from dulwich.errors import (
     )
 from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
+    Commit,
     Tag,
     parse_timezone,
     )
-from dulwich.objectspec import parse_object
+from dulwich.objectspec import (
+    parse_object,
+    parse_reftuples,
+    )
+from dulwich.pack import (
+    write_pack_index,
+    write_pack_objects,
+    )
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import Protocol
 from dulwich.repo import (BaseRepo, Repo)
@@ -84,6 +93,14 @@ from dulwich.server import (
 
 # Module level tuple definition for status output
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
+
+
+def encode_path(path):
+    """Encode a path as bytestring."""
+    # TODO(jelmer): Use something other than ascii?
+    if not isinstance(path, bytes):
+        path = path.encode('ascii')
+    return path
 
 
 def open_repo(path_or_repo):
@@ -122,6 +139,8 @@ def archive(path, committish=None, outstream=sys.stdout,
     client = SubprocessGitClient()
     if committish is None:
         committish = "HEAD"
+    if not isinstance(path, bytes):
+        path = path.encode(sys.getfilesystemencoding())
     # TODO(jelmer): This invokes C git; this introduces a dependency.
     # Instead, dulwich should have its own archiver implementation.
     client.archive(path, committish, outstream.write, errstream.write,
@@ -234,7 +253,7 @@ def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, 
             progress=errstream.write)
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:
-            errstream.write(b'Checking out HEAD')
+            errstream.write(b'Checking out HEAD\n')
             r.reset_index()
     except:
         r.close()
@@ -276,93 +295,99 @@ def rm(repo=".", paths=None):
         index.write()
 
 
-def commit_decode(commit, contents):
+def commit_decode(commit, contents, default_encoding='utf-8'):
     if commit.encoding is not None:
         return contents.decode(commit.encoding, "replace")
-    return contents.decode("utf-8", "replace")
+    return contents.decode(default_encoding, "replace")
 
 
-def print_commit(commit, outstream=sys.stdout):
+def print_commit(commit, decode, outstream=sys.stdout):
     """Write a human-readable commit log entry.
 
     :param commit: A `Commit` object
     :param outstream: A stream file to write to
     """
-    outstream.write(b"-" * 50 + b"\n")
-    outstream.write(b"commit: " + commit.id + b"\n")
+    outstream.write("-" * 50 + "\n")
+    outstream.write("commit: " + commit.id.decode('ascii') + "\n")
     if len(commit.parents) > 1:
-        outstream.write(b"merge: " + b"...".join(commit.parents[1:]) + b"\n")
-    outstream.write(b"author: " + commit.author + b"\n")
-    outstream.write(b"committer: " + commit.committer + b"\n")
-    outstream.write(b"\n")
-    outstream.write(commit.message + b"\n")
-    outstream.write(b"\n")
+        outstream.write("merge: " +
+            "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
+    outstream.write("author: " + decode(commit.author) + "\n")
+    outstream.write("committer: " + decode(commit.committer) + "\n")
+    outstream.write("\n")
+    outstream.write(decode(commit.message) + "\n")
+    outstream.write("\n")
 
 
-def print_tag(tag, outstream=sys.stdout):
+def print_tag(tag, decode, outstream=sys.stdout):
     """Write a human-readable tag.
 
     :param tag: A `Tag` object
+    :param decode: Function for decoding bytes to unicode string
     :param outstream: A stream to write to
     """
-    outstream.write(b"Tagger: " + tag.tagger + b"\n")
-    outstream.write(b"Date:   " + tag.tag_time + b"\n")
-    outstream.write(b"\n")
-    outstream.write(tag.message + b"\n")
-    outstream.write(b"\n")
+    outstream.write("Tagger: " + decode(tag.tagger) + "\n")
+    outstream.write("Date:   " + decode(tag.tag_time) + "\n")
+    outstream.write("\n")
+    outstream.write(decode(tag.message) + "\n")
+    outstream.write("\n")
 
 
-def show_blob(repo, blob, outstream=sys.stdout):
+def show_blob(repo, blob, decode, outstream=sys.stdout):
     """Write a blob to a stream.
 
     :param repo: A `Repo` object
     :param blob: A `Blob` object
+    :param decode: Function for decoding bytes to unicode string
     :param outstream: A stream file to write to
     """
-    outstream.write(blob.data)
+    outstream.write(decode(blob.data))
 
 
-def show_commit(repo, commit, outstream=sys.stdout):
+def show_commit(repo, commit, decode, outstream=sys.stdout):
     """Show a commit to a stream.
 
     :param repo: A `Repo` object
     :param commit: A `Commit` object
+    :param decode: Function for decoding bytes to unicode string
     :param outstream: Stream to write to
     """
-    print_commit(commit, outstream)
+    print_commit(commit, decode=decode, outstream=outstream)
     parent_commit = repo[commit.parents[0]]
     write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
 
 
-def show_tree(repo, tree, outstream=sys.stdout):
+def show_tree(repo, tree, decode, outstream=sys.stdout):
     """Print a tree to a stream.
 
     :param repo: A `Repo` object
     :param tree: A `Tree` object
+    :param decode: Function for decoding bytes to unicode string
     :param outstream: Stream to write to
     """
     for n in tree:
-        outstream.write("%s\n" % n)
+        outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo, tag, outstream=sys.stdout):
+def show_tag(repo, tag, decode, outstream=sys.stdout):
     """Print a tag to a stream.
 
     :param repo: A `Repo` object
     :param tag: A `Tag` object
+    :param decode: Function for decoding bytes to unicode string
     :param outstream: Stream to write to
     """
-    print_tag(tag, outstream)
+    print_tag(tag, decode, outstream)
     show_object(repo, repo[tag.object[1]], outstream)
 
 
-def show_object(repo, obj, outstream):
+def show_object(repo, obj, decode, outstream):
     return {
         b"tree": show_tree,
         b"blob": show_blob,
         b"commit": show_commit,
         b"tag": show_tag,
-            }[obj.type_name](repo, obj, outstream)
+            }[obj.type_name](repo, obj, decode, outstream)
 
 
 def log(repo=".", outstream=sys.stdout, max_entries=None):
@@ -375,15 +400,18 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
     with open_repo_closing(repo) as r:
         walker = r.get_walker(max_entries=max_entries)
         for entry in walker:
-            print_commit(entry.commit, outstream)
+            decode = lambda x: commit_decode(entry.commit, x)
+            print_commit(entry.commit, decode, outstream)
 
 
-def show(repo=".", objects=None, outstream=sys.stdout):
+# TODO(jelmer): better default for encoding?
+def show(repo=".", objects=None, outstream=sys.stdout, default_encoding='utf-8'):
     """Print the changes in a commit.
 
     :param repo: Path to repository
     :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
+    :param default_encoding: Default encoding to use if none is set in the commit
     """
     if objects is None:
         objects = ["HEAD"]
@@ -391,7 +419,12 @@ def show(repo=".", objects=None, outstream=sys.stdout):
         objects = [objects]
     with open_repo_closing(repo) as r:
         for objectish in objects:
-            show_object(r, parse_object(r, objectish), outstream)
+            o = parse_object(r, objectish)
+            if isinstance(o, Commit):
+                decode = lambda x: commit_decode(o, x, default_encoding)
+            else:
+                decode = lambda x: x.decode(default_encoding)
+            show_object(r, o, decode, outstream)
 
 
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
@@ -518,13 +551,13 @@ def reset(repo, mode, committish="HEAD"):
         r.reset_index()
 
 
-def push(repo, remote_location, refs_path,
+def push(repo, remote_location, refspecs=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refs_path: relative path to the refs to push to remote
+    :param refspecs: relative path to the refs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """
@@ -535,10 +568,16 @@ def push(repo, remote_location, refs_path,
         # Get the client and path
         client, path = get_transport_and_path(remote_location)
 
+        selected_refs = []
+
         def update_refs(refs):
-            new_refs = r.get_refs()
-            refs[refs_path] = new_refs[b'HEAD']
-            del new_refs[b'HEAD']
+            selected_refs.extend(parse_reftuples(r.refs, refs, refspecs))
+            # TODO: Handle selected_refs == {None: None}
+            for (lh, rh, force) in selected_refs:
+                if lh is None:
+                    del refs[rh]
+                else:
+                    refs[rh] = r.refs[lh]
             return refs
 
         err_encoding = getattr(errstream, 'encoding', 'utf-8')
@@ -546,27 +585,37 @@ def push(repo, remote_location, refs_path,
         try:
             client.send_pack(path, update_refs,
                 r.object_store.generate_pack_contents, progress=errstream.write)
-            errstream.write(b"Push to " + remote_location_bytes + b" successful.\n")
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" successful.\n")
         except (UpdateRefsError, SendPackError) as e:
-            errstream.write(b"Push to " + remote_location_bytes + b" failed -> " + e.message.encode(err_encoding) + b"\n")
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" failed -> " + e.message.encode(err_encoding) +
+                            b"\n")
 
 
-def pull(repo, remote_location, refs_path,
+def pull(repo, remote_location, refspecs=None,
          outstream=sys.stdout, errstream=sys.stderr):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refs_path: relative path to the fetched refs
+    :param refspec: refspecs to fetch
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
     """
-
     # Open the repo
     with open_repo_closing(repo) as r:
+        selected_refs = []
+        def determine_wants(remote_refs):
+            selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
+            return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(remote_location)
-        remote_refs = client.fetch(path, r, progress=errstream.write)
-        r[b'HEAD'] = remote_refs[refs_path]
+        remote_refs = client.fetch(path, r, progress=errstream.write,
+                determine_wants=determine_wants)
+        for (lh, rh, force) in selected_refs:
+            r.refs[rh] = remote_refs[lh]
+        if selected_refs:
+            r[b'HEAD'] = remote_refs[selected_refs[0][1]]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree
@@ -762,3 +811,38 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
         client, path = get_transport_and_path(remote_location)
         remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs
+
+
+def ls_remote(remote):
+    client, host_path = get_transport_and_path(remote)
+    return client.get_refs(encode_path(host_path))
+
+
+def repack(repo):
+    """Repack loose files in a repository.
+
+    Currently this only packs loose objects.
+
+    :param repo: Path to the repository
+    """
+    with open_repo_closing(repo) as r:
+        r.object_store.pack_loose_objects()
+
+
+def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
+    """Pack objects into a file.
+
+    :param repo: Path to the repository
+    :param object_ids: List of object ids to write
+    :param packf: File-like object to write to
+    :param idxf: File-like object to write to (can be None)
+    """
+    with open_repo_closing(repo) as r:
+        entries, data_sum = write_pack_objects(
+            packf,
+            r.object_store.iter_shas((oid, None) for oid in object_ids),
+            delta_window_size=delta_window_size)
+    if idxf is not None:
+        entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
+        entries.sort()
+        write_pack_index(idxf, entries, data_sum)

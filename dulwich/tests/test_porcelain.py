@@ -20,6 +20,10 @@
 
 from contextlib import closing
 from io import BytesIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 import os
 import shutil
 import tarfile
@@ -232,17 +236,17 @@ class LogTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertEqual(3, outstream.getvalue().count(b"-" * 50))
+        self.assertEqual(3, outstream.getvalue().count("-" * 50))
 
     def test_max_entries(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
-        self.assertEqual(1, outstream.getvalue().count(b"-" * 50))
+        self.assertEqual(1, outstream.getvalue().count("-" * 50))
 
 
 class ShowTests(PorcelainTestCase):
@@ -251,24 +255,24 @@ class ShowTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=c3.id, outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith(b"-" * 50))
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=[c3.id], outstream=outstream)
-        self.assertTrue(outstream.getvalue().startswith(b"-" * 50))
+        self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_blob(self):
         b = Blob.from_string(b"The Foo\n")
         self.repo.object_store.add_object(b)
-        outstream = BytesIO()
+        outstream = StringIO()
         porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
-        self.assertEqual(outstream.getvalue(), b"The Foo\n")
+        self.assertEqual(outstream.getvalue(), "The Foo\n")
 
 
 class SymbolicRefTests(PorcelainTestCase):
@@ -453,7 +457,8 @@ class PushTests(PorcelainTestCase):
         # Setup target repo cloned from temp test repo
         clone_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, clone_path)
-        target_repo = porcelain.clone(self.repo.path, target=clone_path, errstream=errstream)
+        target_repo = porcelain.clone(self.repo.path, target=clone_path,
+            errstream=errstream)
         target_repo.close()
 
         # create a second file to be pushed back to origin
@@ -465,11 +470,11 @@ class PushTests(PorcelainTestCase):
 
         # Setup a non-checked out branch in the remote
         refs_path = b"refs/heads/foo"
-        self.repo[refs_path] = self.repo[b'HEAD']
+        self.repo.refs[refs_path] = self.repo[b'HEAD'].id
 
         # Push to the remote
-        porcelain.push(clone_path, self.repo.path, refs_path, outstream=outstream,
-                errstream=errstream)
+        porcelain.push(clone_path, self.repo.path, b"HEAD:" + refs_path, outstream=outstream,
+            errstream=errstream)
 
         # Check that the target and source
         with closing(Repo(clone_path)) as r_clone:
@@ -479,7 +484,8 @@ class PushTests(PorcelainTestCase):
             # this will be in the foo branch.
             change = list(tree_changes(self.repo, self.repo[b'HEAD'].tree,
                                        self.repo[b'refs/heads/foo'].tree))[0]
-            self.assertEqual(os.path.basename(fullpath), change.new.path.decode('ascii'))
+            self.assertEqual(os.path.basename(fullpath),
+                change.new.path.decode('ascii'))
 
 
 class PullTests(PorcelainTestCase):
@@ -510,6 +516,9 @@ class PullTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test2',
             author=b'test2', committer=b'test2')
+
+        self.assertTrue(b'refs/heads/master' in self.repo.refs)
+        self.assertTrue(b'refs/heads/master' in target_repo.refs)
 
         # Pull changes into the cloned repo
         porcelain.pull(target_path, self.repo.path, b'refs/heads/master',
@@ -731,3 +740,16 @@ class FetchTests(PorcelainTestCase):
         # Check the target repo for pushed changes
         with closing(Repo(target_path)) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
+
+
+class RepackTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.repack(self.repo)
+
+    def test_simple(self):
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
+        filename = os.path.basename(fullpath)
+        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.repack(self.repo)

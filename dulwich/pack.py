@@ -1061,33 +1061,48 @@ class PackData(object):
 
         :return: Tuple with object type and contents.
         """
-        if type not in DELTA_TYPES:
-            return type, obj
+        # Walk down the delta chain, building a stack of deltas to reach
+        # the requested object.
+        base_offset = offset
+        base_type = type
+        base_obj = obj
+        delta_stack = []
+        while base_type in DELTA_TYPES:
+            prev_offset = base_offset
+            if get_ref is None:
+                get_ref = self.get_ref
+            if base_type == OFS_DELTA:
+                (delta_offset, delta) = base_obj
+                # TODO: clean up asserts and replace with nicer error messages
+                assert (
+                    isinstance(base_offset, int)
+                    or isinstance(base_offset, long))
+                assert (
+                    isinstance(delta_offset, int)
+                    or isinstance(base_offset, long))
+                base_offset = base_offset - delta_offset
+                base_type, base_obj = self.get_object_at(base_offset)
+                assert isinstance(base_type, int)
+            elif base_type == REF_DELTA:
+                (basename, delta) = base_obj
+                assert isinstance(basename, bytes) and len(basename) == 20
+                base_offset, base_type, base_obj = get_ref(basename)
+                assert isinstance(base_type, int)
+            delta_stack.append((prev_offset, base_type, delta))
 
-        if get_ref is None:
-            get_ref = self.get_ref
-        if type == OFS_DELTA:
-            (delta_offset, delta) = obj
-            # TODO: clean up asserts and replace with nicer error messages
-            assert isinstance(offset, int) or isinstance(offset, long)
-            assert isinstance(delta_offset, int) or isinstance(offset, long)
-            base_offset = offset-delta_offset
-            type, base_obj = self.get_object_at(base_offset)
-            assert isinstance(type, int)
-        elif type == REF_DELTA:
-            (basename, delta) = obj
-            assert isinstance(basename, bytes) and len(basename) == 20
-            base_offset, type, base_obj = get_ref(basename)
-            assert isinstance(type, int)
-        type, base_chunks = self.resolve_object(base_offset, type, base_obj)
-        chunks = apply_delta(base_chunks, delta)
-        # TODO(dborowitz): This can result in poor performance if large base
-        # objects are separated from deltas in the pack. We should reorganize
-        # so that we apply deltas to all objects in a chain one after the other
-        # to optimize cache performance.
-        if offset is not None:
-            self._offset_cache[offset] = type, chunks
-        return type, chunks
+        # Now grab the base object (mustn't be a delta) and apply the
+        # deltas all the way up the stack.
+        chunks = base_obj
+        for prev_offset, delta_type, delta in reversed(delta_stack):
+            chunks = apply_delta(chunks, delta)
+            # TODO(dborowitz): This can result in poor performance if
+            # large base objects are separated from deltas in the pack.
+            # We should reorganize so that we apply deltas to all
+            # objects in a chain one after the other to optimize cache
+            # performance.
+            if prev_offset is not None:
+                self._offset_cache[prev_offset] = base_type, chunks
+        return base_type, chunks
 
     def iterobjects(self, progress=None, compute_crc32=True):
         self._file.seek(self._header_size)
@@ -1322,15 +1337,16 @@ class DeltaChainIterator(object):
     def _follow_chain(self, offset, obj_type_num, base_chunks):
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
-        unpacked = self._resolve_object(offset, obj_type_num, base_chunks)
-        yield self._result(unpacked)
+        todo = [(offset, obj_type_num, base_chunks)]
+        for offset, obj_type_num, base_chunks in todo:
+            unpacked = self._resolve_object(offset, obj_type_num, base_chunks)
+            yield self._result(unpacked)
 
-        pending = chain(self._pending_ofs.pop(unpacked.offset, []),
-                        self._pending_ref.pop(unpacked.sha(), []))
-        for new_offset in pending:
-            for new_result in self._follow_chain(
-              new_offset, unpacked.obj_type_num, unpacked.obj_chunks):
-                yield new_result
+            unblocked = chain(self._pending_ofs.pop(unpacked.offset, []),
+                              self._pending_ref.pop(unpacked.sha(), []))
+            todo.extend(
+                (new_offset, unpacked.obj_type_num, unpacked.obj_chunks)
+                for new_offset in unblocked)
 
     def __iter__(self):
         return self._walk_all_chains()
@@ -1776,6 +1792,9 @@ def write_pack_index_v2(f, entries, pack_checksum):
     assert len(pack_checksum) == 20
     f.write(pack_checksum)
     return f.write_sha()
+
+
+write_pack_index = write_pack_index_v2
 
 
 class Pack(object):

@@ -171,10 +171,31 @@ class ServerTests(object):
         run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
-        expected_shallow = [b'94de09a530df27ac3bb613aaecdd539e0a0655e1',
-                            b'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
+        expected_shallow = [b'35e0b59e187dd72a0af294aedffc213eaa4d03ff',
+                            b'514dc6d3fbfe77361bcaef320c4d21b72bc10be9']
         self.assertEqual(expected_shallow, _get_shallow(clone))
         self.assertReposNotEqual(clone, self._source_repo)
+
+    def test_shallow_clone_from_git_is_identical(self):
+        require_git_version(self.min_single_branch_version)
+        self._source_repo = self.import_repo('server_new.export')
+        self._stub_repo_git = _StubRepo('shallow-git')
+        self.addCleanup(tear_down_repo, self._stub_repo_git)
+        self._stub_repo_dw = _StubRepo('shallow-dw')
+        self.addCleanup(tear_down_repo, self._stub_repo_dw)
+
+        # shallow clone using stock git, then using dulwich
+        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+                         'file://' + self._source_repo.path,
+                         self._stub_repo_git.path])
+
+        port = self._start_server(self._source_repo)
+        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+                        self.url(port), self._stub_repo_dw.path])
+
+        # compare the two clones; they should be equal
+        self.assertReposEqual(Repo(self._stub_repo_git.path),
+                              Repo(self._stub_repo_dw.path))
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
@@ -183,14 +204,14 @@ class ServerTests(object):
         self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
 
-        # Fetch at depth 1
-        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+        # Fetch at depth 2
+        run_git_or_fail(['clone', '--mirror', '--depth=2', '--no-single-branch',
                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+          ['fetch', '--depth=2', self.url(port)] + self.branch_args(),
           cwd=self._stub_repo.path)
         expected_shallow = [b'94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             b'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
@@ -204,19 +225,19 @@ class ServerTests(object):
         self.addCleanup(tear_down_repo, self._stub_repo)
         port = self._start_server(self._source_repo)
 
-        # Fetch at depth 1
-        run_git_or_fail(['clone', '--mirror', '--depth=1', '--no-single-branch',
+        # Fetch at depth 2
+        run_git_or_fail(['clone', '--mirror', '--depth=2', '--no-single-branch',
                         self.url(port), self._stub_repo.path])
         clone = self._stub_repo = Repo(self._stub_repo.path)
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-          ['fetch', '--depth=1', self.url(port)] + self.branch_args(),
+          ['fetch', '--depth=2', self.url(port)] + self.branch_args(),
           cwd=self._stub_repo.path)
 
-        # The whole repo only has depth 3, so it should equal server_new.
+        # The whole repo only has depth 4, so it should equal server_new.
         run_git_or_fail(
-          ['fetch', '--depth=3', self.url(port)] + self.branch_args(),
+          ['fetch', '--depth=4', self.url(port)] + self.branch_args(),
           cwd=self._stub_repo.path)
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)

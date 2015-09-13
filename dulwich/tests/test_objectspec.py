@@ -28,6 +28,10 @@ from dulwich.objects import (
 from dulwich.objectspec import (
     parse_object,
     parse_commit_range,
+    parse_ref,
+    parse_refs,
+    parse_reftuple,
+    parse_reftuples,
     )
 from dulwich.repo import MemoryRepo
 from dulwich.tests import (
@@ -64,3 +68,72 @@ class ParseCommitRangeTests(TestCase):
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1],
             [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
+
+
+class ParseRefTests(TestCase):
+
+    def test_nonexistent(self):
+        r = {}
+        self.assertRaises(KeyError, parse_ref, r, b"thisdoesnotexist")
+
+    def test_head(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual(b"refs/heads/foo", parse_ref(r, b"foo"))
+
+    def test_full(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual(b"refs/heads/foo", parse_ref(r, b"refs/heads/foo"))
+
+
+class ParseRefsTests(TestCase):
+
+    def test_nonexistent(self):
+        r = {}
+        self.assertRaises(KeyError, parse_refs, r, [b"thisdoesnotexist"])
+
+    def test_head(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual([b"refs/heads/foo"], parse_refs(r, [b"foo"]))
+
+    def test_full(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual([b"refs/heads/foo"], parse_refs(r, b"refs/heads/foo"))
+
+
+class ParseReftupleTests(TestCase):
+
+    def test_nonexistent(self):
+        r = {}
+        self.assertRaises(KeyError, parse_reftuple, r, r, b"thisdoesnotexist")
+
+    def test_head(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"foo"))
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, r, b"+foo"))
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, {}, b"+foo"))
+
+    def test_full(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"refs/heads/foo"))
+
+
+class ParseReftuplesTests(TestCase):
+
+    def test_nonexistent(self):
+        r = {}
+        self.assertRaises(KeyError, parse_reftuples, r, r,
+            [b"thisdoesnotexist"])
+
+    def test_head(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, [b"foo"]))
+
+    def test_full(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, b"refs/heads/foo"))

@@ -712,7 +712,6 @@ class SubprocessGitClient(TraditionalGitClient):
             raise TypeError(path)
         if type(path) is not bytes:
             raise TypeError(path)
-        import subprocess
         if self.git_command is None:
             git_command = find_git_command()
         argv = git_command + [service.decode('ascii'), path]
@@ -855,7 +854,6 @@ class SubprocessSSHVendor(SSHVendor):
             not all([isinstance(b, bytes) for b in command])):
             raise TypeError(command)
 
-        import subprocess
         #FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:

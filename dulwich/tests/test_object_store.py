@@ -392,6 +392,7 @@ class TreeLookupPathTests(TestCase):
     def test_lookup_not_tree(self):
         self.assertRaises(NotTreeError, tree_lookup_path, self.get_object, self.tree_id, b'ad/b/j')
 
+
 class ObjectStoreGraphWalkerTests(TestCase):
 
     def get_walker(self, heads, parent_map):

@@ -75,6 +75,10 @@ from dulwich.objectspec import (
     parse_object,
     parse_reftuples,
     )
+from dulwich.pack import (
+    write_pack_index,
+    write_pack_objects,
+    )
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import Protocol
 from dulwich.repo import (BaseRepo, Repo)
@@ -823,3 +827,22 @@ def repack(repo):
     """
     with open_repo_closing(repo) as r:
         r.object_store.pack_loose_objects()
+
+
+def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
+    """Pack objects into a file.
+
+    :param repo: Path to the repository
+    :param object_ids: List of object ids to write
+    :param packf: File-like object to write to
+    :param idxf: File-like object to write to (can be None)
+    """
+    with open_repo_closing(repo) as r:
+        entries, data_sum = write_pack_objects(
+            packf,
+            r.object_store.iter_shas((oid, None) for oid in object_ids),
+            delta_window_size=delta_window_size)
+    if idxf is not None:
+        entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
+        entries.sort()
+        write_pack_index(idxf, entries, data_sum)

@@ -1794,6 +1794,9 @@ def write_pack_index_v2(f, entries, pack_checksum):
     return f.write_sha()
 
 
+write_pack_index = write_pack_index_v2
+
+
 class Pack(object):
     """A Git pack object."""
 

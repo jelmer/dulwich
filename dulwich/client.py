@@ -94,7 +94,10 @@ def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
-COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
+CAPABILITY_AGENT = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode('ascii')
+
+COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K,
+                       CAPABILITY_AGENT]
 FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
                        CAPABILITY_MULTI_ACK_DETAILED] +
                       COMMON_CAPABILITIES)

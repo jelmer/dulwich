@@ -90,6 +90,14 @@ from dulwich.server import (
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
+def encode_path(path):
+    """Encode a path as bytestring."""
+    # TODO(jelmer): Use something other than ascii?
+    if not isinstance(path, bytes):
+        path = path.encode('ascii')
+    return path
+
+
 def open_repo(path_or_repo):
     """Open an argument that can be a repository or a path for a repository."""
     if isinstance(path_or_repo, BaseRepo):
@@ -294,15 +302,16 @@ def print_commit(commit, outstream=sys.stdout):
     :param commit: A `Commit` object
     :param outstream: A stream file to write to
     """
-    outstream.write(b"-" * 50 + b"\n")
-    outstream.write(b"commit: " + commit.id + b"\n")
+    outstream.write("-" * 50 + "\n")
+    outstream.write("commit: " + commit.id.decode('ascii') + "\n")
     if len(commit.parents) > 1:
-        outstream.write(b"merge: " + b"...".join(commit.parents[1:]) + b"\n")
-    outstream.write(b"author: " + commit.author + b"\n")
-    outstream.write(b"committer: " + commit.committer + b"\n")
-    outstream.write(b"\n")
-    outstream.write(commit.message + b"\n")
-    outstream.write(b"\n")
+        outstream.write("merge: " +
+            "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
+    outstream.write("author: " + commit_decode(commit, commit.author) + "\n")
+    outstream.write("committer: " + commit_decode(commit, commit.committer) + "\n")
+    outstream.write("\n")
+    outstream.write(commit_decode(commit, commit.message) + "\n")
+    outstream.write("\n")
 
 
 def print_tag(tag, outstream=sys.stdout):
@@ -788,4 +797,4 @@ def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
 
 def ls_remote(remote):
     client, host_path = get_transport_and_path(remote)
-    return client.get_refs(host_path)
+    return client.get_refs(encode_path(host_path))

@@ -309,7 +309,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.TCPGitClient(b'localhost')
+        return client.TCPGitClient('localhost')
 
     def _build_path(self, path):
         return path
@@ -345,7 +345,7 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         client.get_ssh_vendor = self.real_vendor
 
     def _client(self):
-        return client.SSHGitClient(b'localhost')
+        return client.SSHGitClient('localhost')
 
     def _build_path(self, path):
         return self.gitroot.encode(sys.getfilesystemencoding()) + path

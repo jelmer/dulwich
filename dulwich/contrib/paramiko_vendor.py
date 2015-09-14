@@ -108,6 +108,40 @@ class _ParamikoWrapper(object):
         self.stop_monitoring()
 
 
+# {{{ shell quoting
+
+# Adapted from
+# https://github.com/python/cpython/blob/8cd133c63f156451eb3388b9308734f699f4f1af/Lib/shlex.py#L278
+
+def is_shell_safe(s):
+    import re
+    import sys
+
+    flags = 0
+    if sys.version_info >= (3,):
+        flags = re.ASCII
+
+    unsafe_re = re.compile(br'[^\w@%+=:,./-]', flags)
+
+    return unsafe_re.search(s) is None
+
+
+def shell_quote(s):
+    """Return a shell-escaped version of the byte string *s*."""
+
+    # Unconditionally quotes because that's apparently git's behavior, too,
+    # and some code hosting sites (notably Bitbucket) appear to rely on that.
+
+    if not s:
+        return b"''"
+
+    # use single quotes, and put single quotes into double quotes
+    # the string $'b is then quoted as '$'"'"'b'
+    return b"'" + s.replace(b"'", b"'\"'\"'") + b"'"
+
+# }}}
+
+
 class ParamikoSSHVendor(object):
 
     def __init__(self):
@@ -132,8 +166,18 @@ class ParamikoSSHVendor(object):
         # Open SSH session
         channel = client.get_transport().open_session()
 
+        # Quote command
+        assert command
+        assert is_shell_safe(command[0])
+
+        quoted_command = (
+            command[0]
+            + b' '
+            + b' '.join(
+                shell_quote(c) for c in command[1:]))
+
         # Run commands
-        channel.exec_command(subprocess.list2cmdline(command))
+        channel.exec_command(quoted_command)
 
         return _ParamikoWrapper(
             client, channel, progress_stderr=progress_stderr)

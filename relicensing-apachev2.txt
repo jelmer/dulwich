@@ -20,7 +20,6 @@ Chris Eberle <eberle1080@gmail.com>
 Damien Tournoud <damien@commerceguys.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
-Jameson Nash <jameson@mit.edu>
 max <max0d41@github.com>
 Nick Ward <ward.nickjames@gmail.com>
 Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>

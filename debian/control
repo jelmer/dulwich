@@ -14,7 +14,6 @@ XS-Testsuite: autopkgtest
 
 Package: python-dulwich
 Architecture: any
-Provides: ${python:Provides}
 Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
 Suggests: python-dulwich-dbg
@@ -36,7 +35,6 @@ Architecture: any
 Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}, python-dbg, python-dulwich (= ${binary:Version})
 Priority: extra
 Section: debug
-Provides: ${python:Provides}
 Description: Python Git library - Debug Extension
  Dulwich is a Python implementation of the file formats and protocols
  used by the Git version control system. It can currently read from and write
@@ -67,10 +65,9 @@ Description: Python Git library - pypy module
 
 Package: python3-dulwich
 Architecture: any
-Provides: ${python:Provides}
-Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Depends: ${python3:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
-Suggests: python-dulwich-dbg
+Suggests: python3-dulwich-dbg
 Description: Python Git library - Python3 module
  Dulwich is a Python implementation of the file formats and protocols
  used by the Git version control system. It can currently read from and write
@@ -85,10 +82,9 @@ Description: Python Git library - Python3 module
 
 Package: python3-dulwich-dbg
 Architecture: any
-Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}, python3-dbg, python3-dulwich (= ${binary:Version})
+Depends: ${misc:Depends}, ${shlibs:Depends}, python3-dbg, python3-dulwich (= ${binary:Version})
 Priority: extra
 Section: debug
-Provides: ${python:Provides}
 Description: Python Git library - Python 3 Debug Extension
  Dulwich is a Python implementation of the file formats and protocols
  used by the Git version control system. It can currently read from and write

@@ -1,6 +1,12 @@
 dulwich (0.11.2-1) UNRELEASED; urgency=medium
 
+  [ Jelmer Vernooij ]
   * New upstream release.
+
+  [ Scott Kitterman ]
+  * Team upload.
+  * Fix python3 depends. Closes: #799185
+  * Remove obsolete provides.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sat, 19 Sep 2015 00:19:21 +0000
 

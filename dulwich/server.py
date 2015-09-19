@@ -68,6 +68,7 @@ from dulwich.pack import (
     )
 from dulwich.protocol import (
     BufferedPktLineWriter,
+    capability_agent,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -75,6 +76,7 @@ from dulwich.protocol import (
     CAPABILITY_NO_DONE,
     CAPABILITY_NO_PROGRESS,
     CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SHALLOW,
     CAPABILITY_SIDE_BAND_64K,
@@ -220,7 +222,8 @@ class Handler(object):
     @classmethod
     def innocuous_capabilities(cls):
         return (CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
-                CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA)
+                CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA,
+                capability_agent())
 
     @classmethod
     def required_capabilities(cls):
@@ -837,7 +840,7 @@ class ReceivePackHandler(Handler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
+        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_QUIET,
                 CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
 
     def _apply_pack(self, refs):

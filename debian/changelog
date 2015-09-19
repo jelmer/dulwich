@@ -1,4 +1,4 @@
-dulwich (0.11.2-1) UNRELEASED; urgency=medium
+dulwich (0.11.2-1) unstable; urgency=medium
 
   [ Jelmer Vernooij ]
   * New upstream release.

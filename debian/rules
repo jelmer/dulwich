@@ -18,7 +18,8 @@ override_dh_auto_build:
 
 override_dh_auto_clean:
 	dh_auto_clean
-	rm -rf build-pypy
+	rm -rf build*
+	rm -f dulwich/*.so dulwich/*.o
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))

@@ -14,7 +14,8 @@ pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CU
 
 override_dh_auto_build:
 	dh_auto_build
-	pypy setup.py build -b build-pypy
+	# Work around bug #799485
+	CFLAGS=-I/usr/lib/pypy pypy setup.py build -b build-pypy
 
 override_dh_auto_clean:
 	dh_auto_clean

@@ -10,6 +10,9 @@ dulwich (0.11.2-1) UNRELEASED; urgency=medium
   * Fix python3 depends. Closes: #799185
   * Remove obsolete provides.
 
+  [ Jelmer Vernooij ]
+  * Force CFLAGS to -I/usr/lib/pypy, to work around bug #799485.
+
  -- Jelmer Vernooij <jelmer@debian.org>  Sat, 19 Sep 2015 00:19:21 +0000
 
 dulwich (0.11.1-1) unstable; urgency=medium

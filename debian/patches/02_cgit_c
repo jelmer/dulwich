@@ -1,0 +1,12 @@
+diff --git a/dulwich/tests/compat/utils.py b/dulwich/tests/compat/utils.py
+index 5142169..d6d1f7f 100644
+--- a/dulwich/tests/compat/utils.py
++++ b/dulwich/tests/compat/utils.py
+@@ -124,6 +124,7 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
+     """
+ 
+     env = get_safe_env(popen_kwargs.pop('env', None))
++    env['LC_ALL'] = env['LANG'] = 'C'
+ 
+     args = [git_path] + args
+     popen_kwargs['stdin'] = subprocess.PIPE

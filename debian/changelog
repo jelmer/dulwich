@@ -2,6 +2,8 @@ dulwich (0.11.2-1) UNRELEASED; urgency=medium
 
   [ Jelmer Vernooij ]
   * New upstream release.
+  * Add patch 02_cgit_c: support building under different locale.
+    Closes: #799076
 
   [ Scott Kitterman ]
   * Team upload.

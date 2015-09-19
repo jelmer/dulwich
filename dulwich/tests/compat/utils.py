@@ -124,6 +124,7 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
     """
 
     env = get_safe_env(popen_kwargs.pop('env', None))
+    env['LC_ALL'] = env['LANG'] = 'C'
 
     args = [git_path] + args
     popen_kwargs['stdin'] = subprocess.PIPE

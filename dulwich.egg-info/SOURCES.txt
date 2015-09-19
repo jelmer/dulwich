@@ -63,6 +63,7 @@ dulwich.egg-info/dependency_links.txt
 dulwich.egg-info/pbr.json
 dulwich.egg-info/top_level.txt
 dulwich/contrib/__init__.py
+dulwich/contrib/paramiko_vendor.py
 dulwich/contrib/swift.py
 dulwich/contrib/test_swift.py
 dulwich/contrib/test_swift_smoke.py

@@ -17,7 +17,6 @@ dual Apachev2/GPLv2:
 
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
 Chris Eberle <eberle1080@gmail.com>
-Damien Tournoud <damien@commerceguys.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
 max <max0d41@github.com>

@@ -502,6 +502,21 @@ exit 1
         self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
+    def test_as_dict(self):
+        def check(repo):
+            self.assertTrue(repo.refs.as_dict())
+            self.assertTrue(repo.refs.as_dict('refs/tags/'))
+            self.assertTrue(repo.refs.as_dict('refs/heads/'))
+            self.assertEqual(repo.refs.as_dict('refs/tags'), repo.refs.as_dict('refs/tags/'))
+            self.assertEqual(repo.refs.as_dict('refs/heads'), repo.refs.as_dict('refs/heads/'))
+
+        bare = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with closing(bare.clone(tmp_dir, mkdir=False)) as nonbare:
+            check(nonbare)
+            check(bare)
+
 
 class BuildRepoRootTests(TestCase):
     """Tests that build on-disk repos from scratch.

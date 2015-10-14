@@ -909,7 +909,7 @@ class SSHGitClient(TraditionalGitClient):
             raise TypeError(path)
         if path.startswith(b"/~"):
             path = path[1:]
-        argv = self._get_cmd_path(cmd) + [path]
+        argv = self._get_cmd_path(cmd) + ["'" + path + "'"]
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,

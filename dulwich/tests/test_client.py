@@ -560,10 +560,10 @@ class SSHGitClientTests(TestCase):
         client._connect(b"command", b"/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual([b"git-command", b"/path/to/repo"], server.command)
+        self.assertEqual([b"git-command", b"'/path/to/repo'"], server.command)
 
         client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual([b"git-relative-command", b"~/path/to/repo"],
+        self.assertEqual([b"git-relative-command", b"'~/path/to/repo'"],
                           server.command)
 
 

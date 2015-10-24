@@ -48,6 +48,7 @@ Differences in behaviour are considered bugs.
 
 __docformat__ = 'restructuredText'
 
+import codecs
 from collections import namedtuple
 from contextlib import (
     closing,
@@ -95,6 +96,14 @@ from dulwich.server import (
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
+if sys.version_info[0] < 3:
+    STDOUT = sys.stdout
+    STDERR = sys.stderr
+else:
+    STDOUT = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    STDERR = codecs.getwriter('utf-8')(sys.stderr.buffer)
+
+
 def encode_path(path):
     """Encode a path as bytestring."""
     # TODO(jelmer): Use something other than ascii?
@@ -126,8 +135,8 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def archive(path, committish=None, outstream=sys.stdout,
-            errstream=sys.stderr):
+def archive(path, committish=None, outstream=STDOUT,
+            errstream=STDERR):
     """Create an archive.
 
     :param path: Path of repository for which to generate an archive.
@@ -215,7 +224,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, outstream=None):
+def clone(source, target=None, bare=False, checkout=None, errstream=STDOUT, outstream=None):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -301,7 +310,7 @@ def commit_decode(commit, contents, default_encoding='utf-8'):
     return contents.decode(default_encoding, "replace")
 
 
-def print_commit(commit, decode, outstream=sys.stdout):
+def print_commit(commit, decode, outstream=STDOUT):
     """Write a human-readable commit log entry.
 
     :param commit: A `Commit` object
@@ -319,7 +328,7 @@ def print_commit(commit, decode, outstream=sys.stdout):
     outstream.write("\n")
 
 
-def print_tag(tag, decode, outstream=sys.stdout):
+def print_tag(tag, decode, outstream=STDOUT):
     """Write a human-readable tag.
 
     :param tag: A `Tag` object
@@ -333,7 +342,7 @@ def print_tag(tag, decode, outstream=sys.stdout):
     outstream.write("\n")
 
 
-def show_blob(repo, blob, decode, outstream=sys.stdout):
+def show_blob(repo, blob, decode, outstream=STDOUT):
     """Write a blob to a stream.
 
     :param repo: A `Repo` object
@@ -344,7 +353,7 @@ def show_blob(repo, blob, decode, outstream=sys.stdout):
     outstream.write(decode(blob.data))
 
 
-def show_commit(repo, commit, decode, outstream=sys.stdout):
+def show_commit(repo, commit, decode, outstream=STDOUT):
     """Show a commit to a stream.
 
     :param repo: A `Repo` object
@@ -357,7 +366,7 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
     write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
 
 
-def show_tree(repo, tree, decode, outstream=sys.stdout):
+def show_tree(repo, tree, decode, outstream=STDOUT):
     """Print a tree to a stream.
 
     :param repo: A `Repo` object
@@ -369,7 +378,7 @@ def show_tree(repo, tree, decode, outstream=sys.stdout):
         outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo, tag, decode, outstream=sys.stdout):
+def show_tag(repo, tag, decode, outstream=STDOUT):
     """Print a tag to a stream.
 
     :param repo: A `Repo` object
@@ -390,7 +399,7 @@ def show_object(repo, obj, decode, outstream):
             }[obj.type_name](repo, obj, decode, outstream)
 
 
-def log(repo=".", outstream=sys.stdout, max_entries=None):
+def log(repo=".", outstream=STDOUT, max_entries=None):
     """Write commit logs.
 
     :param repo: Path to repository
@@ -405,7 +414,7 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
 
 
 # TODO(jelmer): better default for encoding?
-def show(repo=".", objects=None, outstream=sys.stdout, default_encoding='utf-8'):
+def show(repo=".", objects=None, outstream=STDOUT, default_encoding='utf-8'):
     """Print the changes in a commit.
 
     :param repo: Path to repository
@@ -427,7 +436,7 @@ def show(repo=".", objects=None, outstream=sys.stdout, default_encoding='utf-8')
             show_object(r, o, decode, outstream)
 
 
-def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
+def diff_tree(repo, old_tree, new_tree, outstream=STDOUT):
     """Compares the content and mode of blobs found via two tree objects.
 
     :param repo: Path to repository
@@ -439,7 +448,7 @@ def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
         write_tree_diff(outstream, r.object_store, old_tree, new_tree)
 
 
-def rev_list(repo, commits, outstream=sys.stdout):
+def rev_list(repo, commits, outstream=STDOUT):
     """Lists commit objects in reverse chronological order.
 
     :param repo: Path to repository
@@ -507,7 +516,7 @@ def list_tags(*args, **kwargs):
     return tag_list(*args, **kwargs)
 
 
-def tag_list(repo, outstream=sys.stdout):
+def tag_list(repo, outstream=STDOUT):
     """List all tags.
 
     :param repo: Path to repository
@@ -552,7 +561,7 @@ def reset(repo, mode, committish="HEAD"):
 
 
 def push(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=STDOUT, errstream=STDERR):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -594,7 +603,7 @@ def push(repo, remote_location, refspecs=None,
 
 
 def pull(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=STDOUT, errstream=STDERR):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -798,7 +807,7 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+def fetch(repo, remote_location, outstream=STDOUT, errstream=STDERR):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository

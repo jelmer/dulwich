@@ -504,9 +504,7 @@ exit 1
 
     def test_as_dict(self):
         def check(repo):
-            self.assertTrue(repo.refs.as_dict())
-            self.assertTrue(repo.refs.as_dict('refs/tags/'))
-            self.assertTrue(repo.refs.as_dict('refs/heads/'))
+            self.assertEqual(repo.refs.subkeys('refs/tags'), repo.refs.subkeys('refs/tags/'))
             self.assertEqual(repo.refs.as_dict('refs/tags'), repo.refs.as_dict('refs/tags/'))
             self.assertEqual(repo.refs.as_dict('refs/heads'), repo.refs.as_dict('refs/heads/'))
 

@@ -149,6 +149,8 @@ class RefsContainer(object):
         keys = self.keys(base)
         if base is None:
             base = b''
+        else:
+            base = base.rstrip(b'/')
         for key in keys:
             try:
                 ret[key] = self[(base + b'/' + key).strip(b'/')]

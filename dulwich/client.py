@@ -850,8 +850,7 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
-        if (type(command) is not list or
-            not all([isinstance(b, bytes) for b in command])):
+        if not isinstance(command, bytes):
             raise TypeError(command)
 
         #FIXME: This has no way to deal with passwords..
@@ -861,7 +860,7 @@ class SubprocessSSHVendor(SSHVendor):
         if username is not None:
             host = '%s@%s' % (username, host)
         args.append(host)
-        proc = subprocess.Popen(args + command,
+        proc = subprocess.Popen(args + [command],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
@@ -896,11 +895,7 @@ class SSHGitClient(TraditionalGitClient):
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
         assert isinstance(cmd, bytes)
-        if sys.version_info[:2] <= (2, 6):
-            return shlex.split(cmd)
-        else:
-            # TODO(jelmer): Don't decode/encode here
-            return [x.encode('ascii') for x in shlex.split(cmd.decode('ascii'))]
+        return cmd
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
@@ -909,7 +904,7 @@ class SSHGitClient(TraditionalGitClient):
             raise TypeError(path)
         if path.startswith(b"/~"):
             path = path[1:]
-        argv = self._get_cmd_path(cmd) + [b"'" + path + b"'"]
+        argv = self._get_cmd_path(cmd) + b" '" + path + b"'"
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,

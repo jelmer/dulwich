@@ -502,8 +502,7 @@ class TestSSHVendor(object):
         self.port = None
 
     def run_command(self, host, command, username=None, port=None):
-        if (type(command) is not list or
-            not all([isinstance(b, bytes) for b in command])):
+        if not isinstance(command, bytes):
             raise TypeError(command)
 
         self.host = host
@@ -535,19 +534,19 @@ class SSHGitClientTests(TestCase):
         client.get_ssh_vendor = self.real_vendor
 
     def test_default_command(self):
-        self.assertEqual([b'git-upload-pack'],
+        self.assertEqual(b'git-upload-pack',
                 self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path(self):
         self.client.alternative_paths[b'upload-pack'] = (
             b'/usr/lib/git/git-upload-pack')
-        self.assertEqual([b'/usr/lib/git/git-upload-pack'],
+        self.assertEqual(b'/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path_spaces(self):
         self.client.alternative_paths[b'upload-pack'] = (
             b'/usr/lib/git/git-upload-pack -ibla')
-        self.assertEqual([b'/usr/lib/git/git-upload-pack', b'-ibla'],
+        self.assertEqual(b"/usr/lib/git/git-upload-pack -ibla",
             self.client._get_cmd_path(b'upload-pack'))
 
     def test_connect(self):
@@ -560,10 +559,10 @@ class SSHGitClientTests(TestCase):
         client._connect(b"command", b"/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual([b"git-command", b"'/path/to/repo'"], server.command)
+        self.assertEqual(b"git-command '/path/to/repo'", server.command)
 
         client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual([b"git-relative-command", b"'~/path/to/repo'"],
+        self.assertEqual(b"git-relative-command '~/path/to/repo'",
                           server.command)
 
 

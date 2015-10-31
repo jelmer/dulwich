@@ -324,7 +324,7 @@ class TestSSHVendor(object):
 
     @staticmethod
     def run_command(host, command, username=None, port=None):
-        cmd, path = command
+        cmd, path = command.split(b' ')
         cmd = cmd.split(b'-', 1)
         path = path.replace(b"'", b"")
         p = subprocess.Popen(cmd + [path], bufsize=0, env=get_safe_env(), stdin=subprocess.PIPE,

@@ -1,5 +1,12 @@
 0.11.3	UNRELEASED
 
+ BUG FIXES
+
+  * Simplify handling of SSH command invocation.
+    Fixes quoting of paths. Thanks, Thomas Liebetraut. (#384)
+
+  * Fix inconsistent handling of trailing slashes for DictRefsContainer. (#383)
+
 0.11.2	2015-09-18
 
  IMPROVEMENTS

@@ -57,9 +57,11 @@ import os
 import sys
 import time
 
+from dulwich.archive import (
+    tar_stream,
+    )
 from dulwich.client import (
     get_transport_and_path,
-    SubprocessGitClient,
     )
 from dulwich.errors import (
     SendPackError,
@@ -126,25 +128,24 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def archive(path, committish=None, outstream=sys.stdout,
+def archive(repo, committish=None, outstream=sys.stdout,
             errstream=sys.stderr):
     """Create an archive.
 
-    :param path: Path of repository for which to generate an archive.
+    :param repo: Path of repository for which to generate an archive.
     :param committish: Commit SHA1 or ref to use
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     """
 
-    client = SubprocessGitClient()
     if committish is None:
         committish = "HEAD"
-    if not isinstance(path, bytes):
-        path = path.encode(sys.getfilesystemencoding())
-    # TODO(jelmer): This invokes C git; this introduces a dependency.
-    # Instead, dulwich should have its own archiver implementation.
-    client.archive(path, committish, outstream.write, errstream.write,
-                   errstream.write)
+    with open_repo_closing(repo) as repo_obj:
+        c = repo_obj[committish]
+        tree = c.tree
+        for chunk in tar_stream(repo_obj.object_store,
+                repo_obj.object_store[c.tree], c.commit_time):
+            outstream.write(chunk)
 
 
 def update_server_info(repo="."):

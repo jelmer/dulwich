@@ -115,6 +115,7 @@ class BlackboxTestCase(TestCase):
 
 def self_test_suite():
     names = [
+        'archive',
         'blackbox',
         'client',
         'config',

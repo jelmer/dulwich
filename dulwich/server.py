@@ -207,6 +207,16 @@ class Handler(object):
         self.backend = backend
         self.proto = proto
         self.http_req = http_req
+
+    def handle(self):
+        raise NotImplementedError(self.handle)
+
+
+class PackHandler(Handler):
+    """Protocol handler for packs."""
+
+    def __init__(self, backend, proto, http_req=None):
+        super(PackHandler, self).__init__(backend, proto, http_req)
         self._client_capabilities = None
         # Flags needed for the no-done capability
         self._done_received = False
@@ -254,12 +264,14 @@ class Handler(object):
         self._done_received = True
 
 
-class UploadPackHandler(Handler):
+
+class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the server."""
 
     def __init__(self, backend, args, proto, http_req=None,
                  advertise_refs=False):
-        Handler.__init__(self, backend, proto, http_req=http_req)
+        super(UploadPackHandler, self).__init__(backend, proto,
+            http_req=http_req)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
@@ -829,12 +841,13 @@ class MultiAckDetailedGraphWalkerImpl(object):
         return True
 
 
-class ReceivePackHandler(Handler):
+class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
     def __init__(self, backend, args, proto, http_req=None,
                  advertise_refs=False):
-        Handler.__init__(self, backend, proto, http_req=http_req)
+        super(ReceivePackHandler, self).__init__(backend, proto,
+            http_req=http_req)
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
@@ -958,10 +971,21 @@ class ReceivePackHandler(Handler):
             self._report_status(status)
 
 
+class UploadArchiveHandler(Handler):
+
+    def __init__(self, backend, proto, http_req=None):
+        super(UploadArchiveHandler, self).__init__(backend, proto, http_req)
+
+    def handle(self):
+        # TODO(jelmer)
+        raise NotImplementedError(self.handle)
+
+
 # Default handler classes for git services.
 DEFAULT_HANDLERS = {
   b'git-upload-pack': UploadPackHandler,
   b'git-receive-pack': ReceivePackHandler,
+#  b'git-upload-archive': UploadArchiveHandler,
   }
 
 

@@ -33,6 +33,7 @@ import sys
 from getopt import getopt
 import optparse
 import signal
+import time
 
 def signal_int(signal, frame):
     sys.exit(1)
@@ -44,7 +45,10 @@ from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.pack import Pack, sha_to_hex
-from dulwich.patch import write_tree_diff
+from dulwich.patch import (
+    shortid,
+    write_tree_diff,
+    )
 from dulwich.repo import Repo
 
 
@@ -166,6 +170,26 @@ class cmd_dump_pack(Command):
                 print("\t%s: Unable to resolve base %s" % (name, k))
             except ApplyDeltaError as e:
                 print("\t%s: Unable to apply delta: %r" % (name, e))
+
+
+def format_annotate_line(i, commit, entry, line, time_format=None):
+    if time_format is None:
+        time_format = "%Y-%m-%d %H:%M:%S %z"
+    time_str = time.strftime(time_format, time.gmtime(commit.author_time))
+    author_str = commit.author.split(b' <')[0]
+    return "%s\t%s\t(%s\t%20s\t%d)%s" % (
+            commit.id[:8], entry.path, author_str, time_str, i, line)
+
+
+class cmd_annotate(Command):
+
+    def run(self, args):
+        opts, args = getopt(args, "", [])
+        opts = dict(opts)
+
+        for i, ((commit, entry), line) in enumerate(
+                porcelain.annotate(".", args.pop(0)), 1):
+            sys.stdout.write(format_annotate_line(i, commit, entry, line))
 
 
 class cmd_dump_index(Command):
@@ -540,6 +564,7 @@ For a list of supported commands, see 'dulwich help -a'.
 
 commands = {
     "add": cmd_add,
+    "annotate": cmd_annotate,
     "archive": cmd_archive,
     "check-ignore": cmd_check_ignore,
     "clone": cmd_clone,

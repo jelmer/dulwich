@@ -46,6 +46,7 @@ import stat  # noqa: E402
 
 
 def split_email(text):
+    # TODO(jelmer): Dedupe this and the same functionality in format_annotate_line.
     (name, email) = text.rsplit(b" <", 1)
     return (name, email.rstrip(b">"))
 

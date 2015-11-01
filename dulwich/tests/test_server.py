@@ -40,9 +40,9 @@ from dulwich.server import (
     Backend,
     DictBackend,
     FileSystemBackend,
-    Handler,
     MultiAckGraphWalkerImpl,
     MultiAckDetailedGraphWalkerImpl,
+    PackHandler,
     _split_proto_line,
     serve_command,
     _find_shallow,
@@ -100,10 +100,10 @@ class TestProto(object):
         return lines.pop(0)
 
 
-class TestGenericHandler(Handler):
+class TestGenericPackHandler(PackHandler):
 
     def __init__(self):
-        Handler.__init__(self, Backend(), None)
+        PackHandler.__init__(self, Backend(), None)
 
     @classmethod
     def capabilities(cls):
@@ -118,7 +118,7 @@ class HandlerTestCase(TestCase):
 
     def setUp(self):
         super(HandlerTestCase, self).setUp()
-        self._handler = TestGenericHandler()
+        self._handler = TestGenericPackHandler()
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:

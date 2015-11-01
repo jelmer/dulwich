@@ -134,7 +134,7 @@ def parse_commit_range(repo, committishs):
     """
     committishs = to_bytes(committishs)
     # TODO(jelmer): Support more than a single commit..
-    return iter([parse_commit(committishs)])
+    return iter([parse_commit(repo, committishs)])
 
 
 def parse_commit(repo, committish):

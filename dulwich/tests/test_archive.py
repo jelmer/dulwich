@@ -43,7 +43,7 @@ class ArchiveTests(TestCase):
         store = MemoryObjectStore()
         c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]
-        stream = ''.join(tar_stream(store, tree, 10))
+        stream = b''.join(tar_stream(store, tree, 10))
         out = BytesIO(stream)
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
@@ -51,12 +51,12 @@ class ArchiveTests(TestCase):
 
     def test_simple(self):
         store = MemoryObjectStore()
-        b1 = Blob.from_string("somedata")
+        b1 = Blob.from_string(b"somedata")
         store.add_object(b1)
         t1 = Tree()
         t1.add(b"somename", 0o100644, b1.id)
         store.add_object(t1)
-        stream = ''.join(tar_stream(store, t1, 10))
+        stream = b''.join(tar_stream(store, t1, 10))
         out = BytesIO(stream)
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)

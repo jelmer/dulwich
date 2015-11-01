@@ -133,7 +133,8 @@ def parse_commit_range(repo, committishs):
     :raise ValueError: If the range can not be parsed
     """
     committishs = to_bytes(committishs)
-    return iter([repo[committishs]])
+    # TODO(jelmer): Support more than a single commit..
+    return iter([parse_commit(committishs)])
 
 
 def parse_commit(repo, committish):
@@ -147,3 +148,6 @@ def parse_commit(repo, committish):
     """
     committish = to_bytes(committish)
     return repo[committish] # For now..
+
+
+# TODO: parse_path_in_tree(), which handles e.g. v1.0:Documentation

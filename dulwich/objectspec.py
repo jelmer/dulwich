@@ -134,3 +134,16 @@ def parse_commit_range(repo, committishs):
     """
     committishs = to_bytes(committishs)
     return iter([repo[committishs]])
+
+
+def parse_commit(repo, committish):
+    """Parse a string referring to a single commit.
+
+    :param repo: A` Repo` object
+    :param commitish: A string referring to a single commit.
+    :return: A Commit object
+    :raise KeyError: When the reference commits can not be found
+    :raise ValueError: If the range can not be parsed
+    """
+    committish = to_bytes(committish)
+    return repo[committish] # For now..

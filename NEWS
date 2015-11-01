@@ -1,5 +1,10 @@
 0.11.3	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add a `dulwich.archive` module that can create tarballs.
+    Based on code from Jonas Haag in klaus.
+
  BUG FIXES
 
   * Simplify handling of SSH command invocation.

@@ -31,7 +31,6 @@ from dulwich.client import (
     LocalGitClient,
     TraditionalGitClient,
     TCPGitClient,
-    SubprocessGitClient,
     SSHGitClient,
     HttpGitClient,
     ReportStatusParser,

@@ -504,9 +504,9 @@ exit 1
 
     def test_as_dict(self):
         def check(repo):
-            self.assertEqual(repo.refs.subkeys('refs/tags'), repo.refs.subkeys('refs/tags/'))
-            self.assertEqual(repo.refs.as_dict('refs/tags'), repo.refs.as_dict('refs/tags/'))
-            self.assertEqual(repo.refs.as_dict('refs/heads'), repo.refs.as_dict('refs/heads/'))
+            self.assertEqual(repo.refs.subkeys(b'refs/tags'), repo.refs.subkeys(b'refs/tags/'))
+            self.assertEqual(repo.refs.as_dict(b'refs/tags'), repo.refs.as_dict(b'refs/tags/'))
+            self.assertEqual(repo.refs.as_dict(b'refs/heads'), repo.refs.as_dict(b'refs/heads/'))
 
         bare = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()

@@ -87,7 +87,7 @@ def tar_stream(store, tree, mtime, format=''):
             data = ListBytesIO(blob.chunked)
 
             info = tarfile.TarInfo()
-            info.name = entry_abspath
+            info.name = entry_abspath.decode('ascii') # tarfile only works with ascii.
             info.size = blob.raw_length()
             info.mode = entry.mode
             info.mtime = mtime
@@ -99,7 +99,7 @@ def tar_stream(store, tree, mtime, format=''):
     yield buf.getvalue()
 
 
-def _walk_tree(store, tree, root=''):
+def _walk_tree(store, tree, root=b''):
     """Recursively walk a dulwich Tree, yielding tuples of
     (absolute path, TreeEntry) along the way.
     """

@@ -97,6 +97,10 @@ from dulwich.server import (
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
+default_bytes_out_stream = getattr(sys.stdout, 'buffer', sys.stdout)
+default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
+
+
 def encode_path(path):
     """Encode a path as bytestring."""
     # TODO(jelmer): Use something other than ascii?
@@ -216,7 +220,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=sys.stdout, outstream=None):
+def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository

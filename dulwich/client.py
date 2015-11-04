@@ -662,7 +662,7 @@ class SubprocessWrapper(object):
         self.write = proc.stdin.write
 
     def can_read(self):
-        if subprocess.mswindows:
+        if sys.platform == 'win32':
             from msvcrt import get_osfhandle
             from win32pipe import PeekNamedPipe
             handle = get_osfhandle(self.proc.stdout.fileno())

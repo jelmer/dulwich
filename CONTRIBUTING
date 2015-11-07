@@ -26,6 +26,8 @@ unittest2 (which you will need to have installed) on older versions of Python.
 
  $ make check
 
+Tox configuration is also present as well as a Travis configuration file.
+
 String Types
 ------------
 Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribed

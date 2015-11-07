@@ -13,5 +13,6 @@ Tutorial
    object-store
    remote
    tag
+   porcelain
    conclusion
 

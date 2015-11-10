@@ -1,0 +1,10 @@
+files
+tmp
+pypy-dulwich
+python-dulwich
+*.substvars
+python-dulwich-dbg
+*.debhelper
+python3-dulwich-dbg
+python3-dulwich
+*.debhelper.log

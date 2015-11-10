@@ -1,0 +1,47 @@
+Description: Automatically generated patch (0.11.2-1)
+ Last (up to) 3 git changes, FYI:
+ .
+ commit 7cbc394b093fd4567f36a947b809aa042fbed9b8
+ Author: Jelmer Vernooij <jelmer@jelmer.uk>
+ Date:   Sat Sep 19 18:36:29 2015 +0000
+ .
+     releasing package dulwich version 0.11.2-1
+ .
+ commit 2a968e00d24c4ff6fd37e2d64a128f9d10ddbeec
+ Author: Jelmer Vernooij <jelmer@jelmer.uk>
+ Date:   Sat Sep 19 18:36:21 2015 +0000
+ .
+     Force CFLAGS to -I/usr/lib/pypy, to work around bug #799485.
+ .
+ commit e7b2613be8b1a1f3d505e1a04897101cb07659dc
+ Author: Jelmer Vernooij <jelmer@jelmer.uk>
+ Date:   Sat Sep 19 18:21:46 2015 +0000
+ .
+     Add patch 02_cgit_c: support building under different locale. Closes: #799076
+Author: Jelmer Vernooij <jelmer@debian.org>
+
+---
+
+--- /dev/null
++++ dulwich-0.11.2/.gitignore
+@@ -0,0 +1,20 @@
++*~
++*.pyc
++build/
++build-pypy/
++dist/
++.testrepository
++*.swp
++*.swo
++*.so
++*.debhelper.log
++debian/files
++debian/tmp
++debian/pypy-dulwich
++debian/python-dulwich
++debian/*.substvars
++debian/python-dulwich-dbg
++debian/*.debhelper
++dulwich.egg-info
++debian/python3-dulwich-dbg
++debian/python3-dulwich

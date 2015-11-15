@@ -16,7 +16,6 @@ alone. The following contributors have not (yet) relicensed their code under
 dual Apachev2/GPLv2:
 
 Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-Chris Eberle <eberle1080@gmail.com>
 Dmitriy <dkomarov@gmail.com>
 Gary van der Merwé <garyvdm@gmail.com>
 Nick Ward <ward.nickjames@gmail.com>

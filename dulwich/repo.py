@@ -632,6 +632,21 @@ class BaseRepo(object):
         return c.id
 
 
+
+def read_gitfile(f):
+    """Read a ``.git`` file.
+
+    The first line of the file should start with "gitdir: "
+
+    :param f: File-like object to read from
+    :return: A path
+    """
+    cs = f.read()
+    if not cs.startswith("gitdir: "):
+        raise ValueError("Expected file to start with 'gitdir: '")
+    return cs[len("gitdir: "):].rstrip("\n")
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -651,9 +666,9 @@ class Repo(BaseRepo):
             self.bare = True
             self._controldir = root
         elif os.path.isfile(hidden_path):
-            import re
+            self.bare = False
             with open(hidden_path, 'r') as f:
-                _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
+                path = read_gitfile(f)
             self.bare = False
             self._controldir = os.path.join(root, path)
         else:

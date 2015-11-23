@@ -82,6 +82,7 @@ from dulwich.refs import (
 import warnings
 
 
+CONTROLDIR = '.git'
 OBJECTDIR = 'objects'
 REFSDIR = 'refs'
 REFSDIR_TAGS = 'tags'
@@ -641,16 +642,17 @@ class Repo(BaseRepo):
     """
 
     def __init__(self, root):
-        if os.path.isdir(os.path.join(root, ".git", OBJECTDIR)):
+        hidden_path = os.path.join(root, CONTROLDIR)
+        if os.path.isdir(os.path.join(hidden_path, OBJECTDIR)):
             self.bare = False
-            self._controldir = os.path.join(root, ".git")
+            self._controldir = hidden_path
         elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
               os.path.isdir(os.path.join(root, REFSDIR))):
             self.bare = True
             self._controldir = root
-        elif (os.path.isfile(os.path.join(root, ".git"))):
+        elif os.path.isfile(hidden_path):
             import re
-            with open(os.path.join(root, ".git"), 'r') as f:
+            with open(hidden_path, 'r') as f:
                 _, path = re.match('(gitdir: )(.+$)', f.read()).groups()
             self.bare = False
             self._controldir = os.path.join(root, path)
@@ -910,7 +912,7 @@ class Repo(BaseRepo):
         """
         if mkdir:
             os.mkdir(path)
-        controldir = os.path.join(path, ".git")
+        controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)

@@ -46,7 +46,15 @@ def parse_ref(container, refspec):
     :raise KeyError: If the ref can not be found
     """
     refspec = to_bytes(refspec)
-    for ref in [refspec, b"refs/heads/" + refspec]:
+    possible_refs = [
+        refspec,
+        b"refs/" + refspec,
+        b"refs/tags/" + refspec,
+        b"refs/heads/" + refspec,
+        b"refs/remotes/" + refspec,
+        b"refs/remotes/"+refspec+b"/HEAD"
+    ]
+    for ref in possible_refs:
         if ref in container:
             return ref
     else:

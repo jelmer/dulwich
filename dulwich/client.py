@@ -233,8 +233,14 @@ class GitClient(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
-
-        f, commit, abort = target.object_store.add_pack()
+        if CAPABILITY_THIN_PACK in self._fetch_capabilities:
+           f = BytesIO()
+           def commit():
+              if f.tell():
+                f.seek(0)
+                target.object_store.add_thin_pack(f.read, None)
+        else:
+           f, commit, abort = target.object_store.add_pack()
         try:
             result = self.fetch_pack(
                 path, determine_wants, target.get_graph_walker(), f.write,

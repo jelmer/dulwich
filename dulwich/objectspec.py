@@ -52,7 +52,7 @@ def parse_ref(container, refspec):
         b"refs/tags/" + refspec,
         b"refs/heads/" + refspec,
         b"refs/remotes/" + refspec,
-        b"refs/remotes/"+refspec+b"/HEAD"
+        b"refs/remotes/" + refspec + b"/HEAD"
     ]
     for ref in possible_refs:
         if ref in container:

@@ -5,6 +5,10 @@
   * Add a `dulwich.archive` module that can create tarballs.
     Based on code from Jonas Haag in klaus.
 
+  * Fix handling of ambiguous refs in `parse_ref` to make
+    it match the behaviour described in https://git-scm.com/docs/gitrevisions.
+    (Chris Bunney)
+
  BUG FIXES
 
   * Simplify handling of SSH command invocation.

@@ -19,11 +19,16 @@
 """Utilities for reading and generating reflogs.
 """
 
+import collections
+
 from dulwich.objects import (
     format_timezone,
     parse_timezone,
     ZERO_SHA,
     )
+
+Entry = collections.namedtuple('Entry', ['old_sha', 'new_sha', 'committer',
+    'timestamp', 'timezone', 'message'])
 
 
 def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message):
@@ -53,5 +58,15 @@ def parse_reflog_line(line):
     (begin, message) = line.split('\t', 1)
     (old_sha, new_sha, rest) = begin.split(' ', 2)
     (committer, timestamp_str, timezone_str) = rest.rsplit(' ', 2)
-    return (old_sha, new_sha, committer, int(timestamp_str),
-            parse_timezone(timezone_str)[0], message)
+    return Entry(old_sha, new_sha, committer, int(timestamp_str),
+                 parse_timezone(timezone_str)[0], message)
+
+
+def read_reflog(f):
+    """Read reflog.
+
+    :param f: File-like object
+    :returns: Iterator over Entry objects
+    """
+    for l in f:
+        yield parse_reflog_line(l)

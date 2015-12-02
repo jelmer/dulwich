@@ -45,7 +45,7 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message
         old_sha = ZERO_SHA
     return (old_sha + b' ' + new_sha + b' ' + committer + b' ' +
             str(timestamp).encode('ascii') + b' ' +
-            format_timezone(timezone).encode('ascii') + b'\t' + message)
+            format_timezone(timezone) + b'\t' + message)
 
 
 def parse_reflog_line(line):
@@ -55,9 +55,9 @@ def parse_reflog_line(line):
     :return: Tuple of (old_sha, new_sha, committer, timestamp, timezone,
         message)
     """
-    (begin, message) = line.split('\t', 1)
-    (old_sha, new_sha, rest) = begin.split(' ', 2)
-    (committer, timestamp_str, timezone_str) = rest.rsplit(' ', 2)
+    (begin, message) = line.split(b'\t', 1)
+    (old_sha, new_sha, rest) = begin.split(b' ', 2)
+    (committer, timestamp_str, timezone_str) = rest.rsplit(b' ', 2)
     return Entry(old_sha, new_sha, committer, int(timestamp_str),
                  parse_timezone(timezone_str)[0], message)
 

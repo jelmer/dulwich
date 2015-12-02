@@ -21,6 +21,7 @@
 
 from dulwich.objects import (
     format_timezone,
+    parse_timezone,
     ZERO_SHA,
     )
 
@@ -40,3 +41,17 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message
     return (old_sha + b' ' + new_sha + b' ' + committer + b' ' +
             str(timestamp).encode('ascii') + b' ' +
             format_timezone(timezone).encode('ascii') + b'\t' + message)
+
+
+def parse_reflog_line(line):
+    """Parse a reflog line.
+
+    :param line: Line to parse
+    :return: Tuple of (old_sha, new_sha, committer, timestamp, timezone,
+        message)
+    """
+    (begin, message) = line.split('\t', 1)
+    (old_sha, new_sha, rest) = begin.split(' ', 2)
+    (committer, timestamp_str, timezone_str) = rest.rsplit(' ', 2)
+    return (old_sha, new_sha, committer, int(timestamp_str),
+            parse_timezone(timezone_str)[0], message)

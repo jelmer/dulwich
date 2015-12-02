@@ -21,16 +21,19 @@
 """Tests for dulwich.reflog."""
 
 
-from dulwich.reflog import format_reflog_line
+from dulwich.reflog import (
+    format_reflog_line,
+    parse_reflog_line,
+    )
 
 from dulwich.tests import (
     TestCase,
     )
 
 
-class FormatReflogLineTests(TestCase):
+class ReflogLineTests(TestCase):
 
-    def test_valid(self):
+    def test_format(self):
         self.assertEqual(
             b'0000000000000000000000000000000000000000 '
             b'49030649db3dfec5a9bc03e5dde4255a14499f16 Jelmer Vernooij '
@@ -53,3 +56,14 @@ class FormatReflogLineTests(TestCase):
                 b'Jelmer Vernooij <jelmer@jelmer.uk>',
                 1446552482, 0, b'clone: from git://jelmer.uk/samba'))
 
+    def test_parse(self):
+        self.assertEqual(
+                (b'0000000000000000000000000000000000000000',
+                 b'49030649db3dfec5a9bc03e5dde4255a14499f16',
+                 b'Jelmer Vernooij <jelmer@jelmer.uk>',
+                 1446552482, 0, b'clone: from git://jelmer.uk/samba'),
+                 parse_reflog_line(
+                     b'0000000000000000000000000000000000000000 '
+                     b'49030649db3dfec5a9bc03e5dde4255a14499f16 Jelmer Vernooij '
+                     b'<jelmer@jelmer.uk> 1446552482 +0000	'
+                     b'clone: from git://jelmer.uk/samba'))

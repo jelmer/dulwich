@@ -206,8 +206,13 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 	char *sha;
 	int sha_len;
 	int start, end;
-	if (!PyArg_ParseTuple(args, "iis#O", &start, &end, 
-						  &sha, &sha_len, &unpack_name))
+#if PY_MAJOR_VERSION >= 3
+	if (!PyArg_ParseTuple(args, "iiy#O", &start, &end,
+			      &sha, &sha_len, &unpack_name))
+#else
+	if (!PyArg_ParseTuple(args, "iis#O", &start, &end,
+			      &sha, &sha_len, &unpack_name))
+#endif
 		return NULL;
 
 	if (sha_len != 20) {

@@ -25,6 +25,15 @@
 typedef int Py_ssize_t;
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+#define PyInt_Check(obj) 0
+#define PyInt_CheckExact(obj) 0
+#define PyInt_AsLong PyLong_AsLong
+#define PyString_AS_STRING PyBytes_AS_STRING
+#define PyString_Check PyBytes_Check
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#endif
+
 #if defined(__MINGW32_VERSION) || defined(__APPLE__)
 size_t rep_strnlen(char *text, size_t maxlen);
 size_t rep_strnlen(char *text, size_t maxlen)
@@ -248,58 +257,69 @@ static PyMethodDef py_objects_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
-PyMODINIT_FUNC
-init_objects(void)
+static PyObject *
+moduleinit(void)
 {
 	PyObject *m, *objects_mod, *errors_mod;
 
-	m = Py_InitModule3("_objects", py_objects_methods, NULL);
-	if (m == NULL) {
-#if PY_MAJOR_VERSION < 3
-	  return;
+#if PY_MAJOR_VERSION >= 3
+	static struct PyModuleDef moduledef = {
+		PyModuleDef_HEAD_INIT,
+		"_objects",         /* m_name */
+		NULL,               /* m_doc */
+		-1,                 /* m_size */
+		py_objects_methods, /* m_methods */
+		NULL,               /* m_reload */
+		NULL,               /* m_traverse */
+		NULL,               /* m_clear*/
+		NULL,               /* m_free */
+	};
+	m = PyModule_Create(&moduledef);
 #else
-	  return NULL;
+	m = Py_InitModule3("_objects", py_objects_methods, NULL);
 #endif
+	if (m == NULL) {
+		return NULL;
 	}
 
 	errors_mod = PyImport_ImportModule("dulwich.errors");
 	if (errors_mod == NULL) {
-#if PY_MAJOR_VERSION < 3
-	  return;
-#else
-	  return NULL;
-#endif
+		return NULL;
 	}
 
 	object_format_exception_cls = PyObject_GetAttrString(
 		errors_mod, "ObjectFormatException");
 	Py_DECREF(errors_mod);
 	if (object_format_exception_cls == NULL) {
-#if PY_MAJOR_VERSION < 3
-	  return;
-#else
-	  return NULL;
-#endif
+		return NULL;
 	}
 
 	/* This is a circular import but should be safe since this module is
 	 * imported at at the very bottom of objects.py. */
 	objects_mod = PyImport_ImportModule("dulwich.objects");
 	if (objects_mod == NULL) {
-#if PY_MAJOR_VERSION < 3
-	  return;
-#else
-	  return NULL;
-#endif
+		return NULL;
 	}
 
 	tree_entry_cls = PyObject_GetAttrString(objects_mod, "TreeEntry");
 	Py_DECREF(objects_mod);
 	if (tree_entry_cls == NULL) {
-#if PY_MAJOR_VERSION < 3
-	  return;
-#else
-	  return NULL;
-#endif
+		return NULL;
 	}
+
+	return m;
 }
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit__objects(void)
+{
+	return moduleinit();
+}
+#else
+PyMODINIT_FUNC
+init_objects(void)
+{
+	moduleinit();
+}
+#endif

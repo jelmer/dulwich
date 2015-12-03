@@ -125,8 +125,13 @@ class RepositoryRootTests(TestCase):
         for k, contained in test_keys:
             self.assertEqual(k in r, contained)
 
+        # Avoid deprecation warning under Py3.2+
+        if hasattr(self, 'assertRaisesRegex'):
+            assertRaisesRegexp = self.assertRaisesRegex
+        else:
+            assertRaisesRegexp = self.assertRaisesRegexp
         for k, _ in test_keys:
-            self.assertRaisesRegexp(
+            assertRaisesRegexp(
                 TypeError, "'name' must be bytestring, not int",
                 r.__getitem__, 12
             )

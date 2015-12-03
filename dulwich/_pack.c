@@ -249,6 +249,7 @@ void init_pack(void)
 		return;
 
 	PyExc_ApplyDeltaError = PyObject_GetAttrString(errors_module, "ApplyDeltaError");
+	Py_DECREF(errors_module);
 	if (PyExc_ApplyDeltaError == NULL)
 		return;
 

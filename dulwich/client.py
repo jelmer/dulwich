@@ -229,7 +229,7 @@ class GitClient(object):
         :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
-        :return: remote refs as dictionary
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -262,6 +262,7 @@ class GitClient(object):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         raise NotImplementedError(self.fetch_pack)
 
@@ -549,6 +550,7 @@ class TraditionalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
@@ -791,7 +793,7 @@ class LocalGitClient(GitClient):
         :param determine_wants: Optional function to determine what refs
             to fetch
         :param progress: Optional progress function
-        :return: remote refs as dictionary
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         from dulwich.repo import Repo
         with closing(Repo(path)) as r:
@@ -806,6 +808,7 @@ class LocalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         from dulwich.repo import Repo
         with closing(Repo(path)) as r:
@@ -1059,7 +1062,7 @@ class HttpGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
-        :return: Dictionary with the refs of the remote repository
+        :return: Dictionary with all remote refs (not just those fetched)
         """
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(

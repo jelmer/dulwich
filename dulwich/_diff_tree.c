@@ -32,6 +32,22 @@ typedef int Py_ssize_t;
 #define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+#define PyInt_FromLong PyLong_FromLong
+#define PyInt_AsLong PyLong_AsLong
+#define PyInt_AS_LONG PyLong_AS_LONG
+#define PyString_AS_STRING PyBytes_AS_STRING
+#define PyString_AsString PyBytes_AsString
+#define PyString_AsStringAndSize PyBytes_AsStringAndSize
+#define PyString_Check PyBytes_Check
+#define PyString_CheckExact PyBytes_CheckExact
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#define PyString_FromString PyBytes_FromString
+#define PyString_GET_SIZE PyBytes_GET_SIZE
+#define PyString_Size PyBytes_Size
+#define _PyString_Join _PyBytes_Join
+#endif
+
 static PyObject *tree_entry_cls = NULL, *null_entry = NULL,
 	*defaultdict_cls = NULL, *int_cls = NULL;
 static int block_size;
@@ -152,6 +168,17 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	path1 = PyObject_GetAttrString(entry1, "path");
 	if (!path1)
 		goto done;
+
+#if PY_MAJOR_VERSION >= 3
+	/* XXX: Is FSConverter desiderable here? */
+	if (PyUnicode_Check(path1)) {
+		PyObject *bytes;
+		if (!PyUnicode_FSConverter(path1, &bytes))
+			goto done;
+		Py_DECREF(path1);
+		path1 = bytes;
+	}
+#endif
 	if (!PyString_Check(path1)) {
 		PyErr_SetString(PyExc_TypeError, "path is not a string");
 		goto done;
@@ -160,6 +187,17 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	path2 = PyObject_GetAttrString(entry2, "path");
 	if (!path2)
 		goto done;
+
+#if PY_MAJOR_VERSION >= 3
+	/* XXX: Is FSConverter desiderable here? */
+	if (PyUnicode_Check(path2)) {
+		PyObject *bytes;
+		if (!PyUnicode_FSConverter(path2, &bytes))
+			goto done;
+		Py_DECREF(path2);
+		path2 = bytes;
+	}
+#endif
 	if (!PyString_Check(path2)) {
 		PyErr_SetString(PyExc_TypeError, "path is not a string");
 		goto done;
@@ -390,12 +428,28 @@ static PyMethodDef py_diff_tree_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
-PyMODINIT_FUNC
-init_diff_tree(void)
+static PyObject *
+moduleinit(void)
 {
 	PyObject *m, *objects_mod = NULL, *diff_tree_mod = NULL;
-        PyObject *block_size_obj = NULL;
+	PyObject *block_size_obj = NULL;
+
+#if PY_MAJOR_VERSION >= 3
+	static struct PyModuleDef moduledef = {
+		PyModuleDef_HEAD_INIT,
+		"_diff_tree",         /* m_name */
+		NULL,                 /* m_doc */
+		-1,                   /* m_size */
+		py_diff_tree_methods, /* m_methods */
+		NULL,                 /* m_reload */
+		NULL,                 /* m_traverse */
+		NULL,                 /* m_clear*/
+		NULL,                 /* m_free */
+	};
+	m = PyModule_Create(&moduledef);
+#else
 	m = Py_InitModule("_diff_tree", py_diff_tree_methods);
+#endif
 	if (!m)
 		goto error;
 
@@ -437,11 +491,8 @@ init_diff_tree(void)
 	}
 
 	Py_DECREF(diff_tree_mod);
-#if PY_MAJOR_VERSION < 3
-	return;
-#else
-	return NULL;
-#endif
+
+	return m;
 
 error:
 	Py_XDECREF(objects_mod);
@@ -450,9 +501,19 @@ error:
 	Py_XDECREF(block_size_obj);
 	Py_XDECREF(defaultdict_cls);
 	Py_XDECREF(int_cls);
-#if PY_MAJOR_VERSION < 3
-	return;
-#else
 	return NULL;
-#endif
 }
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit__diff_tree(void)
+{
+	return moduleinit();
+}
+#else
+PyMODINIT_FUNC
+init_diff_tree(void)
+{
+	moduleinit();
+}
+#endif

@@ -21,6 +21,9 @@
 
   * Fix inconsistent handling of trailing slashes for DictRefsContainer. (#383)
 
+  * Add hack to support thin packs duing fetch(), albeit while requiring the
+    entire pack file to be loaded into memory. (jsbain)
+
  CHANGES
 
   * This will be the last release to support Python 2.6.

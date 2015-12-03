@@ -234,6 +234,8 @@ class GitClient(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         if CAPABILITY_THIN_PACK in self._fetch_capabilities:
+           # TODO(jelmer): Avoid reading entire file into memory and
+           # only processing it after the whole file has been fetched.
            f = BytesIO()
            def commit():
               if f.tell():

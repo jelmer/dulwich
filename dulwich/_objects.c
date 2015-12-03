@@ -68,8 +68,13 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 	PyObject *ret, *item, *name, *sha, *py_strict = NULL;
 	static char *kwlist[] = {"text", "strict", NULL};
 
+#if PY_MAJOR_VERSION >= 3
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "y#|O", kwlist,
+	                                 &text, &len, &py_strict))
+#else
 	if (!PyArg_ParseTupleAndKeywords(args, kw, "s#|O", kwlist,
 	                                 &text, &len, &py_strict))
+#endif
 		return NULL;
 	strict = py_strict ?  PyObject_IsTrue(py_strict) : 0;
 	/* TODO: currently this returns a list; if memory usage is a concern,

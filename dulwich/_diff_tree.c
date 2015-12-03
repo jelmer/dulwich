@@ -140,8 +140,13 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 			memcpy(new_path, PyString_AS_STRING(name), name_len);
 		}
 
+#if PY_MAJOR_VERSION >= 3
+		result[i] = PyObject_CallFunction(tree_entry_cls, "y#OO", new_path,
+			new_path_len, PyTuple_GET_ITEM(old_entry, 1), sha);
+#else
 		result[i] = PyObject_CallFunction(tree_entry_cls, "s#OO", new_path,
 			new_path_len, PyTuple_GET_ITEM(old_entry, 1), sha);
+#endif
 		PyMem_Free(new_path);
 		if (!result[i]) {
 			goto error;
@@ -169,18 +174,8 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	if (!path1)
 		goto done;
 
-#if PY_MAJOR_VERSION >= 3
-	/* XXX: Is FSConverter desiderable here? */
-	if (PyUnicode_Check(path1)) {
-		PyObject *bytes;
-		if (!PyUnicode_FSConverter(path1, &bytes))
-			goto done;
-		Py_DECREF(path1);
-		path1 = bytes;
-	}
-#endif
 	if (!PyString_Check(path1)) {
-		PyErr_SetString(PyExc_TypeError, "path is not a string");
+		PyErr_SetString(PyExc_TypeError, "path is not a (byte)string");
 		goto done;
 	}
 
@@ -188,18 +183,8 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	if (!path2)
 		goto done;
 
-#if PY_MAJOR_VERSION >= 3
-	/* XXX: Is FSConverter desiderable here? */
-	if (PyUnicode_Check(path2)) {
-		PyObject *bytes;
-		if (!PyUnicode_FSConverter(path2, &bytes))
-			goto done;
-		Py_DECREF(path2);
-		path2 = bytes;
-	}
-#endif
 	if (!PyString_Check(path2)) {
-		PyErr_SetString(PyExc_TypeError, "path is not a string");
+		PyErr_SetString(PyExc_TypeError, "path is not a (byte)string");
 		goto done;
 	}
 
@@ -220,7 +205,11 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 	char *path_str;
 	int cmp;
 
+#if PY_MAJOR_VERSION >= 3
+	if (!PyArg_ParseTuple(args, "y#OO", &path_str, &path_len, &tree1, &tree2))
+#else
 	if (!PyArg_ParseTuple(args, "s#OO", &path_str, &path_len, &tree1, &tree2))
+#endif
 		return NULL;
 
 	entries1 = tree_entries(path_str, path_len, tree1, &n1);

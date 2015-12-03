@@ -126,7 +126,7 @@ class RepositoryRootTests(TestCase):
             self.assertEqual(k in r, contained)
 
         # Avoid deprecation warning under Py3.2+
-        if hasattr(self, 'assertRaisesRegex'):
+        if getattr(self, 'assertRaisesRegex', None):
             assertRaisesRegexp = self.assertRaisesRegex
         else:
             assertRaisesRegexp = self.assertRaisesRegexp

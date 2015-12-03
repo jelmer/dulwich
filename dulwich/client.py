@@ -42,7 +42,6 @@ from contextlib import closing
 from io import BytesIO, BufferedReader
 import dulwich
 import select
-import shlex
 import socket
 import subprocess
 import sys

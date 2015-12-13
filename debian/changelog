@@ -1,6 +1,7 @@
 dulwich (0.12.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Drop patch 02_cgit_c: applied upstream.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sun, 13 Dec 2015 15:34:54 +0000
 

@@ -5,6 +5,7 @@ include Makefile
 include COPYING
 include HACKING
 include CONTRIBUTING
+include TODO
 include setup.cfg
 include dulwich/stdint.h
 recursive-include docs conf.py *.txt Makefile make.bat
@@ -13,3 +14,4 @@ graft dulwich/tests/data
 include tox.ini
 include dulwich.cfg
 include appveyor.yml
+include .testr.conf

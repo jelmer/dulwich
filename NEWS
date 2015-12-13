@@ -1,3 +1,33 @@
+0.12.0	2015-12-13
+
+ IMPROVEMENTS
+
+  * Add a `dulwich.archive` module that can create tarballs.
+    Based on code from Jonas Haag in klaus.
+
+  * Add a `dulwich.reflog` module for reading and writing reflogs.
+    (Jelmer Vernooij)
+
+  * Fix handling of ambiguous refs in `parse_ref` to make
+    it match the behaviour described in https://git-scm.com/docs/gitrevisions.
+    (Chris Bunney)
+
+  * Support Python3 in C modules. (Lele Gaifax)
+
+ BUG FIXES
+
+  * Simplify handling of SSH command invocation.
+    Fixes quoting of paths. Thanks, Thomas Liebetraut. (#384)
+
+  * Fix inconsistent handling of trailing slashes for DictRefsContainer. (#383)
+
+  * Add hack to support thin packs duing fetch(), albeit while requiring the
+    entire pack file to be loaded into memory. (jsbain)
+
+ CHANGES
+
+  * This will be the last release to support Python 2.6.
+
 0.11.2	2015-09-18
 
  IMPROVEMENTS

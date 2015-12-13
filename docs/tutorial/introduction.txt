@@ -10,7 +10,11 @@ The plumbing is the lower layer and it deals with the Git object database and th
 nitty gritty internals. The porcelain is roughly what you would expect to
 be exposed to as a user of the ``git`` command-like tool.
 
-Dulwich has a fairly complete plumbing implementation, and only a somewhat
-smaller porcelain implementation. The porcelain code lives in
-``dulwich.porcelain``. For the large part, this tutorial introduces you to the
-internal concepts of Git and the main plumbing parts of Dulwich.
+Dulwich has a fairly complete plumbing implementation, and a more recently
+added porcelain implementation. The porcelain code lives in
+``dulwich.porcelain``.
+
+
+For the large part, this tutorial introduces you to the internal concepts of
+Git and the main plumbing parts of Dulwich. The last chapter covers
+the porcelain.

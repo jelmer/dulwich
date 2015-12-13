@@ -125,8 +125,13 @@ class RepositoryRootTests(TestCase):
         for k, contained in test_keys:
             self.assertEqual(k in r, contained)
 
+        # Avoid deprecation warning under Py3.2+
+        if getattr(self, 'assertRaisesRegex', None):
+            assertRaisesRegexp = self.assertRaisesRegex
+        else:
+            assertRaisesRegexp = self.assertRaisesRegexp
         for k, _ in test_keys:
-            self.assertRaisesRegexp(
+            assertRaisesRegexp(
                 TypeError, "'name' must be bytestring, not int",
                 r.__getitem__, 12
             )
@@ -501,6 +506,19 @@ exit 1
         self.assertIsInstance(warnings_list[-1], UserWarning)
         self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
         self.assertEqual([commit_sha], r[commit_sha2].parents)
+
+    def test_as_dict(self):
+        def check(repo):
+            self.assertEqual(repo.refs.subkeys(b'refs/tags'), repo.refs.subkeys(b'refs/tags/'))
+            self.assertEqual(repo.refs.as_dict(b'refs/tags'), repo.refs.as_dict(b'refs/tags/'))
+            self.assertEqual(repo.refs.as_dict(b'refs/heads'), repo.refs.as_dict(b'refs/heads/'))
+
+        bare = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with closing(bare.clone(tmp_dir, mkdir=False)) as nonbare:
+            check(nonbare)
+            check(bare)
 
 
 class BuildRepoRootTests(TestCase):

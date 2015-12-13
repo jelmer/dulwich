@@ -1,3 +1,4 @@
+.testr.conf
 AUTHORS
 CONTRIBUTING
 COPYING
@@ -5,6 +6,7 @@ MANIFEST.in
 Makefile
 NEWS
 README.md
+TODO
 appveyor.yml
 dulwich.cfg
 setup.cfg
@@ -25,6 +27,7 @@ docs/tutorial/file-format.txt
 docs/tutorial/index.txt
 docs/tutorial/introduction.txt
 docs/tutorial/object-store.txt
+docs/tutorial/porcelain.txt
 docs/tutorial/remote.txt
 docs/tutorial/repo.txt
 docs/tutorial/tag.txt
@@ -33,6 +36,7 @@ dulwich/_compat.py
 dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c
+dulwich/archive.py
 dulwich/client.py
 dulwich/config.py
 dulwich/diff_tree.py
@@ -51,6 +55,7 @@ dulwich/pack.py
 dulwich/patch.py
 dulwich/porcelain.py
 dulwich/protocol.py
+dulwich/reflog.py
 dulwich/refs.py
 dulwich/repo.py
 dulwich/server.py
@@ -60,7 +65,6 @@ dulwich/web.py
 dulwich.egg-info/PKG-INFO
 dulwich.egg-info/SOURCES.txt
 dulwich.egg-info/dependency_links.txt
-dulwich.egg-info/pbr.json
 dulwich.egg-info/top_level.txt
 dulwich/contrib/__init__.py
 dulwich/contrib/paramiko_vendor.py
@@ -68,6 +72,7 @@ dulwich/contrib/swift.py
 dulwich/contrib/test_swift.py
 dulwich/contrib/test_swift_smoke.py
 dulwich/tests/__init__.py
+dulwich/tests/test_archive.py
 dulwich/tests/test_blackbox.py
 dulwich/tests/test_client.py
 dulwich/tests/test_config.py
@@ -87,6 +92,7 @@ dulwich/tests/test_pack.py
 dulwich/tests/test_patch.py
 dulwich/tests/test_porcelain.py
 dulwich/tests/test_protocol.py
+dulwich/tests/test_reflog.py
 dulwich/tests/test_refs.py
 dulwich/tests/test_repository.py
 dulwich/tests/test_server.py

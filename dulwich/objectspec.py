@@ -46,7 +46,15 @@ def parse_ref(container, refspec):
     :raise KeyError: If the ref can not be found
     """
     refspec = to_bytes(refspec)
-    for ref in [refspec, b"refs/heads/" + refspec]:
+    possible_refs = [
+        refspec,
+        b"refs/" + refspec,
+        b"refs/tags/" + refspec,
+        b"refs/heads/" + refspec,
+        b"refs/remotes/" + refspec,
+        b"refs/remotes/" + refspec + b"/HEAD"
+    ]
+    for ref in possible_refs:
         if ref in container:
             return ref
     else:
@@ -133,4 +141,21 @@ def parse_commit_range(repo, committishs):
     :raise ValueError: If the range can not be parsed
     """
     committishs = to_bytes(committishs)
-    return iter([repo[committishs]])
+    # TODO(jelmer): Support more than a single commit..
+    return iter([parse_commit(repo, committishs)])
+
+
+def parse_commit(repo, committish):
+    """Parse a string referring to a single commit.
+
+    :param repo: A` Repo` object
+    :param commitish: A string referring to a single commit.
+    :return: A Commit object
+    :raise KeyError: When the reference commits can not be found
+    :raise ValueError: If the range can not be parsed
+    """
+    committish = to_bytes(committish)
+    return repo[committish] # For now..
+
+
+# TODO: parse_path_in_tree(), which handles e.g. v1.0:Documentation

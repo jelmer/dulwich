@@ -20,6 +20,19 @@
 #include <Python.h>
 #include <stdint.h>
 
+#if PY_MAJOR_VERSION >= 3
+#define PyInt_FromLong PyLong_FromLong
+#define PyString_AS_STRING PyBytes_AS_STRING
+#define PyString_AsString PyBytes_AsString
+#define PyString_Check PyBytes_Check
+#define PyString_CheckExact PyBytes_CheckExact
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#define PyString_FromString PyBytes_FromString
+#define PyString_GET_SIZE PyBytes_GET_SIZE
+#define PyString_Size PyBytes_Size
+#define _PyString_Join _PyBytes_Join
+#endif
+
 static PyObject *PyExc_ApplyDeltaError = NULL;
 
 static int py_is_sha(PyObject *sha)
@@ -193,8 +206,13 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 	char *sha;
 	int sha_len;
 	int start, end;
-	if (!PyArg_ParseTuple(args, "iis#O", &start, &end, 
-						  &sha, &sha_len, &unpack_name))
+#if PY_MAJOR_VERSION >= 3
+	if (!PyArg_ParseTuple(args, "iiy#O", &start, &end,
+			      &sha, &sha_len, &unpack_name))
+#else
+	if (!PyArg_ParseTuple(args, "iis#O", &start, &end,
+			      &sha, &sha_len, &unpack_name))
+#endif
 		return NULL;
 
 	if (sha_len != 20) {
@@ -239,20 +257,53 @@ static PyMethodDef py_pack_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
-void init_pack(void)
+static PyObject *
+moduleinit(void)
 {
 	PyObject *m;
 	PyObject *errors_module;
 
 	errors_module = PyImport_ImportModule("dulwich.errors");
 	if (errors_module == NULL)
-		return;
+		return NULL;
 
 	PyExc_ApplyDeltaError = PyObject_GetAttrString(errors_module, "ApplyDeltaError");
+	Py_DECREF(errors_module);
 	if (PyExc_ApplyDeltaError == NULL)
-		return;
+		return NULL;
 
+#if PY_MAJOR_VERSION >= 3
+	static struct PyModuleDef moduledef = {
+	  PyModuleDef_HEAD_INIT,
+	  "_pack",         /* m_name */
+	  NULL,            /* m_doc */
+	  -1,              /* m_size */
+	  py_pack_methods, /* m_methods */
+	  NULL,            /* m_reload */
+	  NULL,            /* m_traverse */
+	  NULL,            /* m_clear*/
+	  NULL,            /* m_free */
+	};
+	m = PyModule_Create(&moduledef);
+#else
 	m = Py_InitModule3("_pack", py_pack_methods, NULL);
+#endif
 	if (m == NULL)
-		return;
+		return NULL;
+
+	return m;
 }
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit__pack(void)
+{
+	return moduleinit();
+}
+#else
+PyMODINIT_FUNC
+init_pack(void)
+{
+	moduleinit();
+}
+#endif

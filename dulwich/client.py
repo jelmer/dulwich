@@ -1114,7 +1114,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
     if parsed.scheme == 'git':
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
                 parsed.path)
-    elif parsed.scheme == 'git+ssh':
+    elif parsed.scheme in ('git+ssh', 'ssh'):
         path = parsed.path
         if path.startswith('/'):
             path = parsed.path[1:]

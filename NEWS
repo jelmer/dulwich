@@ -1,5 +1,10 @@
 0.12.1	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Support `ssh://` URLs in get_transport_and_path_from_url().
+    (Jelmer Vernooij, #402)
+
 0.12.0	2015-12-13
 
  IMPROVEMENTS

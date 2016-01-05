@@ -135,6 +135,7 @@ def self_test_suite():
         'patch',
         'porcelain',
         'protocol',
+        'reflog',
         'refs',
         'repository',
         'server',

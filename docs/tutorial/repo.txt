@@ -30,7 +30,7 @@ Let's create a folder and turn it into a repository, like ``git init`` would::
   >>> repo
   <Repo at 'myrepo'>
 
-You can already look a the structure of the "myrepo/.git" folder, though it
+You can already look at the structure of the "myrepo/.git" folder, though it
 is mostly empty for now.
 
 Opening an existing repository

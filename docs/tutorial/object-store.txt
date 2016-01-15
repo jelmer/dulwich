@@ -22,7 +22,7 @@ empty for now, we'll start by adding a new file::
 Of course you could create a blob from an existing file using ``from_file``
 instead.
 
-As said in the introduction, file content is separed from file name. Let's
+As said in the introduction, file content is separated from file name. Let's
 give this content a name::
 
   >>> from dulwich.objects import Tree

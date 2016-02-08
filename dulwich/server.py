@@ -266,7 +266,7 @@ class PackHandler(Handler):
 
 
 class UploadPackHandler(PackHandler):
-    """Protocol handler for uploading a pack to the server."""
+    """Protocol handler for uploading a pack to the client."""
 
     def __init__(self, backend, args, proto, http_req=None,
                  advertise_refs=False):

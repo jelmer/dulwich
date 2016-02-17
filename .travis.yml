@@ -12,6 +12,8 @@ matrix:
       env: TEST_REQUIRE="fastimport"
     - python: "3.4"
       env: TEST_REQUIRE=
+    - python: "3.5"
+      env: TEST_REQUIRE=
 cache:
   directories:
     - $HOME/.cache/pip

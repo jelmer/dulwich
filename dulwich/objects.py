@@ -602,17 +602,39 @@ def _parse_message(chunks):
     f = BytesIO(b''.join(chunks))
     k = None
     v = ""
+    eof = False
+
+    # Parse the headers
+    #
+    # Headers can contain newlines. The next line is indented with a space.
+    # We store the latest key as 'k', and the accumulated value as 'v'.
     for l in f:
         if l.startswith(b' '):
+            # Indented continuation of the previous line
             v += l[1:]
         else:
             if k is not None:
+                # We parsed a new header, return its value
                 yield (k, v.rstrip(b'\n'))
             if l == b'\n':
                 # Empty line indicates end of headers
                 break
             (k, v) = l.split(b' ', 1)
-    yield (None, f.read())
+
+    else:
+        # We reached end of file before the headers ended. We still need to
+        # return the previous header, then we need to return a None field for
+        # the text.
+        eof = True
+        if k is not None:
+            yield (k, v.rstrip(b'\n'))
+        yield (None, None)
+
+    if not eof:
+        # We didn't reach the end of file while parsing headers. We can return
+        # the rest of the file as a message.
+        yield (None, f.read())
+
     f.close()
 
 
@@ -679,8 +701,9 @@ class Tag(ShaFile):
                 chunks.append(git_line(
                     _TAGGER_HEADER, self._tagger, str(self._tag_time).encode('ascii'),
                     format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)))
-        chunks.append(b'\n') # To close headers
-        chunks.append(self._message)
+        if self._message is not None:
+            chunks.append(b'\n') # To close headers
+            chunks.append(self._message)
         return chunks
 
     def _deserialize(self, chunks):

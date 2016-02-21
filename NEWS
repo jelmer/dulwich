@@ -5,6 +5,9 @@
   * Support `ssh://` URLs in get_transport_and_path_from_url().
     (Jelmer Vernooij, #402)
 
+  * Support missing empty line after headers in Git commits and tags.
+    (Nicolas Dandrimont, #413)
+
 0.12.0	2015-12-13
 
  IMPROVEMENTS

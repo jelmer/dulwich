@@ -528,6 +528,13 @@ class PullTests(PorcelainTestCase):
 
 class StatusTests(PorcelainTestCase):
 
+    def test_empty(self):
+        results = porcelain.status(self.repo)
+        self.assertEquals(
+            {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertEquals([], results.unstaged)
+
     def test_status(self):
         """Integration test for `status` functionality."""
 

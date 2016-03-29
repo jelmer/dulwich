@@ -8,8 +8,8 @@ Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3
 Standards-Version: 3.9.6
 X-Python-Version: >= 2.7
 X-Python3-Version: >= 3.2
-Vcs-Git: git://anonscm.debian.org/python-modules/packages/dulwich.git
-Vcs-Browser: http://anonscm.debian.org/gitweb/?p=python-modules/packages/dulwich.git
+Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/dulwich.git
+Vcs-Browser: https://anonscm.debian.org/cgit/python-modules/packages/dulwich.git
 XS-Testsuite: autopkgtest
 
 Package: python-dulwich

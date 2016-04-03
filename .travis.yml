@@ -4,8 +4,6 @@ env:
   global: TEST_RUNNER=unittest PYTHONHASHSEED=random
 matrix:
   include:
-    - python: "2.6"
-      env: TEST_RUNNER=unittest2.__main__ TEST_REQUIRE="gevent geventhttpclient fastimport unittest2"
     - python: "2.7"
       env: TEST_REQUIRE="gevent geventhttpclient fastimport"
     - python: "pypy"

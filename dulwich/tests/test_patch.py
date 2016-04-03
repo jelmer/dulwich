@@ -19,7 +19,6 @@
 """Tests for patch.py."""
 
 from io import BytesIO, StringIO
-import sys
 
 from dulwich.objects import (
     Blob,
@@ -76,9 +75,6 @@ class WriteCommitPatchTests(TestCase):
 class ReadGitAmPatch(TestCase):
 
     def test_extract_string(self):
-        if sys.version_info[:2] <= (2, 6):
-            raise SkipTest("email.parser.Parser.parsestr() inserts extra lines")
-
         text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200

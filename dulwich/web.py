@@ -415,7 +415,7 @@ def make_wsgi_chain(*args, **kwargs):
     correctly wrapped with needed middleware.
     """
     app = HTTPGitApplication(*args, **kwargs)
-    wrapped_app = GunzipFilter(LimitedInputFilter(app))
+    wrapped_app = LimitedInputFilter(GunzipFilter(app))
     return wrapped_app
 
 

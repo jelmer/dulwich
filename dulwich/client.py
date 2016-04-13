@@ -980,16 +980,21 @@ class HttpGitClient(GitClient):
         url = urlparse.urljoin(url, "info/refs")
         headers = {}
         if self.dumb is not False:
-            url += "?service=%s" % service
-            headers["Content-Type"] = "application/x-%s-request" % service
+            url += "?service=%s" % service.decode('ascii')
+            headers["Content-Type"] = "application/x-%s-request" % (
+                service.decode('ascii'))
         resp = self._http_request(url, headers)
         try:
-            self.dumb = (not resp.info().gettype().startswith("application/x-git-"))
+            content_type = resp.info().gettype()
+        except AttributeError:
+            content_type = resp.info().get_content_type()
+        try:
+            self.dumb = (not content_type.startswith("application/x-git-"))
             if not self.dumb:
                 proto = Protocol(resp.read, None)
                 # The first line should mention the service
                 pkts = list(proto.read_pkt_seq())
-                if pkts != [('# service=%s\n' % service)]:
+                if pkts != [b'# service=' + service + b'\n']:
                     raise GitProtocolError(
                         "unexpected first line %r from smart server" % pkts)
                 return read_pkt_refs(proto)
@@ -1001,11 +1006,18 @@ class HttpGitClient(GitClient):
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, service)
-        headers = {"Content-Type": "application/x-%s-request" % service}
+        headers = {
+            "Content-Type": "application/x-%s-request" % service
+        }
         resp = self._http_request(url, headers, data)
-        if resp.info().gettype() != ("application/x-%s-result" % service):
+        try:
+            content_type = resp.info().gettype()
+        except AttributeError:
+            content_type = resp.info().get_content_type()
+        if content_type != (
+                "application/x-%s-result" % service):
             raise GitProtocolError("Invalid content-type from server: %s"
-                % resp.info().gettype())
+                % content_type)
         return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -1045,7 +1057,7 @@ class HttpGitClient(GitClient):
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
             write_pack(req_proto.write_file(), objects)
-        resp = self._smart_request(b"git-receive-pack", url,
+        resp = self._smart_request("git-receive-pack", url,
                                    data=req_data.getvalue())
         try:
             resp_proto = Protocol(resp.read, None)
@@ -1083,7 +1095,7 @@ class HttpGitClient(GitClient):
             req_proto, negotiated_capabilities, graph_walker, wants,
             lambda: False)
         resp = self._smart_request(
-            b"git-upload-pack", url, data=req_data.getvalue())
+            "git-upload-pack", url, data=req_data.getvalue())
         try:
             resp_proto = Protocol(resp.read, None)
             self._handle_upload_pack_tail(resp_proto, negotiated_capabilities,

@@ -19,6 +19,9 @@
 
   * Fix hang on Gzip decompression. (Jonas Haag)
 
+  * Don't rely on working tell() and seek() methods
+    on wsgi.input. (Jonas Haag)
+
 0.12.0	2015-12-13
 
  IMPROVEMENTS

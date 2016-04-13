@@ -371,13 +371,14 @@ class GunzipFilter(object):
 
     def __call__(self, environ, start_response):
         if environ.get('HTTP_CONTENT_ENCODING', '') == 'gzip':
-            if hasattr(environ['wsgi.input'], 'seek'):
+            try:
+                environ['wsgi.input'].tell()
                 wsgi_input = environ['wsgi.input']
-            else:
+            except (AttributeError, IOError, NotImplementedError):
                 # The gzip implementation in the standard library of Python 2.x
-                # requires the '.seek()' and '.tell()' methods to be available
-                # on the input stream.  Read the data into a temporary file to
-                # work around this limitation.
+                # requires working '.seek()' and '.tell()' methods on the input
+                # stream.  Read the data into a temporary file to work around
+                # this limitation.
                 wsgi_input = tempfile.SpooledTemporaryFile(16 * 1024 * 1024)
                 shutil.copyfileobj(environ['wsgi.input'], wsgi_input)
                 wsgi_input.seek(0)

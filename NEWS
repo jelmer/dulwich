@@ -15,6 +15,10 @@
 
   * Drop support for Python 2.6.
 
+ BUG FIXES
+
+  * Fix hang on Gzip decompression. (Jonas Haag)
+
 0.12.0	2015-12-13
 
  IMPROVEMENTS

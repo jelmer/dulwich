@@ -453,9 +453,9 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ua = self.headers.get('user-agent')
         if ua:
             env['HTTP_USER_AGENT'] = ua
-        co = filter(None, self.headers.getheaders('cookie'))
+        co = self.headers.get('cookie')
         if co:
-            env['HTTP_COOKIE'] = ', '.join(co)
+            env['HTTP_COOKIE'] = co
         # XXX Other HTTP_* headers
         # Since we're setting the env in the parent, provide empty
         # values to override previously set values

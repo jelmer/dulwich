@@ -84,7 +84,7 @@ author Jelmer <jelmer@host> 1271345553 +0000
 committer Jelmer <jelmer@host> 1271345553 +0000
 data 3
 msg
-M 644 1 foo
+M 644 :1 foo
 """, self.stream.getvalue())
 
 

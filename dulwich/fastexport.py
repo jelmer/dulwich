@@ -87,8 +87,10 @@ class GitFastExporter(object):
             if old_path != new_path and old_path is not None:
                 yield commands.FileRenameCommand(old_path, new_path)
             if old_mode != new_mode or old_hexsha != new_hexsha:
-                yield commands.FileModifyCommand(new_path, new_mode, marker,
-                    None)
+                prefixed_marker = b':%s' %  (marker,)
+                yield commands.FileModifyCommand(
+                    new_path, new_mode, prefixed_marker, None
+                )
 
     def _export_commit(self, commit, ref, base_tree=None):
         file_cmds = list(self._iter_files(base_tree, commit.tree))

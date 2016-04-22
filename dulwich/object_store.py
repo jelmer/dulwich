@@ -685,6 +685,14 @@ class MemoryObjectStore(BaseObjectStore):
             This dict only accept bytestring of 40 as keys and ShaFile
             instances for values.
         """
+        def __init__(self, copy_only=True):
+            """
+                :param copy_only: (bool)
+                        If set at False the store will behave like a normal
+                        dictionary and will not return copies of the stored
+                        object. True by default.
+            """
+            self._copy_only = copy_only
 
         def __getitem__(self, key):
             if not len(key) == 40 or not isinstance(key, bytes):
@@ -694,7 +702,7 @@ class MemoryObjectStore(BaseObjectStore):
 
             sha_object = super(MemoryObjectStore.Store, self).__getitem__(key)
 
-            return sha_object.copy()
+            return sha_object.copy() if self._copy_only else sha_object
 
         def __setitem__(self, key, value):
             if not len(key) == 40 or not isinstance(key, bytes):
@@ -708,7 +716,7 @@ class MemoryObjectStore(BaseObjectStore):
                     )
                 )
 
-            sha_object = value.copy()
+            sha_object = value.copy() if self._copy_only else value
 
             super(MemoryObjectStore.Store, self).__setitem__(key, sha_object)
 
@@ -721,9 +729,14 @@ class MemoryObjectStore(BaseObjectStore):
                 for sha_object in super(Store, self).values()
             )
 
-    def __init__(self):
+    def __init__(self, safe_store=True):
+        """
+            :param safe_store: (bool)
+                If set to False the store may lose objects if there are
+                updated directly. True by default.
+        """
         super(MemoryObjectStore, self).__init__()
-        self._data = MemoryObjectStore.Store()
+        self._data = MemoryObjectStore.Store(copy_only=safe_store)
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:

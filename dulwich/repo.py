@@ -957,9 +957,19 @@ class MemoryRepo(BaseRepo):
     those have a stronger dependency on the filesystem.
     """
 
-    def __init__(self):
+    def __init__(self, safe_store=True):
+        """
+            :param safe_store: (bool)
+                If set to False the store may lose objects if there are
+                updated directly. True by default.
+        """
         from dulwich.config import ConfigFile
-        BaseRepo.__init__(self, MemoryObjectStore(), DictRefsContainer({}))
+        BaseRepo.__init__(
+            self,
+            MemoryObjectStore(safe_store=safe_store),
+            DictRefsContainer({})
+        )
+
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
@@ -1009,15 +1019,18 @@ class MemoryRepo(BaseRepo):
         return None
 
     @classmethod
-    def init_bare(cls, objects, refs):
+    def init_bare(cls, objects, refs, safe_store=True):
         """Create a new bare repository in memory.
 
         :param objects: Objects for the new repository,
             as iterable
         :param refs: Refs as dictionary, mapping names
             to object SHA1s
+        :param safe_store: (bool)
+                If set to False the store may lose objects if there are
+                updated directly. True by default.
         """
-        ret = cls()
+        ret = cls(safe_store=safe_store)
         for obj in objects:
             ret.object_store.add_object(obj)
         for refname, sha in refs.items():

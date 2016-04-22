@@ -128,12 +128,12 @@ class WebTestCase(TestCase):
         self.assertTrue(('Content-Type', expected) in self._headers)
 
 
-def _test_backend(objects, refs=None, named_files=None):
+def _test_backend(objects, refs=None, named_files=None, safe_store=True):
     if not refs:
         refs = {}
     if not named_files:
         named_files = {}
-    repo = MemoryRepo.init_bare(objects, refs)
+    repo = MemoryRepo.init_bare(objects, refs, safe_store=safe_store)
     for path, contents in named_files.items():
         repo._put_named_file(path, contents)
     return DictBackend({'/': repo})
@@ -214,7 +214,7 @@ class DumbHandlersTestCase(WebTestCase):
 
     def test_get_loose_object_error(self):
         blob = make_object(Blob, data=b'foo')
-        backend = _test_backend([blob])
+        backend = _test_backend([blob], safe_store=False)
         mat = re.search('^(..)(.{38})$', blob.id.decode('ascii'))
 
         def as_legacy_object_error():

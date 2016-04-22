@@ -677,9 +677,56 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
 
+    class Store(dict):
+        """Store the object as raw string and always returns a new object when
+            accessed.
+            This prevent to lose objects by updating directly an object and
+            losing the previous version.
+
+            This dict only accept bytestring of 40 as keys and ShaFile
+            instances for values.
+        """
+
+        def __getitem__(self, key):
+            if not len(key) == 40 or not isinstance(key, bytes):
+                raise TypeError(
+                    "'key' must be bytestring, not %.80s" % type(key).__name__
+                )
+
+            type_num, raw_string = super(
+                MemoryObjectStore.Store, self
+            ).__getitem__(key)
+
+            return ShaFile.from_raw_string(type_num, raw_string, key)
+
+        def __setitem__(self, key, value):
+            if not len(key) == 40 or not isinstance(key, bytes):
+                raise TypeError(
+                    "'key' must be bytestring, not %.80s" % type(key).__name__
+                )
+            if not isinstance(value, ShaFile):
+                raise TypeError(
+                    "'value' must be a ShaFile, not %.80s" % (
+                        type(value).__name__,
+                    )
+                )
+
+            super(MemoryObjectStore.Store, self).__setitem__(
+                key, (value.type, value.as_raw_string())
+            )
+
+        def get(self, key):
+            return self[key]
+
+        def values(self):
+            return (
+                ShaFile.from_raw_string(*values)
+                for values in super(Store, self).values()
+            )
+
     def __init__(self):
         super(MemoryObjectStore, self).__init__()
-        self._data = {}
+        self._data = MemoryObjectStore.Store()
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:

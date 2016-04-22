@@ -87,6 +87,20 @@ class ObjectStoreTests(object):
         # access to a serialized form.
         self.store.add_objects([])
 
+    def test_store_resilience(self):
+        """Test if updating an existing stored object doesn't erase the
+        object from the store.
+        """
+        test_object = make_object(Blob, data=b'data')
+
+        self.store.add_object(test_object)
+        test_object_id = test_object.id
+        test_object.data = test_object.data + b'update'
+        stored_test_object = self.store[test_object_id]
+
+        self.assertNotEqual(test_object.id, stored_test_object.id)
+        self.assertEqual(stored_test_object.id, test_object_id)
+
     def test_add_object(self):
         self.store.add_object(testobject)
         self.assertEqual(set([testobject.id]), set(self.store))

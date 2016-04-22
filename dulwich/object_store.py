@@ -678,8 +678,7 @@ class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
 
     class Store(dict):
-        """Store the object as raw string and always returns a new object when
-            accessed.
+        """Store the object but always returns a new object when accessed.
             This prevent to lose objects by updating directly an object and
             losing the previous version.
 
@@ -693,11 +692,9 @@ class MemoryObjectStore(BaseObjectStore):
                     "'key' must be bytestring, not %.80s" % type(key).__name__
                 )
 
-            type_num, raw_string = super(
-                MemoryObjectStore.Store, self
-            ).__getitem__(key)
+            sha_object = super(MemoryObjectStore.Store, self).__getitem__(key)
 
-            return ShaFile.from_raw_string(type_num, raw_string, key)
+            return sha_object.copy()
 
         def __setitem__(self, key, value):
             if not len(key) == 40 or not isinstance(key, bytes):
@@ -711,17 +708,17 @@ class MemoryObjectStore(BaseObjectStore):
                     )
                 )
 
-            super(MemoryObjectStore.Store, self).__setitem__(
-                key, (value.type, value.as_raw_string())
-            )
+            sha_object = value.copy()
+
+            super(MemoryObjectStore.Store, self).__setitem__(key, sha_object)
 
         def get(self, key):
             return self[key]
 
         def values(self):
             return (
-                ShaFile.from_raw_string(*values)
-                for values in super(Store, self).values()
+                self[sha_object.id]
+                for sha_object in super(Store, self).values()
             )
 
     def __init__(self):

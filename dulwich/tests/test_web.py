@@ -217,10 +217,12 @@ class DumbHandlersTestCase(WebTestCase):
         backend = _test_backend([blob])
         mat = re.search('^(..)(.{38})$', blob.id.decode('ascii'))
 
-        def as_legacy_object_error():
+        def as_legacy_object_error(self):
             raise IOError
 
-        blob.as_legacy_object = as_legacy_object_error
+        self.addCleanup(
+            setattr, Blob, 'as_legacy_object', Blob.as_legacy_object)
+        Blob.as_legacy_object = as_legacy_object_error
         list(get_loose_object(self._req, backend, mat))
         self.assertEqual(HTTP_ERROR, self._status)
 

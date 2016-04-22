@@ -11,6 +11,10 @@
   * Fix `dulwich.porcelain.status` when used in empty trees.
     (Jelmer Vernooij, #415)
 
+  * Return copies of objects in MemoryObjectStore rather than
+    references, making the behaviour more consistent with that of
+    DiskObjectStore. (Félix Mattrat, Jelmer Vernooij)
+
  CHANGES
 
   * Drop support for Python 2.6.
@@ -25,7 +29,7 @@
     on wsgi.input. (Jonas Haag)
 
   * Support fastexport/fastimport functionality on python3 with newer
-    versions of fastimport (>= 0.9.5).
+    versions of fastimport (>= 0.9.5). (Jelmer Vernooij, Félix Mattrat)
 
 0.12.0	2015-12-13
 

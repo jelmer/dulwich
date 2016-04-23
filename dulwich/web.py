@@ -175,7 +175,7 @@ def get_info_refs(req, backend, mat):
     params = parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
     if service and not req.dumb:
-        handler_cls = req.handlers.get(service, None)
+        handler_cls = req.handlers.get(service.encode('ascii'), None)
         if handler_cls is None:
             yield req.forbidden('Unsupported service')
             return
@@ -231,7 +231,7 @@ class _LengthLimitedFile(object):
 def handle_service_request(req, backend, mat):
     service = mat.group().lstrip('/')
     logger.info('Handling service request for %s', service)
-    handler_cls = req.handlers.get(service, None)
+    handler_cls = req.handlers.get(service.encode('ascii'), None)
     if handler_cls is None:
         yield req.forbidden('Unsupported service')
         return
@@ -275,21 +275,21 @@ class HTTPGitRequest(object):
         self._cache_headers = []
         logger.info('Not found: %s', message)
         self.respond(HTTP_NOT_FOUND, 'text/plain')
-        return message
+        return message.encode('ascii')
 
     def forbidden(self, message):
         """Begin a HTTP 403 response and return the text of a message."""
         self._cache_headers = []
         logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
-        return message
+        return message.encode('ascii')
 
     def error(self, message):
         """Begin a HTTP 500 response and return the text of a message."""
         self._cache_headers = []
         logger.error('Error: %s', message)
         self.respond(HTTP_ERROR, 'text/plain')
-        return message
+        return message.encode('ascii')
 
     def nocache(self):
         """Set the response to never be cached by the client."""
@@ -356,7 +356,7 @@ class HTTPGitApplication(object):
             if self.fallback_app is not None:
                 return self.fallback_app(environ, start_response)
             else:
-                return req.not_found('Sorry, that method is not supported')
+                return [req.not_found('Sorry, that method is not supported')]
 
         return handler(req, self.backend, mat)
 
@@ -424,7 +424,7 @@ class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
     def log_exception(self, exc_info):
-        if sys.version < (2, 7):
+        if sys.version_info < (2, 7):
             logger.exception('Exception happened during processing of request')
         else:
             logger.exception('Exception happened during processing of request',

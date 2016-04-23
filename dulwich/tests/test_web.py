@@ -323,13 +323,13 @@ class SmartHandlersTestCase(WebTestCase):
         return self._handler
 
     def _handlers(self):
-        return {'git-upload-pack': self._make_handler}
+        return {b'git-upload-pack': self._make_handler}
 
     def test_handle_service_request_unknown(self):
         mat = re.search('.*', '/git-evil-handler')
         content = list(handle_service_request(self._req, 'backend', mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertFalse('git-evil-handler' in "".join(content))
+        self.assertFalse(b'git-evil-handler' in b"".join(content))
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
@@ -337,11 +337,11 @@ class SmartHandlersTestCase(WebTestCase):
         if content_length is not None:
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
-        handler_output = ''.join(
+        handler_output = b''.join(
           handle_service_request(self._req, 'backend', mat))
         write_output = self._output.getvalue()
         # Ensure all output was written via the write callback.
-        self.assertEqual('', handler_output)
+        self.assertEqual(b'', handler_output)
         self.assertEqual(b'handled input: foo', write_output)
         self.assertContentTypeEquals('application/x-git-upload-pack-result')
         self.assertFalse(self._handler.advertise_refs)
@@ -360,7 +360,7 @@ class SmartHandlersTestCase(WebTestCase):
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
         content = list(get_info_refs(self._req, b'backend', None))
-        self.assertFalse('git-evil-handler' in "".join(content))
+        self.assertFalse(b'git-evil-handler' in b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
 
@@ -407,7 +407,7 @@ class HTTPGitRequestTestCase(WebTestCase):
     def test_not_found(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = 'Something not found'
-        self.assertEqual(message, self._req.not_found(message))
+        self.assertEqual(message.encode('ascii'), self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
                           set(self._headers))
@@ -415,7 +415,7 @@ class HTTPGitRequestTestCase(WebTestCase):
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = 'Something not found'
-        self.assertEqual(message, self._req.forbidden(message))
+        self.assertEqual(message.encode('ascii'), self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
                           set(self._headers))

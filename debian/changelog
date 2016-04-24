@@ -10,6 +10,7 @@ dulwich (0.13.0-1) UNRELEASED; urgency=medium
 
   [ Jelmer Vernooĳ ]
   * Bump standards version to 3.9.7.
+  * Add some lintian overrides for git files that are used for testing.
 
  -- Jelmer Vernooij <jelmer@debian.org>  Sun, 24 Apr 2016 15:34:54 +0000
 

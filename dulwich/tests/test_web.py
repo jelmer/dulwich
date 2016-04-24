@@ -64,6 +64,30 @@ from dulwich.tests.utils import (
     )
 
 
+class MinimalistWSGIInputStream(object):
+    """WSGI input stream with no 'seek()' and 'tell()' methods."""
+    def __init__(self, data):
+        self.data = data
+        self.pos = 0
+
+    def read(self, howmuch):
+        start = self.pos
+        end = self.pos + howmuch
+        if start >= len(self.data):
+            return ''
+        self.pos = end
+        return self.data[start:end]
+
+
+class MinimalistWSGIInputStream2(MinimalistWSGIInputStream):
+    """WSGI input stream with no *working* 'seek()' and 'tell()' methods."""
+    def seek(self, pos):
+        raise NotImplementedError
+
+    def tell(self):
+        raise NotImplementedError
+
+
 class TestHTTPGitRequest(HTTPGitRequest):
     """HTTPGitRequest with overridden methods to help test caching."""
 
@@ -193,10 +217,12 @@ class DumbHandlersTestCase(WebTestCase):
         backend = _test_backend([blob])
         mat = re.search('^(..)(.{38})$', blob.id.decode('ascii'))
 
-        def as_legacy_object_error():
+        def as_legacy_object_error(self):
             raise IOError
 
-        blob.as_legacy_object = as_legacy_object_error
+        self.addCleanup(
+            setattr, Blob, 'as_legacy_object', Blob.as_legacy_object)
+        Blob.as_legacy_object = as_legacy_object_error
         list(get_loose_object(self._req, backend, mat))
         self.assertEqual(HTTP_ERROR, self._status)
 
@@ -297,13 +323,13 @@ class SmartHandlersTestCase(WebTestCase):
         return self._handler
 
     def _handlers(self):
-        return {'git-upload-pack': self._make_handler}
+        return {b'git-upload-pack': self._make_handler}
 
     def test_handle_service_request_unknown(self):
         mat = re.search('.*', '/git-evil-handler')
         content = list(handle_service_request(self._req, 'backend', mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertFalse('git-evil-handler' in "".join(content))
+        self.assertFalse(b'git-evil-handler' in b"".join(content))
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
@@ -311,11 +337,11 @@ class SmartHandlersTestCase(WebTestCase):
         if content_length is not None:
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
-        handler_output = ''.join(
+        handler_output = b''.join(
           handle_service_request(self._req, 'backend', mat))
         write_output = self._output.getvalue()
         # Ensure all output was written via the write callback.
-        self.assertEqual('', handler_output)
+        self.assertEqual(b'', handler_output)
         self.assertEqual(b'handled input: foo', write_output)
         self.assertContentTypeEquals('application/x-git-upload-pack-result')
         self.assertFalse(self._handler.advertise_refs)
@@ -334,7 +360,7 @@ class SmartHandlersTestCase(WebTestCase):
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
         content = list(get_info_refs(self._req, b'backend', None))
-        self.assertFalse('git-evil-handler' in "".join(content))
+        self.assertFalse(b'git-evil-handler' in b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
 
@@ -381,7 +407,7 @@ class HTTPGitRequestTestCase(WebTestCase):
     def test_not_found(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = 'Something not found'
-        self.assertEqual(message, self._req.not_found(message))
+        self.assertEqual(message.encode('ascii'), self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
                           set(self._headers))
@@ -389,7 +415,7 @@ class HTTPGitRequestTestCase(WebTestCase):
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = 'Something not found'
-        self.assertEqual(message, self._req.forbidden(message))
+        self.assertEqual(message.encode('ascii'), self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
                           set(self._headers))
@@ -497,19 +523,15 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         'wsgi.input' except for '.read()'.  (In particular, it shouldn't
         require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.)
         """
-        class MinimalistWSGIInputStream(object):
-            def __init__(self, data):
-                self.data = data
-                self.pos = 0
-
-            def read(self, howmuch):
-                start = self.pos
-                end = self.pos + howmuch
-                if start >= len(self.data):
-                    return ''
-                self.pos = end
-                return self.data[start:end]
-
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(self.example_text,
             MinimalistWSGIInputStream(zstream.read()), zlength)
+
+    def test_call_no_working_seek(self):
+        """
+        Similar to 'test_call_no_seek', but this time the methods are available
+        (but defunct).  See https://github.com/jonashaag/klaus/issues/154.
+        """
+        zstream, zlength = self._get_zstream(self.example_text)
+        self._test_call(self.example_text,
+            MinimalistWSGIInputStream2(zstream.read()), zlength)

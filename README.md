@@ -47,4 +47,3 @@ Supported versions of Python
 ----------------------------
 
 At the moment, Dulwich supports (and is tested on) CPython 2.6, 2.7, 3.4, 3.5 and Pypy.
-The ``dulwich.web`` module is currently broken on Python 3 (issue #295).

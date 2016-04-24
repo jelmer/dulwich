@@ -8,6 +8,9 @@ dulwich (0.13.0-1) UNRELEASED; urgency=medium
   [ Ondřej Nový ]
   * Fixed VCS URL (https)
 
+  [ Jelmer Vernooĳ ]
+  * Bump standards version to 3.9.7.
+
  -- Jelmer Vernooij <jelmer@debian.org>  Sun, 24 Apr 2016 15:34:54 +0000
 
 dulwich (0.12.0-1) unstable; urgency=medium

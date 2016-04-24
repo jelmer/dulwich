@@ -1,8 +1,14 @@
-dulwich (0.12.0-2) UNRELEASED; urgency=medium
+dulwich (0.13.0-1) UNRELEASED; urgency=medium
 
+  [ Jelmer Vernooij ]
+  * New upstream release.
+   + Add Build-Depends: python3-fastimport.
+   + Add Recommends: python3-fastimport to python3-dulwich.
+
+  [ Ondřej Nový ]
   * Fixed VCS URL (https)
 
- -- Ondřej Nový <novy@ondrej.org>  Tue, 29 Mar 2016 21:29:06 +0200
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 24 Apr 2016 15:34:54 +0000
 
 dulwich (0.12.0-1) unstable; urgency=medium
 

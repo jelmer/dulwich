@@ -1,2 +1,2 @@
 # There are some git files that are used for testing:
-W: python3-dulwich: package-contains-vcs-control-file
+python3-dulwich binary: package-contains-vcs-control-file

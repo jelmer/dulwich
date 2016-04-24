@@ -8,3 +8,4 @@ python-dulwich-dbg
 python3-dulwich-dbg
 python3-dulwich
 *.debhelper.log
+debhelper-build-stamp

@@ -818,6 +818,20 @@ class TagSerializeTests(TestCase):
                           b'\n'
                           b'Tag 0.1'), x.as_raw_string())
 
+    def test_serialize_none_message(self):
+        x = make_object(Tag,
+                        tagger=b'Jelmer Vernooij <jelmer@samba.org>',
+                        name=b'0.1',
+                        message=None,
+                        object=(Blob, b'd80c186a03f423a81b39df39dc87fd269736ca86'),
+                        tag_time=423423423,
+                        tag_timezone=0)
+        self.assertEqual((b'object d80c186a03f423a81b39df39dc87fd269736ca86\n'
+                          b'type blob\n'
+                          b'tag 0.1\n'
+                          b'tagger Jelmer Vernooij <jelmer@samba.org> '
+                          b'423423423 +0000\n'), x.as_raw_string())
+
 
 default_tagger = (b'Linus Torvalds <torvalds@woody.linux-foundation.org> '
                   b'1183319674 -0700')
@@ -849,8 +863,8 @@ class TagParseTests(ShaFileCheckTests):
             lines.append(b'tag ' + name)
         if tagger is not None:
             lines.append(b'tagger ' + tagger)
-        lines.append(b'')
         if message is not None:
+            lines.append(b'')
             lines.append(message)
         return lines
 
@@ -875,6 +889,17 @@ class TagParseTests(ShaFileCheckTests):
         x = Tag()
         x.set_raw_string(self.make_tag_text(tagger=None))
         self.assertEqual(None, x.tagger)
+        self.assertEqual(b'v2.6.22-rc7', x.name)
+
+    def test_parse_no_message(self):
+        x = Tag()
+        x.set_raw_string(self.make_tag_text(message=None))
+        self.assertEqual(None, x.message)
+        self.assertEqual(
+            b'Linus Torvalds <torvalds@woody.linux-foundation.org>', x.tagger)
+        self.assertEqual(datetime.datetime.utcfromtimestamp(x.tag_time),
+                          datetime.datetime(2007, 7, 1, 19, 54, 34))
+        self.assertEqual(-25200, x.tag_timezone)
         self.assertEqual(b'v2.6.22-rc7', x.name)
 
     def test_check(self):

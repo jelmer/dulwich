@@ -663,7 +663,12 @@ def get_tree_changes(repo):
             'delete': [],
             'modify': [],
         }
-        for change in index.changes_from_tree(r.object_store, r[b'HEAD'].tree):
+        try:
+            tree_id = r[b'HEAD'].tree
+        except KeyError:
+            tree_id = None
+
+        for change in index.changes_from_tree(r.object_store, tree_id):
             if not change[0][0]:
                 tracked_changes['add'].append(change[0][1])
             elif not change[0][1]:

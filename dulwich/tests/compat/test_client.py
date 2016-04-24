@@ -62,9 +62,6 @@ from dulwich.tests import (
     SkipTest,
     expectedFailure,
     )
-from dulwich.tests.utils import (
-    skipIfPY3,
-    )
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
@@ -436,10 +433,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                         if len(authorization) == 2:
                             env['REMOTE_USER'] = authorization[0]
         # XXX REMOTE_IDENT
-        if self.headers.typeheader is None:
-            env['CONTENT_TYPE'] = self.headers.type
-        else:
-            env['CONTENT_TYPE'] = self.headers.typeheader
+        env['CONTENT_TYPE'] = self.headers.get('content-type')
         length = self.headers.get('content-length')
         if length:
             env['CONTENT_LENGTH'] = length
@@ -456,9 +450,9 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ua = self.headers.get('user-agent')
         if ua:
             env['HTTP_USER_AGENT'] = ua
-        co = filter(None, self.headers.getheaders('cookie'))
+        co = self.headers.get('cookie')
         if co:
-            env['HTTP_COOKIE'] = ', '.join(co)
+            env['HTTP_COOKIE'] = co
         # XXX Other HTTP_* headers
         # Since we're setting the env in the parent, provide empty
         # values to override previously set values
@@ -466,7 +460,11 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                   'HTTP_USER_AGENT', 'HTTP_COOKIE', 'HTTP_REFERER'):
             env.setdefault(k, "")
 
-        self.send_response(200, "Script output follows")
+        self.wfile.write(b"HTTP/1.1 200 Script output follows\r\n")
+        self.wfile.write(
+            ("Server: %s\r\n" % self.server.server_name).encode('ascii'))
+        self.wfile.write(
+            ("Date: %s\r\n" % self.date_time_string()).encode('ascii'))
 
         decoded_query = query.replace('+', ' ')
 
@@ -502,7 +500,6 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
         return 'http://%s:%s/' % (self.server_name, self.server_port)
 
 
-@skipIfPY3
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
     min_git_version = (1, 7, 0, 2)
@@ -528,7 +525,10 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         return client.HttpGitClient(self._httpd.get_url())
 
     def _build_path(self, path):
-        return path
+        if sys.version_info[0] == 3:
+            return path.decode('ascii')
+        else:
+            return path
 
     def test_archive(self):
         raise SkipTest("exporting archives not supported over http")

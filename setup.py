@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.12.0'
+dulwich_version_string = '0.13.0'
 
 include_dirs = []
 # Windows MSVC support
@@ -51,8 +51,6 @@ if sys.version_info[0] == 2:
     if not '__pypy__' in sys.modules and not sys.platform == 'win32':
         tests_require.extend([
             'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
-    if sys.version_info < (2, 7):
-        tests_require.append('unittest2')
 else:
     # fastimport, gevent, geventhttpclient are not available for PY3
     # mock only used for test_swift, which requires gevent/geventhttpclient

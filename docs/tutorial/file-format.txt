@@ -36,7 +36,7 @@ A commit file looks like this::
  
   <commit message>
 
-But where are the changes you commited? The commit contains a reference to a
+But where are the changes you committed? The commit contains a reference to a
 tree.
 
 The Tree
@@ -63,7 +63,7 @@ content yet. That's where the reference to a blob comes in.
 The Blob
 --------
 
-A blob is simply the content of files you are versionning.
+A blob is simply the content of files you are versioning.
 
 A blob file looks like this::
 

@@ -19,7 +19,6 @@
 """Tests for archive support."""
 
 from io import BytesIO
-import sys
 import tarfile
 
 from dulwich.archive import tar_stream
@@ -41,8 +40,6 @@ from dulwich.tests.utils import (
 class ArchiveTests(TestCase):
 
     def test_empty(self):
-        if sys.version_info[:2] <= (2, 6):
-            self.skipTest("archive creation known failing on Python2.6")
         store = MemoryObjectStore()
         c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]

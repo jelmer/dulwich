@@ -25,10 +25,7 @@ import posixpath
 
 from time import time
 from io import BytesIO
-try:
-    from unittest import skipIf
-except ImportError:
-    from unittest2 import skipIf
+from unittest import skipIf
 
 from dulwich.tests import (
     TestCase,

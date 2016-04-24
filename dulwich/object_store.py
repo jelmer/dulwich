@@ -716,7 +716,7 @@ class MemoryObjectStore(BaseObjectStore):
         return obj.type_num, obj.as_raw_string()
 
     def __getitem__(self, name):
-        return self._data[self._to_hexsha(name)]
+        return self._data[self._to_hexsha(name)].copy()
 
     def __delitem__(self, name):
         """Delete an object from this store, for testing only."""
@@ -726,7 +726,7 @@ class MemoryObjectStore(BaseObjectStore):
         """Add a single object to this object store.
 
         """
-        self._data[obj.id] = obj
+        self._data[obj.id] = obj.copy()
 
     def add_objects(self, objects):
         """Add a set of objects to this object store.
@@ -734,7 +734,7 @@ class MemoryObjectStore(BaseObjectStore):
         :param objects: Iterable over a list of objects.
         """
         for obj, path in objects:
-            self._data[obj.id] = obj
+            self.add_object(obj)
 
     def add_pack(self):
         """Add a new pack to this object store.
@@ -750,7 +750,7 @@ class MemoryObjectStore(BaseObjectStore):
             p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
             for obj in PackInflater.for_pack_data(p, self.get_raw):
-                self._data[obj.id] = obj
+                self.add_object(obj)
         def abort():
             pass
         return f, commit, abort

@@ -62,7 +62,7 @@ class GitFastExporter(object):
 
     def _allocate_marker(self):
         self._marker_idx+=1
-        return b"%d" % (self._marker_idx,)
+        return ("%d" % (self._marker_idx,)).encode('ascii')
 
     def _export_blob(self, blob):
         marker = self._allocate_marker()
@@ -87,7 +87,7 @@ class GitFastExporter(object):
             if old_path != new_path and old_path is not None:
                 yield commands.FileRenameCommand(old_path, new_path)
             if old_mode != new_mode or old_hexsha != new_hexsha:
-                prefixed_marker = b':%s' %  (marker,)
+                prefixed_marker = b':' + marker
                 yield commands.FileModifyCommand(
                     new_path, new_mode, prefixed_marker, None
                 )

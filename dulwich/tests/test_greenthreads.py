@@ -51,9 +51,9 @@ if gevent_support:
 skipmsg = "Gevent library is not installed"
 
 def create_commit(marker=None):
-    blob = Blob.from_string(b'The blob content %s' % marker)
+    blob = Blob.from_string(b'The blob content ' + marker)
     tree = Tree()
-    tree.add(b"thefile %s" % marker, 0o100644, blob.id)
+    tree.add(b"thefile " + marker, 0o100644, blob.id)
     cmt = Commit()
     cmt.tree = tree.id
     cmt.author = cmt.committer = b"John Doe <john@doe.net>"

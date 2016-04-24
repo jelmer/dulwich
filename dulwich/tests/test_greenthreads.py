@@ -51,14 +51,14 @@ if gevent_support:
 skipmsg = "Gevent library is not installed"
 
 def create_commit(marker=None):
-    blob = Blob.from_string('The blob content %s' % marker)
+    blob = Blob.from_string(b'The blob content %s' % marker)
     tree = Tree()
-    tree.add("thefile %s" % marker, 0o100644, blob.id)
+    tree.add(b"thefile %s" % marker, 0o100644, blob.id)
     cmt = Commit()
     cmt.tree = tree.id
-    cmt.author = cmt.committer = "John Doe <john@doe.net>"
-    cmt.message = "%s" % marker
-    tz = parse_timezone('-0200')[0]
+    cmt.author = cmt.committer = b"John Doe <john@doe.net>"
+    cmt.message = marker
+    tz = parse_timezone(b'-0200')[0]
     cmt.commit_time = cmt.author_time = int(time.time())
     cmt.commit_timezone = cmt.author_timezone = tz
     return cmt, tree, blob
@@ -67,7 +67,7 @@ def create_commit(marker=None):
 def init_store(store, count=1):
     ret = []
     for i in range(0, count):
-        objs = create_commit(marker=i)
+        objs = create_commit(marker=("%d" % i).encode('ascii'))
         for obj in objs:
             ret.append(obj)
             store.add_object(obj)
@@ -127,7 +127,7 @@ class TestGreenThreadsMissingObjectFinder(TestCase):
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount)
 
         finder = GreenThreadsMissingObjectFinder(self.store,
-                                             wants[0:self.cmt_amount/2],
+                                             wants[0:int(self.cmt_amount/2)],
                                              wants)
         # sha_done will contains commit id and sha of blob refered in tree
         self.assertEqual(len(finder.sha_done), (self.cmt_amount/2)*2)

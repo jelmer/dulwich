@@ -360,5 +360,3 @@ def setup_warning_catcher():
         warnings.showwarning = original_showwarning
 
     return caught_warnings, restore_showwarning
-
-skipIfPY3 = skipIf(sys.version_info[0] == 3, "Feature not yet ported to python3.")

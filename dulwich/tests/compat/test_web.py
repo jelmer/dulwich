@@ -37,9 +37,6 @@ from dulwich.tests import (
     SkipTest,
     skipIf,
     )
-from dulwich.tests.utils import (
-    skipIfPY3,
-    )
 from dulwich.web import (
     make_wsgi_chain,
     HTTPGitApplication,
@@ -81,7 +78,6 @@ class WebTests(ServerTests):
 
 
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
-@skipIfPY3
 class SmartWebTestCase(WebTests, CompatTestCase):
     """Test cases for smart HTTP server.
 
@@ -91,7 +87,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     min_git_version = (1, 6, 6)
 
     def _handlers(self):
-        return {'git-receive-pack': NoSideBand64kReceivePackHandler}
+        return {b'git-receive-pack': NoSideBand64kReceivePackHandler}
 
     def _check_app(self, app):
         receive_pack_handler_cls = app.handlers[b'git-receive-pack']
@@ -121,7 +117,6 @@ def patch_capabilities(handler, caps_removed):
 
 
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
-@skipIfPY3
 class SmartWebSideBand64kTestCase(SmartWebTestCase):
     """Test cases for smart HTTP server with side-band-64k support."""
 
@@ -129,8 +124,8 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
     min_git_version = (1, 7, 0, 2)
 
     def setUp(self):
-        self.o_uph_cap = patch_capabilities(UploadPackHandler, ("no-done",))
-        self.o_rph_cap = patch_capabilities(ReceivePackHandler, ("no-done",))
+        self.o_uph_cap = patch_capabilities(UploadPackHandler, (b"no-done",))
+        self.o_rph_cap = patch_capabilities(ReceivePackHandler, (b"no-done",))
         super(SmartWebSideBand64kTestCase, self).setUp()
 
     def tearDown(self):
@@ -167,7 +162,6 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
 
 
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
-@skipIfPY3
 class DumbWebTestCase(WebTests, CompatTestCase):
     """Test cases for dumb HTTP server."""
 

@@ -96,7 +96,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     def _check_app(self, app):
         receive_pack_handler_cls = app.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
-        self.assertFalse(b'side-band-64k' in caps)
+        self.assertNotIn(b'side-band-64k', caps)
 
     def _make_app(self, backend):
         app = make_wsgi_chain(backend, handlers=self._handlers())
@@ -144,8 +144,8 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
     def _check_app(self, app):
         receive_pack_handler_cls = app.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue(b'side-band-64k' in caps)
-        self.assertFalse(b'no-done' in caps)
+        self.assertIn(b'side-band-64k', caps)
+        self.assertNotIn(b'no-done', caps)
 
 
 class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
@@ -162,8 +162,8 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
     def _check_app(self, app):
         receive_pack_handler_cls = app.handlers[b'git-receive-pack']
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue(b'side-band-64k' in caps)
-        self.assertTrue(b'no-done' in caps)
+        self.assertIn(b'side-band-64k', caps)
+        self.assertIn(b'no-done', caps)
 
 
 @skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')

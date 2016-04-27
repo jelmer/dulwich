@@ -938,10 +938,8 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckFails(Tag, text)
 
     def test_tree_copy_after_update(self):
-        """Check if the id of the Tree is correctly
-           updated when the tree is copied after being
-           updated
-        """   
+        """Check Tree.id is correctly updated when the tree is copied after updated.
+        """
         shas = []
         tree = Tree()
         shas.append(tree.id)
@@ -950,8 +948,9 @@ class TagParseTests(ShaFileCheckTests):
         shas.append(tree.id)
         shas.append(copied.id)
 
-        self.assertTrue(shas[0] not in shas[1:])
-        self.assertTrue(shas[1] == shas[2])
+        self.assertNotIn(shas[0], shas[1:])
+        self.assertEqual(shas[1], shas[2])
+
 
 class CheckTests(TestCase):
 

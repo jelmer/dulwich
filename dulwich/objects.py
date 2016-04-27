@@ -270,6 +270,7 @@ class ShaFile(object):
         :return: List of strings, not necessarily one per line
         """
         if self._needs_serialization:
+            self._sha = None
             self._chunked_text = self._serialize()
             self._needs_serialization = False
         return self._chunked_text
@@ -463,15 +464,10 @@ class ShaFile(object):
     def copy(self):
         """Create a new copy of this SHA1 object from its raw string"""
         obj_class = object_class(self.get_type())
-        # The id need to be retrieved before calling as_raw_string because
-        # that method can overwrite the flag _needs_serialization and by
-        # side effect the self.id property can return an outdated id.
-        hex_sha_id = self.id
-
         return obj_class.from_raw_string(
             self.get_type(),
             self.as_raw_string(),
-            hex_sha_id)
+            self.id)
 
     @property
     def id(self):

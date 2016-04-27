@@ -141,11 +141,9 @@ def serializable_property(name, docstring=None):
     """A property that helps tracking whether serialization is necessary.
     """
     def set(obj, value):
-        obj._ensure_parsed()
         setattr(obj, "_"+name, value)
         obj._needs_serialization = True
     def get(obj):
-        obj._ensure_parsed()
         return getattr(obj, "_"+name)
     return property(get, set, doc=docstring)
 
@@ -218,8 +216,7 @@ class FixedSha(object):
 class ShaFile(object):
     """A git SHA file."""
 
-    __slots__ = ('_needs_parsing', '_chunked_text', '_sha',
-                 '_needs_serialization')
+    __slots__ = ('_chunked_text', '_sha', '_needs_serialization')
 
     @staticmethod
     def _parse_legacy_object_header(magic, f):
@@ -272,9 +269,7 @@ class ShaFile(object):
 
         :return: List of strings, not necessarily one per line
         """
-        if self._needs_parsing:
-            self._ensure_parsed()
-        elif self._needs_serialization:
+        if self._needs_serialization:
             self._chunked_text = self._serialize()
             self._needs_serialization = False
         return self._chunked_text
@@ -298,13 +293,6 @@ class ShaFile(object):
         """Return a string representing this object, fit for display."""
         return self.as_raw_string()
 
-    def _ensure_parsed(self):
-        if self._needs_parsing:
-            if not self._chunked_text:
-                raise AssertionError("ShaFile needs chunked text")
-            self._deserialize(self._chunked_text)
-            self._needs_parsing = False
-
     def set_raw_string(self, text, sha=None):
         """Set the contents of this object from a serialized string."""
         if not isinstance(text, bytes):
@@ -319,7 +307,6 @@ class ShaFile(object):
             self._sha = None
         else:
             self._sha = FixedSha(sha)
-        self._needs_parsing = False
         self._needs_serialization = False
 
     @staticmethod
@@ -365,7 +352,6 @@ class ShaFile(object):
         """Don't call this directly"""
         self._sha = None
         self._chunked_text = []
-        self._needs_parsing = False
         self._needs_serialization = True
 
     def _deserialize(self, chunks):
@@ -539,7 +525,6 @@ class Blob(ShaFile):
     def __init__(self):
         super(Blob, self).__init__()
         self._chunked_text = []
-        self._needs_parsing = False
         self._needs_serialization = False
 
     def _get_data(self):
@@ -552,15 +537,12 @@ class Blob(ShaFile):
                     "The text contained within the blob object.")
 
     def _get_chunked(self):
-        self._ensure_parsed()
         return self._chunked_text
 
     def _set_chunked(self, chunks):
         self._chunked_text = chunks
 
     def _serialize(self):
-        if not self._chunked_text:
-            self._ensure_parsed()
         return self._chunked_text
 
     def _deserialize(self, chunks):
@@ -739,11 +721,9 @@ class Tag(ShaFile):
 
         :return: tuple of (object class, sha).
         """
-        self._ensure_parsed()
         return (self._object_class, self._object_sha)
 
     def _set_object(self, value):
-        self._ensure_parsed()
         (self._object_class, self._object_sha) = value
         self._needs_serialization = True
 
@@ -864,11 +844,9 @@ class Tree(ShaFile):
         return tree
 
     def __contains__(self, name):
-        self._ensure_parsed()
         return name in self._entries
 
     def __getitem__(self, name):
-        self._ensure_parsed()
         return self._entries[name]
 
     def __setitem__(self, name, value):
@@ -880,21 +858,17 @@ class Tree(ShaFile):
             a string.
         """
         mode, hexsha = value
-        self._ensure_parsed()
         self._entries[name] = (mode, hexsha)
         self._needs_serialization = True
 
     def __delitem__(self, name):
-        self._ensure_parsed()
         del self._entries[name]
         self._needs_serialization = True
 
     def __len__(self):
-        self._ensure_parsed()
         return len(self._entries)
 
     def __iter__(self):
-        self._ensure_parsed()
         return iter(self._entries)
 
     def add(self, name, mode, hexsha):
@@ -910,7 +884,6 @@ class Tree(ShaFile):
             warnings.warn(
                 "Please use Tree.add(name, mode, hexsha)",
                 category=DeprecationWarning, stacklevel=2)
-        self._ensure_parsed()
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
@@ -921,7 +894,6 @@ class Tree(ShaFile):
             order.
         :return: Iterator over (name, mode, sha) tuples
         """
-        self._ensure_parsed()
         return sorted_tree_items(self._entries, name_order)
 
     def items(self):
@@ -1209,12 +1181,10 @@ class Commit(ShaFile):
 
     def _get_parents(self):
         """Return a list of parents of this commit."""
-        self._ensure_parsed()
         return self._parents
 
     def _set_parents(self, value):
         """Set a list of parents of this commit."""
-        self._ensure_parsed()
         self._needs_serialization = True
         self._parents = value
 
@@ -1223,7 +1193,6 @@ class Commit(ShaFile):
 
     def _get_extra(self):
         """Return extra settings of this commit."""
-        self._ensure_parsed()
         return self._extra
 
     extra = property(_get_extra,

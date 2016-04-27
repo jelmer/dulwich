@@ -231,7 +231,7 @@ class BlobReadTests(TestCase):
         c = make_commit(id=sha, message=b'foo')
         self.assertTrue(isinstance(c, Commit))
         self.assertEqual(sha, c.id)
-        self.assertNotEqual(sha, c._make_sha())
+        self.assertNotEqual(sha, c.sha())
 
 
 class ShaFileCheckTests(TestCase):

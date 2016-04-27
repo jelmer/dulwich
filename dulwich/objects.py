@@ -463,13 +463,6 @@ class ShaFile(object):
             ret += len(chunk)
         return ret
 
-    def _make_sha(self):
-        ret = sha1()
-        ret.update(self._header())
-        for chunk in self.as_raw_chunks():
-            ret.update(chunk)
-        return ret
-
     def sha(self):
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:

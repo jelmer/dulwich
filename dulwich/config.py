@@ -380,12 +380,19 @@ class StackedConfig(Config):
     def default_backends(cls):
         """Retrieve the default configuration.
 
-        This will look in the users' home directory and the system
-        configuration.
+        See :manpage:`git-config(1)` for details on the files searched.
         """
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))
-        paths.append("/etc/gitconfig")
+
+        xdg_config_home = os.environ.get(
+            "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
+        )
+        paths.append(os.path.join(xdg_config_home, "git", "config"))
+
+        if "GIT_CONFIG_NOSYSTEM" not in os.environ:
+            paths.append("/etc/gitconfig")
+
         backends = []
         for path in paths:
             try:

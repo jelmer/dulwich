@@ -380,7 +380,7 @@ class StackedConfig(Config):
     def default_backends(cls):
         """Retrieve the default configuration.
 
-        See :manpage:`git-config(1)` for details on the files searched.
+        See git-config(1) for details on the files searched.
         """
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))

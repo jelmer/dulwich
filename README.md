@@ -22,7 +22,7 @@ If you don't want to install the C bindings, specify the --pure argument to setu
 
     $ python setup.py --pure install
 
-or if you are installing from pip:
+or if you are installing from pip::
 
     $ pip install dulwich --global-option="--pure"
 

@@ -585,7 +585,7 @@ def push(repo, remote_location, refspecs=None,
                     refs[rh] = r.refs[lh]
             return refs
 
-        err_encoding = getattr(errstream, 'encoding', 'utf-8')
+        err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
         remote_location_bytes = remote_location.encode(err_encoding)
         try:
             client.send_pack(path, update_refs,

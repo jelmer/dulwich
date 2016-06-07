@@ -349,8 +349,16 @@ class GitClient(object):
 
         all_refs = set(new_refs.keys()).union(set(old_refs.keys()))
         for refname in all_refs:
+            if not isinstance(refname, bytes):
+                raise TypeError('refname is not a bytestring: %r' % refname)
             old_sha1 = old_refs.get(refname, ZERO_SHA)
+            if not isinstance(old_sha1, bytes):
+                raise TypeError('old sha1 for %s is not a bytestring: %r' %
+                        (refname, old_sha1))
             new_sha1 = new_refs.get(refname, ZERO_SHA)
+            if not isinstance(new_sha1, bytes):
+                raise TypeError('old sha1 for %s is not a bytestring %r' %
+                        (refname, new_sha1))
 
             if old_sha1 != new_sha1:
                 if sent_capabilities:

@@ -428,7 +428,7 @@ def parse_submodules(config):
     """
     for section in config.keys():
         section_kind, section_name = section
-        if section_kind == 'submodule':
-            sm_path = config.get(section, 'path')
-            sm_url = config.get(section, 'url')
+        if section_kind == b'submodule':
+            sm_path = config.get(section, b'path')
+            sm_url = config.get(section, b'url')
             yield (sm_path, sm_url, section_name)

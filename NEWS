@@ -5,6 +5,10 @@
   * Fix ShaFile.id after modification of a copied ShaFile.
     (Félix Mattrat, Jelmer Vernooij)
 
+ IMPROVEMENTS
+
+  * Add `dulwich.config.parse_submodules` function.
+
 0.13.0	2016-04-24
 
  IMPROVEMENTS

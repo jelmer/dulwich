@@ -417,3 +417,18 @@ class StackedConfig(Config):
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
+
+
+def parse_submodules(config):
+    """Parse a gitmodules GitConfig file, returning submodules.
+
+   :param config: A `ConfigFile`
+   :return: list of tuples (submodule path, url, name),
+       where name is quoted part of the section's name.
+    """
+    for section in config.keys():
+        section_kind, section_name = section
+        if section_kind == 'submodule':
+            sm_path = config.get(section, 'path')
+            sm_url = config.get(section, 'url')
+            yield (sm_path, sm_url, section_name)

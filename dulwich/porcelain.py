@@ -489,9 +489,9 @@ def tag_create(repo, tag, author=None, message=None, annotated=False,
             tag_obj.message = message
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
-            tag_obj.tag_time = tag_time
             if tag_time is None:
                 tag_time = int(time.time())
+            tag_obj.tag_time = tag_time
             if tag_timezone is None:
                 # TODO(jelmer) Use current user timezone rather than UTC
                 tag_timezone = 0

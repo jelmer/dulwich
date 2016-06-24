@@ -28,6 +28,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -375,6 +376,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertTrue(isinstance(tag, Tag))
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar", tag.message)
+        self.assertLess(time.time() - tag.tag_time, 5)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],

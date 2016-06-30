@@ -188,6 +188,17 @@ class BaseRepo(object):
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), b'')
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (
+            self.object_store == other.object_store and
+            self.get_refs() == other.get_refs()
+        )
+
+    def __ne__(self, other):
+        return not self == other
+
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 

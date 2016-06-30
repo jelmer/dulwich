@@ -89,7 +89,7 @@ class DulwichClientTestBase(object):
         dest_repo_dir = os.path.join(self.gitroot, 'dest')
         with closing(repo.Repo(repo_dir)) as src:
             with closing(repo.Repo(dest_repo_dir)) as dest:
-                self.assertReposEqual(src, dest)
+                self.assertEqual(src, dest)
 
     def _client(self):
         raise NotImplementedError()

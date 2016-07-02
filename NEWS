@@ -9,6 +9,8 @@
 
   * Add `dulwich.config.parse_submodules` function.
 
+  * Add `RefsContainer.follow` method. (#438)
+
 0.13.0	2016-04-24
 
  IMPROVEMENTS

@@ -891,12 +891,12 @@ class ReceivePackHandler(PackHandler):
                           'Attempted to delete refs without delete-refs '
                           'capability.')
                     try:
-                        del self.repo.refs[ref]
+                        self.repo.refs.remove_if_equals(ref, oldsha)
                     except all_exceptions:
                         ref_status = b'failed to delete'
                 else:
                     try:
-                        self.repo.refs[ref] = sha
+                        self.repo.refs.set_if_equals(ref, oldsha, sha)
                     except all_exceptions:
                         ref_status = b'failed to write'
             except KeyError as e:

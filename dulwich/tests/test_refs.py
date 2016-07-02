@@ -367,13 +367,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(nines, refs[b'refs/heads/master'])
 
     def test_follow(self):
-        self.assertEqual((b'refs/heads/master',
+        self.assertEqual(([b'HEAD', b'refs/heads/master'],
                           b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
-                         self._refs._follow(b'HEAD'))
-        self.assertEqual((b'refs/heads/master',
+                         self._refs.follow(b'HEAD'))
+        self.assertEqual(([b'refs/heads/master'],
                           b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
-                         self._refs._follow(b'refs/heads/master'))
-        self.assertRaises(KeyError, self._refs._follow, b'refs/heads/loop')
+                         self._refs.follow(b'refs/heads/master'))
+        self.assertRaises(KeyError, self._refs.follow, b'refs/heads/loop')
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)

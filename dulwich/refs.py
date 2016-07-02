@@ -32,6 +32,7 @@ from dulwich.errors import (
 from dulwich.objects import (
     git_line,
     valid_hexsha,
+    ZERO_SHA,
     )
 from dulwich.file import (
     GitFile,
@@ -317,7 +318,7 @@ class DictRefsContainer(RefsContainer):
         self._refs[name] = SYMREF + other
 
     def set_if_equals(self, name, old_ref, new_ref):
-        if old_ref is not None and self._refs.get(name, None) != old_ref:
+        if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         realnames, _ = self.follow(name)
         for realname in realnames:
@@ -332,7 +333,7 @@ class DictRefsContainer(RefsContainer):
         return True
 
     def remove_if_equals(self, name, old_ref):
-        if old_ref is not None and self._refs.get(name, None) != old_ref:
+        if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         del self._refs[name]
         return True

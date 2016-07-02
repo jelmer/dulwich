@@ -196,23 +196,25 @@ class RefsContainer(object):
         """
         raise NotImplementedError(self.read_loose_ref)
 
-    def _follow(self, name):
+    def follow(self, name):
         """Follow a reference name.
 
-        :return: a tuple of (refname, sha), where refname is the name of the
-            last reference in the symbolic reference chain
+        :return: a tuple of (refnames, sha), wheres refnames are the names of
+            references in the chain
         """
         contents = SYMREF + name
         depth = 0
+        refnames = []
         while contents.startswith(SYMREF):
             refname = contents[len(SYMREF):]
+            refnames.append(refname)
             contents = self.read_ref(refname)
             if not contents:
                 break
             depth += 1
             if depth > 5:
                 raise KeyError(name)
-        return refname, contents
+        return refnames, contents
 
     def __contains__(self, refname):
         if self.read_ref(refname):
@@ -224,7 +226,7 @@ class RefsContainer(object):
 
         This method follows all symbolic references.
         """
-        _, sha = self._follow(name)
+        _, sha = self.follow(name)
         if sha is None:
             raise KeyError(name)
         return sha
@@ -317,9 +319,10 @@ class DictRefsContainer(RefsContainer):
     def set_if_equals(self, name, old_ref, new_ref):
         if old_ref is not None and self._refs.get(name, None) != old_ref:
             return False
-        realname, _ = self._follow(name)
-        self._check_refname(realname)
-        self._refs[realname] = new_ref
+        realnames, _ = self.follow(name)
+        for realname in realnames:
+            self._check_refname(realname)
+            self._refs[realname] = new_ref
         return True
 
     def add_if_new(self, name, ref):
@@ -567,8 +570,9 @@ class DiskRefsContainer(RefsContainer):
         """
         self._check_refname(name)
         try:
-            realname, _ = self._follow(name)
-        except KeyError:
+            realnames, _ = self.follow(name)
+            realname = realnames[-1]
+        except (KeyError, IndexError):
             realname = name
         filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
@@ -603,10 +607,11 @@ class DiskRefsContainer(RefsContainer):
         :return: True if the add was successful, False otherwise.
         """
         try:
-            realname, contents = self._follow(name)
+            realnames, contents = self.follow(name)
             if contents is not None:
                 return False
-        except KeyError:
+            realname = realnames[-1]
+        except (KeyError, IndexError):
             realname = name
         self._check_refname(realname)
         filename = self.refpath(realname)

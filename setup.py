@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # Setup file for dulwich
-# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
+# Copyright (C) 2008-2016 Jelmer Vernooij <jelmer@jelmer.uk>
 
 try:
     from setuptools import setup, Extension
@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.14.0'
+dulwich_version_string = '0.15.0'
 
 include_dirs = []
 # Windows MSVC support

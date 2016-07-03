@@ -60,6 +60,10 @@ CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
 CAPABILITY_THIN_PACK = b'thin-pack'
 CAPABILITY_AGENT = b'agent'
 
+# Magic ref that is used to attach capabilities to when
+# there are no refs. Should always be ste to ZERO_SHA.
+CAPABILITIES_REF = b'capabilities^{}'
+
 
 def agent_string():
     return ('dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')

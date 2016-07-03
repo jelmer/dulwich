@@ -345,7 +345,10 @@ class DictRefsContainer(RefsContainer):
     def remove_if_equals(self, name, old_ref):
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
-        del self._refs[name]
+        try:
+            del self._refs[name]
+        except KeyError:
+            pass
         return True
 
     def get_peeled(self, name):
@@ -593,7 +596,7 @@ class DiskRefsContainer(RefsContainer):
                     # read again while holding the lock
                     orig_ref = self.read_loose_ref(realname)
                     if orig_ref is None:
-                        orig_ref = self.get_packed_refs().get(realname, None)
+                        orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
                     if orig_ref != old_ref:
                         f.abort()
                         return False
@@ -657,7 +660,7 @@ class DiskRefsContainer(RefsContainer):
             if old_ref is not None:
                 orig_ref = self.read_loose_ref(name)
                 if orig_ref is None:
-                    orig_ref = self.get_packed_refs().get(name, None)
+                    orig_ref = self.get_packed_refs().get(name, ZERO_SHA)
                 if orig_ref != old_ref:
                     return False
             # may only be packed

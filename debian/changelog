@@ -1,6 +1,7 @@
 dulwich (0.14.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Drop patch 01_refs_unicode: applied upstream.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 03 Jul 2016 19:17:25 +0000
 

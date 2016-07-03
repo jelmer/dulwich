@@ -523,11 +523,10 @@ class PushTests(PorcelainTestCase):
         porcelain.push(clone_path, self.repo.path, b":" + refs_path, outstream=outstream,
             errstream=errstream)
 
-        with closing(Repo(clone_path)) as r_clone:
-            self.assertEqual({
-                b'HEAD': new_id,
-                b'refs/heads/master': new_id,
-                }, self.repo.get_refs())
+        self.assertEqual({
+            b'HEAD': new_id,
+            b'refs/heads/master': new_id,
+            }, self.repo.get_refs())
 
 
 

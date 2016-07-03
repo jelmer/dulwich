@@ -219,14 +219,6 @@ def _parse_string(value):
     return bytes(ret)
 
 
-def _unescape_value(value):
-    """Unescape a value."""
-    ret = bytearray()
-    i = 0
-
-    return ret
-
-
 def _escape_value(value):
     """Escape a value."""
     return value.replace(b"\\", b"\\\\").replace(b"\n", b"\\n").replace(b"\t", b"\\t").replace(b"\"", b"\\\"")

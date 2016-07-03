@@ -779,6 +779,8 @@ class LocalGitClient(GitClient):
         :return: new_refs dictionary containing the changes that were made
             {refname: new_ref}, including deleted refs.
         """
+        if not progress:
+            progress = lambda x: None
         from dulwich.repo import Repo
 
         with closing(Repo(path)) as target:
@@ -791,7 +793,7 @@ class LocalGitClient(GitClient):
                 if new_sha1 not in have and not new_sha1 in want and new_sha1 != ZERO_SHA:
                     want.append(new_sha1)
 
-            if not want and set(old_refs.items()).issubset(set(new_refs.items())):
+            if not want and set(new_refs.items()).issubset(set(old_refs.items())):
                 return new_refs
 
             target.object_store.add_objects(generate_pack_contents(have, want))
@@ -799,9 +801,11 @@ class LocalGitClient(GitClient):
             for refname, new_sha1 in new_refs.items():
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
                 if new_sha1 != ZERO_SHA:
-                    target.refs.set_if_equals(refname, old_sha1, new_sha1)
+                    if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
+                        progress('unable to set %s to %s' % (refname, new_sha1))
                 else:
-                    target.refs.remove_if_equals(refname, old_sha1)
+                    if not target.refs.remove_if_equals(refname, old_sha1):
+                        progress('unable to remove %s' % refname)
 
         return new_refs
 

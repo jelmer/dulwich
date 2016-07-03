@@ -2,7 +2,7 @@ Source: dulwich
 Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
-Uploaders: Jelmer Vernooij <jelmer@debian.org>
+Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: http://samba.org/~jelmer/dulwich
 Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev, dh-python
 Standards-Version: 3.9.7

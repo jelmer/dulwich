@@ -107,7 +107,23 @@ class GitClientTests(TestCase):
     def test_fetch_empty(self):
         self.rin.write(b'0000')
         self.rin.seek(0)
-        self.client.fetch_pack(b'/', lambda heads: [], None, None)
+        def check_heads(heads):
+            self.assertIs(heads, None)
+            return []
+        self.client.fetch_pack(b'/', check_heads, None, None)
+
+    def test_fetch_pack_ignores_magic_ref(self):
+        self.rin.write(
+            b'00000000000000000000000000000000000000000000 capabilities^{}\x00 multi_ack '
+            b'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
+            b'include-tag\n'
+            b'0000')
+        self.rin.seek(0)
+        def check_heads(heads):
+            self.assertEquals({}, heads)
+            return []
+        self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_fetch_pack_none(self):
         self.rin.write(

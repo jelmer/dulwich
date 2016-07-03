@@ -8,6 +8,9 @@
   * Support removing refs from porcelain.push.
     (Jelmer Vernooij, #437)
 
+  * Stop magic protocol ref `capabilities^{}` from leaking out
+    to clients. (Jelmer Vernooij, #254)
+
  IMPROVEMENTS
 
   * Add `dulwich.config.parse_submodules` function.

@@ -70,6 +70,7 @@ from dulwich.protocol import (
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
+    CAPABILITIES_REF,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_WANT,
@@ -175,6 +176,8 @@ def read_pkt_refs(proto):
 
     if len(refs) == 0:
         return None, set([])
+    if refs == {CAPABILITIES_REF: ZERO_SHA}:
+        refs = {}
     return refs, set(server_capabilities)
 
 

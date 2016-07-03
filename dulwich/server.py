@@ -69,6 +69,7 @@ from dulwich.pack import (
 from dulwich.protocol import (
     BufferedPktLineWriter,
     capability_agent,
+    CAPABILITIES_REF,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -932,16 +933,14 @@ class ReceivePackHandler(PackHandler):
         if self.advertise_refs or not self.http_req:
             refs = sorted(self.repo.get_refs().items())
 
-            if refs:
-                self.proto.write_pkt_line(
-                  refs[0][1] + b' ' + refs[0][0] + b'\0' +
-                  self.capability_line() + b'\n')
-                for i in range(1, len(refs)):
-                    ref = refs[i]
-                    self.proto.write_pkt_line(ref[1] + b' ' + ref[0] + b'\n')
-            else:
-                self.proto.write_pkt_line(ZERO_SHA + b" capabilities^{}\0" +
-                    self.capability_line())
+            if not refs:
+                refs = [(CAPABILITIES_REF, ZERO_SHA)]
+            self.proto.write_pkt_line(
+              refs[0][1] + b' ' + refs[0][0] + b'\0' +
+              self.capability_line() + b'\n')
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                self.proto.write_pkt_line(ref[1] + b' ' + ref[0] + b'\n')
 
             self.proto.write_pkt_line(None)
             if self.advertise_refs:

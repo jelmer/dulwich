@@ -45,6 +45,7 @@ from dulwich.tests import (
 from dulwich.protocol import (
     TCP_GIT_PORT,
     Protocol,
+    ZERO_SHA,
     )
 from dulwich.pack import (
     write_pack_objects,
@@ -656,6 +657,7 @@ class LocalGitClientTests(TestCase):
         self.assertDictEqual(local.refs.as_dict(), refs)
 
     def send_and_verify(self, branch, local, target):
+        """Send a branch from local to remote repository and verify it worked."""
         client = LocalGitClient()
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
@@ -663,9 +665,6 @@ class LocalGitClientTests(TestCase):
                                     local.object_store.generate_pack_contents)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])
-
-        for name, sha in new_refs.items():
-            self.assertEqual(new_refs[name], target.refs[name])
 
         obj_local = local.get_object(new_refs[ref_name])
         obj_target = target.get_object(new_refs[ref_name])

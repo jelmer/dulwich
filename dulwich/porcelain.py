@@ -82,7 +82,10 @@ from dulwich.pack import (
     write_pack_objects,
     )
 from dulwich.patch import write_tree_diff
-from dulwich.protocol import Protocol
+from dulwich.protocol import (
+    Protocol,
+    ZERO_SHA,
+    )
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import (
     FileSystemBackend,
@@ -580,7 +583,7 @@ def push(repo, remote_location, refspecs=None,
             # TODO: Handle selected_refs == {None: None}
             for (lh, rh, force) in selected_refs:
                 if lh is None:
-                    del refs[rh]
+                    refs[rh] = ZERO_SHA
                 else:
                     refs[rh] = r.refs[lh]
             return refs

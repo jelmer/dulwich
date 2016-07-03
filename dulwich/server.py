@@ -473,7 +473,6 @@ def _all_wants_satisfied(store, haves, wants):
         earliest = min([store[h].commit_time for h in haves])
     else:
         earliest = 0
-    unsatisfied_wants = set()
     for want in wants:
         if not _want_satisfied(store, haves, want, earliest):
             return False

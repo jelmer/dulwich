@@ -28,7 +28,6 @@ from dulwich.config import (
     _format_string,
     _escape_value,
     _parse_string,
-    _unescape_value,
     parse_submodules,
     )
 from dulwich.tests import (

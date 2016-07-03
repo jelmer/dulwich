@@ -29,6 +29,7 @@ from dulwich import errors
 from dulwich.file import (
     GitFile,
     )
+from dulwich.objects import ZERO_SHA
 from dulwich.refs import (
     DictRefsContainer,
     InfoRefsContainer,
@@ -203,6 +204,10 @@ class RefsContainerTests(object):
                                                  nines))
         self.assertEqual(nines, self._refs[b'refs/heads/master'])
 
+        self.assertTrue(self._refs.set_if_equals(
+            b'refs/heads/nonexistant', ZERO_SHA, nines))
+        self.assertEqual(nines, self._refs[b'refs/heads/nonexistant'])
+
     def test_add_if_new(self):
         nines = b'9' * 40
         self.assertFalse(self._refs.add_if_new(b'refs/heads/master', nines))
@@ -259,8 +264,9 @@ class RefsContainerTests(object):
                          self._refs[b'HEAD'])
         self.assertTrue(self._refs.remove_if_equals(
             b'refs/tags/refs-0.2', b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'))
+        self.assertTrue(self._refs.remove_if_equals(
+            b'refs/tags/refs-0.2', ZERO_SHA))
         self.assertFalse(b'refs/tags/refs-0.2' in self._refs)
-
 
 
 class DictRefsContainerTests(RefsContainerTests, TestCase):

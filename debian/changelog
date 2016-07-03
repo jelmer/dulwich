@@ -1,4 +1,4 @@
-dulwich (0.14.0-1) UNRELEASED; urgency=medium
+dulwich (0.14.0-1) unstable; urgency=medium
 
   * New upstream release.
   * Drop patch 01_refs_unicode: applied upstream.

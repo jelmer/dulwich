@@ -580,13 +580,14 @@ def push(repo, remote_location, refspecs=None,
 
         def update_refs(refs):
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs))
+            new_refs = {}
             # TODO: Handle selected_refs == {None: None}
             for (lh, rh, force) in selected_refs:
                 if lh is None:
-                    refs[rh] = ZERO_SHA
+                    new_refs[rh] = ZERO_SHA
                 else:
-                    refs[rh] = r.refs[lh]
-            return refs
+                    new_refs[rh] = r.refs[lh]
+            return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
         remote_location_bytes = remote_location.encode(err_encoding)

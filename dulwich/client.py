@@ -784,20 +784,21 @@ class LocalGitClient(GitClient):
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
-            all_refs = set(new_refs.keys()).union(set(old_refs.keys()))
-            for refname in all_refs:
-                old_sha1 = old_refs.get(refname, ZERO_SHA)
-                new_sha1 = new_refs.get(refname, ZERO_SHA)
-                if new_sha1 not in have and new_sha1 != ZERO_SHA:
+            for refname, new_sha1 in new_refs.items():
+                if new_sha1 not in have and not new_sha1 in want and new_sha1 != ZERO_SHA:
                     want.append(new_sha1)
 
-            if not want and old_refs == new_refs:
+            if not want and set(old_refs.items()).issubset(set(new_refs.items())):
                 return new_refs
 
             target.object_store.add_objects(generate_pack_contents(have, want))
 
-            for name, sha in new_refs.items():
-                target.refs[name] = sha
+            for refname, new_sha1 in new_refs.items():
+                old_sha1 = old_refs.get(refname, ZERO_SHA)
+                if new_sha1 != ZERO_SHA:
+                    target.refs.set_if_equals(refname, old_sha1, new_sha1)
+                else:
+                    target.refs.remove_if_equals(refname, old_sha1)
 
         return new_refs
 

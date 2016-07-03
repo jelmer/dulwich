@@ -20,7 +20,6 @@
 import os
 import stat
 import shutil
-import sys
 import tempfile
 
 from dulwich import errors

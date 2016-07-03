@@ -80,7 +80,7 @@ def parse_reftuple(lh_container, rh_container, refspec):
         (lh, rh) = refspec.split(b":")
     else:
         lh = rh = refspec
-    if rh == b"":
+    if lh == b"":
         lh = None
     else:
         lh = parse_ref(lh_container, lh)

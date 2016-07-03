@@ -29,6 +29,7 @@ from dulwich import errors
 from dulwich.file import (
     GitFile,
     )
+from dulwich.objects import ZERO_SHA
 from dulwich.refs import (
     DictRefsContainer,
     InfoRefsContainer,
@@ -203,6 +204,10 @@ class RefsContainerTests(object):
                                                  nines))
         self.assertEqual(nines, self._refs[b'refs/heads/master'])
 
+        self.assertTrue(self._refs.set_if_equals(
+            b'refs/heads/nonexistant', ZERO_SHA, nines))
+        self.assertEqual(nines, self._refs[b'refs/heads/nonexistant'])
+
     def test_add_if_new(self):
         nines = b'9' * 40
         self.assertFalse(self._refs.add_if_new(b'refs/heads/master', nines))
@@ -259,8 +264,9 @@ class RefsContainerTests(object):
                          self._refs[b'HEAD'])
         self.assertTrue(self._refs.remove_if_equals(
             b'refs/tags/refs-0.2', b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'))
+        self.assertTrue(self._refs.remove_if_equals(
+            b'refs/tags/refs-0.2', ZERO_SHA))
         self.assertFalse(b'refs/tags/refs-0.2' in self._refs)
-
 
 
 class DictRefsContainerTests(RefsContainerTests, TestCase):
@@ -367,13 +373,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(nines, refs[b'refs/heads/master'])
 
     def test_follow(self):
-        self.assertEqual((b'refs/heads/master',
+        self.assertEqual(([b'HEAD', b'refs/heads/master'],
                           b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
-                         self._refs._follow(b'HEAD'))
-        self.assertEqual((b'refs/heads/master',
+                         self._refs.follow(b'HEAD'))
+        self.assertEqual(([b'refs/heads/master'],
                           b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
-                         self._refs._follow(b'refs/heads/master'))
-        self.assertRaises(KeyError, self._refs._follow, b'refs/heads/loop')
+                         self._refs.follow(b'refs/heads/master'))
+        self.assertRaises(KeyError, self._refs.follow, b'refs/heads/loop')
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)

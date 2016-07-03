@@ -30,5 +30,5 @@ Commit changes
 
   >>> r = porcelain.init("testrepo")
   >>> open("testrepo/testfile", "w").write("data")
-  >>> porcelain.add(r, "testrepo/testfile")
-  >>> porcelain.commit(r, "A sample commit")
+  >>> porcelain.add(r, "testfile")
+  >>> porcelain.commit(r, b"A sample commit")

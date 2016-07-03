@@ -28,7 +28,7 @@ from dulwich.config import (
     _format_string,
     _escape_value,
     _parse_string,
-    _unescape_value,
+    parse_submodules,
     )
 from dulwich.tests import (
     TestCase,
@@ -292,3 +292,16 @@ class CheckSectionNameTests(TestCase):
         self.assertTrue(_check_section_name(b"foo"))
         self.assertTrue(_check_section_name(b"foo-bar"))
         self.assertTrue(_check_section_name(b"bar.bar"))
+
+
+class SubmodulesTests(TestCase):
+
+    def testSubmodules(self):
+        cf = ConfigFile.from_file(BytesIO(b"""\
+[submodule "core/lib"]
+	path = core/lib
+	url = https://github.com/phhusson/QuasselC.git
+"""))
+        got = list(parse_submodules(cf))
+        self.assertEqual([
+            (b'core/lib', b'https://github.com/phhusson/QuasselC.git', b'core/lib')], got)

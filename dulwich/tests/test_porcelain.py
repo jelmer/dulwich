@@ -28,6 +28,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -35,6 +36,7 @@ from dulwich.objects import (
     Blob,
     Tag,
     Tree,
+    ZERO_SHA,
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
@@ -375,6 +377,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertTrue(isinstance(tag, Tag))
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar", tag.message)
+        self.assertLess(time.time() - tag.tag_time, 5)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1],
@@ -456,7 +459,10 @@ class PushTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, clone_path)
         target_repo = porcelain.clone(self.repo.path, target=clone_path,
             errstream=errstream)
-        target_repo.close()
+        try:
+            self.assertEqual(target_repo[b'HEAD'], self.repo[b'HEAD'])
+        finally:
+            target_repo.close()
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
@@ -467,7 +473,9 @@ class PushTests(PorcelainTestCase):
 
         # Setup a non-checked out branch in the remote
         refs_path = b"refs/heads/foo"
-        self.repo.refs[refs_path] = self.repo[b'HEAD'].id
+        new_id = self.repo[b'HEAD'].id
+        self.assertNotEqual(new_id, ZERO_SHA)
+        self.repo.refs[refs_path] = new_id
 
         # Push to the remote
         porcelain.push(clone_path, self.repo.path, b"HEAD:" + refs_path, outstream=outstream,
@@ -475,7 +483,12 @@ class PushTests(PorcelainTestCase):
 
         # Check that the target and source
         with closing(Repo(clone_path)) as r_clone:
-            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
+            self.assertEqual({
+                b'HEAD': new_id,
+                b'refs/heads/foo': r_clone[b'HEAD'].id,
+                b'refs/heads/master': new_id,
+                }, self.repo.get_refs())
+            self.assertEqual(r_clone[b'HEAD'].id, self.repo.refs[refs_path])
 
             # Get the change in the target repo corresponding to the add
             # this will be in the foo branch.
@@ -483,6 +496,38 @@ class PushTests(PorcelainTestCase):
                                        self.repo[b'refs/heads/foo'].tree))[0]
             self.assertEqual(os.path.basename(fullpath),
                 change.new.path.decode('ascii'))
+
+    def test_delete(self):
+        """Basic test of porcelain push, removing a branch.
+        """
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        porcelain.commit(repo=self.repo.path, message=b'init',
+            author=b'', committer=b'')
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(self.repo.path, target=clone_path,
+            errstream=errstream)
+        target_repo.close()
+
+        # Setup a non-checked out branch in the remote
+        refs_path = b"refs/heads/foo"
+        new_id = self.repo[b'HEAD'].id
+        self.assertNotEqual(new_id, ZERO_SHA)
+        self.repo.refs[refs_path] = new_id
+
+        # Push to the remote
+        porcelain.push(clone_path, self.repo.path, b":" + refs_path, outstream=outstream,
+            errstream=errstream)
+
+        self.assertEqual({
+            b'HEAD': new_id,
+            b'refs/heads/master': new_id,
+            }, self.repo.get_refs())
+
 
 
 class PullTests(PorcelainTestCase):

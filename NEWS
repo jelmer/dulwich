@@ -1,3 +1,22 @@
+0.14.0	2016-07-03
+
+ BUG FIXES
+
+  * Fix ShaFile.id after modification of a copied ShaFile.
+    (Félix Mattrat, Jelmer Vernooij)
+
+  * Support removing refs from porcelain.push.
+    (Jelmer Vernooij, #437)
+
+  * Stop magic protocol ref `capabilities^{}` from leaking out
+    to clients. (Jelmer Vernooij, #254)
+
+ IMPROVEMENTS
+
+  * Add `dulwich.config.parse_submodules` function.
+
+  * Add `RefsContainer.follow` method. (#438)
+
 0.13.0	2016-04-24
 
  IMPROVEMENTS

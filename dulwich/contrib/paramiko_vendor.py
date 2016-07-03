@@ -30,7 +30,6 @@ This implementation is experimental and does not have any tests.
 
 import paramiko
 import paramiko.client
-import subprocess
 import threading
 
 class _ParamikoWrapper(object):

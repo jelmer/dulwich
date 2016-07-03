@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
 
-dulwich_version_string = '0.13.0'
+dulwich_version_string = '0.14.0'
 
 include_dirs = []
 # Windows MSVC support
@@ -46,15 +46,10 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
             os.environ['ARCHFLAGS'] = ''
 
-if sys.version_info[0] == 2:
-    tests_require = ['fastimport']
-    if not '__pypy__' in sys.modules and not sys.platform == 'win32':
-        tests_require.extend([
-            'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
-else:
-    # fastimport, gevent, geventhttpclient are not available for PY3
-    # mock only used for test_swift, which requires gevent/geventhttpclient
-    tests_require = []
+tests_require = ['fastimport']
+if not '__pypy__' in sys.modules and not sys.platform == 'win32':
+    tests_require.extend([
+        'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
 if sys.version_info[0] > 2 and sys.platform == 'win32':
     # C Modules don't build for python3 windows, and prevent tests from running

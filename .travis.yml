@@ -5,13 +5,13 @@ env:
 matrix:
   include:
     - python: "2.7"
-      env: TEST_REQUIRE="gevent geventhttpclient fastimport"
+      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "pypy"
       env: TEST_REQUIRE="fastimport"
     - python: "3.4"
-      env: TEST_REQUIRE="fastimport"
+      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.5"
-      env: TEST_REQUIRE="fastimport"
+      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
 cache:
   directories:
     - $HOME/.cache/pip

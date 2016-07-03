@@ -231,7 +231,7 @@ class BlobReadTests(TestCase):
         c = make_commit(id=sha, message=b'foo')
         self.assertTrue(isinstance(c, Commit))
         self.assertEqual(sha, c.id)
-        self.assertNotEqual(sha, c._make_sha())
+        self.assertNotEqual(sha, c.sha())
 
 
 class ShaFileCheckTests(TestCase):
@@ -936,6 +936,20 @@ class TagParseTests(ShaFileCheckTests):
                 self.assertCheckSucceeds(Tag, text)
             else:
                 self.assertCheckFails(Tag, text)
+
+    def test_tree_copy_after_update(self):
+        """Check Tree.id is correctly updated when the tree is copied after updated.
+        """
+        shas = []
+        tree = Tree()
+        shas.append(tree.id)
+        tree.add(b'data', 0o644, Blob().id)
+        copied = tree.copy()
+        shas.append(tree.id)
+        shas.append(copied.id)
+
+        self.assertNotIn(shas[0], shas[1:])
+        self.assertEqual(shas[1], shas[2])
 
 
 class CheckTests(TestCase):

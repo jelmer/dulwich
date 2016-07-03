@@ -833,9 +833,9 @@ class Repo(BaseRepo):
             pass
 
         # Update target head
-        head, head_sha = self.refs._follow(b'HEAD')
-        if head is not None and head_sha is not None:
-            target.refs.set_symbolic_ref(b'HEAD', head)
+        head_chain, head_sha = self.refs.follow(b'HEAD')
+        if head_chain and head_sha is not None:
+            target.refs.set_symbolic_ref(b'HEAD', head_chain[-1])
             target[b'HEAD'] = head_sha
 
             if not bare:

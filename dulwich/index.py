@@ -389,8 +389,12 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
 
     # Mention added files
     for name in other_names:
-        (other_sha, other_mode) = lookup_entry(name)
-        yield ((None, name), (None, other_mode), (None, other_sha))
+        try:
+            (other_sha, other_mode) = lookup_entry(name)
+        except KeyError:
+            pass
+        else:
+            yield ((None, name), (None, other_mode), (None, other_sha))
 
 
 def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):

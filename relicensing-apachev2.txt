@@ -1,0 +1,23 @@
+At the moment, Dulwich is licensed under the GNU General Public License,
+version 2 or later.
+
+We'd like to relicense Dulwich under the Apache v2 (or later) license, as
+the GPL is problematic for many free software Python projects that are under
+BSD-style licenses. See also https://github.com/jelmer/dulwich/issues/153
+
+For reference, a full copy of the Apachev2 license can be found here:
+https://www.apache.org/licenses/LICENSE-2.0
+
+New contributions to Dulwich should be dual licensed under the GNU GPLv2 (or
+later) and the Apachev2 (or later) licenses.
+
+Contributions made prior were contributed under the GPLv2 (or later) license
+alone. Code written by the following contributors has not (yet) been relicensed
+under dual Apachev2/GPLv2:
+
+Artem Tikhomirov <artem.tikhomirov@syntevo.com>
+Risto Kankkunen <risto.kankkunen@f-secure.com> <risto.kankkunen@iki.fi>
+
+If your name is in this list and you'd be happy to relicense your contribution
+under dual GPLv2/Apachev2, then please send me an e-mail (jelmer@jelmer.uk) or
+a pull request on GitHub removing your name from the list above.

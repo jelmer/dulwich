@@ -134,7 +134,6 @@ class TestPack(PackTests):
         # two copy operations in git's binary delta format.
         raise SkipTest('skipping slow, large test')
         with self.get_pack(pack1_sha) as orig_pack:
-            orig_blob = orig_pack[a_sha]
             new_blob = Blob()
             new_blob.data = 'big blob' + ('x' * 2 ** 25)
             new_blob_2 = Blob()

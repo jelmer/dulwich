@@ -24,7 +24,7 @@ remote program.
 A common way of sending a unit of information is a pkt_line. This is a 4 byte
 size as human encoded hex (i.e. totally underusing the 4 bytes...) that tells
 you the size of the payload, followed by the payload. The size includes the 4
-byes used by the size itself.
+bytes used by the size itself.
 
     0009ABCD\n
 

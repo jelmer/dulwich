@@ -70,6 +70,7 @@ from dulwich.protocol import (
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
+    CAPABILITIES_REF,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_WANT,
@@ -175,6 +176,8 @@ def read_pkt_refs(proto):
 
     if len(refs) == 0:
         return None, set([])
+    if refs == {CAPABILITIES_REF: ZERO_SHA}:
+        refs = {}
     return refs, set(server_capabilities)
 
 
@@ -218,6 +221,8 @@ class GitClient(object):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         raise NotImplementedError(self.send_pack)
 
@@ -349,8 +354,16 @@ class GitClient(object):
 
         all_refs = set(new_refs.keys()).union(set(old_refs.keys()))
         for refname in all_refs:
+            if not isinstance(refname, bytes):
+                raise TypeError('refname is not a bytestring: %r' % refname)
             old_sha1 = old_refs.get(refname, ZERO_SHA)
+            if not isinstance(old_sha1, bytes):
+                raise TypeError('old sha1 for %s is not a bytestring: %r' %
+                        (refname, old_sha1))
             new_sha1 = new_refs.get(refname, ZERO_SHA)
+            if not isinstance(new_sha1, bytes):
+                raise TypeError('old sha1 for %s is not a bytestring %r' %
+                        (refname, new_sha1))
 
             if old_sha1 != new_sha1:
                 if sent_capabilities:
@@ -489,6 +502,8 @@ class TraditionalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         proto, unused_can_read = self._connect(b'receive-pack', path)
         with proto:
@@ -761,7 +776,11 @@ class LocalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
+        if not progress:
+            progress = lambda x: None
         from dulwich.repo import Repo
 
         with closing(Repo(path)) as target:
@@ -770,20 +789,23 @@ class LocalGitClient(GitClient):
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
-            all_refs = set(new_refs.keys()).union(set(old_refs.keys()))
-            for refname in all_refs:
-                old_sha1 = old_refs.get(refname, ZERO_SHA)
-                new_sha1 = new_refs.get(refname, ZERO_SHA)
-                if new_sha1 not in have and new_sha1 != ZERO_SHA:
+            for refname, new_sha1 in new_refs.items():
+                if new_sha1 not in have and not new_sha1 in want and new_sha1 != ZERO_SHA:
                     want.append(new_sha1)
 
-            if not want and old_refs == new_refs:
+            if not want and set(new_refs.items()).issubset(set(old_refs.items())):
                 return new_refs
 
             target.object_store.add_objects(generate_pack_contents(have, want))
 
-            for name, sha in new_refs.items():
-                target.refs[name] = sha
+            for refname, new_sha1 in new_refs.items():
+                old_sha1 = old_refs.get(refname, ZERO_SHA)
+                if new_sha1 != ZERO_SHA:
+                    if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
+                        progress('unable to set %s to %s' % (refname, new_sha1))
+                else:
+                    if not target.refs.remove_if_equals(refname, old_sha1):
+                        progress('unable to remove %s' % refname)
 
         return new_refs
 
@@ -1034,6 +1056,8 @@ class HttpGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
@@ -1045,6 +1069,7 @@ class HttpGitClient(GitClient):
 
         new_refs = determine_wants(dict(old_refs))
         if new_refs is None:
+            # Determine wants function is aborting the push.
             return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)

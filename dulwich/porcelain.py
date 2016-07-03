@@ -82,7 +82,10 @@ from dulwich.pack import (
     write_pack_objects,
     )
 from dulwich.patch import write_tree_diff
-from dulwich.protocol import Protocol
+from dulwich.protocol import (
+    Protocol,
+    ZERO_SHA,
+    )
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import (
     FileSystemBackend,
@@ -489,9 +492,9 @@ def tag_create(repo, tag, author=None, message=None, annotated=False,
             tag_obj.message = message
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
-            tag_obj.tag_time = tag_time
             if tag_time is None:
                 tag_time = int(time.time())
+            tag_obj.tag_time = tag_time
             if tag_timezone is None:
                 # TODO(jelmer) Use current user timezone rather than UTC
                 tag_timezone = 0
@@ -577,15 +580,16 @@ def push(repo, remote_location, refspecs=None,
 
         def update_refs(refs):
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs))
+            new_refs = {}
             # TODO: Handle selected_refs == {None: None}
             for (lh, rh, force) in selected_refs:
                 if lh is None:
-                    del refs[rh]
+                    new_refs[rh] = ZERO_SHA
                 else:
-                    refs[rh] = r.refs[lh]
-            return refs
+                    new_refs[rh] = r.refs[lh]
+            return new_refs
 
-        err_encoding = getattr(errstream, 'encoding', 'utf-8')
+        err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
         remote_location_bytes = remote_location.encode(err_encoding)
         try:
             client.send_pack(path, update_refs,

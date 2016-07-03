@@ -5,6 +5,9 @@
   * Fix ShaFile.id after modification of a copied ShaFile.
     (Félix Mattrat, Jelmer Vernooij)
 
+  * Support removing refs from porcelain.push.
+    (Jelmer Vernooij, #437)
+
  IMPROVEMENTS
 
   * Add `dulwich.config.parse_submodules` function.

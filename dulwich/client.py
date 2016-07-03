@@ -218,6 +218,8 @@ class GitClient(object):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         raise NotImplementedError(self.send_pack)
 
@@ -497,6 +499,8 @@ class TraditionalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         proto, unused_can_read = self._connect(b'receive-pack', path)
         with proto:
@@ -769,6 +773,8 @@ class LocalGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         from dulwich.repo import Repo
 
@@ -1042,6 +1048,8 @@ class HttpGitClient(GitClient):
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
                                  and rejects ref updates
+        :return: new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
         """
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
@@ -1053,6 +1061,7 @@ class HttpGitClient(GitClient):
 
         new_refs = determine_wants(dict(old_refs))
         if new_refs is None:
+            # Determine wants function is aborting the push.
             return old_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)

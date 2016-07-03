@@ -36,11 +36,11 @@ from dulwich.objects import (
     Blob,
     Tag,
     Tree,
+    ZERO_SHA,
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
-    expectedFailure,
     )
 from dulwich.tests.utils import (
     build_commit_graph,
@@ -459,7 +459,10 @@ class PushTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, clone_path)
         target_repo = porcelain.clone(self.repo.path, target=clone_path,
             errstream=errstream)
-        target_repo.close()
+        try:
+            self.assertEqual(target_repo[b'HEAD'], self.repo[b'HEAD'])
+        finally:
+            target_repo.close()
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
@@ -470,7 +473,9 @@ class PushTests(PorcelainTestCase):
 
         # Setup a non-checked out branch in the remote
         refs_path = b"refs/heads/foo"
-        self.repo.refs[refs_path] = self.repo[b'HEAD'].id
+        new_id = self.repo[b'HEAD'].id
+        self.assertNotEqual(new_id, ZERO_SHA)
+        self.repo.refs[refs_path] = new_id
 
         # Push to the remote
         porcelain.push(clone_path, self.repo.path, b"HEAD:" + refs_path, outstream=outstream,
@@ -478,7 +483,12 @@ class PushTests(PorcelainTestCase):
 
         # Check that the target and source
         with closing(Repo(clone_path)) as r_clone:
-            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
+            self.assertEqual({
+                b'HEAD': new_id,
+                b'refs/heads/foo': r_clone[b'HEAD'].id,
+                b'refs/heads/master': new_id,
+                }, self.repo.get_refs())
+            self.assertEqual(r_clone[b'HEAD'].id, self.repo.refs[refs_path])
 
             # Get the change in the target repo corresponding to the add
             # this will be in the foo branch.
@@ -487,8 +497,6 @@ class PushTests(PorcelainTestCase):
             self.assertEqual(os.path.basename(fullpath),
                 change.new.path.decode('ascii'))
 
-    # Deletions don't work yet. #437
-    @expectedFailure
     def test_delete(self):
         """Basic test of porcelain push, removing a branch.
         """
@@ -507,7 +515,9 @@ class PushTests(PorcelainTestCase):
 
         # Setup a non-checked out branch in the remote
         refs_path = b"refs/heads/foo"
-        self.repo.refs[refs_path] = self.repo[b'HEAD'].id
+        new_id = self.repo[b'HEAD'].id
+        self.assertNotEqual(new_id, ZERO_SHA)
+        self.repo.refs[refs_path] = new_id
 
         # Push to the remote
         porcelain.push(clone_path, self.repo.path, b":" + refs_path, outstream=outstream,
@@ -515,8 +525,8 @@ class PushTests(PorcelainTestCase):
 
         with closing(Repo(clone_path)) as r_clone:
             self.assertEqual({
-                b'HEAD': self.repo[b'HEAD'].id,
-                b'refs/heads/master': self.repo[b'HEAD'].id
+                b'HEAD': new_id,
+                b'refs/heads/master': new_id,
                 }, self.repo.get_refs())
 
 

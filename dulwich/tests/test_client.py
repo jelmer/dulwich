@@ -45,7 +45,6 @@ from dulwich.tests import (
 from dulwich.protocol import (
     TCP_GIT_PORT,
     Protocol,
-    ZERO_SHA,
     )
 from dulwich.pack import (
     write_pack_objects,

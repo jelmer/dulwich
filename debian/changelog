@@ -1,3 +1,9 @@
+dulwich (0.14.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 05 Jul 2016 23:04:21 +0000
+
 dulwich (0.14.0-1) unstable; urgency=medium
 
   * New upstream release.

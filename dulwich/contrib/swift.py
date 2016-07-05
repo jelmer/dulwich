@@ -530,14 +530,14 @@ class SwiftPackReader(object):
         if self.base_offset + end > self.pack_length:
             data = self.buff[self.offset:]
             self.offset = end
-            return b"".join(data)
+            return data
         if end > len(self.buff):
             # Need to read more from swift
             self._read(more=True)
             return self.read(length)
         data = self.buff[self.offset:end]
         self.offset = end
-        return b"".join(data)
+        return data
 
     def seek(self, offset):
         """Seek to a specified offset
@@ -584,8 +584,6 @@ class SwiftPackData(PackData):
     def get_object_at(self, offset):
         if offset in self._offset_cache:
             return self._offset_cache[offset]
-        assert isinstance(offset, long) or isinstance(offset, int),\
-            'offset was %r' % offset
         assert offset >= self._header_size
         pack_reader = SwiftPackReader(self.scon, self._filename,
                                       self.pack_length)

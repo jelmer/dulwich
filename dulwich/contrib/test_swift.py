@@ -25,6 +25,11 @@ import posixpath
 
 from time import time
 from io import BytesIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
 from unittest import skipIf
 
 from dulwich.tests import (
@@ -161,37 +166,37 @@ def fake_auth_request_v2(*args, **kwargs):
     return ret
 
 
-def create_commit(data, marker='Default', blob=None):
+def create_commit(data, marker=b'Default', blob=None):
     if not blob:
-        blob = Blob.from_string('The blob content %s' % marker)
+        blob = Blob.from_string(b'The blob content ' + marker)
     tree = Tree()
-    tree.add("thefile_%s" % marker, 0o100644, blob.id)
+    tree.add(b"thefile_" + marker, 0o100644, blob.id)
     cmt = Commit()
     if data:
         assert isinstance(data[-1], Commit)
         cmt.parents = [data[-1].id]
     cmt.tree = tree.id
-    author = "John Doe %s <john@doe.net>" % marker
+    author = b"John Doe " + marker + b" <john@doe.net>"
     cmt.author = cmt.committer = author
-    tz = parse_timezone('-0200')[0]
+    tz = parse_timezone(b'-0200')[0]
     cmt.commit_time = cmt.author_time = int(time())
     cmt.commit_timezone = cmt.author_timezone = tz
-    cmt.encoding = "UTF-8"
-    cmt.message = "The commit message %s" % marker
+    cmt.encoding = b"UTF-8"
+    cmt.message = b"The commit message " + marker
     tag = Tag()
-    tag.tagger = "john@doe.net"
-    tag.message = "Annotated tag"
-    tag.tag_timezone = parse_timezone('-0200')[0]
+    tag.tagger = b"john@doe.net"
+    tag.message = b"Annotated tag"
+    tag.tag_timezone = parse_timezone(b'-0200')[0]
     tag.tag_time = cmt.author_time
     tag.object = (Commit, cmt.id)
-    tag.name = "v_%s_0.1" % marker
+    tag.name = b"v_" + marker + b"_0.1"
     return blob, tree, tag, cmt
 
 
-def create_commits(length=1, marker='Default'):
+def create_commits(length=1, marker=b'Default'):
     data = []
     for i in range(0, length):
-        _marker = "%s_%s" % (marker, i)
+        _marker = ("%s_%s" % (marker, i)).encode()
         blob, tree, tag, cmt = create_commit(data, _marker)
         data.extend([blob, tree, tag, cmt])
     return data
@@ -257,7 +262,7 @@ class TestSwiftObjectStore(TestCase):
 
     def setUp(self):
         super(TestSwiftObjectStore, self).setUp()
-        self.conf = swift.load_conf(file=BytesIO(config_file %
+        self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
 
@@ -376,7 +381,7 @@ class TestSwiftRepo(TestCase):
 
     def setUp(self):
         super(TestSwiftRepo, self).setUp()
-        self.conf = swift.load_conf(file=BytesIO(config_file %
+        self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
 
     def test_init(self):
@@ -406,7 +411,7 @@ class TestSwiftRepo(TestCase):
                    new_callable=create_swift_connector,
                    store=store):
             repo = swift.SwiftRepo('fakerepo', conf=self.conf)
-            desc = 'Fake repo'
+            desc = b'Fake repo'
             repo._put_named_file('description', desc)
         self.assertEqual(repo.scon.store['fakerepo/description'],
                          desc)
@@ -425,7 +430,7 @@ class TestSwiftRepo(TestCase):
 @skipIf(missing_libs, skipmsg)
 class TestPackInfoLoadDump(TestCase):
     def setUp(self):
-        conf = swift.load_conf(file=BytesIO(config_file %
+        conf = swift.load_conf(file=StringIO(config_file %
                                              def_config_file))
         sos = swift.SwiftObjectStore(
             FakeSwiftConnector('fakerepo', conf=conf))
@@ -473,7 +478,7 @@ class TestSwiftInfoRefsContainer(TestCase):
             "22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
             "cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         self.store = {'fakerepo/info/refs': content}
-        self.conf = swift.load_conf(file=BytesIO(config_file %
+        self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
         self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
         self.object_store = {}
@@ -507,7 +512,7 @@ class TestSwiftConnector(TestCase):
 
     def setUp(self):
         super(TestSwiftConnector, self).setUp()
-        self.conf = swift.load_conf(file=BytesIO(config_file %
+        self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
         with patch('geventhttpclient.HTTPClient.request',
                    fake_auth_request_v1):
@@ -635,7 +640,7 @@ class SwiftObjectStoreTests(ObjectStoreTests, TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        conf = swift.load_conf(file=BytesIO(config_file %
+        conf = swift.load_conf(file=StringIO(config_file %
                                def_config_file))
         fsc = FakeSwiftConnector('fakerepo', conf=conf)
         self.store = swift.SwiftObjectStore(fsc)

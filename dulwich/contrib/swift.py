@@ -31,9 +31,16 @@ import zlib
 import tempfile
 import posixpath
 
-from urlparse import urlparse
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
+
 from io import BytesIO
-from ConfigParser import ConfigParser
+try:
+    from ConfigParser import ConfigParser
+except ImportError:
+    from configparser import ConfigParser
 from geventhttpclient import HTTPClient
 
 from dulwich.greenthreads import (
@@ -274,8 +281,8 @@ class SwiftConnector(object):
                                 connection_timeout=self.http_timeout,
                                 network_timeout=self.http_timeout,
                                 headers=token_header)
-        self.base_path = str(posixpath.join(urlparse(self.storage_url).path,
-                             self.root))
+        self.base_path = str(
+            posixpath.join(urlparse.urlparse(self.storage_url).path, self.root))
 
     def swift_auth_v1(self):
         self.user = self.user.replace(";", ":")
@@ -286,7 +293,7 @@ class SwiftConnector(object):
             )
         headers = {'X-Auth-User': self.user,
                    'X-Auth-Key': self.password}
-        path = urlparse(self.auth_url).path
+        path = urlparse.urlparse(self.auth_url).path
 
         ret = auth_httpclient.request('GET', path, headers=headers)
 
@@ -318,7 +325,7 @@ class SwiftConnector(object):
             connection_timeout=self.http_timeout,
             network_timeout=self.http_timeout,
             )
-        path = urlparse(self.auth_url).path
+        path = urlparse.urlparse(self.auth_url).path
         if not path.endswith('tokens'):
             path = posixpath.join(path, 'tokens')
         ret = auth_httpclient.request('POST', path,

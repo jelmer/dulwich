@@ -211,7 +211,7 @@ def pack_info_create(pack_data, pack_index):
         # Tree
         elif obj.type_num == Tree.type_num:
             shas = [(s, n, not stat.S_ISDIR(m)) for
-                    n, m, s in obj.iteritems() if not S_ISGITLINK(m)]
+                    n, m, s in obj.items() if not S_ISGITLINK(m)]
             info[obj.id] = (obj.type_num, shas)
         # Blob
         elif obj.type_num == Blob.type_num:
@@ -849,7 +849,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self.store = store
         f = self.scon.get_object(self.filename)
         if not f:
-            f = BytesIO('')
+            f = BytesIO(b'')
         super(SwiftInfoRefsContainer, self).__init__(f)
 
     def _load_check_ref(self, name, old_ref):
@@ -951,7 +951,7 @@ class SwiftRepo(BaseRepo):
         scon.create_root()
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),
                     posixpath.join(INFODIR, 'refs')]:
-            scon.put_object(obj, BytesIO(''))
+            scon.put_object(obj, BytesIO(b''))
         ret = cls(scon.root, conf)
         ret._init_files(True)
         return ret

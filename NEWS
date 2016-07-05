@@ -1,3 +1,13 @@
+0.14.1	2016-07-05
+
+ BUG FIXES
+
+  * Fix regression removing untouched refs when pushing over SSH.
+    (Jelmer Vernooij #441)
+
+  * Skip Python3 tests for SWIFT contrib module, as it has not yet
+    been ported.
+
 0.14.0	2016-07-03
 
  BUG FIXES

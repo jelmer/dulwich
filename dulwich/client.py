@@ -345,15 +345,14 @@ class GitClient(object):
         :param proto: Protocol object to read from
         :param capabilities: List of negotiated capabilities
         :param old_refs: Old refs, as received from the server
-        :param new_refs: New refs
+        :param new_refs: Refs to change
         :return: (have, want) tuple
         """
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
         sent_capabilities = False
 
-        all_refs = set(new_refs.keys()).union(set(old_refs.keys()))
-        for refname in all_refs:
+        for refname in new_refs:
             if not isinstance(refname, bytes):
                 raise TypeError('refname is not a bytestring: %r' % refname)
             old_sha1 = old_refs.get(refname, ZERO_SHA)
@@ -544,7 +543,7 @@ class TraditionalGitClient(GitClient):
 
             (have, want) = self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
-            if not want and old_refs == new_refs:
+            if not want and set(new_refs.items()).issubset(set(old_refs.items())):
                 return new_refs
             objects = generate_pack_contents(have, want)
 
@@ -1077,7 +1076,7 @@ class HttpGitClient(GitClient):
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
-        if not want and old_refs == new_refs:
+        if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:

@@ -190,6 +190,32 @@ class GitClientTests(TestCase):
         self.client.send_pack(b'/', determine_wants, generate_pack_contents)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
+    def test_send_pack_keep_and_delete(self):
+        self.rin.write(
+            b'0063310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'refs/heads/master\x00report-status delete-refs ofs-delta\n'
+            b'003f310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/keepme\n'
+            b'0000000eunpack ok\n'
+            b'0019ok refs/heads/master\n'
+            b'0000')
+        self.rin.seek(0)
+
+        def determine_wants(refs):
+            return {b'refs/heads/master': b'0' * 40}
+
+        def generate_pack_contents(have, want):
+            return {}
+
+        self.client.send_pack(b'/', determine_wants, generate_pack_contents)
+        self.assertIn(
+            self.rout.getvalue(),
+            [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             b'0000000000000000000000000000000000000000 '
+             b'refs/heads/master\x00report-status ofs-delta0000',
+             b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
+             b'0000000000000000000000000000000000000000 '
+             b'refs/heads/master\x00ofs-delta report-status0000'])
+
     def test_send_pack_delete_only(self):
         self.rin.write(
             b'0063310ca9477129b8586fa2afc779c1f57cf64bba6c '

@@ -1,5 +1,10 @@
 0.15.0	UNRELEASED
 
+ BUG FIXES
+
+  * Fix regression removing untouched refs when pushing over SSH.
+    (Jelmer Vernooij #441)
+
 0.14.0	2016-07-03
 
  BUG FIXES

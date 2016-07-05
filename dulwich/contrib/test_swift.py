@@ -30,6 +30,7 @@ try:
 except ImportError:
     from io import StringIO
 
+import sys
 from unittest import skipIf
 
 from dulwich.tests import (
@@ -79,6 +80,8 @@ except ImportError:
 
 skipmsg = "Required libraries are not installed (%r)" % missing_libs
 
+skipIfPY3 = skipIf(sys.version_info[0] == 3, "SWIFT module not yet ported to python3.")
+
 if not missing_libs:
     from dulwich.contrib import swift
 
@@ -124,11 +127,7 @@ class Response(object):
         return self.headers[key]
 
     def items(self):
-        return self.headers
-
-    def iteritems(self):
-        for k, v in self.headers.iteritems():
-            yield k, v
+        return self.headers.items()
 
     def read(self):
         return self.content
@@ -258,6 +257,7 @@ class FakeSwiftConnector(object):
 
 
 @skipIf(missing_libs, skipmsg)
+@skipIfPY3
 class TestSwiftObjectStore(TestCase):
 
     def setUp(self):
@@ -475,8 +475,8 @@ class TestSwiftInfoRefsContainer(TestCase):
     def setUp(self):
         super(TestSwiftInfoRefsContainer, self).setUp()
         content = \
-            "22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
-            "cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
+            b"22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
+            b"cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         self.store = {'fakerepo/info/refs': content}
         self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
@@ -489,22 +489,22 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.assertEqual(len(irc._refs), 0)
         self.fsc.store = self.store
         irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
-        self.assertIn('refs/heads/dev', irc.allkeys())
-        self.assertIn('refs/heads/master', irc.allkeys())
+        self.assertIn(b'refs/heads/dev', irc.allkeys())
+        self.assertIn(b'refs/heads/master', irc.allkeys())
 
     def test_set_if_equals(self):
         self.fsc.store = self.store
         irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
-        irc.set_if_equals('refs/heads/dev',
-                          "cca703b0e1399008b53a1a236d6b4584737649e4", '1'*40)
-        self.assertEqual(irc['refs/heads/dev'], '1'*40)
+        irc.set_if_equals(b'refs/heads/dev',
+                          b"cca703b0e1399008b53a1a236d6b4584737649e4", b'1'*40)
+        self.assertEqual(irc[b'refs/heads/dev'], b'1'*40)
 
     def test_remove_if_equals(self):
         self.fsc.store = self.store
         irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
-        irc.remove_if_equals('refs/heads/dev',
-                             "cca703b0e1399008b53a1a236d6b4584737649e4")
-        self.assertNotIn('refs/heads/dev', irc.allkeys())
+        irc.remove_if_equals(b'refs/heads/dev',
+                             b"cca703b0e1399008b53a1a236d6b4584737649e4")
+        self.assertNotIn(b'refs/heads/dev', irc.allkeys())
 
 
 @skipIf(missing_libs, skipmsg)
@@ -596,7 +596,7 @@ class TestSwiftConnector(TestCase):
     def test_put_object(self):
         with patch('geventhttpclient.HTTPClient.request',
                    lambda *args, **kwargs: Response()):
-            self.assertEqual(self.conn.put_object('a', BytesIO('content')),
+            self.assertEqual(self.conn.put_object('a', BytesIO(b'content')),
                              None)
 
     def test_put_object_fails(self):
@@ -604,15 +604,15 @@ class TestSwiftConnector(TestCase):
                    lambda *args, **kwargs: Response(status=400)):
             self.assertRaises(swift.SwiftException,
                               lambda: self.conn.put_object(
-                                  'a', BytesIO('content')))
+                                  'a', BytesIO(b'content')))
 
     def test_get_object(self):
         with patch('geventhttpclient.HTTPClient.request',
-                   lambda *args, **kwargs: Response(content='content')):
-            self.assertEqual(self.conn.get_object('a').read(), 'content')
+                   lambda *args, **kwargs: Response(content=b'content')):
+            self.assertEqual(self.conn.get_object('a').read(), b'content')
         with patch('geventhttpclient.HTTPClient.request',
-                   lambda *args, **kwargs: Response(content='content')):
-            self.assertEqual(self.conn.get_object('a', range='0-6'), 'content')
+                   lambda *args, **kwargs: Response(content=b'content')):
+            self.assertEqual(self.conn.get_object('a', range='0-6'), b'content')
 
     def test_get_object_fails(self):
         with patch('geventhttpclient.HTTPClient.request',

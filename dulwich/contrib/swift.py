@@ -404,7 +404,7 @@ class SwiftConnector(object):
             raise SwiftException('HEAD request failed with error code %s'
                                  % ret.status_code)
         resp_headers = {}
-        for header, value in ret.iteritems():
+        for header, value in ret.items():
             resp_headers[header.lower()] = value
         return resp_headers
 
@@ -509,7 +509,7 @@ class SwiftPackReader(object):
         self.pack_length = pack_length
         self.offset = 0
         self.base_offset = 0
-        self.buff = ''
+        self.buff = b''
         self.buff_length = self.scon.chunk_length
 
     def _read(self, more=False):
@@ -530,16 +530,14 @@ class SwiftPackReader(object):
         if self.base_offset + end > self.pack_length:
             data = self.buff[self.offset:]
             self.offset = end
-            return "".join(data)
-        try:
-            self.buff[end]
-        except IndexError:
+            return b"".join(data)
+        if end > len(self.buff):
             # Need to read more from swift
             self._read(more=True)
             return self.read(length)
         data = self.buff[self.offset:end]
         self.offset = end
-        return "".join(data)
+        return b"".join(data)
 
     def seek(self, offset):
         """Seek to a specified offset
@@ -810,7 +808,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = posixpath.join(
-            self.pack_dir, 'pack-' + iter_sha1(e[0] for e in entries))
+            self.pack_dir,
+            'pack-' + iter_sha1(e[0] for e in entries).decode(sys.getfilesystemencoding()))
         self.scon.put_object(pack_base_name + '.pack', f)
 
         # Write the index.

@@ -756,7 +756,7 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 def read_info_refs(f):
     ret = {}
     for l in f.readlines():
-        (sha, name) = l.rstrip("\r\n").split("\t", 1)
+        (sha, name) = l.rstrip(b"\r\n").split(b"\t", 1)
         ret[name] = sha
     return ret
 

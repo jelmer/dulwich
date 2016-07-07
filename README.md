@@ -46,4 +46,4 @@ https://launchpad.net/~dulwich-users.
 Supported versions of Python
 ----------------------------
 
-At the moment, Dulwich supports (and is tested on) CPython 2.6, 2.7, 3.4, 3.5 and Pypy.
+At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5 and Pypy.

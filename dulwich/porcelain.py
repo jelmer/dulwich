@@ -590,7 +590,7 @@ def push(repo, remote_location, refspecs=None,
             return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
-        remote_location_bytes = remote_location.encode(err_encoding)
+        remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(path, update_refs,
                 r.object_store.generate_pack_contents, progress=errstream.write)

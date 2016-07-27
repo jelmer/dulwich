@@ -971,7 +971,7 @@ def default_urllib2_opener(config):
 class HttpGitClient(GitClient):
 
     def __init__(self, base_url, dumb=None, opener=None, config=None, **kwargs):
-        self.base_url = base_url.rstrip("/") + "/"
+        self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
             self.opener = default_urllib2_opener(config)
@@ -980,10 +980,10 @@ class HttpGitClient(GitClient):
         GitClient.__init__(self, **kwargs)
 
     def __repr__(self):
-        return "%s(%r, dumb=%r)" % (type(self).__name__, self.base_url, self.dumb)
+        return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)
 
     def _get_url(self, path):
-        return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
+        return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers={}, data=None):
         req = urllib2.Request(url, headers=headers, data=data)

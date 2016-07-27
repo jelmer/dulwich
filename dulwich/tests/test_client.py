@@ -582,6 +582,20 @@ class SSHGitClientTests(TestCase):
         super(SSHGitClientTests, self).tearDown()
         client.get_ssh_vendor = self.real_vendor
 
+    def test_get_url(self):
+        path = '/tmp/repo.git'
+        c = SSHGitClient('git.samba.org')
+
+        url = c.get_url(path)
+        self.assertEqual('ssh://git.samba.org/tmp/repo.git', url)
+
+    def test_get_url_with_username_and_port(self):
+        path = '/tmp/repo.git'
+        c = SSHGitClient('git.samba.org', port=2222, username='user')
+
+        url = c.get_url(path)
+        self.assertEqual('ssh://user@git.samba.org:2222/tmp/repo.git', url)
+
     def test_default_command(self):
         self.assertEqual(b'git-upload-pack',
                 self.client._get_cmd_path(b'upload-pack'))
@@ -640,6 +654,13 @@ class ReportStatusParserTests(TestCase):
 
 
 class LocalGitClientTests(TestCase):
+
+    def test_get_url(self):
+        path = "/tmp/repo.git"
+        c = LocalGitClient()
+
+        url = c.get_url(path)
+        self.assertEqual('file:///tmp/repo.git', url)
 
     def test_fetch_into_empty(self):
         c = LocalGitClient()
@@ -710,3 +731,34 @@ class LocalGitClientTests(TestCase):
         obj_local = local.get_object(new_refs[ref_name])
         obj_target = target.get_object(new_refs[ref_name])
         self.assertEqual(obj_local, obj_target)
+
+
+class HttpGitClientTests(TestCase):
+
+    def test_get_url(self):
+        base_url = 'https://github.com/jelmer/dulwich'
+        path = '/jelmer/dulwich'
+        c = HttpGitClient(base_url)
+
+        url = c.get_url(path)
+        self.assertEqual('https://github.com/jelmer/dulwich', url)
+
+
+class TCPGitClientTests(TestCase):
+
+    def test_get_url(self):
+        host = 'github.com'
+        path = '/jelmer/dulwich'
+        c = TCPGitClient(host)
+
+        url = c.get_url(path)
+        self.assertEqual('git://github.com/jelmer/dulwich', url)
+
+    def test_get_url_with_port(self):
+        host = 'github.com'
+        path = '/jelmer/dulwich'
+        port = 9090
+        c = TCPGitClient(host, port=9090)
+
+        url = c.get_url(path)
+        self.assertEqual('git://github.com:9090/jelmer/dulwich', url)

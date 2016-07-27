@@ -1040,7 +1040,7 @@ class HttpGitClient(GitClient):
             self.opener = opener
         if username is not None:
             pass_man = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            pass_man.add_password(None, base_url, user, password)
+            pass_man.add_password(None, base_url, username, password)
             self.opener.add_handler(urllib2.HTTPBasicAuthHandler(pass_man))
         GitClient.__init__(self, **kwargs)
 
@@ -1051,10 +1051,11 @@ class HttpGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         auth, host = urllib2.splituser(parsedurl.netloc)
         password = parsedurl.password
+        username = parsedurl.username
         # TODO(jelmer): This also strips the username
         parsedurl = parsedurl._replace(netloc=host)
         return cls(urlparse.urlunparse(parsedurl),
-                   password=password, **kwargs)
+                   password=password, username=username, **kwargs)
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)

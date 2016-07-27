@@ -5,9 +5,9 @@ env:
 matrix:
   include:
     - python: "2.7"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport mock"
     - python: "pypy"
-      env: TEST_REQUIRE="fastimport"
+      env: TEST_REQUIRE="fastimport mock"
     - python: "3.4"
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.5"

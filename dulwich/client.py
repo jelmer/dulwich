@@ -1005,7 +1005,11 @@ class HttpGitClient(GitClient):
             self.opener = default_urllib2_opener(config)
         else:
             self.opener = opener
-        if username is not None:
+
+        if passwd is None:
+            passwd = ""
+
+        if username:
             pass_man=urllib2.HTTPPasswordMgrWithDefaultRealm()
             pass_man.add_password(None, base_url, username, passwd)
             self.opener.add_handler(urllib2.HTTPBasicAuthHandler(pass_man))

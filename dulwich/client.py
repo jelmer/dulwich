@@ -207,6 +207,14 @@ class GitClient(object):
         if not thin_packs:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
 
+    def get_url(self, path):
+        """Retrieves full url to given path.
+
+        :param path: Repository path (as string)
+        :return: Url to path (as string)
+        """
+        return path
+
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
@@ -636,6 +644,17 @@ class TCPGitClient(TraditionalGitClient):
         self._port = port
         TraditionalGitClient.__init__(self, **kwargs)
 
+    def get_url(self, path):
+        url = "git://{host:s}".format(host=self._host)
+
+        if self._port is not None and self._port != TCP_GIT_PORT:
+            url += ":{port:d}".format(port=self._port)
+
+        if path is not None:
+            url += path
+
+        return url
+
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
             raise TypeError(path)
@@ -760,6 +779,9 @@ class LocalGitClient(GitClient):
         """
         self._report_activity = report_activity
         # Ignore the thin_packs argument
+
+    def get_url(self, path):
+        return "file://{path:s}".format(path=path)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -925,6 +947,19 @@ class SSHGitClient(TraditionalGitClient):
         else:
             self.ssh_vendor = get_ssh_vendor()
 
+    def get_url(self, path):
+        url = "ssh://"
+
+        if self.username is not None:
+            url += "{username:s}@".format(username=self.username)
+
+        url += self.host
+
+        if self.port is not None:
+            url += ":{port:d}".format(port=self.port)
+
+        return url + path
+
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
         assert isinstance(cmd, bytes)
@@ -978,6 +1013,9 @@ class HttpGitClient(GitClient):
         else:
             self.opener = opener
         GitClient.__init__(self, **kwargs)
+
+    def get_url(self, path):
+        return self._get_url(path).rstrip("/")
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)

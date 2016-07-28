@@ -213,7 +213,7 @@ class GitClient(object):
         :param path: Repository path (as string)
         :return: Url to path (as string)
         """
-        return path
+        raise NotImplementedError(self.get_url)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -645,15 +645,10 @@ class TCPGitClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self, **kwargs)
 
     def get_url(self, path):
-        url = "git://{host:s}".format(host=self._host)
-
+        netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
-            url += ":{port:d}".format(port=self._port)
-
-        if path is not None:
-            url += path
-
-        return url
+            netloc += ":%d" % self._port
+        return urlparse.urlunsplit(("git", netloc, path, '', ''))
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
@@ -781,7 +776,7 @@ class LocalGitClient(GitClient):
         # Ignore the thin_packs argument
 
     def get_url(self, path):
-        return "file://{path:s}".format(path=path)
+        return urlparse.urlunsplit(('file', '', path, '', ''))
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -948,17 +943,14 @@ class SSHGitClient(TraditionalGitClient):
             self.ssh_vendor = get_ssh_vendor()
 
     def get_url(self, path):
-        url = "ssh://"
+        netloc = self.host
+        if self.port is not None:
+            netloc += ":%d" % self.port
 
         if self.username is not None:
-            url += "{username:s}@".format(username=self.username)
+            netloc = self.username + "@" + netloc
 
-        url += self.host
-
-        if self.port is not None:
-            url += ":{port:d}".format(port=self.port)
-
-        return url + path
+        return urlparse.urlunsplit(('ssh', netloc, path, '', ''))
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)

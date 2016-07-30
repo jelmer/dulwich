@@ -1,6 +1,7 @@
 #!/usr/bin/python
+# encoding: utf-8
 # Setup file for dulwich
-# Copyright (C) 2008-2016 Jelmer Vernooij <jelmer@jelmer.uk>
+# Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
 try:
     from setuptools import setup, Extension
@@ -71,7 +72,7 @@ setup(name='dulwich',
       version=dulwich_version_string,
       url='https://www.dulwich.io/',
       license='GPLv2 or later',
-      author='Jelmer Vernooij',
+      author='Jelmer Vernooĳ',
       author_email='jelmer@jelmer.uk',
       long_description="""
       Python implementation of the Git file formats and protocols,

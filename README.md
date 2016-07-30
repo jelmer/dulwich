@@ -6,7 +6,7 @@ It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
 Homepage: https://www.dulwich.io/
-Author: Jelmer Vernooij <jelmer@jelmer.uk>
+Author: Jelmer Vernooĳ <jelmer@jelmer.uk>
 
 The project is named after the part of London that Mr. and Mrs. Git live in
 in the particular Monty Python sketch.

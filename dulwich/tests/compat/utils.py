@@ -34,7 +34,6 @@ from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
 
 from dulwich.tests import (
-    get_safe_env,
     SkipTest,
     TestCase,
     )
@@ -123,7 +122,7 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
     :raise OSError: if the git executable was not found.
     """
 
-    env = get_safe_env(popen_kwargs.pop('env', None))
+    env = popen_kwargs.pop('env', {})
     env['LC_ALL'] = env['LANG'] = 'C'
 
     args = [git_path] + args

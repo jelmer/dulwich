@@ -642,7 +642,7 @@ class TCPGitClient(TraditionalGitClient):
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(TCPGitClient, self).__init__(**kwargs)
 
     def get_url(self, path):
         netloc = self._host
@@ -742,7 +742,7 @@ class SubprocessGitClient(TraditionalGitClient):
         self._stderr = kwargs.get('stderr')
         if 'stderr' in kwargs:
             del kwargs['stderr']
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(SubprocessGitClient, self).__init__(**kwargs)
 
     git_command = None
 
@@ -935,7 +935,7 @@ class SSHGitClient(TraditionalGitClient):
         self.host = host
         self.port = port
         self.username = username
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(SSHGitClient, self).__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
             self.ssh_vendor = vendor

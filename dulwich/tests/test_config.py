@@ -19,6 +19,7 @@
 """Tests for reading and writing configuration files."""
 
 from io import BytesIO
+import os
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
@@ -35,7 +36,15 @@ from dulwich.tests import (
     )
 
 
-class ConfigFileTests(TestCase):
+class ConfigTestCase(TestCase):
+
+    def setUp(self):
+        super(ConfigTestCase, self).setUp()
+        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
+        os.environ["HOME"] = "/nonexistant"
+
+
+class ConfigFileTests(ConfigTestCase):
 
     def from_file(self, text):
         return ConfigFile.from_file(BytesIO(text))
@@ -162,7 +171,7 @@ class ConfigFileTests(TestCase):
         }}), cf)
 
 
-class ConfigDictTests(TestCase):
+class ConfigDictTests(ConfigTestCase):
 
     def test_get_set(self):
         cd = ConfigDict()
@@ -216,7 +225,7 @@ class ConfigDictTests(TestCase):
             list(cd.itersections()))
 
 
-class StackedConfigTests(TestCase):
+class StackedConfigTests(ConfigTestCase):
 
     def test_default_backends(self):
         StackedConfig.default_backends()
@@ -294,7 +303,7 @@ class CheckSectionNameTests(TestCase):
         self.assertTrue(_check_section_name(b"bar.bar"))
 
 
-class SubmodulesTests(TestCase):
+class SubmodulesTests(ConfigTestCase):
 
     def testSubmodules(self):
         cf = ConfigFile.from_file(BytesIO(b"""\

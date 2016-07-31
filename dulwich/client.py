@@ -1044,10 +1044,14 @@ class HttpGitClient(GitClient):
             if not self.dumb:
                 proto = Protocol(resp.read, None)
                 # The first line should mention the service
-                pkts = list(proto.read_pkt_seq())
-                if pkts != [b'# service=' + service + b'\n']:
+                try:
+                    [pkt] = list(proto.read_pkt_seq())
+                except ValueError:
                     raise GitProtocolError(
-                        "unexpected first line %r from smart server" % pkts)
+                        "unexpected number of packets received")
+                if pkt.rstrip(b'\n') != (b'# service=' + service):
+                    raise GitProtocolError(
+                        "unexpected first line %r from smart server" % pkt)
                 return read_pkt_refs(proto)
             else:
                 return read_info_refs(resp), set()

@@ -58,7 +58,6 @@ from dulwich import (
     repo,
     )
 from dulwich.tests import (
-    get_safe_env,
     SkipTest,
     expectedFailure,
     )
@@ -268,7 +267,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
                               protocol.TCP_GIT_PORT)
-        env = get_safe_env()
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
@@ -279,7 +277,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
                 '--listen=localhost', '--reuseaddr',
                 self.gitroot]
         self.process = subprocess.Popen(
-            args, env=env, cwd=self.gitroot,
+            args, cwd=self.gitroot,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
@@ -324,7 +322,7 @@ class TestSSHVendor(object):
         cmd, path = command.split(b' ')
         cmd = cmd.split(b'-', 1)
         path = path.replace(b"'", b"")
-        p = subprocess.Popen(cmd + [path], bufsize=0, env=get_safe_env(), stdin=subprocess.PIPE,
+        p = subprocess.Popen(cmd + [path], bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 

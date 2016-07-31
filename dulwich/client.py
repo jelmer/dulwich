@@ -47,6 +47,11 @@ import subprocess
 import sys
 
 try:
+    from urllib import quote as urlquote
+except ImportError:
+    from urllib.parse import quote as urlquote
+
+try:
     import urllib2
     import urlparse
 except ImportError:
@@ -948,7 +953,7 @@ class SSHGitClient(TraditionalGitClient):
             netloc += ":%d" % self.port
 
         if self.username is not None:
-            netloc = self.username + "@" + netloc
+            netloc = urlquote(self.username, '@/:') + "@" + netloc
 
         return urlparse.urlunsplit(('ssh', netloc, path, '', ''))
 

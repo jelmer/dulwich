@@ -1,15 +1,15 @@
 Porcelain
 =========
 
-The ``porcelain'' is the higher level interface, built on top of the lower
+The ``porcelain`` is the higher level interface, built on top of the lower
 level implementation covered in previous chapters of this tutorial. The
-``dulwich.porcelain'' module in Dulwich is aimed to closely resemble
+``dulwich.porcelain`` module in Dulwich is aimed to closely resemble
 the Git command-line API that you are familiar with.
 
 Basic concepts
 --------------
 The porcelain operations are implemented as top-level functions in the
-``dulwich.porcelain'' module. Most arguments can either be strings or
+``dulwich.porcelain`` module. Most arguments can either be strings or
 more complex Dulwich objects; e.g. a repository argument will either take
 a string with a path to the repository or an instance of a ``Repo`` object.
 

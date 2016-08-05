@@ -61,6 +61,7 @@ from dulwich.archive import (
     tar_stream,
     )
 from dulwich.client import (
+    HttpGitClient,
     get_transport_and_path,
     )
 from dulwich.errors import (
@@ -223,7 +224,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None):
+def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None, opener=None):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -231,6 +232,7 @@ def clone(source, target=None, bare=False, checkout=None, errstream=default_byte
     :param bare: Whether or not to create a bare repository
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
+    :param opener:  Custom urllib2 opener, used for authentication
     :return: The new repository
     """
     if outstream is not None:
@@ -244,7 +246,10 @@ def clone(source, target=None, bare=False, checkout=None, errstream=default_byte
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
     client, host_path = get_transport_and_path(source)
-
+    
+    if type(client) is HttpGitClient and opener:
+        client.opener = opener
+        
     if target is None:
         target = host_path.split("/")[-1]
 
@@ -560,7 +565,7 @@ def reset(repo, mode, committish="HEAD"):
 
 
 def push(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=sys.stdout, errstream=sys.stderr,opener=None):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -568,6 +573,7 @@ def push(repo, remote_location, refspecs=None,
     :param refspecs: relative path to the refs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
+    :param opener: custom urllib opener for authentication
     """
 
     # Open the repo
@@ -575,7 +581,10 @@ def push(repo, remote_location, refspecs=None,
 
         # Get the client and path
         client, path = get_transport_and_path(remote_location)
-
+        
+        if type(client) is HttpGitClient and opener:
+           client.opener = opener
+  
         selected_refs = []
 
         def update_refs(refs):
@@ -603,7 +612,7 @@ def push(repo, remote_location, refspecs=None,
 
 
 def pull(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=sys.stdout, errstream=sys.stderr, opener=None):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -611,6 +620,7 @@ def pull(repo, remote_location, refspecs=None,
     :param refspec: refspecs to fetch
     :param outstream: A stream file to write to output
     :param errstream: A stream file to write to errors
+    :param opener: Custom urllib2 opener for authentication
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -619,6 +629,9 @@ def pull(repo, remote_location, refspecs=None,
             selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(remote_location)
+        if type(client) is HttpGitClient and opener:
+            client.opener = opener
+        
         remote_refs = client.fetch(path, r, progress=errstream.write,
                 determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
@@ -812,17 +825,20 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr, opener=None):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
     :param remote_location: String identifying a remote server
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
+    :param opener: Custom urllib2 opener used for authentication
     :return: Dictionary with refs on the remote
     """
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(remote_location)
+        if type(client) is HttpGitClient and opener:
+            client.opener = opener
         remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs
 

@@ -48,8 +48,9 @@ from dulwich.objects import (
     hex_to_filename,
     check_hexsha,
     check_identity,
-    parse_timezone,
     object_class,
+    parse_timezone,
+    pretty_format_tree_entry,
     parse_tree,
     _parse_tree_py,
     sorted_tree_items,
@@ -1130,3 +1131,13 @@ class ShaFileSerializeTests(TestCase):
 
         with self.assert_serialization_on_change(tag):
             tag.message = b'new message'
+
+
+class PrettyFormatTreeEntryTests(TestCase):
+
+    def test_format(self):
+        self.assertEquals(
+                '40000 tree 40820c38cfb182ce6c8b261555410d8382a5918b\tfoo\n',
+                pretty_format_tree_entry("foo", 0o40000,
+                    "40820c38cfb182ce6c8b261555410d8382a5918b"))
+

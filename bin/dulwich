@@ -358,6 +358,22 @@ def cmd_ls_remote(args):
         sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
 
 
+def cmd_ls_tree(args):
+    parser = optparse.OptionParser()
+    parser.add_option("-r", "--recursive", action="store_true",
+                      help="Recusively list tree contents.")
+    parser.add_option("--name-only", action="store_true",
+                      help="Only display name.")
+    options, args = parser.parse_args(args)
+    try:
+        treeish = args.pop(0)
+    except IndexError:
+        treeish = None
+    porcelain.ls_tree(
+        '.', treeish, outstream=sys.stdout, recursive=options.recursive,
+        name_only=options.name_only)
+
+
 def cmd_pack_objects(args):
     opts, args = getopt(args, '', ['stdout'])
     opts = dict(opts)
@@ -395,6 +411,7 @@ commands = {
     "init": cmd_init,
     "log": cmd_log,
     "ls-remote": cmd_ls_remote,
+    "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
     "receive-pack": cmd_receive_pack,
     "repack": cmd_repack,

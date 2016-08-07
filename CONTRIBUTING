@@ -48,6 +48,5 @@ requests on GitHub.
 
 Licensing
 ---------
-Dulwich is currently licensed under the GNU General Public License, version 2
-or later. We would like to change the license to Apachev2 or later eventually;
-new contributions should be made under dual GPLv2+/Apachev2+.
+All contributions should be made under the same license that Dulwich itself comes under:
+both Apache License, version 2.0 or later and GNU General Public License, version 2.0 or later.

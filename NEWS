@@ -5,6 +5,12 @@
   * Allow missing trailing LF when reading service name from
     HTTP servers. (Jelmer Vernooij, Andrew Shadura, #442)
 
+ CHANGES
+
+  * Changed license from "GNU General Public License, version 2.0 or later"
+    to "Apache License, version 2.0 or later or GNU General Public License,
+    version 2.0 or later". (#153)
+
 0.14.1	2016-07-05
 
  BUG FIXES

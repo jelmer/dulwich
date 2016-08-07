@@ -30,6 +30,7 @@ Currently implemented:
  * fetch
  * init
  * ls-remote
+ * ls-tree
  * pull
  * push
  * rm
@@ -54,6 +55,8 @@ from contextlib import (
     contextmanager,
 )
 import os
+import posixpath
+import stat
 import sys
 import time
 
@@ -72,6 +75,7 @@ from dulwich.objects import (
     Commit,
     Tag,
     parse_timezone,
+    pretty_format_tree_entry,
     )
 from dulwich.objectspec import (
     parse_object,
@@ -860,3 +864,31 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
         entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
         entries.sort()
         write_pack_index(idxf, entries, data_sum)
+
+
+def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
+        name_only=False):
+    """List contents of a tree.
+
+    :param repo: Path to the repository
+    :param tree_ish: Tree id to list
+    :param outstream: Output stream (defaults to stdout)
+    :param recursive: Whether to recursively list files
+    :param name_only: Only print item name
+    """
+    def list_tree(store, treeid, base):
+        for (name, mode, sha) in store[treeid].iteritems():
+            if base:
+                name = posixpath.join(base, name)
+            if name_only:
+                outstream.write(name + b"\n")
+            else:
+                outstream.write(pretty_format_tree_entry(name, mode, sha))
+            if stat.S_ISDIR(mode):
+                list_tree(store, sha, name)
+    if tree_ish is None:
+        tree_ish = "HEAD"
+    with open_repo_closing(repo) as r:
+        c = r[tree_ish]
+        treeid = c.tree
+        list_tree(r.object_store, treeid, "")

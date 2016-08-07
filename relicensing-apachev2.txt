@@ -10,13 +10,3 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 New contributions to Dulwich should be dual licensed under the GNU GPLv2 (or
 later) and the Apachev2 (or later) licenses.
-
-Contributions made prior were contributed under the GPLv2 (or later) license
-alone. Code written by the following contributors has not (yet) been relicensed
-under dual Apachev2/GPLv2:
-
-Artem Tikhomirov <artem.tikhomirov@syntevo.com>
-
-If your name is in this list and you'd be happy to relicense your contribution
-under dual GPLv2/Apachev2, then please send me an e-mail (jelmer@jelmer.uk) or
-a pull request on GitHub removing your name from the list above.

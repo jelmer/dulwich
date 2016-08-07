@@ -825,6 +825,21 @@ def key_entry_name_order(entry):
     return entry[0]
 
 
+def pretty_format_tree_entry(name, mode, hexsha):
+    """Pretty format tree entry.
+
+    :param name: Name of the directory entry
+    :param mode: Mode of entry
+    :param hexsha: Hexsha of the referenced object
+    :return: string describing the tree entry
+    """
+    if mode & stat.S_IFDIR:
+        kind = "tree"
+    else:
+        kind = "blob"
+    return "%04o %s %s\t%s\n" % (mode, kind, hexsha, name)
+
+
 class Tree(ShaFile):
     """A Git tree object"""
 
@@ -948,11 +963,7 @@ class Tree(ShaFile):
     def as_pretty_string(self):
         text = []
         for name, mode, hexsha in self.iteritems():
-            if mode & stat.S_IFDIR:
-                kind = "tree"
-            else:
-                kind = "blob"
-            text.append("%04o %s %s\t%s\n" % (mode, kind, hexsha, name))
+            text.append(pretty_format_tree_entry(name, mode, hexsha))
         return "".join(text)
 
     def lookup_path(self, lookup_obj, path):

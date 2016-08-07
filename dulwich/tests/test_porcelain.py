@@ -802,3 +802,30 @@ class RepackTests(PorcelainTestCase):
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.repack(self.repo)
+
+
+class LsTreeTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        f = StringIO()
+        porcelain.ls_tree(self.repo, "HEAD", outstream=f)
+        self.assertEquals(f.getvalue(), "")
+
+    def test_simple(self):
+        # Commit a dummy file then modify it
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write('origstuff')
+
+        porcelain.add(repo=self.repo.path, paths=['foo'])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        f = StringIO()
+        porcelain.ls_tree(self.repo, "HEAD", outstream=f)
+        self.assertEquals(
+                f.getvalue(),
+                '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')

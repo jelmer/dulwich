@@ -29,7 +29,22 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from unittest import SkipTest, TestCase, skipIf, expectedFailure
+from unittest import SkipTest, TestCase as _TestCase, skipIf, expectedFailure
+
+
+class TestCase(_TestCase):
+
+    def setUp(self):
+        super(TestCase, self).setUp()
+        self._old_home = os.environ.get("HOME")
+        os.environ["HOME"] = "/nonexistant"
+
+    def tearDown(self):
+        super(TestCase, self).tearDown()
+        if self._old_home:
+            os.environ["HOME"] = self._old_home
+        else:
+            del os.environ["HOME"]
 
 
 class BlackboxTestCase(TestCase):

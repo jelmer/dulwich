@@ -430,7 +430,9 @@ class TestSwiftRepo(TestCase):
 @skipIf(missing_libs, skipmsg)
 @skipIfPY3
 class TestPackInfoLoadDump(TestCase):
+
     def setUp(self):
+        super(TestPackInfoLoadDump, self).setUp()
         conf = swift.load_conf(file=StringIO(config_file %
                                              def_config_file))
         sos = swift.SwiftObjectStore(

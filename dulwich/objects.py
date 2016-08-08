@@ -825,7 +825,7 @@ def key_entry_name_order(entry):
     return entry[0]
 
 
-def pretty_format_tree_entry(name, mode, hexsha):
+def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8"):
     """Pretty format tree entry.
 
     :param name: Name of the directory entry
@@ -837,7 +837,9 @@ def pretty_format_tree_entry(name, mode, hexsha):
         kind = "tree"
     else:
         kind = "blob"
-    return "%04o %s %s\t%s\n" % (mode, kind, hexsha, name)
+    return "%04o %s %s\t%s\n" % (
+            mode, kind, hexsha.decode('ascii'),
+            name.decode(encoding, 'replace'))
 
 
 class Tree(ShaFile):

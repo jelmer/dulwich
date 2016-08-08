@@ -811,7 +811,7 @@ class LsTreeTests(PorcelainTestCase):
             author=b'', committer=b'')
 
         f = StringIO()
-        porcelain.ls_tree(self.repo, "HEAD", outstream=f)
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
         self.assertEquals(f.getvalue(), "")
 
     def test_simple(self):
@@ -825,7 +825,7 @@ class LsTreeTests(PorcelainTestCase):
             author=b'', committer=b'')
 
         f = StringIO()
-        porcelain.ls_tree(self.repo, "HEAD", outstream=f)
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
         self.assertEquals(
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')

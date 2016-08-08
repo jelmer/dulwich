@@ -36,15 +36,7 @@ from dulwich.tests import (
     )
 
 
-class ConfigTestCase(TestCase):
-
-    def setUp(self):
-        super(ConfigTestCase, self).setUp()
-        self.addCleanup(os.environ.__setitem__, "HOME", os.environ["HOME"])
-        os.environ["HOME"] = "/nonexistant"
-
-
-class ConfigFileTests(ConfigTestCase):
+class ConfigFileTests(TestCase):
 
     def from_file(self, text):
         return ConfigFile.from_file(BytesIO(text))
@@ -171,7 +163,7 @@ class ConfigFileTests(ConfigTestCase):
         }}), cf)
 
 
-class ConfigDictTests(ConfigTestCase):
+class ConfigDictTests(TestCase):
 
     def test_get_set(self):
         cd = ConfigDict()
@@ -225,7 +217,7 @@ class ConfigDictTests(ConfigTestCase):
             list(cd.itersections()))
 
 
-class StackedConfigTests(ConfigTestCase):
+class StackedConfigTests(TestCase):
 
     def test_default_backends(self):
         StackedConfig.default_backends()
@@ -303,7 +295,7 @@ class CheckSectionNameTests(TestCase):
         self.assertTrue(_check_section_name(b"bar.bar"))
 
 
-class SubmodulesTests(ConfigTestCase):
+class SubmodulesTests(TestCase):
 
     def testSubmodules(self):
         cf = ConfigFile.from_file(BytesIO(b"""\

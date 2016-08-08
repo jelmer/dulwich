@@ -1138,6 +1138,6 @@ class PrettyFormatTreeEntryTests(TestCase):
     def test_format(self):
         self.assertEquals(
                 '40000 tree 40820c38cfb182ce6c8b261555410d8382a5918b\tfoo\n',
-                pretty_format_tree_entry("foo", 0o40000,
-                    "40820c38cfb182ce6c8b261555410d8382a5918b"))
+                pretty_format_tree_entry(b"foo", 0o40000,
+                    b"40820c38cfb182ce6c8b261555410d8382a5918b"))
 

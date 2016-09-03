@@ -5,6 +5,8 @@
   * Allow missing trailing LF when reading service name from
     HTTP servers. (Jelmer Vernooij, Andrew Shadura, #442)
 
+  * Fix dulwich.porcelain.pull() on Python3. (Jelmer Vernooij, #451)
+
  CHANGES
 
   * Changed license from "GNU General Public License, version 2.0 or later"

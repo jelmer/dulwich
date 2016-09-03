@@ -139,8 +139,8 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def archive(repo, committish=None, outstream=sys.stdout,
-            errstream=sys.stderr):
+def archive(repo, committish=None, outstream=default_bytes_out_stream,
+            errstream=default_bytes_err_stream):
     """Create an archive.
 
     :param repo: Path of repository for which to generate an archive.
@@ -564,7 +564,7 @@ def reset(repo, mode, committish="HEAD"):
 
 
 def push(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -607,7 +607,7 @@ def push(repo, remote_location, refspecs=None,
 
 
 def pull(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -618,6 +618,8 @@ def pull(repo, remote_location, refspecs=None,
     """
     # Open the repo
     with open_repo_closing(repo) as r:
+        if refspecs is None:
+            refspecs = [b"HEAD"]
         selected_refs = []
         def determine_wants(remote_refs):
             selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
@@ -816,7 +818,8 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+def fetch(repo, remote_location, outstream=sys.stdout,
+        errstream=default_bytes_err_stream):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository

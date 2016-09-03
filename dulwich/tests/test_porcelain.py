@@ -532,10 +532,8 @@ class PushTests(PorcelainTestCase):
 
 class PullTests(PorcelainTestCase):
 
-    def test_simple(self):
-        outstream = BytesIO()
-        errstream = BytesIO()
-
+    def setUp(self):
+        super(PullTests, self).setUp()
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
@@ -545,10 +543,10 @@ class PullTests(PorcelainTestCase):
                          author=b'test', committer=b'test')
 
         # Setup target repo
-        target_path = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, target_path)
-        target_repo = porcelain.clone(self.repo.path, target=target_path,
-                                      errstream=errstream)
+        self.target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.target_path)
+        target_repo = porcelain.clone(self.repo.path, target=self.target_path,
+                errstream=BytesIO())
         target_repo.close()
 
         # create a second file to be pushed
@@ -562,12 +560,28 @@ class PullTests(PorcelainTestCase):
         self.assertTrue(b'refs/heads/master' in self.repo.refs)
         self.assertTrue(b'refs/heads/master' in target_repo.refs)
 
+    def test_simple(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Pull changes into the cloned repo
-        porcelain.pull(target_path, self.repo.path, b'refs/heads/master',
+        porcelain.pull(self.target_path, self.repo.path, b'refs/heads/master',
             outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
-        with closing(Repo(target_path)) as r:
+        with closing(Repo(self.target_path)) as r:
+            self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
+
+    def test_no_refspec(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Pull changes into the cloned repo
+        porcelain.pull(self.target_path, self.repo.path, outstream=outstream,
+                       errstream=errstream)
+
+        # Check the target repo for pushed changes
+        with closing(Repo(self.target_path)) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
 
@@ -812,7 +826,7 @@ class LsTreeTests(PorcelainTestCase):
 
         f = StringIO()
         porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
-        self.assertEquals(f.getvalue(), "")
+        self.assertEqual(f.getvalue(), "")
 
     def test_simple(self):
         # Commit a dummy file then modify it
@@ -826,6 +840,6 @@ class LsTreeTests(PorcelainTestCase):
 
         f = StringIO()
         porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
-        self.assertEquals(
+        self.assertEqual(
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')

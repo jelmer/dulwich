@@ -265,12 +265,12 @@ def clone(source, target=None, bare=False, checkout=None, errstream=default_byte
             progress=errstream.write)
         r.refs.import_refs(
             b'refs/remotes/' + origin,
-            {n[len('refs/heads/'):]: v for (n, v) in remote_refs.iteritems()
-                if n.startswith('refs/heads/')})
+            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.iteritems()
+                if n.startswith(b'refs/heads/')})
         r.refs.import_refs(
             b'refs/tags',
-            {n[len('refs/tags/'):]: v for (n, v) in remote_refs.iteritems()
-                if n.startswith('refs/tags/')})
+            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.iteritems()
+                if n.startswith(b'refs/tags/')})
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:
             errstream.write(b'Checking out HEAD\n')

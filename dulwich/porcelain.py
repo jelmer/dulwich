@@ -227,7 +227,9 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None, origin="origin"):
+def clone(source, target=None, bare=False, checkout=None,
+          errstream=default_bytes_err_stream, outstream=None,
+          origin=b"origin"):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository

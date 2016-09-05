@@ -112,13 +112,16 @@ class CloneTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store,
                                         commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/tags/foo"] = c3.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, errstream=errstream)
         self.assertEqual(r.path, target_path)
-        self.assertEqual(Repo(target_path).head(), c3.id)
+        target_repo = Repo(target_path)
+        self.assertEqual(target_repo.head(), c3.id)
+        self.assertEquals(c3.id, target_repo.refs['refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
 

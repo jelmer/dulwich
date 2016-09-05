@@ -7,6 +7,9 @@
 
   * Fix dulwich.porcelain.pull() on Python3. (Jelmer Vernooij, #451)
 
+  * Properly pull in tags during dulwich.porcelain.clone.
+    (Jelmer Vernooĳ, #408)
+
  CHANGES
 
   * Changed license from "GNU General Public License, version 2.0 or later"

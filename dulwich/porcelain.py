@@ -267,11 +267,11 @@ def clone(source, target=None, bare=False, checkout=None,
             progress=errstream.write)
         r.refs.import_refs(
             b'refs/remotes/' + origin,
-            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.iteritems()
+            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.items()
                 if n.startswith(b'refs/heads/')})
         r.refs.import_refs(
             b'refs/tags',
-            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.iteritems()
+            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
                 if n.startswith(b'refs/tags/')})
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:

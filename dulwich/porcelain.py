@@ -227,7 +227,7 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None):
+def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None, origin="origin"):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -263,6 +263,14 @@ def clone(source, target=None, bare=False, checkout=None, errstream=default_byte
         remote_refs = client.fetch(host_path, r,
             determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
+        r.refs.import_refs(
+            b'refs/remotes/' + origin,
+            {n[len('refs/heads/'):]: v for (n, v) in remote_refs.iteritems()
+                if n.startswith('refs/heads/')})
+        r.refs.import_refs(
+            b'refs/tags',
+            {n[len('refs/tags/'):]: v for (n, v) in remote_refs.iteritems()
+                if n.startswith('refs/tags/')})
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:
             errstream.write(b'Checking out HEAD\n')

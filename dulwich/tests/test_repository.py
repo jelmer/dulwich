@@ -47,8 +47,11 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     open_repo,
+    rmtree_ro,
     tear_down_repo,
     setup_warning_catcher,
+    create_empty_commit,
+    create_repo_and_worktree,
     )
 
 missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
@@ -521,6 +524,15 @@ exit 1
             check(nonbare)
             check(bare)
 
+    def test_working_tree(self):
+        (r, w) = create_repo_and_worktree()
+        self.addCleanup(rmtree_ro, r.path)
+        self.addCleanup(rmtree_ro, w.path)
+        self.assertEqual(os.path.abspath(r.controldir()),
+                         os.path.abspath(w.commondir()))
+        self.assertEqual(r.refs.keys(), w.refs.keys())
+        self.assertNotEqual(r.head(), w.head())
+        self.assertEqual(w.get_parents(w.head()), [r.head()])
 
 class BuildRepoRootTests(TestCase):
     """Tests that build on-disk repos from scratch.

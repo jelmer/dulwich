@@ -30,12 +30,17 @@ from dulwich.objects import (
     )
 from dulwich.repo import (
     check_ref_format,
+    Repo,
     )
+
+from dulwich.tests import skipIf
 
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
     CompatTestCase,
-    )
+    rmtree_ro,
+    git_version
+)
 
 
 class ObjectStoreTestCase(CompatTestCase):
@@ -44,6 +49,9 @@ class ObjectStoreTestCase(CompatTestCase):
     def setUp(self):
         super(ObjectStoreTestCase, self).setUp()
         self._repo = self.import_repo('server_new.export')
+
+    def repo_path(self):
+        return self._repo.path
 
     def _run_git(self, args):
         return run_git_or_fail(args, cwd=self._repo.path)
@@ -119,3 +127,32 @@ class ObjectStoreTestCase(CompatTestCase):
     def test_all_objects(self):
         expected_shas = self._get_all_shas()
         self.assertShasMatch(expected_shas, iter(self._repo.object_store))
+
+
+@skipIf(git_version() < (2, 5), 'Git version must be >= 2.5')
+class WorkingTreeTestCase(ObjectStoreTestCase):
+    """Test for compatibility with git-worktree."""
+
+    def setUp(self):
+        super(WorkingTreeTestCase, self).setUp()
+        self._worktree_path = self.create_new_worktree(self.repo_path())
+        self._worktree_repo = Repo(self._worktree_path)
+        self._mainworktree_repo = self._repo
+        self._repo = self._worktree_repo
+
+    def tearDown(self):
+        self._worktree_repo.close()
+        rmtree_ro(self._worktree_path)
+        self._repo = self._mainworktree_repo
+        super(WorkingTreeTestCase, self).tearDown()
+
+    def test_refs(self):
+        super(WorkingTreeTestCase, self).test_refs()
+        self.assertTrue(self._mainworktree_repo.refs.allkeys()==\
+                        self._repo.refs.allkeys())
+        self.assertFalse(self._repo.refs[b'HEAD']==\
+                         self._mainworktree_repo.refs[b'HEAD'])
+
+    def test_bare(self):
+        self.assertFalse(self._repo.bare)
+        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, '.git')))

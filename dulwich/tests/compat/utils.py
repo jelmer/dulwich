@@ -243,6 +243,17 @@ class CompatTestCase(TestCase):
         self.addCleanup(cleanup)
         return repo
 
+    def create_new_worktree(self, repo_dir):
+        """Create a new worktree using git-worktree.
+
+        :param repo_dir: The directory of the main working tree.
+
+        :returns: The path to the new working tree.
+        """
+        temp_dir = tempfile.mkdtemp()
+        run_git_or_fail(['worktree', 'add', temp_dir, 'branch'],\
+                        cwd=repo_dir)
+        return temp_dir
 
 if sys.platform == 'win32':
     def remove_ro(action, name, exc):

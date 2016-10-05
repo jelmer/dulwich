@@ -89,6 +89,7 @@ REFSDIR = 'refs'
 REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
+COMMONDIR = 'commondir'
 
 BASE_DIRECTORIES = [
     ["branches"],
@@ -648,6 +649,16 @@ def read_gitfile(f):
     return cs[len("gitdir: "):].rstrip("\n")
 
 
+def read_gitdirfile(f):
+    """Read a ``gitdir`` or ``commondir`` file.
+
+    :param f: File-like object to read from
+    :return: A path
+    """
+    cs = f.read()
+    return cs.rstrip("\n")
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -676,10 +687,17 @@ class Repo(BaseRepo):
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)
             )
+        worktree_commondir = os.path.join(self._controldir, COMMONDIR)
+        if(os.path.isfile(worktree_commondir)):
+            with open(worktree_commondir, 'r') as f:
+                self._commondir = os.path.join(self.controldir(),\
+                                                   read_gitdirfile(f))
+        else:
+            self._commondir = self._controldir
         self.path = root
-        object_store = DiskObjectStore(os.path.join(self.controldir(),
+        object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))
-        refs = DiskRefsContainer(self.controldir())
+        refs = DiskRefsContainer(self.commondir())
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
@@ -719,6 +737,16 @@ class Repo(BaseRepo):
     def controldir(self):
         """Return the path of the control directory."""
         return self._controldir
+
+    def commondir(self):
+        """Return the path of the common directory.
+
+        For a main working tree, it is identical to `controldir()`.
+
+        For a linked working tree, it is the control directory of the
+        main working tree."""
+
+        return self._commondir
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.

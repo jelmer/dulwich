@@ -23,7 +23,7 @@
 
 from io import BytesIO
 from itertools import chain
-import os
+import os, tempfile
 
 from dulwich.objects import (
     hex_to_sha,
@@ -32,13 +32,13 @@ from dulwich.repo import (
     check_ref_format,
     Repo,
     )
-
-from dulwich.tests import skipIf
-
+from dulwich.tests.utils import (
+    rmtree_ro,
+    create_empty_commit,
+)
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
     CompatTestCase,
-    rmtree_ro,
     git_version
 )
 
@@ -69,6 +69,13 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def _parse_objects(self, output):
         return set(s.rstrip(b'\n').split(b' ')[0] for s in BytesIO(output))
+
+    def _parse_worktree_list(self, output):
+        worktrees = []
+        for line in BytesIO(output):
+            fields = line.rstrip(b'\n').split()
+            worktrees.append(tuple(f.decode() for f in fields))
+        return worktrees
 
     def test_bare(self):
         self.assertTrue(self._repo.bare)
@@ -129,15 +136,17 @@ class ObjectStoreTestCase(CompatTestCase):
         self.assertShasMatch(expected_shas, iter(self._repo.object_store))
 
 
-@skipIf(git_version() < (2, 5), 'Git version must be >= 2.5')
 class WorkingTreeTestCase(ObjectStoreTestCase):
     """Test for compatibility with git-worktree."""
 
+    min_git_version = (2, 5, 0)
+
     def setUp(self):
         super(WorkingTreeTestCase, self).setUp()
-        self._worktree_path = self.create_new_worktree(self.repo_path())
+        self._worktree_path = self.create_new_worktree(self.repo_path(), 'branch')
         self._worktree_repo = Repo(self._worktree_path)
         self._mainworktree_repo = self._repo
+        self._number_of_working_tree = 2
         self._repo = self._worktree_repo
 
     def tearDown(self):
@@ -148,9 +157,50 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
     def test_refs(self):
         super(WorkingTreeTestCase, self).test_refs()
-        self.assertTrue(self._mainworktree_repo.refs.allkeys()==\
-                        self._repo.refs.allkeys())
-        self.assertFalse(self._repo.refs[b'HEAD']==\
+        self.assertEqual(self._mainworktree_repo.refs.allkeys(),
+                         self._repo.refs.allkeys())
+
+    def test_head_equality(self):
+        self.assertNotEqual(self._repo.refs[b'HEAD'],
+                            self._mainworktree_repo.refs[b'HEAD'])
+
+    def test_bare(self):
+        self.assertFalse(self._repo.bare)
+        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, '.git')))
+
+    def test_git_worktree_list(self):
+        output = run_git_or_fail(['worktree', 'list'], cwd=self._repo.path)
+        worktrees = self._parse_worktree_list(output)
+        self.assertEqual(len(worktrees), self._number_of_working_tree)
+        self.assertEqual(worktrees[0][1], '(bare)')
+        self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+        
+        output = run_git_or_fail(['worktree', 'list'], cwd=self._mainworktree_repo.path)
+        worktrees = self._parse_worktree_list(output)
+        self.assertEqual(len(worktrees), self._number_of_working_tree)
+        self.assertEqual(worktrees[0][1], '(bare)')
+        self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+
+class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
+    """Test compatibility of Repo.init_new_working_directory."""
+
+    min_git_version = (2, 5, 0)
+
+    def setUp(self):
+        super(InitNewWorkingDirectoryTestCase, self).setUp()
+        self._other_worktree = self._repo
+        self._repo = Repo.init_new_working_directory(tempfile.mkdtemp(),
+                                                     self._mainworktree_repo.path)
+        self._number_of_working_tree = 3
+        
+    def tearDown(self):
+        self._repo.close()
+        rmtree_ro(self._repo.path)
+        self._repo = self._other_worktree
+        super(InitNewWorkingDirectoryTestCase, self).tearDown()
+
+    def test_head_equality(self):
+        self.assertEqual(self._repo.refs[b'HEAD'],
                          self._mainworktree_repo.refs[b'HEAD'])
 
     def test_bare(self):

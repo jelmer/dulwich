@@ -405,7 +405,7 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(self, path, **kwargs):
         self.path = path
-        self.worktree_path = kwargs["worktree"]
+        self.worktree_path = kwargs.get('worktree', path)
         self._packed_refs = None
         self._peeled_refs = None
 

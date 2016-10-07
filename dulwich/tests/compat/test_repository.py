@@ -33,10 +33,13 @@ from dulwich.repo import (
     Repo,
     )
 
+from dulwich.tests import skipIf
+
 from dulwich.tests.compat.utils import (
     run_git_or_fail,
     CompatTestCase,
     rmtree_ro,
+    git_version
 )
 
 
@@ -126,6 +129,7 @@ class ObjectStoreTestCase(CompatTestCase):
         self.assertShasMatch(expected_shas, iter(self._repo.object_store))
 
 
+@skipIf(git_version() < (2, 5), 'Git version must be >= 2.5')
 class WorkingTreeTestCase(ObjectStoreTestCase):
     """Test for compatibility with git-worktree."""
 

@@ -148,10 +148,10 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
     def test_refs(self):
         super(WorkingTreeTestCase, self).test_refs()
-        self.assertTrue(self._mainworktree_repo.refs.allkeys()==\
-                        self._repo.refs.allkeys())
-        self.assertFalse(self._repo.refs[b'HEAD']==\
-                         self._mainworktree_repo.refs[b'HEAD'])
+        self.assertEqual(self._mainworktree_repo.refs.allkeys(),
+                         self._repo.refs.allkeys())
+        self.assertNotEqual(self._repo.refs[b'HEAD'],
+                            self._mainworktree_repo.refs[b'HEAD'])
 
     def test_bare(self):
         self.assertFalse(self._repo.bare)

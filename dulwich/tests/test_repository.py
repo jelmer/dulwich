@@ -521,6 +521,23 @@ exit 1
             check(nonbare)
             check(bare)
 
+    def test_working_tree(self):
+        temp_dir = tempfile.mkdtemp()
+        a_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', 'a.git')
+        b_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', 'b')
+        temp_repo_dir_a = os.path.join(temp_dir, 'a.git')
+        temp_repo_dir_b = os.path.join(temp_dir, 'b')
+        os.makedirs(temp_repo_dir_b)
+        gitdir = open(os.path.join(temp_repo_dir_b, '.git'), 'w')
+        gitdir.write('gitdir: ../a.git/worktrees/b\n')
+        gitdir.close()
+        shutil.copytree(a_dir, temp_repo_dir_a, symlinks=True)
+        a = Repo(temp_repo_dir_a)
+        b = Repo(temp_repo_dir_b)
+        self.addCleanup(tear_down_repo, a)
+        self.assertEqual(a.refs.allkeys(), b.refs.allkeys())
+        self.assertNotEqual(a.refs[b'HEAD'], b.refs[b'HEAD'])
+        self.assertEqual(b.refs[b'HEAD'], b'2a72d929692c41d8554c07f6301757ba18a65d91')
 
 class BuildRepoRootTests(TestCase):
     """Tests that build on-disk repos from scratch.

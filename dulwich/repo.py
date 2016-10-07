@@ -190,7 +190,7 @@ class BaseRepo(object):
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), b'')
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, **kwargs):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -689,11 +689,13 @@ class Repo(BaseRepo):
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
-        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        graft_file = self.get_named_file(os.path.join("info", "grafts"),
+                                         basedir=self.commondir())
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
-        graft_file = self.get_named_file("shallow")
+        graft_file = self.get_named_file("shallow",
+                                         basedir=self.commondir())
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
@@ -746,7 +748,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, **kwargs):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -754,13 +756,15 @@ class Repo(BaseRepo):
         pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
+        :param basedir: Optional argument that specifies an alternative to the control dir.
         :return: An open file object, or None if the file does not exist.
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
+        basedir=kwargs.get("basedir", self.controldir())
         path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(self.controldir(), path), 'rb')
+            return open(os.path.join(basedir, path), 'rb')
         except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
@@ -989,7 +993,7 @@ class MemoryRepo(BaseRepo):
         """
         self._named_files[path] = contents
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, **kwargs):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to

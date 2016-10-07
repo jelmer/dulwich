@@ -649,16 +649,6 @@ def read_gitfile(f):
     return cs[len("gitdir: "):].rstrip("\n")
 
 
-def read_gitdirfile(f):
-    """Read a ``gitdir`` or ``commondir`` file.
-
-    :param f: File-like object to read from
-    :return: A path
-    """
-    cs = f.read()
-    return cs.rstrip("\n")
-
-
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -691,13 +681,13 @@ class Repo(BaseRepo):
         if(os.path.isfile(worktree_commondir)):
             with open(worktree_commondir, 'r') as f:
                 self._commondir = os.path.join(self.controldir(),\
-                                                   read_gitdirfile(f))
+                                                   f.read().rstrip("\n"))
         else:
             self._commondir = self._controldir
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))
-        refs = DiskRefsContainer(self.commondir())
+        refs = DiskRefsContainer(self.commondir(), worktree=self._controldir)
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}

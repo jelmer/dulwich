@@ -677,16 +677,11 @@ class Repo(BaseRepo):
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)
             )
-        worktree_commondir = os.path.join(self._controldir, COMMONDIR)
-        try:
-            with open(worktree_commondir, 'r') as f:
-                self._commondir = os.path.join(self.controldir(),\
-                                                   f.read().rstrip("\n"))
-        except (IOError, OSError) as e:
-            if e.errno != errno.ENOENT:
-                raise
+        commondir = self.get_named_file(COMMONDIR)
+        if commondir:
+            self._commondir = os.path.join(self.controldir(), commondir.read().rstrip("\n"))
+        else:
             self._commondir = self._controldir
-
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))

@@ -678,12 +678,15 @@ class Repo(BaseRepo):
                 "No git repository was found at %(path)s" % dict(path=root)
             )
         worktree_commondir = os.path.join(self._controldir, COMMONDIR)
-        if(os.path.isfile(worktree_commondir)):
+        try:
             with open(worktree_commondir, 'r') as f:
                 self._commondir = os.path.join(self.controldir(),\
                                                    f.read().rstrip("\n"))
-        else:
+        except (IOError, OSError) as e:
+            if e.errno != errno.ENOENT:
+                raise
             self._commondir = self._controldir
+
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))

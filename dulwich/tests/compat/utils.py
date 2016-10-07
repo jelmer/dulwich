@@ -251,7 +251,7 @@ class CompatTestCase(TestCase):
         :returns: The path to the new working tree.
         """
         temp_dir = tempfile.mkdtemp()
-        run_git_or_fail(['worktree', 'add', temp_dir, 'branch'],\
+        run_git_or_fail(['worktree', 'add', temp_dir, 'branch'],
                         cwd=repo_dir)
         return temp_dir
 

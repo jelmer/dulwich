@@ -1,20 +1,22 @@
 # client.py -- Implementation of the client side git protocols
 # Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# or (at your option) a later version of the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Client side support for the Git protocol.
 
@@ -45,6 +47,11 @@ import select
 import socket
 import subprocess
 import sys
+
+try:
+    from urllib import quote as urlquote
+except ImportError:
+    from urllib.parse import quote as urlquote
 
 try:
     import urllib2
@@ -206,6 +213,14 @@ class GitClient(object):
             self._send_capabilities.add(CAPABILITY_QUIET)
         if not thin_packs:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
+
+    def get_url(self, path):
+        """Retrieves full url to given path.
+
+        :param path: Repository path (as string)
+        :return: Url to path (as string)
+        """
+        raise NotImplementedError(self.get_url)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -634,7 +649,13 @@ class TCPGitClient(TraditionalGitClient):
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(TCPGitClient, self).__init__(**kwargs)
+
+    def get_url(self, path):
+        netloc = self._host
+        if self._port is not None and self._port != TCP_GIT_PORT:
+            netloc += ":%d" % self._port
+        return urlparse.urlunsplit(("git", netloc, path, '', ''))
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
@@ -728,7 +749,7 @@ class SubprocessGitClient(TraditionalGitClient):
         self._stderr = kwargs.get('stderr')
         if 'stderr' in kwargs:
             del kwargs['stderr']
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(SubprocessGitClient, self).__init__(**kwargs)
 
     git_command = None
 
@@ -760,6 +781,9 @@ class LocalGitClient(GitClient):
         """
         self._report_activity = report_activity
         # Ignore the thin_packs argument
+
+    def get_url(self, path):
+        return urlparse.urlunsplit(('file', '', path, '', ''))
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -918,12 +942,22 @@ class SSHGitClient(TraditionalGitClient):
         self.host = host
         self.port = port
         self.username = username
-        TraditionalGitClient.__init__(self, **kwargs)
+        super(SSHGitClient, self).__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
             self.ssh_vendor = vendor
         else:
             self.ssh_vendor = get_ssh_vendor()
+
+    def get_url(self, path):
+        netloc = self.host
+        if self.port is not None:
+            netloc += ":%d" % self.port
+
+        if self.username is not None:
+            netloc = urlquote(self.username, '@/:') + "@" + netloc
+
+        return urlparse.urlunsplit(('ssh', netloc, path, '', ''))
 
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
@@ -971,7 +1005,7 @@ def default_urllib2_opener(config):
 class HttpGitClient(GitClient):
 
     def __init__(self, base_url, dumb=None, opener=None, config=None, **kwargs):
-        self.base_url = base_url.rstrip("/") + "/"
+        self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
             self.opener = default_urllib2_opener(config)
@@ -979,11 +1013,14 @@ class HttpGitClient(GitClient):
             self.opener = opener
         GitClient.__init__(self, **kwargs)
 
+    def get_url(self, path):
+        return self._get_url(path).rstrip("/")
+
     def __repr__(self):
-        return "%s(%r, dumb=%r)" % (type(self).__name__, self.base_url, self.dumb)
+        return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)
 
     def _get_url(self, path):
-        return urlparse.urljoin(self.base_url, path).rstrip("/") + "/"
+        return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers={}, data=None):
         req = urllib2.Request(url, headers=headers, data=data)
@@ -1014,10 +1051,14 @@ class HttpGitClient(GitClient):
             if not self.dumb:
                 proto = Protocol(resp.read, None)
                 # The first line should mention the service
-                pkts = list(proto.read_pkt_seq())
-                if pkts != [b'# service=' + service + b'\n']:
+                try:
+                    [pkt] = list(proto.read_pkt_seq())
+                except ValueError:
                     raise GitProtocolError(
-                        "unexpected first line %r from smart server" % pkts)
+                        "unexpected number of packets received")
+                if pkt.rstrip(b'\n') != (b'# service=' + service):
+                    raise GitProtocolError(
+                        "unexpected first line %r from smart server" % pkt)
                 return read_pkt_refs(proto)
             else:
                 return read_info_refs(resp), set()

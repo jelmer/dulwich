@@ -1,4 +1,4 @@
-dulwich (0.15.0-1) UNRELEASED; urgency=medium
+dulwich (0.15.0-1) unstable; urgency=medium
 
   * New upstream release.
   * Update debian/copyright to reflect that dulwich is now licensed under

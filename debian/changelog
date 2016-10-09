@@ -3,6 +3,7 @@ dulwich (0.15.0-1) UNRELEASED; urgency=medium
   * New upstream release.
   * Update debian/copyright to reflect that dulwich is now licensed under
     dual GPLv2+/Apache-2.
+  * Extend lintian overrides for testdata.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 09 Oct 2016 12:54:38 +0000
 

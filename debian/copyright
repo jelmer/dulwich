@@ -6,10 +6,12 @@ Debianized-By: Jelmer Vernooĳ <jelmer@debian.org>
 Debianized-Date: Tue, 13 Jan 2009 16:56:47 +0100
 
 License: GPL-2+
-License-Reference: /usr/share/common-licenses/GPL-2
+ On Debian systems the full text of the GNU General Public License version 2
+ can be found in the `/usr/share/common-licenses/GPL-2' file.
 
 License: Apache-2
-License-Reference: /usr/share/common-licenses/Apache-2.0
+ On Debian systems the full text of the Apache License version 2
+ can be found in the `/usr/share/common-licenses/Apache-2.0' file.
 
 Files: *
 Copyright:

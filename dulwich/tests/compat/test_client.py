@@ -1,21 +1,22 @@
 # test_client.py -- Compatibilty tests for git client.
 # Copyright (C) 2010 Google, Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of
-# the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
@@ -58,7 +59,6 @@ from dulwich import (
     repo,
     )
 from dulwich.tests import (
-    get_safe_env,
     SkipTest,
     expectedFailure,
     )
@@ -268,7 +268,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
                               protocol.TCP_GIT_PORT)
-        env = get_safe_env()
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
@@ -279,7 +278,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
                 '--listen=localhost', '--reuseaddr',
                 self.gitroot]
         self.process = subprocess.Popen(
-            args, env=env, cwd=self.gitroot,
+            args, cwd=self.gitroot,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if not check_for_daemon():
             raise SkipTest('git-daemon failed to start')
@@ -324,7 +323,7 @@ class TestSSHVendor(object):
         cmd, path = command.split(b' ')
         cmd = cmd.split(b'-', 1)
         path = path.replace(b"'", b"")
-        p = subprocess.Popen(cmd + [path], bufsize=0, env=get_safe_env(), stdin=subprocess.PIPE,
+        p = subprocess.Popen(cmd + [path], bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return client.SubprocessWrapper(p)
 

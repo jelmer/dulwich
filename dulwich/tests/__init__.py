@@ -1,21 +1,22 @@
 # __init__.py -- The tests for dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# of the License or (at your option) any later version of
-# the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Tests for Dulwich."""
 
@@ -32,41 +33,19 @@ import unittest
 from unittest import SkipTest, TestCase as _TestCase, skipIf, expectedFailure
 
 
-def get_safe_env(env=None):
-    """Returns the environment "env" (or a copy of "os.environ" by default)
-    modified to avoid side-effects caused by user's ~/.gitconfig"""
-
-    if env is None:
-        env = os.environ.copy()
-    # On Windows it's not enough to set "HOME" to a non-existing
-    # directory. Git.cmd takes the first existing directory out of
-    # "%HOME%", "%HOMEDRIVE%%HOMEPATH%" and "%USERPROFILE%".
-    for e in 'HOME', 'HOMEPATH', 'USERPROFILE':
-        env[e] = '/nosuchdir'
-    return env
-
-
 class TestCase(_TestCase):
-
-    def makeSafeEnv(self):
-        """Create environment with homedirectory-related variables stripped.
-
-        Modifies os.environ for the duration of a test case to avoid
-        side-effects caused by the user's ~/.gitconfig and other
-        files in their home directory.
-        """
-        old_env = os.environ
-        def restore():
-            os.environ = old_env
-        self.addCleanup(restore)
-        new_env = dict(os.environ)
-        for e in ['HOME', 'HOMEPATH', 'USERPROFILE']:
-            new_env[e] = '/nosuchdir'
-        os.environ = new_env
 
     def setUp(self):
         super(TestCase, self).setUp()
-        self.makeSafeEnv()
+        self._old_home = os.environ.get("HOME")
+        os.environ["HOME"] = "/nonexistant"
+
+    def tearDown(self):
+        super(TestCase, self).tearDown()
+        if self._old_home:
+            os.environ["HOME"] = self._old_home
+        else:
+            del os.environ["HOME"]
 
 
 class BlackboxTestCase(TestCase):

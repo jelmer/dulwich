@@ -5,8 +5,9 @@ This is the Dulwich project.
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
-Homepage: https://www.dulwich.io/
-Author: Jelmer Vernooij <jelmer@jelmer.uk>
+Main website: https://www.dulwich.io/
+
+License: Apache License, version 2 or GNU General Public License, version 2 or later.
 
 The project is named after the part of London that Mr. and Mrs. Git live in
 in the particular Monty Python sketch.
@@ -46,4 +47,4 @@ https://launchpad.net/~dulwich-users.
 Supported versions of Python
 ----------------------------
 
-At the moment, Dulwich supports (and is tested on) CPython 2.6, 2.7, 3.4, 3.5 and Pypy.
+At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5 and Pypy.

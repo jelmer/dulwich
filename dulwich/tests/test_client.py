@@ -1,20 +1,22 @@
 # test_client.py -- Tests for the git protocol, client side
 # Copyright (C) 2009 Jelmer Vernooij <jelmer@samba.org>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# or (at your option) any later version of the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 from contextlib import closing
 from io import BytesIO
@@ -582,6 +584,20 @@ class SSHGitClientTests(TestCase):
         super(SSHGitClientTests, self).tearDown()
         client.get_ssh_vendor = self.real_vendor
 
+    def test_get_url(self):
+        path = '/tmp/repo.git'
+        c = SSHGitClient('git.samba.org')
+
+        url = c.get_url(path)
+        self.assertEqual('ssh://git.samba.org/tmp/repo.git', url)
+
+    def test_get_url_with_username_and_port(self):
+        path = '/tmp/repo.git'
+        c = SSHGitClient('git.samba.org', port=2222, username='user')
+
+        url = c.get_url(path)
+        self.assertEqual('ssh://user@git.samba.org:2222/tmp/repo.git', url)
+
     def test_default_command(self):
         self.assertEqual(b'git-upload-pack',
                 self.client._get_cmd_path(b'upload-pack'))
@@ -640,6 +656,13 @@ class ReportStatusParserTests(TestCase):
 
 
 class LocalGitClientTests(TestCase):
+
+    def test_get_url(self):
+        path = "/tmp/repo.git"
+        c = LocalGitClient()
+
+        url = c.get_url(path)
+        self.assertEqual('file:///tmp/repo.git', url)
 
     def test_fetch_into_empty(self):
         c = LocalGitClient()
@@ -710,3 +733,34 @@ class LocalGitClientTests(TestCase):
         obj_local = local.get_object(new_refs[ref_name])
         obj_target = target.get_object(new_refs[ref_name])
         self.assertEqual(obj_local, obj_target)
+
+
+class HttpGitClientTests(TestCase):
+
+    def test_get_url(self):
+        base_url = 'https://github.com/jelmer/dulwich'
+        path = '/jelmer/dulwich'
+        c = HttpGitClient(base_url)
+
+        url = c.get_url(path)
+        self.assertEqual('https://github.com/jelmer/dulwich', url)
+
+
+class TCPGitClientTests(TestCase):
+
+    def test_get_url(self):
+        host = 'github.com'
+        path = '/jelmer/dulwich'
+        c = TCPGitClient(host)
+
+        url = c.get_url(path)
+        self.assertEqual('git://github.com/jelmer/dulwich', url)
+
+    def test_get_url_with_port(self):
+        host = 'github.com'
+        path = '/jelmer/dulwich'
+        port = 9090
+        c = TCPGitClient(host, port=9090)
+
+        url = c.get_url(path)
+        self.assertEqual('git://github.com:9090/jelmer/dulwich', url)

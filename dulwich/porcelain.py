@@ -1,20 +1,22 @@
 # porcelain.py -- Porcelain-like layer on top of Dulwich
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# or (at your option) a later version of the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
@@ -30,6 +32,7 @@ Currently implemented:
  * fetch
  * init
  * ls-remote
+ * ls-tree
  * pull
  * push
  * rm
@@ -54,6 +57,8 @@ from contextlib import (
     contextmanager,
 )
 import os
+import posixpath
+import stat
 import sys
 import time
 
@@ -72,6 +77,7 @@ from dulwich.objects import (
     Commit,
     Tag,
     parse_timezone,
+    pretty_format_tree_entry,
     )
 from dulwich.objectspec import (
     parse_object,
@@ -135,8 +141,8 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def archive(repo, committish=None, outstream=sys.stdout,
-            errstream=sys.stderr):
+def archive(repo, committish=None, outstream=default_bytes_out_stream,
+            errstream=default_bytes_err_stream):
     """Create an archive.
 
     :param repo: Path of repository for which to generate an archive.
@@ -223,7 +229,9 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None, errstream=default_bytes_err_stream, outstream=None):
+def clone(source, target=None, bare=False, checkout=None,
+          errstream=default_bytes_err_stream, outstream=None,
+          origin=b"origin"):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -259,6 +267,14 @@ def clone(source, target=None, bare=False, checkout=None, errstream=default_byte
         remote_refs = client.fetch(host_path, r,
             determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
+        r.refs.import_refs(
+            b'refs/remotes/' + origin,
+            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.items()
+                if n.startswith(b'refs/heads/')})
+        r.refs.import_refs(
+            b'refs/tags',
+            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
+                if n.startswith(b'refs/tags/')})
         r[b"HEAD"] = remote_refs[b"HEAD"]
         if checkout:
             errstream.write(b'Checking out HEAD\n')
@@ -560,7 +576,7 @@ def reset(repo, mode, committish="HEAD"):
 
 
 def push(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -590,7 +606,7 @@ def push(repo, remote_location, refspecs=None,
             return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
-        remote_location_bytes = remote_location.encode(err_encoding)
+        remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(path, update_refs,
                 r.object_store.generate_pack_contents, progress=errstream.write)
@@ -603,7 +619,7 @@ def push(repo, remote_location, refspecs=None,
 
 
 def pull(repo, remote_location, refspecs=None,
-         outstream=sys.stdout, errstream=sys.stderr):
+         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -614,6 +630,8 @@ def pull(repo, remote_location, refspecs=None,
     """
     # Open the repo
     with open_repo_closing(repo) as r:
+        if refspecs is None:
+            refspecs = [b"HEAD"]
         selected_refs = []
         def determine_wants(remote_refs):
             selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
@@ -812,7 +830,8 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout, errstream=sys.stderr):
+def fetch(repo, remote_location, outstream=sys.stdout,
+        errstream=default_bytes_err_stream):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -860,3 +879,31 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
         entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
         entries.sort()
         write_pack_index(idxf, entries, data_sum)
+
+
+def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
+        name_only=False):
+    """List contents of a tree.
+
+    :param repo: Path to the repository
+    :param tree_ish: Tree id to list
+    :param outstream: Output stream (defaults to stdout)
+    :param recursive: Whether to recursively list files
+    :param name_only: Only print item name
+    """
+    def list_tree(store, treeid, base):
+        for (name, mode, sha) in store[treeid].iteritems():
+            if base:
+                name = posixpath.join(base, name)
+            if name_only:
+                outstream.write(name + b"\n")
+            else:
+                outstream.write(pretty_format_tree_entry(name, mode, sha))
+            if stat.S_ISDIR(mode):
+                list_tree(store, sha, name)
+    if tree_ish is None:
+        tree_ish = "HEAD"
+    with open_repo_closing(repo) as r:
+        c = r[tree_ish]
+        treeid = c.tree
+        list_tree(r.object_store, treeid, "")

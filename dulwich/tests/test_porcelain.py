@@ -1,20 +1,22 @@
 # test_porcelain.py -- porcelain tests
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# of the License or (at your option) a later version.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Tests for dulwich.porcelain."""
 
@@ -112,13 +114,16 @@ class CloneTests(PorcelainTestCase):
         c1, c2, c3 = build_commit_graph(self.repo.object_store,
                                         commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/tags/foo"] = c3.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, errstream=errstream)
         self.assertEqual(r.path, target_path)
-        self.assertEqual(Repo(target_path).head(), c3.id)
+        target_repo = Repo(target_path)
+        self.assertEqual(target_repo.head(), c3.id)
+        self.assertEquals(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
 
@@ -532,10 +537,8 @@ class PushTests(PorcelainTestCase):
 
 class PullTests(PorcelainTestCase):
 
-    def test_simple(self):
-        outstream = BytesIO()
-        errstream = BytesIO()
-
+    def setUp(self):
+        super(PullTests, self).setUp()
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
@@ -545,10 +548,10 @@ class PullTests(PorcelainTestCase):
                          author=b'test', committer=b'test')
 
         # Setup target repo
-        target_path = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, target_path)
-        target_repo = porcelain.clone(self.repo.path, target=target_path,
-                                      errstream=errstream)
+        self.target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.target_path)
+        target_repo = porcelain.clone(self.repo.path, target=self.target_path,
+                errstream=BytesIO())
         target_repo.close()
 
         # create a second file to be pushed
@@ -562,12 +565,28 @@ class PullTests(PorcelainTestCase):
         self.assertTrue(b'refs/heads/master' in self.repo.refs)
         self.assertTrue(b'refs/heads/master' in target_repo.refs)
 
+    def test_simple(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Pull changes into the cloned repo
-        porcelain.pull(target_path, self.repo.path, b'refs/heads/master',
+        porcelain.pull(self.target_path, self.repo.path, b'refs/heads/master',
             outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
-        with closing(Repo(target_path)) as r:
+        with closing(Repo(self.target_path)) as r:
+            self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
+
+    def test_no_refspec(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Pull changes into the cloned repo
+        porcelain.pull(self.target_path, self.repo.path, outstream=outstream,
+                       errstream=errstream)
+
+        # Check the target repo for pushed changes
+        with closing(Repo(self.target_path)) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
 
@@ -802,3 +821,30 @@ class RepackTests(PorcelainTestCase):
         filename = os.path.basename(fullpath)
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.repack(self.repo)
+
+
+class LsTreeTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        self.assertEqual(f.getvalue(), "")
+
+    def test_simple(self):
+        # Commit a dummy file then modify it
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write('origstuff')
+
+        porcelain.add(repo=self.repo.path, paths=['foo'])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        self.assertEqual(
+                f.getvalue(),
+                '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')

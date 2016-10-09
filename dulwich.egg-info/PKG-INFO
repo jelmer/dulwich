@@ -1,11 +1,11 @@
 Metadata-Version: 1.1
 Name: dulwich
-Version: 0.14.1
+Version: 0.15.0
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
-Author: Jelmer Vernooij
+Author: Jelmer Vernooĳ
 Author-email: jelmer@jelmer.uk
-License: GPLv2 or later
+License: Apachev2 or later or GPLv2
 Description: 
               Python implementation of the Git file formats and protocols,
               without the need to have git installed.
@@ -19,10 +19,10 @@ Description:
 Keywords: git
 Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
-Classifier: License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
-Classifier: Programming Language :: Python :: 2.6
+Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Programming Language :: Python :: 2.7
 Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Operating System :: POSIX

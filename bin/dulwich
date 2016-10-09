@@ -4,20 +4,22 @@
 # Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@samba.org>
 # vim: expandtab
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; version 2
-# or (at your option) a later version of the License.
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA  02110-1301, USA.
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 
 """Simple command-line interface to Dulwich>
 
@@ -358,6 +360,22 @@ def cmd_ls_remote(args):
         sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
 
 
+def cmd_ls_tree(args):
+    parser = optparse.OptionParser()
+    parser.add_option("-r", "--recursive", action="store_true",
+                      help="Recusively list tree contents.")
+    parser.add_option("--name-only", action="store_true",
+                      help="Only display name.")
+    options, args = parser.parse_args(args)
+    try:
+        treeish = args.pop(0)
+    except IndexError:
+        treeish = None
+    porcelain.ls_tree(
+        '.', treeish, outstream=sys.stdout, recursive=options.recursive,
+        name_only=options.name_only)
+
+
 def cmd_pack_objects(args):
     opts, args = getopt(args, '', ['stdout'])
     opts = dict(opts)
@@ -395,6 +413,7 @@ commands = {
     "init": cmd_init,
     "log": cmd_log,
     "ls-remote": cmd_ls_remote,
+    "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
     "receive-pack": cmd_receive_pack,
     "repack": cmd_repack,

@@ -679,7 +679,8 @@ class Repo(BaseRepo):
             )
         commondir = self.get_named_file(COMMONDIR)
         if commondir:
-            self._commondir = os.path.join(self.controldir(), commondir.read().rstrip("\n"))
+            for line in commondir:
+                self._commondir = os.path.join(self.controldir(), line.rstrip("\n"))
         else:
             self._commondir = self._controldir
         self.path = root

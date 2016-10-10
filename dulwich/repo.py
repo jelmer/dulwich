@@ -190,7 +190,7 @@ class BaseRepo(object):
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), b'')
 
-    def get_named_file(self, path, **kwargs):
+    def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -685,7 +685,7 @@ class Repo(BaseRepo):
         self.path = root
         object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))
-        refs = DiskRefsContainer(self.commondir(), worktree=self._controldir)
+        refs = DiskRefsContainer(self.commondir(), self._controldir)
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
@@ -748,7 +748,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
-    def get_named_file(self, path, **kwargs):
+    def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -761,10 +761,10 @@ class Repo(BaseRepo):
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
-        basedir=kwargs.get("basedir", self.controldir())
+        basedir_ = basedir or self.controldir()
         path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(basedir, path), 'rb')
+            return open(os.path.join(basedir_, path), 'rb')
         except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
@@ -993,7 +993,7 @@ class MemoryRepo(BaseRepo):
         """
         self._named_files[path] = contents
 
-    def get_named_file(self, path, **kwargs):
+    def get_named_file(self, path):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to

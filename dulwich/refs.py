@@ -453,7 +453,7 @@ class DiskRefsContainer(RefsContainer):
             name = name.replace("/", os.path.sep)
         #TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
-        if name == b'HEAD':
+        if name == 'HEAD':
             return os.path.join(self.worktree_path, name)
         else:
             return os.path.join(self.path, name)

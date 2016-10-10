@@ -677,10 +677,10 @@ class Repo(BaseRepo):
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)
             )
-        commondir = self.get_named_file(COMMONDIR)
+        commondir = self.get_named_file(COMMONDIR, mode='r')
         if commondir:
-            for line in commondir:
-                self._commondir = os.path.join(self.controldir(), line.rstrip("\n"))
+            with commondir:
+                self._commondir = os.path.join(self.controldir(), commondir.read().rstrip("\n"))
         else:
             self._commondir = self._controldir
         self.path = root
@@ -749,7 +749,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
-    def get_named_file(self, path, basedir=None):
+    def get_named_file(self, path, **kwargs):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -762,10 +762,11 @@ class Repo(BaseRepo):
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
-        basedir_ = basedir or self.controldir()
+        basedir_ = kwargs.get('basedir', self.controldir())
+        mode = kwargs.get('mode', 'rb')
         path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(basedir_, path), 'rb')
+            return open(os.path.join(basedir_, path), mode)
         except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None

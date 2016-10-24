@@ -110,11 +110,13 @@ default_bytes_out_stream = getattr(sys.stdout, 'buffer', sys.stdout)
 default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 
 
-def encode_path(path):
+DEFAULT_ENCODING = 'utf-8'
+
+
+def encode_path(path, default_encoding=DEFAULT_ENCODING):
     """Encode a path as bytestring."""
-    # TODO(jelmer): Use something other than ascii?
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode(default_encoding)
     return path
 
 
@@ -319,7 +321,7 @@ def rm(repo=".", paths=None):
         index.write()
 
 
-def commit_decode(commit, contents, default_encoding='utf-8'):
+def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
     if commit.encoding is not None:
         return contents.decode(commit.encoding, "replace")
     return contents.decode(default_encoding, "replace")
@@ -429,7 +431,8 @@ def log(repo=".", outstream=sys.stdout, max_entries=None):
 
 
 # TODO(jelmer): better default for encoding?
-def show(repo=".", objects=None, outstream=sys.stdout, default_encoding='utf-8'):
+def show(repo=".", objects=None, outstream=sys.stdout,
+         default_encoding=DEFAULT_ENCODING):
     """Print the changes in a commit.
 
     :param repo: Path to repository
@@ -605,7 +608,7 @@ def push(repo, remote_location, refspecs=None,
                     new_refs[rh] = r.refs[lh]
             return new_refs
 
-        err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
+        err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(path, update_refs,

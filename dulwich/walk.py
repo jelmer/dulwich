@@ -252,6 +252,7 @@ class Walker(object):
         if changed_path is None:
             return False
         for followed_path in self.paths:
+            followed_path = followed_path.encode("utf-8")
             if changed_path == followed_path:
                 return True
             if (changed_path.startswith(followed_path) and

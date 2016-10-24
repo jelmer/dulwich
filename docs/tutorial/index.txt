@@ -8,6 +8,7 @@ Tutorial
    :maxdepth: 2
 
    introduction
+   encoding 
    file-format
    repo
    object-store

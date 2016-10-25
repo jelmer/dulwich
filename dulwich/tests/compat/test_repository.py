@@ -23,7 +23,8 @@
 
 from io import BytesIO
 from itertools import chain
-import os, tempfile
+import os
+import tempfile
 
 from dulwich.objects import (
     hex_to_sha,
@@ -32,15 +33,11 @@ from dulwich.repo import (
     check_ref_format,
     Repo,
     )
-from dulwich.tests.utils import (
-    rmtree_ro,
-    create_empty_commit,
-)
 from dulwich.tests.compat.utils import (
+    rmtree_ro,
     run_git_or_fail,
     CompatTestCase,
-    git_version
-)
+    )
 
 
 class ObjectStoreTestCase(CompatTestCase):
@@ -49,9 +46,6 @@ class ObjectStoreTestCase(CompatTestCase):
     def setUp(self):
         super(ObjectStoreTestCase, self).setUp()
         self._repo = self.import_repo('server_new.export')
-
-    def repo_path(self):
-        return self._repo.path
 
     def _run_git(self, args):
         return run_git_or_fail(args, cwd=self._repo.path)
@@ -141,9 +135,22 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
     min_git_version = (2, 5, 0)
 
+    def create_new_worktree(self, repo_dir, branch):
+        """Create a new worktree using git-worktree.
+
+        :param repo_dir: The directory of the main working tree.
+        :param branch: The branch or commit to checkout in the new worktree.
+
+        :returns: The path to the new working tree.
+        """
+        temp_dir = tempfile.mkdtemp()
+        run_git_or_fail(['worktree', 'add', temp_dir, branch],
+                        cwd=repo_dir)
+        return temp_dir
+
     def setUp(self):
         super(WorkingTreeTestCase, self).setUp()
-        self._worktree_path = self.create_new_worktree(self.repo_path(), 'branch')
+        self._worktree_path = self.create_new_worktree(self._repo.path, 'branch')
         self._worktree_repo = Repo(self._worktree_path)
         self._mainworktree_repo = self._repo
         self._number_of_working_tree = 2
@@ -174,12 +181,13 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
         self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
-        
+
         output = run_git_or_fail(['worktree', 'list'], cwd=self._mainworktree_repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
         self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     """Test compatibility of Repo.init_new_working_directory."""
@@ -189,14 +197,13 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     def setUp(self):
         super(InitNewWorkingDirectoryTestCase, self).setUp()
         self._other_worktree = self._repo
-        self._repo = Repo.init_new_working_directory(tempfile.mkdtemp(),
-                                                     self._mainworktree_repo.path)
+        self._repo = Repo._init_new_working_directory(
+            tempfile.mkdtemp(), self._mainworktree_repo)
         self._number_of_working_tree = 3
-        
+
     def tearDown(self):
         self._repo.close()
         rmtree_ro(self._repo.path)
-        self._repo = self._other_worktree
         super(InitNewWorkingDirectoryTestCase, self).tearDown()
 
     def test_head_equality(self):

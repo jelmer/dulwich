@@ -679,15 +679,15 @@ class Repo(BaseRepo):
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)
             )
-        commondir = self.get_named_file(COMMONDIR, mode='r')
-        if commondir:
-            with commondir:
-                self._commondir = os.path.join(self.controldir(), commondir.read().rstrip("\n"))
+        commondir = self.get_named_file(COMMONDIR)
+        if commondir is not None:
+            self._commondir = os.path.join(
+                self.controldir(), commondir.read().rstrip("\r\n"))
         else:
             self._commondir = self._controldir
         self.path = root
-        object_store = DiskObjectStore(os.path.join(self.commondir(),
-                                                    OBJECTDIR))
+        object_store = DiskObjectStore(
+            os.path.join(self.commondir(), OBJECTDIR))
         refs = DiskRefsContainer(self.commondir(), self._controldir)
         BaseRepo.__init__(self, object_store, refs)
 
@@ -751,7 +751,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
-    def get_named_file(self, path, **kwargs):
+    def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -764,11 +764,11 @@ class Repo(BaseRepo):
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
-        basedir_ = kwargs.get('basedir', self.controldir())
-        mode = kwargs.get('mode', 'rb')
+        if basedir is None:
+            basedir = self.controldir()
         path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(basedir_, path), mode)
+            return open(os.path.join(basedir, path), 'rb')
         except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
@@ -958,24 +958,26 @@ class Repo(BaseRepo):
         return cls(path)
 
     @classmethod
-    def init_new_working_directory(cls, path, main_path, mkdir=False):
+    def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
         """Create a new working directory linked to a repository.
 
         :param path: Path in which to create the working tree.
-        :param main_path: Path to the main repository (that can be bare or not).
+        :param main_repo: Main repository to reference
+        :param identifier: Worktree identifier
         :param mkdir: Whether to create the directory
         :return: `Repo` instance
         """
         if mkdir:
             os.mkdir(path)
-        worktree_id = os.path.basename(path)
+        if identifier is None:
+            identifier = os.path.basename(path)
+        main_worktreesdir = os.path.join(main_repo.controldir(), WORKTREES)
+        worktree_controldir = os.path.join(main_worktreesdir, identifier)
         gitdirfile = os.path.join(path, CONTROLDIR)
-        main = Repo(main_path)
-        main_controldir = main.controldir()
-        main_worktreesdir = os.path.join(main_controldir, WORKTREES)
-        worktree_controldir = os.path.join(main_worktreesdir, worktree_id)
-        with open(gitdirfile, 'w') as f:
-            f.write('gitdir: {}\n'.format(worktree_controldir))
+        with open(gitdirfile, 'wb') as f:
+            f.write('gitdir: ' +
+                    worktree_controldir.encode(sys.getfilesystemencoding()) +
+                    b'\n')
         try:
             os.mkdir(main_worktreesdir)
         except OSError as e:
@@ -986,20 +988,14 @@ class Repo(BaseRepo):
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        with open(os.path.join(worktree_controldir, GITDIR), 'w') as f:
-            f.write(gitdirfile + '\n')
-        with open(os.path.join(worktree_controldir, COMMONDIR), 'w') as f:
-            f.write('../..\n')
-        with open(os.path.join(worktree_controldir, 'HEAD'), 'w') as f:
-            f.write('{}\n'.format(main.refs[b'HEAD'].decode('ascii')))
-        main.close()
+        with open(os.path.join(worktree_controldir, GITDIR), 'wb') as f:
+            f.write(gitdirfile + b'\n')
+        with open(os.path.join(worktree_controldir, COMMONDIR), 'wb') as f:
+            f.write(b'../..\n')
+        with open(os.path.join(worktree_controldir, 'HEAD'), 'wb') as f:
+            f.write(main_repo.head() + b'\n')
         r = cls(path)
-        from dulwich.index import (
-            build_index_from_tree,
-            )
-        indexfile = r.index_path()
-        tree = r[b'HEAD'].tree
-        build_index_from_tree(r.path, indexfile, r.object_store, tree)
+        r.reset_index()
         return r
 
     @classmethod

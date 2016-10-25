@@ -64,13 +64,6 @@ class ObjectStoreTestCase(CompatTestCase):
     def _parse_objects(self, output):
         return set(s.rstrip(b'\n').split(b' ')[0] for s in BytesIO(output))
 
-    def _parse_worktree_list(self, output):
-        worktrees = []
-        for line in BytesIO(output):
-            fields = line.rstrip(b'\n').split()
-            worktrees.append(tuple(f.decode() for f in fields))
-        return worktrees
-
     def test_bare(self):
         self.assertTrue(self._repo.bare)
         self.assertFalse(os.path.exists(os.path.join(self._repo.path, '.git')))
@@ -146,21 +139,17 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         temp_dir = tempfile.mkdtemp()
         run_git_or_fail(['worktree', 'add', temp_dir, branch],
                         cwd=repo_dir)
+        self.addCleanup(rmtree_ro, temp_dir)
         return temp_dir
 
     def setUp(self):
         super(WorkingTreeTestCase, self).setUp()
         self._worktree_path = self.create_new_worktree(self._repo.path, 'branch')
         self._worktree_repo = Repo(self._worktree_path)
+        self.addCleanup(self._worktree_repo.close)
         self._mainworktree_repo = self._repo
         self._number_of_working_tree = 2
         self._repo = self._worktree_repo
-
-    def tearDown(self):
-        self._worktree_repo.close()
-        rmtree_ro(self._worktree_path)
-        self._repo = self._mainworktree_repo
-        super(WorkingTreeTestCase, self).tearDown()
 
     def test_refs(self):
         super(WorkingTreeTestCase, self).test_refs()
@@ -174,6 +163,13 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
     def test_bare(self):
         self.assertFalse(self._repo.bare)
         self.assertTrue(os.path.isfile(os.path.join(self._repo.path, '.git')))
+
+    def _parse_worktree_list(self, output):
+        worktrees = []
+        for line in BytesIO(output):
+            fields = line.rstrip(b'\n').split()
+            worktrees.append(tuple(f.decode() for f in fields))
+        return worktrees
 
     def test_git_worktree_list(self):
         output = run_git_or_fail(['worktree', 'list'], cwd=self._repo.path)
@@ -197,14 +193,12 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     def setUp(self):
         super(InitNewWorkingDirectoryTestCase, self).setUp()
         self._other_worktree = self._repo
+        worktree_repo_path = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, worktree_repo_path)
         self._repo = Repo._init_new_working_directory(
-            tempfile.mkdtemp(), self._mainworktree_repo)
+            worktree_repo_path, self._mainworktree_repo)
+        self.addCleanup(self._repo.close)
         self._number_of_working_tree = 3
-
-    def tearDown(self):
-        self._repo.close()
-        rmtree_ro(self._repo.path)
-        super(InitNewWorkingDirectoryTestCase, self).tearDown()
 
     def test_head_equality(self):
         self.assertEqual(self._repo.refs[b'HEAD'],

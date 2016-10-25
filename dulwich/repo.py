@@ -681,8 +681,10 @@ class Repo(BaseRepo):
             )
         commondir = self.get_named_file(COMMONDIR)
         if commondir is not None:
-            self._commondir = os.path.join(
-                self.controldir(), commondir.read().rstrip("\r\n"))
+            with commondir:
+                self._commondir = os.path.join(
+                    self.controldir(),
+                    commondir.read().rstrip(b"\r\n").decode(sys.getfilesystemencoding()))
         else:
             self._commondir = self._controldir
         self.path = root
@@ -975,7 +977,7 @@ class Repo(BaseRepo):
         worktree_controldir = os.path.join(main_worktreesdir, identifier)
         gitdirfile = os.path.join(path, CONTROLDIR)
         with open(gitdirfile, 'wb') as f:
-            f.write('gitdir: ' +
+            f.write(b'gitdir: ' +
                     worktree_controldir.encode(sys.getfilesystemencoding()) +
                     b'\n')
         try:
@@ -989,7 +991,7 @@ class Repo(BaseRepo):
             if e.errno != errno.EEXIST:
                 raise
         with open(os.path.join(worktree_controldir, GITDIR), 'wb') as f:
-            f.write(gitdirfile + b'\n')
+            f.write(gitdirfile.encode(sys.getfilesystemencoding()) + b'\n')
         with open(os.path.join(worktree_controldir, COMMONDIR), 'wb') as f:
             f.write(b'../..\n')
         with open(os.path.join(worktree_controldir, 'HEAD'), 'wb') as f:

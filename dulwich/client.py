@@ -1004,13 +1004,22 @@ def default_urllib2_opener(config):
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, config=None, **kwargs):
+    def __init__(self, base_url, dumb=None, opener=None, config=None,
+                 username=None, passwd=None, **kwargs):
         self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         if opener is None:
             self.opener = default_urllib2_opener(config)
         else:
             self.opener = opener
+
+        if passwd is None:
+            passwd = ""
+
+        if username:
+            pass_man=urllib2.HTTPPasswordMgrWithDefaultRealm()
+            pass_man.add_password(None, base_url, username, passwd)
+            self.opener.add_handler(urllib2.HTTPBasicAuthHandler(pass_man))
         GitClient.__init__(self, **kwargs)
 
     def get_url(self, path):
@@ -1188,6 +1197,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
     :return: Tuple with client instance and relative path.
     """
     parsed = urlparse.urlparse(url)
+    auth, host = urllib2.splituser(parsed.netloc)
     if parsed.scheme == 'git':
         return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
                 parsed.path)
@@ -1198,8 +1208,9 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
         return SSHGitClient(parsed.hostname, port=parsed.port,
                             username=parsed.username, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed), config=config,
-                **kwargs), parsed.path
+        base_url = urlparse.urlunparse(parsed._replace(netloc=host))
+        return HttpGitClient(base_url, config=config, username=parsed.username,
+                             passwd=parsed.password, **kwargs), parsed.path
     elif parsed.scheme == 'file':
         return default_local_git_client_cls(**kwargs), parsed.path
 

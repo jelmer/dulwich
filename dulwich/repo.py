@@ -89,6 +89,9 @@ REFSDIR = 'refs'
 REFSDIR_TAGS = 'tags'
 REFSDIR_HEADS = 'heads'
 INDEX_FILENAME = "index"
+COMMONDIR = 'commondir'
+GITDIR = 'gitdir'
+WORKTREES = 'worktrees'
 
 BASE_DIRECTORIES = [
     ["branches"],
@@ -676,18 +679,26 @@ class Repo(BaseRepo):
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=root)
             )
+        commondir = self.get_named_file(COMMONDIR, mode='r')
+        if commondir:
+            with commondir:
+                self._commondir = os.path.join(self.controldir(), commondir.read().rstrip("\n"))
+        else:
+            self._commondir = self._controldir
         self.path = root
-        object_store = DiskObjectStore(os.path.join(self.controldir(),
+        object_store = DiskObjectStore(os.path.join(self.commondir(),
                                                     OBJECTDIR))
-        refs = DiskRefsContainer(self.controldir())
+        refs = DiskRefsContainer(self.commondir(), self._controldir)
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
-        graft_file = self.get_named_file(os.path.join("info", "grafts"))
+        graft_file = self.get_named_file(os.path.join("info", "grafts"),
+                                         basedir=self.commondir())
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
-        graft_file = self.get_named_file("shallow")
+        graft_file = self.get_named_file("shallow",
+                                         basedir=self.commondir())
         if graft_file:
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
@@ -720,6 +731,16 @@ class Repo(BaseRepo):
         """Return the path of the control directory."""
         return self._controldir
 
+    def commondir(self):
+        """Return the path of the common directory.
+
+        For a main working tree, it is identical to `controldir()`.
+
+        For a linked working tree, it is the control directory of the
+        main working tree."""
+
+        return self._commondir
+
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
@@ -730,7 +751,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, **kwargs):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -738,13 +759,16 @@ class Repo(BaseRepo):
         pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
+        :param basedir: Optional argument that specifies an alternative to the control dir.
         :return: An open file object, or None if the file does not exist.
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
+        basedir_ = kwargs.get('basedir', self.controldir())
+        mode = kwargs.get('mode', 'rb')
         path = path.lstrip(os.path.sep)
         try:
-            return open(os.path.join(self.controldir(), path), 'rb')
+            return open(os.path.join(basedir_, path), mode)
         except (IOError, OSError) as e:
             if e.errno == errno.ENOENT:
                 return None
@@ -932,6 +956,51 @@ class Repo(BaseRepo):
         os.mkdir(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)
+
+    @classmethod
+    def init_new_working_directory(cls, path, main_path, mkdir=False):
+        """Create a new working directory linked to a repository.
+
+        :param path: Path in which to create the working tree.
+        :param main_path: Path to the main repository (that can be bare or not).
+        :param mkdir: Whether to create the directory
+        :return: `Repo` instance
+        """
+        if mkdir:
+            os.mkdir(path)
+        worktree_id = os.path.basename(path)
+        gitdirfile = os.path.join(path, CONTROLDIR)
+        main = Repo(main_path)
+        main_controldir = main.controldir()
+        main_worktreesdir = os.path.join(main_controldir, WORKTREES)
+        worktree_controldir = os.path.join(main_worktreesdir, worktree_id)
+        with open(gitdirfile, 'w') as f:
+            f.write('gitdir: {}\n'.format(worktree_controldir))
+        try:
+            os.mkdir(main_worktreesdir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        try:
+            os.mkdir(worktree_controldir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        with open(os.path.join(worktree_controldir, GITDIR), 'w') as f:
+            f.write(gitdirfile + '\n')
+        with open(os.path.join(worktree_controldir, COMMONDIR), 'w') as f:
+            f.write('../..\n')
+        with open(os.path.join(worktree_controldir, 'HEAD'), 'w') as f:
+            f.write('{}\n'.format(main.refs[b'HEAD'].decode('ascii')))
+        main.close()
+        r = cls(path)
+        from dulwich.index import (
+            build_index_from_tree,
+            )
+        indexfile = r.index_path()
+        tree = r[b'HEAD'].tree
+        build_index_from_tree(r.path, indexfile, r.object_store, tree)
+        return r
 
     @classmethod
     def init_bare(cls, path):

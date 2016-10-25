@@ -22,8 +22,10 @@
 
 
 import datetime
+import functools
 import os
 import shutil
+import sys
 import tempfile
 import time
 import types
@@ -360,3 +362,32 @@ def setup_warning_catcher():
         warnings.showwarning = original_showwarning
 
     return caught_warnings, restore_showwarning
+
+def create_empty_commit(r):
+    return r.do_commit(
+        b'empty commit',
+        committer=b'Test Committer <test@nodomain.com>',
+        author=b'Test Author <test@nodomain.com>',
+        commit_timestamp=12345, commit_timezone=0,
+        author_timestamp=12345, author_timezone=0)
+
+def create_repo_and_worktree():
+    temp_dir = tempfile.mkdtemp()
+    worktree_temp_dir = tempfile.mkdtemp()
+    r = Repo.init(temp_dir)
+    root_sha = create_empty_commit(r)
+    second_sha = create_empty_commit(r)
+    r.refs[b'refs/heads/master'] = second_sha
+    w = Repo.init_new_working_directory(worktree_temp_dir, temp_dir)
+    new_sha = create_empty_commit(w)
+    w.refs[b'refs/heads/branch'] = new_sha
+    return (r, w)
+
+if sys.platform == 'win32':
+    def remove_ro(action, name, exc):
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
+
+    rmtree_ro = functools.partial(shutil.rmtree, onerror=remove_ro)
+else:
+    rmtree_ro = shutil.rmtree

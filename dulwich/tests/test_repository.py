@@ -47,11 +47,8 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     open_repo,
-    rmtree_ro,
     tear_down_repo,
     setup_warning_catcher,
-    create_empty_commit,
-    create_repo_and_worktree,
     )
 
 missing_sha = b'b91fa4d900e17e99b433218e988c4eb4a3e9a097'
@@ -525,14 +522,31 @@ exit 1
             check(bare)
 
     def test_working_tree(self):
-        (r, w) = create_repo_and_worktree()
-        self.addCleanup(rmtree_ro, r.path)
-        self.addCleanup(rmtree_ro, w.path)
+        temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, temp_dir)
+        worktree_temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, worktree_temp_dir)
+        r = Repo.init(temp_dir)
+        root_sha = r.do_commit(
+                b'empty commit',
+                committer=b'Test Committer <test@nodomain.com>',
+                author=b'Test Author <test@nodomain.com>',
+                commit_timestamp=12345, commit_timezone=0,
+                author_timestamp=12345, author_timezone=0)
+        r.refs[b'refs/heads/master'] = root_sha
+        w = Repo._init_new_working_directory(worktree_temp_dir, r)
+        new_sha = w.do_commit(
+                b'new commit',
+                committer=b'Test Committer <test@nodomain.com>',
+                author=b'Test Author <test@nodomain.com>',
+                commit_timestamp=12345, commit_timezone=0,
+                author_timestamp=12345, author_timezone=0)
+        w.refs[b'HEAD'] = new_sha
         self.assertEqual(os.path.abspath(r.controldir()),
                          os.path.abspath(w.commondir()))
         self.assertEqual(r.refs.keys(), w.refs.keys())
         self.assertNotEqual(r.head(), w.head())
-        self.assertEqual(w.get_parents(w.head()), [r.head()])
+
 
 class BuildRepoRootTests(TestCase):
     """Tests that build on-disk repos from scratch.

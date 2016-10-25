@@ -405,7 +405,7 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(self, path, worktree_path=None):
         self.path = path
-        self.worktree_path = worktree_path or path;
+        self.worktree_path = worktree_path or path
         self._packed_refs = None
         self._peeled_refs = None
 
@@ -451,7 +451,7 @@ class DiskRefsContainer(RefsContainer):
             name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
-        #TODO: as the 'HEAD' reference is working tree specific, it
+        # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
         if name == 'HEAD':
             return os.path.join(self.worktree_path, name)

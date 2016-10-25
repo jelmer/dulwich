@@ -1,5 +1,14 @@
 0.15.1	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add support for worktrees. See `git-worktree(1)` and
+    `gitrepository-layout(5)`. (Laurent Rineau)
+
+  * Add support for `commondir` file in Git control
+    directories. (Laurent Rineau)
+
+
 0.15.0	2016-10-09
 
  BUG FIXES

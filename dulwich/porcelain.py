@@ -266,7 +266,7 @@ def clone(source, target=None, bare=False, checkout=None,
     else:
         r = Repo.init(target)
     try:
-        remote_refs = client.fetch(encode_path(host_path), r,
+        remote_refs = client.fetch(host_path, r,
             determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
         r.refs.import_refs(

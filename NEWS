@@ -8,6 +8,9 @@
   * Add support for `commondir` file in Git control
     directories. (Laurent Rineau)
 
+  * Add support for passwords in HTTP URLs.
+    (Jon Bain)
+
 
 0.15.0	2016-10-09
 

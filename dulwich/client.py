@@ -222,6 +222,15 @@ class GitClient(object):
         """
         raise NotImplementedError(self.get_url)
 
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an instance of this client from a urlparse.parsed object.
+
+        :param parsedurl: Result of urlparse.urlparse()
+        :return: A `GitClient` object
+        """
+        raise NotImplementedError(cls.from_parsedurl)
+
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
@@ -651,6 +660,10 @@ class TCPGitClient(TraditionalGitClient):
         self._port = port
         super(TCPGitClient, self).__init__(**kwargs)
 
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(parsedurl.hostname, port=parsedurl.port, **kwargs)
+
     def get_url(self, path):
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
@@ -751,6 +764,10 @@ class SubprocessGitClient(TraditionalGitClient):
             del kwargs['stderr']
         super(SubprocessGitClient, self).__init__(**kwargs)
 
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(**kwargs)
+
     git_command = None
 
     def _connect(self, service, path):
@@ -784,6 +801,10 @@ class LocalGitClient(GitClient):
 
     def get_url(self, path):
         return urlparse.urlunsplit(('file', '', path, '', ''))
+
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(**kwargs)
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -959,6 +980,11 @@ class SSHGitClient(TraditionalGitClient):
 
         return urlparse.urlunsplit(('ssh', netloc, path, '', ''))
 
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(host=parsedurl.hostname, port=parsedurl.port,
+                   username=parsedurl.username, **kwargs)
+
     def _get_cmd_path(self, cmd):
         cmd = self.alternative_paths.get(cmd, b'git-' + cmd)
         assert isinstance(cmd, bytes)
@@ -1015,6 +1041,10 @@ class HttpGitClient(GitClient):
 
     def get_url(self, path):
         return self._get_url(path).rstrip("/")
+
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(urlparse.urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)
@@ -1189,19 +1219,19 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
     """
     parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
-        return (TCPGitClient(parsed.hostname, port=parsed.port, **kwargs),
+        return (TCPGitClient.from_parsedurl(parsed, **kwargs),
                 parsed.path)
     elif parsed.scheme in ('git+ssh', 'ssh'):
         path = parsed.path
         if path.startswith('/'):
             path = parsed.path[1:]
-        return SSHGitClient(parsed.hostname, port=parsed.port,
-                            username=parsed.username, **kwargs), path
+        return SSHGitClient.from_parsedurl(parsed, **kwargs), path
     elif parsed.scheme in ('http', 'https'):
-        return HttpGitClient(urlparse.urlunparse(parsed), config=config,
+        return HttpGitClient.from_parsedurl(parsed, config=config,
                 **kwargs), parsed.path
     elif parsed.scheme == 'file':
-        return default_local_git_client_cls(**kwargs), parsed.path
+        return default_local_git_client_cls.from_parsedurl(
+            parsed, **kwargs), parsed.path
 
     raise ValueError("unknown scheme '%s'" % parsed.scheme)
 

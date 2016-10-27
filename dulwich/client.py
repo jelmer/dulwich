@@ -1033,6 +1033,8 @@ class HttpGitClient(GitClient):
     def __init__(self, base_url, dumb=None, opener=None, config=None,
                  username=None, password=None, **kwargs):
         self._base_url = base_url.rstrip("/") + "/"
+        self._username = username
+        self._password = password
         self.dumb = dumb
         if opener is None:
             self.opener = default_urllib2_opener(config)

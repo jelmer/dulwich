@@ -9,7 +9,7 @@
     directories. (Laurent Rineau)
 
   * Add support for passwords in HTTP URLs.
-    (Jon Bain)
+    (Jon Bain, Mika Mäenpää)
 
 
 0.15.0	2016-10-09

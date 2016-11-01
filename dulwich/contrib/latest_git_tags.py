@@ -3,10 +3,10 @@ Alternate to `Versioneer <https://pypi.python.org/pypi/versioneer/>`_ using
 `Dulwich <https://pypi.python.org/pypi/dulwich>`_ to sort tags by time from
 newest to oldest.
 
-Copy this file (``latest_git_tags.py``) into the package's top folder, import it
-into ``__init__.py`` and then set ::
+Import this module into the package ``__init__.py`` and then set ``__version__``
+as follows::
 
-    from latest_git_tags import get_recent_tags
+    from dulwich.contrib.latest_git_tags import get_recent_tags
 
     __version__ = get_recent_tags()[0][0][1:]
     # other dunder classes like __author__, etc.

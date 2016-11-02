@@ -6,7 +6,7 @@ newest to oldest.
 Import this module into the package ``__init__.py`` and then set ``__version__``
 as follows::
 
-    from dulwich.contrib.latest_git_tags import get_recent_tags
+    from dulwich.contrib.robotic_releases import get_recent_tags
 
     __version__ = get_recent_tags()[0][0][1:]
     # other dunder classes like __author__, etc.

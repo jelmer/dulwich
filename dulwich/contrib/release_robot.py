@@ -6,9 +6,9 @@ newest to oldest.
 Import this module into the package ``__init__.py`` and then set ``__version__``
 as follows::
 
-    from dulwich.contrib.release_robot import get_recent_tags
+    from dulwich.contrib.release_robot import get_current_version
 
-    __version__ = get_recent_tags()[0][0][1:]
+    __version__ = get_current_version()
     # other dunder classes like __author__, etc.
 
 This example assumes the tags have a leading "v" like "v0.3", and that the
@@ -19,10 +19,12 @@ from dulwich.repo import Repo
 import time
 import datetime
 import os
+import re
 
 # CONSTANTS
 DIRNAME = os.path.abspath(os.path.dirname(__file__))
 PROJDIR = os.path.dirname(DIRNAME)
+PATTERN = '[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)'
 
 def get_recent_tags(projdir=PROJDIR):
     """
@@ -57,3 +59,42 @@ def get_recent_tags(projdir=PROJDIR):
             
     # return list of tags sorted by their datetimes from newest to oldest
     return sorted(tags.iteritems(), key=lambda tag: tag[1][0], reverse=True)
+
+
+def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
+    """
+    Return the most recent tag, using an options regular expression pattern. The
+    default pattern will strip any characters preceding the first semantic
+    version. *EG*: "Release-0.2.1-rc.1" will be come "0.2.1-rc.1". If no match
+    is found, then the most recent tag is return without modification.
+
+    :param pattern: regular expression pattern with group that matches version
+    :param projdir: path to ``.git``
+    :param logger: a Python logging instance to capture exception
+    :returns: tag matching first group in regular expression pattern
+    """
+    tags = get_recent_tags(projdir)
+    try:
+        tag = tags[0][0]
+    except IndexError:
+        return
+    m = re.match(pattern, tag)
+    try:
+        current_version = m.group(1)
+    except (IndexError, AttributeError) as err:
+        if logger:
+            logger.exception(err)
+        return tag
+    return current_version
+
+
+def test_tag_pattern():
+    test_cases = {
+        '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3', 'Release-0.3': '0.3',
+        'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1', 'v0.3-rc.1': '0.3-rc.1',
+        'version 0.3': '0.3', 'version_0.3_rc_1': '0.3_rc_1', 'v1': '1',
+        '0.3rc1': '0.3rc1'
+    }
+    for tc, version in test_cases.iteritems():
+        m = re.match(PATTERN, tc)
+        assert m.group(1) == version

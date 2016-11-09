@@ -21,7 +21,9 @@
 Annotated lines are represented as tuples with last modified revision SHA1
 and contents.
 
-Please note that this is a very naive annotate implementation; it's
+Please note that this is a very naive annotate implementation. It works,
+but its speed could be improved - in particular because it uses
+Python's difflib.
 """
 
 import difflib
@@ -39,24 +41,24 @@ from dulwich.walk import (
 # Any lines that are not in common were introduced by the newer revision.
 # If there were no lines kept from the older version, stop going deeper in the graph.
 
-def update_lines(differ, annotated_lines, new_history_data, new_blob):
+def update_lines(annotated_lines, new_history_data, new_blob):
     """Update annotation lines with old blob lines.
     """
-    old_index = 0
-    for diffline in differ.compare(
-            [l for (h, l) in annotated_lines],
-            new_blob.splitlines()):
-        if diffline[0:1] == '?':
-            continue
-        elif diffline[0:1] == ' ':
-            yield annotated_lines[old_index]
-            old_index += 1
-        elif diffline[0:1] == '+':
-            yield (new_history_data, diffline[2:])
-        elif diffline[0:1] == '-':
-            old_index += 1
+    ret = []
+    new_lines = new_blob.splitlines()
+    matcher = difflib.SequenceMatcher(
+        a=[l for (h, l) in annotated_lines],
+        b=new_lines)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            ret.extend(annotated_lines[i1:i2])
+        elif tag in ('insert', 'replace'):
+            ret.extend([(new_history_data, l) for l in new_lines[j1:j2]])
+        elif tag == 'delete':
+            pass  # don't care
         else:
-            raise RuntimeError('Unknown character %s returned in diff' % diffline[0])
+            raise RuntimeError('Unknown tag %s returned in diff' % tag)
+    return ret
 
 
 def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=True):
@@ -73,7 +75,6 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=
     """
     walker = Walker(store, include=[commit_id], paths=[path], order=order,
         follow=follow)
-    d = difflib.Differ()
     revs = []
     for log_entry in walker:
         for tree_change in log_entry.changes():
@@ -87,5 +88,5 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=
 
     lines = []
     for (commit, entry) in reversed(revs):
-        lines = list(update_lines(d, lines, (commit, entry), store[entry.sha]))
+        lines = list(update_lines(lines, (commit, entry), store[entry.sha]))
     return lines

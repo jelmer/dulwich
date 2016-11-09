@@ -96,11 +96,7 @@ def cmd_fetch(args):
 
 def cmd_log(args):
     opts, args = getopt(args, "", [])
-    if len(args) > 0:
-        path = args.pop(0)
-    else:
-        path = "."
-    porcelain.log(repo=path, outstream=sys.stdout)
+    porcelain.log(".", paths=args, outstream=sys.stdout)
 
 
 def cmd_diff(args):

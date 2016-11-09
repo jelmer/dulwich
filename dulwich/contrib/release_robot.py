@@ -1,4 +1,5 @@
-"""
+"""Determine last version string from tags.
+
 Alternate to `Versioneer <https://pypi.python.org/pypi/versioneer/>`_ using
 `Dulwich <https://pypi.python.org/pypi/dulwich>`_ to sort tags by time from
 newest to oldest.
@@ -26,9 +27,9 @@ DIRNAME = os.path.abspath(os.path.dirname(__file__))
 PROJDIR = os.path.dirname(DIRNAME)
 PATTERN = '[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)'
 
+
 def get_recent_tags(projdir=PROJDIR):
-    """
-    Get list of recent tags in order from newest to oldest and their datetimes.
+    """Get list of tags in order from newest to oldest and their datetimes.
 
     :param projdir: path to ``.git``
     :returns: list of (tag, [datetime, commit, author]) sorted from new to old
@@ -56,15 +57,15 @@ def get_recent_tags(projdir=PROJDIR):
                 commit.id,
                 commit.author
             ]
-            
+
     # return list of tags sorted by their datetimes from newest to oldest
     return sorted(tags.iteritems(), key=lambda tag: tag[1][0], reverse=True)
 
 
 def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
-    """
-    Return the most recent tag, using an options regular expression pattern. The
-    default pattern will strip any characters preceding the first semantic
+    """Return the most recent tag, using an options regular expression pattern.
+
+    The default pattern will strip any characters preceding the first semantic
     version. *EG*: "Release-0.2.1-rc.1" will be come "0.2.1-rc.1". If no match
     is found, then the most recent tag is return without modification.
 

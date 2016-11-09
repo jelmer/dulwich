@@ -338,8 +338,9 @@ def print_commit(commit, decode, outstream=sys.stdout):
     if len(commit.parents) > 1:
         outstream.write("merge: " +
             "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
-    outstream.write("author: " + decode(commit.author) + "\n")
-    outstream.write("committer: " + decode(commit.committer) + "\n")
+    outstream.write("Author: " + decode(commit.author) + "\n")
+    if commit.author != commit.committer:
+        outstream.write("Committer: " + decode(commit.committer) + "\n")
     outstream.write("\n")
     outstream.write(decode(commit.message) + "\n")
     outstream.write("\n")

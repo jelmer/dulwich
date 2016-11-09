@@ -136,6 +136,26 @@ class BlobReadTests(TestCase):
         b = Blob.from_string(string)
         self.assertEqual([string], b.chunked)
 
+    def test_splitlines(self):
+        b = Blob()
+        b.chunked = ['bl\na', 'blie']
+        self.assertEqual(['bl\n', 'ablie'], b.splitlines())
+
+    def test_splitlines_nonewline(self):
+        b = Blob()
+        b.chunked = ['bl\na', 'blie', 'bloe\n']
+        self.assertEqual(['bl\n', 'abliebloe\n'], b.splitlines())
+
+    def test_splitlines_firstempty(self):
+        b = Blob()
+        b.chunked = ['', 'bl\na', 'blie', 'bloe\n']
+        self.assertEqual(['bl\n', 'abliebloe\n'], b.splitlines())
+
+    def test_splitlines_nonewline(self):
+        b = Blob()
+        b.chunked = []
+        self.assertEqual([], b.splitlines())
+
     def test_set_chunks(self):
         b = Blob()
         b.chunked = [b'te', b'st', b' 5\n']

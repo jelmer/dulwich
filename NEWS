@@ -15,6 +15,9 @@
     allowing easy finding of current version based on Git tags.
     (Mark Mikofski)
 
+ * Add ``Blob.splitlines`` method.
+   (Jelmer Vernooij)
+
 
 0.15.0	2016-10-09
 

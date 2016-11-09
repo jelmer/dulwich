@@ -583,7 +583,7 @@ class Blob(ShaFile):
         for chunk in chunks:
             lines = chunk.splitlines(True)
             if len(lines) > 1:
-                ret.append((remaining or "") + lines[0])
+                ret.append((remaining or b"") + lines[0])
                 ret.extend(lines[1:-1])
                 remaining = lines[-1]
             elif len(lines) == 1:

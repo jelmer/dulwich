@@ -139,14 +139,14 @@ class BlobReadTests(TestCase):
     def test_splitlines(self):
         for case in [
             [],
-            ['foo\nbar\n'],
-            ['bl\na', 'blie'],
-            ['bl\na', 'blie', 'bloe\n'],
-            ['', 'bl\na', 'blie', 'bloe\n'],
-            ['', '', '', 'bla\n'],
-            ['', '', '', 'bla\n', ''],
-            ['bl', '', 'a\naaa'],
-            ['a\naaa', 'a'],
+            [b'foo\nbar\n'],
+            [b'bl\na', b'blie'],
+            [b'bl\na', b'blie', b'bloe\n'],
+            [b'', b'bl\na', b'blie', b'bloe\n'],
+            [b'', b'', b'', b'bla\n'],
+            [b'', b'', b'', b'bla\n', b''],
+            [b'bl', b'', b'a\naaa'],
+            [b'a\naaa', b'a'],
             ]:
             b = Blob()
             b.chunked = case

@@ -353,7 +353,7 @@ def print_commit(commit, decode, outstream=sys.stdout):
 
     time_tuple = time.gmtime(commit.author_time + commit.author_timezone)
     time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
-    timezone_str = format_timezone(commit.author_timezone)
+    timezone_str = format_timezone(commit.author_timezone).decode('ascii')
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(commit.message) + "\n")

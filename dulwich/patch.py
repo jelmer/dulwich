@@ -92,7 +92,7 @@ def unified_diff(a, b, fromfile, tofile, n=3):
     Based on the same function in Python2.6.5-rc2's difflib.py
     """
     started = False
-    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
+    for group in SequenceMatcher(a=a, b=b).get_grouped_opcodes(n):
         if not started:
             yield b'--- ' + fromfile + b'\n'
             yield b'+++ ' + tofile + b'\n'

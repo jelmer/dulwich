@@ -397,6 +397,26 @@ def cmd_pack_objects(args):
         f.close()
 
 
+def cmd_help(args):
+    parser = optparse.OptionParser()
+    parser.add_option("-a", "--all", dest="all",
+                      action="store_true",
+                      help="List all commands.")
+    options, args = parser.parse_args(args)
+
+    if options.all:
+        print('Available commands:')
+        for cmd in sorted(commands):
+            print('  %s' % cmd)
+    else:
+        print("""\
+The dulwich command line tool is currently a very basic frontend for the
+Dulwich python module. For full functionality, please see the API reference.
+
+For a list of supported commands, see 'dulwich help -a'.
+""")
+
+
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
@@ -410,6 +430,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,
     "ls-remote": cmd_ls_remote,

@@ -76,6 +76,7 @@ from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
     Commit,
     Tag,
+    format_timezone,
     parse_timezone,
     pretty_format_tree_entry,
     )
@@ -341,6 +342,11 @@ def print_commit(commit, decode, outstream=sys.stdout):
     outstream.write("Author: " + decode(commit.author) + "\n")
     if commit.author != commit.committer:
         outstream.write("Committer: " + decode(commit.committer) + "\n")
+
+    time_tuple = time.gmtime(commit.author_time + commit.author_timezone)
+    time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
+    timezone_str = format_timezone(commit.author_timezone)
+    outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(commit.message) + "\n")
     outstream.write("\n")

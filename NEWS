@@ -11,6 +11,10 @@
   * Add support for passwords in HTTP URLs.
     (Jon Bain, Mika Mäenpää)
 
+  * Add `release_robot` script to contrib,
+    allowing easy finding of current version based on Git tags.
+    (Mark Mikofski)
+
 
 0.15.0	2016-10-09
 

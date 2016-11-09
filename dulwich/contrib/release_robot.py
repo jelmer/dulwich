@@ -21,6 +21,7 @@ import time
 import datetime
 import os
 import re
+import sys
 
 # CONSTANTS
 DIRNAME = os.path.abspath(os.path.dirname(__file__))
@@ -99,3 +100,11 @@ def test_tag_pattern():
     for tc, version in test_cases.iteritems():
         m = re.match(PATTERN, tc)
         assert m.group(1) == version
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        projdir = sys.argv[1]
+    else:
+        projdir = PROJDIR
+    print get_current_version(projdir=projdir)

@@ -1181,7 +1181,7 @@ class Commit(ShaFile):
 
     def _serialize(self):
         chunks = []
-        tree_bytes = self._tree.as_raw_string() if isinstance(self._tree, Tree) else self._tree
+        tree_bytes = self._tree.id if isinstance(self._tree, Tree) else self._tree
         chunks.append(git_line(_TREE_HEADER, tree_bytes))
         for p in self._parents:
             chunks.append(git_line(_PARENT_HEADER, p))

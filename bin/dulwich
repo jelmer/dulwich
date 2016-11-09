@@ -95,8 +95,12 @@ def cmd_fetch(args):
 
 
 def cmd_log(args):
-    opts, args = getopt(args, "", [])
-    porcelain.log(".", paths=args, outstream=sys.stdout)
+    parser = optparse.OptionParser()
+    parser.add_option("--reverse", dest="reverse", action="store_true",
+                      help="Reverse order in which entries are printed")
+    options, args = parser.parse_args(args)
+
+    porcelain.log(".", paths=args, reverse=options.reverse, outstream=sys.stdout)
 
 
 def cmd_diff(args):

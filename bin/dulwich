@@ -23,8 +23,8 @@
 
 """Simple command-line interface to Dulwich>
 
-This is a very simple command-line wrapper for Dulwich. It is by 
-no means intended to be a full-blown Git command-line interface but just 
+This is a very simple command-line wrapper for Dulwich. It is by
+no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
@@ -98,9 +98,13 @@ def cmd_log(args):
     parser = optparse.OptionParser()
     parser.add_option("--reverse", dest="reverse", action="store_true",
                       help="Reverse order in which entries are printed")
+    parser.add_option("--name-status", dest="name_status", action="store_true",
+                      help="Print name/status for each changed file")
     options, args = parser.parse_args(args)
 
-    porcelain.log(".", paths=args, reverse=options.reverse, outstream=sys.stdout)
+    porcelain.log(".", paths=args, reverse=options.reverse,
+                  name_status=options.name_status,
+                  outstream=sys.stdout)
 
 
 def cmd_diff(args):

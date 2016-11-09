@@ -137,24 +137,20 @@ class BlobReadTests(TestCase):
         self.assertEqual([string], b.chunked)
 
     def test_splitlines(self):
-        b = Blob()
-        b.chunked = ['bl\na', 'blie']
-        self.assertEqual(['bl\n', 'ablie'], b.splitlines())
-
-    def test_splitlines_nonewline(self):
-        b = Blob()
-        b.chunked = ['bl\na', 'blie', 'bloe\n']
-        self.assertEqual(['bl\n', 'abliebloe\n'], b.splitlines())
-
-    def test_splitlines_firstempty(self):
-        b = Blob()
-        b.chunked = ['', 'bl\na', 'blie', 'bloe\n']
-        self.assertEqual(['bl\n', 'abliebloe\n'], b.splitlines())
-
-    def test_splitlines_nonewline(self):
-        b = Blob()
-        b.chunked = []
-        self.assertEqual([], b.splitlines())
+        for case in [
+            [],
+            ['foo\nbar\n'],
+            ['bl\na', 'blie'],
+            ['bl\na', 'blie', 'bloe\n'],
+            ['', 'bl\na', 'blie', 'bloe\n'],
+            ['', '', '', 'bla\n'],
+            ['', '', '', 'bla\n', ''],
+            ['bl', '', 'a\naaa'],
+            ['a\naaa', 'a'],
+            ]:
+            b = Blob()
+            b.chunked = case
+            self.assertEqual(b.data.splitlines(True), b.splitlines())
 
     def test_set_chunks(self):
         b = Blob()

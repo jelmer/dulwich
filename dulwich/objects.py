@@ -568,6 +568,13 @@ class Blob(ShaFile):
         """
         super(Blob, self).check()
 
+    def splitlines(self):
+        """Return list of lines in this blob.
+
+        This preserves the original line endings.
+        """
+        return self.data.splitlines(True)
+
 
 def _parse_message(chunks):
     """Parse a message with a list of fields and a body.

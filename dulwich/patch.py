@@ -163,7 +163,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         if not content:
             return []
         else:
-            return content.blob.splitlines(True)
+            return content.splitlines()
     f.writelines(gen_diff_header(
         (old_path, new_path), (old_mode, new_mode), (old_id, new_id)))
     old_content = content(old_mode, old_id)
@@ -217,7 +217,7 @@ def write_blob_diff(f, old_file, new_file):
     new_path = patch_filename(new_path, b"b")
     def lines(blob):
         if blob is not None:
-            return blob.data.splitlines(True)
+            return blob.splitlines()
         else:
             return []
     f.writelines(gen_diff_header(

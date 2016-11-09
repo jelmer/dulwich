@@ -423,15 +423,19 @@ def show_object(repo, obj, decode, outstream):
             }[obj.type_name](repo, obj, decode, outstream)
 
 
-def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None):
+def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
+        reverse=False):
     """Write commit logs.
 
     :param repo: Path to repository
+    :param paths: Optional set of specific paths to print entries for
     :param outstream: Stream to write log output to
+    :param reverse: Reverse order in which entries are printed
     :param max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
-        walker = r.get_walker(max_entries=max_entries, paths=paths)
+        walker = r.get_walker(
+            max_entries=max_entries, paths=paths, reverse=reverse)
         for entry in walker:
             decode = lambda x: commit_decode(entry.commit, x)
             print_commit(entry.commit, decode, outstream)

@@ -318,6 +318,16 @@ class CommitSerializationTests(TestCase):
         c1.set_raw_string(c.as_raw_string())
         self.assertEqual(30, c1.commit_time)
 
+    def test_full_tree(self):
+        c = self.make_commit(commit_time=30)
+        t = Tree()
+        t.add(b'data-x', 0o644, Blob().id)
+        c.tree = t
+        c1 = Commit()
+        c1.set_raw_string(c.as_raw_string())
+        self.assertEqual(t.id, c1.tree)
+        self.assertEqual(c.as_raw_string(), c1.as_raw_string())
+
     def test_raw_length(self):
         c = self.make_commit()
         self.assertEqual(len(c.as_raw_string()), c.raw_length())

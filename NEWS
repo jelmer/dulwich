@@ -15,9 +15,13 @@
     allowing easy finding of current version based on Git tags.
     (Mark Mikofski)
 
- * Add ``Blob.splitlines`` method.
-   (Jelmer Vernooij)
+  * Add ``Blob.splitlines`` method.
+    (Jelmer Vernooij)
 
+ BUG FIXES
+
+  * Fix handling of ``Commit.tree`` being set to an actual
+   tree object rather than a tree id. (Jelmer Vernooij)
 
 0.15.0	2016-10-09
 

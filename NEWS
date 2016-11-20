@@ -27,6 +27,9 @@
     consistent with the documentation for that method.
     (#461, Jelmer Vernooĳ)
 
+  * Fix handling of unknown URL schemes in get_transport_and_path.
+    (#465, Jelmer Vernooij)
+
 0.15.0	2016-10-09
 
  BUG FIXES

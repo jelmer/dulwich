@@ -1273,12 +1273,16 @@ def get_transport_and_path(location, **kwargs):
 
     if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.
-        (hostname, path) = location.split(':')
+        (hostname, path) = location.split(':', 1)
         return SSHGitClient(hostname, **kwargs), path
-    elif '@' in location and ':' in location:
+    elif ':' in location:
         # SSH with user@host:foo.
-        user_host, path = location.split(':')
-        user, host = user_host.rsplit('@')
+        user_host, path = location.split(':', 1)
+        if '@' in user_host:
+            user, host = user_host.rsplit('@', 1)
+        else:
+            user = None
+            host = user_host
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.

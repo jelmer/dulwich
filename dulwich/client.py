@@ -887,6 +887,7 @@ class LocalGitClient(GitClient):
             if objects_iter is None:
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
+            return r.get_refs()
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""

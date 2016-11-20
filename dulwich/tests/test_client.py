@@ -112,7 +112,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertIs(heads, None)
             return []
-        self.client.fetch_pack(b'/', check_heads, None, None)
+        ret = self.client.fetch_pack(b'/', check_heads, None, None)
+        self.assertIs(None, ret)
 
     def test_fetch_pack_ignores_magic_ref(self):
         self.rin.write(
@@ -124,7 +125,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertEquals({}, heads)
             return []
-        self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        self.assertIs(None, ret)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_fetch_pack_none(self):
@@ -697,8 +699,14 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = {}
-        c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
+        ret = c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
+        self.assertEqual({
+            'HEAD': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/heads/master': 'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            'refs/tags/mytag': '28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            'refs/tags/mytag-packed': 'b0931cadc54336e78a1d980420e3268903b57a50'
+            }, ret)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
             b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 

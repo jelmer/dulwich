@@ -102,6 +102,8 @@ BASE_DIRECTORIES = [
     ["info"]
     ]
 
+DEFAULT_REF = b'refs/heads/master'
+
 
 def parse_graftpoints(graftpoints):
     """Convert a list of graftpoints into a dict
@@ -853,9 +855,7 @@ class Repo(BaseRepo):
         target.refs.import_refs(
             b'refs/tags', self.refs.as_dict(b'refs/tags'))
         try:
-            target.refs.add_if_new(
-                b'refs/heads/master',
-                self.refs[b'refs/heads/master'])
+            target.refs.add_if_new(DEFAULT_REF, self.refs[DEFAULT_REF])
         except KeyError:
             pass
 
@@ -940,7 +940,7 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_symbolic_ref(b'HEAD', b"refs/heads/master")
+        ret.refs.set_symbolic_ref(b'HEAD', DEFAULT_REF)
         ret._init_files(bare)
         return ret
 

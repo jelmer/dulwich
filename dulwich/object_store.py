@@ -131,7 +131,7 @@ class BaseObjectStore(object):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (path, object) tuples
         """
         raise NotImplementedError(self.add_objects)
 
@@ -740,7 +740,7 @@ class MemoryObjectStore(BaseObjectStore):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (path, object) tuples
         """
         for obj, path in objects:
             self.add_object(obj)

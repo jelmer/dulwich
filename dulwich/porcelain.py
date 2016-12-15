@@ -628,7 +628,7 @@ def reset(repo, mode, committish="HEAD"):
 
     with open_repo_closing(repo) as r:
         tree = r[committish].tree
-        r.reset_index()
+        r.reset_index(tree)
 
 
 def push(repo, remote_location, refspecs=None,

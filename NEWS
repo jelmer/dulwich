@@ -20,6 +20,9 @@
 
  BUG FIXES
 
+  * Fix ``porcelain.reset`` to respect the comittish argument.
+    (Koen Martens)
+
   * Fix handling of ``Commit.tree`` being set to an actual
    tree object rather than a tree id. (Jelmer Vernooij)
 

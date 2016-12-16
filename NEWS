@@ -24,7 +24,7 @@
     (Koen Martens)
 
   * Fix handling of ``Commit.tree`` being set to an actual
-   tree object rather than a tree id. (Jelmer Vernooij)
+    tree object rather than a tree id. (Jelmer Vernooij)
 
   * Return remote refs from LocalGitClient.fetch_pack(),
     consistent with the documentation for that method.

@@ -131,7 +131,7 @@ class BaseObjectStore(object):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (object, path) tuples
         """
         raise NotImplementedError(self.add_objects)
 
@@ -382,7 +382,8 @@ class PackBasedObjectStore(BaseObjectStore):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over objects, should support __len__.
+        :param objects: Iterable over (object, path) tuples, should support
+            __len__.
         :return: Pack object of the objects written.
         """
         if len(objects) == 0:
@@ -740,7 +741,7 @@ class MemoryObjectStore(BaseObjectStore):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (object, path) tuples
         """
         for obj, path in objects:
             self.add_object(obj)

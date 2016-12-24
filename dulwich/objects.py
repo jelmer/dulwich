@@ -568,6 +568,33 @@ class Blob(ShaFile):
         """
         super(Blob, self).check()
 
+    def splitlines(self):
+        """Return list of lines in this blob.
+
+        This preserves the original line endings.
+        """
+        chunks = self.chunked
+        if not chunks:
+            return []
+        if len(chunks) == 1:
+            return chunks[0].splitlines(True)
+        remaining = None
+        ret = []
+        for chunk in chunks:
+            lines = chunk.splitlines(True)
+            if len(lines) > 1:
+                ret.append((remaining or b"") + lines[0])
+                ret.extend(lines[1:-1])
+                remaining = lines[-1]
+            elif len(lines) == 1:
+                if remaining is None:
+                    remaining = lines.pop()
+                else:
+                    remaining += lines.pop()
+        if remaining is not None:
+            ret.append(remaining)
+        return ret
+
 
 def _parse_message(chunks):
     """Parse a message with a list of fields and a body.
@@ -1154,7 +1181,7 @@ class Commit(ShaFile):
 
     def _serialize(self):
         chunks = []
-        tree_bytes = self._tree.as_raw_string() if isinstance(self._tree, Tree) else self._tree
+        tree_bytes = self._tree.id if isinstance(self._tree, Tree) else self._tree
         chunks.append(git_line(_TREE_HEADER, tree_bytes))
         for p in self._parents:
             chunks.append(git_line(_PARENT_HEADER, p))

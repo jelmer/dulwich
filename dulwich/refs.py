@@ -403,8 +403,9 @@ class InfoRefsContainer(RefsContainer):
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
-    def __init__(self, path):
+    def __init__(self, path, worktree_path=None):
         self.path = path
+        self.worktree_path = worktree_path or path
         self._packed_refs = None
         self._peeled_refs = None
 
@@ -450,7 +451,12 @@ class DiskRefsContainer(RefsContainer):
             name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
-        return os.path.join(self.path, name)
+        # TODO: as the 'HEAD' reference is working tree specific, it
+        # should actually not be a part of RefsContainer
+        if name == 'HEAD':
+            return os.path.join(self.worktree_path, name)
+        else:
+            return os.path.join(self.path, name)
 
     def get_packed_refs(self):
         """Get contents of the packed-refs file.

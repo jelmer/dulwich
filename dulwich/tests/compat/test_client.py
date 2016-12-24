@@ -66,9 +66,9 @@ from dulwich.tests.compat.utils import (
     CompatTestCase,
     check_for_daemon,
     import_repo_to_dir,
+    rmtree_ro,
     run_git_or_fail,
     _DEFAULT_GIT,
-    rmtree_ro,
     )
 
 

@@ -1,3 +1,38 @@
+0.16.0	2016-12-24
+
+ IMPROVEMENTS
+
+  * Add support for worktrees. See `git-worktree(1)` and
+    `gitrepository-layout(5)`. (Laurent Rineau)
+
+  * Add support for `commondir` file in Git control
+    directories. (Laurent Rineau)
+
+  * Add support for passwords in HTTP URLs.
+    (Jon Bain, Mika Mäenpää)
+
+  * Add `release_robot` script to contrib,
+    allowing easy finding of current version based on Git tags.
+    (Mark Mikofski)
+
+  * Add ``Blob.splitlines`` method.
+    (Jelmer Vernooij)
+
+ BUG FIXES
+
+  * Fix ``porcelain.reset`` to respect the comittish argument.
+    (Koen Martens)
+
+  * Fix handling of ``Commit.tree`` being set to an actual
+    tree object rather than a tree id. (Jelmer Vernooij)
+
+  * Return remote refs from LocalGitClient.fetch_pack(),
+    consistent with the documentation for that method.
+    (#461, Jelmer Vernooĳ)
+
+  * Fix handling of unknown URL schemes in get_transport_and_path.
+    (#465, Jelmer Vernooij)
+
 0.15.0	2016-10-09
 
  BUG FIXES

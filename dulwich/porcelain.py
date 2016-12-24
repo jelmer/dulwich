@@ -68,6 +68,14 @@ from dulwich.archive import (
 from dulwich.client import (
     get_transport_and_path,
     )
+from dulwich.diff_tree import (
+    CHANGE_ADD,
+    CHANGE_DELETE,
+    CHANGE_MODIFY,
+    CHANGE_RENAME,
+    CHANGE_COPY,
+    RENAME_CHANGE_TYPES,
+    )
 from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
@@ -76,6 +84,7 @@ from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
     Commit,
     Tag,
+    format_timezone,
     parse_timezone,
     pretty_format_tree_entry,
     )
@@ -110,11 +119,13 @@ default_bytes_out_stream = getattr(sys.stdout, 'buffer', sys.stdout)
 default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 
 
-def encode_path(path):
+DEFAULT_ENCODING = 'utf-8'
+
+
+def encode_path(path, default_encoding=DEFAULT_ENCODING):
     """Encode a path as bytestring."""
-    # TODO(jelmer): Use something other than ascii?
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode(default_encoding)
     return path
 
 
@@ -319,7 +330,7 @@ def rm(repo=".", paths=None):
         index.write()
 
 
-def commit_decode(commit, contents, default_encoding='utf-8'):
+def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
     if commit.encoding is not None:
         return contents.decode(commit.encoding, "replace")
     return contents.decode(default_encoding, "replace")
@@ -336,8 +347,14 @@ def print_commit(commit, decode, outstream=sys.stdout):
     if len(commit.parents) > 1:
         outstream.write("merge: " +
             "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
-    outstream.write("author: " + decode(commit.author) + "\n")
-    outstream.write("committer: " + decode(commit.committer) + "\n")
+    outstream.write("Author: " + decode(commit.author) + "\n")
+    if commit.author != commit.committer:
+        outstream.write("Committer: " + decode(commit.committer) + "\n")
+
+    time_tuple = time.gmtime(commit.author_time + commit.author_timezone)
+    time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
+    timezone_str = format_timezone(commit.author_timezone).decode('ascii')
+    outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(commit.message) + "\n")
     outstream.write("\n")
@@ -414,22 +431,61 @@ def show_object(repo, obj, decode, outstream):
             }[obj.type_name](repo, obj, decode, outstream)
 
 
-def log(repo=".", outstream=sys.stdout, max_entries=None):
+def print_name_status(changes):
+    """Print a simple status summary, listing changed files.
+    """
+    for change in changes:
+        if not change:
+            continue
+        if type(change) is list:
+            change = change[0]
+        if change.type == CHANGE_ADD:
+            path1 = change.new.path
+            path2 = ''
+            kind = 'A'
+        elif change.type == CHANGE_DELETE:
+            path1 = change.old.path
+            path2 = ''
+            kind = 'D'
+        elif change.type == CHANGE_MODIFY:
+            path1 = change.new.path
+            path2 = ''
+            kind = 'M'
+        elif change.type in RENAME_CHANGE_TYPES:
+            path1 = change.old.path
+            path2 = change.new.path
+            if change.type == CHANGE_RENAME:
+                kind = 'R'
+            elif change.type == CHANGE_COPY:
+                kind = 'C'
+        yield '%-8s%-20s%-20s' % (kind, path1, path2)
+
+
+def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
+        reverse=False, name_status=False):
     """Write commit logs.
 
     :param repo: Path to repository
+    :param paths: Optional set of specific paths to print entries for
     :param outstream: Stream to write log output to
+    :param reverse: Reverse order in which entries are printed
+    :param name_status: Print name status
     :param max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
-        walker = r.get_walker(max_entries=max_entries)
+        walker = r.get_walker(
+            max_entries=max_entries, paths=paths, reverse=reverse)
         for entry in walker:
             decode = lambda x: commit_decode(entry.commit, x)
             print_commit(entry.commit, decode, outstream)
+            if name_status:
+                outstream.writelines(
+                    [l+'\n' for l in print_name_status(entry.changes())])
 
 
 # TODO(jelmer): better default for encoding?
-def show(repo=".", objects=None, outstream=sys.stdout, default_encoding='utf-8'):
+def show(repo=".", objects=None, outstream=sys.stdout,
+         default_encoding=DEFAULT_ENCODING):
     """Print the changes in a commit.
 
     :param repo: Path to repository
@@ -572,7 +628,7 @@ def reset(repo, mode, committish="HEAD"):
 
     with open_repo_closing(repo) as r:
         tree = r[committish].tree
-        r.reset_index()
+        r.reset_index(tree)
 
 
 def push(repo, remote_location, refspecs=None,
@@ -605,7 +661,7 @@ def push(repo, remote_location, refspecs=None,
                     new_refs[rh] = r.refs[lh]
             return new_refs
 
-        err_encoding = getattr(errstream, 'encoding', None) or 'utf-8'
+        err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(path, update_refs,

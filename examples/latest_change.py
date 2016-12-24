@@ -11,7 +11,9 @@ if len(sys.argv) < 2:
 
 r = Repo(".")
 
-w = r.get_walker(paths=[sys.argv[1]], max_entries=1)
+path = sys.argv[1].encode('utf-8')
+
+w = r.get_walker(paths=[path], max_entries=1)
 try:
     c = next(iter(w)).commit
 except StopIteration:

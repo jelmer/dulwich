@@ -112,7 +112,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertIs(heads, None)
             return []
-        self.client.fetch_pack(b'/', check_heads, None, None)
+        ret = self.client.fetch_pack(b'/', check_heads, None, None)
+        self.assertIs(None, ret)
 
     def test_fetch_pack_ignores_magic_ref(self):
         self.rin.write(
@@ -124,7 +125,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertEquals({}, heads)
             return []
-        self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        self.assertIs(None, ret)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_fetch_pack_none(self):
@@ -378,6 +380,22 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual(1234, c.port)
         self.assertEqual('bar/baz', path)
 
+    def test_username_and_port_explicit_unknown_scheme(self):
+        c, path = get_transport_and_path(
+            'unknown://git@server:7999/dply/stuff.git')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('unknown', c.host)
+        self.assertEqual('//git@server:7999/dply/stuff.git', path)
+
+    def test_username_and_port_explicit(self):
+        c, path = get_transport_and_path(
+            'ssh://git@server:7999/dply/stuff.git')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('git', c.username)
+        self.assertEqual('server', c.host)
+        self.assertEqual(7999, c.port)
+        self.assertEqual('dply/stuff.git', path)
+
     def test_ssh_abspath_explicit(self):
         c, path = get_transport_and_path('git+ssh://foo.com//bar/baz')
         self.assertTrue(isinstance(c, SSHGitClient))
@@ -464,6 +482,26 @@ class TestGetTransportAndPath(TestCase):
         c, path = get_transport_and_path(url)
         self.assertTrue(isinstance(c, HttpGitClient))
         self.assertEqual('/jelmer/dulwich', path)
+
+    def test_http_auth(self):
+        url = 'https://user:passwd@github.com/jelmer/dulwich'
+
+        c, path = get_transport_and_path(url)
+
+        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('/jelmer/dulwich', path)
+        self.assertEqual('user', c._username)
+        self.assertEqual('passwd', c._password)
+
+    def test_http_no_auth(self):
+        url = 'https://github.com/jelmer/dulwich'
+
+        c, path = get_transport_and_path(url)
+
+        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('/jelmer/dulwich', path)
+        self.assertIs(None, c._username)
+        self.assertIs(None, c._password)
 
 
 class TestGetTransportAndPathFromUrl(TestCase):
@@ -677,8 +715,14 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = {}
-        c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
+        ret = c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
+        self.assertEqual({
+            b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/heads/master': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/tags/mytag': b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            b'refs/tags/mytag-packed': b'b0931cadc54336e78a1d980420e3268903b57a50'
+            }, ret)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
             b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
@@ -744,6 +788,37 @@ class HttpGitClientTests(TestCase):
 
         url = c.get_url(path)
         self.assertEqual('https://github.com/jelmer/dulwich', url)
+
+    def test_get_url_with_username_and_passwd(self):
+        base_url = 'https://github.com/jelmer/dulwich'
+        path = '/jelmer/dulwich'
+        c = HttpGitClient(base_url, username='USERNAME', password='PASSWD')
+
+        url = c.get_url(path)
+        self.assertEqual('https://github.com/jelmer/dulwich', url)
+
+    def test_init_username_passwd_set(self):
+        url = 'https://github.com/jelmer/dulwich'
+
+        c = HttpGitClient(url, config=None, username='user', password='passwd')
+        self.assertEqual('user', c._username)
+        self.assertEqual('passwd', c._password)
+        [pw_handler] = [
+            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+        self.assertEqual(
+            ('user', 'passwd'),
+            pw_handler.passwd.find_user_password(
+                None, 'https://github.com/jelmer/dulwich'))
+
+    def test_init_no_username_passwd(self):
+        url = 'https://github.com/jelmer/dulwich'
+
+        c = HttpGitClient(url, config=None)
+        self.assertIs(None, c._username)
+        self.assertIs(None, c._password)
+        pw_handler = [
+            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+        self.assertEqual(0, len(pw_handler))
 
 
 class TCPGitClientTests(TestCase):

@@ -136,6 +136,22 @@ class BlobReadTests(TestCase):
         b = Blob.from_string(string)
         self.assertEqual([string], b.chunked)
 
+    def test_splitlines(self):
+        for case in [
+            [],
+            [b'foo\nbar\n'],
+            [b'bl\na', b'blie'],
+            [b'bl\na', b'blie', b'bloe\n'],
+            [b'', b'bl\na', b'blie', b'bloe\n'],
+            [b'', b'', b'', b'bla\n'],
+            [b'', b'', b'', b'bla\n', b''],
+            [b'bl', b'', b'a\naaa'],
+            [b'a\naaa', b'a'],
+            ]:
+            b = Blob()
+            b.chunked = case
+            self.assertEqual(b.data.splitlines(True), b.splitlines())
+
     def test_set_chunks(self):
         b = Blob()
         b.chunked = [b'te', b'st', b' 5\n']
@@ -301,6 +317,16 @@ class CommitSerializationTests(TestCase):
         c1 = Commit()
         c1.set_raw_string(c.as_raw_string())
         self.assertEqual(30, c1.commit_time)
+
+    def test_full_tree(self):
+        c = self.make_commit(commit_time=30)
+        t = Tree()
+        t.add(b'data-x', 0o644, Blob().id)
+        c.tree = t
+        c1 = Commit()
+        c1.set_raw_string(c.as_raw_string())
+        self.assertEqual(t.id, c1.tree)
+        self.assertEqual(c.as_raw_string(), c1.as_raw_string())
 
     def test_raw_length(self):
         c = self.make_commit()

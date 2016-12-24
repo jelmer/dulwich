@@ -123,7 +123,7 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
         self.assertEqual(target_repo.head(), c3.id)
-        self.assertEquals(c3.id, target_repo.refs[b'refs/tags/foo'])
+        self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
 
@@ -441,6 +441,30 @@ class ResetTests(PorcelainTestCase):
         changes = list(tree_changes(self.repo,
                        index.commit(self.repo.object_store),
                        self.repo[b'HEAD'].tree))
+
+        self.assertEqual([], changes)
+
+    def test_hard_commit(self):
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=["foo"])
+        sha = porcelain.commit(self.repo.path, message=b"Some message",
+                committer=b"Jane <jane@example.com>",
+                author=b"John <john@example.com>")
+
+        with open(os.path.join(self.repo.path, 'foo'), 'wb') as f:
+            f.write(b"BAZ")
+        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.commit(self.repo.path, message=b"Some other message",
+                committer=b"Jane <jane@example.com>",
+                author=b"John <john@example.com>")
+
+        porcelain.reset(self.repo, "hard", sha)
+
+        index = self.repo.open_index()
+        changes = list(tree_changes(self.repo,
+                       index.commit(self.repo.object_store),
+                       self.repo[sha].tree))
 
         self.assertEqual([], changes)
 

@@ -1,4 +1,4 @@
-dulwich (0.16.0-1) UNRELEASED; urgency=medium
+dulwich (0.16.0-1) unstable; urgency=low
 
   * New upstream release.
 

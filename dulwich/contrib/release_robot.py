@@ -1,3 +1,22 @@
+# release_robot.py
+#
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
+
 """Determine last version string from tags.
 
 Alternate to `Versioneer <https://pypi.python.org/pypi/versioneer/>`_ using
@@ -39,7 +58,7 @@ def get_recent_tags(projdir=PROJDIR):
     refs = project.get_refs()  # dictionary of refs and their SHA-1 values
     tags = {}  # empty dictionary to hold tags, commits and datetimes
     # iterate over refs in repository
-    for key, value in refs.iteritems():
+    for key, value in refs.items():
         obj = project.get_object(value)  # dulwich object from SHA-1
         # check if object is tag
         if obj.type_name != 'tag':
@@ -60,7 +79,7 @@ def get_recent_tags(projdir=PROJDIR):
             ]
 
     # return list of tags sorted by their datetimes from newest to oldest
-    return sorted(tags.iteritems(), key=lambda tag: tag[1][0], reverse=True)
+    return sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
 
 def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
@@ -107,4 +126,4 @@ if __name__ == '__main__':
         projdir = sys.argv[1]
     else:
         projdir = PROJDIR
-    print get_current_version(projdir=projdir)
+    print(get_current_version(projdir=projdir))

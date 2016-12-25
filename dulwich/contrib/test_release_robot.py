@@ -1,6 +1,4 @@
-# __init__.py -- The git module of dulwich
-# Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@samba.org>
+# release_robot.py
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -19,7 +17,23 @@
 # License, Version 2.0.
 #
 
+"""Tests for release_robot."""
 
-"""Python implementation of the Git file formats and protocols."""
+import re
+import unittest
 
-__version__ = (0, 16, 1)
+from dulwich.contrib.release_robot import PATTERN
+
+
+class TagPatternTests(unittest.TestCase):
+
+    def test_tag_pattern(self):
+        test_cases = {
+            '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3', 'Release-0.3': '0.3',
+            'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1', 'v0.3-rc.1': '0.3-rc.1',
+            'version 0.3': '0.3', 'version_0.3_rc_1': '0.3_rc_1', 'v1': '1',
+            '0.3rc1': '0.3rc1'
+        }
+        for tc, version in test_cases.items():
+            m = re.match(PATTERN, tc)
+            self.assertEqual(m.group(1), version)

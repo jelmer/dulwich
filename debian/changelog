@@ -1,4 +1,4 @@
-dulwich (0.16.1-1) UNRELEASED; urgency=medium
+dulwich (0.16.1-1) unstable; urgency=medium
 
   * New upstream release.
    + Fixes Python3 compatibility of `dulwich.contrib.release_robot`.

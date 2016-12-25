@@ -1,5 +1,10 @@
 0.16.1	UNRELEASED
 
+ BUG FIXES
+
+  * Fix python3 compatibility for dulwich.contrib.release_robot.
+    (Jelmer Vernooĳ)
+
 0.16.0	2016-12-24
 
  IMPROVEMENTS

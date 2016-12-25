@@ -39,7 +39,7 @@ def get_recent_tags(projdir=PROJDIR):
     refs = project.get_refs()  # dictionary of refs and their SHA-1 values
     tags = {}  # empty dictionary to hold tags, commits and datetimes
     # iterate over refs in repository
-    for key, value in refs.iteritems():
+    for key, value in refs.items():
         obj = project.get_object(value)  # dulwich object from SHA-1
         # check if object is tag
         if obj.type_name != 'tag':
@@ -60,7 +60,7 @@ def get_recent_tags(projdir=PROJDIR):
             ]
 
     # return list of tags sorted by their datetimes from newest to oldest
-    return sorted(tags.iteritems(), key=lambda tag: tag[1][0], reverse=True)
+    return sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
 
 def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
@@ -107,4 +107,4 @@ if __name__ == '__main__':
         projdir = sys.argv[1]
     else:
         projdir = PROJDIR
-    print get_current_version(projdir=projdir)
+    print(get_current_version(projdir=projdir))

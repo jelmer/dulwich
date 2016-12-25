@@ -70,6 +70,7 @@ dulwich/contrib/__init__.py
 dulwich/contrib/paramiko_vendor.py
 dulwich/contrib/release_robot.py
 dulwich/contrib/swift.py
+dulwich/contrib/test_release_robot.py
 dulwich/contrib/test_swift.py
 dulwich/contrib/test_swift_smoke.py
 dulwich/tests/__init__.py

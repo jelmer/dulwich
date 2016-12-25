@@ -905,6 +905,7 @@ class SSHVendor(object):
     """A client side SSH implementation."""
 
     def connect_ssh(self, host, command, username=None, port=None):
+        # This function was deprecated in 0.9.1
         import warnings
         warnings.warn(
             "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",

@@ -34,6 +34,7 @@ from dulwich.repo import (
     Repo,
     )
 from dulwich.tests.compat.utils import (
+    require_git_version,
     rmtree_ro,
     run_git_or_fail,
     CompatTestCase,
@@ -172,6 +173,8 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         return worktrees
 
     def test_git_worktree_list(self):
+        # 'git worktree list' was introduced in 2.7.0
+        require_git_version((2, 7, 0))
         output = run_git_or_fail(['worktree', 'list'], cwd=self._repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)

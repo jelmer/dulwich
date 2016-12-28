@@ -10,6 +10,9 @@
   * Fix dulwich.porcelain.ls_remote() on Python 3.
     (#471, Jelmer Vernooĳ)
 
+  * Allow both unicode and byte strings for host paths
+    in dulwich.client. (#435, Jelmer Vernooĳ)
+
 0.16.1	2016-12-25
 
  BUG FIXES

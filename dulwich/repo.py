@@ -858,6 +858,14 @@ class Repo(BaseRepo):
             target.refs.add_if_new(DEFAULT_REF, self.refs[DEFAULT_REF])
         except KeyError:
             pass
+        target_config = target.get_config()
+        encoded_path = self.path
+        if not isinstance(encoded_path, bytes):
+            encoded_path = encoded_path.encode(sys.getfilesystemencoding())
+        target_config.set((b'remote', b'origin'), b'url', encoded_path)
+        target_config.set((b'remote', b'origin'), b'fetch',
+            b'+refs/heads/*:refs/remotes/origin/*')
+        target_config.write_to_path()
 
         # Update target head
         head_chain, head_sha = self.refs.follow(b'HEAD')

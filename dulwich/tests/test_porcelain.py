@@ -872,3 +872,18 @@ class LsTreeTests(PorcelainTestCase):
         self.assertEqual(
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')
+
+
+class LsRemoteTests(PorcelainTestCase):
+
+    def test_empty(self):
+        self.assertEqual({}, porcelain.ls_remote(self.repo.path))
+
+    def test_some(self):
+        cid = porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        self.assertEqual({
+            b'refs/heads/master': cid,
+            b'HEAD': cid},
+            porcelain.ls_remote(self.repo.path))

@@ -122,13 +122,6 @@ default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 DEFAULT_ENCODING = 'utf-8'
 
 
-def encode_path(path, default_encoding=DEFAULT_ENCODING):
-    """Encode a path as bytestring."""
-    if not isinstance(path, bytes):
-        path = path.encode(default_encoding)
-    return path
-
-
 def open_repo(path_or_repo):
     """Open an argument that can be a repository or a path for a repository."""
     if isinstance(path_or_repo, BaseRepo):
@@ -903,8 +896,13 @@ def fetch(repo, remote_location, outstream=sys.stdout,
 
 
 def ls_remote(remote):
+    """List the refs in a remote.
+
+    :param remote: Remote repository location
+    :return: Dictionary with remote refs
+    """
     client, host_path = get_transport_and_path(remote)
-    return client.get_refs(encode_path(host_path))
+    return client.get_refs(host_path)
 
 
 def repack(repo):

@@ -246,6 +246,14 @@ class RepositoryRootTests(TestCase):
             shas = [e.commit.id for e in r.get_walker()]
             self.assertEqual(shas, [t.head(),
                              b'2a72d929692c41d8554c07f6301757ba18a65d91'])
+            c = t.get_config()
+            encoded_path = r.path
+            if not isinstance(encoded_path, bytes):
+                encoded_path = encoded_path.encode(sys.getfilesystemencoding())
+            self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
+            self.assertEqual(
+                b'+refs/heads/*:refs/remotes/origin/*',
+                c.get((b'remote', b'origin'), b'fetch'))
 
     def test_clone_no_head(self):
         temp_dir = self.mkdtemp()

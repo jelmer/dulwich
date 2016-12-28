@@ -282,6 +282,13 @@ def clone(source, target=None, bare=False, checkout=None,
                 if n.startswith(b'refs/tags/') and
                 not n.endswith(ANNOTATED_TAG_SUFFIX)})
         r[b"HEAD"] = remote_refs[b"HEAD"]
+        target_config = r.get_config()
+        if not isinstance(source, bytes):
+            source = source.encode(DEFAULT_ENCODING)
+        target_config.set((b'remote', b'origin'), b'url', source)
+        target_config.set((b'remote', b'origin'), b'fetch',
+            b'+refs/heads/*:refs/remotes/origin/*')
+        target_config.write_to_path()
         if checkout:
             errstream.write(b'Checking out HEAD\n')
             r.reset_index()

@@ -126,6 +126,14 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
+        c = r.get_config()
+        encoded_path = self.repo.path
+        if not isinstance(encoded_path, bytes):
+            encoded_path = encoded_path.encode('utf-8')
+        self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
+        self.assertEqual(
+            b'+refs/heads/*:refs/remotes/origin/*',
+            c.get((b'remote', b'origin'), b'fetch'))
 
     def test_simple_local_with_checkout(self):
         f1_1 = make_object(Blob, data=b'f1')

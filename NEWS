@@ -13,6 +13,8 @@
   * Allow both unicode and byte strings for host paths
     in dulwich.client. (#435, Jelmer Vernooĳ)
 
+  * Add remote from porcelain.clone. (#466, Jelmer Vernooĳ)
+
 0.16.1	2016-12-25
 
  BUG FIXES

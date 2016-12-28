@@ -806,6 +806,11 @@ class LocalGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         return cls(**kwargs)
 
+    @classmethod
+    def _open_repo(cls, path):
+        from dulwich.repo import Repo
+        return closing(Repo(path))
+
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
@@ -825,9 +830,8 @@ class LocalGitClient(GitClient):
         """
         if not progress:
             progress = lambda x: None
-        from dulwich.repo import Repo
 
-        with closing(Repo(path)) as target:
+        with self._open_repo(path)  as target:
             old_refs = target.get_refs()
             new_refs = determine_wants(dict(old_refs))
 
@@ -863,8 +867,7 @@ class LocalGitClient(GitClient):
         :param progress: Optional progress function
         :return: Dictionary with all remote refs (not just those fetched)
         """
-        from dulwich.repo import Repo
-        with closing(Repo(path)) as r:
+        with self._open_repo(path) as r:
             return r.fetch(target, determine_wants=determine_wants,
                            progress=progress)
 
@@ -878,8 +881,7 @@ class LocalGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         :return: Dictionary with all remote refs (not just those fetched)
         """
-        from dulwich.repo import Repo
-        with closing(Repo(path)) as r:
+        with self._open_repo(path) as r:
             objects_iter = r.fetch_objects(determine_wants, graph_walker, progress)
 
             # Did the process short-circuit (e.g. in a stateless RPC call)? Note
@@ -891,9 +893,8 @@ class LocalGitClient(GitClient):
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
-        from dulwich.repo import Repo
 
-        with closing(Repo(path)) as target:
+        with self._open_repo(path) as target:
             return target.get_refs()
 
 

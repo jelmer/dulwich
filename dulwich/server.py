@@ -106,6 +106,7 @@ from dulwich.protocol import (
     extract_want_line_capabilities,
     )
 from dulwich.refs import (
+    ANNOTATED_TAG_SUFFIX,
     write_info_refs,
     )
 from dulwich.repo import (
@@ -537,7 +538,8 @@ class ProtocolGraphWalker(object):
                 self.proto.write_pkt_line(line + b'\n')
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
-                    self.proto.write_pkt_line(peeled_sha + b' ' + ref + b'^{}\n')
+                    self.proto.write_pkt_line(
+                        peeled_sha + b' ' + ref + ANNOTATED_TAG_SUFFIX + b'\n')
 
             # i'm done..
             self.proto.write_pkt_line(None)

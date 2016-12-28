@@ -5,6 +5,11 @@
   * Only run worktree list compat tests against git 2.7.0,
     when 'git worktree list' was introduced. (Jelmer Vernooĳ)
 
+ BUG FIXES
+
+  * Fix dulwich.porcelain.ls_remote() on Python 3.
+    (#471, Jelmer Vernooĳ)
+
 0.16.1	2016-12-25
 
  BUG FIXES

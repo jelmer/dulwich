@@ -497,6 +497,12 @@ class GitClient(object):
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
 
+    DEFAULT_ENCODING = 'utf-8'
+
+    def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs):
+        self._remote_path_encoding = path_encoding
+        super(TraditionalGitClient, self).__init__(**kwargs)
+
     def _connect(self, cmd, path):
         """Create a connection to the server.
 
@@ -672,9 +678,9 @@ class TCPGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
-            raise TypeError(path)
+            raise TypeError(cmd)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
@@ -772,9 +778,9 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def _connect(self, service, path):
         if type(service) is not bytes:
-            raise TypeError(path)
+            raise TypeError(service)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
         argv = git_command + [service.decode('ascii'), path]
@@ -997,9 +1003,9 @@ class SSHGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
-            raise TypeError(path)
+            raise TypeError(cmd)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         if path.startswith(b"/~"):
             path = path[1:]
         argv = self._get_cmd_path(cmd) + b" '" + path + b"'"

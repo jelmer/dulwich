@@ -809,6 +809,8 @@ class LocalGitClient(GitClient):
     @classmethod
     def _open_repo(cls, path):
         from dulwich.repo import Repo
+        if not isinstance(path, str):
+            path = path.decode(sys.getfilesystemencoding())
         return closing(Repo(path))
 
     def send_pack(self, path, determine_wants, generate_pack_contents,

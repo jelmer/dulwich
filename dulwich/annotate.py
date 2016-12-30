@@ -88,5 +88,5 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=
 
     lines = []
     for (commit, entry) in reversed(revs):
-        lines = list(update_lines(lines, (commit, entry), store[entry.sha]))
+        lines = update_lines(lines, (commit, entry), store[entry.sha])
     return lines

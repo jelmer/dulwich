@@ -181,21 +181,15 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
-        if sys.platform == 'win32':
-            # on windows, paths are case insensitive, and native git reports paths with '/' as seperator
-            self.assertEqual(os.path.normpath(worktrees[0][0]).lower(), self._mainworktree_repo.path.lower())
-        else:
-            self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+        self.assertEqual(os.path.normcase(worktrees[0][0]).lower(),
+                         self._mainworktree_repo.path.lower())
 
         output = run_git_or_fail(['worktree', 'list'], cwd=self._mainworktree_repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
-        if sys.platform == 'win32':
-            # on windows, paths are case insensitive, and native git reports paths with '/' as seperator
-            self.assertEqual(os.path.normpath(worktrees[0][0]).lower(), self._mainworktree_repo.path.lower())
-        else:
-            self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+        self.assertEqual(os.path.normcase(worktrees[0][0]).lower(),
+                         self._mainworktree_repo.path.lower())
 
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):

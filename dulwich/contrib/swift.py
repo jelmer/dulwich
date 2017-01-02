@@ -927,6 +927,13 @@ class SwiftRepo(BaseRepo):
         refs = SwiftInfoRefsContainer(self.scon, object_store)
         BaseRepo.__init__(self, object_store, refs)
 
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        return False
+
     def _put_named_file(self, filename, contents):
         """Put an object in a Swift container
 

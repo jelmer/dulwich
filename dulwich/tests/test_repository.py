@@ -73,6 +73,12 @@ class CreateRepositoryTests(TestCase):
         with repo.get_named_file('config') as f:
             config_text = f.read()
             self.assertTrue(barestr in config_text, "%r" % config_text)
+        expect_filemode = sys.platform != 'win32'
+        barestr = b'filemode = ' + str(expect_filemode).lower().encode('ascii')
+        with repo.get_named_file('config') as f:
+            config_text = f.read()
+            self.assertTrue(barestr in config_text, "%r" % config_text)
+
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})

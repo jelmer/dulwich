@@ -32,6 +32,7 @@ from io import BytesIO
 import errno
 import os
 import sys
+import stat
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -180,6 +181,13 @@ class BaseRepo(object):
         self._graftpoints = {}
         self.hooks = {}
 
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        raise NotImplementedError(self._determine_file_mode)
+
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
@@ -187,7 +195,11 @@ class BaseRepo(object):
         f = BytesIO()
         cf = ConfigFile()
         cf.set(b"core", b"repositoryformatversion", b"0")
-        cf.set(b"core", b"filemode", b"true")
+        if self._determine_file_mode():
+            cf.set(b"core", b"filemode", b"true")
+        else:
+            cf.set(b"core", b"filemode", b"false")
+
         cf.set(b"core", b"bare", bare)
         cf.set(b"core", b"logallrefupdates", True)
         cf.write_to_file(f)
@@ -745,6 +757,26 @@ class Repo(BaseRepo):
 
         return self._commondir
 
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        fname = os.path.join(self.path, '.probe-permissions')
+        with open(fname, 'w') as f:
+            f.write('')
+
+        st1 = os.lstat(fname)
+        os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        st2 = os.lstat(fname)
+
+        os.unlink(fname)
+
+        mode_differs = st1.st_mode != st2.st_mode
+        st2_has_exec = (st2.st_mode & stat.S_IXUSR) != 0
+
+        return mode_differs and st2_has_exec
+
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
@@ -1039,6 +1071,13 @@ class MemoryRepo(BaseRepo):
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
+
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        return sys.platform != 'win32'
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.

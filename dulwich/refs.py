@@ -686,7 +686,7 @@ class DiskRefsContainer(RefsContainer):
 
 def _split_ref_line(line):
     """Split a single ref line into a tuple of SHA1 and name."""
-    fields = line.rstrip(b'\n').split(b' ')
+    fields = line.rstrip(b'\n\r').split(b' ')
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line %r" % line)
     sha, name = fields

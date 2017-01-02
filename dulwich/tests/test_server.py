@@ -25,6 +25,8 @@ import os
 import shutil
 import tempfile
 
+import sys
+
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -993,7 +995,10 @@ class FileSystemBackendTests(TestCase):
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
-        self.backend = FileSystemBackend()
+        if sys.platform == 'win32':
+            self.backend = FileSystemBackend(self.path[0] + ':' + os.sep)
+        else:
+            self.backend = FileSystemBackend()
 
     def test_nonexistant(self):
         self.assertRaises(NotGitRepository,

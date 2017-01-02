@@ -26,6 +26,9 @@
 
  IMPROVEMENTS
 
+  * Fixed failing test-cases on windows.
+    (Koen Martens)
+
   * Add support for worktrees. See `git-worktree(1)` and
     `gitrepository-layout(5)`. (Laurent Rineau)
 
@@ -43,6 +46,14 @@
     (Jelmer Vernooij)
 
  BUG FIXES
+
+  * Ignore filemode when building index when core.filemode
+    is false.
+    (Koen Martens)
+
+  * Initialize core.filemode configuration setting by
+    probing the filesystem for trustable permissions.
+    (Koen Martens)
 
   * Fix ``porcelain.reset`` to respect the comittish argument.
     (Koen Martens)

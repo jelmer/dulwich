@@ -242,6 +242,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param source: Path or URL for source repository
     :param target: Path to target repository (optional)
     :param bare: Whether or not to create a bare repository
+    :param checkout: Whether or not to check-out HEAD after cloning
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
     :return: The new repository

@@ -26,6 +26,8 @@ from itertools import chain
 import os
 import tempfile
 
+import sys
+
 from dulwich.objects import (
     hex_to_sha,
     )
@@ -179,13 +181,15 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
-        self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+        self.assertEqual(os.path.normcase(worktrees[0][0]).lower(),
+                         self._mainworktree_repo.path.lower())
 
         output = run_git_or_fail(['worktree', 'list'], cwd=self._mainworktree_repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')
-        self.assertEqual(worktrees[0][0], self._mainworktree_repo.path)
+        self.assertEqual(os.path.normcase(worktrees[0][0]).lower(),
+                         self._mainworktree_repo.path.lower())
 
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):

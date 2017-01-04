@@ -505,8 +505,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
         # Add file to index
         st = os.lstat(full_path)
         if not honor_filemode:
-            st_tuple = (entry.mode, st.st_ino, st.st_dev, st.st_nlink, st.st_uid, st.st_gid, st.st_size, st.st_atime, st.st_mtime, st.st_ctime)
-            st = st.__class__(st_tuple)
+            st = st.__class__((entry.mode, ) + st[1:])
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()

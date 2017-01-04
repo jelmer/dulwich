@@ -196,9 +196,9 @@ class BaseRepo(object):
         cf = ConfigFile()
         cf.set(b"core", b"repositoryformatversion", b"0")
         if self._determine_file_mode():
-            cf.set(b"core", b"filemode", b"true")
+            cf.set(b"core", b"filemode", True)
         else:
-            cf.set(b"core", b"filemode", b"false")
+            cf.set(b"core", b"filemode", False)
 
         cf.set(b"core", b"bare", bare)
         cf.set(b"core", b"logallrefupdates", True)

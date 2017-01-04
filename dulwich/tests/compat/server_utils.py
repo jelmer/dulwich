@@ -89,27 +89,27 @@ class ServerTests(object):
 
     def test_push_to_dulwich(self):
         self.import_repos()
-        self.assertReposNotEqual(self._old_repo, self._new_repo)
+        self.assertNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(['push', self.url(port)] + self.branch_args(),
                         cwd=self._new_repo.path)
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
 
     def test_push_to_dulwich_no_op(self):
         self._old_repo = self.import_repo('server_old.export')
         self._new_repo = self.import_repo('server_old.export')
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(['push', self.url(port)] + self.branch_args(),
                         cwd=self._new_repo.path)
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
 
     def test_push_to_dulwich_remove_branch(self):
         self._old_repo = self.import_repo('server_old.export')
         self._new_repo = self.import_repo('server_old.export')
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(['push', self.url(port), ":master"],
@@ -120,26 +120,26 @@ class ServerTests(object):
 
     def test_fetch_from_dulwich(self):
         self.import_repos()
-        self.assertReposNotEqual(self._old_repo, self._new_repo)
+        self.assertNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
                         cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache_time = 0
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
 
     def test_fetch_from_dulwich_no_op(self):
         self._old_repo = self.import_repo('server_old.export')
         self._new_repo = self.import_repo('server_old.export')
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(['fetch', self.url(port)] + self.branch_args(),
                         cwd=self._old_repo.path)
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache_time = 0
-        self.assertReposEqual(self._old_repo, self._new_repo)
+        self.assertEqual(self._old_repo, self._new_repo)
 
     def test_clone_from_dulwich_empty(self):
         old_repo_dir = tempfile.mkdtemp()
@@ -153,7 +153,7 @@ class ServerTests(object):
         run_git_or_fail(['clone', self.url(port), new_repo_dir],
                         cwd=new_repo_base_dir)
         new_repo = Repo(new_repo_dir)
-        self.assertReposEqual(self._old_repo, new_repo)
+        self.assertEqual(self._old_repo, new_repo)
 
     def test_lsremote_from_dulwich(self):
         self._repo = self.import_repo('server_old.export')
@@ -175,7 +175,7 @@ class ServerTests(object):
         expected_shallow = [b'35e0b59e187dd72a0af294aedffc213eaa4d03ff',
                             b'514dc6d3fbfe77361bcaef320c4d21b72bc10be9']
         self.assertEqual(expected_shallow, _get_shallow(clone))
-        self.assertReposNotEqual(clone, self._source_repo)
+        self.assertNotEqual(clone, self._source_repo)
 
     def test_shallow_clone_from_git_is_identical(self):
         require_git_version(self.min_single_branch_version)
@@ -195,8 +195,8 @@ class ServerTests(object):
                         self.url(port), self._stub_repo_dw.path])
 
         # compare the two clones; they should be equal
-        self.assertReposEqual(Repo(self._stub_repo_git.path),
-                              Repo(self._stub_repo_dw.path))
+        self.assertEqual(Repo(self._stub_repo_git.path),
+                         Repo(self._stub_repo_dw.path))
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
@@ -217,7 +217,7 @@ class ServerTests(object):
         expected_shallow = [b'94de09a530df27ac3bb613aaecdd539e0a0655e1',
                             b'da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d']
         self.assertEqual(expected_shallow, _get_shallow(clone))
-        self.assertReposNotEqual(clone, self._source_repo)
+        self.assertNotEqual(clone, self._source_repo)
 
     def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
         require_git_version(self.min_single_branch_version)
@@ -241,7 +241,7 @@ class ServerTests(object):
           ['fetch', '--depth=4', self.url(port)] + self.branch_args(),
           cwd=self._stub_repo.path)
         self.assertEqual([], _get_shallow(clone))
-        self.assertReposEqual(clone, self._source_repo)
+        self.assertEqual(clone, self._source_repo)
 
     def test_fetch_from_dulwich_issue_88_standard(self):
         # Basically an integration test to see that the ACK/NAK
@@ -252,7 +252,7 @@ class ServerTests(object):
 
         run_git_or_fail(['fetch', self.url(port), 'master',],
                         cwd=self._client_repo.path)
-        self.assertObjectStoreEqual(
+        self.assertEqual(
             self._source_repo.object_store,
             self._client_repo.object_store)
 
@@ -278,7 +278,7 @@ class ServerTests(object):
 
         run_git_or_fail(['push', self.url(port), 'master',],
                         cwd=self._client_repo.path)
-        self.assertReposEqual(self._source_repo, self._client_repo)
+        self.assertEqual(self._source_repo, self._client_repo)
 
 
 # TODO(dborowitz): Come up with a better way of testing various permutations of

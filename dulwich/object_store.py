@@ -122,6 +122,14 @@ class BaseObjectStore(object):
         """Iterate over the SHAs that are present in this store."""
         raise NotImplementedError(self.__iter__)
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return set(self) == set(other)
+
+    def __ne__(self, other):
+        return not self == other
+
     def add_object(self, obj):
         """Add a single object to this object store.
 

@@ -214,20 +214,6 @@ class CompatTestCase(TestCase):
         super(CompatTestCase, self).setUp()
         require_git_version(self.min_git_version)
 
-    def assertObjectStoreEqual(self, store1, store2):
-        self.assertEqual(sorted(set(store1)), sorted(set(store2)))
-
-    def assertReposEqual(self, repo1, repo2):
-        self.assertEqual(repo1.get_refs(), repo2.get_refs())
-        self.assertObjectStoreEqual(repo1.object_store, repo2.object_store)
-
-    def assertReposNotEqual(self, repo1, repo2):
-        refs1 = repo1.get_refs()
-        objs1 = set(repo1.object_store)
-        refs2 = repo2.get_refs()
-        objs2 = set(repo2.object_store)
-        self.assertFalse(refs1 == refs2 and objs1 == objs2)
-
     def import_repo(self, name):
         """Import a repo from a fast-export file in a temporary directory.
 

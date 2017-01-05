@@ -21,7 +21,6 @@
 
 """Tests for the repository."""
 
-from contextlib import closing
 import locale
 import os
 import stat
@@ -239,7 +238,7 @@ class RepositoryRootTests(TestCase):
         r = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
-        with closing(r.clone(tmp_dir, mkdir=False)) as t:
+        with r.clone(tmp_dir, mkdir=False) as t:
             self.assertEqual({
                 b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                 b'refs/remotes/origin/master':
@@ -330,7 +329,7 @@ class RepositoryRootTests(TestCase):
                         os.path.join(temp_dir, 'a.git'), symlinks=True)
         rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
         os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
-        with closing(Repo(temp_dir)) as r:
+        with Repo(temp_dir) as r:
             self.assertEqual(r.head(), b'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_common_revisions(self):
@@ -531,7 +530,7 @@ exit 1
         bare = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
-        with closing(bare.clone(tmp_dir, mkdir=False)) as nonbare:
+        with bare.clone(tmp_dir, mkdir=False) as nonbare:
             check(nonbare)
             check(bare)
 

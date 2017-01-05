@@ -1057,6 +1057,12 @@ class Repo(BaseRepo):
         """Close any files opened by this repository."""
         self.object_store.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 class MemoryRepo(BaseRepo):
     """Repo that stores refs, objects, and named files in memory.

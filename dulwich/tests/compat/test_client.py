@@ -20,7 +20,6 @@
 
 """Compatibilty tests between the Dulwich client and the cgit server."""
 
-from contextlib import closing
 import copy
 from io import BytesIO
 import os
@@ -87,8 +86,8 @@ class DulwichClientTestBase(object):
     def assertDestEqualsSrc(self):
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
         dest_repo_dir = os.path.join(self.gitroot, 'dest')
-        with closing(repo.Repo(repo_dir)) as src:
-            with closing(repo.Repo(dest_repo_dir)) as dest:
+        with repo.Repo(repo_dir) as src:
+            with repo.Repo(dest_repo_dir) as dest:
                 self.assertReposEqual(src, dest)
 
     def _client(self):
@@ -100,7 +99,7 @@ class DulwichClientTestBase(object):
     def _do_send_pack(self):
         c = self._client()
         srcpath = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(srcpath)) as src:
+        with repo.Repo(srcpath) as src:
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path(b'/dest'), lambda _: sendrefs,
@@ -120,7 +119,7 @@ class DulwichClientTestBase(object):
         c = self._client()
         c._send_capabilities.remove(b'report-status')
         srcpath = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(srcpath)) as src:
+        with repo.Repo(srcpath) as src:
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path(b'/dest'), lambda _: sendrefs,
@@ -157,7 +156,7 @@ class DulwichClientTestBase(object):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
         dest.refs[b'refs/heads/master'] = dummy_commit
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(repo_dir)) as src:
+        with repo.Repo(repo_dir) as src:
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
@@ -175,7 +174,7 @@ class DulwichClientTestBase(object):
         branch, master = b'refs/heads/branch', b'refs/heads/master'
         dest.refs[branch] = dest.refs[master] = dummy
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(repo_dir)) as src:
+        with repo.Repo(repo_dir) as src:
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
@@ -200,7 +199,7 @@ class DulwichClientTestBase(object):
 
     def test_fetch_pack(self):
         c = self._client()
-        with closing(repo.Repo(os.path.join(self.gitroot, 'dest'))) as dest:
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
             refs = c.fetch(self._build_path(b'/server_new.export'), dest)
             for r in refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
@@ -212,7 +211,7 @@ class DulwichClientTestBase(object):
         dest.refs[b'refs/heads/master'] = dummy
         c = self._client()
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(repo_dir)) as dest:
+        with repo.Repo(repo_dir) as dest:
             refs = c.fetch(self._build_path(b'/dest'), dest)
             for r in refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
@@ -221,7 +220,7 @@ class DulwichClientTestBase(object):
     def test_fetch_pack_no_side_band_64k(self):
         c = self._client()
         c._fetch_capabilities.remove(b'side-band-64k')
-        with closing(repo.Repo(os.path.join(self.gitroot, 'dest'))) as dest:
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
             refs = c.fetch(self._build_path(b'/server_new.export'), dest)
             for r in refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
@@ -231,14 +230,14 @@ class DulwichClientTestBase(object):
         # zero sha1s are already present on the client, and should
         # be ignored
         c = self._client()
-        with closing(repo.Repo(os.path.join(self.gitroot, 'dest'))) as dest:
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
             refs = c.fetch(self._build_path(b'/server_new.export'), dest,
                 lambda refs: [protocol.ZERO_SHA])
             for r in refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
 
     def test_send_remove_branch(self):
-        with closing(repo.Repo(os.path.join(self.gitroot, 'dest'))) as dest:
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
             dummy_commit = self.make_dummy_commit(dest)
             dest.refs[b'refs/heads/master'] = dummy_commit
             dest.refs[b'refs/heads/abranch'] = dummy_commit
@@ -256,7 +255,7 @@ class DulwichClientTestBase(object):
         refs = c.get_refs(self._build_path(b'/server_new.export'))
 
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
-        with closing(repo.Repo(repo_dir)) as dest:
+        with repo.Repo(repo_dir) as dest:
             self.assertDictEqual(dest.refs.as_dict(), refs)
 
 

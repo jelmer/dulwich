@@ -18,7 +18,6 @@
 # License, Version 2.0.
 #
 
-from contextlib import closing
 from io import BytesIO
 import sys
 import shutil
@@ -753,7 +752,7 @@ class LocalGitClientTests(TestCase):
 
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
-        with closing(Repo.init_bare(target_path)) as target:
+        with Repo.init_bare(target_path) as target:
             self.send_and_verify(b"master", local, target)
 
     def test_get_refs(self):

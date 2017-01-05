@@ -23,7 +23,6 @@
 """Tests for the index."""
 
 
-from contextlib import closing
 from io import BytesIO
 import os
 import shutil
@@ -267,7 +266,7 @@ class BuildIndexTests(TestCase):
     def test_empty(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
             tree = Tree()
             repo.object_store.add_object(tree)
 
@@ -284,7 +283,7 @@ class BuildIndexTests(TestCase):
     def test_git_dir(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
 
             # Populate repo
             filea = Blob.from_string(b'file a')
@@ -318,7 +317,7 @@ class BuildIndexTests(TestCase):
     def test_nonempty(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
 
             # Populate repo
             filea = Blob.from_string(b'file a')
@@ -371,7 +370,7 @@ class BuildIndexTests(TestCase):
     def test_symlink(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
 
             # Populate repo
             filed = Blob.from_string(b'file d')
@@ -403,7 +402,7 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         repo_dir_bytes = repo_dir.encode(sys.getfilesystemencoding())
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
 
             # Populate repo
             file = Blob.from_string(b'foo')
@@ -438,7 +437,7 @@ class GetUnstagedChangesTests(TestCase):
 
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-        with closing(Repo.init(repo_dir)) as repo:
+        with Repo.init(repo_dir) as repo:
 
             # Commit a dummy file then modify it
             foo1_fullpath = os.path.join(repo_dir, 'foo1')

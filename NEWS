@@ -5,6 +5,11 @@
   * Fixed failing test-cases on windows.
     (Koen Martens)
 
+ API CHANGES
+
+  * Repo is now a context manager, so that it can be easily
+    closed using a ``with`` statement.
+
  TEST FIXES
 
   * Only run worktree list compat tests against git 2.7.0,

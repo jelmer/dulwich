@@ -8,7 +8,7 @@
  API CHANGES
 
   * Repo is now a context manager, so that it can be easily
-    closed using a ``with`` statement.
+    closed using a ``with`` statement. (Søren Løvborg)
 
  TEST FIXES
 

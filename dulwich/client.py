@@ -50,8 +50,10 @@ import sys
 
 try:
     from urllib import quote as urlquote
+    from urllib import unquote as urlunquote
 except ImportError:
     from urllib.parse import quote as urlquote
+    from urllib.parse import unquote as urlunquote
 
 try:
     import urllib2
@@ -1064,7 +1066,11 @@ class HttpGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         auth, host = urllib2.splituser(parsedurl.netloc)
         password = parsedurl.password
+        if password is not None:
+            password = urlunquote(password)
         username = parsedurl.username
+        if username is not None:
+            username = urlunquote(username)
         # TODO(jelmer): This also strips the username
         parsedurl = parsedurl._replace(netloc=host)
         return cls(urlparse.urlunparse(parsedurl),

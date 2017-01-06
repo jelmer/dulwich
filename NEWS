@@ -36,6 +36,9 @@
 
   * Add remote from porcelain.clone. (#466, Jelmer Vernooĳ)
 
+  * Fix unquoting of credentials before passing to urllib2.
+    (#475, Volodymyr Holovko)
+
 0.16.1	2016-12-25
 
  BUG FIXES

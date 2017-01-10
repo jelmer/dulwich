@@ -53,7 +53,9 @@ from dulwich.object_store import (
     )
 from dulwich.objects import (
     Blob,
+    Commit,
     Tree,
+    S_IFGITLINK,
     )
 from dulwich.repo import Repo
 from dulwich.tests import (
@@ -428,6 +430,46 @@ class BuildIndexTests(TestCase):
 
             utf8_path = os.path.join(repo_dir_bytes, utf8_name)
             self.assertTrue(os.path.exists(utf8_path))
+
+    def test_git_submodule(self):
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            filea = Blob.from_string(b'file alalala')
+
+            subtree = Tree()
+            subtree[b'a'] = (stat.S_IFREG | 0o644, filea.id)
+
+            c = Commit()
+            c.tree = subtree.id
+            c.committer = c.author = b'Somebody <somebody@example.com>'
+            c.commit_time = c.author_time = 42342
+            c.commit_timezone = c.author_timezone = 0
+            c.parents = []
+            c.message = b'Subcommit'
+
+            tree = Tree()
+            tree[b'c'] = (S_IFGITLINK, c.id)
+
+            repo.object_store.add_objects(
+                [(o, None) for o in [tree]])
+
+            build_index_from_tree(repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
+
+            # Verify index entries
+            index = repo.open_index()
+            self.assertEqual(len(index), 1)
+
+            # filea
+            apath = os.path.join(repo.path, 'c/a')
+            self.assertFalse(os.path.exists(apath))
+
+            # dir c
+            cpath = os.path.join(repo.path, 'c')
+            self.assertTrue(os.path.isdir(cpath))
+            self.assertEqual(index[b'c'][4], S_IFGITLINK)  # mode
+            self.assertEqual(index[b'c'][8], c.id)  # sha
 
 
 class GetUnstagedChangesTests(TestCase):

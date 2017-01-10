@@ -499,12 +499,15 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
-        obj = object_store[entry.sha]
-        build_file_from_blob(obj, entry.mode, full_path,
-            honor_filemode=honor_filemode)
+        if S_ISGITLINK(entry.mode):
+            os.mkdir(full_path)
+        else:
+            obj = object_store[entry.sha]
+            build_file_from_blob(obj, entry.mode, full_path,
+                honor_filemode=honor_filemode)
         # Add file to index
         st = os.lstat(full_path)
-        if not honor_filemode:
+        if not honor_filemode or S_ISGITLINK(entry.mode):
             st = st.__class__((entry.mode, ) + st[1:])
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 

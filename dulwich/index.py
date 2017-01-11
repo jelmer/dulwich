@@ -513,7 +513,13 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
         # Add file to index
         st = os.lstat(full_path)
         if not honor_filemode or S_ISGITLINK(entry.mode):
-            st = st.__class__((entry.mode, ) + st[1:])
+            # we can not use tuple slicing to build a new tuple,
+            # because on windows that will convert the times to
+            # longs, which causes errors further along
+            st_tuple = (entry.mode, st.st_ino, st.st_dev, st.st_nlink,
+                        st.st_uid, st.st_gid, st.st_size, st.st_atime,
+                        st.st_mtime, st.st_ctime)
+            st = st.__class__(st_tuple)
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()
@@ -549,9 +555,17 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
-        blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
-        if blob.id != entry.sha:
+        try:
+            blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # The file was removed, so we assume that counts as
+            # different from whatever file used to exist.
             yield tree_path
+        else:
+            if blob.id != entry.sha:
+                yield tree_path
 
 
 os_sep_bytes = os.sep.encode('ascii')

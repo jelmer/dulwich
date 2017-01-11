@@ -544,9 +544,17 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
-        blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
-        if blob.id != entry.sha:
+        try:
+            blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # The file was removed, so we assume that counts as
+            # different from whatever file used to exist.
             yield tree_path
+        else:
+            if blob.id != entry.sha:
+                yield tree_path
 
 
 os_sep_bytes = os.sep.encode('ascii')

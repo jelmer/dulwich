@@ -398,7 +398,7 @@ class BuildIndexTests(TestCase):
 
             # Modify content
             with open(filea_path, 'wb') as fh:
-                fh.write('test a')
+                fh.write(b'test a')
             os.system('sync')
             mtime = os.stat(filea_path).st_mtime
  

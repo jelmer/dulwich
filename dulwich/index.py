@@ -434,6 +434,11 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
             else:
                 raise
     else:
+        if os.path.exists(target_path):
+            with open(target_path, 'rb') as f:
+                if f.read() == blob.as_raw_string():
+                    return
+
         with open(target_path, 'wb') as f:
             # Write out file
             f.write(blob.as_raw_string())

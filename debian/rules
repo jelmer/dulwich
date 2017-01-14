@@ -9,8 +9,10 @@ LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
 pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
 
+pyflavours = python2,python3,pypy
+
 %:
-	dh $* --with python2,python3,pypy --buildsystem=python_distutils
+	dh $* --with $(pyflavours) --buildsystem=python_distutils
 
 override_dh_auto_build:
 	dh_auto_build
@@ -24,7 +26,9 @@ override_dh_auto_test:
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) check PYTHON=python
 	$(MAKE) check PYTHON=python3
+ifneq (,$(findstring pypy,$(pyflavours)))
 	$(MAKE) check PYTHON=pypy
+endif
 endif
 
 override_dh_auto_install:
@@ -32,28 +36,36 @@ override_dh_auto_install:
 	set -ex; for python in $(shell py3versions -r); do \
 	  $$python setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb; \
 	done;
+ifneq (,$(findstring pypy,$(pyflavours)))
 	pypy setup.py build -b build-pypy install --root=$(CURDIR)/debian/tmp --install-layout deb
 	rm -rf debian/tmp/usr/lib/pypy/bin
+endif
 	# Install everything excluding the *_d.so debug extensions to python-dulwich and python3-dulwich
 	dh_install -X"*_d.so" "debian/tmp/usr/lib/python2*/*-packages" -p python-dulwich
 	dh_install -X"*_d.so" "debian/tmp/usr/lib/python3*/*-packages" -p python3-dulwich
 	# Install the debug extensions to python-dulwich-dbg
 	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
+ifneq (,$(findstring pypy,$(pyflavours)))
 	# Install the pypy files to pypy-dulwich
 	dh_install "debian/tmp/usr/lib/pypy/" -p pypy-dulwich
+endif
 
 override_dh_installdocs:
 	dh_installdocs -ppython-dulwich-dbg --link-doc=python-dulwich
 	dh_installdocs -ppython3-dulwich-dbg --link-doc=python3-dulwich
 	dh_installdocs -ppython-dulwich docs/tutorial -X.gitignore -XMakefile
 	dh_installdocs -ppython3-dulwich docs/tutorial -X.gitignore -XMakefile
+ifneq (,$(findstring pypy,$(pyflavours)))
 	dh_installdocs -ppypy-dulwich docs/tutorial -X.gitignore -XMakefile
+endif
 
 override_dh_strip:
 	dh_strip -p python-dulwich --dbg-package=python-dulwich-dbg
 	dh_strip -p python3-dulwich --dbg-package=python3-dulwich-dbg
+ifneq (,$(findstring pypy,$(pyflavours)))
 	# For the moment, there is no dbg package for pypy-dulwich.
 	dh_strip -p pypy-dulwich
+endif
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS

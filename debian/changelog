@@ -1,5 +1,6 @@
-dulwich (0.16.1-3) UNRELEASED; urgency=medium
+dulwich (0.16.2-1) UNRELEASED; urgency=medium
 
+  * New upstream release.
   * Update homepage to www.dulwich.io.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 08 Jan 2017 02:12:51 +0000

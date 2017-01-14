@@ -405,7 +405,8 @@ class BuildIndexTests(TestCase):
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
             sync()
-            self.assertNotEqual(mtime, os.stat(filea_path).st_mtime)
+            with open(filea_path, 'rb') as fh:
+                self.assertEqual(b'file a', fh.read())
 
 
     @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')

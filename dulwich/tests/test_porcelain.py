@@ -20,7 +20,6 @@
 
 """Tests for dulwich.porcelain."""
 
-from contextlib import closing
 from io import BytesIO
 try:
     from StringIO import StringIO
@@ -126,6 +125,14 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
+        c = r.get_config()
+        encoded_path = self.repo.path
+        if not isinstance(encoded_path, bytes):
+            encoded_path = encoded_path.encode('utf-8')
+        self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
+        self.assertEqual(
+            b'+refs/heads/*:refs/remotes/origin/*',
+            c.get((b'remote', b'origin'), b'fetch'))
 
     def test_simple_local_with_checkout(self):
         f1_1 = make_object(Blob, data=b'f1')
@@ -140,11 +147,11 @@ class CloneTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
-        with closing(porcelain.clone(self.repo.path, target_path,
-                                     checkout=True,
-                                     errstream=errstream)) as r:
+        with porcelain.clone(self.repo.path, target_path,
+                             checkout=True,
+                             errstream=errstream) as r:
             self.assertEqual(r.path, target_path)
-        with closing(Repo(target_path)) as r:
+        with Repo(target_path) as r:
             self.assertEqual(r.head(), c3.id)
         self.assertTrue('f1' in os.listdir(target_path))
         self.assertTrue('f2' in os.listdir(target_path))
@@ -511,7 +518,7 @@ class PushTests(PorcelainTestCase):
             errstream=errstream)
 
         # Check that the target and source
-        with closing(Repo(clone_path)) as r_clone:
+        with Repo(clone_path) as r_clone:
             self.assertEqual({
                 b'HEAD': new_id,
                 b'refs/heads/foo': r_clone[b'HEAD'].id,
@@ -598,7 +605,7 @@ class PullTests(PorcelainTestCase):
             outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
-        with closing(Repo(self.target_path)) as r:
+        with Repo(self.target_path) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
     def test_no_refspec(self):
@@ -610,7 +617,7 @@ class PullTests(PorcelainTestCase):
                        errstream=errstream)
 
         # Check the target repo for pushed changes
-        with closing(Repo(self.target_path)) as r:
+        with Repo(self.target_path) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
 
@@ -830,7 +837,7 @@ class FetchTests(PorcelainTestCase):
             errstream=errstream)
 
         # Check the target repo for pushed changes
-        with closing(Repo(target_path)) as r:
+        with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
 
 
@@ -872,3 +879,18 @@ class LsTreeTests(PorcelainTestCase):
         self.assertEqual(
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')
+
+
+class LsRemoteTests(PorcelainTestCase):
+
+    def test_empty(self):
+        self.assertEqual({}, porcelain.ls_remote(self.repo.path))
+
+    def test_some(self):
+        cid = porcelain.commit(repo=self.repo.path, message=b'test status',
+            author=b'', committer=b'')
+
+        self.assertEqual({
+            b'refs/heads/master': cid,
+            b'HEAD': cid},
+            porcelain.ls_remote(self.repo.path))

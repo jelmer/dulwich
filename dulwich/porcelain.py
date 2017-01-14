@@ -101,6 +101,7 @@ from dulwich.protocol import (
     Protocol,
     ZERO_SHA,
     )
+from dulwich.refs import ANNOTATED_TAG_SUFFIX
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import (
     FileSystemBackend,
@@ -120,13 +121,6 @@ default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 
 
 DEFAULT_ENCODING = 'utf-8'
-
-
-def encode_path(path, default_encoding=DEFAULT_ENCODING):
-    """Encode a path as bytestring."""
-    if not isinstance(path, bytes):
-        path = path.encode(default_encoding)
-    return path
 
 
 def open_repo(path_or_repo):
@@ -248,6 +242,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param source: Path or URL for source repository
     :param target: Path to target repository (optional)
     :param bare: Whether or not to create a bare repository
+    :param checkout: Whether or not to check-out HEAD after cloning
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
     :return: The new repository
@@ -285,8 +280,16 @@ def clone(source, target=None, bare=False, checkout=None,
         r.refs.import_refs(
             b'refs/tags',
             {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
-                if n.startswith(b'refs/tags/')})
+                if n.startswith(b'refs/tags/') and
+                not n.endswith(ANNOTATED_TAG_SUFFIX)})
         r[b"HEAD"] = remote_refs[b"HEAD"]
+        target_config = r.get_config()
+        if not isinstance(source, bytes):
+            source = source.encode(DEFAULT_ENCODING)
+        target_config.set((b'remote', b'origin'), b'url', source)
+        target_config.set((b'remote', b'origin'), b'fetch',
+            b'+refs/heads/*:refs/remotes/origin/*')
+        target_config.write_to_path()
         if checkout:
             errstream.write(b'Checking out HEAD\n')
             r.reset_index()
@@ -903,8 +906,13 @@ def fetch(repo, remote_location, outstream=sys.stdout,
 
 
 def ls_remote(remote):
+    """List the refs in a remote.
+
+    :param remote: Remote repository location
+    :return: Dictionary with remote refs
+    """
     client, host_path = get_transport_and_path(remote)
-    return client.get_refs(encode_path(host_path))
+    return client.get_refs(host_path)
 
 
 def repack(repo):

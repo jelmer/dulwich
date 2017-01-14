@@ -25,6 +25,7 @@ from itertools import (
     )
 
 from dulwich.diff_tree import (
+    CHANGE_ADD,
     CHANGE_MODIFY,
     CHANGE_RENAME,
     TreeChange,
@@ -415,3 +416,128 @@ class WalkerTest(TestCase):
     def test_empty_walk(self):
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], exclude=[c3.id])
+
+
+class WalkEntryTest(TestCase):
+
+    def setUp(self):
+        super(WalkEntryTest, self).setUp()
+        self.store = MemoryObjectStore()
+
+    def make_commits(self, commit_spec, **kwargs):
+        times = kwargs.pop('times', [])
+        attrs = kwargs.pop('attrs', {})
+        for i, t in enumerate(times):
+            attrs.setdefault(i + 1, {})['commit_time'] = t
+        return build_commit_graph(self.store, commit_spec, attrs=attrs,
+                                  **kwargs)
+
+    def make_linear_commits(self, num_commits, **kwargs):
+        commit_spec = []
+        for i in range(1, num_commits + 1):
+            c = [i]
+            if i > 1:
+                c.append(i - 1)
+            commit_spec.append(c)
+        return self.make_commits(commit_spec, **kwargs)
+
+    def test_all_changes(self):
+        # Construct a commit with 2 files in different subdirectories.
+        blob_a = make_object(Blob, data=b'a')
+        blob_b = make_object(Blob, data=b'b')
+        c1 = self.make_linear_commits(
+            1,
+            trees={1: [(b'x/a', blob_a), (b'y/b', blob_b)]},
+        )[0]
+
+        # Get the WalkEntry for the commit.
+        walker = Walker(self.store, c1.id)
+        walker_entry = list(walker)[0]
+        changes = walker_entry.changes()
+
+        # Compare the changes with the expected values.
+        entry_a = (b'x/a', F, blob_a.id)
+        entry_b = (b'y/b', F, blob_b.id)
+        self.assertEqual(
+            [TreeChange.add(entry_a),
+             TreeChange.add(entry_b)],
+            changes,
+        )
+
+    def test_all_with_merge(self):
+        blob_a = make_object(Blob, data=b'a')
+        blob_a2 = make_object(Blob, data=b'a2')
+        blob_b = make_object(Blob, data=b'b')
+        blob_b2 = make_object(Blob, data=b'b2')
+        x1, y2, m3 = self.make_commits(
+            [[1], [2], [3, 1, 2]],
+            trees={1: [(b'x/a', blob_a)],
+                   2: [(b'y/b', blob_b)],
+                   3: [(b'x/a', blob_a2), (b'y/b', blob_b2)]})
+
+        # Get the WalkEntry for the merge commit.
+        walker = Walker(self.store, m3.id)
+        entries = list(walker)
+        walker_entry = entries[0]
+        self.assertEqual(walker_entry.commit.id, m3.id)
+        changes = walker_entry.changes()
+        self.assertEqual(2, len(changes))
+
+        entry_a = (b'x/a', F, blob_a.id)
+        entry_a2 = (b'x/a', F, blob_a2.id)
+        entry_b = (b'y/b', F, blob_b.id)
+        entry_b2 = (b'y/b', F, blob_b2.id)
+        self.assertEqual(
+            [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2),
+             TreeChange.add(entry_a2)],
+            [TreeChange.add(entry_b2),
+             TreeChange(CHANGE_MODIFY, entry_b, entry_b2)]],
+            changes,
+        )
+
+    def test_filter_changes(self):
+        # Construct a commit with 2 files in different subdirectories.
+        blob_a = make_object(Blob, data=b'a')
+        blob_b = make_object(Blob, data=b'b')
+        c1 = self.make_linear_commits(
+            1,
+            trees={1: [(b'x/a', blob_a), (b'y/b', blob_b)]},
+        )[0]
+
+        # Get the WalkEntry for the commit.
+        walker = Walker(self.store, c1.id)
+        walker_entry = list(walker)[0]
+        changes = walker_entry.changes(path_prefix=b'x')
+
+        # Compare the changes with the expected values.
+        entry_a = (b'a', F, blob_a.id)
+        self.assertEqual(
+            [TreeChange.add(entry_a)],
+            changes,
+        )
+
+    def test_filter_with_merge(self):
+        blob_a = make_object(Blob, data=b'a')
+        blob_a2 = make_object(Blob, data=b'a2')
+        blob_b = make_object(Blob, data=b'b')
+        blob_b2 = make_object(Blob, data=b'b2')
+        x1, y2, m3 = self.make_commits(
+            [[1], [2], [3, 1, 2]],
+            trees={1: [(b'x/a', blob_a)],
+                   2: [(b'y/b', blob_b)],
+                   3: [(b'x/a', blob_a2), (b'y/b', blob_b2)]})
+
+        # Get the WalkEntry for the merge commit.
+        walker = Walker(self.store, m3.id)
+        entries = list(walker)
+        walker_entry = entries[0]
+        self.assertEqual(walker_entry.commit.id, m3.id)
+        changes = walker_entry.changes(b'x')
+        self.assertEqual(1, len(changes))
+
+        entry_a = (b'a', F, blob_a.id)
+        entry_a2 = (b'a', F, blob_a2.id)
+        self.assertEqual(
+            [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2)]],
+            changes,
+        )

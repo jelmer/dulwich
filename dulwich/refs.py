@@ -44,6 +44,7 @@ from dulwich.file import (
 SYMREF = b'ref: '
 LOCAL_BRANCH_PREFIX = b'refs/heads/'
 BAD_REF_CHARS = set(b'\177 ~^:?*[')
+ANNOTATED_TAG_SUFFIX = b'^{}'
 
 
 def check_ref_format(refname):
@@ -374,7 +375,7 @@ class InfoRefsContainer(RefsContainer):
         self._peeled = {}
         for l in f.readlines():
             sha, name = l.rstrip(b'\n').split(b'\t')
-            if name.endswith(b'^{}'):
+            if name.endswith(ANNOTATED_TAG_SUFFIX):
                 name = name[:-3]
                 if not check_ref_format(name):
                     raise ValueError("invalid ref name %r" % name)
@@ -685,7 +686,7 @@ class DiskRefsContainer(RefsContainer):
 
 def _split_ref_line(line):
     """Split a single ref line into a tuple of SHA1 and name."""
-    fields = line.rstrip(b'\n').split(b' ')
+    fields = line.rstrip(b'\n\r').split(b' ')
     if len(fields) != 2:
         raise PackedRefsException("invalid ref line %r" % line)
     sha, name = fields
@@ -782,7 +783,7 @@ def write_info_refs(refs, store):
         peeled = store.peel_sha(sha)
         yield o.id + b'\t' + name + b'\n'
         if o.id != peeled.id:
-            yield peeled.id + b'\t' + name + b'^{}\n'
+            yield peeled.id + b'\t' + name + ANNOTATED_TAG_SUFFIX + b'\n'
 
 
 is_local_branch = lambda x: x.startswith(b'refs/heads/')

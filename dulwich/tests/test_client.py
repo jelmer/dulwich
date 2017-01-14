@@ -18,12 +18,20 @@
 # License, Version 2.0.
 #
 
-from contextlib import closing
 from io import BytesIO
 import sys
 import shutil
 import tempfile
 
+try:
+    from urllib import quote as urlquote
+except ImportError:
+    from urllib.parse import quote as urlquote
+
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
 
 import dulwich
 from dulwich import (
@@ -753,7 +761,7 @@ class LocalGitClientTests(TestCase):
 
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
-        with closing(Repo.init_bare(target_path)) as target:
+        with Repo.init_bare(target_path) as target:
             self.send_and_verify(b"master", local, target)
 
     def test_get_refs(self):
@@ -819,6 +827,28 @@ class HttpGitClientTests(TestCase):
         pw_handler = [
             h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
         self.assertEqual(0, len(pw_handler))
+
+    def test_from_parsedurl_on_url_with_quoted_credentials(self):
+        original_username = 'john|the|first'
+        quoted_username = urlquote(original_username)
+
+        original_password = 'Ya#1$2%3'
+        quoted_password = urlquote(original_password)
+
+        url = 'https://{username}:{password}@github.com/jelmer/dulwich'.format(
+            username=quoted_username,
+            password=quoted_password
+        )
+
+        c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
+        self.assertEqual(original_username, c._username)
+        self.assertEqual(original_password, c._password)
+        [pw_handler] = [
+            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+        self.assertEqual(
+            (original_username, original_password),
+            pw_handler.passwd.find_user_password(
+                None, 'https://github.com/jelmer/dulwich'))
 
 
 class TCPGitClientTests(TestCase):

@@ -422,21 +422,28 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
     """
+    try:
+        oldstat = os.stat(target_path)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            oldstat = None
+        else:
+            raise
+    contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         # FIXME: This will fail on Windows. What should we do instead?
-        src_path = blob.as_raw_string()
-        try:
-            os.symlink(src_path, target_path)
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                os.unlink(target_path)
-                os.symlink(src_path, target_path)
-            else:
-                raise
+        if oldstat:
+            os.unlink(target_path)
+        os.symlink(contents, target_path)
     else:
+        if oldstat is not None and oldstat.st_size == len(contents):
+            with open(target_path, 'rb') as f:
+                if f.read() == contents:
+                    return
+
         with open(target_path, 'wb') as f:
             # Write out file
-            f.write(blob.as_raw_string())
+            f.write(contents)
 
         if honor_filemode:
             os.chmod(target_path, mode)
@@ -499,11 +506,22 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             os.makedirs(os.path.dirname(full_path))
 
         # FIXME: Merge new index into working tree
-        obj = object_store[entry.sha]
-        build_file_from_blob(obj, entry.mode, full_path,
-            honor_filemode=honor_filemode)
+        if S_ISGITLINK(entry.mode):
+            os.mkdir(full_path)
+        else:
+            obj = object_store[entry.sha]
+            build_file_from_blob(obj, entry.mode, full_path,
+                honor_filemode=honor_filemode)
         # Add file to index
         st = os.lstat(full_path)
+        if not honor_filemode or S_ISGITLINK(entry.mode):
+            # we can not use tuple slicing to build a new tuple,
+            # because on windows that will convert the times to
+            # longs, which causes errors further along
+            st_tuple = (entry.mode, st.st_ino, st.st_dev, st.st_nlink,
+                        st.st_uid, st.st_gid, st.st_size, st.st_atime,
+                        st.st_mtime, st.st_ctime)
+            st = st.__class__(st_tuple)
         index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
     index.write()
@@ -539,9 +557,17 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
-        blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
-        if blob.id != entry.sha:
+        try:
+            blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # The file was removed, so we assume that counts as
+            # different from whatever file used to exist.
             yield tree_path
+        else:
+            if blob.id != entry.sha:
+                yield tree_path
 
 
 os_sep_bytes = os.sep.encode('ascii')

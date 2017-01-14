@@ -149,6 +149,10 @@ class ConfigDict(Config, MutableMapping):
     def set(self, section, name, value):
         if not isinstance(section, tuple):
             section = (section, )
+        if not isinstance(name, bytes):
+            raise TypeError(name)
+        if type(value) not in (bool, bytes):
+            raise TypeError(value)
         self._values.setdefault(section, OrderedDict())[name] = value
 
     def iteritems(self, section):

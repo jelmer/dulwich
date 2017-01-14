@@ -21,7 +21,6 @@
 
 """Tests for the repository."""
 
-from contextlib import closing
 import locale
 import os
 import stat
@@ -73,6 +72,12 @@ class CreateRepositoryTests(TestCase):
         with repo.get_named_file('config') as f:
             config_text = f.read()
             self.assertTrue(barestr in config_text, "%r" % config_text)
+        expect_filemode = sys.platform != 'win32'
+        barestr = b'filemode = ' + str(expect_filemode).lower().encode('ascii')
+        with repo.get_named_file('config') as f:
+            config_text = f.read()
+            self.assertTrue(barestr in config_text, "%r" % config_text)
+
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})
@@ -233,7 +238,7 @@ class RepositoryRootTests(TestCase):
         r = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
-        with closing(r.clone(tmp_dir, mkdir=False)) as t:
+        with r.clone(tmp_dir, mkdir=False) as t:
             self.assertEqual({
                 b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
                 b'refs/remotes/origin/master':
@@ -246,6 +251,14 @@ class RepositoryRootTests(TestCase):
             shas = [e.commit.id for e in r.get_walker()]
             self.assertEqual(shas, [t.head(),
                              b'2a72d929692c41d8554c07f6301757ba18a65d91'])
+            c = t.get_config()
+            encoded_path = r.path
+            if not isinstance(encoded_path, bytes):
+                encoded_path = encoded_path.encode(sys.getfilesystemencoding())
+            self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
+            self.assertEqual(
+                b'+refs/heads/*:refs/remotes/origin/*',
+                c.get((b'remote', b'origin'), b'fetch'))
 
     def test_clone_no_head(self):
         temp_dir = self.mkdtemp()
@@ -316,7 +329,7 @@ class RepositoryRootTests(TestCase):
                         os.path.join(temp_dir, 'a.git'), symlinks=True)
         rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
         os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
-        with closing(Repo(temp_dir)) as r:
+        with Repo(temp_dir) as r:
             self.assertEqual(r.head(), b'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_common_revisions(self):
@@ -517,7 +530,7 @@ exit 1
         bare = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
-        with closing(bare.clone(tmp_dir, mkdir=False)) as nonbare:
+        with bare.clone(tmp_dir, mkdir=False) as nonbare:
             check(nonbare)
             check(bare)
 

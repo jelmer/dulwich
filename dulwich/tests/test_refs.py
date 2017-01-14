@@ -327,8 +327,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # ensure HEAD was not modified
         f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
-        self.assertEqual(b'ref: refs/heads/master', next(iter(f)).rstrip(b'\n'))
+        v = next(iter(f)).rstrip(b'\n\r')
         f.close()
+        self.assertEqual(b'ref: refs/heads/master', v)
 
         # ensure the symbolic link was written through
         f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'), 'rb')
@@ -450,7 +451,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
         except UnicodeEncodeError:
             raise SkipTest("filesystem encoding doesn't support special character")
-        p = os.path.join(self._repo.path, 'refs', 'tags', 'schön')
+        p = os.path.join(self._repo.path, 'refs', 'tags', u'schön')
         with open(p, 'w') as f:
             f.write('00' * 20)
 

@@ -1,3 +1,58 @@
+0.16.2	2016-01-14
+
+ IMPROVEMENTS
+
+  * Fixed failing test-cases on windows.
+    (Koen Martens)
+
+ API CHANGES
+
+  * Repo is now a context manager, so that it can be easily
+    closed using a ``with`` statement. (Søren Løvborg)
+
+ TEST FIXES
+
+  * Only run worktree list compat tests against git 2.7.0,
+    when 'git worktree list' was introduced. (Jelmer Vernooĳ)
+
+ BUG FIXES
+
+  * Ignore filemode when building index when core.filemode
+    is false.
+    (Koen Martens)
+
+  * Initialize core.filemode configuration setting by
+    probing the filesystem for trustable permissions.
+    (Koen Martens)
+
+  * Fix ``porcelain.reset`` to respect the comittish argument.
+    (Koen Martens)
+
+  * Fix dulwich.porcelain.ls_remote() on Python 3.
+    (#471, Jelmer Vernooĳ)
+
+  * Allow both unicode and byte strings for host paths
+    in dulwich.client. (#435, Jelmer Vernooĳ)
+
+  * Add remote from porcelain.clone. (#466, Jelmer Vernooĳ)
+
+  * Fix unquoting of credentials before passing to urllib2.
+    (#475, Volodymyr Holovko)
+
+  * Cope with submodules in `build_index_from_tree`.
+    (#477, Jelmer Vernooĳ)
+
+  * Handle deleted files in `get_unstaged_changes`.
+    (#483, Doug Hellmann)
+
+  * Don't overwrite files when they haven't changed in
+    `build_file_from_blob`.
+    (#479, Benoît HERVIER)
+
+  * Check for existence of index file before opening pack.
+    Fixes a race when new packs are being added.
+    (#482, wme)
+
 0.16.1	2016-12-25
 
  BUG FIXES
@@ -26,9 +81,6 @@
     (Jelmer Vernooij)
 
  BUG FIXES
-
-  * Fix ``porcelain.reset`` to respect the comittish argument.
-    (Koen Martens)
 
   * Fix handling of ``Commit.tree`` being set to an actual
     tree object rather than a tree id. (Jelmer Vernooij)

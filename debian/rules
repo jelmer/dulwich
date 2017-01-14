@@ -9,8 +9,7 @@ LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
 pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
 
-pyflavours = python2,python3
-pyflavours += $(shell which pypy >/dev/null && echo ,pypy)
+pyflavours = python2,python3$(shell which pypy >/dev/null && echo -n ,pypy)
 
 %:
 	dh $* --with $(pyflavours) --buildsystem=python_distutils

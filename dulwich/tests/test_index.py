@@ -369,10 +369,10 @@ class BuildIndexTests(TestCase):
                 sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
     def test_norewrite(self):
+        sync = getattr(os, 'sync', lambda: os.system('sync'))
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Populate repo
             filea = Blob.from_string(b'file a')
             filea_path = os.path.join(repo_dir, 'a')
@@ -386,28 +386,26 @@ class BuildIndexTests(TestCase):
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
             # Use sync as metadata can be cached on some FS
-            os.system('sync')
+            sync()
             mtime = os.stat(filea_path).st_mtime
 
             # Test Rewrite
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
-            os.system('sync')
-            self.assertEqual(mtime, 
-                             os.stat(filea_path).st_mtime)
+            sync()
+            self.assertEqual(mtime, os.stat(filea_path).st_mtime)
 
             # Modify content
             with open(filea_path, 'wb') as fh:
                 fh.write(b'test a')
-            os.system('sync')
+            sync()
             mtime = os.stat(filea_path).st_mtime
- 
+
             # Test rewrite
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
-            os.system('sync')
-            self.assertNotEqual(mtime, 
-                                os.stat(filea_path).st_mtime)
+            sync()
+            self.assertNotEqual(mtime, os.stat(filea_path).st_mtime)
 
 
     @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')

@@ -422,26 +422,28 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
     """
+    try:
+        oldstat = os.stat(target_path)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            oldstat = None
+        else:
+            raise
+    contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         # FIXME: This will fail on Windows. What should we do instead?
-        src_path = blob.as_raw_string()
-        try:
-            os.symlink(src_path, target_path)
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                os.unlink(target_path)
-                os.symlink(src_path, target_path)
-            else:
-                raise
+        if oldstat:
+            os.unlink(target_path)
+        os.symlink(contents, target_path)
     else:
-        if os.path.exists(target_path):
+        if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, 'rb') as f:
-                if f.read() == blob.as_raw_string():
+                if f.read() == contents:
                     return
 
         with open(target_path, 'wb') as f:
             # Write out file
-            f.write(blob.as_raw_string())
+            f.write(contents)
 
         if honor_filemode:
             os.chmod(target_path, mode)

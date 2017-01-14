@@ -3,6 +3,7 @@ dulwich (0.16.2-1) UNRELEASED; urgency=medium
   * New upstream release.
   * Drop upstream applied patch 'older-git'.
   * Update homepage to www.dulwich.io.
+  * Drop (now unnecessary) workaround for #799485.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 08 Jan 2017 02:12:51 +0000
 

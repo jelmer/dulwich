@@ -1,4 +1,4 @@
-dulwich (0.16.2-1) UNRELEASED; urgency=medium
+dulwich (0.16.3-1) UNRELEASED; urgency=medium
 
   * New upstream release.
   * Drop upstream applied patch 'older-git'.

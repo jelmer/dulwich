@@ -45,6 +45,14 @@
   * Handle deleted files in `get_unstaged_changes`.
     (#483, Doug Hellmann)
 
+  * Don't overwrite files when they haven't changed in
+    `build_file_from_blob`.
+    (#479, Benoît HERVIER)
+
+  * Check for existence of index file before opening pack.
+    Fixes a race when new packs are being added.
+    (#482, wme)
+
 0.16.1	2016-12-25
 
  BUG FIXES

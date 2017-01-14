@@ -1,3 +1,10 @@
+0.16.3	2016-01-14
+
+ TEST FIXES
+
+  * Remove racy check that relies on clock time changing between writes.
+   (Jelmer Vernooij)
+
 0.16.2	2016-01-14
 
  IMPROVEMENTS

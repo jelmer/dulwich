@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: https://www.dulwich.io/
-Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev, dh-python
+Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev [!hurd-any !m68k !sh4 !x32], dh-python
 Standards-Version: 3.9.8
 X-Python-Version: >= 2.7
 X-Python3-Version: >= 3.2
@@ -48,7 +48,7 @@ Description: Python Git library - Debug Extension
  This package contains the extensions built for the Python debug interpreter.
 
 Package: pypy-dulwich
-Architecture: any
+Architecture: amd64 arm64 armel armhf i386 mips mipsel mips64el ppc64el s390x alpha hppa kfreebsd-any powerpc powerpcspe ppc64 sparc64
 Provides: ${pypy:Provides}
 Depends: ${pypy:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Recommends: pypy-fastimport

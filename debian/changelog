@@ -5,6 +5,8 @@ dulwich (0.16.2-1) UNRELEASED; urgency=medium
   * Update homepage to www.dulwich.io.
   * Drop (now unnecessary) workaround for #799485.
   * Add autopkgtest for python3 testsuite.
+  * Disable pypy-dulwich build on architectures where pypy is not
+    available (hurd-any, m68k, sh4, x32).
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 08 Jan 2017 02:12:51 +0000
 

@@ -421,9 +421,10 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
     :param target_path: Path to write to
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
+    :return: stat object for the file
     """
     try:
-        oldstat = os.stat(target_path)
+        oldstat = os.lstat(target_path)
     except OSError as e:
         if e.errno == errno.ENOENT:
             oldstat = None
@@ -439,7 +440,7 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
         if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, 'rb') as f:
                 if f.read() == contents:
-                    return
+                    return oldstat
 
         with open(target_path, 'wb') as f:
             # Write out file
@@ -447,6 +448,8 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
 
         if honor_filemode:
             os.chmod(target_path, mode)
+
+    return os.lstat(target_path)
 
 
 INVALID_DOTNAMES = (b".git", b".", b"..", b"")
@@ -508,12 +511,12 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
         # FIXME: Merge new index into working tree
         if S_ISGITLINK(entry.mode):
             os.mkdir(full_path)
+            st = os.lstat(full_path)
         else:
             obj = object_store[entry.sha]
-            build_file_from_blob(obj, entry.mode, full_path,
+            st = build_file_from_blob(obj, entry.mode, full_path,
                 honor_filemode=honor_filemode)
         # Add file to index
-        st = os.lstat(full_path)
         if not honor_filemode or S_ISGITLINK(entry.mode):
             # we can not use tuple slicing to build a new tuple,
             # because on windows that will convert the times to

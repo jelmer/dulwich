@@ -335,11 +335,12 @@ def cmd_status(args):
     else:
         gitdir = '.'
     status = porcelain.status(gitdir)
-    if status.staged:
+    if any(names for (kind, names) in status.staged.items()):
         sys.stdout.write("Changes to be committed:\n\n")
         for kind, names in status.staged.items():
             for name in names:
-                sys.stdout.write("\t%s: %s\n" % (kind, name))
+                sys.stdout.write("\t%s: %s\n" % (
+                    kind, name.decode(sys.getfilesystemencoding())))
         sys.stdout.write("\n")
     if status.unstaged:
         sys.stdout.write("Changes not staged for commit:\n\n")

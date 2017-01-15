@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: https://www.dulwich.io/
-Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev [!hurd-any !m68k !sh4 !x32], dh-python
+Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9.20160114), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev [!hurd-any !m68k !sh4 !x32], dh-python
 Standards-Version: 3.9.8
 X-Python-Version: >= 2.7
 X-Python3-Version: >= 3.2
@@ -16,7 +16,6 @@ Package: python-dulwich
 Architecture: any
 Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
-Suggests: python-dulwich-dbg
 Recommends: python-fastimport
 Description: Python Git library
  Dulwich is a Python implementation of the file formats and protocols
@@ -29,23 +28,6 @@ Description: Python Git library
  includes the high performance versions.
  .
  This package contains the module built for Python version 2.x.
-
-Package: python-dulwich-dbg
-Architecture: any
-Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}, python-dbg, python-dulwich (= ${binary:Version})
-Priority: extra
-Section: debug
-Description: Python Git library - Debug Extension
- Dulwich is a Python implementation of the file formats and protocols
- used by the Git version control system. It can currently read from and write
- to existing Git repositories and implements the protocol for pushing and
- receiving packs from remote servers.
- .
- All functionality is available in pure Python, but for improved performance
- replacements of some modules written in C are also available. This package
- includes the high performance versions.
- .
- This package contains the extensions built for the Python debug interpreter.
 
 Package: pypy-dulwich
 Architecture: amd64 arm64 armel armhf i386 mips mipsel mips64el ppc64el s390x alpha hppa kfreebsd-any powerpc powerpcspe ppc64 sparc64
@@ -68,7 +50,6 @@ Package: python3-dulwich
 Architecture: any
 Depends: ${python3:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
-Suggests: python3-dulwich-dbg
 Recommends: python3-fastimport
 Description: Python Git library - Python3 module
  Dulwich is a Python implementation of the file formats and protocols
@@ -81,20 +62,3 @@ Description: Python Git library - Python3 module
  includes the high performance versions.
  .
  This package contains the module built for Python version 3.x.
-
-Package: python3-dulwich-dbg
-Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, python3-dbg, python3-dulwich (= ${binary:Version})
-Priority: extra
-Section: debug
-Description: Python Git library - Python 3 Debug Extension
- Dulwich is a Python implementation of the file formats and protocols
- used by the Git version control system. It can currently read from and write
- to existing Git repositories and implements the protocol for pushing and
- receiving packs from remote servers.
- .
- All functionality is available in pure Python, but for improved performance
- replacements of some modules written in C are also available. This package
- includes the high performance versions.
- .
- This package contains the extensions built for the Python 3 debug interpreter.

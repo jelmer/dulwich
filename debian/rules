@@ -60,10 +60,9 @@ ifneq (,$(findstring pypy,$(pyflavours)))
 endif
 
 override_dh_strip:
-	dh_strip -p python-dulwich --dbg-package=python-dulwich-dbg
-	dh_strip -p python3-dulwich --dbg-package=python3-dulwich-dbg
+	dh_strip -p python-dulwich --dbgsym-migration='python-dulwich-dbg (<< 0.16.4-1)'
+	dh_strip -p python3-dulwich --dbgsym-migration='python3-dulwich-dbg (<< 0.16.4-1)'
 ifneq (,$(findstring pypy,$(pyflavours)))
-	# For the moment, there is no dbg package for pypy-dulwich.
 	dh_strip -p pypy-dulwich
 endif
 

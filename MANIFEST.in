@@ -1,11 +1,10 @@
 include NEWS
 include AUTHORS
 include README.md
-include README.swift
+include README.swift.md
 include Makefile
 include COPYING
-include HACKING
-include CONTRIBUTING
+include CONTRIBUTING.md
 include TODO
 include setup.cfg
 include dulwich/stdint.h
@@ -17,4 +16,3 @@ include dulwich.cfg
 include appveyor.yml
 include .testr.conf
 include .travis.yml
-include relicensing-apachev2.txt

@@ -18,12 +18,20 @@
 # License, Version 2.0.
 #
 
-from contextlib import closing
 from io import BytesIO
 import sys
 import shutil
 import tempfile
 
+try:
+    from urllib import quote as urlquote
+except ImportError:
+    from urllib.parse import quote as urlquote
+
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
 
 import dulwich
 from dulwich import (
@@ -112,7 +120,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertIs(heads, None)
             return []
-        self.client.fetch_pack(b'/', check_heads, None, None)
+        ret = self.client.fetch_pack(b'/', check_heads, None, None)
+        self.assertIs(None, ret)
 
     def test_fetch_pack_ignores_magic_ref(self):
         self.rin.write(
@@ -124,7 +133,8 @@ class GitClientTests(TestCase):
         def check_heads(heads):
             self.assertEquals({}, heads)
             return []
-        self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
+        self.assertIs(None, ret)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_fetch_pack_none(self):
@@ -377,6 +387,22 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('foo.com', c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual('bar/baz', path)
+
+    def test_username_and_port_explicit_unknown_scheme(self):
+        c, path = get_transport_and_path(
+            'unknown://git@server:7999/dply/stuff.git')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('unknown', c.host)
+        self.assertEqual('//git@server:7999/dply/stuff.git', path)
+
+    def test_username_and_port_explicit(self):
+        c, path = get_transport_and_path(
+            'ssh://git@server:7999/dply/stuff.git')
+        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertEqual('git', c.username)
+        self.assertEqual('server', c.host)
+        self.assertEqual(7999, c.port)
+        self.assertEqual('dply/stuff.git', path)
 
     def test_ssh_abspath_explicit(self):
         c, path = get_transport_and_path('git+ssh://foo.com//bar/baz')
@@ -697,8 +723,14 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = {}
-        c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
+        ret = c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
             pack_data=out.write)
+        self.assertEqual({
+            b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/heads/master': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/tags/mytag': b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            b'refs/tags/mytag-packed': b'b0931cadc54336e78a1d980420e3268903b57a50'
+            }, ret)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
             b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
 
@@ -729,7 +761,7 @@ class LocalGitClientTests(TestCase):
 
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
-        with closing(Repo.init_bare(target_path)) as target:
+        with Repo.init_bare(target_path) as target:
             self.send_and_verify(b"master", local, target)
 
     def test_get_refs(self):
@@ -795,6 +827,28 @@ class HttpGitClientTests(TestCase):
         pw_handler = [
             h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
         self.assertEqual(0, len(pw_handler))
+
+    def test_from_parsedurl_on_url_with_quoted_credentials(self):
+        original_username = 'john|the|first'
+        quoted_username = urlquote(original_username)
+
+        original_password = 'Ya#1$2%3'
+        quoted_password = urlquote(original_password)
+
+        url = 'https://{username}:{password}@github.com/jelmer/dulwich'.format(
+            username=quoted_username,
+            password=quoted_password
+        )
+
+        c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
+        self.assertEqual(original_username, c._username)
+        self.assertEqual(original_password, c._password)
+        [pw_handler] = [
+            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+        self.assertEqual(
+            (original_username, original_password),
+            pw_handler.passwd.find_user_password(
+                None, 'https://github.com/jelmer/dulwich'))
 
 
 class TCPGitClientTests(TestCase):

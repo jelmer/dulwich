@@ -131,7 +131,7 @@ class BaseObjectStore(object):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (object, path) tuples
         """
         raise NotImplementedError(self.add_objects)
 
@@ -382,7 +382,8 @@ class PackBasedObjectStore(BaseObjectStore):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over objects, should support __len__.
+        :param objects: Iterable over (object, path) tuples, should support
+            __len__.
         :return: Pack object of the objects written.
         """
         if len(objects) == 0:
@@ -480,9 +481,12 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_files = set()
         for name in pack_dir_contents:
             assert isinstance(name, basestring if sys.version_info[0] == 2 else str)
-            # TODO: verify that idx exists first
             if name.startswith("pack-") and name.endswith(".pack"):
-                pack_files.add(name[:-len(".pack")])
+                # verify that idx exists first (otherwise the pack was not yet fully written)
+                idx_name = os.path.splitext(name)[0] + ".idx"
+                if idx_name in pack_dir_contents:
+                    pack_name = name[:-len(".pack")]
+                    pack_files.add(pack_name)
 
         # Open newly appeared pack files
         for f in pack_files:
@@ -740,7 +744,7 @@ class MemoryObjectStore(BaseObjectStore):
     def add_objects(self, objects):
         """Add a set of objects to this object store.
 
-        :param objects: Iterable over a list of objects.
+        :param objects: Iterable over a list of (object, path) tuples
         """
         for obj, path in objects:
             self.add_object(obj)

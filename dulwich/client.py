@@ -50,8 +50,10 @@ import sys
 
 try:
     from urllib import quote as urlquote
+    from urllib import unquote as urlunquote
 except ImportError:
     from urllib.parse import quote as urlquote
+    from urllib.parse import unquote as urlunquote
 
 try:
     import urllib2
@@ -497,6 +499,12 @@ class GitClient(object):
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
 
+    DEFAULT_ENCODING = 'utf-8'
+
+    def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs):
+        self._remote_path_encoding = path_encoding
+        super(TraditionalGitClient, self).__init__(**kwargs)
+
     def _connect(self, cmd, path):
         """Create a connection to the server.
 
@@ -672,9 +680,9 @@ class TCPGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
-            raise TypeError(path)
+            raise TypeError(cmd)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
         s = None
@@ -772,9 +780,9 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def _connect(self, service, path):
         if type(service) is not bytes:
-            raise TypeError(path)
+            raise TypeError(service)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
         argv = git_command + [service.decode('ascii'), path]
@@ -806,6 +814,13 @@ class LocalGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         return cls(**kwargs)
 
+    @classmethod
+    def _open_repo(cls, path):
+        from dulwich.repo import Repo
+        if not isinstance(path, str):
+            path = path.decode(sys.getfilesystemencoding())
+        return closing(Repo(path))
+
     def send_pack(self, path, determine_wants, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
@@ -825,9 +840,8 @@ class LocalGitClient(GitClient):
         """
         if not progress:
             progress = lambda x: None
-        from dulwich.repo import Repo
 
-        with closing(Repo(path)) as target:
+        with self._open_repo(path)  as target:
             old_refs = target.get_refs()
             new_refs = determine_wants(dict(old_refs))
 
@@ -863,8 +877,7 @@ class LocalGitClient(GitClient):
         :param progress: Optional progress function
         :return: Dictionary with all remote refs (not just those fetched)
         """
-        from dulwich.repo import Repo
-        with closing(Repo(path)) as r:
+        with self._open_repo(path) as r:
             return r.fetch(target, determine_wants=determine_wants,
                            progress=progress)
 
@@ -878,8 +891,7 @@ class LocalGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         :return: Dictionary with all remote refs (not just those fetched)
         """
-        from dulwich.repo import Repo
-        with closing(Repo(path)) as r:
+        with self._open_repo(path) as r:
             objects_iter = r.fetch_objects(determine_wants, graph_walker, progress)
 
             # Did the process short-circuit (e.g. in a stateless RPC call)? Note
@@ -887,12 +899,12 @@ class LocalGitClient(GitClient):
             if objects_iter is None:
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
+            return r.get_refs()
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
-        from dulwich.repo import Repo
 
-        with closing(Repo(path)) as target:
+        with self._open_repo(path) as target:
             return target.get_refs()
 
 
@@ -904,6 +916,7 @@ class SSHVendor(object):
     """A client side SSH implementation."""
 
     def connect_ssh(self, host, command, username=None, port=None):
+        # This function was deprecated in 0.9.1
         import warnings
         warnings.warn(
             "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
@@ -992,9 +1005,9 @@ class SSHGitClient(TraditionalGitClient):
 
     def _connect(self, cmd, path):
         if type(cmd) is not bytes:
-            raise TypeError(path)
+            raise TypeError(cmd)
         if type(path) is not bytes:
-            raise TypeError(path)
+            path = path.encode(self._remote_path_encoding)
         if path.startswith(b"/~"):
             path = path[1:]
         argv = self._get_cmd_path(cmd) + b" '" + path + b"'"
@@ -1053,7 +1066,11 @@ class HttpGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         auth, host = urllib2.splituser(parsedurl.netloc)
         password = parsedurl.password
+        if password is not None:
+            password = urlunquote(password)
         username = parsedurl.username
+        if username is not None:
+            username = urlunquote(username)
         # TODO(jelmer): This also strips the username
         parsedurl = parsedurl._replace(netloc=host)
         return cls(urlparse.urlunparse(parsedurl),
@@ -1272,12 +1289,16 @@ def get_transport_and_path(location, **kwargs):
 
     if ':' in location and not '@' in location:
         # SSH with no user@, zero or one leading slash.
-        (hostname, path) = location.split(':')
+        (hostname, path) = location.split(':', 1)
         return SSHGitClient(hostname, **kwargs), path
-    elif '@' in location and ':' in location:
+    elif ':' in location:
         # SSH with user@host:foo.
-        user_host, path = location.split(':')
-        user, host = user_host.rsplit('@')
+        user_host, path = location.split(':', 1)
+        if '@' in user_host:
+            user, host = user_host.rsplit('@', 1)
+        else:
+            user = None
+            host = user_host
         return SSHGitClient(host, username=user, **kwargs), path
 
     # Otherwise, assume it's a local path.

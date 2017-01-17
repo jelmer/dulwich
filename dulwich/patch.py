@@ -29,6 +29,7 @@ import email.parser
 import time
 
 from dulwich.objects import (
+    Blob,
     Commit,
     S_ISGITLINK,
     )
@@ -152,22 +153,23 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     new_path = patch_filename(new_path, b"b")
     def content(mode, hexsha):
         if hexsha is None:
-            return b''
+            return Blob.from_string(b'')
         elif S_ISGITLINK(mode):
-            return b"Submodule commit " + hexsha + b"\n"
+            return Blob.from_string(b"Submodule commit " + hexsha + b"\n")
         else:
-            return store[hexsha].data
+            return store[hexsha]
 
     def lines(content):
         if not content:
             return []
         else:
-            return content.splitlines(True)
+            return content.splitlines()
     f.writelines(gen_diff_header(
         (old_path, new_path), (old_mode, new_mode), (old_id, new_id)))
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
-    if not diff_binary and (is_binary(old_content) or is_binary(new_content)):
+    if not diff_binary and (
+            is_binary(old_content.data) or is_binary(new_content.data)):
         f.write(b"Binary files " + old_path + b" and " + new_path + b" differ\n")
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
@@ -215,7 +217,7 @@ def write_blob_diff(f, old_file, new_file):
     new_path = patch_filename(new_path, b"b")
     def lines(blob):
         if blob is not None:
-            return blob.data.splitlines(True)
+            return blob.splitlines()
         else:
             return []
     f.writelines(gen_diff_header(

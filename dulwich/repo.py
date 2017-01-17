@@ -32,6 +32,7 @@ from io import BytesIO
 import errno
 import os
 import sys
+import stat
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -101,6 +102,8 @@ BASE_DIRECTORIES = [
     ["hooks"],
     ["info"]
     ]
+
+DEFAULT_REF = b'refs/heads/master'
 
 
 def parse_graftpoints(graftpoints):
@@ -178,6 +181,13 @@ class BaseRepo(object):
         self._graftpoints = {}
         self.hooks = {}
 
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        raise NotImplementedError(self._determine_file_mode)
+
     def _init_files(self, bare):
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
@@ -185,7 +195,11 @@ class BaseRepo(object):
         f = BytesIO()
         cf = ConfigFile()
         cf.set(b"core", b"repositoryformatversion", b"0")
-        cf.set(b"core", b"filemode", b"true")
+        if self._determine_file_mode():
+            cf.set(b"core", b"filemode", True)
+        else:
+            cf.set(b"core", b"filemode", False)
+
         cf.set(b"core", b"bare", bare)
         cf.set(b"core", b"logallrefupdates", True)
         cf.write_to_file(f)
@@ -743,6 +757,26 @@ class Repo(BaseRepo):
 
         return self._commondir
 
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        fname = os.path.join(self.path, '.probe-permissions')
+        with open(fname, 'w') as f:
+            f.write('')
+
+        st1 = os.lstat(fname)
+        os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        st2 = os.lstat(fname)
+
+        os.unlink(fname)
+
+        mode_differs = st1.st_mode != st2.st_mode
+        st2_has_exec = (st2.st_mode & stat.S_IXUSR) != 0
+
+        return mode_differs and st2_has_exec
+
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
@@ -853,11 +887,17 @@ class Repo(BaseRepo):
         target.refs.import_refs(
             b'refs/tags', self.refs.as_dict(b'refs/tags'))
         try:
-            target.refs.add_if_new(
-                b'refs/heads/master',
-                self.refs[b'refs/heads/master'])
+            target.refs.add_if_new(DEFAULT_REF, self.refs[DEFAULT_REF])
         except KeyError:
             pass
+        target_config = target.get_config()
+        encoded_path = self.path
+        if not isinstance(encoded_path, bytes):
+            encoded_path = encoded_path.encode(sys.getfilesystemencoding())
+        target_config.set((b'remote', b'origin'), b'url', encoded_path)
+        target_config.set((b'remote', b'origin'), b'fetch',
+            b'+refs/heads/*:refs/remotes/origin/*')
+        target_config.write_to_path()
 
         # Update target head
         head_chain, head_sha = self.refs.follow(b'HEAD')
@@ -940,7 +980,7 @@ class Repo(BaseRepo):
             os.mkdir(os.path.join(path, *d))
         DiskObjectStore.init(os.path.join(path, OBJECTDIR))
         ret = cls(path)
-        ret.refs.set_symbolic_ref(b'HEAD', b"refs/heads/master")
+        ret.refs.set_symbolic_ref(b'HEAD', DEFAULT_REF)
         ret._init_files(bare)
         return ret
 
@@ -1017,6 +1057,12 @@ class Repo(BaseRepo):
         """Close any files opened by this repository."""
         self.object_store.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 class MemoryRepo(BaseRepo):
     """Repo that stores refs, objects, and named files in memory.
@@ -1031,6 +1077,13 @@ class MemoryRepo(BaseRepo):
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
+
+    def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        :return: True if permissions can be trusted, False otherwise.
+        """
+        return sys.platform != 'win32'
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.

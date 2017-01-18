@@ -22,6 +22,7 @@
 def test_suite():
     import unittest
     names = [
+        'release_robot',
         'swift',
         ]
     module_names = ['dulwich.contrib.test_' + name for name in names]

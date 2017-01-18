@@ -22,18 +22,13 @@
 import json
 import os
 import re
+import shutil
 import unittest
 
-import dulwich
+from dulwich import porcelain
 from dulwich.contrib import release_robot
 
-BASEDIR = os.path.dirname(__file__)  # this directory
-# path to dulwich tag test data, also in this folder
-DULWICH_TAG_TEST_DATA = os.path.join(BASEDIR, 'dulwich_tag_test.dat')
-with open(DULWICH_TAG_TEST_DATA, 'r') as f:
-    DULWICH_TAG_TEST_DATA = json.load(f)  # dictionary of tags
-# Git repo for dulwich project
-PROJDIR = os.path.abspath(os.path.dirname(os.path.dirname(dulwich.__file__)))
+BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 
 
 class TagPatternTests(unittest.TestCase):
@@ -49,18 +44,37 @@ class TagPatternTests(unittest.TestCase):
             m = re.match(release_robot.PATTERN, tc)
             self.assertEqual(m.group(1), version)
 
+
+class DulwichTagsTest(unittest.TestCase):
+
+    # Git repo for dulwich project
+    projdir = os.path.join(BASEDIR, 'dulwich_test_repo')
+    src = 'git@github.com:jelmer/dulwich.git'
+    # path to dulwich tag test data, also in this folder
+    with open(os.path.join(BASEDIR, 'dulwich_tag_test.dat'), 'r') as testfile:
+        dulwich_tag_test_data = json.load(testfile)  # dictionary of tags
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo = porcelain.clone(source=cls.src, target=cls.projdir)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.repo.close()
+        shutil.rmtree(cls.projdir)
+
     def test_dulwich_tags(self):
-        tags = release_robot.get_recent_tags(PROJDIR)  # get test tags
-        self.assertEqual(len(DULWICH_TAG_TEST_DATA), 95)  # number of test tags
+        tags = release_robot.get_recent_tags(self.projdir)  # get test tags
+        self.assertEqual(len(self.dulwich_tag_test_data), 95)  # number of test tags
         for tag, metadata in tags[-95:]:
-            test_data = DULWICH_TAG_TEST_DATA[tag]
+            test_data = self.dulwich_tag_test_data[tag]
             # test commit meta data
             self.assertEqual(metadata[0].isoformat(), test_data[0])  # date
             self.assertEqual(metadata[1], test_data[1])  # id
             # test author, encode unicode as utf-8 for comparison
             self.assertEqual(metadata[2], test_data[2].encode('utf-8'))
             # test tag meta
-            if None in test_data[3]:
+            if not test_data[3]:
                 # skip since no tag meta data
                 continue
             # tag date

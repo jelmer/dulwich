@@ -89,9 +89,10 @@ def get_recent_tags(projdir=PROJDIR):
     :param projdir: path to ``.git``
     :returns: list of tags sorted by commit time from newest to oldest
 
-    Each tag in the list contains the tag name, commit meta and tag meta if the
-    tag is annotated. The commit meta contains the commit time, commit id and
-    author. The tag meta has the tag time, tag id and tag name. Time is in UTC.
+    Each tag in the list contains the tag name, commit time, commit id, author
+    and any tag meta. If a tag isn't annotated, then its tag meta is ``None``.
+    Otherwise the tag meta is a tuple containing the tag time, tag id and tag
+    name. Time is in UTC.
     """
     with Repo(projdir) as project:  # dulwich repository object
         refs = project.get_refs()  # dictionary of refs and their SHA-1 values
@@ -111,7 +112,7 @@ def get_recent_tags(projdir=PROJDIR):
                 commit = obj.object  # a tuple (commit class, commit id)
             except AttributeError:
                 commit = obj
-                tag_meta = (None, None, None)
+                tag_meta = None
             else:
                 tag_meta = (
                     datetime.datetime(*time.gmtime(obj.tag_time)[:6]),

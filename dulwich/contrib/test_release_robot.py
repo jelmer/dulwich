@@ -19,21 +19,51 @@
 
 """Tests for release_robot."""
 
+import json
+import os
 import re
 import unittest
 
-from dulwich.contrib.release_robot import PATTERN
+import dulwich
+from dulwich.contrib import release_robot
+
+BASEDIR = os.path.dirname(__file__)  # this directory
+# path to dulwich tag test data, also in this folder
+DULWICH_TAG_TEST_DATA = os.path.join(BASEDIR, 'dulwich_tag_test.dat')
+with open(DULWICH_TAG_TEST_DATA, 'r') as f:
+    DULWICH_TAG_TEST_DATA = json.load(f)  # dictionary of tags
+# Git repo for dulwich project
+PROJDIR = os.path.abspath(os.path.dirname(os.path.dirname(dulwich.__file__)))
 
 
 class TagPatternTests(unittest.TestCase):
 
     def test_tag_pattern(self):
         test_cases = {
-            '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3', 'Release-0.3': '0.3',
-            'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1', 'v0.3-rc.1': '0.3-rc.1',
-            'version 0.3': '0.3', 'version_0.3_rc_1': '0.3_rc_1', 'v1': '1',
-            '0.3rc1': '0.3rc1'
+            '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3',
+            'Release-0.3': '0.3', 'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1',
+            'v0.3-rc.1': '0.3-rc.1', 'version 0.3': '0.3',
+            'version_0.3_rc_1': '0.3_rc_1', 'v1': '1', '0.3rc1': '0.3rc1'
         }
         for tc, version in test_cases.items():
-            m = re.match(PATTERN, tc)
+            m = re.match(release_robot.PATTERN, tc)
             self.assertEqual(m.group(1), version)
+
+    def test_dulwich_tags(self):
+        tags = release_robot.get_recent_tags(PROJDIR)  # get test tags
+        self.assertEqual(len(DULWICH_TAG_TEST_DATA), 95)  # number of test tags
+        for tag, metadata in tags[-95:]:
+            test_data = DULWICH_TAG_TEST_DATA[tag]
+            # test commit meta data
+            self.assertEqual(metadata[0].isoformat(), test_data[0])  # date
+            self.assertEqual(metadata[1], test_data[1])  # id
+            # test author, encode unicode as utf-8 for comparison
+            self.assertEqual(metadata[2], test_data[2].encode('utf-8'))
+            # test tag meta
+            if None in test_data[3]:
+                # skip since no tag meta data
+                continue
+            # tag date
+            self.assertEqual(metadata[3][0].isoformat(), test_data[3][0])
+            self.assertEqual(metadata[3][1], test_data[3][1])  # tag id
+            self.assertEqual(metadata[3][2], test_data[3][2])  # tag name

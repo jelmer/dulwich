@@ -23,16 +23,52 @@ Alternate to `Versioneer <https://pypi.python.org/pypi/versioneer/>`_ using
 `Dulwich <https://pypi.python.org/pypi/dulwich>`_ to sort tags by time from
 newest to oldest.
 
-Import this module into the package ``__init__.py`` and then set ``__version__``
-as follows::
+Copy the following into the package ``__init__.py`` module::
 
     from dulwich.contrib.release_robot import get_current_version
+    from dulwich.repo import NotGitRepository
+    import os
+    import importlib
 
-    __version__ = get_current_version()
-    # other dunder classes like __author__, etc.
+    BASEDIR = os.path.dirname(__file__)  # this directory
+    VER_FILE = 'version'  # name of file to store version
+    # use release robot to try to get current Git tag
+    try:
+        GIT_TAG = get_current_version(os.path.dirname(BASEDIR))
+    except NotGitRepository:
+        GIT_TAG = None
+    # check version file
+    try:
+        version = importlib.import_module('%s.%s' % (__name__, VER_FILE))
+    except ImportError:
+        VERSION = None
+    else:
+        VERSION = version.VERSION
+    # update version file if it differs from Git tag
+    if GIT_TAG is not None and VERSION != GIT_TAG:
+        with open(os.path.join(BASEDIR, VER_FILE + '.py'), 'w') as vf:
+            vf.write('VERSION = "%s"\n' % GIT_TAG)
+    else:
+        GIT_TAG = VERSION  # if Git tag is none use version file
+    VERSION = GIT_TAG  # version
+
+    __version__ = VERSION
+    # other dunder constants like __author__, __email__, __url__, etc.
 
 This example assumes the tags have a leading "v" like "v0.3", and that the
-``.git`` folder is in the project folder that containts the package folder.
+``.git`` folder is in a project folder that containts the package folder.
+
+EG::
+
+    * project
+    |
+    * .git
+    |
+    +-* package
+      |
+      * __init__.py  <-- put __version__ here
+
+
 """
 
 from dulwich.repo import Repo
@@ -43,8 +79,7 @@ import re
 import sys
 
 # CONSTANTS
-DIRNAME = os.path.abspath(os.path.dirname(__file__))
-PROJDIR = os.path.dirname(DIRNAME)
+PROJDIR = '.'
 PATTERN = '[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)'
 
 
@@ -52,45 +87,61 @@ def get_recent_tags(projdir=PROJDIR):
     """Get list of tags in order from newest to oldest and their datetimes.
 
     :param projdir: path to ``.git``
-    :returns: list of (tag, [datetime, commit, author]) sorted from new to old
+    :returns: list of tags sorted by commit time from newest to oldest
+
+    Each tag in the list contains the tag name, commit meta and tag meta if the
+    tag is annotated. The commit meta contains the commit time, commit id and
+    author. The tag meta has the tag time, tag id and tag name. Time is in UTC.
     """
-    project = Repo(projdir)  # dulwich repository object
-    refs = project.get_refs()  # dictionary of refs and their SHA-1 values
-    tags = {}  # empty dictionary to hold tags, commits and datetimes
-    # iterate over refs in repository
-    for key, value in refs.items():
-        obj = project.get_object(value)  # dulwich object from SHA-1
-        # check if object is tag
-        if obj.type_name != 'tag':
-            # skip ref if not a tag
-            continue
-        # strip the leading text from "refs/tag/<tag name>" to get "tag name"
-        _, tag = key.rsplit('/', 1)
-        # check if tag object is commit, altho it should always be true
-        if obj.object[0].type_name == 'commit':
-            commit = project.get_object(obj.object[1])  # commit object
+    with Repo(projdir) as project:  # dulwich repository object
+        refs = project.get_refs()  # dictionary of refs and their SHA-1 values
+        tags = {}  # empty dictionary to hold tags, commits and datetimes
+        # iterate over refs in repository
+        for key, value in refs.items():
+            obj = project.get_object(value)  # dulwich object from SHA-1
+            # don't just check if object is "tag" b/c it could be a "commit"
+            # instead check if "tags" is in the ref-name
+            if 'tags' not in key:
+                # skip ref if not a tag
+                continue
+            # strip the leading text from refs to get "tag name"
+            _, tag = key.rsplit('/', 1)
+            # check if tag object is "commit" or "tag" pointing to a "commit"
+            try:
+                commit = obj.object  # a tuple (commit class, commit id)
+            except AttributeError:
+                commit = obj
+                tag_meta = (None, None, None)
+            else:
+                tag_meta = (
+                    datetime.datetime(*time.gmtime(obj.tag_time)[:6]),
+                    obj.id,
+                    obj.name
+                )
+                commit = project.get_object(commit[1])  # commit object
             # get tag commit datetime, but dulwich returns seconds since
             # beginning of epoch, so use Python time module to convert it to
             # timetuple then convert to datetime
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
                 commit.id,
-                commit.author
+                commit.author,
+                tag_meta
             ]
 
     # return list of tags sorted by their datetimes from newest to oldest
     return sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
 
-def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
+def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
     """Return the most recent tag, using an options regular expression pattern.
 
     The default pattern will strip any characters preceding the first semantic
     version. *EG*: "Release-0.2.1-rc.1" will be come "0.2.1-rc.1". If no match
     is found, then the most recent tag is return without modification.
 
-    :param pattern: regular expression pattern with group that matches version
     :param projdir: path to ``.git``
+    :param pattern: regular expression pattern with group that matches version
     :param logger: a Python logging instance to capture exception
     :returns: tag matching first group in regular expression pattern
     """
@@ -107,18 +158,6 @@ def get_current_version(pattern=PATTERN, projdir=PROJDIR, logger=None):
             logger.exception(err)
         return tag
     return current_version
-
-
-def test_tag_pattern():
-    test_cases = {
-        '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3', 'Release-0.3': '0.3',
-        'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1', 'v0.3-rc.1': '0.3-rc.1',
-        'version 0.3': '0.3', 'version_0.3_rc_1': '0.3_rc_1', 'v1': '1',
-        '0.3rc1': '0.3rc1'
-    }
-    for tc, version in test_cases.iteritems():
-        m = re.match(PATTERN, tc)
-        assert m.group(1) == version
 
 
 if __name__ == '__main__':

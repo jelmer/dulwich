@@ -20,35 +20,42 @@
 """Tests for release_robot."""
 
 import json
+import logging
 import os
 import re
 import shutil
+import tempfile
 import unittest
+import zipfile
 
-from dulwich import porcelain
 from dulwich.contrib import release_robot
 
+logging.basicConfig(level=logging.DEBUG)
+LOGGER = logging.getLogger(__name__)
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 
 
 class TagPatternTests(unittest.TestCase):
+    """test tag patterns"""
 
     def test_tag_pattern(self):
+        """test tag patterns"""
         test_cases = {
             '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3',
             'Release-0.3': '0.3', 'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1',
             'v0.3-rc.1': '0.3-rc.1', 'version 0.3': '0.3',
             'version_0.3_rc_1': '0.3_rc_1', 'v1': '1', '0.3rc1': '0.3rc1'
         }
-        for tc, version in test_cases.items():
-            m = re.match(release_robot.PATTERN, tc)
-            self.assertEqual(m.group(1), version)
+        for testcase, version in test_cases.items():
+            matches = re.match(release_robot.PATTERN, testcase)
+            self.assertEqual(matches.group(1), version)
 
 
-class DulwichTagsTest(unittest.TestCase):
+class GetRecentTagsTest(unittest.TestCase):
+    """test get recent tags"""
 
     # Git repo for dulwich project
-    projdir = os.path.join(BASEDIR, 'dulwich_test_repo')
+    test_repo = os.path.join(BASEDIR, 'dulwich_test_repo.zip')
     src = 'git@github.com:jelmer/dulwich.git'
     # path to dulwich tag test data, also in this folder
     with open(os.path.join(BASEDIR, 'dulwich_tag_test.dat'), 'r') as testfile:
@@ -56,18 +63,21 @@ class DulwichTagsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.repo = porcelain.clone(source=cls.src, target=cls.projdir)
+        cls.projdir = tempfile.mkdtemp()
+        LOGGER.debug('temp dir: %s', cls.projdir)
+        with zipfile.ZipFile(cls.test_repo, 'r') as myzip:
+            myzip.extractall(cls.projdir)
 
     @classmethod
     def tearDownClass(cls):
-        cls.repo.close()
         shutil.rmtree(cls.projdir)
 
-    def test_dulwich_tags(self):
+    def test_get_recent_tags(self):
+        """test get recent tags"""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
-        self.assertEqual(len(self.dulwich_tag_test_data), 95)  # number of test tags
-        for tag, metadata in tags[-95:]:
+        for tag, metadata in tags:
             test_data = self.dulwich_tag_test_data[tag]
+            LOGGER.debug('test data:\n%r', test_data)
             # test commit meta data
             self.assertEqual(metadata[0].isoformat(), test_data[0])  # date
             self.assertEqual(metadata[1], test_data[1])  # id

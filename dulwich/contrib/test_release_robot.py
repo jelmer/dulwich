@@ -20,7 +20,6 @@
 """Tests for release_robot."""
 
 import json
-import logging
 import os
 import re
 import shutil
@@ -30,8 +29,6 @@ import zipfile
 
 from dulwich.contrib import release_robot
 
-logging.basicConfig(level=logging.DEBUG)
-LOGGER = logging.getLogger(__name__)
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 
 
@@ -64,7 +61,6 @@ class GetRecentTagsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.projdir = tempfile.mkdtemp()
-        LOGGER.debug('temp dir: %s', cls.projdir)
         with zipfile.ZipFile(cls.test_repo, 'r') as myzip:
             myzip.extractall(cls.projdir)
 
@@ -76,18 +72,15 @@ class GetRecentTagsTest(unittest.TestCase):
         """test get recent tags"""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:
-            test_data = self.dulwich_tag_test_data[tag]
-            LOGGER.debug('test data:\n%r', test_data)
-            # test commit meta data
-            self.assertEqual(metadata[0].isoformat(), test_data[0])  # date
-            self.assertEqual(metadata[1], test_data[1])  # id
-            # test author, encode unicode as utf-8 for comparison
-            self.assertEqual(metadata[2], test_data[2].encode('utf-8'))
-            # test tag meta
+            test_data = self.dulwich_tag_test_data[tag]  # test data tag
+            # test commit date, id and author name
+            self.assertEqual(metadata[0].isoformat(), test_data[0])
+            self.assertEqual(metadata[1], test_data[1])
+            self.assertEqual(metadata[2], test_data[2])
+            # skip unannotated tags
             if not test_data[3]:
-                # skip since no tag meta data
                 continue
-            # tag date
+            # tag date, id and name
             self.assertEqual(metadata[3][0].isoformat(), test_data[3][0])
-            self.assertEqual(metadata[3][1], test_data[3][1])  # tag id
-            self.assertEqual(metadata[3][2], test_data[3][2])  # tag name
+            self.assertEqual(metadata[3][1], test_data[3][1])
+            self.assertEqual(metadata[3][2], test_data[3][2])

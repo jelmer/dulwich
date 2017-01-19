@@ -19,17 +19,23 @@
 
 """Tests for release_robot."""
 
-import json
+import datetime
 import os
 import re
 import shutil
 import tempfile
+import time
 import unittest
-import zipfile
 
 from dulwich.contrib import release_robot
+from dulwich.repo import Repo
+from dulwich.tests.utils import make_commit, make_tag
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
+
+
+def gmtime_to_datetime(gmt):
+    return datetime.datetime(*time.gmtime(gmt)[:6])
 
 
 class TagPatternTests(unittest.TestCase):
@@ -53,34 +59,69 @@ class GetRecentTagsTest(unittest.TestCase):
 
     # Git repo for dulwich project
     test_repo = os.path.join(BASEDIR, 'dulwich_test_repo.zip')
-    src = 'git@github.com:jelmer/dulwich.git'
-    # path to dulwich tag test data, also in this folder
-    with open(os.path.join(BASEDIR, 'dulwich_tag_test.dat'), 'r') as testfile:
-        dulwich_tag_test_data = json.load(testfile)  # dictionary of tags
+    committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
+    test_tags = [b'v0.1a', b'v0.1']
+    tag_test_data = {
+        test_tags[0]: [1484788003, b'0' * 40, None],
+        test_tags[1]: [1484788314, b'1' * 40, (1484788401, b'2' * 40)]
+    }
 
     @classmethod
     def setUpClass(cls):
-        cls.projdir = tempfile.mkdtemp()
-        with zipfile.ZipFile(cls.test_repo, 'r') as myzip:
-            myzip.extractall(cls.projdir)
+        cls.projdir = tempfile.mkdtemp()  # temporary project directory
+        cls.repo = Repo.init(cls.projdir)  # test repo
+        obj_store = cls.repo.object_store  # test repo object store
+        # commit 1 ('2017-01-19T01:06:43')
+        cls.c1 = make_commit(
+            id=cls.tag_test_data[cls.test_tags[0]][1],
+            commit_time=cls.tag_test_data[cls.test_tags[0]][0],
+            message=b'unannotated tag',
+            author=cls.committer
+        )
+        obj_store.add_object(cls.c1)
+        # tag 1: unannotated
+        cls.t1 = cls.test_tags[0]
+        cls.repo[b'refs/tags/' + cls.t1] = cls.c1.id  # add unannotated tag
+        # commit 2 ('2017-01-19T01:11:54')
+        cls.c2 = make_commit(
+            id=cls.tag_test_data[cls.test_tags[1]][1],
+            commit_time=cls.tag_test_data[cls.test_tags[1]][0],
+            message=b'annotated tag',
+            parents=[cls.c1.id],
+            author=cls.committer
+        )
+        obj_store.add_object(cls.c2)
+        # tag 2: annotated ('2017-01-19T01:13:21')
+        cls.t2 = make_tag(
+            cls.c2,
+            id=cls.tag_test_data[cls.test_tags[1]][2][1],
+            name=cls.test_tags[1],
+            tag_time=cls.tag_test_data[cls.test_tags[1]][2][0]
+        )
+        obj_store.add_object(cls.t2)
+        cls.repo[b'refs/heads/master'] = cls.c2.id
+        cls.repo[b'refs/tags/' + cls.t2.name] = cls.t2.id  # add annotated tag
 
     @classmethod
     def tearDownClass(cls):
+        cls.repo.close()
         shutil.rmtree(cls.projdir)
 
     def test_get_recent_tags(self):
         """test get recent tags"""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:
-            test_data = self.dulwich_tag_test_data[tag]  # test data tag
+            tag = tag.encode('utf-8')
+            test_data = self.tag_test_data[tag]  # test data tag
             # test commit date, id and author name
-            self.assertEqual(metadata[0].isoformat(), test_data[0])
-            self.assertEqual(metadata[1], test_data[1])
-            self.assertEqual(metadata[2], test_data[2])
+            self.assertEqual(metadata[0], gmtime_to_datetime(test_data[0]))
+            self.assertEqual(metadata[1].encode('utf-8'), test_data[1])
+            self.assertEqual(metadata[2].encode('utf-8'), self.committer)
             # skip unannotated tags
-            if not test_data[3]:
+            tag_obj = test_data[2]
+            if not tag_obj:
                 continue
             # tag date, id and name
-            self.assertEqual(metadata[3][0].isoformat(), test_data[3][0])
-            self.assertEqual(metadata[3][1], test_data[3][1])
-            self.assertEqual(metadata[3][2], test_data[3][2])
+            self.assertEqual(metadata[3][0], gmtime_to_datetime(tag_obj[0]))
+            self.assertEqual(metadata[3][1].encode('utf-8'), tag_obj[1])
+            self.assertEqual(metadata[3][2].encode('utf-8'), tag)

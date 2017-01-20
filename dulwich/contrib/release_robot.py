@@ -26,34 +26,7 @@ newest to oldest.
 Copy the following into the package ``__init__.py`` module::
 
     from dulwich.contrib.release_robot import get_current_version
-    from dulwich.repo import NotGitRepository
-    import os
-    import importlib
-
-    BASEDIR = os.path.dirname(__file__)  # this directory
-    VER_FILE = 'version'  # name of file to store version
-    # use release robot to try to get current Git tag
-    try:
-        GIT_TAG = get_current_version(os.path.dirname(BASEDIR))
-    except NotGitRepository:
-        GIT_TAG = None
-    # check version file
-    try:
-        version = importlib.import_module('%s.%s' % (__name__, VER_FILE))
-    except ImportError:
-        VERSION = None
-    else:
-        VERSION = version.VERSION
-    # update version file if it differs from Git tag
-    if GIT_TAG is not None and VERSION != GIT_TAG:
-        with open(os.path.join(BASEDIR, VER_FILE + '.py'), 'w') as vf:
-            vf.write('VERSION = "%s"\n' % GIT_TAG)
-    else:
-        GIT_TAG = VERSION  # if Git tag is none use version file
-    VERSION = GIT_TAG  # version
-
-    __version__ = VERSION
-    # other dunder constants like __author__, __email__, __url__, etc.
+    __version__ = get_current_version()
 
 This example assumes the tags have a leading "v" like "v0.3", and that the
 ``.git`` folder is in a project folder that containts the package folder.

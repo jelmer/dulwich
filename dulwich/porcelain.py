@@ -49,8 +49,6 @@ These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
 """
 
-__docformat__ = 'restructuredText'
-
 from collections import namedtuple
 from contextlib import (
     closing,

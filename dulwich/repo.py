@@ -750,7 +750,7 @@ class Repo(BaseRepo):
     def commondir(self):
         """Return the path of the common directory.
 
-        For a main working tree, it is identical to `controldir()`.
+        For a main working tree, it is identical to controldir().
 
         For a linked working tree, it is the control directory of the
         main working tree."""

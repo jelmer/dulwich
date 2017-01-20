@@ -41,8 +41,10 @@ https://www.dulwich.io/apidocs
 Help
 ----
 
-There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
-https://launchpad.net/~dulwich-users.
+There is a #dulwich IRC channel on Freenode, and
+[dulwich-announce](https://groups.google.com/forum/#!forum/dulwich-announce)
+and [dulwich-discuss](https://groups.google.com/forum/#!forum/dulwich-announce)
+mailing lists.
 
 Supported versions of Python
 ----------------------------

@@ -368,8 +368,8 @@ class BuildIndexTests(TestCase):
             self.assertEqual(['d'],
                 sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
+    @skipIf(not getattr(os, 'sync', None), 'Requires sync support')
     def test_norewrite(self):
-        sync = getattr(os, 'sync', lambda: os.system('sync'))
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
@@ -386,25 +386,25 @@ class BuildIndexTests(TestCase):
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
             # Use sync as metadata can be cached on some FS
-            sync()
+            os.sync()
             mtime = os.stat(filea_path).st_mtime
 
             # Test Rewrite
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
-            sync()
+            os.sync()
             self.assertEqual(mtime, os.stat(filea_path).st_mtime)
 
             # Modify content
             with open(filea_path, 'wb') as fh:
                 fh.write(b'test a')
-            sync()
+            os.sync()
             mtime = os.stat(filea_path).st_mtime
 
             # Test rewrite
             build_index_from_tree(repo.path, repo.index_path(),
                                   repo.object_store, tree.id)
-            sync()
+            os.sync()
             with open(filea_path, 'rb') as fh:
                 self.assertEqual(b'file a', fh.read())
 

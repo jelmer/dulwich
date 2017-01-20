@@ -38,8 +38,6 @@ Known capabilities that are not supported:
  * include-tag
 """
 
-__docformat__ = 'restructuredText'
-
 from contextlib import closing
 from io import BytesIO, BufferedReader
 import dulwich

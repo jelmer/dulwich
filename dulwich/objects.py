@@ -655,6 +655,9 @@ class Tag(ShaFile):
 
     def __init__(self):
         super(Tag, self).__init__()
+        self._tagger = None
+        self._tag_time = None
+        self._tag_timezone = None
         self._tag_timezone_neg_utc = False
 
     @classmethod
@@ -714,6 +717,9 @@ class Tag(ShaFile):
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
+        self._tag_time = None
+        self._tag_timezone = None
+        self._tag_timezone_neg_utc = False
         for field, value in _parse_message(chunks):
             if field == _OBJECT_HEADER:
                 self._object_sha = value

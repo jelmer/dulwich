@@ -918,6 +918,7 @@ class TagParseTests(ShaFileCheckTests):
         x.set_raw_string(self.make_tag_text(tagger=None))
         self.assertEqual(None, x.tagger)
         self.assertEqual(b'v2.6.22-rc7', x.name)
+        self.assertEqual(None, x.tag_time)
 
     def test_parse_no_message(self):
         x = Tag()

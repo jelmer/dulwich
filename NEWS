@@ -5,6 +5,11 @@
  * Skip test that requires sync to synchronize filesystems if os.sync is
    not available. (Koen Martens)
 
+ IMPROVEMENTS
+
+ * Implement MemoryRepo.{set_description,get_description}.
+   (Jelmer Vernooĳ)
+
 0.16.3	2016-01-14
 
  TEST FIXES

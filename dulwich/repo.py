@@ -1077,6 +1077,13 @@ class MemoryRepo(BaseRepo):
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
+        self._description = None
+
+    def set_description(self, description):
+        self._description = description
+
+    def get_description(self):
+        return self._description
 
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
@@ -1121,13 +1128,6 @@ class MemoryRepo(BaseRepo):
         :return: `ConfigFile` object.
         """
         return self._config
-
-    def get_description(self):
-        """Retrieve the repository description.
-
-        This defaults to None, for no description.
-        """
-        return None
 
     @classmethod
     def init_bare(cls, objects, refs):

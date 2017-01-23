@@ -98,6 +98,15 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, False)
 
 
+class MemoryRepoTests(TestCase):
+
+    def test_set_description(self):
+        r = MemoryRepo.init_bare([], {})
+        description = b"Some description"
+        r.set_description(description)
+        self.assertEqual(description, r.get_description())
+
+
 class RepositoryRootTests(TestCase):
 
     def mkdtemp(self):

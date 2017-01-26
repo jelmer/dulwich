@@ -850,6 +850,10 @@ class Repo(BaseRepo):
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
                 fs_path = fs_path.encode(sys.getfilesystemencoding())
+            if os.path.isabs(fs_path):
+                raise ValueError(
+                    "path %r should be relative to "
+                    "repository root, not absolute" % fs_path)
             tree_path = _fs_to_tree_path(fs_path)
             full_path = os.path.join(root_path_bytes, fs_path)
             try:
@@ -1044,7 +1048,7 @@ class Repo(BaseRepo):
     def init_bare(cls, path):
         """Create a new bare repository.
 
-        ``path`` should already exist and be an emty directory.
+        ``path`` should already exist and be an empty directory.
 
         :param path: Path to create bare repository in
         :return: a `Repo` instance

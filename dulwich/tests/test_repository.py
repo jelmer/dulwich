@@ -813,6 +813,11 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual([self._root_commit], r[commit_sha].parents)
         self.assertEqual(old_refs, r.get_refs())
 
+    def test_stage_absolute(self):
+        r = self._repo
+        os.remove(os.path.join(r.path, 'a'))
+        self.assertRaises(ValueError, r.stage, [os.path.join(r.path, 'a')])
+
     def test_stage_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))

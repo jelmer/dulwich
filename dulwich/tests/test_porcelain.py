@@ -230,6 +230,14 @@ class AddTests(PorcelainTestCase):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
         porcelain.add(self.repo.path, paths=["foo"])
+        self.assertIn("foo", self.repo.open_index())
+
+    def test_add_file_absolute_path(self):
+        # Absolute paths are (not yet) supported
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        porcelain.add(self.repo, paths=[os.path.join(self.repo.path, "foo")])
+        self.assertIn("foo", self.repo.open_index())
 
 
 class RemoveTests(PorcelainTestCase):

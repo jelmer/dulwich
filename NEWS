@@ -10,6 +10,10 @@
  * Implement MemoryRepo.{set_description,get_description}.
    (Jelmer Vernooĳ)
 
+ * Raise exception in Repo.stage() when absolute paths are
+   passed in. Allow passing in relative paths to
+   porcelain.add().(Jelmer Vernooij)
+
 0.16.3	2016-01-14
 
  TEST FIXES

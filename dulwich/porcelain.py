@@ -304,7 +304,6 @@ def add(repo=".", paths=None):
     :param repo: Repository for the files
     :param paths: Paths to add.  No value passed stages all modified files.
     """
-    # FIXME: Support patterns, directories.
     with open_repo_closing(repo) as r:
         if not paths:
             # If nothing is specified, add all non-ignored files.
@@ -315,7 +314,18 @@ def add(repo=".", paths=None):
                     dirnames.remove('.git')
                 for filename in filenames:
                     paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-        r.stage(paths)
+        # TODO(jelmer): Possibly allow passing in absolute paths?
+        relpaths = []
+        if not isinstance(paths, list):
+            paths = [paths]
+        for p in paths:
+            # FIXME: Support patterns, directories.
+            if os.path.isabs(p) and p.startswith(repo.path):
+                relpath = os.path.relpath(p, repo.path)
+            else:
+                relpath = p
+            relpaths.append(relpath)
+        r.stage(relpaths)
 
 
 def rm(repo=".", paths=None):

@@ -1,5 +1,8 @@
 language: python
 sudo: false
+os:
+  - linux
+  - osx
 env:
   global: TEST_RUNNER=unittest PYTHONHASHSEED=random
 matrix:

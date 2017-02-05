@@ -14,3 +14,5 @@ docs/tutorial/index.html
 dulwich.egg-info/
 .tox/
 .idea/
+.coverage
+htmlcov/

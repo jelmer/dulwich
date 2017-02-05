@@ -5,6 +5,7 @@ SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=.:$(PYTHONPATH) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
+COVERAGE = python3-coverage
 
 DESTDIR=/
 
@@ -58,3 +59,9 @@ pep8:
 
 before-push: check
 	git diff origin/master | $(PEP8) --diff
+
+coverage:
+	$(COVERAGE) run --source=dulwich -m unittest dulwich.tests.test_suite dulwich.contrib.test_suite
+
+coverage-html: coverage
+	$(COVERAGE) html

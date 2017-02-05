@@ -1158,8 +1158,7 @@ class PackData(object):
             object count
         :return: List of tuples with (sha, offset, crc32)
         """
-        ret = list(self.iterentries(progress=progress))
-        ret.sort()
+        ret = sorted(self.iterentries(progress=progress))
         return ret
 
     def create_index_v1(self, filename, progress=None):
@@ -1495,8 +1494,7 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(f, objects,
             delta_window_size=delta_window_size, deltify=deltify)
-    entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
-    entries.sort()
+    entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
 

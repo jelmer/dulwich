@@ -448,7 +448,7 @@ def print_name_status(changes):
     for change in changes:
         if not change:
             continue
-        if type(change) is list:
+        if isinstance(change, list):
             change = change[0]
         if change.type == CHANGE_ADD:
             path1 = change.new.path
@@ -605,8 +605,7 @@ def tag_list(repo, outstream=sys.stdout):
     :param outstream: Stream to write tags to
     """
     with open_repo_closing(repo) as r:
-        tags = list(r.refs.as_dict(b"refs/tags"))
-        tags.sort()
+        tags = sorted(r.refs.as_dict(b"refs/tags"))
         return tags
 
 
@@ -948,8 +947,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
             r.object_store.iter_shas((oid, None) for oid in object_ids),
             delta_window_size=delta_window_size)
     if idxf is not None:
-        entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
-        entries.sort()
+        entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
         write_pack_index(idxf, entries, data_sum)
 
 

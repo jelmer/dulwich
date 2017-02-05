@@ -677,9 +677,9 @@ class TCPGitClient(TraditionalGitClient):
         return urlparse.urlunsplit(("git", netloc, path, '', ''))
 
     def _connect(self, cmd, path):
-        if type(cmd) is not bytes:
+        if not isinstance(cmd, bytes):
             raise TypeError(cmd)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -777,9 +777,9 @@ class SubprocessGitClient(TraditionalGitClient):
     git_command = None
 
     def _connect(self, service, path):
-        if type(service) is not bytes:
+        if not isinstance(service, bytes):
             raise TypeError(service)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
@@ -1002,9 +1002,9 @@ class SSHGitClient(TraditionalGitClient):
         return cmd
 
     def _connect(self, cmd, path):
-        if type(cmd) is not bytes:
+        if not isinstance(cmd, bytes):
             raise TypeError(cmd)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         if path.startswith(b"/~"):
             path = path[1:]

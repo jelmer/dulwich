@@ -26,6 +26,10 @@
   * Remove racy check that relies on clock time changing between writes.
     (Jelmer Vernooij)
 
+ IMPROVEMENTS
+
+  * Add porcelain.remote_add. (Jelmer Vernooĳ)
+
 0.16.2	2016-01-14
 
  IMPROVEMENTS

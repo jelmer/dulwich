@@ -36,6 +36,7 @@ Currently implemented:
  * pull
  * push
  * rm
+ * remote{_add}
  * receive-pack
  * reset
  * rev-list
@@ -119,6 +120,10 @@ default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 
 
 DEFAULT_ENCODING = 'utf-8'
+
+
+class RemoteExists(Exception):
+    """Raised when the remote already exists."""
 
 
 def open_repo(path_or_repo):
@@ -977,3 +982,23 @@ def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
         c = r[tree_ish]
         treeid = c.tree
         list_tree(r.object_store, treeid, "")
+
+
+def remote_add(repo, name, url):
+    """Add a remote.
+
+    :param repo: Path to the repository
+    :param name: Remote name
+    :param url: Remote URL
+    """
+    if not isinstance(name, bytes):
+        name = name.encode(DEFAULT_ENCODING)
+    if not isinstance(url, bytes):
+        url = url.encode(DEFAULT_ENCODING)
+    with open_repo_closing(repo) as r:
+        c = r.get_config()
+        section = (b'remote', name)
+        if c.has_section(section):
+            raise RemoteExists(section)
+        c.set(section, b"url", url)
+        c.write_to_path()

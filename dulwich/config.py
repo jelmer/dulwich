@@ -95,6 +95,14 @@ class Config(object):
         """
         raise NotImplementedError(self.itersections)
 
+    def has_section(self, name):
+        """Check if a specified section exists.
+
+        :param name: Name of section to check for
+        :return: boolean indicating whether the section exists
+        """
+        return (name in self.itersections())
+
 
 class ConfigDict(Config, MutableMapping):
     """Git configuration stored in a dictionary."""

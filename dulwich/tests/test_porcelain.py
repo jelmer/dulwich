@@ -172,7 +172,7 @@ class CloneTests(PorcelainTestCase):
         r = porcelain.clone(self.repo.path, target_path,
                             bare=True, errstream=errstream)
         self.assertEqual(r.path, target_path)
-        self.assertEqual(Repo(target_path).head(), c3.id)
+        self.assertRaises(KeyError, Repo(target_path).head)
         self.assertFalse(b'f1' in os.listdir(target_path))
         self.assertFalse(b'f2' in os.listdir(target_path))
 
@@ -183,11 +183,25 @@ class CloneTests(PorcelainTestCase):
 
         (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c1.id
+        self.repo.refs[b"HEAD"] = c1.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(ValueError, porcelain.clone, self.repo.path,
             target_path, checkout=True, bare=True, errstream=errstream)
+
+    def test_no_head_no_checkout(self):
+        f1_1 = make_object(Blob, data=b'f1')
+        commit_spec = [[1]]
+        trees = {1: [(b'f1', f1_1), (b'f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        errstream = BytesIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        porcelain.clone(self.repo.path, target_path, checkout=True,
+            errstream=errstream)
 
 
 class InitTests(TestCase):

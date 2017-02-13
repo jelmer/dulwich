@@ -19,6 +19,9 @@
  * Handle multi-line quoted values in config files.
    (Jelmer Vernooĳ, #495)
 
+ * Allow porcelain.clone of repository without HEAD.
+   (Jelmer Vernooĳ, #501)
+
 0.16.3	2016-01-14
 
  TEST FIXES

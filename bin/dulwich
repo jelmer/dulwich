@@ -468,6 +468,20 @@ class cmd_pack_objects(Command):
             f.close()
 
 
+def cmd_remote_add(args):
+    parser = optparse.OptionParser()
+    options, args = parser.parse_args(args)
+    porcelain.remote_add('.', args[0], args[1])
+
+
+def cmd_remote(args):
+    subcommands = {
+        "add": cmd_remote_add,
+    }
+    cmd = args[0]
+    return subcommands[cmd](args[1:])
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -510,6 +524,7 @@ commands = {
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
     "receive-pack": cmd_receive_pack,
+    "remote": cmd_remote,
     "repack": cmd_repack,
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,

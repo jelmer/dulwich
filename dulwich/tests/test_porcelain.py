@@ -902,3 +902,20 @@ class LsRemoteTests(PorcelainTestCase):
             b'refs/heads/master': cid,
             b'HEAD': cid},
             porcelain.ls_remote(self.repo.path))
+
+
+class RemoteAddTests(PorcelainTestCase):
+
+    def test_new(self):
+        porcelain.remote_add(
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
+        c = self.repo.get_config()
+        self.assertEqual(
+            c.get((b'remote', b'jelmer'), b'url'),
+            b'git://jelmer.uk/code/dulwich')
+
+    def test_exists(self):
+        porcelain.remote_add(
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
+        self.assertRaises(porcelain.RemoteExists, porcelain.remote_add,
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')

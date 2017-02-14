@@ -268,7 +268,9 @@ class Walker(object):
         if order not in ALL_ORDERS:
             raise ValueError('Unknown walk order %s' % order)
         self.store = store
-        if not isinstance(include, list):
+        if isinstance(include, bytes):
+            # TODO(jelmer): Really, this should require a single type.
+            # Print deprecation warning here?
             include = [include]
         self.include = include
         self.excluded = set(exclude or [])

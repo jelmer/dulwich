@@ -36,6 +36,10 @@ from dulwich.diff_tree import (
 from dulwich.errors import (
     MissingCommitError,
     )
+from dulwich.objects import (
+    Commit,
+    Tag,
+    )
 
 ORDER_DATE = 'date'
 ORDER_TOPO = 'topo'
@@ -136,15 +140,20 @@ class _CommitTimeQueue(object):
         for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
 
-    def _push(self, commit_id):
+    def _push(self, object_id):
         try:
-            commit = self._store[commit_id]
+            obj = self._store[object_id]
         except KeyError:
-            raise MissingCommitError(commit_id)
-        if commit_id not in self._pq_set and commit_id not in self._done:
+            raise MissingCommitError(object_id)
+        if isinstance(obj, Tag):
+            self._push(obj.object[1])
+            return
+        # TODO(jelmer): What to do about non-Commit and non-Tag objects?
+        commit = obj
+        if commit.id not in self._pq_set and commit.id not in self._done:
             heapq.heappush(self._pq, (-commit.commit_time, commit))
-            self._pq_set.add(commit_id)
-            self._seen.add(commit_id)
+            self._pq_set.add(commit.id)
+            self._seen.add(commit.id)
 
     def _exclude_parents(self, commit):
         excluded = self._excluded

@@ -667,6 +667,39 @@ fDeF1m4qYs+cUXKNUZ03
 =X6RT
 -----END PGP SIGNATURE-----""", c.gpgsig)
 
+    def test_parse_header_trailing_newline(self):
+        c = Commit.from_string(b'''\
+tree a7d6277f78d3ecd0230a1a5df6db00b1d9c521ac
+parent c09b6dec7a73760fbdb478383a3c926b18db8bbe
+author Neil Matatall <oreoshake@github.com> 1461964057 -1000
+committer Neil Matatall <oreoshake@github.com> 1461964057 -1000
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ wsBcBAABCAAQBQJXI80ZCRA6pcNDcVZ70gAAarcIABs72xRX3FWeox349nh6ucJK
+ CtwmBTusez2Zwmq895fQEbZK7jpaGO5TRO4OvjFxlRo0E08UFx3pxZHSpj6bsFeL
+ hHsDXnCaotphLkbgKKRdGZo7tDqM84wuEDlh4MwNe7qlFC7bYLDyysc81ZX5lpMm
+ 2MFF1TvjLAzSvkT7H1LPkuR3hSvfCYhikbPOUNnKOo0sYjeJeAJ/JdAVQ4mdJIM0
+ gl3REp9+A+qBEpNQI7z94Pg5Bc5xenwuDh3SJgHvJV6zBWupWcdB3fAkVd4TPnEZ
+ nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
+ =ms6q
+ -----END PGP SIGNATURE-----
+ 
+
+3.3.0 version bump and docs
+''')
+        self.assertEqual([], c.extra)
+        self.assertEqual(b'''\
+-----BEGIN PGP SIGNATURE-----
+
+wsBcBAABCAAQBQJXI80ZCRA6pcNDcVZ70gAAarcIABs72xRX3FWeox349nh6ucJK
+CtwmBTusez2Zwmq895fQEbZK7jpaGO5TRO4OvjFxlRo0E08UFx3pxZHSpj6bsFeL
+hHsDXnCaotphLkbgKKRdGZo7tDqM84wuEDlh4MwNe7qlFC7bYLDyysc81ZX5lpMm
+2MFF1TvjLAzSvkT7H1LPkuR3hSvfCYhikbPOUNnKOo0sYjeJeAJ/JdAVQ4mdJIM0
+gl3REp9+A+qBEpNQI7z94Pg5Bc5xenwuDh3SJgHvJV6zBWupWcdB3fAkVd4TPnEZ
+nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
+=ms6q
+-----END PGP SIGNATURE-----\n''', c.gpgsig)
+
 
 _TREE_ITEMS = {
     b'a.c': (0o100755, b'd80c186a03f423a81b39df39dc87fd269736ca86'),

@@ -25,6 +25,9 @@
  * Support passing tag ids to Walker()'s include argument.
    (Jelmer Vernooĳ)
 
+ * Don't strip trailing newlines from extra headers.
+   (Nicolas Dandrimont)
+
 0.16.3	2016-01-14
 
  TEST FIXES

@@ -28,6 +28,9 @@
  * Don't strip trailing newlines from extra headers.
    (Nicolas Dandrimont)
 
+ * Set bufsize=0 for subprocess interaction with SSH client.
+   Fixes hangs on Python 3. (René Stern, #434)
+
 0.16.3	2016-01-14
 
  TEST FIXES

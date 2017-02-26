@@ -949,7 +949,7 @@ class SubprocessSSHVendor(SSHVendor):
         if username is not None:
             host = '%s@%s' % (username, host)
         args.append(host)
-        proc = subprocess.Popen(args + [command],
+        proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)

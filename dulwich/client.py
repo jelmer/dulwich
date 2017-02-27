@@ -1250,10 +1250,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
         return (TCPGitClient.from_parsedurl(parsed, **kwargs),
                 parsed.path)
     elif parsed.scheme in ('git+ssh', 'ssh'):
-        path = parsed.path
-        if path.startswith('/'):
-            path = parsed.path[1:]
-        return SSHGitClient.from_parsedurl(parsed, **kwargs), path
+        return SSHGitClient.from_parsedurl(parsed, **kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient.from_parsedurl(
             parsed, config=config, **kwargs), parsed.path

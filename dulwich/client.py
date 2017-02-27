@@ -630,6 +630,7 @@ class TraditionalGitClient(GitClient):
         proto, _ = self._connect(b'upload-pack', path)
         with proto:
             refs, _ = read_pkt_refs(proto)
+            proto.write_pkt_line(None)
             return refs
 
     def archive(self, path, committish, write_data, progress=None,

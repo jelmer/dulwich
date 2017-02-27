@@ -31,6 +31,9 @@
  * Set bufsize=0 for subprocess interaction with SSH client.
    Fixes hangs on Python 3. (René Stern, #434)
 
+ * Don't drop first slash for SSH paths, except for those
+   starting with "~". (Jelmer Vernooij, René Stern, #463)
+
 0.16.3	2016-01-14
 
  TEST FIXES

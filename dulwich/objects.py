@@ -609,6 +609,12 @@ def _parse_message(chunks):
     v = ""
     eof = False
 
+    def _strip_last_newline(value):
+        """Strip the last newline from value"""
+        if value and value.endswith(b'\n'):
+            return value[:-1]
+        return value
+
     # Parse the headers
     #
     # Headers can contain newlines. The next line is indented with a space.
@@ -620,7 +626,7 @@ def _parse_message(chunks):
         else:
             if k is not None:
                 # We parsed a new header, return its value
-                yield (k, v.rstrip(b'\n'))
+                yield (k, _strip_last_newline(v))
             if l == b'\n':
                 # Empty line indicates end of headers
                 break
@@ -632,7 +638,7 @@ def _parse_message(chunks):
         # the text.
         eof = True
         if k is not None:
-            yield (k, v.rstrip(b'\n'))
+            yield (k, _strip_last_newline(v))
         yield (None, None)
 
     if not eof:
@@ -655,6 +661,9 @@ class Tag(ShaFile):
 
     def __init__(self):
         super(Tag, self).__init__()
+        self._tagger = None
+        self._tag_time = None
+        self._tag_timezone = None
         self._tag_timezone_neg_utc = False
 
     @classmethod
@@ -714,6 +723,9 @@ class Tag(ShaFile):
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
         self._tagger = None
+        self._tag_time = None
+        self._tag_timezone = None
+        self._tag_timezone_neg_utc = False
         for field, value in _parse_message(chunks):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
@@ -1204,7 +1216,8 @@ class Commit(ShaFile):
                 chunks.append(b' ' + chunk + b'\n')
 
             # No trailing empty line
-            chunks[-1] = chunks[-1].rstrip(b' \n')
+            if chunks[-1].endswith(b' \n'):
+                chunks[-1] = chunks[-1][:-2]
         for k, v in self.extra:
             if b'\n' in k or b'\n' in v:
                 raise AssertionError(

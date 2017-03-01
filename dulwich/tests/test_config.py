@@ -155,7 +155,6 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
-    #@expectedFailure
     def test_quoted(self):
         cf = self.from_file(b"""[gui]
 	fontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -weight normal -slant roman -underline 0 -overstrike 0
@@ -163,6 +162,16 @@ class ConfigFileTests(TestCase):
         self.assertEqual(ConfigFile({(b'gui', ): {
             b'fontdiff': b'-family "Ubuntu Mono" -size 11 -weight normal -slant roman -underline 0 -overstrike 0',
         }}), cf)
+
+    def test_quoted_multiline(self):
+        cf = self.from_file(b"""[alias]
+who = \"!who() {\\
+  git log --no-merges --pretty=format:'%an - %ae' $@ | sort | uniq -c | sort -rn;\\
+};\\
+who\"
+""")
+        self.assertEqual(ConfigFile({(b'alias', ): {
+            b'who': b"!who() {git log --no-merges --pretty=format:'%an - %ae' $@ | sort | uniq -c | sort -rn;};who"}}), cf)
 
 
 class ConfigDictTests(TestCase):

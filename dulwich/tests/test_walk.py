@@ -51,6 +51,7 @@ from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     F,
     make_object,
+    make_tag,
     build_commit_graph,
     )
 
@@ -104,6 +105,12 @@ class WalkerTest(TestCase):
                 expected[i] = TestWalkEntry(entry, None)
         actual = list(walker)
         self.assertEqual(expected, actual)
+
+    def test_tag(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+        t2 = make_tag(target=c2)
+        self.store.add_object(t2)
+        self.assertWalkYields([c2, c1], [t2.id])
 
     def test_linear(self):
         c1, c2, c3 = self.make_linear_commits(3)

@@ -98,6 +98,15 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, False)
 
 
+class MemoryRepoTests(TestCase):
+
+    def test_set_description(self):
+        r = MemoryRepo.init_bare([], {})
+        description = b"Some description"
+        r.set_description(description)
+        self.assertEqual(description, r.get_description())
+
+
 class RepositoryRootTests(TestCase):
 
     def mkdtemp(self):
@@ -803,6 +812,11 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual(r[self._root_commit].tree, new_commit.tree)
         self.assertEqual([self._root_commit], r[commit_sha].parents)
         self.assertEqual(old_refs, r.get_refs())
+
+    def test_stage_absolute(self):
+        r = self._repo
+        os.remove(os.path.join(r.path, 'a'))
+        self.assertRaises(ValueError, r.stage, [os.path.join(r.path, 'a')])
 
     def test_stage_deleted(self):
         r = self._repo

@@ -1,9 +1,63 @@
+0.17.1	2017-03-01
+
+ IMPROVEMENTS
+
+ * Add basic 'dulwich pull' command. (Jelmer Vernooĳ)
+
+ BUG FIXES
+
+ * Cope with existing submodules during pull.
+   (Jelmer Vernooĳ, #505)
+
+0.17.0	2017-03-01
+
+ TEST FIXES
+
+ * Skip test that requires sync to synchronize filesystems if os.sync is
+   not available. (Koen Martens)
+
+ IMPROVEMENTS
+
+ * Implement MemoryRepo.{set_description,get_description}.
+   (Jelmer Vernooĳ)
+
+ * Raise exception in Repo.stage() when absolute paths are
+   passed in. Allow passing in relative paths to
+   porcelain.add().(Jelmer Vernooij)
+
+ BUG FIXES
+
+ * Handle multi-line quoted values in config files.
+   (Jelmer Vernooĳ, #495)
+
+ * Allow porcelain.clone of repository without HEAD.
+   (Jelmer Vernooĳ, #501)
+
+ * Support passing tag ids to Walker()'s include argument.
+   (Jelmer Vernooĳ)
+
+ * Don't strip trailing newlines from extra headers.
+   (Nicolas Dandrimont)
+
+ * Set bufsize=0 for subprocess interaction with SSH client.
+   Fixes hangs on Python 3. (René Stern, #434)
+
+ * Don't drop first slash for SSH paths, except for those
+   starting with "~". (Jelmer Vernooij, René Stern, #463)
+
+ * Properly log off after retrieving just refs.
+   (Jelmer Vernooij)
+
 0.16.3	2016-01-14
 
  TEST FIXES
 
   * Remove racy check that relies on clock time changing between writes.
-   (Jelmer Vernooij)
+    (Jelmer Vernooij)
+
+ IMPROVEMENTS
+
+  * Add porcelain.remote_add. (Jelmer Vernooĳ)
 
 0.16.2	2016-01-14
 

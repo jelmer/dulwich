@@ -45,7 +45,7 @@ def write_commit_patch(f, commit, contents, progress, version=None, encoding=Non
     :return: tuple with filename and contents
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
-    if type(contents) is str:
+    if isinstance(contents, str):
         contents = contents.encode(encoding)
     (num, total) = progress
     f.write(b"From " + commit.id + b" " + time.ctime(commit.commit_time).encode(encoding) + b"\n")
@@ -255,7 +255,7 @@ def git_am_patch_split(f, encoding=None):
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
     contents = f.read()
-    if type(contents) is bytes and getattr(email.parser, "BytesParser", None):
+    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
         parser = email.parser.BytesParser()
         msg = parser.parsebytes(contents)
     else:

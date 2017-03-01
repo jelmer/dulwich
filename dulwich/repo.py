@@ -750,7 +750,7 @@ class Repo(BaseRepo):
     def commondir(self):
         """Return the path of the common directory.
 
-        For a main working tree, it is identical to `controldir()`.
+        For a main working tree, it is identical to controldir().
 
         For a linked working tree, it is the control directory of the
         main working tree."""
@@ -850,6 +850,10 @@ class Repo(BaseRepo):
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
                 fs_path = fs_path.encode(sys.getfilesystemencoding())
+            if os.path.isabs(fs_path):
+                raise ValueError(
+                    "path %r should be relative to "
+                    "repository root, not absolute" % fs_path)
             tree_path = _fs_to_tree_path(fs_path)
             full_path = os.path.join(root_path_bytes, fs_path)
             try:
@@ -1044,7 +1048,7 @@ class Repo(BaseRepo):
     def init_bare(cls, path):
         """Create a new bare repository.
 
-        ``path`` should already exist and be an emty directory.
+        ``path`` should already exist and be an empty directory.
 
         :param path: Path to create bare repository in
         :return: a `Repo` instance
@@ -1077,6 +1081,13 @@ class MemoryRepo(BaseRepo):
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
+        self._description = None
+
+    def set_description(self, description):
+        self._description = description
+
+    def get_description(self):
+        return self._description
 
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
@@ -1121,13 +1132,6 @@ class MemoryRepo(BaseRepo):
         :return: `ConfigFile` object.
         """
         return self._config
-
-    def get_description(self):
-        """Retrieve the repository description.
-
-        This defaults to None, for no description.
-        """
-        return None
 
     @classmethod
     def init_bare(cls, objects, refs):

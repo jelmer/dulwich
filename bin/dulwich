@@ -468,6 +468,18 @@ class cmd_pack_objects(Command):
             f.close()
 
 
+class cmd_pull(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        try:
+            from_location = args[0]
+        except IndexError:
+            from_location = None
+        porcelain.pull('.', from_location)
+
+
 class cmd_remote_add(Command):
 
     def run(self, args):
@@ -536,6 +548,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
+    "pull": cmd_pull,
     "receive-pack": cmd_receive_pack,
     "remote": cmd_remote,
     "repack": cmd_repack,

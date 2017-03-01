@@ -4,6 +4,11 @@
 
  * Add basic 'dulwich pull' command. (Jelmer Vernooĳ)
 
+ BUG FIXES
+
+ * Cope with existing submodules during pull.
+   (Jelmer Vernooĳ, #505)
+
 0.17.0	2017-03-01
 
  TEST FIXES

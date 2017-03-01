@@ -692,7 +692,7 @@ def push(repo, remote_location, refspecs=None,
                             b"\n")
 
 
-def pull(repo, remote_location, refspecs=None,
+def pull(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Pull from remote via dulwich.client
 
@@ -704,6 +704,10 @@ def pull(repo, remote_location, refspecs=None,
     """
     # Open the repo
     with open_repo_closing(repo) as r:
+        if remote_location is None:
+            # TODO(jelmer): Lookup 'remote' for current branch in config
+            raise NotImplementedError(
+                "looking up remote from branch config not supported yet")
         if refspecs is None:
             refspecs = [b"HEAD"]
         selected_refs = []

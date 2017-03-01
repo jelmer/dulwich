@@ -21,8 +21,7 @@ You can generate the documentation by running "make doc".
 Running the tests
 -----------------
 To run the testsuite, you should be able to simply run "make check". This
-will run the tests using unittest on Python 2.7 and higher, and using
-unittest2 (which you will need to have installed) on older versions of Python.
+will run the tests using unittest.
 
  $ make check
 
@@ -43,7 +42,7 @@ to the Dulwich API user to encode and decode them if necessary.
 
 Merge requests
 --------------
-Please either send pull requests to the author (jelmer@jelmer.uk) or create new pull
+Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create new pull
 requests on GitHub.
 
 Licensing

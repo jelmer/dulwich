@@ -508,10 +508,12 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
 
-        # FIXME: Merge new index into working tree
+        # TODO(jelmer): Merge new index into working tree
         if S_ISGITLINK(entry.mode):
-            os.mkdir(full_path)
+            if not os.path.isdir(full_path):
+                os.mkdir(full_path)
             st = os.lstat(full_path)
+            # TODO(jelmer): record and return submodule paths
         else:
             obj = object_store[entry.sha]
             st = build_file_from_blob(obj, entry.mode, full_path,
@@ -560,6 +562,7 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
+        # TODO(jelmer): handle S_ISGITLINK(entry.mode) here
         try:
             blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         except OSError as e:
@@ -567,6 +570,11 @@ def get_unstaged_changes(index, root_path):
                 raise
             # The file was removed, so we assume that counts as
             # different from whatever file used to exist.
+            yield tree_path
+        except IOError as e:
+            if e.errno != errno.EISDIR:
+                raise
+            # The file was changed to a directory, so consider it removed.
             yield tree_path
         else:
             if blob.id != entry.sha:

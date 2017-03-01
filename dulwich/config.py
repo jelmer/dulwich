@@ -95,6 +95,14 @@ class Config(object):
         """
         raise NotImplementedError(self.itersections)
 
+    def has_section(self, name):
+        """Check if a specified section exists.
+
+        :param name: Name of section to check for
+        :return: boolean indicating whether the section exists
+        """
+        return (name in self.itersections())
+
 
 class ConfigDict(Config, MutableMapping):
     """Git configuration stored in a dictionary."""
@@ -307,23 +315,20 @@ class ConfigFile(ConfigDict):
                 if not _check_variable_name(setting):
                     raise ValueError("invalid variable name %s" % setting)
                 if value.endswith(b"\\\n"):
-                    value = value[:-2]
-                    continuation = True
+                    continuation = value[:-2]
                 else:
-                    continuation = False
-                value = _parse_string(value)
-                ret._values[section][setting] = value
-                if not continuation:
+                    continuation = None
+                    value = _parse_string(value)
+                    ret._values[section][setting] = value
                     setting = None
             else:  # continuation line
                 if line.endswith(b"\\\n"):
-                    line = line[:-2]
-                    continuation = True
+                    continuation += line[:-2]
                 else:
-                    continuation = False
-                value = _parse_string(line)
-                ret._values[section][setting] += value
-                if not continuation:
+                    continuation += line
+                    value = _parse_string(continuation)
+                    ret._values[section][setting] = value
+                    continuation = None
                     setting = None
         return ret
 

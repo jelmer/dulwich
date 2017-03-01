@@ -36,6 +36,7 @@ Currently implemented:
  * pull
  * push
  * rm
+ * remote{_add}
  * receive-pack
  * reset
  * rev-list
@@ -48,8 +49,6 @@ Currently implemented:
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
 """
-
-__docformat__ = 'restructuredText'
 
 from collections import namedtuple
 from contextlib import (
@@ -121,6 +120,10 @@ default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
 
 
 DEFAULT_ENCODING = 'utf-8'
+
+
+class RemoteExists(Exception):
+    """Raised when the remote already exists."""
 
 
 def open_repo(path_or_repo):
@@ -282,7 +285,10 @@ def clone(source, target=None, bare=False, checkout=None,
             {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
                 if n.startswith(b'refs/tags/') and
                 not n.endswith(ANNOTATED_TAG_SUFFIX)})
-        r[b"HEAD"] = remote_refs[b"HEAD"]
+        if b"HEAD" in remote_refs and not bare:
+            # TODO(jelmer): Support symref capability,
+            # https://github.com/jelmer/dulwich/issues/485
+            r[b"HEAD"] = remote_refs[b"HEAD"]
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -290,7 +296,7 @@ def clone(source, target=None, bare=False, checkout=None,
         target_config.set((b'remote', b'origin'), b'fetch',
             b'+refs/heads/*:refs/remotes/origin/*')
         target_config.write_to_path()
-        if checkout:
+        if checkout and b"HEAD" in r.refs:
             errstream.write(b'Checking out HEAD\n')
             r.reset_index()
     except:
@@ -306,7 +312,6 @@ def add(repo=".", paths=None):
     :param repo: Repository for the files
     :param paths: Paths to add.  No value passed stages all modified files.
     """
-    # FIXME: Support patterns, directories.
     with open_repo_closing(repo) as r:
         if not paths:
             # If nothing is specified, add all non-ignored files.
@@ -317,7 +322,18 @@ def add(repo=".", paths=None):
                     dirnames.remove('.git')
                 for filename in filenames:
                     paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
-        r.stage(paths)
+        # TODO(jelmer): Possibly allow passing in absolute paths?
+        relpaths = []
+        if not isinstance(paths, list):
+            paths = [paths]
+        for p in paths:
+            # FIXME: Support patterns, directories.
+            if os.path.isabs(p) and p.startswith(repo.path):
+                relpath = os.path.relpath(p, repo.path)
+            else:
+                relpath = p
+            relpaths.append(relpath)
+        r.stage(relpaths)
 
 
 def rm(repo=".", paths=None):
@@ -440,7 +456,7 @@ def print_name_status(changes):
     for change in changes:
         if not change:
             continue
-        if type(change) is list:
+        if isinstance(change, list):
             change = change[0]
         if change.type == CHANGE_ADD:
             path1 = change.new.path
@@ -597,8 +613,7 @@ def tag_list(repo, outstream=sys.stdout):
     :param outstream: Stream to write tags to
     """
     with open_repo_closing(repo) as r:
-        tags = list(r.refs.as_dict(b"refs/tags"))
-        tags.sort()
+        tags = sorted(r.refs.as_dict(b"refs/tags"))
         return tags
 
 
@@ -677,7 +692,7 @@ def push(repo, remote_location, refspecs=None,
                             b"\n")
 
 
-def pull(repo, remote_location, refspecs=None,
+def pull(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
     """Pull from remote via dulwich.client
 
@@ -689,6 +704,10 @@ def pull(repo, remote_location, refspecs=None,
     """
     # Open the repo
     with open_repo_closing(repo) as r:
+        if remote_location is None:
+            # TODO(jelmer): Lookup 'remote' for current branch in config
+            raise NotImplementedError(
+                "looking up remote from branch config not supported yet")
         if refspecs is None:
             refspecs = [b"HEAD"]
         selected_refs = []
@@ -806,6 +825,7 @@ def upload_pack(path=".", inf=None, outf=None):
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
     if inf is None:
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
+    path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
     def send_fn(data):
         outf.write(data)
@@ -828,6 +848,7 @@ def receive_pack(path=".", inf=None, outf=None):
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
     if inf is None:
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
+    path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
     def send_fn(data):
         outf.write(data)
@@ -940,8 +961,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
             r.object_store.iter_shas((oid, None) for oid in object_ids),
             delta_window_size=delta_window_size)
     if idxf is not None:
-        entries = [(k, v[0], v[1]) for (k, v) in entries.items()]
-        entries.sort()
+        entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
         write_pack_index(idxf, entries, data_sum)
 
 
@@ -971,3 +991,23 @@ def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
         c = r[tree_ish]
         treeid = c.tree
         list_tree(r.object_store, treeid, "")
+
+
+def remote_add(repo, name, url):
+    """Add a remote.
+
+    :param repo: Path to the repository
+    :param name: Remote name
+    :param url: Remote URL
+    """
+    if not isinstance(name, bytes):
+        name = name.encode(DEFAULT_ENCODING)
+    if not isinstance(url, bytes):
+        url = url.encode(DEFAULT_ENCODING)
+    with open_repo_closing(repo) as r:
+        c = r.get_config()
+        section = (b'remote', name)
+        if c.has_section(section):
+            raise RemoteExists(section)
+        c.set(section, b"url", url)
+        c.write_to_path()

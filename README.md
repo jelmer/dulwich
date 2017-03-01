@@ -5,9 +5,9 @@ This is the Dulwich project.
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
-Main website: https://www.dulwich.io/
+**Main website**: [www.dulwich.io](https://www.dulwich.io/)
 
-License: Apache License, version 2 or GNU General Public License, version 2 or later.
+**License**: Apache License, version 2 or GNU General Public License, version 2 or later.
 
 The project is named after the part of London that Mr. and Mrs. Git live in
 in the particular Monty Python sketch.
@@ -30,19 +30,19 @@ or if you are installing from pip::
 Further documentation
 ---------------------
 
-The dulwich documentation can be found in doc/ and on the web:
+The dulwich documentation can be found in doc/ and
+[on the web](https://www.dulwich.io/docs/).
 
-https://www.dulwich.io/docs/
-
-The API reference can be generated using pydoctor, by running "make pydoctor", or on the web:
-
-https://www.dulwich.io/apidocs
+The API reference can be generated using pydoctor, by running "make pydoctor",
+or [on the web](https://www.dulwich.io/apidocs).
 
 Help
 ----
 
-There is a #dulwich IRC channel on Freenode, and a dulwich mailing list at
-https://launchpad.net/~dulwich-users.
+There is a *#dulwich* IRC channel on the [Freenode](https://www.freenode.net/), and
+[dulwich-announce](https://groups.google.com/forum/#!forum/dulwich-announce)
+and [dulwich-discuss](https://groups.google.com/forum/#!forum/dulwich-discuss)
+mailing lists.
 
 Supported versions of Python
 ----------------------------

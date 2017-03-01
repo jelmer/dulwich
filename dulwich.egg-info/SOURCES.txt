@@ -1,11 +1,13 @@
 .testr.conf
 .travis.yml
 AUTHORS
+CONTRIBUTING.md
 COPYING
 MANIFEST.in
 Makefile
 NEWS
 README.md
+README.swift.md
 TODO
 appveyor.yml
 dulwich.cfg

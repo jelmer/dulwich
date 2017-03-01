@@ -172,7 +172,7 @@ class CloneTests(PorcelainTestCase):
         r = porcelain.clone(self.repo.path, target_path,
                             bare=True, errstream=errstream)
         self.assertEqual(r.path, target_path)
-        self.assertEqual(Repo(target_path).head(), c3.id)
+        self.assertRaises(KeyError, Repo(target_path).head)
         self.assertFalse(b'f1' in os.listdir(target_path))
         self.assertFalse(b'f2' in os.listdir(target_path))
 
@@ -183,11 +183,25 @@ class CloneTests(PorcelainTestCase):
 
         (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c1.id
+        self.repo.refs[b"HEAD"] = c1.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(ValueError, porcelain.clone, self.repo.path,
             target_path, checkout=True, bare=True, errstream=errstream)
+
+    def test_no_head_no_checkout(self):
+        f1_1 = make_object(Blob, data=b'f1')
+        commit_spec = [[1]]
+        trees = {1: [(b'f1', f1_1), (b'f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        errstream = BytesIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        porcelain.clone(self.repo.path, target_path, checkout=True,
+            errstream=errstream)
 
 
 class InitTests(TestCase):
@@ -230,6 +244,14 @@ class AddTests(PorcelainTestCase):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
         porcelain.add(self.repo.path, paths=["foo"])
+        self.assertIn(b"foo", self.repo.open_index())
+
+    def test_add_file_absolute_path(self):
+        # Absolute paths are (not yet) supported
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        porcelain.add(self.repo, paths=[os.path.join(self.repo.path, "foo")])
+        self.assertIn(b"foo", self.repo.open_index())
 
 
 class RemoveTests(PorcelainTestCase):
@@ -894,3 +916,20 @@ class LsRemoteTests(PorcelainTestCase):
             b'refs/heads/master': cid,
             b'HEAD': cid},
             porcelain.ls_remote(self.repo.path))
+
+
+class RemoteAddTests(PorcelainTestCase):
+
+    def test_new(self):
+        porcelain.remote_add(
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
+        c = self.repo.get_config()
+        self.assertEqual(
+            c.get((b'remote', b'jelmer'), b'url'),
+            b'git://jelmer.uk/code/dulwich')
+
+    def test_exists(self):
+        porcelain.remote_add(
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
+        self.assertRaises(porcelain.RemoteExists, porcelain.remote_add,
+            self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')

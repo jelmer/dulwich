@@ -38,8 +38,6 @@ Known capabilities that are not supported:
  * include-tag
 """
 
-__docformat__ = 'restructuredText'
-
 from contextlib import closing
 from io import BytesIO, BufferedReader
 import dulwich
@@ -632,6 +630,7 @@ class TraditionalGitClient(GitClient):
         proto, _ = self._connect(b'upload-pack', path)
         with proto:
             refs, _ = read_pkt_refs(proto)
+            proto.write_pkt_line(None)
             return refs
 
     def archive(self, path, committish, write_data, progress=None,
@@ -679,9 +678,9 @@ class TCPGitClient(TraditionalGitClient):
         return urlparse.urlunsplit(("git", netloc, path, '', ''))
 
     def _connect(self, cmd, path):
-        if type(cmd) is not bytes:
+        if not isinstance(cmd, bytes):
             raise TypeError(cmd)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -779,9 +778,9 @@ class SubprocessGitClient(TraditionalGitClient):
     git_command = None
 
     def _connect(self, service, path):
-        if type(service) is not bytes:
+        if not isinstance(service, bytes):
             raise TypeError(service)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
@@ -951,7 +950,7 @@ class SubprocessSSHVendor(SSHVendor):
         if username is not None:
             host = '%s@%s' % (username, host)
         args.append(host)
-        proc = subprocess.Popen(args + [command],
+        proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
@@ -1004,9 +1003,9 @@ class SSHGitClient(TraditionalGitClient):
         return cmd
 
     def _connect(self, cmd, path):
-        if type(cmd) is not bytes:
+        if not isinstance(cmd, bytes):
             raise TypeError(cmd)
-        if type(path) is not bytes:
+        if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
         if path.startswith(b"/~"):
             path = path[1:]
@@ -1252,10 +1251,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
         return (TCPGitClient.from_parsedurl(parsed, **kwargs),
                 parsed.path)
     elif parsed.scheme in ('git+ssh', 'ssh'):
-        path = parsed.path
-        if path.startswith('/'):
-            path = parsed.path[1:]
-        return SSHGitClient.from_parsedurl(parsed, **kwargs), path
+        return SSHGitClient.from_parsedurl(parsed, **kwargs), parsed.path
     elif parsed.scheme in ('http', 'https'):
         return HttpGitClient.from_parsedurl(
             parsed, config=config, **kwargs), parsed.path

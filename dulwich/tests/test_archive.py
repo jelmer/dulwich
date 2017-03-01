@@ -21,6 +21,7 @@
 """Tests for archive support."""
 
 from io import BytesIO
+import sys
 import tarfile
 
 from dulwich.archive import tar_stream
@@ -52,7 +53,6 @@ class ArchiveTests(TestCase):
         self.assertEqual([], tf.getnames())
 
     def test_simple(self):
-        self.skipTest("known to fail on python2.6 and 3.4; needs debugging")
         store = MemoryObjectStore()
         b1 = Blob.from_string(b"somedata")
         store.add_object(b1)

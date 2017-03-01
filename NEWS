@@ -1,3 +1,9 @@
+0.17.1	UNRELEASED
+
+ IMPROVEMENTS
+
+ * Add basic 'dulwich pull' command. (Jelmer Vernooĳ)
+
 0.17.0	2017-03-01
 
  TEST FIXES

@@ -1,4 +1,4 @@
-dulwich (0.17.1-1) UNRELEASED; urgency=medium
+dulwich (0.17.1-1) unstable; urgency=medium
 
   * Remove -dbg packages and migrate to -dbgsym packages.
   * New upstream version.

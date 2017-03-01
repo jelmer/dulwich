@@ -468,18 +468,31 @@ class cmd_pack_objects(Command):
             f.close()
 
 
-def cmd_remote_add(args):
-    parser = optparse.OptionParser()
-    options, args = parser.parse_args(args)
-    porcelain.remote_add('.', args[0], args[1])
+class cmd_remote_add(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.remote_add('.', args[0], args[1])
 
 
-def cmd_remote(args):
+class cmd_remote(Command):
+
     subcommands = {
         "add": cmd_remote_add,
     }
-    cmd = args[0]
-    return subcommands[cmd](args[1:])
+
+    def run(self, args):
+        if not args:
+            print("Supported subcommands: %s" % ', '.join(self.subcommands.keys()))
+            return False
+        cmd = args[0]
+        try:
+            cmd_kls = self.subcommands[cmd]
+        except KeyError:
+            print('No such subcommand: %s' % args[0])
+            return False
+        return cmd_kls(args[1:])
 
 
 class cmd_help(Command):
@@ -543,7 +556,10 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 cmd = sys.argv[1]
-if not cmd in commands:
+try:
+    cmd_kls = commands[cmd]
+except KeyError:
     print("No such subcommand: %s" % cmd)
     sys.exit(1)
-commands[cmd]().run(sys.argv[2:])
+# TODO(jelmer): Return non-0 on errors
+cmd_kls().run(sys.argv[2:])

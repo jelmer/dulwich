@@ -24,7 +24,7 @@
 #if PY_MAJOR_VERSION >= 3
 #define PyInt_FromLong PyLong_FromLong
 #define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_AsString PyBytes_AsString
+#define PyString_AS_STRING PyBytes_AS_STRING
 #define PyString_Check PyBytes_Check
 #define PyString_CheckExact PyBytes_CheckExact
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
@@ -133,7 +133,7 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		Py_DECREF(py_delta);
 		return NULL;
 	}
-	out = (uint8_t *)PyString_AsString(ret);
+	out = (uint8_t *)PyString_AS_STRING(ret);
 	while (index < delta_len) {
 		uint8_t cmd = delta[index];
 		index++;
@@ -238,7 +238,7 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 			Py_DECREF(file_sha);
 			return NULL;
 		}
-		cmp = memcmp(PyString_AsString(file_sha), sha, 20);
+		cmp = memcmp(PyString_AS_STRING(file_sha), sha, 20);
 		Py_DECREF(file_sha);
 		if (cmp < 0)
 			start = i + 1;

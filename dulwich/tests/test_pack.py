@@ -198,6 +198,36 @@ class TestPackDeltas(TestCase):
             ApplyDeltaError,
             apply_delta, b'', b'\x00\x80\x02\xb0\x11\x11')
 
+    def test_pypy_issue(self):
+        # Test for https://github.com/jelmer/dulwich/issues/509 /
+        # https://bitbucket.org/pypy/pypy/issues/2499/cpyext-pystring_asstring-doesnt-work
+        chunks = [
+            b'tree 03207ccf58880a748188836155ceed72f03d65d6\n'
+            b'parent 408fbab530fd4abe49249a636a10f10f44d07a21\n'
+            b'author Victor Stinner <victor.stinner@gmail.com> 1421355207 +0100\n'
+            b'committer Victor Stinner <victor.stinner@gmail.com> 1421355207 +0100\n'
+            b'\n'
+            b'Backout changeset 3a06020af8cf\n'
+            b'\nStreamWriter: close() now clears the reference to the transport\n'
+            b'\nStreamWriter now raises an exception if it is closed: write(), writelines(),\n'
+            b'write_eof(), can_write_eof(), get_extra_info(), drain().\n']
+        delta = [
+            b'\xcd\x03\xad\x03]tree ff3c181a393d5a7270cddc01ea863818a8621ca8\n'
+            b'parent 20a103cc90135494162e819f98d0edfc1f1fba6b\x91]7\x0510738'
+            b'\x91\x99@\x0b10738 +0100\x93\x04\x01\xc9']
+        res = apply_delta(chunks, delta)
+        expected = [
+            b'tree ff3c181a393d5a7270cddc01ea863818a8621ca8\n'
+            b'parent 20a103cc90135494162e819f98d0edfc1f1fba6b',
+            b'\nauthor Victor Stinner <victor.stinner@gmail.com> 14213',
+            b'10738',
+            b' +0100\ncommitter Victor Stinner <victor.stinner@gmail.com> 14213',
+            b'10738 +0100',
+            b'\n\nStreamWriter: close() now clears the reference to the transport\n\n'
+            b'StreamWriter now raises an exception if it is closed: write(), writelines(),\n'
+            b'write_eof(), can_write_eof(), get_extra_info(), drain().\n']
+        self.assertEqual(b''.join(expected), b''.join(res))
+
 
 class TestPackData(PackTests):
     """Tests getting the data from the packfile."""

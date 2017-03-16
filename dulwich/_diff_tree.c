@@ -38,7 +38,6 @@ typedef int Py_ssize_t;
 #define PyInt_AsLong PyLong_AsLong
 #define PyInt_AS_LONG PyLong_AS_LONG
 #define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_AsString PyBytes_AsString
 #define PyString_AsStringAndSize PyBytes_AsStringAndSize
 #define PyString_Check PyBytes_Check
 #define PyString_CheckExact PyBytes_CheckExact

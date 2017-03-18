@@ -174,6 +174,7 @@ def _format_string(value):
     if (value.startswith(b" ") or
         value.startswith(b"\t") or
         value.endswith(b" ") or
+        b'#' in value or
         value.endswith(b"\t")):
         return b'"' + _escape_value(value) + b'"'
     return _escape_value(value)
@@ -365,7 +366,7 @@ class ConfigFile(ConfigDict):
                 elif value is False:
                     value = b"false"
                 else:
-                    value = _escape_value(value)
+                    value = _format_string(value)
                 f.write(b"\t" + key + b" = " + value + b"\n")
 
 

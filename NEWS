@@ -6,6 +6,9 @@
    https://bitbucket.org/pypy/pypy/issues/2499/cpyext-pystring_asstring-doesnt-work,
    fixing Dulwich when used with C extensions on pypy < 5.6. (Victor Stinner)
 
+ * Properly quote config values with a '#' character in them.
+   (Jelmer Vernooij, #511)
+
 0.17.1	2017-03-01
 
  IMPROVEMENTS

@@ -28,11 +28,14 @@ cache:
 script:
   - pip install pip --upgrade
   - pip install $TEST_REQUIRE
+  - pip install coverage codecov
 
   # Test without c extensions
-  - python -m $TEST_RUNNER dulwich.tests.test_suite
+  - python -m coverage run -p -m $TEST_RUNNER dulwich.tests.test_suite
 
   # Test with c extensions
   - python setup.py build_ext -i
-  - python -m $TEST_RUNNER dulwich.tests.test_suite
-
+  - python -m coverage run -p -m $TEST_RUNNER dulwich.tests.test_suite
+after_success:
+  - python -m coverage combine
+  - codecov

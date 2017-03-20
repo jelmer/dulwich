@@ -528,9 +528,16 @@ exit 1
             author=b'Test Author <test@nodomain.com>',
             commit_timestamp=12345, commit_timezone=0,
             author_timestamp=12345, author_timezone=0)
-        self.assertEqual(len(warnings_list), 1, warnings_list)
-        self.assertIsInstance(warnings_list[-1], UserWarning)
-        self.assertTrue("post-commit hook failed: " in str(warnings_list[-1]))
+        expected_warning = UserWarning(
+            'post-commit hook failed: Hook post-commit exited with '
+            'non-zero status',)
+        for w in warnings_list:
+            if (type(w) == type(expected_warning) and
+                    w.args == expected_warning.args):
+                break
+        else:
+            raise AssertionError('Expected warning %r not in %r' %
+                    (expected_warning, warnings_list))
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
     def test_as_dict(self):

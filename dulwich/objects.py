@@ -1126,8 +1126,8 @@ class Commit(ShaFile):
     __slots__ = ('_parents', '_encoding', '_extra', '_author_timezone_neg_utc',
                  '_commit_timezone_neg_utc', '_commit_time',
                  '_author_time', '_author_timezone', '_commit_timezone',
-                 '_author', '_committer', '_parents', '_extra',
-                 '_encoding', '_tree', '_message', '_mergetag', '_gpgsig')
+                 '_author', '_committer', '_tree', '_message',
+                 '_mergetag', '_gpgsig')
 
     def __init__(self):
         super(Commit, self).__init__()

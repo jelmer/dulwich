@@ -1,41 +1,36 @@
 language: python
 sudo: false
 cache: pip
+
+python:
+  - 2.7
+  - 3.3
+  - 3.4
+  - 3.5
+  - 3.5-dev
+  - 3.6
+  - 3.6-dev
+  - 3.7-dev
+
 env:
-  global: TEST_RUNNER=unittest PYTHONHASHSEED=random
+  - PYTHONHASHSEED=random
+    TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+
 matrix:
   include:
-    - python: "2.7"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "pypy"
-      env: TEST_REQUIRE="fastimport"
-    - python: "3.3"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.4"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.5"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.6"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.5-dev"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.6"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.6-dev"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-    - python: "3.7-dev"
-      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+    - python: pypy
+      env: TEST_REQUIRE=fastimport
 
 install:
   - travis_retry pip install -U pip coverage codecov $TEST_REQUIRE
 
 script:
   # Test without c extensions
-  - python -m coverage run -p --source=dulwich -m $TEST_RUNNER dulwich.tests.test_suite
+  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
 
   # Test with c extensions
   - python setup.py build_ext -i
-  - python -m coverage run -p --source=dulwich -m $TEST_RUNNER dulwich.tests.test_suite
+  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
 
 after_success:
   - python -m coverage combine

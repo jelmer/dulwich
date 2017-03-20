@@ -25,17 +25,18 @@ matrix:
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.7-dev"
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-script:
-  - pip install pip --upgrade
-  - pip install $TEST_REQUIRE
-  - pip install coverage codecov
 
+install:
+  - travis_retry pip install -U pip coverage codecov $TEST_REQUIRE
+
+script:
   # Test without c extensions
   - python -m coverage run -p --source=dulwich -m $TEST_RUNNER dulwich.tests.test_suite
 
   # Test with c extensions
   - python setup.py build_ext -i
   - python -m coverage run -p --source=dulwich -m $TEST_RUNNER dulwich.tests.test_suite
+
 after_success:
   - python -m coverage combine
   - codecov

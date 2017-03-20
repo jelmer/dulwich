@@ -8,6 +8,8 @@ matrix:
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "pypy"
       env: TEST_REQUIRE="fastimport"
+    - python: "3.3"
+      env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.4"
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.5"

@@ -1,5 +1,6 @@
 language: python
 sudo: false
+cache: pip
 env:
   global: TEST_RUNNER=unittest PYTHONHASHSEED=random
 matrix:
@@ -24,9 +25,6 @@ matrix:
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     - python: "3.7-dev"
       env: TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
-cache:
-  directories:
-    - $HOME/.cache/pip
 script:
   - pip install pip --upgrade
   - pip install $TEST_REQUIRE

@@ -4,6 +4,10 @@
 
   * List Python 3.3 as supported. (Jelmer Vernooĳ, #513)
 
+ BUG FIXES
+
+  * Fix compatibility with pypy 3. (Jelmer Vernooĳ)
+
 0.17.2	2017-03-19
 
  BUG FIXES

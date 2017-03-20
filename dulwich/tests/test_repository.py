@@ -401,8 +401,9 @@ exit 0
 """
 
         repo_dir = os.path.join(self.mkdtemp())
-        r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        r = Repo.init(repo_dir)
+        self.addCleanup(r.close)
 
         pre_commit = os.path.join(r.controldir(), 'hooks', 'pre-commit')
 
@@ -441,8 +442,9 @@ exit 0
 """
 
         repo_dir = self.mkdtemp()
-        r = Repo.init(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        r = Repo.init(repo_dir)
+        self.addCleanup(r.close)
 
         commit_msg = os.path.join(r.controldir(), 'hooks', 'commit-msg')
 
@@ -473,9 +475,10 @@ exit 0
             self.skipTest('shell hook tests requires POSIX shell')
 
         repo_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
 
         r = Repo.init(repo_dir)
-        self.addCleanup(shutil.rmtree, repo_dir)
+        self.addCleanup(r.close)
 
         (fd, path) = tempfile.mkstemp(dir=repo_dir)
         os.close(fd)
@@ -549,6 +552,7 @@ exit 1
         worktree_temp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, worktree_temp_dir)
         r = Repo.init(temp_dir)
+        self.addCleanup(r.close)
         root_sha = r.do_commit(
                 b'empty commit',
                 committer=b'Test Committer <test@nodomain.com>',
@@ -557,6 +561,7 @@ exit 1
                 author_timestamp=12345, author_timezone=0)
         r.refs[b'refs/heads/master'] = root_sha
         w = Repo._init_new_working_directory(worktree_temp_dir, r)
+        self.addCleanup(w.close)
         new_sha = w.do_commit(
                 b'new commit',
                 committer=b'Test Committer <test@nodomain.com>',

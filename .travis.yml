@@ -1,5 +1,5 @@
 language: python
-sudo: false
+sudo: true
 env:
   global: TEST_RUNNER=unittest PYTHONHASHSEED=random
 matrix:
@@ -28,6 +28,7 @@ cache:
   directories:
     - $HOME/.cache/pip
 script:
+  - sudo apt-get install -qq git
   - pip install pip --upgrade
   - pip install $TEST_REQUIRE
   - pip install coverage codecov

@@ -266,10 +266,12 @@ class GitClient(object):
             # TODO(jelmer): Avoid reading entire file into memory and
             # only processing it after the whole file has been fetched.
             f = BytesIO()
+
             def commit():
                 if f.tell():
                     f.seek(0)
                     target.object_store.add_thin_pack(f.read, None)
+
             def abort():
                 pass
         else:
@@ -337,10 +339,9 @@ class GitClient(object):
                 else:
                     ok.add(ref)
                 ref_status[ref] = status
-            raise UpdateRefsError(', '.join([ref for ref in ref_status
-                                             if ref not in ok]) +
-                                             b' failed to update',
-                                  ref_status=ref_status)
+            raise UpdateRefsError(', '.join([
+                ref for ref in ref_status if ref not in ok]) +
+                b' failed to update', ref_status=ref_status)
 
     def _read_side_band64k_data(self, proto, channel_callbacks):
         """Read per-channel data.
@@ -382,15 +383,16 @@ class GitClient(object):
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             if not isinstance(old_sha1, bytes):
                 raise TypeError('old sha1 for %s is not a bytestring: %r' %
-                        (refname, old_sha1))
+                                (refname, old_sha1))
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if not isinstance(new_sha1, bytes):
                 raise TypeError('old sha1 for %s is not a bytestring %r' %
-                        (refname, new_sha1))
+                                (refname, new_sha1))
 
             if old_sha1 != new_sha1:
                 if sent_capabilities:
-                    proto.write_pkt_line(old_sha1 + b' ' + new_sha1 + b' ' + refname)
+                    proto.write_pkt_line(old_sha1 + b' ' + new_sha1 + b' ' +
+                                         refname)
                 else:
                     proto.write_pkt_line(
                         old_sha1 + b' ' + new_sha1 + b' ' + refname + b'\0' +
@@ -410,7 +412,8 @@ class GitClient(object):
         """
         if b"side-band-64k" in capabilities:
             if progress is None:
-                progress = lambda x: None
+                def progress(x):
+                    pass
             channel_callbacks = {2: progress}
             if CAPABILITY_REPORT_STATUS in capabilities:
                 channel_callbacks[1] = PktLineParser(
@@ -435,7 +438,8 @@ class GitClient(object):
             whether there is extra graph data to read on proto
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
-        proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' + b' '.join(capabilities) + b'\n')
+        proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' +
+                             b' '.join(capabilities) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
         proto.write_pkt_line(None)
@@ -481,7 +485,9 @@ class GitClient(object):
         if CAPABILITY_SIDE_BAND_64K in capabilities:
             if progress is None:
                 # Just ignore progress data
-                progress = lambda x: None
+
+                def progress(x):
+                    pass
             self._read_side_band64k_data(proto, {
                 SIDE_BAND_CHANNEL_DATA: pack_data,
                 SIDE_BAND_CHANNEL_PROGRESS: progress}
@@ -537,7 +543,8 @@ class TraditionalGitClient(GitClient):
         proto, unused_can_read = self._connect(b'receive-pack', path)
         with proto:
             old_refs, server_capabilities = read_pkt_refs(proto)
-            negotiated_capabilities = self._send_capabilities & server_capabilities
+            negotiated_capabilities = (
+                self._send_capabilities & server_capabilities)
 
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
@@ -549,14 +556,15 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 raise
 
-            if not CAPABILITY_DELETE_REFS in server_capabilities:
+            if CAPABILITY_DELETE_REFS not in server_capabilities:
                 # Server does not support deletions. Fail later.
                 new_refs = dict(orig_new_refs)
                 for ref, sha in orig_new_refs.items():
                     if sha == ZERO_SHA:
                         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                             report_status_parser._ref_statuses.append(
-                                b'ng ' + sha + b' remote does not support deleting refs')
+                                b'ng ' + sha +
+                                b' remote does not support deleting refs')
                             report_status_parser._ref_status_ok = False
                         del new_refs[ref]
 
@@ -573,7 +581,8 @@ class TraditionalGitClient(GitClient):
 
             (have, want) = self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
-            if not want and set(new_refs.items()).issubset(set(old_refs.items())):
+            if (not want and
+                    set(new_refs.items()).issubset(set(old_refs.items()))):
                 return new_refs
             objects = generate_pack_contents(have, want)
 
@@ -621,7 +630,8 @@ class TraditionalGitClient(GitClient):
             self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read)
             self._handle_upload_pack_tail(
-                proto, negotiated_capabilities, graph_walker, pack_data, progress)
+                proto, negotiated_capabilities, graph_walker, pack_data,
+                progress)
             return refs
 
     def get_refs(self, path):
@@ -702,6 +712,7 @@ class TCPGitClient(TraditionalGitClient):
         rfile = s.makefile('rb', -1)
         # 0 means unbuffered
         wfile = s.makefile('wb', 0)
+
         def close():
             rfile.close()
             wfile.close()
@@ -712,7 +723,8 @@ class TCPGitClient(TraditionalGitClient):
         if path.startswith(b"/~"):
             path = path[1:]
         # TODO(jelmer): Alternative to ascii?
-        proto.send_cmd(b'git-' + cmd, path, b'host=' + self._host.encode('ascii'))
+        proto.send_cmd(
+            b'git-' + cmd, path, b'host=' + self._host.encode('ascii'))
         return proto, lambda: _fileno_can_read(s)
 
 
@@ -748,10 +760,10 @@ class SubprocessWrapper(object):
 def find_git_command():
     """Find command to run for system Git (usually C Git).
     """
-    if sys.platform == 'win32': # support .exe, .bat and .cmd
-        try: # to avoid overhead
+    if sys.platform == 'win32':  # support .exe, .bat and .cmd
+        try:  # to avoid overhead
             import win32api
-        except ImportError: # run through cmd.exe with some overhead
+        except ImportError:  # run through cmd.exe with some overhead
             return ['cmd', '/c', 'git']
         else:
             status, git = win32api.FindExecutable('git')
@@ -838,19 +850,23 @@ class LocalGitClient(GitClient):
             {refname: new_ref}, including deleted refs.
         """
         if not progress:
-            progress = lambda x: None
+            def progress(x):
+                pass
 
-        with self._open_repo(path)  as target:
+        with self._open_repo(path) as target:
             old_refs = target.get_refs()
             new_refs = determine_wants(dict(old_refs))
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
             for refname, new_sha1 in new_refs.items():
-                if new_sha1 not in have and not new_sha1 in want and new_sha1 != ZERO_SHA:
+                if (new_sha1 not in have and
+                        new_sha1 not in want and
+                        new_sha1 != ZERO_SHA):
                     want.append(new_sha1)
 
-            if not want and set(new_refs.items()).issubset(set(old_refs.items())):
+            if (not want and
+                    set(new_refs.items()).issubset(set(old_refs.items()))):
                 return new_refs
 
             target.object_store.add_objects(generate_pack_contents(have, want))
@@ -858,8 +874,10 @@ class LocalGitClient(GitClient):
             for refname, new_sha1 in new_refs.items():
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
                 if new_sha1 != ZERO_SHA:
-                    if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
-                        progress('unable to set %s to %s' % (refname, new_sha1))
+                    if not target.refs.set_if_equals(
+                            refname, old_sha1, new_sha1):
+                        progress('unable to set %s to %s' %
+                                 (refname, new_sha1))
                 else:
                     if not target.refs.remove_if_equals(refname, old_sha1):
                         progress('unable to remove %s' % refname)
@@ -891,10 +909,11 @@ class LocalGitClient(GitClient):
         :return: Dictionary with all remote refs (not just those fetched)
         """
         with self._open_repo(path) as r:
-            objects_iter = r.fetch_objects(determine_wants, graph_walker, progress)
+            objects_iter = r.fetch_objects(
+                determine_wants, graph_walker, progress)
 
-            # Did the process short-circuit (e.g. in a stateless RPC call)? Note
-            # that the client still expects a 0-object pack in most cases.
+            # Did the process short-circuit (e.g. in a stateless RPC call)?
+            # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
                 return
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
@@ -943,7 +962,7 @@ class SubprocessSSHVendor(SSHVendor):
         if not isinstance(command, bytes):
             raise TypeError(command)
 
-        #FIXME: This has no way to deal with passwords..
+        # FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:
             args.extend(['-p', str(port)])
@@ -1076,7 +1095,8 @@ class HttpGitClient(GitClient):
                    password=password, username=username, **kwargs)
 
     def __repr__(self):
-        return "%s(%r, dumb=%r)" % (type(self).__name__, self._base_url, self.dumb)
+        return "%s(%r, dumb=%r)" % (
+            type(self).__name__, self._base_url, self.dumb)
 
     def _get_url(self, path):
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
@@ -1138,7 +1158,7 @@ class HttpGitClient(GitClient):
         if content_type != (
                 "application/x-%s-result" % service):
             raise GitProtocolError("Invalid content-type from server: %s"
-                % content_type)
+                                   % content_type)
         return resp
 
     def send_pack(self, path, determine_wants, generate_pack_contents,
@@ -1185,12 +1205,11 @@ class HttpGitClient(GitClient):
                                    data=req_data.getvalue())
         try:
             resp_proto = Protocol(resp.read, None)
-            self._handle_receive_pack_tail(resp_proto, negotiated_capabilities,
-                progress)
+            self._handle_receive_pack_tail(
+                resp_proto, negotiated_capabilities, progress)
             return new_refs
         finally:
             resp.close()
-
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None):
@@ -1205,7 +1224,8 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
-        negotiated_capabilities = self._fetch_capabilities & server_capabilities
+        negotiated_capabilities = (
+            self._fetch_capabilities & server_capabilities)
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
@@ -1216,14 +1236,15 @@ class HttpGitClient(GitClient):
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(
-            req_proto, negotiated_capabilities, graph_walker, wants,
-            lambda: False)
+                req_proto, negotiated_capabilities, graph_walker, wants,
+                lambda: False)
         resp = self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:
             resp_proto = Protocol(resp.read, None)
-            self._handle_upload_pack_tail(resp_proto, negotiated_capabilities,
-                graph_walker, pack_data, progress)
+            self._handle_upload_pack_tail(
+                resp_proto, negotiated_capabilities, graph_walker, pack_data,
+                progress)
             return refs
         finally:
             resp.close()
@@ -1283,7 +1304,7 @@ def get_transport_and_path(location, **kwargs):
         # Windows local path
         return default_local_git_client_cls(**kwargs), location
 
-    if ':' in location and not '@' in location:
+    if ':' in location and '@' not in location:
         # SSH with no user@, zero or one leading slash.
         (hostname, path) = location.split(':', 1)
         return SSHGitClient(hostname, **kwargs), path

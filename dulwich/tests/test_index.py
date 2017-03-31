@@ -236,8 +236,8 @@ class IndexEntryFromStatTests(TestCase):
         st = os.stat_result((stat.S_IFREG + 0o644, 131078, 64769,
                 154, 1000, 1000, 12288,
                 1323629595, 1324180496, 1324180496))
-        entry = index_entry_from_stat(st, "22" * 20, 0,
-                mode=stat.S_IFREG + 0o755)
+        entry = index_entry_from_stat(
+            st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
         self.assertEqual(entry, (
             1324180496,
             1324180496,
@@ -298,8 +298,8 @@ class BuildIndexTests(TestCase):
             repo.object_store.add_objects([(o, None)
                 for o in [filea, filee, tree]])
 
-            build_index_from_tree(repo.path, repo.index_path(),
-                    repo.object_store, tree.id)
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()
@@ -312,8 +312,8 @@ class BuildIndexTests(TestCase):
             # filee
             epath = os.path.join(repo.path, 'c', 'e')
             self.assertTrue(os.path.exists(epath))
-            self.assertReasonableIndexEntry(index[b'c/e'],
-                stat.S_IFREG | 0o644, 1, filee.id)
+            self.assertReasonableIndexEntry(
+                index[b'c/e'], stat.S_IFREG | 0o644, 1, filee.id)
             self.assertFileContents(epath, b'd')
 
     def test_nonempty(self):
@@ -331,11 +331,11 @@ class BuildIndexTests(TestCase):
             tree[b'b'] = (stat.S_IFREG | 0o644, fileb.id)
             tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
 
-            repo.object_store.add_objects([(o, None)
-                for o in [filea, fileb, filed, tree]])
+            repo.object_store.add_objects(
+                [(o, None) for o in [filea, fileb, filed, tree]])
 
-            build_index_from_tree(repo.path, repo.index_path(),
-                    repo.object_store, tree.id)
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()

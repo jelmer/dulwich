@@ -136,7 +136,8 @@ def filename_to_hex(filename):
 
 def object_header(num_type, length):
     """Return an object header for the given numeric type and text length."""
-    return object_class(num_type).type_name + b' ' + str(length).encode('ascii') + b'\0'
+    return (object_class(num_type).type_name +
+            b' ' + str(length).encode('ascii') + b'\0')
 
 
 def serializable_property(name, docstring=None):
@@ -145,6 +146,7 @@ def serializable_property(name, docstring=None):
     def set(obj, value):
         setattr(obj, "_"+name, value)
         obj._needs_serialization = True
+
     def get(obj):
         return getattr(obj, "_"+name)
     return property(get, set, doc=docstring)
@@ -182,9 +184,9 @@ def check_identity(identity, error_msg):
     email_start = identity.find(b'<')
     email_end = identity.find(b'>')
     if (email_start < 0 or email_end < 0 or email_end <= email_start
-        or identity.find(b'<', email_start + 1) >= 0
-        or identity.find(b'>', email_end + 1) >= 0
-        or not identity.endswith(b'>')):
+            or identity.find(b'<', email_start + 1) >= 0
+            or identity.find(b'>', email_end + 1) >= 0
+            or not identity.endswith(b'>')):
         raise ObjectFormatException(error_msg)
 
 
@@ -551,7 +553,8 @@ class Blob(ShaFile):
     def _deserialize(self, chunks):
         self._chunked_text = chunks
 
-    chunked = property(_get_chunked, _set_chunked,
+    chunked = property(
+        _get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
 
     @classmethod
@@ -713,7 +716,8 @@ class Tag(ShaFile):
                 chunks.append(git_line(_TAGGER_HEADER, self._tagger))
             else:
                 chunks.append(git_line(
-                    _TAGGER_HEADER, self._tagger, str(self._tag_time).encode('ascii'),
+                    _TAGGER_HEADER, self._tagger,
+                    str(self._tag_time).encode('ascii'),
                     format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)))
         if self._message is not None:
             chunks.append(b'\n') # To close headers

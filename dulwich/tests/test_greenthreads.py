@@ -94,17 +94,15 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
         self.assertEqual(len(iterator), self.cmt_amount * 3)
         haves = wants[0:self.cmt_amount-1]
         finder = MissingObjectFinder(self.store, haves, wants)
-        iterator = GreenThreadsObjectStoreIterator(self.store,
-                                               iter(finder.next, None),
-                                               finder)
+        iterator = GreenThreadsObjectStoreIterator(
+            self.store, iter(finder.next, None), finder)
         self.assertEqual(len(iterator), 3)
 
     def test_iter(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
-        iterator = GreenThreadsObjectStoreIterator(self.store,
-                                               iter(finder.next, None),
-                                               finder)
+        iterator = GreenThreadsObjectStoreIterator(
+            self.store, iter(finder.next, None), finder)
         objs = []
         for sha, path in iterator:
             self.assertIn(sha, self.objs)
@@ -127,9 +125,8 @@ class TestGreenThreadsMissingObjectFinder(TestCase):
         self.assertEqual(len(finder.sha_done), 0)
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount)
 
-        finder = GreenThreadsMissingObjectFinder(self.store,
-                                             wants[0:int(self.cmt_amount/2)],
-                                             wants)
+        finder = GreenThreadsMissingObjectFinder(
+            self.store, wants[0:int(self.cmt_amount/2)], wants)
         # sha_done will contains commit id and sha of blob refered in tree
         self.assertEqual(len(finder.sha_done), (self.cmt_amount/2)*2)
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount/2)

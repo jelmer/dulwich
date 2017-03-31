@@ -58,8 +58,8 @@ flakes:
 pep8:
 	$(PEP8) dulwich
 
-style8:
-	$(FLAKE8)
+style:
+	$(FLAKE8) --exclude=build,.git
 
 before-push: check
 	git diff origin/master | $(PEP8) --diff

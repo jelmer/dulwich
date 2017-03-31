@@ -649,13 +649,14 @@ def reset(repo, mode, committish="HEAD"):
         r.reset_index(tree)
 
 
-def push(repo, remote_location, refspecs=None,
-         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
+def push(repo, remote_location, refspecs,
+         outstream=default_bytes_out_stream,
+         errstream=default_bytes_err_stream):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refspecs: relative path to the refs to push to remote
+    :param refspecs: Fefs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """

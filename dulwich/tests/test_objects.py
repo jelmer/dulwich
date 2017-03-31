@@ -864,13 +864,14 @@ class TreeTests(ShaFileCheckTests):
 class TagSerializeTests(TestCase):
 
     def test_serialize_simple(self):
-        x = make_object(Tag,
-                        tagger=b'Jelmer Vernooij <jelmer@samba.org>',
-                        name=b'0.1',
-                        message=b'Tag 0.1',
-                        object=(Blob, b'd80c186a03f423a81b39df39dc87fd269736ca86'),
-                        tag_time=423423423,
-                        tag_timezone=0)
+        x = make_object(
+            Tag,
+            tagger=b'Jelmer Vernooij <jelmer@samba.org>',
+            name=b'0.1',
+            message=b'Tag 0.1',
+            object=(Blob, b'd80c186a03f423a81b39df39dc87fd269736ca86'),
+            tag_time=423423423,
+            tag_timezone=0)
         self.assertEqual((b'object d80c186a03f423a81b39df39dc87fd269736ca86\n'
                           b'type blob\n'
                           b'tag 0.1\n'
@@ -880,13 +881,14 @@ class TagSerializeTests(TestCase):
                           b'Tag 0.1'), x.as_raw_string())
 
     def test_serialize_none_message(self):
-        x = make_object(Tag,
-                        tagger=b'Jelmer Vernooij <jelmer@samba.org>',
-                        name=b'0.1',
-                        message=None,
-                        object=(Blob, b'd80c186a03f423a81b39df39dc87fd269736ca86'),
-                        tag_time=423423423,
-                        tag_timezone=0)
+        x = make_object(
+            Tag,
+            tagger=b'Jelmer Vernooij <jelmer@samba.org>',
+            name=b'0.1',
+            message=None,
+            object=(Blob, b'd80c186a03f423a81b39df39dc87fd269736ca86'),
+            tag_time=423423423,
+            tag_timezone=0)
         self.assertEqual((b'object d80c186a03f423a81b39df39dc87fd269736ca86\n'
                           b'type blob\n'
                           b'tag 0.1\n'
@@ -943,7 +945,7 @@ class TagParseTests(ShaFileCheckTests):
                          object_sha)
         self.assertEqual(Commit, object_type)
         self.assertEqual(datetime.datetime.utcfromtimestamp(x.tag_time),
-                          datetime.datetime(2007, 7, 1, 19, 54, 34))
+                         datetime.datetime(2007, 7, 1, 19, 54, 34))
         self.assertEqual(-25200, x.tag_timezone)
 
     def test_parse_no_tagger(self):
@@ -960,7 +962,7 @@ class TagParseTests(ShaFileCheckTests):
         self.assertEqual(
             b'Linus Torvalds <torvalds@woody.linux-foundation.org>', x.tagger)
         self.assertEqual(datetime.datetime.utcfromtimestamp(x.tag_time),
-                          datetime.datetime(2007, 7, 1, 19, 54, 34))
+                         datetime.datetime(2007, 7, 1, 19, 54, 34))
         self.assertEqual(-25200, x.tag_timezone)
         self.assertEqual(b'v2.6.22-rc7', x.name)
 
@@ -1134,12 +1136,12 @@ class ShaFileCopyTests(TestCase):
 
 
 class ShaFileSerializeTests(TestCase):
-    """
-    Test that `ShaFile` objects only gets serialized once if they haven't changed.
+    """`ShaFile` objects only gets serialized once if they haven't changed.
     """
 
     @contextmanager
-    def assert_serialization_on_change(self, obj, needs_serialization_after_change=True):
+    def assert_serialization_on_change(
+            self, obj, needs_serialization_after_change=True):
         old_id = obj.id
         self.assertFalse(obj._needs_serialization)
 
@@ -1172,7 +1174,8 @@ class ShaFileSerializeTests(TestCase):
     def test_blob_serialize(self):
         blob = make_object(Blob, data=b'i am a blob')
 
-        with self.assert_serialization_on_change(blob, needs_serialization_after_change=False):
+        with self.assert_serialization_on_change(
+                blob, needs_serialization_after_change=False):
             blob.data = b'i am another blob'
 
     def test_tree_serialize(self):
@@ -1199,6 +1202,6 @@ class PrettyFormatTreeEntryTests(TestCase):
     def test_format(self):
         self.assertEqual(
                 '40000 tree 40820c38cfb182ce6c8b261555410d8382a5918b\tfoo\n',
-                pretty_format_tree_entry(b"foo", 0o40000,
+                pretty_format_tree_entry(
+                    b"foo", 0o40000,
                     b"40820c38cfb182ce6c8b261555410d8382a5918b"))
-

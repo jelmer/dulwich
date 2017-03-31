@@ -234,8 +234,9 @@ class DiffTests(TestCase):
 
     def test_blob_diff(self):
         f = BytesIO()
-        write_blob_diff(f, (b"foo.txt", 0o644, Blob.from_string(b"old\nsame\n")),
-                           (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
+        write_blob_diff(
+            f, (b"foo.txt", 0o644, Blob.from_string(b"old\nsame\n")),
+            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
             b"diff --git a/foo.txt b/bar.txt",
             b"index 3b0f961..a116b51 644",
@@ -249,8 +250,9 @@ class DiffTests(TestCase):
 
     def test_blob_add(self):
         f = BytesIO()
-        write_blob_diff(f, (None, None, None),
-                           (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
+        write_blob_diff(
+            f, (None, None, None),
+            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
              b'diff --git /dev/null b/bar.txt',
              b'new mode 644',
@@ -264,8 +266,9 @@ class DiffTests(TestCase):
 
     def test_blob_remove(self):
         f = BytesIO()
-        write_blob_diff(f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
-                           (None, None, None))
+        write_blob_diff(
+            f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
+            (None, None, None))
         self.assertEqual([
             b'diff --git a/bar.txt /dev/null',
             b'deleted mode 644',
@@ -326,10 +329,10 @@ class DiffTests(TestCase):
         store = MemoryObjectStore()
         tree1 = Tree()
         tree1.add(b"asubmodule", S_IFGITLINK,
-            b"06d0bdd9e2e20377b3180e4986b14c8549b393e4")
+                  b"06d0bdd9e2e20377b3180e4986b14c8549b393e4")
         tree2 = Tree()
         tree2.add(b"asubmodule", S_IFGITLINK,
-            b"cc975646af69f279396d4d5e1379ac6af80ee637")
+                  b"cc975646af69f279396d4d5e1379ac6af80ee637")
         store.add_objects([(o, None) for o in [tree1, tree2]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEqual([
@@ -408,8 +411,9 @@ class DiffTests(TestCase):
             b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
-        write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
-                                    (b'bar.png', 0o644, b2.id), diff_binary=True)
+        write_object_diff(
+            f, store, (b'foo.png', 0o644, b1.id),
+            (b'bar.png', 0o644, b2.id), diff_binary=True)
         self.assertEqual([
             b'diff --git a/foo.png b/bar.png',
             b'index f73e47d..06364b7 644',
@@ -481,8 +485,10 @@ class DiffTests(TestCase):
         b1 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
         store.add_object(b1)
-        write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
-            (b"bar.txt", 0o160000, b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
+        write_object_diff(
+            f, store, (b"bar.txt", 0o644, b1.id),
+            (b"bar.txt", 0o160000,
+                b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"))
         self.assertEqual([
             b'diff --git a/bar.txt b/bar.txt',
             b'old mode 644',

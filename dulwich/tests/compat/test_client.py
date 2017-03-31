@@ -160,7 +160,8 @@ class DulwichClientTestBase(object):
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
-                c.send_pack(self._build_path(b'/dest'), lambda _: sendrefs, gen_pack)
+                c.send_pack(self._build_path(b'/dest'),
+                            lambda _: sendrefs, gen_pack)
             except errors.UpdateRefsError as e:
                 self.assertEqual('refs/heads/master failed to update',
                                  e.args[0])
@@ -231,7 +232,8 @@ class DulwichClientTestBase(object):
         # be ignored
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
-            refs = c.fetch(self._build_path(b'/server_new.export'), dest,
+            refs = c.fetch(
+                self._build_path(b'/server_new.export'), dest,
                 lambda refs: [protocol.ZERO_SHA])
             for r in refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
@@ -244,10 +246,13 @@ class DulwichClientTestBase(object):
             sendrefs = dict(dest.refs)
             sendrefs[b'refs/heads/abranch'] = b"00" * 20
             del sendrefs[b'HEAD']
-            gen_pack = lambda have, want: []
+
+            def gen_pack(have, want):
+                return []
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
-            c.send_pack(self._build_path(b'/dest'), lambda _: sendrefs, gen_pack)
+            c.send_pack(
+                self._build_path(b'/dest'), lambda _: sendrefs, gen_pack)
             self.assertFalse(b"refs/heads/abranch" in dest.refs)
 
     def test_get_refs(self):
@@ -266,7 +271,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
             raise SkipTest('git-daemon was already running on port %s' %
-                              protocol.TCP_GIT_PORT)
+                           protocol.TCP_GIT_PORT)
         fd, self.pidfile = tempfile.mkstemp(prefix='dulwich-test-git-client',
                                             suffix=".pid")
         os.fdopen(fd).close()
@@ -387,7 +392,8 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def run_backend(self):
         """Call out to git http-backend."""
         # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
-        # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+        # Copyright (c) 2001-2010 Python Software Foundation;
+        # All Rights Reserved
         # Licensed under the Python Software Foundation License.
         rest = self.path
         # find an explicit query string, if present.
@@ -419,7 +425,8 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         if authorization:
             authorization = authorization.split()
             if len(authorization) == 2:
-                import base64, binascii
+                import base64
+                import binascii
                 env['AUTH_TYPE'] = authorization[0]
                 if authorization[0].lower() == "basic":
                     try:
@@ -481,7 +488,8 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         args = ['http-backend']
         if '=' not in decoded_query:
             args.append(decoded_query)
-        stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
+        stdout = run_git_or_fail(
+            args, input=data, env=env, stderr=subprocess.PIPE)
         self.wfile.write(stdout)
 
 
@@ -490,7 +498,8 @@ class HTTPGitServer(BaseHTTPServer.HTTPServer):
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path):
-        BaseHTTPServer.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
+        BaseHTTPServer.HTTPServer.__init__(
+            self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"
 

@@ -261,8 +261,8 @@ class BaseRepo(object):
             that a revision is present.
         :param progress: Simple progress function that will be called with
             updated progress strings.
-        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
-            sha for including tags.
+        :param get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
         :return: iterator over objects, with __len__ implemented
         """
         wants = determine_wants(self.get_refs())
@@ -290,8 +290,9 @@ class BaseRepo(object):
         # Deal with shallow requests separately because the haves do
         # not reflect what objects are missing
         if shallows or unshallows:
-            haves = []  # TODO: filter the haves commits from iter_shas.
-                        # the specific commits aren't missing.
+            # TODO: filter the haves commits from iter_shas. the specific
+            # commits aren't missing.
+            haves = []
 
         def get_parents(commit):
             if commit.id in shallows:
@@ -412,8 +413,8 @@ class BaseRepo(object):
 
         :param ref: The refname to peel.
         :return: The fully-peeled SHA1 of a tag object, after peeling all
-            intermediate tags; if the original ref does not point to a tag, this
-            will equal the original SHA1.
+            intermediate tags; if the original ref does not point to a tag,
+            this will equal the original SHA1.
         """
         cached = self.refs.get_peeled(ref)
         if cached is not None:
@@ -427,8 +428,8 @@ class BaseRepo(object):
             ancestors. Defaults to [HEAD]
         :param exclude: Iterable of SHAs of commits to exclude along with their
             ancestors, overriding includes.
-        :param order: ORDER_* constant specifying the order of results. Anything
-            other than ORDER_DATE may result in O(n) memory usage.
+        :param order: ORDER_* constant specifying the order of results.
+            Anything other than ORDER_DATE may result in O(n) memory usage.
         :param reverse: If True, reverse the order of output, requiring O(n)
             memory.
         :param max_entries: The maximum number of entries to yield, or None for
@@ -451,7 +452,8 @@ class BaseRepo(object):
         if isinstance(include, str):
             include = [include]
 
-        kwargs['get_parents'] = lambda commit: self.get_parents(commit.id, commit)
+        kwargs['get_parents'] = lambda commit: self.get_parents(
+            commit.id, commit)
 
         return Walker(self.object_store, include, *args, **kwargs)
 
@@ -464,7 +466,7 @@ class BaseRepo(object):
         """
         if not isinstance(name, bytes):
             raise TypeError("'name' must be bytestring, not %.80s" %
-                    type(name).__name__)
+                            type(name).__name__)
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
@@ -551,7 +553,8 @@ class BaseRepo(object):
         :param author: Author fullname (defaults to committer)
         :param commit_timestamp: Commit timestamp (defaults to now)
         :param commit_timezone: Commit timestamp timezone (defaults to GMT)
-        :param author_timestamp: Author timestamp (defaults to commit timestamp)
+        :param author_timestamp: Author timestamp (defaults to commit
+            timestamp)
         :param author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
         :param tree: SHA1 of the tree root to use (if not specified the
@@ -636,8 +639,8 @@ class BaseRepo(object):
                 self.object_store.add_object(c)
                 ok = self.refs.add_if_new(ref, c.id)
             if not ok:
-                # Fail if the atomic compare-and-swap failed, leaving the commit and
-                # all its objects as garbage.
+                # Fail if the atomic compare-and-swap failed, leaving the
+                # commit and all its objects as garbage.
                 raise CommitError("%s changed during commit" % (ref,))
 
         try:
@@ -648,7 +651,6 @@ class BaseRepo(object):
             pass
 
         return c.id
-
 
 
 def read_gitfile(f):
@@ -698,7 +700,8 @@ class Repo(BaseRepo):
             with commondir:
                 self._commondir = os.path.join(
                     self.controldir(),
-                    commondir.read().rstrip(b"\r\n").decode(sys.getfilesystemencoding()))
+                    commondir.read().rstrip(b"\r\n").decode(
+                        sys.getfilesystemencoding()))
         else:
             self._commondir = self._controldir
         self.path = root
@@ -795,7 +798,8 @@ class Repo(BaseRepo):
         pointing to a file in that location.
 
         :param path: The path to the file, relative to the control dir.
-        :param basedir: Optional argument that specifies an alternative to the control dir.
+        :param basedir: Optional argument that specifies an alternative to the
+            control dir.
         :return: An open file object, or None if the file does not exist.
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
@@ -871,7 +875,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-            origin=b"origin"):
+              origin=b"origin"):
         """Clone this repository.
 
         :param target_path: Target path
@@ -900,7 +904,7 @@ class Repo(BaseRepo):
             encoded_path = encoded_path.encode(sys.getfilesystemencoding())
         target_config.set((b'remote', b'origin'), b'url', encoded_path)
         target_config.set((b'remote', b'origin'), b'fetch',
-            b'+refs/heads/*:refs/remotes/origin/*')
+                          b'+refs/heads/*:refs/remotes/origin/*')
         target_config.write_to_path()
 
         # Update target head
@@ -928,14 +932,16 @@ class Repo(BaseRepo):
         if tree is None:
             tree = self[b'HEAD'].tree
         config = self.get_config()
-        honor_filemode = config.get_boolean('core', 'filemode', os.name != "nt")
+        honor_filemode = config.get_boolean(
+            'core', 'filemode', os.name != "nt")
         if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default
-        return build_index_from_tree(self.path, self.index_path(),
-                self.object_store, tree, honor_filemode=honor_filemode,
-                validate_path_element=validate_path_element)
+        return build_index_from_tree(
+            self.path, self.index_path(), self.object_store, tree,
+            honor_filemode=honor_filemode,
+            validate_path_element=validate_path_element)
 
     def get_config(self):
         """Retrieve the config object.
@@ -1004,7 +1010,8 @@ class Repo(BaseRepo):
         return cls(path)
 
     @classmethod
-    def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
+    def _init_new_working_directory(cls, path, main_repo, identifier=None,
+                                    mkdir=False):
         """Create a new working directory linked to a repository.
 
         :param path: Path in which to create the working tree.

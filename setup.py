@@ -8,15 +8,16 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
+import os
+import sys
 
 dulwich_version_string = '0.17.4'
 
 include_dirs = []
 # Windows MSVC support
-import os
-import sys
 if sys.platform == 'win32':
     include_dirs.append('dulwich')
+
 
 class DulwichDistribution(Distribution):
 
@@ -33,6 +34,7 @@ class DulwichDistribution(Distribution):
 
     pure = False
 
+
 if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
     # distutils.sysconfig
@@ -48,7 +50,9 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
-if not '__pypy__' in sys.modules and not sys.platform == 'win32':
+
+
+if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
@@ -81,10 +85,11 @@ setup(name='dulwich',
       All functionality is available in pure Python. Optional
       C extensions can be built for improved performance.
 
-      The project is named after the part of London that Mr. and Mrs. Git live in
-      in the particular Monty Python sketch.
+      The project is named after the part of London that Mr. and Mrs. Git live
+      in in the particular Monty Python sketch.
       """,
-      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
+      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
+                'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       classifiers=[

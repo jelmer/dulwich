@@ -29,11 +29,13 @@ from dulwich.objects import (
     ZERO_SHA,
     )
 
-Entry = collections.namedtuple('Entry', ['old_sha', 'new_sha', 'committer',
-    'timestamp', 'timezone', 'message'])
+Entry = collections.namedtuple(
+    'Entry', ['old_sha', 'new_sha', 'committer', 'timestamp', 'timezone',
+              'message'])
 
 
-def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message):
+def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
+                       message):
     """Generate a single reflog line.
 
     :param old_sha: Old Commit SHA

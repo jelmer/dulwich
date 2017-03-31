@@ -163,9 +163,9 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
         committish = "HEAD"
     with open_repo_closing(repo) as repo_obj:
         c = repo_obj[committish]
-        tree = c.tree
-        for chunk in tar_stream(repo_obj.object_store,
-                repo_obj.object_store[c.tree], c.commit_time):
+        for chunk in tar_stream(
+                repo_obj.object_store, repo_obj.object_store[c.tree],
+                c.commit_time):
             outstream.write(chunk)
 
 
@@ -204,8 +204,7 @@ def commit(repo=".", message=None, author=None, committer=None):
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
     with open_repo_closing(repo) as r:
-        return r.do_commit(message=message, author=author,
-            committer=committer)
+        return r.do_commit(message=message, author=author, committer=committer)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -217,8 +216,8 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     :param committer: Optional committer name and email
     """
     with open_repo_closing(repo) as r:
-        return r.do_commit(message=message, tree=tree, committer=committer,
-                author=author)
+        return r.do_commit(
+            message=message, tree=tree, committer=committer, author=author)
 
 
 def init(path=".", bare=False):
@@ -252,8 +251,9 @@ def clone(source, target=None, bare=False, checkout=None,
     """
     if outstream is not None:
         import warnings
-        warnings.warn("outstream= has been deprecated in favour of errstream=.", DeprecationWarning,
-                stacklevel=3)
+        warnings.warn(
+            "outstream= has been deprecated in favour of errstream=.",
+            DeprecationWarning, stacklevel=3)
         errstream = outstream
 
     if checkout is None:
@@ -273,8 +273,8 @@ def clone(source, target=None, bare=False, checkout=None,
     else:
         r = Repo.init(target)
     try:
-        remote_refs = client.fetch(host_path, r,
-            determine_wants=r.object_store.determine_wants_all,
+        remote_refs = client.fetch(
+            host_path, r, determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
         r.refs.import_refs(
             b'refs/remotes/' + origin,
@@ -293,7 +293,8 @@ def clone(source, target=None, bare=False, checkout=None,
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
         target_config.set((b'remote', b'origin'), b'url', source)
-        target_config.set((b'remote', b'origin'), b'fetch',
+        target_config.set(
+            (b'remote', b'origin'), b'fetch',
             b'+refs/heads/*:refs/remotes/origin/*')
         target_config.write_to_path()
         if checkout and b"HEAD" in r.refs:
@@ -321,7 +322,8 @@ def add(repo=".", paths=None):
                 if '.git' in dirnames:
                     dirnames.remove('.git')
                 for filename in filenames:
-                    paths.append(os.path.join(dirpath[len(r.path)+1:], filename))
+                    paths.append(
+                        os.path.join(dirpath[len(r.path)+1:], filename))
         # TODO(jelmer): Possibly allow passing in absolute paths?
         relpaths = []
         if not isinstance(paths, list):
@@ -364,7 +366,8 @@ def print_commit(commit, decode, outstream=sys.stdout):
     outstream.write("-" * 50 + "\n")
     outstream.write("commit: " + commit.id.decode('ascii') + "\n")
     if len(commit.parents) > 1:
-        outstream.write("merge: " +
+        outstream.write(
+            "merge: " +
             "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
     outstream.write("Author: " + decode(commit.author) + "\n")
     if commit.author != commit.committer:
@@ -414,7 +417,8 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
     """
     print_commit(commit, decode=decode, outstream=outstream)
     parent_commit = repo[commit.parents[0]]
-    write_tree_diff(outstream, repo.object_store, parent_commit.tree, commit.tree)
+    write_tree_diff(
+        outstream, repo.object_store, parent_commit.tree, commit.tree)
 
 
 def show_tree(repo, tree, decode, outstream=sys.stdout):
@@ -495,7 +499,8 @@ def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
         walker = r.get_walker(
             max_entries=max_entries, paths=paths, reverse=reverse)
         for entry in walker:
-            decode = lambda x: commit_decode(entry.commit, x)
+            def decode(x):
+                return commit_decode(entry.commit, x)
             print_commit(entry.commit, decode, outstream)
             if name_status:
                 outstream.writelines(
@@ -510,7 +515,8 @@ def show(repo=".", objects=None, outstream=sys.stdout,
     :param repo: Path to repository
     :param objects: Objects to show (defaults to [HEAD])
     :param outstream: Stream to write to
-    :param default_encoding: Default encoding to use if none is set in the commit
+    :param default_encoding: Default encoding to use if none is set in the
+        commit
     """
     if objects is None:
         objects = ["HEAD"]
@@ -520,9 +526,11 @@ def show(repo=".", objects=None, outstream=sys.stdout,
         for objectish in objects:
             o = parse_object(r, objectish)
             if isinstance(o, Commit):
-                decode = lambda x: commit_decode(o, x, default_encoding)
+                def decode(x):
+                    return commit_decode(o, x, default_encoding)
             else:
-                decode = lambda x: x.decode(default_encoding)
+                def decode(x):
+                    return x.decode(default_encoding)
             show_object(r, o, decode, outstream)
 
 
@@ -552,11 +560,13 @@ def rev_list(repo, commits, outstream=sys.stdout):
 
 def tag(*args, **kwargs):
     import warnings
-    warnings.warn("tag has been deprecated in favour of tag_create.", DeprecationWarning)
+    warnings.warn("tag has been deprecated in favour of tag_create.",
+                  DeprecationWarning)
     return tag_create(*args, **kwargs)
 
 
-def tag_create(repo, tag, author=None, message=None, annotated=False,
+def tag_create(
+        repo, tag, author=None, message=None, annotated=False,
         objectish="HEAD", tag_time=None, tag_timezone=None):
     """Creates a tag in git via dulwich calls:
 
@@ -602,7 +612,8 @@ def tag_create(repo, tag, author=None, message=None, annotated=False,
 
 def list_tags(*args, **kwargs):
     import warnings
-    warnings.warn("list_tags has been deprecated in favour of tag_list.", DeprecationWarning)
+    warnings.warn("list_tags has been deprecated in favour of tag_list.",
+                  DeprecationWarning)
     return tag_list(*args, **kwargs)
 
 
@@ -683,10 +694,11 @@ def push(repo, remote_location, refspecs,
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
-            client.send_pack(path, update_refs,
-                r.object_store.generate_pack_contents, progress=errstream.write)
-            errstream.write(b"Push to " + remote_location_bytes +
-                            b" successful.\n")
+            client.send_pack(
+                path, update_refs, r.object_store.generate_pack_contents,
+                progress=errstream.write)
+            errstream.write(
+                b"Push to " + remote_location_bytes + b" successful.\n")
         except (UpdateRefsError, SendPackError) as e:
             errstream.write(b"Push to " + remote_location_bytes +
                             b" failed -> " + e.message.encode(err_encoding) +
@@ -694,7 +706,8 @@ def push(repo, remote_location, refspecs,
 
 
 def pull(repo, remote_location=None, refspecs=None,
-         outstream=default_bytes_out_stream, errstream=default_bytes_err_stream):
+         outstream=default_bytes_out_stream,
+         errstream=default_bytes_err_stream):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -712,12 +725,14 @@ def pull(repo, remote_location=None, refspecs=None,
         if refspecs is None:
             refspecs = [b"HEAD"]
         selected_refs = []
+
         def determine_wants(remote_refs):
-            selected_refs.extend(parse_reftuples(remote_refs, r.refs, refspecs))
+            selected_refs.extend(
+                parse_reftuples(remote_refs, r.refs, refspecs))
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(remote_location)
-        remote_refs = client.fetch(path, r, progress=errstream.write,
-                determine_wants=determine_wants)
+        remote_refs = client.fetch(
+            path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
             r.refs[rh] = remote_refs[lh]
         if selected_refs:
@@ -828,6 +843,7 @@ def upload_pack(path=".", inf=None, outf=None):
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
+
     def send_fn(data):
         outf.write(data)
         outf.flush()
@@ -851,6 +867,7 @@ def receive_pack(path=".", inf=None, outf=None):
         inf = getattr(sys.stdin, 'buffer', sys.stdin)
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
+
     def send_fn(data):
         outf.write(data)
         outf.flush()
@@ -887,12 +904,6 @@ def branch_create(repo, name, objectish=None, force=False):
     :param force: Force creation of branch, even if it already exists
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, bytes):
-            names = [name]
-        elif isinstance(name, list):
-            names = name
-        else:
-            raise TypeError("Unexpected branch name type %r" % name)
         if objectish is None:
             objectish = "HEAD"
         object = parse_object(r, objectish)
@@ -912,7 +923,7 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, outstream=sys.stdout,
-        errstream=default_bytes_err_stream):
+          errstream=default_bytes_err_stream):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -967,7 +978,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
 
 
 def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
-        name_only=False):
+            name_only=False):
     """List contents of a tree.
 
     :param repo: Path to the repository

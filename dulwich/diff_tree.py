@@ -173,10 +173,10 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
         source and target tree.
     """
     if (rename_detector is not None and tree1_id is not None and
-        tree2_id is not None):
+            tree2_id is not None):
         for change in rename_detector.changes_with_renames(
-            tree1_id, tree2_id, want_unchanged=want_unchanged):
-                yield change
+                tree1_id, tree2_id, want_unchanged=want_unchanged):
+            yield change
         return
 
     entries = walk_trees(store, tree1_id, tree2_id,
@@ -255,8 +255,11 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
                 path = change.new.path
             changes_by_path[path][i] = change
 
-    old_sha = lambda c: c.old.sha
-    change_type = lambda c: c.type
+    def old_sha(c):
+        return c.old.sha
+
+    def change_type(c):
+        return c.type
 
     # Yield only conflicting changes.
     for _, changes in sorted(changes_by_path.items()):
@@ -381,9 +384,9 @@ class RenameDetector(object):
             an add/delete pair to be a rename/copy; see _similarity_score.
         :param max_files: The maximum number of adds and deletes to consider,
             or None for no limit. The detector is guaranteed to compare no more
-            than max_files ** 2 add/delete pairs. This limit is provided because
-            rename detection can be quadratic in the project size. If the limit
-            is exceeded, no content rename detection is attempted.
+            than max_files ** 2 add/delete pairs. This limit is provided
+            because rename detection can be quadratic in the project size. If
+            the limit is exceeded, no content rename detection is attempted.
         :param rewrite_threshold: The threshold similarity score below which a
             modify should be considered a delete/add, or None to not break
             modifies; see _similarity_score.
@@ -404,7 +407,7 @@ class RenameDetector(object):
 
     def _should_split(self, change):
         if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or
-            change.old.sha == change.new.sha):
+                change.old.sha == change.new.sha):
             return False
         old_obj = self._store[change.old.sha]
         new_obj = self._store[change.new.sha]
@@ -551,7 +554,7 @@ class RenameDetector(object):
             path = add.new.path
             delete = delete_map.get(path)
             if (delete is not None and
-                stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+                    stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]
@@ -570,7 +573,8 @@ class RenameDetector(object):
     def _prune_unchanged(self):
         if self._want_unchanged:
             return
-        self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
+        self._deletes = [
+            d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
     def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False):
         """Iterate TreeChanges between two tree SHAs, with rename detection."""

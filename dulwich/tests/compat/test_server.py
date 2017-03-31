@@ -43,7 +43,9 @@ from dulwich.tests.compat.utils import (
     require_git_version,
     )
 
-@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
+
+@skipIf(sys.platform == 'win32',
+        'Broken on windows, with very long fail time.')
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
@@ -73,7 +75,8 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
 
-@skipIf(sys.platform == 'win32', 'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == 'win32',
+        'Broken on windows, with very long fail time.')
 class GitServerSideBand64kTestCase(GitServerTestCase):
     """Tests for client/server compatibility with side-band-64k support."""
 
@@ -87,7 +90,6 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         # Fix has landed for the 1.9.3 release.
         if os.name == 'nt':
             require_git_version((1, 9, 3))
-
 
     def _handlers(self):
         return None  # default handlers include side-band-64k

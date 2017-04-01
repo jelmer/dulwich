@@ -36,5 +36,5 @@ script:
   - mv .coverage .coverage.unit-cext
 
 after_success:
-  - codecov -F unit-noext -f .coverage.unit-noext
-  - codecov -F unit-cext -f .coverage.unit-cext
+  - codecov --flags unit-noext --file .coverage.unit-noext --required
+  - codecov --flags unit-cext --file .coverage.unit-cext --required

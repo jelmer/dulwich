@@ -1,0 +1,9 @@
+comment: false
+coverage:
+  status:
+    patch: false
+    project:
+      unit:
+        flags: noext
+      litmus:
+        flags: cext

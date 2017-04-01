@@ -28,9 +28,13 @@ install:
 script:
   # Test without c extensions
   - python -m coverage run --source=dulwich -m unittest dulwich.tests.test_suite
-  - codecov -c -F noext
+  - mv .coverage .coverage.noext
 
   # Test with c extensions
   - python setup.py build_ext -i
   - python -m coverage run --source=dulwich -m unittest dulwich.tests.test_suite
-  - codecov -c -F cext
+  - mv .coverage .coverage.cext
+
+after_success:
+  - codecov -F noext -f .coverage.noext
+  - codecov -F cext -f .coverage.cext

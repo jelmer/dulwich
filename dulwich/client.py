@@ -192,9 +192,7 @@ def read_pkt_refs(proto):
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
 class GitClient(object):
-    """Git smart server client.
-
-    """
+    """Git smart server client."""
 
     def __init__(self, thin_packs=True, report_activity=None, quiet=False):
         """Create a new GitClient instance.
@@ -989,6 +987,7 @@ get_ssh_vendor = SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
+    """A Git Client that works over SSH connections."""
 
     def __init__(self, host, port=None, username=None, vendor=None, **kwargs):
         self.host = host
@@ -1060,6 +1059,7 @@ def default_urllib2_opener(config):
 
 
 class HttpGitClient(GitClient):
+    """A Git Client that works over HTTP connections."""
 
     def __init__(self, base_url, dumb=None, opener=None, config=None,
                  username=None, password=None, **kwargs):

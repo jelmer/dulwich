@@ -195,6 +195,10 @@ class FileSystemBackend(Backend):
         self.root = (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep)
 
     def open_repository(self, path):
+        # If path starts with a '/' the os.path.join function has no effect, so
+        # we make sure to get rid of that.
+        if path.startswith('/'):
+            path = path[1:]
         logger.debug('opening repository at %s', path)
         abspath = os.path.abspath(os.path.join(self.root, path)) + os.sep
         normcase_abspath = os.path.normcase(abspath)

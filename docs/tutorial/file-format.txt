@@ -33,7 +33,7 @@ A commit file looks like this::
   [parent <parent sha> if several parents from merges]
   author <author name> <author e-mail> <timestamp> <timezone>
   committer <author name> <author e-mail> <timestamp> <timezone>
- 
+
   <commit message>
 
 But where are the changes you committed? The commit contains a reference to a
@@ -90,7 +90,7 @@ used for the history. They can either appear as simple files on disk (one file
 per object) or in a ``pack`` file, which is a container for a number of these
 objects.
 
-The is also an index of the current state of the working copy in the
+There is also an index of the current state of the working copy in the
 repository as well as files to track the existing branches and tags.
 
 For a more detailed explanation of object formats and SHA-1 digests, see:

@@ -816,6 +816,14 @@ class HttpGitClientTests(TestCase):
         url = c.get_url(path)
         self.assertEqual('https://github.com/jelmer/dulwich', url)
 
+    def test_get_url_bytes_path(self):
+        base_url = 'https://github.com/jelmer/dulwich'
+        path_bytes = b'/jelmer/dulwich'
+        c = HttpGitClient(base_url)
+
+        url = c.get_url(path_bytes)
+        self.assertEqual('https://github.com/jelmer/dulwich', url)
+
     def test_get_url_with_username_and_passwd(self):
         base_url = 'https://github.com/jelmer/dulwich'
         path = '/jelmer/dulwich'

@@ -1099,6 +1099,8 @@ class HttpGitClient(GitClient):
             type(self).__name__, self._base_url, self.dumb)
 
     def _get_url(self, path):
+        if not isinstance(path, str):
+            path = path.decode(sys.getfilesystemencoding())
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers={}, data=None):

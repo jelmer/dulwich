@@ -1100,6 +1100,9 @@ class HttpGitClient(GitClient):
 
     def _get_url(self, path):
         if not isinstance(path, str):
+            # TODO(jelmer): this is unrelated to the local filesystem;
+            # This is not necessarily the right encoding to decode the path
+            # with.
             path = path.decode(sys.getfilesystemencoding())
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 

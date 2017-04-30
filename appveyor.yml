@@ -9,6 +9,9 @@ environment:
     - PYTHON: "C:\\Python35"
       PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py3.5.exe"
 
+    - PYTHON: "C:\\Python36"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py3.6.exe"
+
     - PYTHON: "C:\\Python27-x64"
       PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py2.7.exe"
 
@@ -17,6 +20,9 @@ environment:
 
     - PYTHON: "C:\\Python35-x64"
       PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py3.5.exe"
+
+    - PYTHON: "C:\\Python36-x64"
+      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py3.6.exe"
 
 install:
   - ps: (new-object net.webclient).DownloadFile($env:PYWIN32_URL, 'c:\\pywin32.exe')

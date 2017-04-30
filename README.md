@@ -44,6 +44,14 @@ There is a *#dulwich* IRC channel on the [Freenode](https://www.freenode.net/), 
 and [dulwich-discuss](https://groups.google.com/forum/#!forum/dulwich-discuss)
 mailing lists.
 
+Contributing
+------------
+
+For a full list of contributors, see the git logs or [AUTHORS](AUTHORS).
+
+If you'd like to contribute to Dulwich, see the [CONTRIBUTING](CONTRIBUTING.md)
+file and [list of open issues](https://github.com/jelmer/dulwich/issues).
+
 Supported versions of Python
 ----------------------------
 

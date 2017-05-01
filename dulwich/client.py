@@ -803,8 +803,8 @@ class SubprocessGitClient(TraditionalGitClient):
     def _connect(self, service, path):
         if not isinstance(service, bytes):
             raise TypeError(service)
-        if not isinstance(path, bytes):
-            path = path.encode(self._remote_path_encoding)
+        if isinstance(path, bytes):
+            path = path.decode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
         argv = git_command + [service.decode('ascii'), path]

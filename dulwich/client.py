@@ -970,9 +970,6 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None):
-        if not isinstance(command, bytes):
-            raise TypeError(command)
-
         # FIXME: This has no way to deal with passwords..
         args = ['ssh', '-x']
         if port is not None:
@@ -1035,11 +1032,12 @@ class SSHGitClient(TraditionalGitClient):
     def _connect(self, cmd, path):
         if not isinstance(cmd, bytes):
             raise TypeError(cmd)
-        if not isinstance(path, bytes):
-            path = path.encode(self._remote_path_encoding)
-        if path.startswith(b"/~"):
+        if isinstance(path, bytes):
+            path = path.decode(self._remote_path_encoding)
+        if path.startswith("/~"):
             path = path[1:]
-        argv = self._get_cmd_path(cmd) + b" '" + path + b"'"
+        argv = (self._get_cmd_path(cmd).decode(self._remote_path_encoding) +
+                " '" + path + "'")
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username)
         return (Protocol(con.read, con.write, con.close,

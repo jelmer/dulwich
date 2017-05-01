@@ -452,12 +452,21 @@ class BuildIndexTests(TestCase):
 
             tree = Tree()
             latin1_name = u'À'.encode('latin1')
+            latin1_path = os.path.join(repo_dir_bytes, latin1_name)
             utf8_name = u'À'.encode('utf8')
+            utf8_path = os.path.join(repo_dir_bytes, utf8_name)
             tree[latin1_name] = (stat.S_IFREG | 0o644, file.id)
             tree[utf8_name] = (stat.S_IFREG | 0o644, file.id)
 
             repo.object_store.add_objects(
                 [(o, None) for o in [file, tree]])
+
+            try:
+                os.path.exists(latin1_path)
+            except UnicodeDecodeError:
+                # This happens e.g. with python3.6 on Windows.
+                # It implicitly decodes using utf8, which doesn't work.
+                self.skipTest('can not implicitly convert as utf8')
 
             build_index_from_tree(
                 repo.path, repo.index_path(),
@@ -465,11 +474,11 @@ class BuildIndexTests(TestCase):
 
             # Verify index entries
             index = repo.open_index()
+            self.assertIn(latin1_name, index)
+            self.assertIn(utf8_name, index)
 
-            latin1_path = os.path.join(repo_dir_bytes, latin1_name)
             self.assertTrue(os.path.exists(latin1_path))
 
-            utf8_path = os.path.join(repo_dir_bytes, utf8_name)
             self.assertTrue(os.path.exists(utf8_path))
 
     def test_git_submodule(self):

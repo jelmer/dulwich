@@ -104,6 +104,19 @@ def _fileno_can_read(fileno):
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 
+def _win32_peek_avail(handle):
+    """Wrapper around PeekNamedPipe to check how many bytes are available."""
+    from ctypes import wintypes, windll
+    c_avail = wintypes.DWORD()
+    c_message = wintypes.DWORD()
+    success = windll.kernel32.PeekNamedPipe(
+        handle, None, 0, None, wintypes.byref(c_avail),
+        wintypes.byref(c_message))
+    if not success:
+        raise OSError(wintypes.GetLastError())
+    return c_avail.value
+
+
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
 FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
                        CAPABILITY_MULTI_ACK_DETAILED] +
@@ -742,10 +755,8 @@ class SubprocessWrapper(object):
     def can_read(self):
         if sys.platform == 'win32':
             from msvcrt import get_osfhandle
-            from win32pipe import PeekNamedPipe
             handle = get_osfhandle(self.proc.stdout.fileno())
-            data, total_bytes_avail, msg_bytes_left = PeekNamedPipe(handle, 0)
-            return total_bytes_avail != 0
+            return _win32_peek_avail(handle) != 0
         else:
             return _fileno_can_read(self.proc.stdout.fileno())
 

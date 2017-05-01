@@ -22,10 +22,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#if (PY_VERSION_HEX < 0x02050000)
-typedef int Py_ssize_t;
-#endif
-
 #if PY_MAJOR_VERSION >= 3
 #define PyInt_Check(obj) 0
 #define PyInt_CheckExact(obj) 0

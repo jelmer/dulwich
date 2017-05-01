@@ -17,6 +17,7 @@ environment:
     - PYTHON: "C:\\Python33-x64"
       PYTHON_VERSION: "3.3.x"
       PYTHON_ARCH: "64"
+      DISTUTILS_USE_SDK: "1"
 
     - PYTHON: "C:\\Python34"
       PYTHON_VERSION: "3.4.x"
@@ -25,6 +26,7 @@ environment:
     - PYTHON: "C:\\Python34-x64"
       PYTHON_VERSION: "3.4.x"
       PYTHON_ARCH: "64"
+      DISTUTILS_USE_SDK: "1"
 
     - PYTHON: "C:\\Python35"
       PYTHON_VERSION: "3.5.x"
@@ -68,26 +70,26 @@ install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
 
   # Check that we have the expected version and architecture for Python
-  - "python --version"
-  - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
+  - "build.cmd %PYTHON%\\python.exe --version"
+  - "build.cmd %PYTHON%\\python.exe -c \"import struct; print(struct.calcsize('P') * 8)\""
 
   # Install setuptools/wheel so that we can e.g. use bdist_wheel
   - "pip install setuptools wheel"
 
-  - "python setup.py develop"
+  - "build.cmd %PYTHON%\\python.exe setup.py develop"
 
 build_script:
   # Build the compiled extension
-  - "python setup.py build"
+  - "build.cmd %PYTHON%\\python.exe setup.py build"
 
 test_script:
-  - "python setup.py test"
+  - "build.cmd %PYTHON%\\python.exe setup.py test"
 
 after_test:
-  - "python setup.py bdist_wheel"
+  - "build.cmd %PYTHON%\\python.exe setup.py bdist_wheel"
   # http://stackoverflow.com/questions/43255455/unicode-character-causing-error-with-bdist-wininst-on-python-3-but-not-python-2
   # - "python setup.py bdist_wininst"
-  - "python setup.py bdist_msi"
+  - "build.cmd %PYTHON%\\python.exe setup.py bdist_msi"
   - ps: "ls dist"
 
 artifacts:

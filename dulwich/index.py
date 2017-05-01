@@ -435,6 +435,11 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
         # FIXME: This will fail on Windows. What should we do instead?
         if oldstat:
             os.unlink(target_path)
+        if sys.platform == 'win32' and sys.version_info[0] == 3:
+            # os.readlink on Python3 on Windows requires a unicode string.
+            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
+            tree_encoding = sys.getfilesystemencoding()
+            contents = contents.decode(tree_encoding)
         os.symlink(contents, target_path)
     else:
         if oldstat is not None and oldstat.st_size == len(contents):

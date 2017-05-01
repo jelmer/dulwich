@@ -56,18 +56,14 @@ if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
-if sys.version_info[0] > 2 and sys.platform == 'win32':
-    # C Modules don't build for python3 windows, and prevent tests from running
-    ext_modules = []
-else:
-    ext_modules = [
-        Extension('dulwich._objects', ['dulwich/_objects.c'],
-                  include_dirs=include_dirs),
-        Extension('dulwich._pack', ['dulwich/_pack.c'],
-                  include_dirs=include_dirs),
-        Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-                  include_dirs=include_dirs),
-    ]
+ext_modules = [
+    Extension('dulwich._objects', ['dulwich/_objects.c'],
+              include_dirs=include_dirs),
+    Extension('dulwich._pack', ['dulwich/_pack.c'],
+              include_dirs=include_dirs),
+    Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+              include_dirs=include_dirs),
+]
 
 
 setup(name='dulwich',

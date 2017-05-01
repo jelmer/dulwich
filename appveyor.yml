@@ -1,41 +1,90 @@
 environment:
+
   matrix:
+
     - PYTHON: "C:\\Python27"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py2.7.exe"
-
-    - PYTHON: "C:\\Python34"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py3.4.exe"
-
-    - PYTHON: "C:\\Python35"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py3.5.exe"
-
-    - PYTHON: "C:\\Python36"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win32-py3.6.exe"
+      PYTHON_VERSION: "2.7.x"
+      PYTHON_ARCH: "32"
 
     - PYTHON: "C:\\Python27-x64"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py2.7.exe"
+      PYTHON_VERSION: "2.7.x"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python33"
+      PYTHON_VERSION: "3.3.x"
+      PYTHON_ARCH: "32"
+
+    - PYTHON: "C:\\Python33-x64"
+      PYTHON_VERSION: "3.3.x"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python34"
+      PYTHON_VERSION: "3.4.x"
+      PYTHON_ARCH: "32"
 
     - PYTHON: "C:\\Python34-x64"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py3.4.exe"
+      PYTHON_VERSION: "3.4.x"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.x"
+      PYTHON_ARCH: "32"
 
     - PYTHON: "C:\\Python35-x64"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py3.5.exe"
+      PYTHON_VERSION: "3.5.x"
+      PYTHON_ARCH: "64"
+
+    - PYTHON: "C:\\Python36"
+      PYTHON_VERSION: "3.6.x"
+      PYTHON_ARCH: "32"
 
     - PYTHON: "C:\\Python36-x64"
-      PYWIN32_URL: "https://downloads.sourceforge.net/project/pywin32/pywin32/Build%20220/pywin32-220.win-amd64-py3.6.exe"
+      PYTHON_VERSION: "3.6.x"
+      PYTHON_ARCH: "64"
 
 install:
-  - ps: (new-object net.webclient).DownloadFile($env:PYWIN32_URL, 'c:\\pywin32.exe')
-  - "%PYTHON%/Scripts/easy_install.exe c:\\pywin32.exe"
-  - "%PYTHON%/Scripts/easy_install.exe wheel"
+  # If there is a newer build queued for the same PR, cancel this one.
+  # The AppVeyor 'rollout builds' option is supposed to serve the same
+  # purpose but it is problematic because it tends to cancel builds pushed
+  # directly to master instead of just PR builds (or the converse).
+  # credits: JuliaLang developers.
+  - ps: if ($env:APPVEYOR_PULL_REQUEST_NUMBER -and $env:APPVEYOR_BUILD_NUMBER -ne ((Invoke-RestMethod `
+        https://ci.appveyor.com/api/projects/$env:APPVEYOR_ACCOUNT_NAME/$env:APPVEYOR_PROJECT_SLUG/history?recordsNumber=50).builds | `
+        Where-Object pullRequestId -eq $env:APPVEYOR_PULL_REQUEST_NUMBER)[0].buildNumber) { `
+          throw "There are newer queued builds for this pull request, failing early." }
+  - ECHO "Filesystem root:"
+  - ps: "ls \"C:/\""
 
-build: off
+  - ECHO "Installed SDKs:"
+  - ps: "ls \"C:/Program Files/Microsoft SDKs/Windows\""
+
+  # Install Python (from the official .msi of http://python.org) and pip when
+  # not already installed.
+  - ps: if (-not(Test-Path($env:PYTHON))) { & appveyor\install.ps1 }
+
+  # Prepend newly installed Python to the PATH of this build (this cannot be
+  # done from inside the powershell script as it would require to restart
+  # the parent CMD process).
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+
+  # Check that we have the expected version and architecture for Python
+  - "python --version"
+  - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
+
+  - "python setup.py develop"
+
+build_script:
+  # Build the compiled extension
+  - "python setup.py build"
 
 test_script:
-  - "%WITH_COMPILER% %PYTHON%/python setup.py test"
+  - "python setup.py test"
 
 after_test:
-  - "%WITH_COMPILER% %PYTHON%/python setup.py bdist_wheel"
+  - "python setup.py bdist_wheel"
+  - "python setup.py bdist_wininst"
+  - "python setup.py bdist_msi"
+  - ps: "ls dist"
 
 artifacts:
   - path: dist\*

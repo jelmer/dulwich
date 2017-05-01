@@ -15,7 +15,8 @@ dulwich_version_string = '0.17.4'
 
 include_dirs = []
 # Windows MSVC support
-if sys.platform == 'win32':
+if sys.platform == 'win32' and sys.version_info[:2] < (3, 6):
+    # Include dulwich/ for fallback stdint.h
     include_dirs.append('dulwich')
 
 

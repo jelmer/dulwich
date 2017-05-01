@@ -85,7 +85,8 @@ test_script:
 
 after_test:
   - "python setup.py bdist_wheel"
-  - "python setup.py bdist_wininst"
+  # http://stackoverflow.com/questions/43255455/unicode-character-causing-error-with-bdist-wininst-on-python-3-but-not-python-2
+  # - "python setup.py bdist_wininst"
   - "python setup.py bdist_msi"
   - ps: "ls dist"
 

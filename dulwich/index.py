@@ -516,8 +516,8 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             # TODO(jelmer): record and return submodule paths
         else:
             obj = object_store[entry.sha]
-            st = build_file_from_blob(obj, entry.mode, full_path,
-                honor_filemode=honor_filemode)
+            st = build_file_from_blob(
+                obj, entry.mode, full_path, honor_filemode=honor_filemode)
         # Add file to index
         if not honor_filemode or S_ISGITLINK(entry.mode):
             # we can not use tuple slicing to build a new tuple,
@@ -547,9 +547,10 @@ def blob_from_path_and_stat(fs_path, st):
     else:
         if sys.platform == 'win32' and sys.version_info[0] == 3:
             # os.readlink on Python3 on Windows requires a unicode string.
-            fs_path = fs_path.decode(sys.getfilesystemencoding())
-            blob.data = os.readlink(fs_path).encode(
-                sys.getfilesystemencoding())
+            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
+            tree_encoding = sys.getfilesystemencoding()
+            fs_path = fs_path.decode(tree_encoding)
+            blob.data = os.readlink(fs_path).encode(tree_encoding)
         else:
             blob.data = os.readlink(fs_path)
     return blob

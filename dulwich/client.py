@@ -106,12 +106,12 @@ def _fileno_can_read(fileno):
 
 def _win32_peek_avail(handle):
     """Wrapper around PeekNamedPipe to check how many bytes are available."""
-    from ctypes import wintypes, windll
+    from ctypes import byref, wintypes, windll
     c_avail = wintypes.DWORD()
     c_message = wintypes.DWORD()
     success = windll.kernel32.PeekNamedPipe(
-        handle, None, 0, None, wintypes.byref(c_avail),
-        wintypes.byref(c_message))
+        handle, None, 0, None, byref(c_avail),
+        byref(c_message))
     if not success:
         raise OSError(wintypes.GetLastError())
     return c_avail.value

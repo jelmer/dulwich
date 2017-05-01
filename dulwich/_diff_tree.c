@@ -25,14 +25,6 @@
 typedef unsigned short mode_t;
 #endif
 
-#if (PY_VERSION_HEX < 0x02050000)
-typedef int Py_ssize_t;
-#endif
-
-#if (PY_VERSION_HEX < 0x02060000)
-#define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
-#endif
-
 #if PY_MAJOR_VERSION >= 3
 #define PyInt_FromLong PyLong_FromLong
 #define PyInt_AsLong PyLong_AsLong

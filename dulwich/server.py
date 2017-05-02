@@ -964,8 +964,32 @@ class ReceivePackHandler(PackHandler):
             client_refs.append(ref.split())
             ref = self.proto.read_pkt_line()
 
-        # backend can now deal with this refs and read a pack using self.read
-        status = self._apply_pack(client_refs)
+        hook = self.repo.hooks.get('pre-receive', None)
+        ret = 0
+        if hook:
+            ret = hook.execute(
+                stdin='\n'.join([' '.join(i) for i in client_refs])
+            )
+            if hook.stdout:
+                self.proto.write_sideband(2, hook.stdout)
+
+        if ret == 0:
+            # backend can now deal with this refs and read a
+            # pack using self.read
+            status = self._apply_pack(client_refs)
+            hook = self.repo.hooks.get('post-receive', None)
+            if hook:
+                hook.execute(
+                    stdin='\n'.join([' '.join(i) for i in client_refs])
+                )
+                if hook.stdout:
+                    self.proto.write_sideband(2, hook.stdout)
+        else:
+            status = [
+                ('unpack', 'ok'),
+            ] + [
+                (r[-1], 'pre-receive hook declined') for r in client_refs
+            ]
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

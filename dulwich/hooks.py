@@ -150,3 +150,55 @@ class CommitMsgShellHook(ShellHook):
 
         ShellHook.__init__(self, 'commit-msg', filepath, 1,
                            prepare_msg, clean_msg)
+
+
+class PreReceiveShellHook(ShellHook):
+    """pre-receive shell hook"""
+
+    def __init__(self, controldir):
+        self.controldir = controldir
+        filepath = os.path.join(controldir, 'hooks', 'pre-receive')
+        ShellHook.__init__(self, 'pre-receive', filepath, 0)
+
+    def execute(self, stdin):
+        try:
+            env = os.environ.copy()
+            env['GIT_DIR'] = self.controldir
+            p = subprocess.Popen(
+                self.filepath,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env
+            )
+            self.stdout, self.stderr = p.communicate(stdin)
+            return p.returncode
+        except OSError:  # no file. silent failure.
+            self.stdout = None
+            return 0
+
+
+class PostReceiveShellHook(ShellHook):
+    """post-receive shell hook"""
+
+    def __init__(self, controldir):
+        self.controldir = controldir
+        filepath = os.path.join(controldir, 'hooks', 'post-receive')
+        ShellHook.__init__(self, 'post-receive', filepath, 0)
+
+    def execute(self, stdin):
+        try:
+            env = os.environ.copy()
+            env['GIT_DIR'] = self.controldir
+            p = subprocess.Popen(
+                self.filepath,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env
+            )
+            self.stdout, self.stderr = p.communicate(stdin)
+            return p.returncode
+        except OSError:  # no file. silent failure.
+            self.stdout = None
+            return 0

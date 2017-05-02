@@ -697,9 +697,66 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self):
+    class Store(dict):
+        """Store the object but always returns a new object when accessed.
+            This prevent to lose objects by updating directly an object and
+            losing the previous version.
+
+            This dict only accept bytestring of 40 as keys and ShaFile
+            instances for values.
+        """
+        def __init__(self, copy_only=True):
+            """
+                :param copy_only: (bool)
+                        If set at False the store will behave like a normal
+                        dictionary and will not return copies of the stored
+                        object. True by default.
+            """
+            self._copy_only = copy_only
+
+        def __getitem__(self, key):
+            if not len(key) == 40 or not isinstance(key, bytes):
+                raise TypeError(
+                    "'key' must be bytestring, not %.80s" % type(key).__name__
+                )
+
+            sha_object = super(MemoryObjectStore.Store, self).__getitem__(key)
+
+            return sha_object.copy() if self._copy_only else sha_object
+
+        def __setitem__(self, key, value):
+            if not len(key) == 40 or not isinstance(key, bytes):
+                raise TypeError(
+                    "'key' must be bytestring, not %.80s" % type(key).__name__
+                )
+            if not isinstance(value, ShaFile):
+                raise TypeError(
+                    "'value' must be a ShaFile, not %.80s" % (
+                        type(value).__name__,
+                    )
+                )
+
+            sha_object = value.copy() if self._copy_only else value
+
+            super(MemoryObjectStore.Store, self).__setitem__(key, sha_object)
+
+        def get(self, key):
+            return self[key]
+
+        def values(self):
+            return (
+                self[sha_object.id]
+                for sha_object in super(Store, self).values()
+            )
+
+    def __init__(self, safe_store=True):
+        """
+            :param safe_store: (bool)
+                If set to False the store may lose objects if there are
+                updated directly. True by default.
+        """
         super(MemoryObjectStore, self).__init__()
-        self._data = {}
+        self._data = MemoryObjectStore.Store(copy_only=safe_store)
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:

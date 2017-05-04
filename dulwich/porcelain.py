@@ -667,7 +667,7 @@ def push(repo, remote_location, refspecs,
 
     :param repo: Path to repository
     :param remote_location: Location of the remote
-    :param refspecs: Fefs to push to remote
+    :param refspecs: Refs to push to remote
     :param outstream: A stream file to write output
     :param errstream: A stream file to write errors
     """

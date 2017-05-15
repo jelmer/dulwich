@@ -32,3 +32,9 @@ Commit changes
   >>> open("testrepo/testfile", "w").write("data")
   >>> porcelain.add(r, "testfile")
   >>> porcelain.commit(r, b"A sample commit")
+
+Push changes
+------------
+
+  >>> tr = porcelain.init("targetrepo")
+  >>> r = porcelain.push("testrepo", "targetrepo", "master")

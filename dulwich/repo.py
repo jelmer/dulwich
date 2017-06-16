@@ -888,7 +888,7 @@ class Repo(BaseRepo):
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
         else:
-            target = self.init_bare(target_path)
+            target = self.init_bare(target_path, mkdir=mkdir)
         self.fetch(target)
         target.refs.import_refs(
             b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'))
@@ -1052,7 +1052,7 @@ class Repo(BaseRepo):
         return r
 
     @classmethod
-    def init_bare(cls, path):
+    def init_bare(cls, path, mkdir=False):
         """Create a new bare repository.
 
         ``path`` should already exist and be an empty directory.
@@ -1060,6 +1060,8 @@ class Repo(BaseRepo):
         :param path: Path to create bare repository in
         :return: a `Repo` instance
         """
+        if mkdir:
+            os.mkdir(path)
         return cls._init_maybe_bare(path, True)
 
     create = init_bare

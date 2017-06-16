@@ -244,11 +244,14 @@ class GitClient(object):
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, determine_wants, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
+        :param update_refs: Function to determine changes to remote refs.
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=None for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -269,7 +272,8 @@ class GitClient(object):
         :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
         :param determine_wants: Optional function to determine what refs
-            to fetch
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch. Defaults to all shas.
         :param progress: Optional progress function
         :return: Dictionary with all remote refs (not just those fetched)
         """
@@ -304,7 +308,10 @@ class GitClient(object):
                    progress=None):
         """Retrieve a pack from a git smart server.
 
-        :param determine_wants: Callback that returns list of commits to fetch
+        :param path: Remote path to fetch from
+        :param determine_wants: Function determine what refs
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
@@ -536,11 +543,14 @@ class TraditionalGitClient(GitClient):
         """
         raise NotImplementedError()
 
-    def send_pack(self, path, determine_wants, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
+        :param update_refs: Function to determine changes to remote refs.
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=None for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
@@ -564,7 +574,7 @@ class TraditionalGitClient(GitClient):
             report_status_parser = self._report_status_parser
 
             try:
-                new_refs = orig_new_refs = determine_wants(dict(old_refs))
+                new_refs = orig_new_refs = update_refs(dict(old_refs))
             except:
                 proto.write_pkt_line(None)
                 raise
@@ -614,7 +624,10 @@ class TraditionalGitClient(GitClient):
                    progress=None):
         """Retrieve a pack from a git smart server.
 
-        :param determine_wants: Callback that returns list of commits to fetch
+        :param path: Remote path to fetch from
+        :param determine_wants: Function determine what refs
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
@@ -843,11 +856,14 @@ class LocalGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return closing(Repo(path))
 
-    def send_pack(self, path, determine_wants, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
+        :param update_refs: Function to determine changes to remote refs.
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=None for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -866,7 +882,7 @@ class LocalGitClient(GitClient):
 
         with self._open_repo(path) as target:
             old_refs = target.get_refs()
-            new_refs = determine_wants(dict(old_refs))
+            new_refs = update_refs(dict(old_refs))
 
             have = [sha1 for sha1 in old_refs.values() if sha1 != ZERO_SHA]
             want = []
@@ -900,8 +916,9 @@ class LocalGitClient(GitClient):
 
         :param path: Path to fetch from (as bytestring)
         :param target: Target repository to fetch into
-        :param determine_wants: Optional function to determine what refs
-            to fetch
+        :param determine_wants: Optional function determine what refs
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch. Defaults to all shas.
         :param progress: Optional progress function
         :return: Dictionary with all remote refs (not just those fetched)
         """
@@ -913,7 +930,10 @@ class LocalGitClient(GitClient):
                    progress=None):
         """Retrieve a pack from a git smart server.
 
-        :param determine_wants: Callback that returns list of commits to fetch
+        :param path: Remote path to fetch from
+        :param determine_wants: Function determine what refs
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
@@ -1175,11 +1195,14 @@ class HttpGitClient(GitClient):
                                    % content_type)
         return resp
 
-    def send_pack(self, path, determine_wants, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
+        :param update_refs: Function to determine changes to remote refs.
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=None for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -1200,7 +1223,7 @@ class HttpGitClient(GitClient):
         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
             self._report_status_parser = ReportStatusParser()
 
-        new_refs = determine_wants(dict(old_refs))
+        new_refs = update_refs(dict(old_refs))
         if new_refs is None:
             # Determine wants function is aborting the push.
             return old_refs

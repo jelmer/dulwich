@@ -98,6 +98,22 @@ class CreateRepositoryTests(TestCase):
         self.assertEqual(os.path.join(tmp_dir, '.git'), repo._controldir)
         self._check_repo_contents(repo, False)
 
+    def test_create_disk_non_bare_mkdir(self):
+        tmp_dir = tempfile.mkdtemp()
+        target_dir = os.path.join(tmp_dir, "target")
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(target_dir, mkdir=True)
+        self.assertEqual(os.path.join(target_dir, '.git'), repo._controldir)
+        self._check_repo_contents(repo, False)
+
+    def test_create_disk_bare_mkdir(self):
+        tmp_dir = tempfile.mkdtemp()
+        target_dir = os.path.join(tmp_dir, "target")
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init_bare(target_dir, mkdir=True)
+        self.assertEqual(target_dir, repo._controldir)
+        self._check_repo_contents(repo, True)
+
 
 class MemoryRepoTests(TestCase):
 

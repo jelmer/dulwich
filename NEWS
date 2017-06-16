@@ -7,6 +7,9 @@
   * Fix build of C extensions with Python 3 on Windows.
     (Jelmer Vernooĳ)
 
+  * Pass 'mkdir' argument onto Repo.init_bare in Repo.clone.
+    (Jelmer Vernooĳ, #504)
+
  DOCUMENTATION
 
   * Clarified docstrings for Client.{send_pack,fetch_pack} implementations.

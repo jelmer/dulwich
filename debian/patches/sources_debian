@@ -11,7 +11,7 @@ Author: Jelmer Vernooĳ <jelmer@debian.org>
  README.md
  README.swift.md
  TODO
-@@ -17,6 +18,24 @@ tox.ini
+@@ -17,6 +18,25 @@ tox.ini
  bin/dul-receive-pack
  bin/dul-upload-pack
  bin/dulwich
@@ -27,6 +27,7 @@ Author: Jelmer Vernooĳ <jelmer@debian.org>
 +debian/rules
 +debian/watch
 +debian/patches/series
++debian/patches/sources_debian
 +debian/source/format
 +debian/source/options
 +debian/tests/control

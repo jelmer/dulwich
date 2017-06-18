@@ -5,7 +5,7 @@ Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.
 Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: https://www.dulwich.io/
 Build-Depends: python-all-dev (>= 2.6.6-3), python-all-dbg (>= 2.6.6-3), python3-all-dev, python3-all-dbg, debhelper (>= 9.20160114), python-unittest2, git (>= 1:1.7.0.4-2) | git-core, python-fastimport (>= 0.9.0~bzr293), python3-fastimport, pypy-dev [!hurd-any !m68k !sh4 !x32], dh-python
-Standards-Version: 3.9.8
+Standards-Version: 4.0.0
 X-Python-Version: >= 2.7
 X-Python3-Version: >= 3.2
 Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/dulwich.git

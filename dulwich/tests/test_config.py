@@ -173,6 +173,13 @@ who\"
         self.assertEqual(ConfigFile({(b'alias', ): {
             b'who': b"!who() {git log --no-merges --pretty=format:'%an - %ae' $@ | sort | uniq -c | sort -rn;};who"}}), cf)
 
+    def test_set_hash_gets_quoted(self):
+        c = ConfigFile()
+        c.set(b"xandikos", b"color", b"#665544")
+        f = BytesIO()
+        c.write_to_file(f)
+        self.assertEqual(b"[xandikos]\n\tcolor = \"#665544\"\n", f.getvalue())
+
 
 class ConfigDictTests(TestCase):
 

@@ -172,7 +172,11 @@ def load_conf(path=None, file=None):
     """
     conf = ConfigParser()
     if file:
-        conf.readfp(file)
+        try:
+            conf.read_file(file, path)
+        except AttributeError:
+            # read_file only exists in Python3
+            conf.readfp(file)
         return conf
     confpath = None
     if not path:

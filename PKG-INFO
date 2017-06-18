@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: dulwich
-Version: 0.17.1
+Version: 0.17.3
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooĳ
@@ -21,8 +21,10 @@ Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3.3
 Classifier: Programming Language :: Python :: 3.4
 Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Operating System :: POSIX

@@ -224,7 +224,6 @@ class InitTests(TestCase):
 class AddTests(PorcelainTestCase):
 
     def test_add_default_paths(self):
-
         # create a file for initial commit
         with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
             f.write("\n")
@@ -238,11 +237,35 @@ class AddTests(PorcelainTestCase):
         os.mkdir(os.path.join(self.repo.path, 'adir'))
         with open(os.path.join(self.repo.path, 'adir', 'afile'), 'w') as f:
             f.write("\n")
-        porcelain.add(self.repo.path)
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            porcelain.add(self.repo.path)
+        finally:
+            os.chdir(cwd)
 
         # Check that foo was added and nothing in .git was modified
         index = self.repo.open_index()
         self.assertEqual(sorted(index), [b'adir/afile', b'blah', b'foo'])
+
+    def test_add_default_paths_subdir(self):
+        os.mkdir(os.path.join(self.repo.path, 'foo'))
+        with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
+            f.write("\n")
+        with open(os.path.join(self.repo.path, 'foo', 'blie'), 'w') as f:
+            f.write("\n")
+
+        cwd = os.getcwd()
+        try:
+            os.chdir(os.path.join(self.repo.path, 'foo'))
+            porcelain.add(repo=self.repo.path)
+            porcelain.commit(repo=self.repo.path, message=b'test',
+                author=b'test', committer=b'test')
+        finally:
+            os.chdir(cwd)
+
+        index = self.repo.open_index()
+        self.assertEqual(sorted(index), [b'foo/blie'])
 
     def test_add_file(self):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:

@@ -317,7 +317,7 @@ def add(repo=".", paths=None):
         if not paths:
             # If nothing is specified, add all non-ignored files.
             paths = []
-            for dirpath, dirnames, filenames in os.walk(r.path):
+            for dirpath, dirnames, filenames in os.walk(os.getcwd()):
                 # Skip .git and below.
                 if '.git' in dirnames:
                     dirnames.remove('.git')

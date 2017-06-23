@@ -251,7 +251,7 @@ class GitClient(object):
         :param path: Repository path (as bytestring)
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=None for deletions)
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -550,7 +550,7 @@ class TraditionalGitClient(GitClient):
         :param path: Repository path (as bytestring)
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=None for deletions)
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
@@ -863,7 +863,7 @@ class LocalGitClient(GitClient):
         :param path: Repository path (as bytestring)
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=None for deletions)
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
@@ -1202,7 +1202,7 @@ class HttpGitClient(GitClient):
         :param path: Repository path (as bytestring)
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=None for deletions)
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function

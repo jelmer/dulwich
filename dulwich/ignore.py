@@ -34,16 +34,16 @@ def translate(pat):
     to cope with features in Git ignore patterns.
     """
 
-    res = ''
+    res = b''
 
-    if '/' not in pat:
+    if b'/' not in pat:
         # If there's no slash, this is a filename-based match
-        res = '(.*\/)?'
+        res = b'(.*\/)?'
 
-    if pat.startswith('**/'):
+    if pat.startswith(b'**/'):
         # Leading **/
         pat = pat[2:]
-        res = '(.*\/)?'
+        res = b'(.*\/)?'
 
     if pat.startswith(b'/'):
         pat = pat[1:]
@@ -52,36 +52,36 @@ def translate(pat):
 
     while i < n:
         if pat[i:i+3] == b'/**':
-            res = res + '(\\/.*)?'
+            res = res + b'(\\/.*)?'
             i = i+3
             continue
-        c = pat[i]
+        c = pat[i:i+1]
         i = i+1
-        if c == '*':
-            res = res + '[^\/]+'
-        elif c == '?':
-            res = res + '.'
-        elif c == '[':
+        if c == b'*':
+            res = res + b'[^\/]+'
+        elif c == b'?':
+            res = res + b'.'
+        elif c == b'[':
             j = i
-            if j < n and pat[j] == '!':
+            if j < n and pat[j:j+1] == b'!':
                 j = j+1
-            if j < n and pat[j] == ']':
+            if j < n and pat[j:j+1] == b']':
                 j = j+1
-            while j < n and pat[j] != ']':
+            while j < n and pat[j:j+1] != b']':
                 j = j+1
             if j >= n:
-                res = res + '\\['
+                res = res + b'\\['
             else:
-                stuff = pat[i:j].replace('\\','\\\\')
+                stuff = pat[i:j].replace(b'\\', b'\\\\')
                 i = j+1
-                if stuff[0] == '!':
-                    stuff = '^' + stuff[1:]
-                elif stuff[0] == '^':
-                    stuff = '\\' + stuff
-                res = '%s[%s]' % (res, stuff)
+                if stuff.startswith(b'!'):
+                    stuff = b'^' + stuff[1:]
+                elif stuff.startswith(b'^'):
+                    stuff = b'\\' + stuff
+                res = res + b'[' + stuff + b']'
         else:
             res = res + re.escape(c)
-    return res + '\Z(?ms)'
+    return res + b'\Z(?ms)'
 
 
 def read_ignore_patterns(f):

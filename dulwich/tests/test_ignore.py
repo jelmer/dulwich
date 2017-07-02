@@ -33,39 +33,39 @@ from dulwich.ignore import (
 
 
 POSITIVE_MATCH_TESTS = [
-    ("foo.c", "*.c"),
-    ("foo/foo.c", "*.c"),
-    ("foo/foo.c", "foo.c"),
-    ("foo.c", "/*.c"),
-    ("foo.c", "/foo.c"),
-    ("foo.c", "foo.c"),
-    ("foo.c", "foo.[ch]"),
-    ("foo/bar/bla.c", "foo/**"),
-    ("foo/bar/bla/blie.c", "foo/**/blie.c"),
-    ("foo/bar/bla.c", "**/bla.c"),
-    ("bla.c", "**/bla.c"),
-    ("foo/bar", "foo/**/bar"),
-    ("foo/bla/bar", "foo/**/bar"),
+    (b"foo.c", b"*.c"),
+    (b"foo/foo.c", b"*.c"),
+    (b"foo/foo.c", b"foo.c"),
+    (b"foo.c", b"/*.c"),
+    (b"foo.c", b"/foo.c"),
+    (b"foo.c", b"foo.c"),
+    (b"foo.c", b"foo.[ch]"),
+    (b"foo/bar/bla.c", b"foo/**"),
+    (b"foo/bar/bla/blie.c", b"foo/**/blie.c"),
+    (b"foo/bar/bla.c", b"**/bla.c"),
+    (b"bla.c", b"**/bla.c"),
+    (b"foo/bar", b"foo/**/bar"),
+    (b"foo/bla/bar", b"foo/**/bar"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
-    ("foo.c", "foo.[dh]"),
-    ("foo/foo.c", "/foo.c"),
-    ("foo/foo.c", "/*.c"),
+    (b"foo.c", b"foo.[dh]"),
+    (b"foo/foo.c", b"/foo.c"),
+    (b"foo/foo.c", b"/*.c"),
 ]
 
 
 TRANSLATE_TESTS = [
-    ("*.c", '(.*\\/)?[^\\/]+\\.c\\Z(?ms)'),
-    ("foo.c", '(.*\\/)?foo\\.c\\Z(?ms)'),
-    ("/*.c", '[^\\/]+\\.c\\Z(?ms)'),
-    ("/foo.c", 'foo\\.c\\Z(?ms)'),
-    ("foo.c", '(.*\\/)?foo\\.c\\Z(?ms)'),
-    ("foo.[ch]", '(.*\\/)?foo\\.[ch]\\Z(?ms)'),
-    ("foo/**", 'foo(\\/.*)?\\Z(?ms)'),
-    ("foo/**/blie.c", 'foo(\\/.*)?\\/blie\\.c\\Z(?ms)'),
-    ("**/bla.c", '(.*\\/)?bla\\.c\\Z(?ms)'),
-    ("foo/**/bar", 'foo(\\/.*)?\\/bar\\Z(?ms)'),
+    (b"*.c", b'(.*\\/)?[^\\/]+\\.c\\Z(?ms)'),
+    (b"foo.c", b'(.*\\/)?foo\\.c\\Z(?ms)'),
+    (b"/*.c", b'[^\\/]+\\.c\\Z(?ms)'),
+    (b"/foo.c", b'foo\\.c\\Z(?ms)'),
+    (b"foo.c", b'(.*\\/)?foo\\.c\\Z(?ms)'),
+    (b"foo.[ch]", b'(.*\\/)?foo\\.[ch]\\Z(?ms)'),
+    (b"foo/**", b'foo(\\/.*)?\\Z(?ms)'),
+    (b"foo/**/blie.c", b'foo(\\/.*)?\\/blie\\.c\\Z(?ms)'),
+    (b"**/bla.c", b'(.*\\/)?bla\\.c\\Z(?ms)'),
+    (b"foo/**/bar", b'foo(\\/.*)?\\/bar\\Z(?ms)'),
 ]
 
 
@@ -93,10 +93,10 @@ with trailing whitespace
 with escaped trailing whitespace\ 
 """)
         self.assertEqual(list(read_ignore_patterns(f)), [
-            '\\#not a comment',
-            '!negative',
-            'with trailing whitespace',
-            'with escaped trailing whitespace '
+            b'\\#not a comment',
+            b'!negative',
+            b'with trailing whitespace',
+            b'with escaped trailing whitespace '
         ])
 
 
@@ -118,25 +118,25 @@ class MatchPatternTests(unittest.TestCase):
 class IgnoreFilterTests(unittest.TestCase):
 
     def test_included(self):
-        filter = IgnoreFilter(['a.c', 'b.c'])
-        self.assertTrue(filter.is_ignored('a.c'))
-        self.assertIs(None, filter.is_ignored('c.c'))
+        filter = IgnoreFilter([b'a.c', b'b.c'])
+        self.assertTrue(filter.is_ignored(b'a.c'))
+        self.assertIs(None, filter.is_ignored(b'c.c'))
 
     def test_excluded(self):
-        filter = IgnoreFilter(['a.c', 'b.c', '!c.c'])
-        self.assertFalse(filter.is_ignored('c.c'))
-        self.assertIs(None, filter.is_ignored('d.c'))
+        filter = IgnoreFilter([b'a.c', b'b.c', b'!c.c'])
+        self.assertFalse(filter.is_ignored(b'c.c'))
+        self.assertIs(None, filter.is_ignored(b'd.c'))
 
 
 class IgnoreFilterStackTests(unittest.TestCase):
 
     def test_stack_first(self):
-        filter1 = IgnoreFilter(['a.c', 'b.c', '!d.c'])
-        filter2 = IgnoreFilter(['a.c', '!b,c', 'c.c', 'd.c'])
+        filter1 = IgnoreFilter([b'a.c', b'b.c', b'!d.c'])
+        filter2 = IgnoreFilter([b'a.c', b'!b,c', b'c.c', b'd.c'])
         stack = IgnoreFilterStack([filter1, filter2])
-        self.assertIs(True, stack.is_ignored('a.c'))
-        self.assertIs(True, stack.is_ignored('b.c'))
-        self.assertIs(True, stack.is_ignored('c.c'))
-        self.assertIs(False, stack.is_ignored('d.c'))
-        self.assertIs(None, stack.is_ignored('e.c'))
+        self.assertIs(True, stack.is_ignored(b'a.c'))
+        self.assertIs(True, stack.is_ignored(b'b.c'))
+        self.assertIs(True, stack.is_ignored(b'c.c'))
+        self.assertIs(False, stack.is_ignored(b'd.c'))
+        self.assertIs(None, stack.is_ignored(b'e.c'))
 

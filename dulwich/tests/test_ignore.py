@@ -25,6 +25,7 @@ import unittest
 
 from dulwich.ignore import (
     IgnoreFilter,
+    IgnoreFilterStack,
     match_pattern,
     read_ignore_patterns,
     translate,
@@ -125,3 +126,17 @@ class IgnoreFilterTests(unittest.TestCase):
         filter = IgnoreFilter(['a.c', 'b.c', '!c.c'])
         self.assertFalse(filter.is_ignored('c.c'))
         self.assertIs(None, filter.is_ignored('d.c'))
+
+
+class IgnoreFilterStackTests(unittest.TestCase):
+
+    def test_stack_first(self):
+        filter1 = IgnoreFilter(['a.c', 'b.c', '!d.c'])
+        filter2 = IgnoreFilter(['a.c', '!b,c', 'c.c', 'd.c'])
+        stack = IgnoreFilterStack([filter1, filter2])
+        self.assertIs(True, stack.is_ignored('a.c'))
+        self.assertIs(True, stack.is_ignored('b.c'))
+        self.assertIs(True, stack.is_ignored('c.c'))
+        self.assertIs(False, stack.is_ignored('d.c'))
+        self.assertIs(None, stack.is_ignored('e.c'))
+

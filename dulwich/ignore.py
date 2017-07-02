@@ -38,12 +38,12 @@ def translate(pat):
 
     if b'/' not in pat:
         # If there's no slash, this is a filename-based match
-        res = res + b'(.*\/)?'
+        res = res + b'(.*/)?'
 
     if pat.startswith(b'**/'):
         # Leading **/
         pat = pat[2:]
-        res = res + b'(.*\/)?'
+        res = res + b'(.*/)?'
 
     if pat.startswith(b'/'):
         pat = pat[1:]
@@ -52,13 +52,13 @@ def translate(pat):
 
     while i < n:
         if pat[i:i+3] == b'/**':
-            res = res + b'(\\/.*)?'
+            res = res + b'(/.*)?'
             i = i+3
             continue
         c = pat[i:i+1]
         i = i+1
         if c == b'*':
-            res = res + b'[^\/]+'
+            res = res + b'[^/]+'
         elif c == b'?':
             res = res + b'.'
         elif c == b'[':

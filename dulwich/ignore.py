@@ -36,7 +36,7 @@ def translate(pat):
 
     res = ''
 
-    if not '/' in pat:
+    if '/' not in pat:
         # If there's no slash, this is a filename-based match
         res = '(.*\/)?'
 
@@ -161,7 +161,12 @@ class IgnoreFilterStack(object):
         self._filters = filters
 
     def is_ignored(self, path):
-        """Check whether a path is explicitly included or excluded in ignores."""
+        """Check whether a path is explicitly included or excluded in ignores.
+
+        :param path: Path to check
+        :return: None if the file is not mentioned, True if it is included,
+            False if it is explicitly excluded.
+        """
         status = None
         for filter in self._filters:
             status = filter.is_ignored(path)

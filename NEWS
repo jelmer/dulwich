@@ -17,9 +17,7 @@
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.
-    Note that this is not yet hooked into the other parts of Dulwich,
-    and not all gitignore patterns are currently supported. See
-    the TODOs at the top of dulwich/ignore.py.
+    Note that this is not yet hooked into the other parts of Dulwich.
     (Jelmer Vernooĳ, #524)
 
  DOCUMENTATION

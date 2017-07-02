@@ -14,6 +14,12 @@
    add from current working directory rather than repository root.
    (Jelmer Vernooĳ, #521)
 
+ IMPROVEMENTS
+
+  * Add basic support for reading ignore files in ``dulwich.ignore``.
+    Note that this is not yet hooked into the other parts of Dulwich.
+    (Jelmer Vernooĳ, #524)
+
  DOCUMENTATION
 
   * Clarified docstrings for Client.{send_pack,fetch_pack} implementations.

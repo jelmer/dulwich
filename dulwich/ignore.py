@@ -23,8 +23,54 @@
 # TODO(jelmer): Handle ** in patterns
 # TODO(jelmer): Compile patterns
 
-import fnmatch
+import re
 import posixpath
+
+
+def translate(pat):
+    """Translate a shell PATTERN to a regular expression.
+
+    There is no way to quote meta-characters.
+
+    Originally copied from fnmatch in Python 2.7.
+    """
+
+    res = ''
+
+    if not '/' in pat:
+        res = '(.*\/)?'
+
+    pat = pat.lstrip('/')
+    i, n = 0, len(pat)
+
+    while i < n:
+        c = pat[i]
+        i = i+1
+        if c == '*':
+            res = res + '.*'
+        elif c == '?':
+            res = res + '.'
+        elif c == '[':
+            j = i
+            if j < n and pat[j] == '!':
+                j = j+1
+            if j < n and pat[j] == ']':
+                j = j+1
+            while j < n and pat[j] != ']':
+                j = j+1
+            if j >= n:
+                res = res + '\\['
+            else:
+                stuff = pat[i:j].replace('\\','\\\\')
+                i = j+1
+                if stuff[0] == '!':
+                    stuff = '^' + stuff[1:]
+                elif stuff[0] == '^':
+                    stuff = '\\' + stuff
+                res = '%s[%s]' % (res, stuff)
+        else:
+            res = res + re.escape(c)
+    return res + '\Z(?ms)'
 
 
 def read_ignore_patterns(f):
@@ -60,10 +106,10 @@ def match_pattern(path, pattern):
     :param pattern: Pattern to match
     :return: bool indicating whether the pattern matched
     """
+    re_pattern = translate(pattern)
     if b'/' not in pattern:
-        return fnmatch.fnmatch(posixpath.basename(path), pattern)
-    pattern = pattern.lstrip(b'/')
-    return fnmatch.fnmatch(path, pattern)
+        return re.match(re_pattern, posixpath.basename(path))
+    return re.match(re_pattern, path)
 
 
 class IgnoreFilter(object):

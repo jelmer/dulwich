@@ -17,14 +17,12 @@
 # License, Version 2.0.
 #
 
-"""Parsing of gitignore files."""
+"""Parsing of gitignore files.
 
-# TODO(jelmer): Handle ignore files in subdirectories
-# TODO(jelmer): Handle ** in patterns
-# TODO(jelmer): Compile patterns
+For details for the matching rules, see https://git-scm.com/docs/gitignore
+"""
 
 import re
-import posixpath
 
 
 def translate(pat):
@@ -32,12 +30,19 @@ def translate(pat):
 
     There is no way to quote meta-characters.
 
-    Originally copied from fnmatch in Python 2.7.
+    Originally copied from fnmatch in Python 2.7, but modified for Dulwich
+    to cope with features in Git ignore patterns.
     """
 
     res = ''
 
     if not '/' in pat:
+        # If there's no slash, this is a filename-based match
+        res = '(.*\/)?'
+
+    if pat.startswith('**/'):
+        # Leading **/
+        pat = pat[2:]
         res = '(.*\/)?'
 
     if pat.startswith(b'/'):
@@ -49,7 +54,7 @@ def translate(pat):
         c = pat[i]
         i = i+1
         if c == '*':
-            if i < n and pat[i] == '*':
+            if i < n and pat[i:i+1] == '*':
                 res = res + '.*?'
                 i = i+1
             else:

@@ -61,9 +61,10 @@ TRANSLATE_TESTS = [
     ("/foo.c", 'foo\\.c\\Z(?ms)'),
     ("foo.c", '(.*\\/)?foo\\.c\\Z(?ms)'),
     ("foo.[ch]", '(.*\\/)?foo\\.[ch]\\Z(?ms)'),
-    ("foo/**", 'foo\\/.*?\\Z(?ms)'),
-    ("foo/**/blie.c", 'foo\\/.*?\\/blie\\.c\\Z(?ms)'),
+    ("foo/**", 'foo(\\/.*)?\\Z(?ms)'),
+    ("foo/**/blie.c", 'foo(\\/.*)?\\/blie\\.c\\Z(?ms)'),
     ("**/bla.c", '(.*\\/)?bla\\.c\\Z(?ms)'),
+    ("foo/**/bar", 'foo(\\/.*)?\\/bar\\Z(?ms)'),
 ]
 
 

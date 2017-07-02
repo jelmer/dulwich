@@ -315,15 +315,8 @@ def add(repo=".", paths=None):
     """
     with open_repo_closing(repo) as r:
         if not paths:
-            # If nothing is specified, add all non-ignored files.
-            paths = []
-            for dirpath, dirnames, filenames in os.walk(os.getcwd()):
-                # Skip .git and below.
-                if '.git' in dirnames:
-                    dirnames.remove('.git')
-                for filename in filenames:
-                    paths.append(
-                        os.path.join(dirpath[len(r.path)+1:], filename))
+            paths = list(get_untracked_paths(os.getcwd(), r.path,
+                r.open_index()))
         # TODO(jelmer): Possibly allow passing in absolute paths?
         relpaths = []
         if not isinstance(paths, list):
@@ -756,10 +749,28 @@ def status(repo="."):
         # 1. Get status of staged
         tracked_changes = get_tree_changes(r)
         # 2. Get status of unstaged
-        unstaged_changes = list(get_unstaged_changes(r.open_index(), r.path))
-        # TODO - Status of untracked - add untracked changes, need gitignore.
-        untracked_changes = []
+        index = r.open_index()
+        unstaged_changes = list(get_unstaged_changes(index, r.path))
+        untracked_changes = list(get_untracked_paths(r.path, r.path, index))
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
+
+
+def get_untracked_paths(frompath, basepath, index):
+    """Get untracked paths.
+
+    ;param frompath: Path to walk
+    :param basepath: Path to compare to
+    :param index: Index to check against
+    """
+    # If nothing is specified, add all non-ignored files.
+    for dirpath, dirnames, filenames in os.walk(frompath):
+        # Skip .git and below.
+        if '.git' in dirnames:
+            dirnames.remove('.git')
+        for filename in filenames:
+            p = os.path.join(dirpath[len(basepath)+1:], filename)
+            if p not in index:
+                yield p
 
 
 def get_tree_changes(repo):

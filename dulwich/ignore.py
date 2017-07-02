@@ -34,16 +34,16 @@ def translate(pat):
     to cope with features in Git ignore patterns.
     """
 
-    res = b''
+    res = b'(?ms)'
 
     if b'/' not in pat:
         # If there's no slash, this is a filename-based match
-        res = b'(.*\/)?'
+        res = res + b'(.*\/)?'
 
     if pat.startswith(b'**/'):
         # Leading **/
         pat = pat[2:]
-        res = b'(.*\/)?'
+        res = res + b'(.*\/)?'
 
     if pat.startswith(b'/'):
         pat = pat[1:]
@@ -81,7 +81,7 @@ def translate(pat):
                 res = res + b'[' + stuff + b']'
         else:
             res = res + re.escape(c)
-    return res + b'\Z(?ms)'
+    return res + b'\Z'
 
 
 def read_ignore_patterns(f):
@@ -98,7 +98,7 @@ def read_ignore_patterns(f):
         if not l:
             continue
 
-        if l[0:1] == b'#':
+        if l.startswith(b'#'):
             # Comment
             continue
 

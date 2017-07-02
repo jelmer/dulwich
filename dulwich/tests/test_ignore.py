@@ -56,16 +56,16 @@ NEGATIVE_MATCH_TESTS = [
 
 
 TRANSLATE_TESTS = [
-    (b"*.c", b'(.*\\/)?[^\\/]+\\.c\\Z(?ms)'),
-    (b"foo.c", b'(.*\\/)?foo\\.c\\Z(?ms)'),
-    (b"/*.c", b'[^\\/]+\\.c\\Z(?ms)'),
-    (b"/foo.c", b'foo\\.c\\Z(?ms)'),
-    (b"foo.c", b'(.*\\/)?foo\\.c\\Z(?ms)'),
-    (b"foo.[ch]", b'(.*\\/)?foo\\.[ch]\\Z(?ms)'),
-    (b"foo/**", b'foo(\\/.*)?\\Z(?ms)'),
-    (b"foo/**/blie.c", b'foo(\\/.*)?\\/blie\\.c\\Z(?ms)'),
-    (b"**/bla.c", b'(.*\\/)?bla\\.c\\Z(?ms)'),
-    (b"foo/**/bar", b'foo(\\/.*)?\\/bar\\Z(?ms)'),
+    (b"*.c", b'(?ms)(.*\\/)?[^\\/]+\\.c\\Z'),
+    (b"foo.c", b'(?ms)(.*\\/)?foo\\.c\\Z'),
+    (b"/*.c", b'(?ms)[^\\/]+\\.c\\Z'),
+    (b"/foo.c", b'(?ms)foo\\.c\\Z'),
+    (b"foo.c", b'(?ms)(.*\\/)?foo\\.c\\Z'),
+    (b"foo.[ch]", b'(?ms)(.*\\/)?foo\\.[ch]\\Z'),
+    (b"foo/**", b'(?ms)foo(\\/.*)?\\Z'),
+    (b"foo/**/blie.c", b'(?ms)foo(\\/.*)?\\/blie\\.c\\Z'),
+    (b"**/bla.c", b'(?ms)(.*\\/)?bla\\.c\\Z'),
+    (b"foo/**/bar", b'(?ms)foo(\\/.*)?\\/bar\\Z'),
 ]
 
 

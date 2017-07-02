@@ -21,6 +21,7 @@
 """Tests for ignore files."""
 
 from io import BytesIO
+import re
 import unittest
 
 from dulwich.ignore import (
@@ -73,6 +74,10 @@ class TranslateTests(unittest.TestCase):
 
     def test_translate(self):
         for (pattern, regex) in TRANSLATE_TESTS:
+            if re.escape(b'/') == b'/':
+                # Slash is no longer escaped in Python3.7, so undo the escaping
+                # in the expected return value..
+                regex = regex.replace(b'\\/', b'/')
             self.assertEqual(
                 regex, translate(pattern),
                 "orig pattern: %r, regex: %r, expected: %r" %

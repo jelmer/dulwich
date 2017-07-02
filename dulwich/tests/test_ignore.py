@@ -42,6 +42,7 @@ POSITIVE_MATCH_TESTS = [
     ("foo/bar/bla.c", "foo/**"),
     ("foo/bar/bla/blie.c", "foo/**/blie.c"),
     ("foo/bar/bla.c", "**/bla.c"),
+    ("bla.c", "**/bla.c"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
@@ -52,15 +53,15 @@ NEGATIVE_MATCH_TESTS = [
 
 
 TRANSLATE_TESTS = [
-    ("*.c", '[^\\/]+\\.c$(?ms)'),
-    ("foo.c", 'foo\\.c$(?ms)'),
-    ("/*.c", '\\/[^\\/]+\\.c$(?ms)'),
-    ("/foo.c", '\\/foo\\.c$(?ms)'),
-    ("foo.c", 'foo\\.c$(?ms)'),
-    ("foo.[ch]",  'foo\\.[ch]$(?ms)'),
-    ("foo/**", 'foo\\/.*?$(?ms)'),
-    ("foo/**/blie.c", 'foo\\/.*?\\/blie\\.c$(?ms)'),
-    ("**/bla.c", '.*?\\/bla\\.c$(?ms)'),
+    ("*.c", '(.*\\/)?[^\\/]+\\.c\\Z(?ms)'),
+    ("foo.c", '(.*\\/)?foo\\.c\\Z(?ms)'),
+    ("/*.c", '[^\\/]+\\.c\\Z(?ms)'),
+    ("/foo.c", 'foo\\.c\\Z(?ms)'),
+    ("foo.c", '(.*\\/)?foo\\.c\\Z(?ms)'),
+    ("foo.[ch]", '(.*\\/)?foo\\.[ch]\\Z(?ms)'),
+    ("foo/**", 'foo\\/.*?\\Z(?ms)'),
+    ("foo/**/blie.c", 'foo\\/.*?\\/blie\\.c\\Z(?ms)'),
+    ("**/bla.c", '.*?\\/bla\\.c\\Z(?ms)'),
 ]
 
 

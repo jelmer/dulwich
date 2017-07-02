@@ -27,6 +27,7 @@ from dulwich.ignore import (
     IgnoreFilter,
     match_pattern,
     read_ignore_patterns,
+    translate,
     )
 
 
@@ -46,12 +47,31 @@ POSITIVE_MATCH_TESTS = [
 NEGATIVE_MATCH_TESTS = [
     ("foo.c", "foo.[dh]"),
     ("foo/foo.c", "/foo.c"),
+    ("foo/foo.c", "/*.c"),
 ]
 
 
-KNOWNFAIL_NEGATIVE_MATCH_TESTS = [
-    ("foo/foo.c", "/*.c"),
-    ]
+TRANSLATE_TESTS = [
+    ("*.c", '[^\\/]+\\.c$(?ms)'),
+    ("foo.c", 'foo\\.c$(?ms)'),
+    ("/*.c", '\\/[^\\/]+\\.c$(?ms)'),
+    ("/foo.c", '\\/foo\\.c$(?ms)'),
+    ("foo.c", 'foo\\.c$(?ms)'),
+    ("foo.[ch]",  'foo\\.[ch]$(?ms)'),
+    ("foo/**", 'foo\\/.*?$(?ms)'),
+    ("foo/**/blie.c", 'foo\\/.*?\\/blie\\.c$(?ms)'),
+    ("**/bla.c", '.*?\\/bla\\.c$(?ms)'),
+]
+
+
+class TranslateTests(unittest.TestCase):
+
+    def test_translate(self):
+        for (pattern, regex) in TRANSLATE_TESTS:
+            self.assertEqual(
+                regex, translate(pattern),
+                "orig pattern: %r, regex: %r, expected: %r" %
+                (pattern, translate(pattern), regex))
 
 
 class ReadIgnorePatterns(unittest.TestCase):
@@ -100,3 +120,4 @@ class IgnoreFilterTests(unittest.TestCase):
     def test_excluded(self):
         filter = IgnoreFilter(['a.c', 'b.c', '!c.c'])
         self.assertFalse(filter.is_ignored('c.c'))
+        self.assertIs(None, filter.is_ignored('d.c'))

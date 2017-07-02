@@ -51,14 +51,14 @@ def translate(pat):
     i, n = 0, len(pat)
 
     while i < n:
+        if pat[i:i+3] == b'/**':
+            res = res + '(\\/.*)?'
+            i = i+3
+            continue
         c = pat[i]
         i = i+1
         if c == '*':
-            if i < n and pat[i:i+1] == '*':
-                res = res + '.*?'
-                i = i+1
-            else:
-                res = res + '[^\/]+'
+            res = res + '[^\/]+'
         elif c == '?':
             res = res + '.'
         elif c == '[':

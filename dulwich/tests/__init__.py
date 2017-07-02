@@ -101,6 +101,7 @@ def self_test_suite():
         'grafts',
         'greenthreads',
         'hooks',
+        'ignore',
         'index',
         'lru_cache',
         'objects',

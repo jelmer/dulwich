@@ -40,14 +40,20 @@ def translate(pat):
     if not '/' in pat:
         res = '(.*\/)?'
 
-    pat = pat.lstrip('/')
+    if pat.startswith(b'/'):
+        pat = pat[1:]
+
     i, n = 0, len(pat)
 
     while i < n:
         c = pat[i]
         i = i+1
         if c == '*':
-            res = res + '.*'
+            if i < n and pat[i] == '*':
+                res = res + '.*?'
+                i = i+1
+            else:
+                res = res + '[^\/]+'
         elif c == '?':
             res = res + '.'
         elif c == '[':
@@ -107,8 +113,6 @@ def match_pattern(path, pattern):
     :return: bool indicating whether the pattern matched
     """
     re_pattern = translate(pattern)
-    if b'/' not in pattern:
-        return re.match(re_pattern, posixpath.basename(path))
     return re.match(re_pattern, path)
 
 

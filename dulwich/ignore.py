@@ -143,13 +143,13 @@ class IgnoreFilter(object):
         status = None
         for pattern in self._patterns:
             if pattern[0:1] == b'!':
-                if match_pattern(pattern[1:], path):
+                if match_pattern(path, pattern[1:]):
                     # Explicitly excluded.
                     return False
             else:
                 if pattern[0:1] == b'\\':
                     pattern = pattern[1:]
-                if match_pattern(pattern, path):
+                if match_pattern(path, pattern):
                     status = True
         return status
 

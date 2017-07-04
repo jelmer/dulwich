@@ -47,12 +47,14 @@ POSITIVE_MATCH_TESTS = [
     (b"bla.c", b"**/bla.c"),
     (b"foo/bar", b"foo/**/bar"),
     (b"foo/bla/bar", b"foo/**/bar"),
+    (b"foo/bar/", b"bar/"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
     (b"foo.c", b"foo.[dh]"),
     (b"foo/foo.c", b"/foo.c"),
     (b"foo/foo.c", b"/*.c"),
+    (b"foo/bar/", b"/bar/"),
 ]
 
 

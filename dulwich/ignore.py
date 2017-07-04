@@ -144,8 +144,7 @@ class IgnoreFilter(object):
         for pattern in self._patterns:
             if pattern[0:1] == b'!':
                 if match_pattern(path, pattern[1:]):
-                    # Explicitly excluded.
-                    return False
+                    status = False
             else:
                 if pattern[0:1] == b'\\':
                     pattern = pattern[1:]

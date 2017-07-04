@@ -36,7 +36,7 @@ def translate(pat):
 
     res = b'(?ms)'
 
-    if b'/' not in pat:
+    if b'/' not in pat[:-1]:
         # If there's no slash, this is a filename-based match
         res = res + b'(.*/)?'
 

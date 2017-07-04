@@ -134,6 +134,10 @@ class IgnoreFilterTests(unittest.TestCase):
         self.assertFalse(filter.is_ignored(b'c.c'))
         self.assertIs(None, filter.is_ignored(b'd.c'))
 
+    def test_include_exclude_include(self):
+        filter = IgnoreFilter([b'a.c', b'!a.c', b'a.c'])
+        self.assertTrue(filter.is_ignored(b'a.c'))
+
 
 class IgnoreFilterStackTests(unittest.TestCase):
 
@@ -146,4 +150,3 @@ class IgnoreFilterStackTests(unittest.TestCase):
         self.assertIs(True, stack.is_ignored(b'c.c'))
         self.assertIs(False, stack.is_ignored(b'd.c'))
         self.assertIs(None, stack.is_ignored(b'e.c'))
-

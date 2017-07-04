@@ -136,8 +136,8 @@ class IgnoreFilterTests(unittest.TestCase):
 class IgnoreFilterStackTests(unittest.TestCase):
 
     def test_stack_first(self):
-        filter1 = IgnoreFilter([b'a.c', b'b.c', b'!d.c'])
-        filter2 = IgnoreFilter([b'a.c', b'!b,c', b'c.c', b'd.c'])
+        filter1 = IgnoreFilter([b'[a].c', b'[b].c', b'![d].c'])
+        filter2 = IgnoreFilter([b'[a].c', b'![b],c', b'[c].c', b'[d].c'])
         stack = IgnoreFilterStack([filter1, filter2])
         self.assertIs(True, stack.is_ignored(b'a.c'))
         self.assertIs(True, stack.is_ignored(b'b.c'))

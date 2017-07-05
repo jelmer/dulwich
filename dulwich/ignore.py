@@ -81,6 +81,10 @@ def translate(pat):
                 res = res + b'[' + stuff + b']'
         else:
             res = res + re.escape(c)
+
+    if not res.endswith(b'/'):
+        res = res + b'/?'
+
     return res + b'\Z'
 
 

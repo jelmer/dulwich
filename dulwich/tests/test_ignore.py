@@ -21,16 +21,21 @@
 """Tests for ignore files."""
 
 from io import BytesIO
+import os
 import re
-import unittest
+import shutil
+import tempfile
+from dulwich.tests import TestCase
 
 from dulwich.ignore import (
     IgnoreFilter,
+    IgnoreFilterManager,
     IgnoreFilterStack,
     match_pattern,
     read_ignore_patterns,
     translate,
     )
+from dulwich.repo import Repo
 
 
 POSITIVE_MATCH_TESTS = [
@@ -74,7 +79,7 @@ TRANSLATE_TESTS = [
 ]
 
 
-class TranslateTests(unittest.TestCase):
+class TranslateTests(TestCase):
 
     def test_translate(self):
         for (pattern, regex) in TRANSLATE_TESTS:
@@ -88,7 +93,7 @@ class TranslateTests(unittest.TestCase):
                 (pattern, translate(pattern), regex))
 
 
-class ReadIgnorePatterns(unittest.TestCase):
+class ReadIgnorePatterns(TestCase):
 
     def test_read_file(self):
         f = BytesIO(b"""
@@ -109,7 +114,7 @@ with escaped trailing whitespace\
         ])
 
 
-class MatchPatternTests(unittest.TestCase):
+class MatchPatternTests(TestCase):
 
     def test_matches(self):
         for (path, pattern) in POSITIVE_MATCH_TESTS:
@@ -124,7 +129,7 @@ class MatchPatternTests(unittest.TestCase):
                 "path: %r, pattern: %r" % (path, pattern))
 
 
-class IgnoreFilterTests(unittest.TestCase):
+class IgnoreFilterTests(TestCase):
 
     def test_included(self):
         filter = IgnoreFilter([b'a.c', b'b.c'])
@@ -141,7 +146,7 @@ class IgnoreFilterTests(unittest.TestCase):
         self.assertTrue(filter.is_ignored(b'a.c'))
 
 
-class IgnoreFilterStackTests(unittest.TestCase):
+class IgnoreFilterStackTests(TestCase):
 
     def test_stack_first(self):
         filter1 = IgnoreFilter([b'[a].c', b'[b].c', b'![d].c'])
@@ -152,3 +157,26 @@ class IgnoreFilterStackTests(unittest.TestCase):
         self.assertIs(True, stack.is_ignored(b'c.c'))
         self.assertIs(False, stack.is_ignored(b'd.c'))
         self.assertIs(None, stack.is_ignored(b'e.c'))
+
+
+class IgnoreFilterManagerTests(TestCase):
+
+    def test_load_ignore(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, '.gitignore'), 'w') as f:
+            f.write('/foo/bar\n')
+        os.mkdir(os.path.join(repo.path, 'dir'))
+        with open(os.path.join(repo.path, 'dir', '.gitignore'), 'w') as f:
+            f.write('/blie\n')
+        with open(os.path.join(repo.path, 'dir', 'blie'), 'w') as f:
+            f.write('IGNORED')
+        with open(os.path.join(repo.controldir(), 'info', 'exclude'), 'w') as f:
+            f.write('/excluded\n')
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'dir', 'blie')))
+        self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
+        self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir')))
+        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'foo', 'bar')))
+        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))

@@ -22,6 +22,7 @@
 For details for the matching rules, see https://git-scm.com/docs/gitignore
 """
 
+import os.path
 import re
 
 
@@ -156,6 +157,19 @@ class IgnoreFilter(object):
                     status = True
         return status
 
+    @classmethod
+    def from_path(cls, path):
+        with open(path, 'r') as f:
+            ret = cls(read_ignore_patterns(f))
+            ret._path = path
+            return ret
+
+    def __repr__(self):
+        if getattr(self, '_path', None) is None:
+            return "<%s>" % (type(self).__name__)
+        else:
+            return "%s.from_path(%r)" % (type(self).__name__, self._path)
+
 
 class IgnoreFilterStack(object):
     """Check for ignore status in multiple filters."""
@@ -176,3 +190,77 @@ class IgnoreFilterStack(object):
             if status is not None:
                 return status
         return status
+
+
+def default_user_ignore_filter_path(config):
+    """Return default user ignore filter path.
+
+    :param config: A Config object
+    :return: Path to a global ignore file
+    """
+    try:
+        return config.get(('core', ), 'excludesFile')
+    except KeyError:
+        pass
+
+    if os.environ.get('XDG_CONFIG_HOME', ''):
+        return os.path.join(os.environ['XDG_CONFIG_HOME'], 'git', 'ignore')
+    else:
+        return os.path.join(os.environ['HOME'], '.config', 'git', 'ignore')
+
+
+class IgnoreFilterManager(object):
+    """Ignore file manager."""
+
+    def __init__(self, top_path, global_filters):
+        self._path_filters = {}
+        self._top_path = top_path
+        self._global_filters = global_filters
+
+    def _load_path(self, path):
+        try:
+            return self._path_filters[path]
+        except KeyError:
+            pass
+
+        p = os.path.join(path, '.gitignore')
+        try:
+            self._path_filters[path] = IgnoreFilter.from_path(p)
+        except IOError:
+            self._path_filters[path] = None
+        return self._path_filters[path]
+
+    def is_ignored(self, path):
+        """Check whether a path is explicitly included or excluded in ignores.
+
+        :param path: Path to check
+        :return: None if the file is not mentioned, True if it is included,
+            False if it is explicitly excluded.
+        """
+        dirname = path
+        while dirname not in (self._top_path, '/'):
+            dirname = os.path.dirname(dirname)
+            ignore_filter = self._load_path(dirname)
+            if ignore_filter is not None:
+                relpath = os.path.relpath(path, dirname)
+                status = ignore_filter.is_ignored(relpath)
+                if status is not None:
+                    return status
+        for ignore_filter in self._global_filters:
+            relpath = os.path.relpath(path, dirname)
+            status = ignore_filter.is_ignored(relpath)
+            if status is not None:
+                return status
+        return None
+
+    @classmethod
+    def from_repo(cls, repo):
+        global_filters = []
+        for p in [
+                os.path.join(repo.controldir(), 'info', 'exclude'),
+                default_user_ignore_filter_path(repo.get_config_stack())]:
+            try:
+                global_filters.append(IgnoreFilter.from_path(p))
+            except IOError:
+                pass
+        return cls(repo.path, global_filters)

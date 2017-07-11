@@ -325,9 +325,12 @@ class HTTPGitApplication(object):
       ('GET', re.compile('/objects/info/alternates$')): get_text_file,
       ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
       ('GET', re.compile('/objects/info/packs$')): get_info_packs,
-      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
+      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')):
+      get_loose_object,
+      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')):
+      get_pack_file,
+      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')):
+      get_idx_file,
 
       ('POST', re.compile('/git-upload-pack$')): handle_service_request,
       ('POST', re.compile('/git-receive-pack$')): handle_service_request,

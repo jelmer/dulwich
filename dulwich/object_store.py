@@ -484,7 +484,6 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = os.stat(self.pack_dir).st_mtime
         pack_files = set()
         for name in pack_dir_contents:
-            assert isinstance(name, basestring if sys.version_info[0] == 2 else str)
             if name.startswith("pack-") and name.endswith(".pack"):
                 # verify that idx exists first (otherwise the pack was not yet
                 # fully written)

@@ -65,12 +65,12 @@ except ImportError:
 missing_libs = []
 
 try:
-    import gevent
+    import gevent  # noqa:F401
 except ImportError:
     missing_libs.append("gevent")
 
 try:
-    import geventhttpclient
+    import geventhttpclient  # noqa:F401
 except ImportError:
     missing_libs.append("geventhttpclient")
 
@@ -81,7 +81,8 @@ except ImportError:
 
 skipmsg = "Required libraries are not installed (%r)" % missing_libs
 
-skipIfPY3 = skipIf(sys.version_info[0] == 3, "SWIFT module not yet ported to python3.")
+skipIfPY3 = skipIf(sys.version_info[0] == 3,
+                   "SWIFT module not yet ported to python3.")
 
 if not missing_libs:
     from dulwich.contrib import swift
@@ -201,6 +202,7 @@ def create_commits(length=1, marker=b'Default'):
         data.extend([blob, tree, tag, cmt])
     return data
 
+
 @skipIf(missing_libs, skipmsg)
 class FakeSwiftConnector(object):
 
@@ -252,7 +254,7 @@ class FakeSwiftConnector(object):
 
     def get_object_stat(self, name):
         name = posixpath.join(self.root, name)
-        if not name in self.store:
+        if name not in self.store:
             return None
         return {'content-length': len(self.store[name])}
 
@@ -315,7 +317,9 @@ class TestSwiftObjectStore(TestCase):
         head = odata[-1].id
         peeled_sha = dict([(sha.object[1], sha.id)
                            for sha in odata if isinstance(sha, Tag)])
-        get_tagged = lambda: peeled_sha
+
+        def get_tagged():
+            return peeled_sha
         i = sos.iter_shas(sos.find_missing_objects([],
                                                    [head, ],
                                                    progress=None,
@@ -478,9 +482,9 @@ class TestSwiftInfoRefsContainer(TestCase):
 
     def setUp(self):
         super(TestSwiftInfoRefsContainer, self).setUp()
-        content = \
-            b"22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n" + \
-            b"cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
+        content = (
+            b"22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n"
+            b"cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev")
         self.store = {'fakerepo/info/refs': content}
         self.conf = swift.load_conf(file=StringIO(config_file %
                                                   def_config_file))
@@ -562,9 +566,9 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root(self):
         with patch('dulwich.contrib.swift.SwiftConnector.test_root_exists',
-                lambda *args: None):
+                   lambda *args: None):
             with patch('geventhttpclient.HTTPClient.request',
-                lambda *args: Response()):
+                       lambda *args: Response()):
                 self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
@@ -616,7 +620,9 @@ class TestSwiftConnector(TestCase):
             self.assertEqual(self.conn.get_object('a').read(), b'content')
         with patch('geventhttpclient.HTTPClient.request',
                    lambda *args, **kwargs: Response(content=b'content')):
-            self.assertEqual(self.conn.get_object('a', range='0-6'), b'content')
+            self.assertEqual(
+                    self.conn.get_object('a', range='0-6'),
+                    b'content')
 
     def test_get_object_fails(self):
         with patch('geventhttpclient.HTTPClient.request',

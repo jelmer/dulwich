@@ -37,7 +37,8 @@ from dulwich.objects import (
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
+def write_commit_patch(f, commit, contents, progress, version=None,
+                       encoding=None):
     """Write a individual file patch.
 
     :param commit: Commit object
@@ -48,10 +49,13 @@ def write_commit_patch(f, commit, contents, progress, version=None, encoding=Non
     if isinstance(contents, str):
         contents = contents.encode(encoding)
     (num, total) = progress
-    f.write(b"From " + commit.id + b" " + time.ctime(commit.commit_time).encode(encoding) + b"\n")
+    f.write(b"From " + commit.id + b" " +
+            time.ctime(commit.commit_time).encode(encoding) + b"\n")
     f.write(b"From: " + commit.author + b"\n")
-    f.write(b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n")
-    f.write(("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding) + commit.message + b"\n")
+    f.write(b"Date: " +
+            time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n")
+    f.write(("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding) +
+            commit.message + b"\n")
     f.write(b"\n")
     f.write(b"---\n")
     try:
@@ -59,7 +63,7 @@ def write_commit_patch(f, commit, contents, progress, version=None, encoding=Non
         p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
                              stdin=subprocess.PIPE)
     except (ImportError, OSError):
-        pass # diffstat not available?
+        pass  # diffstat not available?
     else:
         (diffstat, _) = p.communicate(contents)
         f.write(diffstat)
@@ -151,6 +155,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     (new_path, new_mode, new_id) = new_file
     old_path = patch_filename(old_path, b"a")
     new_path = patch_filename(new_path, b"b")
+
     def content(mode, hexsha):
         if hexsha is None:
             return Blob.from_string(b'')
@@ -170,10 +175,11 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     new_content = content(new_mode, new_id)
     if not diff_binary and (
             is_binary(old_content.data) or is_binary(new_content.data)):
-        f.write(b"Binary files " + old_path + b" and " + new_path + b" differ\n")
+        f.write(b"Binary files " + old_path + b" and " + new_path +
+                b" differ\n")
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
-            old_path, new_path))
+                     old_path, new_path))
 
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
@@ -215,6 +221,7 @@ def write_blob_diff(f, old_file, new_file):
     (new_path, new_mode, new_blob) = new_file
     old_path = patch_filename(old_path, b"a")
     new_path = patch_filename(new_path, b"b")
+
     def lines(blob):
         if blob is not None:
             return blob.splitlines()
@@ -226,7 +233,7 @@ def write_blob_diff(f, old_file, new_file):
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
-        old_path, new_path))
+                 old_path, new_path))
 
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
@@ -242,8 +249,7 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
         write_object_diff(f, store, (oldpath, oldmode, oldsha),
-                                    (newpath, newmode, newsha),
-                                    diff_binary=diff_binary)
+                          (newpath, newmode, newsha), diff_binary=diff_binary)
 
 
 def git_am_patch_split(f, encoding=None):
@@ -255,7 +261,8 @@ def git_am_patch_split(f, encoding=None):
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
     contents = f.read()
-    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
+    if (isinstance(contents, bytes) and
+            getattr(email.parser, "BytesParser", None)):
         parser = email.parser.BytesParser()
         msg = parser.parsebytes(contents)
     else:

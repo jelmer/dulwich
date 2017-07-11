@@ -315,8 +315,8 @@ def add(repo=".", paths=None):
     """
     with open_repo_closing(repo) as r:
         if not paths:
-            paths = list(get_untracked_paths(os.getcwd(), r.path,
-                r.open_index()))
+            paths = list(
+                get_untracked_paths(os.getcwd(), r.path, r.open_index()))
         # TODO(jelmer): Possibly allow passing in absolute paths?
         relpaths = []
         if not isinstance(paths, list):
@@ -733,7 +733,7 @@ def pull(repo, remote_location=None, refspecs=None,
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree
-        r.reset_index()
+        r.reset_index(tree=tree)
 
 
 def status(repo="."):

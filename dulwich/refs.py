@@ -52,13 +52,14 @@ def check_ref_format(refname):
 
     Implements all the same rules as git-check-ref-format[1].
 
-    [1] http://www.kernel.org/pub/software/scm/git/docs/git-check-ref-format.html
+    [1]
+    http://www.kernel.org/pub/software/scm/git/docs/git-check-ref-format.html
 
     :param refname: The refname to check
     :return: True if refname is valid, False otherwise
     """
-    # These could be combined into one big expression, but are listed separately
-    # to parallel [1].
+    # These could be combined into one big expression, but are listed
+    # separately to parallel [1].
     if b'/.' in refname or refname.startswith(b'.'):
         return False
     if b'/' not in refname:
@@ -104,9 +105,9 @@ class RefsContainer(object):
         """Return the cached peeled value of a ref, if available.
 
         :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to a
-            tag, this will be the SHA the ref refers to. If the ref may point to
-            a tag, but no cached information is available, None is returned.
+        :return: The peeled value of the ref. If the ref is known not point to
+            a tag, this will be the SHA the ref refers to. If the ref may point
+            to a tag, but no cached information is available, None is returned.
         """
         return None
 
@@ -222,8 +223,8 @@ class RefsContainer(object):
     def _follow(self, name):
         import warnings
         warnings.warn(
-            "RefsContainer._follow is deprecated. Use RefsContainer.follow instead.",
-            DeprecationWarning)
+            "RefsContainer._follow is deprecated. Use RefsContainer.follow "
+            "instead.", DeprecationWarning)
         refnames, contents = self.follow(name)
         if not refnames:
             return (None, contents)
@@ -285,8 +286,8 @@ class RefsContainer(object):
         operation.
 
         :param name: The refname to delete.
-        :param old_ref: The old sha the refname must refer to, or None to delete
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None to
+            delete unconditionally.
         :return: True if the delete was successful, False otherwise.
         """
         raise NotImplementedError(self.remove_if_equals)
@@ -438,7 +439,9 @@ class DiskRefsContainer(RefsContainer):
         for root, dirs, files in os.walk(self.refpath(b'refs')):
             dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = ("%s/%s" % (dir, filename)).encode(sys.getfilesystemencoding())
+                refname = (
+                    "%s/%s" % (dir, filename)).encode(
+                            sys.getfilesystemencoding())
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())
@@ -448,7 +451,8 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        if getattr(self.path, "encode", None) and getattr(name, "decode", None):
+        if (getattr(self.path, "encode", None) and
+                getattr(name, "decode", None)):
             name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
@@ -498,9 +502,9 @@ class DiskRefsContainer(RefsContainer):
         """Return the cached peeled value of a ref, if available.
 
         :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to a
-            tag, this will be the SHA the ref refers to. If the ref may point to
-            a tag, but no cached information is available, None is returned.
+        :return: The peeled value of the ref. If the ref is known not point to
+            a tag, this will be the SHA the ref refers to. If the ref may point
+            to a tag, but no cached information is available, None is returned.
         """
         self.get_packed_refs()
         if self._peeled_refs is None or name not in self._packed_refs:
@@ -604,7 +608,8 @@ class DiskRefsContainer(RefsContainer):
                     # read again while holding the lock
                     orig_ref = self.read_loose_ref(realname)
                     if orig_ref is None:
-                        orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
+                        orig_ref = self.get_packed_refs().get(
+                                realname, ZERO_SHA)
                     if orig_ref != old_ref:
                         f.abort()
                         return False
@@ -656,8 +661,8 @@ class DiskRefsContainer(RefsContainer):
         perform an atomic compare-and-delete operation.
 
         :param name: The refname to delete.
-        :param old_ref: The old sha the refname must refer to, or None to delete
-            unconditionally.
+        :param old_ref: The old sha the refname must refer to, or None to
+            delete unconditionally.
         :return: True if the delete was successful, False otherwise.
         """
         self._check_refname(name)
@@ -786,4 +791,5 @@ def write_info_refs(refs, store):
             yield peeled.id + b'\t' + name + ANNOTATED_TAG_SUFFIX + b'\n'
 
 
-is_local_branch = lambda x: x.startswith(b'refs/heads/')
+def is_local_branch(x):
+    return x.startswith(b'refs/heads/')

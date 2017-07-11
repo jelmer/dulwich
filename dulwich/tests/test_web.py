@@ -538,5 +538,6 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         (but defunct).  See https://github.com/jonashaag/klaus/issues/154.
         """
         zstream, zlength = self._get_zstream(self.example_text)
-        self._test_call(self.example_text,
-            MinimalistWSGIInputStream2(zstream.read()), zlength)
+        self._test_call(
+                self.example_text,
+                MinimalistWSGIInputStream2(zstream.read()), zlength)

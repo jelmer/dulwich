@@ -63,6 +63,7 @@ from dulwich.tests import (
     skipIf,
     )
 
+
 class IndexTestCase(TestCase):
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/indexes')
@@ -80,10 +81,11 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual([b'bla'], list(self.get_simple_index("index")))
 
     def test_getitem(self):
-        self.assertEqual(((1230680220, 0), (1230680220, 0), 2050, 3761020,
-                           33188, 1000, 1000, 0,
-                           b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
-                          self.get_simple_index("index")[b"bla"])
+        self.assertEqual(
+                ((1230680220, 0), (1230680220, 0), 2050, 3761020,
+                 33188, 1000, 1000, 0,
+                 b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0),
+                self.get_simple_index("index")[b"bla"])
 
     def test_empty(self):
         i = self.get_simple_index("notanindex")
@@ -97,6 +99,7 @@ class SimpleIndexTestCase(IndexTestCase):
         (oldname, newname), (oldmode, newmode), (oldsha, newsha) = changes[0]
         self.assertEqual(b'bla', newname)
         self.assertEqual(b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', newsha)
+
 
 class SimpleIndexWriterTestCase(IndexTestCase):
 
@@ -131,9 +134,11 @@ class ReadIndexDictTests(IndexTestCase):
         shutil.rmtree(self.tempdir)
 
     def test_simple_write(self):
-        entries = {b'barbla': ((1230680220, 0), (1230680220, 0), 2050, 3761020,
-                    33188, 1000, 1000, 0,
-                    b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
+        entries = {
+                b'barbla':
+                ((1230680220, 0), (1230680220, 0), 2050, 3761020, 33188,
+                 1000, 1000, 0,
+                 b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 0)}
         filename = os.path.join(self.tempdir, 'test-simple-write-index')
         with open(filename, 'wb+') as x:
             write_index_dict(x, entries)
@@ -170,7 +175,7 @@ class CommitTreeTests(TestCase):
         self.assertEqual((stat.S_IFDIR, dirid), self.store[rootid][b"bla"])
         self.assertEqual((stat.S_IFREG, blob.id), self.store[dirid][b"bar"])
         self.assertEqual(set([rootid, dirid, blob.id]),
-                          set(self.store._data.keys()))
+                         set(self.store._data.keys()))
 
 
 class CleanupModeTests(TestCase):
@@ -216,9 +221,9 @@ class WriteCacheTimeTests(TestCase):
 class IndexEntryFromStatTests(TestCase):
 
     def test_simple(self):
-        st = os.stat_result((16877, 131078, 64769,
-                154, 1000, 1000, 12288,
-                1323629595, 1324180496, 1324180496))
+        st = os.stat_result(
+                (16877, 131078, 64769, 154, 1000, 1000, 12288,
+                 1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(st, "22" * 20, 0)
         self.assertEqual(entry, (
             1324180496,
@@ -233,9 +238,10 @@ class IndexEntryFromStatTests(TestCase):
             0))
 
     def test_override_mode(self):
-        st = os.stat_result((stat.S_IFREG + 0o644, 131078, 64769,
-                154, 1000, 1000, 12288,
-                1323629595, 1324180496, 1324180496))
+        st = os.stat_result(
+                (stat.S_IFREG + 0o644, 131078, 64769,
+                 154, 1000, 1000, 12288,
+                 1323629595, 1324180496, 1324180496))
         entry = index_entry_from_stat(
             st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
         self.assertEqual(entry, (
@@ -272,7 +278,8 @@ class BuildIndexTests(TestCase):
             tree = Tree()
             repo.object_store.add_object(tree)
 
-            build_index_from_tree(repo.path, repo.index_path(),
+            build_index_from_tree(
+                    repo.path, repo.index_path(),
                     repo.object_store, tree.id)
 
             # Verify index entries
@@ -295,8 +302,8 @@ class BuildIndexTests(TestCase):
             tree[b'.git/a'] = (stat.S_IFREG | 0o644, filea.id)
             tree[b'c/e'] = (stat.S_IFREG | 0o644, filee.id)
 
-            repo.object_store.add_objects([(o, None)
-                for o in [filea, filee, tree]])
+            repo.object_store.add_objects(
+                    [(o, None) for o in [filea, filee, tree]])
 
             build_index_from_tree(
                 repo.path, repo.index_path(), repo.object_store, tree.id)
@@ -344,29 +351,29 @@ class BuildIndexTests(TestCase):
             # filea
             apath = os.path.join(repo.path, 'a')
             self.assertTrue(os.path.exists(apath))
-            self.assertReasonableIndexEntry(index[b'a'],
-                stat.S_IFREG | 0o644, 6, filea.id)
+            self.assertReasonableIndexEntry(
+                    index[b'a'], stat.S_IFREG | 0o644, 6, filea.id)
             self.assertFileContents(apath, b'file a')
 
             # fileb
             bpath = os.path.join(repo.path, 'b')
             self.assertTrue(os.path.exists(bpath))
-            self.assertReasonableIndexEntry(index[b'b'],
-                stat.S_IFREG | 0o644, 6, fileb.id)
+            self.assertReasonableIndexEntry(
+                    index[b'b'], stat.S_IFREG | 0o644, 6, fileb.id)
             self.assertFileContents(bpath, b'file b')
 
             # filed
             dpath = os.path.join(repo.path, 'c', 'd')
             self.assertTrue(os.path.exists(dpath))
-            self.assertReasonableIndexEntry(index[b'c/d'],
-                stat.S_IFREG | 0o644, 6, filed.id)
+            self.assertReasonableIndexEntry(
+                    index[b'c/d'], stat.S_IFREG | 0o644, 6, filed.id)
             self.assertFileContents(dpath, b'file d')
 
             # Verify no extra files
-            self.assertEqual(['.git', 'a', 'b', 'c'],
-                sorted(os.listdir(repo.path)))
-            self.assertEqual(['d'],
-                sorted(os.listdir(os.path.join(repo.path, 'c'))))
+            self.assertEqual(
+                    ['.git', 'a', 'b', 'c'], sorted(os.listdir(repo.path)))
+            self.assertEqual(
+                    ['d'], sorted(os.listdir(os.path.join(repo.path, 'c'))))
 
     @skipIf(not getattr(os, 'sync', None), 'Requires sync support')
     def test_norewrite(self):
@@ -379,8 +386,7 @@ class BuildIndexTests(TestCase):
             tree = Tree()
             tree[b'a'] = (stat.S_IFREG | 0o644, filea.id)
 
-            repo.object_store.add_objects([(o, None)
-                for o in [filea, tree]])
+            repo.object_store.add_objects([(o, None) for o in [filea, tree]])
 
             # First Write
             build_index_from_tree(repo.path, repo.index_path(),
@@ -408,7 +414,6 @@ class BuildIndexTests(TestCase):
             with open(filea_path, 'rb') as fh:
                 self.assertEqual(b'file a', fh.read())
 
-
     @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
     def test_symlink(self):
         repo_dir = tempfile.mkdtemp()
@@ -423,11 +428,11 @@ class BuildIndexTests(TestCase):
             tree[b'c/d'] = (stat.S_IFREG | 0o644, filed.id)
             tree[b'c/e'] = (stat.S_IFLNK, filee.id)  # symlink
 
-            repo.object_store.add_objects([(o, None)
-                for o in [filed, filee, tree]])
+            repo.object_store.add_objects(
+                    [(o, None) for o in [filed, filee, tree]])
 
-            build_index_from_tree(repo.path, repo.index_path(),
-                    repo.object_store, tree.id)
+            build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()
@@ -504,8 +509,8 @@ class BuildIndexTests(TestCase):
             repo.object_store.add_objects(
                 [(o, None) for o in [tree]])
 
-            build_index_from_tree(repo.path, repo.index_path(),
-                    repo.object_store, tree.id)
+            build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()
@@ -545,8 +550,8 @@ class BuildIndexTests(TestCase):
             repo.object_store.add_objects(
                 [(o, None) for o in [tree]])
 
-            build_index_from_tree(repo.path, repo.index_path(),
-                    repo.object_store, tree.id)
+            build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()

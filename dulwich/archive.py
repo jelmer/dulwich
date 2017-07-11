@@ -34,9 +34,11 @@ class ChunkedBytesIO(object):
     """Turn a list of bytestrings into a file-like object.
 
     This is similar to creating a `BytesIO` from a concatenation of the
-    bytestring list, but saves memory by NOT creating one giant bytestring first::
+    bytestring list, but saves memory by NOT creating one giant bytestring
+    first::
 
-        BytesIO(b''.join(list_of_bytestrings)) =~= ChunkedBytesIO(list_of_bytestrings)
+        BytesIO(b''.join(list_of_bytestrings)) =~= ChunkedBytesIO(
+            list_of_bytestrings)
     """
     def __init__(self, contents):
         self.contents = contents
@@ -84,12 +86,14 @@ def tar_stream(store, tree, mtime, format=''):
             try:
                 blob = store[entry.sha]
             except KeyError:
-                # Entry probably refers to a submodule, which we don't yet support.
+                # Entry probably refers to a submodule, which we don't yet
+                # support.
                 continue
             data = ChunkedBytesIO(blob.chunked)
 
             info = tarfile.TarInfo()
-            info.name = entry_abspath.decode('ascii') # tarfile only works with ascii.
+            # tarfile only works with ascii.
+            info.name = entry_abspath.decode('ascii')
             info.size = blob.raw_length()
             info.mode = entry.mode
             info.mtime = mtime

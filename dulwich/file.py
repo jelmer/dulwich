@@ -26,6 +26,7 @@ import os
 import sys
 import tempfile
 
+
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
     try:

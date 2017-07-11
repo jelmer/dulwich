@@ -105,7 +105,7 @@ class ReadIgnorePatterns(TestCase):
 !negative
 with trailing whitespace 
 with escaped trailing whitespace\ 
-""")
+""")  # noqa: W291
         self.assertEqual(list(read_ignore_patterns(f)), [
             b'\\#not a comment',
             b'!negative',
@@ -172,11 +172,13 @@ class IgnoreFilterManagerTests(TestCase):
             f.write('/blie\n')
         with open(os.path.join(repo.path, 'dir', 'blie'), 'w') as f:
             f.write('IGNORED')
-        with open(os.path.join(repo.controldir(), 'info', 'exclude'), 'w') as f:
+        p = os.path.join(repo.controldir(), 'info', 'exclude')
+        with open(p, 'w') as f:
             f.write('/excluded\n')
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'dir', 'blie')))
-        self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
+        self.assertIs(None,
+                      m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
         self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir')))
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'foo', 'bar')))
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))

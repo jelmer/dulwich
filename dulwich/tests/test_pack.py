@@ -93,19 +93,24 @@ class PackTests(TestCase):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__),
-        'data/packs'))
+    datadir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), 'data/packs'))
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""
-        return load_pack_index(os.path.join(self.datadir, 'pack-%s.idx' % sha.decode('ascii')))
+        return load_pack_index(
+                os.path.join(self.datadir,
+                             'pack-%s.idx' % sha.decode('ascii')))
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha"""
-        return PackData(os.path.join(self.datadir, 'pack-%s.pack' % sha.decode('ascii')))
+        return PackData(
+                os.path.join(
+                        self.datadir, 'pack-%s.pack' % sha.decode('ascii')))
 
     def get_pack(self, sha):
-        return Pack(os.path.join(self.datadir, 'pack-%s' % sha.decode('ascii')))
+        return Pack(
+                os.path.join(self.datadir, 'pack-%s' % sha.decode('ascii')))
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -165,8 +170,9 @@ class TestPackDeltas(TestCase):
     test_string_huge = b'Z' * 100000
 
     def _test_roundtrip(self, base, target):
-        self.assertEqual(target,
-                          b''.join(apply_delta(base, create_delta(base, target))))
+        self.assertEqual(
+                target,
+                b''.join(apply_delta(base, create_delta(base, target))))
 
     def test_nochange(self):
         self._test_roundtrip(self.test_string1, self.test_string1)
@@ -191,9 +197,9 @@ class TestPackDeltas(TestCase):
                              self.test_string_huge + self.test_string2)
 
     def test_dest_overflow(self):
-        self.assertRaises(
-            ApplyDeltaError,
-            apply_delta, b'a'*0x10000, b'\x80\x80\x04\x80\x80\x04\x80' + b'a'*0x10000)
+        self.assertRaises(ApplyDeltaError, apply_delta,
+                          b'a'*0x10000, b'\x80\x80\x04\x80\x80\x04\x80' +
+                          b'a'*0x10000)
         self.assertRaises(
             ApplyDeltaError,
             apply_delta, b'', b'\x00\x80\x02\xb0\x11\x11')
@@ -204,12 +210,16 @@ class TestPackDeltas(TestCase):
         chunks = [
             b'tree 03207ccf58880a748188836155ceed72f03d65d6\n'
             b'parent 408fbab530fd4abe49249a636a10f10f44d07a21\n'
-            b'author Victor Stinner <victor.stinner@gmail.com> 1421355207 +0100\n'
-            b'committer Victor Stinner <victor.stinner@gmail.com> 1421355207 +0100\n'
+            b'author Victor Stinner <victor.stinner@gmail.com> '
+            b'1421355207 +0100\n'
+            b'committer Victor Stinner <victor.stinner@gmail.com> '
+            b'1421355207 +0100\n'
             b'\n'
             b'Backout changeset 3a06020af8cf\n'
-            b'\nStreamWriter: close() now clears the reference to the transport\n'
-            b'\nStreamWriter now raises an exception if it is closed: write(), writelines(),\n'
+            b'\nStreamWriter: close() now clears the reference to the '
+            b'transport\n'
+            b'\nStreamWriter now raises an exception if it is closed: '
+            b'write(), writelines(),\n'
             b'write_eof(), can_write_eof(), get_extra_info(), drain().\n']
         delta = [
             b'\xcd\x03\xad\x03]tree ff3c181a393d5a7270cddc01ea863818a8621ca8\n'
@@ -221,10 +231,13 @@ class TestPackDeltas(TestCase):
             b'parent 20a103cc90135494162e819f98d0edfc1f1fba6b',
             b'\nauthor Victor Stinner <victor.stinner@gmail.com> 14213',
             b'10738',
-            b' +0100\ncommitter Victor Stinner <victor.stinner@gmail.com> 14213',
+            b' +0100\ncommitter Victor Stinner <victor.stinner@gmail.com> '
+            b'14213',
             b'10738 +0100',
-            b'\n\nStreamWriter: close() now clears the reference to the transport\n\n'
-            b'StreamWriter now raises an exception if it is closed: write(), writelines(),\n'
+            b'\n\nStreamWriter: close() now clears the reference to the '
+            b'transport\n\n'
+            b'StreamWriter now raises an exception if it is closed: '
+            b'write(), writelines(),\n'
             b'write_eof(), can_write_eof(), get_extra_info(), drain().\n']
         self.assertEqual(b''.join(expected), b''.join(res))
 
@@ -236,7 +249,8 @@ class TestPackData(PackTests):
         self.get_pack_data(pack1_sha).close()
 
     def test_from_file(self):
-        path = os.path.join(self.datadir, 'pack-%s.pack' % pack1_sha.decode('ascii'))
+        path = os.path.join(self.datadir,
+                            'pack-%s.pack' % pack1_sha.decode('ascii'))
         with open(path, 'rb') as f:
             PackData.from_file(f, os.path.getsize(path))
 
@@ -250,13 +264,14 @@ class TestPackData(PackTests):
 
     def test_iterobjects(self):
         with self.get_pack_data(pack1_sha) as p:
-            commit_data = (b'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\n'
-                           b'author James Westby <jw+debian@jameswestby.net> '
-                           b'1174945067 +0100\n'
-                           b'committer James Westby <jw+debian@jameswestby.net> '
-                           b'1174945067 +0100\n'
-                           b'\n'
-                           b'Test commit\n')
+            commit_data = (
+                    b'tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\n'
+                    b'author James Westby <jw+debian@jameswestby.net> '
+                    b'1174945067 +0100\n'
+                    b'committer James Westby <jw+debian@jameswestby.net> '
+                    b'1174945067 +0100\n'
+                    b'\n'
+                    b'Test commit\n')
             blob_sha = b'6f670c0fb53f9463760b7295fbb814e965fb20c8'
             tree_data = b'100644 a\0' + hex_to_sha(blob_sha)
             actual = []
@@ -312,7 +327,7 @@ class TestPackData(PackTests):
         self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
         self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
         self.assertRaises(AssertionError, compute_file_sha, f, start_ofs=10,
-            end_ofs=-12)
+                          end_ofs=-12)
 
 
 class TestPack(PackTests):
@@ -341,7 +356,8 @@ class TestPack(PackTests):
     def test_pack_tuples(self):
         with self.get_pack(pack1_sha) as p:
             tuples = p.pack_tuples()
-            expected = set([(p[s], None) for s in [commit_sha, tree_sha, a_sha]])
+            expected = set(
+                    [(p[s], None) for s in [commit_sha, tree_sha, a_sha]])
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(3, len(tuples))
@@ -370,7 +386,7 @@ class TestPack(PackTests):
                 self.assertSucceeds(newpack.index.check)
                 self.assertEqual(origpack.name(), newpack.name())
                 self.assertEqual(origpack.index.get_pack_checksum(),
-                                  newpack.index.get_pack_checksum())
+                                 newpack.index.get_pack_checksum())
 
                 wrong_version = origpack.index.version != newpack.index.version
                 orig_checksum = origpack.index.get_stored_checksum()
@@ -577,10 +593,10 @@ class BaseTestPackIndexWriting(object):
         entry1_sha = hex_to_sha('4e6388232ec39792661e2e75db8fb117fc869ce6')
         entry2_sha = hex_to_sha('e98f071751bd77f59967bfa671cd2caebdccc9a2')
         entries = [(entry1_sha, 0xf2972d0830529b87, 24),
-                   (entry2_sha, (~0xf2972d0830529b87)&(2**64-1), 92)]
+                   (entry2_sha, (~0xf2972d0830529b87) & (2 ** 64 - 1), 92)]
         if not self._supports_large:
             self.assertRaises(TypeError, self.index, 'single.idx',
-                entries, pack_checksum)
+                              entries, pack_checksum)
             return
         idx = self.index('single.idx', entries, pack_checksum)
         self.assertEqual(idx.get_pack_checksum(), pack_checksum)
@@ -697,7 +713,8 @@ class ReadZlibTests(TestCase):
     def setUp(self):
         super(ReadZlibTests, self).setUp()
         self.read = BytesIO(self.comp + self.extra).read
-        self.unpacked = UnpackedObject(Tree.type_num, None, len(self.decomp), 0)
+        self.unpacked = UnpackedObject(
+                Tree.type_num, None, len(self.decomp), 0)
 
     def test_decompress_size(self):
         good_decomp_len = len(self.decomp)
@@ -963,7 +980,8 @@ class DeltaChainIteratorTests(TestCase):
         n = 100
         objects_spec = [(Blob.type_num, b'blob')]
         for i in range(n):
-            objects_spec.append((OFS_DELTA, (i, b'blob' + str(i).encode('ascii'))))
+            objects_spec.append(
+                    (OFS_DELTA, (i, b'blob' + str(i).encode('ascii'))))
         f = BytesIO()
         entries = build_pack(f, objects_spec)
         self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
@@ -972,7 +990,8 @@ class DeltaChainIteratorTests(TestCase):
         n = 100
         objects_spec = [(Blob.type_num, b'blob')]
         for i in range(n):
-            objects_spec.append((OFS_DELTA, (0, b'blob' + str(i).encode('ascii'))))
+            objects_spec.append(
+                    (OFS_DELTA, (0, b'blob' + str(i).encode('ascii'))))
         f = BytesIO()
         entries = build_pack(f, objects_spec)
         self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
@@ -1039,8 +1058,7 @@ class DeltaChainIteratorTests(TestCase):
     def test_bad_ext_ref_non_thin_pack(self):
         blob, = self.store_blobs([b'blob'])
         f = BytesIO()
-        entries = build_pack(f, [(REF_DELTA, (blob.id, b'blob1'))],
-                             store=self.store)
+        build_pack(f, [(REF_DELTA, (blob.id, b'blob1'))], store=self.store)
         pack_iter = self.make_pack_iter(f, thin=False)
         try:
             list(pack_iter._walk_all_chains())
@@ -1082,5 +1100,7 @@ class EncodeCopyOperationTests(TestCase):
     def test_basic(self):
         self.assertEqual(b'\x80', _encode_copy_operation(0, 0))
         self.assertEqual(b'\x91\x01\x0a', _encode_copy_operation(1, 10))
-        self.assertEqual(b'\xb1\x64\xe8\x03', _encode_copy_operation(100, 1000))
-        self.assertEqual(b'\x93\xe8\x03\x01', _encode_copy_operation(1000, 1))
+        self.assertEqual(b'\xb1\x64\xe8\x03',
+                         _encode_copy_operation(100, 1000))
+        self.assertEqual(b'\x93\xe8\x03\x01',
+                         _encode_copy_operation(1000, 1))

@@ -57,7 +57,8 @@ class WriteCommitPatchTests(TestCase):
         write_commit_patch(f, c, b"CONTENTS", (1, 1), version="custom")
         f.seek(0)
         lines = f.readlines()
-        self.assertTrue(lines[0].startswith(b"From 0b0d34d1b5b596c928adc9a727a4b9e03d025298"))
+        self.assertTrue(lines[0].startswith(
+                    b"From 0b0d34d1b5b596c928adc9a727a4b9e03d025298"))
         self.assertEqual(lines[1], b"From: Jelmer <jelmer@samba.org>\n")
         self.assertTrue(lines[2].startswith(b"Date: "))
         self.assertEqual([
@@ -77,10 +78,11 @@ class WriteCommitPatchTests(TestCase):
 class ReadGitAmPatch(TestCase):
 
     def test_extract_string(self):
-        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""\
+From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
-Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian warning).
+Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 ---
  pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
@@ -89,12 +91,13 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
 
 -- 
 1.7.0.4
-"""
-        c, diff, version = git_am_patch_split(StringIO(text.decode("utf-8")), "utf-8")
+"""  # noqa: W291
+        c, diff, version = git_am_patch_split(
+                StringIO(text.decode("utf-8")), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
         self.assertEqual(b"Remove executable bit from prey.ico "
-            b"(triggers a lintian warning).\n", c.message)
+                         b"(triggers a warning).\n", c.message)
         self.assertEqual(b""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
@@ -103,10 +106,11 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
         self.assertEqual(b"1.7.0.4", version)
 
     def test_extract_bytes(self):
-        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""\
+From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
-Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian warning).
+Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 ---
  pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
@@ -115,12 +119,12 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a lintian war
 
 -- 
 1.7.0.4
-"""
+"""  # noqa: W291
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
         self.assertEqual(b"Remove executable bit from prey.ico "
-            b"(triggers a lintian warning).\n", c.message)
+                         b"(triggers a warning).\n", c.message)
         self.assertEqual(b""" pixmaps/prey.ico |  Bin 9662 -> 9662 bytes
  1 files changed, 0 insertions(+), 0 deletions(-)
  mode change 100755 => 100644 pixmaps/prey.ico
@@ -145,9 +149,15 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 
 -- 
 1.7.0.4
-"""
+"""  # noqa: W291
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
-        self.assertEqual(b'Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        self.assertEqual(b'''\
+Added unit tests for dulwich.object_store.tree_lookup_path.
+
+* dulwich/tests/test_object_store.py
+  (TreeLookupPathTests): This test case contains a few tests that ensure the
+   tree_lookup_path function works as expected.
+''', c.message)
 
     def test_extract_pseudo_from_header(self):
         text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
@@ -168,13 +178,20 @@ From: Jelmer Vernooy <jelmer@debian.org>
 
 -- 
 1.7.0.4
-"""
+"""  # noqa: W291
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(b"Jelmer Vernooy <jelmer@debian.org>", c.author)
-        self.assertEqual(b'Added unit tests for dulwich.object_store.tree_lookup_path.\n\n* dulwich/tests/test_object_store.py\n  (TreeLookupPathTests): This test case contains a few tests that ensure the\n   tree_lookup_path function works as expected.\n', c.message)
+        self.assertEqual(b'''\
+Added unit tests for dulwich.object_store.tree_lookup_path.
+
+* dulwich/tests/test_object_store.py
+  (TreeLookupPathTests): This test case contains a few tests that ensure the
+   tree_lookup_path function works as expected.
+''', c.message)
 
     def test_extract_no_version_tail(self):
-        text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
+        text = b"""\
+From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
@@ -192,8 +209,11 @@ From: Jelmer Vernooy <jelmer@debian.org>
         self.assertEqual(None, version)
 
     def test_extract_mercurial(self):
-        raise SkipTest("git_am_patch_split doesn't handle Mercurial patches properly yet")
-        expected_diff = """diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
+        raise SkipTest(
+                "git_am_patch_split doesn't handle Mercurial patches "
+                "properly yet")
+        expected_diff = """\
+diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
 --- a/dulwich/tests/test_patch.py
 +++ b/dulwich/tests/test_patch.py
 @@ -158,7 +158,7 @@
@@ -205,8 +225,10 @@ From: Jelmer Vernooy <jelmer@debian.org>
  
  
  class DiffTests(TestCase):
-"""
-        text = """From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net Mon Nov 29 00:58:18 2010
+"""  # noqa: W291,W293
+        text = """\
+From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net \
+Mon Nov 29 00:58:18 2010
 Date: Sun, 28 Nov 2010 17:57:27 -0600
 From: Augie Fackler <durin42@gmail.com>
 To: dulwich-users <dulwich-users@lists.launchpad.net>
@@ -223,7 +245,7 @@ Post to     : dulwich-users@lists.launchpad.net
 Unsubscribe : https://launchpad.net/~dulwich-users
 More help   : https://help.launchpad.net/ListHelp
 
-""" % expected_diff
+""" % expected_diff  # noqa: W291
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)
         self.assertEqual(None, version)
@@ -404,11 +426,15 @@ class DiffTests(TestCase):
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
-            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
+            b"\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f"
+            b"\x08\x04\x00\x00\x00\x05\x04\x8b")
         b2 = Blob.from_string(
-            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
+            b"\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f"
+            b"\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
         write_object_diff(
@@ -423,9 +449,11 @@ class DiffTests(TestCase):
             b' \x89PNG',
             b' \x1a',
             b' \x00\x00\x00',
-            b'-IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
+            b'-IHDR\x00\x00\x01\xd5\x00\x00\x00'
+            b'\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
             b'\\ No newline at end of file',
-            b'+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3',
+            b'+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f'
+            b'\x08\x03\x00\x00\x00\x98\xd3\xb3',
             b'\\ No newline at end of file'
             ], f.getvalue().splitlines())
 
@@ -433,11 +461,15 @@ class DiffTests(TestCase):
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
-            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
+            b"\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f"
+            b"\x08\x04\x00\x00\x00\x05\x04\x8b")
         b2 = Blob.from_string(
-            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52"
-            b"\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3")
+            b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
+            b"\x00\x00\x00\x0d\x49\x48\x44\x52"
+            b"\x00\x00\x01\xd5\x00\x00\x00\x9f"
+            b"\x08\x03\x00\x00\x00\x98\xd3\xb3")
         store = MemoryObjectStore()
         store.add_objects([(b1, None), (b2, None)])
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
@@ -451,8 +483,10 @@ class DiffTests(TestCase):
     def test_object_diff_add_bin_blob(self):
         f = BytesIO()
         b2 = Blob.from_string(
-            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
-            b'\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x03\x00\x00\x00\x98\xd3\xb3')
+            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a'
+            b'\x00\x00\x00\x0d\x49\x48\x44\x52'
+            b'\x00\x00\x01\xd5\x00\x00\x00\x9f'
+            b'\x08\x03\x00\x00\x00\x98\xd3\xb3')
         store = MemoryObjectStore()
         store.add_object(b2)
         write_object_diff(f, store, (None, None, None),
@@ -467,8 +501,10 @@ class DiffTests(TestCase):
     def test_object_diff_remove_bin_blob(self):
         f = BytesIO()
         b1 = Blob.from_string(
-            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52'
-            b'\x00\x00\x01\xd5\x00\x00\x00\x9f\x08\x04\x00\x00\x00\x05\x04\x8b')
+            b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a'
+            b'\x00\x00\x00\x0d\x49\x48\x44\x52'
+            b'\x00\x00\x01\xd5\x00\x00\x00\x9f'
+            b'\x08\x04\x00\x00\x00\x05\x04\x8b')
         store = MemoryObjectStore()
         store.add_object(b1)
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),

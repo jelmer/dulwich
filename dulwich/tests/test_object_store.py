@@ -130,12 +130,15 @@ class ObjectStoreTests(object):
         tree1_id = commit_tree(self.store, blobs_1)
         blobs_2 = [(b'a', blob_a2.id, 0o100644), (b'b', blob_b.id, 0o100644)]
         tree2_id = commit_tree(self.store, blobs_2)
-        change_a = ((b'a', b'a'), (0o100644, 0o100644), (blob_a1.id, blob_a2.id))
+        change_a = ((b'a', b'a'), (0o100644, 0o100644),
+                    (blob_a1.id, blob_a2.id))
         self.assertEqual([change_a],
                          list(self.store.tree_changes(tree1_id, tree2_id)))
         self.assertEqual(
-            [change_a, ((b'b', b'b'), (0o100644, 0o100644), (blob_b.id, blob_b.id))],
-            list(self.store.tree_changes(tree1_id, tree2_id, want_unchanged=True)))
+            [change_a, ((b'b', b'b'), (0o100644, 0o100644),
+             (blob_b.id, blob_b.id))],
+            list(self.store.tree_changes(tree1_id, tree2_id,
+                 want_unchanged=True)))
 
     def test_iter_tree_contents(self):
         blob_a = make_object(Blob, data=b'a')
@@ -416,10 +419,11 @@ class TreeLookupPathTests(TestCase):
 class ObjectStoreGraphWalkerTests(TestCase):
 
     def get_walker(self, heads, parent_map):
-        new_parent_map = dict([
-            (k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()])
+        new_parent_map = dict(
+                [(k * 40, [(p * 40) for p in ps])
+                 for (k, ps) in parent_map.items()])
         return ObjectStoreGraphWalker([x * 40 for x in heads],
-            new_parent_map.__getitem__)
+                                      new_parent_map.__getitem__)
 
     def test_ack_invalid_value(self):
         gw = self.get_walker([], {})
@@ -474,17 +478,18 @@ class ObjectStoreGraphWalkerTests(TestCase):
         # A branch (a, c) or (b, d) may be done after 2 steps or 3 depending on
         # the order walked: 3-step walks include (a, b, c) and (b, a, d), etc.
         if walk == [b"a" * 40, b"c" * 40] or walk == [b"b" * 40, b"d" * 40]:
-          gw.ack(walk[0])
-          acked = True
+            gw.ack(walk[0])
+            acked = True
 
         walk.append(next(gw))
         if not acked and walk[2] == b"c" * 40:
-          gw.ack(b"a" * 40)
+            gw.ack(b"a" * 40)
         elif not acked and walk[2] == b"d" * 40:
-          gw.ack(b"b" * 40)
+            gw.ack(b"b" * 40)
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 
-        self.assertEqual([b"a" * 40, b"b" * 40, b"c" * 40, b"d" * 40], sorted(walk))
+        self.assertEqual([b"a" * 40, b"b" * 40, b"c" * 40, b"d" * 40],
+                         sorted(walk))
         self.assertLess(walk.index(b"a" * 40), walk.index(b"c" * 40))
         self.assertLess(walk.index(b"b" * 40), walk.index(b"d" * 40))

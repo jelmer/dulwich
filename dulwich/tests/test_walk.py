@@ -25,7 +25,6 @@ from itertools import (
     )
 
 from dulwich.diff_tree import (
-    CHANGE_ADD,
     CHANGE_MODIFY,
     CHANGE_RENAME,
     TreeChange,
@@ -177,9 +176,11 @@ class WalkerTest(TestCase):
             2, trees={1: [(b'a', blob_a1)],
                       2: [(b'a', blob_a2), (b'b', blob_b2)]})
         e1 = TestWalkEntry(c1, [TreeChange.add((b'a', F, blob_a1.id))])
-        e2 = TestWalkEntry(c2, [TreeChange(CHANGE_MODIFY, (b'a', F, blob_a1.id),
+        e2 = TestWalkEntry(
+                c2,
+                [TreeChange(CHANGE_MODIFY, (b'a', F, blob_a1.id),
                                            (b'a', F, blob_a2.id)),
-                                TreeChange.add((b'b', F, blob_b2.id))])
+                 TreeChange.add((b'b', F, blob_b2.id))])
         self.assertWalkYields([e2, e1], [c2.id])
 
     def test_changes_multiple_parents(self):
@@ -192,8 +193,9 @@ class WalkerTest(TestCase):
                    3: [(b'a', blob_a3), (b'b', blob_b2)]})
         # a is a modify/add conflict and b is not conflicted.
         changes = [[
-            TreeChange(CHANGE_MODIFY, (b'a', F, blob_a1.id), (b'a', F, blob_a3.id)),
-            TreeChange.add((b'a', F, blob_a3.id)),
+                TreeChange(CHANGE_MODIFY,
+                           (b'a', F, blob_a1.id), (b'a', F, blob_a3.id)),
+                TreeChange.add((b'a', F, blob_a3.id)),
         ]]
         self.assertWalkYields([TestWalkEntry(c3, changes)], [c3.id],
                               exclude=[c1.id, c2.id])
@@ -293,7 +295,8 @@ class WalkerTest(TestCase):
         c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
         self.assertWalkYields([c5], [c6.id], paths=[b'c'])
 
-        e = lambda n: (n, F, blob.id)
+        def e(n):
+            return (n, F, blob.id)
         self.assertWalkYields(
             [TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e(b'b'), e(b'c'))]),
              TestWalkEntry(c3, [TreeChange(CHANGE_RENAME, e(b'a'), e(b'b'))]),
@@ -310,7 +313,8 @@ class WalkerTest(TestCase):
                       5: [(b'a', blob)],
                       6: [(b'c', blob)]})
 
-        e = lambda n: (n, F, blob.id)
+        def e(n):
+            return (n, F, blob.id)
         # Once the path changes to b, we aren't interested in a or c anymore.
         self.assertWalkYields(
             [TestWalkEntry(c6, [TreeChange(CHANGE_RENAME, e(b'a'), e(b'c'))]),
@@ -356,8 +360,8 @@ class WalkerTest(TestCase):
           11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
         c8, _, c10, c11 = commits[-4:]
         del self.store[commits[0].id]
-        # c9 is older than we want to walk, but is out of order with its parent,
-        # so we need to walk past it to get to c8.
+        # c9 is older than we want to walk, but is out of order with its
+        # parent, so we need to walk past it to get to c8.
         # c1 would also match, but we've deleted it, and it should get pruned
         # even with over-scanning.
         self.assertWalkYields([c11, c10, c8], [c11.id], since=7)
@@ -495,11 +499,11 @@ class WalkEntryTest(TestCase):
         entry_b = (b'y/b', F, blob_b.id)
         entry_b2 = (b'y/b', F, blob_b2.id)
         self.assertEqual(
-            [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2),
-             TreeChange.add(entry_a2)],
-            [TreeChange.add(entry_b2),
-             TreeChange(CHANGE_MODIFY, entry_b, entry_b2)]],
-            changes,
+                [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2),
+                  TreeChange.add(entry_a2)],
+                 [TreeChange.add(entry_b2),
+                  TreeChange(CHANGE_MODIFY, entry_b, entry_b2)]],
+                changes,
         )
 
     def test_filter_changes(self):

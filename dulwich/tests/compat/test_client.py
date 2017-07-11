@@ -45,9 +45,6 @@ except ImportError:
     BaseHTTPServer = http.server
     SimpleHTTPServer = http.server
 
-if sys.platform == 'win32':
-    import ctypes
-
 from dulwich import (
     client,
     errors,
@@ -71,11 +68,16 @@ from dulwich.tests.compat.utils import (
     )
 
 
+if sys.platform == 'win32':
+    import ctypes
+
+
 class DulwichClientTestBase(object):
     """Tests for client/server compatibility."""
 
     def setUp(self):
-        self.gitroot = os.path.dirname(import_repo_to_dir('server_new.export').rstrip(os.sep))
+        self.gitroot = os.path.dirname(
+                import_repo_to_dir('server_new.export').rstrip(os.sep))
         self.dest = os.path.join(self.gitroot, 'dest')
         file.ensure_dir_exists(self.dest)
         run_git_or_fail(['init', '--quiet', '--bare'], cwd=self.dest)
@@ -179,13 +181,15 @@ class DulwichClientTestBase(object):
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
-                c.send_pack(self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+                c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                            gen_pack)
             except errors.UpdateRefsError as e:
-                self.assertIn(str(e),
-                              ['{0}, {1} failed to update'.format(
-                                  branch.decode('ascii'), master.decode('ascii')),
-                               '{1}, {0} failed to update'.format(
-                                   branch.decode('ascii'), master.decode('ascii'))])
+                self.assertIn(
+                        str(e),
+                        ['{0}, {1} failed to update'.format(
+                            branch.decode('ascii'), master.decode('ascii')),
+                         '{1}, {0} failed to update'.format(
+                             branch.decode('ascii'), master.decode('ascii'))])
                 self.assertEqual({branch: b'non-fast-forward',
                                   master: b'non-fast-forward'},
                                  e.ref_status)

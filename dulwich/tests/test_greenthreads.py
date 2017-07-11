@@ -38,7 +38,7 @@ from dulwich.objects import (
     )
 
 try:
-    import gevent
+    import gevent  # noqa: F401
     gevent_support = True
 except ImportError:
     gevent_support = False
@@ -50,6 +50,7 @@ if gevent_support:
     )
 
 skipmsg = "Gevent library is not installed"
+
 
 def create_commit(marker=None):
     blob = Blob.from_string(b'The blob content ' + marker)
@@ -87,9 +88,8 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
     def test_len(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
-        iterator = GreenThreadsObjectStoreIterator(self.store,
-                                               iter(finder.next, None),
-                                               finder)
+        iterator = GreenThreadsObjectStoreIterator(
+                self.store, iter(finder.next, None), finder)
         # One commit refers one tree and one blob
         self.assertEqual(len(iterator), self.cmt_amount * 3)
         haves = wants[0:self.cmt_amount-1]

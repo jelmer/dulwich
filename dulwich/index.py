@@ -124,8 +124,10 @@ def write_cache_entry(f, entry):
     (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(b'>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    flags = len(name) | (flags & ~0x0fff)
+    f.write(struct.pack(
+            b'>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF,
+            mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     f.write(b'\0' * ((beginoffset + real_size) - f.tell()))
@@ -243,7 +245,8 @@ class Index(object):
     def __getitem__(self, name):
         """Retrieve entry by relative path.
 
-        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha,
+            flags)
         """
         return self._byname[name]
 
@@ -292,13 +295,14 @@ class Index(object):
         :param object_store: Object store to use for retrieving tree contents
         :param tree: SHA1 of the root tree
         :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+            newmode), (oldsha, newsha)
         """
         def lookup_entry(path):
             entry = self[path]
             return entry.sha, entry.mode
-        for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
+        for (name, mode, sha) in changes_from_tree(
+                self._byname.keys(), lookup_entry, object_store, tree,
                 want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
@@ -363,7 +367,7 @@ def commit_index(object_store, index):
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
+                      want_unchanged=False):
     """Find the differences between the contents of a tree and
     a working copy.
 
@@ -495,8 +499,8 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
-    :param validate_path_element: Function to validate path elements to check out;
-        default just refuses .git and .. directories.
+    :param validate_path_element: Function to validate path elements to check
+        out; default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suitable only for fresh clones.

@@ -637,11 +637,12 @@ class BuildRepoRootTests(TestCase):
         with open(os.path.join(r.path, 'a'), 'wb') as f:
             f.write(b'file contents')
         r.stage(['a'])
-        commit_sha = r.do_commit(b'msg',
-                                 committer=b'Test Committer <test@nodomain.com>',
-                                 author=b'Test Author <test@nodomain.com>',
-                                 commit_timestamp=12345, commit_timezone=0,
-                                 author_timestamp=12345, author_timezone=0)
+        commit_sha = r.do_commit(
+                b'msg',
+                committer=b'Test Committer <test@nodomain.com>',
+                author=b'Test Author <test@nodomain.com>',
+                commit_timestamp=12345, commit_timezone=0,
+                author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
         self._root_commit = commit_sha
 

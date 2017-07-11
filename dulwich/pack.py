@@ -53,6 +53,14 @@ except ImportError:
 import os
 import sys
 
+from hashlib import sha1
+from os import (
+    SEEK_CUR,
+    SEEK_END,
+    )
+from struct import unpack_from
+import zlib
+
 try:
     import mmap
 except ImportError:
@@ -64,23 +72,15 @@ else:
 if sys.platform == 'Plan9':
     has_mmap = False
 
-from hashlib import sha1
-from os import (
-    SEEK_CUR,
-    SEEK_END,
-    )
-from struct import unpack_from
-import zlib
-
-from dulwich.errors import (
+from dulwich.errors import (  # noqa: E402
     ApplyDeltaError,
     ChecksumMismatch,
     )
-from dulwich.file import GitFile
-from dulwich.lru_cache import (
+from dulwich.file import GitFile  # noqa: E402
+from dulwich.lru_cache import (  # noqa: E402
     LRUSizeCache,
     )
-from dulwich.objects import (
+from dulwich.objects import (  # noqa: E402
     ShaFile,
     hex_to_sha,
     sha_to_hex,
@@ -634,7 +634,9 @@ class PackIndex2(FilePackIndex):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8
+            offset = (
+                self._pack_offset_largetable_offset +
+                (offset & (2 ** 31 - 1)) * 8)
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 
@@ -1080,12 +1082,6 @@ class PackData(object):
             if base_type == OFS_DELTA:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages
-                assert (
-                    isinstance(base_offset, int)
-                    or isinstance(base_offset, long))
-                assert (
-                    isinstance(delta_offset, int)
-                    or isinstance(base_offset, long))
                 base_offset = base_offset - delta_offset
                 base_type, base_obj = self.get_object_at(base_offset)
                 assert isinstance(base_type, int)
@@ -1379,7 +1375,7 @@ class PackInflater(DeltaChainIterator):
 
 
 class SHA1Reader(object):
-    """Wrapper around a file-like object that remembers the SHA1 of its data."""
+    """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
         self.f = f
@@ -1403,7 +1399,7 @@ class SHA1Reader(object):
 
 
 class SHA1Writer(object):
-    """Wrapper around a file-like object that remembers the SHA1 of its data."""
+    """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
         self.f = f
@@ -1966,6 +1962,6 @@ class Pack(object):
 
 
 try:
-    from dulwich._pack import apply_delta, bisect_find_sha
+    from dulwich._pack import apply_delta, bisect_find_sha  # noqa: F811
 except ImportError:
     pass

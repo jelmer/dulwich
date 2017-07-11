@@ -23,7 +23,7 @@ matrix:
       env: TEST_REQUIRE=fastimport
 
 install:
-  - travis_retry pip install -U pip coverage codecov $TEST_REQUIRE
+  - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
 
 script:
   # Test without c extensions
@@ -32,6 +32,9 @@ script:
   # Test with c extensions
   - python setup.py build_ext -i
   - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+
+  # Style
+  - make style
 
 after_success:
   - python -m coverage combine

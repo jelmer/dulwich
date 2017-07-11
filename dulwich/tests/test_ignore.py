@@ -165,16 +165,16 @@ class IgnoreFilterManagerTests(TestCase):
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
-        with open(os.path.join(repo.path, '.gitignore'), 'w') as f:
-            f.write('/foo/bar\n')
+        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
+            f.write(b'/foo/bar\n')
         os.mkdir(os.path.join(repo.path, 'dir'))
-        with open(os.path.join(repo.path, 'dir', '.gitignore'), 'w') as f:
-            f.write('/blie\n')
-        with open(os.path.join(repo.path, 'dir', 'blie'), 'w') as f:
-            f.write('IGNORED')
+        with open(os.path.join(repo.path, 'dir', '.gitignore'), 'wb') as f:
+            f.write(b'/blie\n')
+        with open(os.path.join(repo.path, 'dir', 'blie'), 'wb') as f:
+            f.write(b'IGNORED')
         p = os.path.join(repo.controldir(), 'info', 'exclude')
-        with open(p, 'w') as f:
-            f.write('/excluded\n')
+        with open(p, 'wb') as f:
+            f.write(b'/excluded\n')
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'dir', 'blie')))
         self.assertIs(None,

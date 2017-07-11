@@ -114,8 +114,8 @@ class Protocol(object):
 
     Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
     consists of the length of the line as a 4-byte hex string, followed by the
-    payload data. The length includes the 4-byte header. The special line '0000'
-    indicates the end of a section of input and is called a 'flush-pkt'.
+    payload data. The length includes the 4-byte header. The special line
+    '0000' indicates the end of a section of input and is called a 'flush-pkt'.
 
     For details on the pkt-line format, see the cgit distribution:
         Documentation/technical/protocol-common.txt
@@ -169,13 +169,15 @@ class Protocol(object):
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
-                    'Length of pkt read %04x does not match length prefix %04x' % (len(pkt_contents) + 4, size))
+                    'Length of pkt read %04x does not match length prefix %04x'
+                    % (len(pkt_contents) + 4, size))
             return pkt_contents
 
     def eof(self):
         """Test whether the protocol stream has reached EOF.
 
-        Note that this refers to the actual stream EOF and not just a flush-pkt.
+        Note that this refers to the actual stream EOF and not just a
+        flush-pkt.
 
         :return: True if the stream is at EOF, False otherwise.
         """
@@ -202,7 +204,8 @@ class Protocol(object):
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
 
-        :return: Yields each line of data up to but not including the next flush-pkt.
+        :return: Yields each line of data up to but not including the next
+            flush-pkt.
         """
         pkt = self.read_pkt_line()
         while pkt:
@@ -291,9 +294,9 @@ class ReceivableProtocol(Protocol):
     to a read() method.
 
     If you want to read n bytes from the wire and block until exactly n bytes
-    (or EOF) are read, use read(n). If you want to read at most n bytes from the
-    wire but don't care if you get less, use recv(n). Note that recv(n) will
-    still block until at least one byte is read.
+    (or EOF) are read, use read(n). If you want to read at most n bytes from
+    the wire but don't care if you get less, use recv(n). Note that recv(n)
+    will still block until at least one byte is read.
     """
 
     def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
@@ -310,7 +313,8 @@ class ReceivableProtocol(Protocol):
         #  - seek back to start rather than 0 in case some buffer has been
         #    consumed.
         #  - use SEEK_END instead of the magic number.
-        # Copyright (c) 2001-2010 Python Software Foundation; All Rights Reserved
+        # Copyright (c) 2001-2010 Python Software Foundation; All Rights
+        # Reserved
         # Licensed under the Python Software Foundation License.
         # TODO: see if buffer is more efficient than cBytesIO.
         assert size > 0
@@ -359,7 +363,7 @@ class ReceivableProtocol(Protocol):
             buf.write(data)
             buf_len += n
             del data  # explicit free
-            #assert buf_len == buf.tell()
+            # assert buf_len == buf.tell()
         buf.seek(start)
         return buf.read()
 
@@ -393,7 +397,7 @@ def extract_capabilities(text):
     :param text: String to extract from
     :return: Tuple with text with capabilities removed and list of capabilities
     """
-    if not b"\0" in text:
+    if b"\0" not in text:
         return text, []
     text, capabilities = text.rstrip().split(b"\0")
     return (text, capabilities.strip().split(b" "))
@@ -428,9 +432,9 @@ def ack_type(capabilities):
 class BufferedPktLineWriter(object):
     """Writer that wraps its data in pkt-lines and has an independent buffer.
 
-    Consecutive calls to write() wrap the data in a pkt-line and then buffers it
-    until enough lines have been written such that their total length (including
-    length prefix) reach the buffer size.
+    Consecutive calls to write() wrap the data in a pkt-line and then buffers
+    it until enough lines have been written such that their total length
+    (including length prefix) reach the buffer size.
     """
 
     def __init__(self, write, bufsize=65515):

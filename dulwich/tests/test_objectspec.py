@@ -66,8 +66,8 @@ class ParseCommitRangeTests(TestCase):
 
     def test_commit_by_sha(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1],
-            [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(
+                r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
 
 
@@ -152,26 +152,26 @@ class ParseReftupleTests(TestCase):
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
-            parse_reftuple(r, r, b"foo"))
+                         parse_reftuple(r, r, b"foo"))
         self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
-            parse_reftuple(r, r, b"+foo"))
+                         parse_reftuple(r, r, b"+foo"))
         self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
-            parse_reftuple(r, {}, b"+foo"))
+                         parse_reftuple(r, {}, b"+foo"))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
-            parse_reftuple(r, r, b"refs/heads/foo"))
+                         parse_reftuple(r, r, b"refs/heads/foo"))
 
     def test_no_left_ref(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual((None, b"refs/heads/foo", False),
-            parse_reftuple(r, r, b":refs/heads/foo"))
+                         parse_reftuple(r, r, b":refs/heads/foo"))
 
     def test_no_right_ref(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual((b"refs/heads/foo", None, False),
-            parse_reftuple(r, r, b"refs/heads/foo:"))
+                         parse_reftuple(r, r, b"refs/heads/foo:"))
 
 
 class ParseReftuplesTests(TestCase):
@@ -179,14 +179,14 @@ class ParseReftuplesTests(TestCase):
     def test_nonexistent(self):
         r = {}
         self.assertRaises(KeyError, parse_reftuples, r, r,
-            [b"thisdoesnotexist"])
+                          [b"thisdoesnotexist"])
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
-            parse_reftuples(r, r, [b"foo"]))
+                         parse_reftuples(r, r, [b"foo"]))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
-            parse_reftuples(r, r, b"refs/heads/foo"))
+                         parse_reftuples(r, r, b"refs/heads/foo"))

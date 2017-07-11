@@ -21,7 +21,6 @@
 """Tests for reading and writing configuration files."""
 
 from io import BytesIO
-import os
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
@@ -51,10 +50,10 @@ class ConfigFileTests(TestCase):
 
     def test_default_config(self):
         cf = self.from_file(b"""[core]
-	repositoryformatversion = 0
-	filemode = true
-	bare = false
-	logallrefupdates = true
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true
 """)
         self.assertEqual(ConfigFile({(b"core", ): {
             b"repositoryformatversion": b"0",
@@ -97,8 +96,7 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"barla", cf.get((b"core", ), b"foo"))
 
     def test_from_file_with_open_quoted(self):
-        self.assertRaises(ValueError,
-            self.from_file, b"[core]\nfoo = \"bar\n")
+        self.assertRaises(ValueError, self.from_file, b"[core]\nfoo = \"bar\n")
 
     def test_from_file_with_quotes(self):
         cf = self.from_file(
@@ -124,8 +122,8 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
     def test_from_file_subsection_invalid(self):
-        self.assertRaises(ValueError,
-            self.from_file, b"[branch \"foo]\nfoo = bar\n")
+        self.assertRaises(
+                ValueError, self.from_file, b"[branch \"foo]\nfoo = bar\n")
 
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
@@ -157,21 +155,23 @@ class ConfigFileTests(TestCase):
 
     def test_quoted(self):
         cf = self.from_file(b"""[gui]
-	fontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -weight normal -slant roman -underline 0 -overstrike 0
+\tfontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -overstrike 0
 """)
         self.assertEqual(ConfigFile({(b'gui', ): {
-            b'fontdiff': b'-family "Ubuntu Mono" -size 11 -weight normal -slant roman -underline 0 -overstrike 0',
+            b'fontdiff': b'-family "Ubuntu Mono" -size 11 -overstrike 0',
         }}), cf)
 
     def test_quoted_multiline(self):
         cf = self.from_file(b"""[alias]
 who = \"!who() {\\
-  git log --no-merges --pretty=format:'%an - %ae' $@ | sort | uniq -c | sort -rn;\\
+  git log --no-merges --pretty=format:'%an - %ae' $@ | uniq -c | sort -rn;\\
 };\\
 who\"
 """)
         self.assertEqual(ConfigFile({(b'alias', ): {
-            b'who': b"!who() {git log --no-merges --pretty=format:'%an - %ae' $@ | sort | uniq -c | sort -rn;};who"}}), cf)
+            b'who': (b"!who() {git log --no-merges --pretty=format:'%an - "
+                     b"%ae' $@ | uniq -c | sort -rn;};who")
+            }}), cf)
 
     def test_set_hash_gets_quoted(self):
         c = ConfigFile()
@@ -224,15 +224,13 @@ class ConfigDictTests(TestCase):
         cd = ConfigDict()
         cd.set((b"core2", ), b"foo", b"bloe")
 
-        self.assertEqual([],
-            list(cd.iteritems((b"core", ))))
+        self.assertEqual([], list(cd.iteritems((b"core", ))))
 
     def test_itersections(self):
         cd = ConfigDict()
         cd.set((b"core2", ), b"foo", b"bloe")
 
-        self.assertEqual([(b"core2", )],
-            list(cd.itersections()))
+        self.assertEqual([(b"core2", )], list(cd.itersections()))
 
 
 class StackedConfigTests(TestCase):
@@ -318,9 +316,10 @@ class SubmodulesTests(TestCase):
     def testSubmodules(self):
         cf = ConfigFile.from_file(BytesIO(b"""\
 [submodule "core/lib"]
-	path = core/lib
-	url = https://github.com/phhusson/QuasselC.git
+\tpath = core/lib
+\turl = https://github.com/phhusson/QuasselC.git
 """))
         got = list(parse_submodules(cf))
         self.assertEqual([
-            (b'core/lib', b'https://github.com/phhusson/QuasselC.git', b'core/lib')], got)
+            (b'core/lib', b'https://github.com/phhusson/QuasselC.git',
+             b'core/lib')], got)

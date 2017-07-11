@@ -93,7 +93,7 @@ def parse_reftuple(lh_container, rh_container, refspec):
             rh = parse_ref(rh_container, rh)
         except KeyError:
             # TODO: check force?
-            if not b"/" in rh:
+            if b"/" not in rh:
                 rh = b"refs/heads/" + rh
     return (lh, rh, force)
 
@@ -157,7 +157,7 @@ def parse_commit(repo, committish):
     :raise ValueError: If the range can not be parsed
     """
     committish = to_bytes(committish)
-    return repo[committish] # For now..
+    return repo[committish]  # For now..
 
 
 # TODO: parse_path_in_tree(), which handles e.g. v1.0:Documentation

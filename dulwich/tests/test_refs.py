@@ -84,6 +84,7 @@ TWOS = b'2' * 40
 THREES = b'3' * 40
 FOURS = b'4' * 40
 
+
 class PackedRefsFileTests(TestCase):
 
     def test_split_ref_line_errors(self):
@@ -106,7 +107,8 @@ class PackedRefsFileTests(TestCase):
         f = BytesIO(b'\n'.join([
             ONES + b' ref/1',
             b'^' + TWOS]))
-        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+        self.assertRaises(errors.PackedRefsException, list,
+                          read_packed_refs(f))
 
     def test_read_with_peeled(self):
         f = BytesIO(b'\n'.join([
@@ -124,13 +126,15 @@ class PackedRefsFileTests(TestCase):
         f = BytesIO(b'\n'.join([
             b'^' + TWOS,
             ONES + b' ref/1']))
-        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+        self.assertRaises(errors.PackedRefsException, list,
+                          read_packed_refs(f))
 
         f = BytesIO(b'\n'.join([
-            ONES + b' ref/1',
-            b'^' + TWOS,
-            b'^' + THREES]))
-        self.assertRaises(errors.PackedRefsException, list, read_packed_refs(f))
+                ONES + b' ref/1',
+                b'^' + TWOS,
+                b'^' + THREES]))
+        self.assertRaises(errors.PackedRefsException, list,
+                          read_packed_refs(f))
 
     def test_write_with_peeled(self):
         f = BytesIO()
@@ -154,7 +158,8 @@ class PackedRefsFileTests(TestCase):
 # Dict of refs that we expect all RefsContainerTests subclasses to define.
 _TEST_REFS = {
     b'HEAD': b'42d06bd4b77fed026b154d16493e5deab78f02ec',
-    b'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa': b'42d06bd4b77fed026b154d16493e5deab78f02ec',
+    b'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa':
+             b'42d06bd4b77fed026b154d16493e5deab78f02ec',
     b'refs/heads/master': b'42d06bd4b77fed026b154d16493e5deab78f02ec',
     b'refs/heads/packed': b'42d06bd4b77fed026b154d16493e5deab78f02ec',
     b'refs/tags/refs-0.1': b'df6800012397fb85c56e7418dd4eb9405dee075c',
@@ -184,7 +189,8 @@ class RefsContainerTests(object):
         self.assertEqual(_TEST_REFS, self._refs.as_dict())
 
     def test_setitem(self):
-        self._refs[b'refs/some/ref'] = b'42d06bd4b77fed026b154d16493e5deab78f02ec'
+        self._refs[b'refs/some/ref'] = (
+                b'42d06bd4b77fed026b154d16493e5deab78f02ec')
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'refs/some/ref'])
         self.assertRaises(
@@ -264,7 +270,8 @@ class RefsContainerTests(object):
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'HEAD'])
         self.assertTrue(self._refs.remove_if_equals(
-            b'refs/tags/refs-0.2', b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'))
+            b'refs/tags/refs-0.2',
+            b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'))
         self.assertTrue(self._refs.remove_if_equals(
             b'refs/tags/refs-0.2', ZERO_SHA))
         self.assertFalse(b'refs/tags/refs-0.2' in self._refs)
@@ -332,7 +339,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(b'ref: refs/heads/master', v)
 
         # ensure the symbolic link was written through
-        f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'), 'rb')
+        f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'),
+                 'rb')
         self.assertEqual(ones, f.read()[:40])
         f.close()
 
@@ -441,16 +449,19 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertRaises(KeyError, lambda: self._refs[b'refs/tags/refs-0.1'])
 
     def test_read_ref(self):
-        self.assertEqual(b'ref: refs/heads/master', self._refs.read_ref(b'HEAD'))
+        self.assertEqual(b'ref: refs/heads/master',
+                         self._refs.read_ref(b'HEAD'))
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
 
     def test_non_ascii(self):
         try:
-            encoded_ref = u'refs/tags/schön'.encode(sys.getfilesystemencoding())
+            encoded_ref = u'refs/tags/schön'.encode(
+                    sys.getfilesystemencoding())
         except UnicodeEncodeError:
-            raise SkipTest("filesystem encoding doesn't support special character")
+            raise SkipTest(
+                    "filesystem encoding doesn't support special character")
         p = os.path.join(self._repo.path, 'refs', 'tags', u'schön')
         with open(p, 'w') as f:
             f.write('00' * 20)
@@ -462,7 +473,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
 
 _TEST_REFS_SERIALIZED = (
-    b'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa\n'
+    b'42d06bd4b77fed026b154d16493e5deab78f02ec\t'
+    b'refs/heads/40-char-ref-aaaaaaaaaaaaaaaaaa\n'
     b'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/master\n'
     b'42d06bd4b77fed026b154d16493e5deab78f02ec\trefs/heads/packed\n'
     b'df6800012397fb85c56e7418dd4eb9405dee075c\trefs/tags/refs-0.1\n'

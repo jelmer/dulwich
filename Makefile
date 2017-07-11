@@ -59,7 +59,7 @@ pep8:
 	$(PEP8) dulwich
 
 style:
-	$(FLAKE8) --exclude=build,.git
+	$(FLAKE8) --exclude=build,.git,build-pypy
 
 before-push: check
 	git diff origin/master | $(PEP8) --diff

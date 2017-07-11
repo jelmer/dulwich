@@ -286,8 +286,8 @@ class SwiftConnector(object):
                                 connection_timeout=self.http_timeout,
                                 network_timeout=self.http_timeout,
                                 headers=token_header)
-        self.base_path = str(
-            posixpath.join(urlparse.urlparse(self.storage_url).path, self.root))
+        self.base_path = str(posixpath.join(
+                urlparse.urlparse(self.storage_url).path, self.root))
 
     def swift_auth_v1(self):
         self.user = self.user.replace(";", ":")
@@ -812,7 +812,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = posixpath.join(
             self.pack_dir,
-            'pack-' + iter_sha1(e[0] for e in entries).decode(sys.getfilesystemencoding()))
+            'pack-' + iter_sha1(e[0] for e in entries).decode(
+                sys.getfilesystemencoding()))
         self.scon.put_object(pack_base_name + '.pack', f)
 
         # Write the index.
@@ -994,7 +995,7 @@ def cmd_daemon(args):
 
     try:
         import gevent
-        import geventhttpclient
+        import geventhttpclient  # noqa: F401
     except ImportError:
         print("gevent and geventhttpclient libraries are mandatory "
               " for use the Swift backend.")
@@ -1036,14 +1037,16 @@ def main(argv=sys.argv):
     }
 
     if len(sys.argv) < 2:
-        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        print("Usage: %s <%s> [OPTIONS...]" % (
+                sys.argv[0], "|".join(commands.keys())))
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if not cmd in commands:
+    if cmd not in commands:
         print("No such subcommand: %s" % cmd)
         sys.exit(1)
     commands[cmd](sys.argv[2:])
+
 
 if __name__ == '__main__':
     main()

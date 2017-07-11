@@ -32,16 +32,17 @@ from dulwich.objects import (
     Tag,
     )
 from fastimport import __version__ as fastimport_version
-if fastimport_version <= (0, 9, 5) and sys.version_info[0] == 3 and sys.version_info[1] < 5:
+if (fastimport_version <= (0, 9, 5) and
+        sys.version_info[0] == 3 and sys.version_info[1] < 5):
     raise ImportError("Older versions of fastimport don't support python3<3.5")
-from fastimport import (
+from fastimport import (  # noqa: E402
     commands,
     errors as fastimport_errors,
     parser,
     processor,
     )
 
-import stat
+import stat  # noqa: E402
 
 
 def split_email(text):
@@ -62,7 +63,7 @@ class GitFastExporter(object):
         self.outf.write(getattr(cmd, "__bytes__", cmd.__repr__)() + b"\n")
 
     def _allocate_marker(self):
-        self._marker_idx+=1
+        self._marker_idx += 1
         return ("%d" % (self._marker_idx,)).encode('ascii')
 
     def _export_blob(self, blob):
@@ -77,7 +78,7 @@ class GitFastExporter(object):
 
     def _iter_files(self, base_tree, new_tree):
         for ((old_path, new_path), (old_mode, new_mode),
-            (old_hexsha, new_hexsha)) in \
+             (old_hexsha, new_hexsha)) in \
                 self.store.tree_changes(base_tree, new_tree):
             if new_path is None:
                 yield commands.FileDeleteCommand(old_path)
@@ -104,7 +105,8 @@ class GitFastExporter(object):
             merges = []
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
-        cmd = commands.CommitCommand(ref, marker,
+        cmd = commands.CommitCommand(
+            ref, marker,
             (author, author_email, commit.author_time, commit.author_timezone),
             (committer, committer_email, commit.commit_time,
                 commit.commit_timezone),
@@ -174,7 +176,8 @@ class GitImportProcessor(processor.ImportProcessor):
                     blob_id = blob.id
                 else:
                     assert filecmd.dataref.startswith(b":"), \
-                        "non-marker refs not supported yet (%r)" % filecmd.dataref
+                           ("non-marker refs not supported yet (%r)" %
+                            filecmd.dataref)
                     blob_id = self.markers[filecmd.dataref[1:]]
                 self._contents[filecmd.path] = (filecmd.mode, blob_id)
             elif filecmd.name == b"filedelete":
@@ -190,7 +193,8 @@ class GitImportProcessor(processor.ImportProcessor):
                 self._contents = {}
             else:
                 raise Exception("Command %s not supported" % filecmd.name)
-        commit.tree = commit_tree(self.repo.object_store,
+        commit.tree = commit_tree(
+            self.repo.object_store,
             ((path, hexsha, mode) for (path, (mode, hexsha)) in
                 self._contents.items()))
         if self.last_commit is not None:

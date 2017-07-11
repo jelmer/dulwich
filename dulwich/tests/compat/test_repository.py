@@ -24,7 +24,6 @@
 from io import BytesIO
 from itertools import chain
 import os
-import sys
 import tempfile
 
 from dulwich.objects import (

@@ -30,7 +30,12 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from unittest import SkipTest, TestCase as _TestCase, skipIf, expectedFailure
+from unittest import (  # noqa: F401
+    SkipTest,
+    TestCase as _TestCase,
+    skipIf,
+    expectedFailure,
+    )
 
 
 class TestCase(_TestCase):
@@ -52,8 +57,9 @@ class BlackboxTestCase(TestCase):
     """Blackbox testing."""
 
     # TODO(jelmer): Include more possible binary paths.
-    bin_directories = [os.path.abspath(os.path.join(os.path.dirname(__file__),
-        "..", "..", "bin")), '/usr/bin', '/usr/local/bin']
+    bin_directories = [os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "bin")), '/usr/bin',
+            '/usr/local/bin']
 
     def bin_path(self, name):
         """Determine the full path of a binary.
@@ -83,10 +89,11 @@ class BlackboxTestCase(TestCase):
         #
         # Save us from all that headache and call python with the bin script.
         argv = [sys.executable, self.bin_path(name)] + args
-        return subprocess.Popen(argv,
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=env)
+        return subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+                env=env)
 
 
 def self_test_suite():
@@ -135,15 +142,17 @@ def tutorial_test_suite():
         'conclusion',
         ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+
     def setup(test):
         test.__old_cwd = os.getcwd()
         test.__dulwich_tempdir = tempfile.mkdtemp()
         os.chdir(test.__dulwich_tempdir)
+
     def teardown(test):
         os.chdir(test.__old_cwd)
         shutil.rmtree(test.__dulwich_tempdir)
-    return doctest.DocFileSuite(setUp=setup, tearDown=teardown,
-        *tutorial_files)
+    return doctest.DocFileSuite(
+            setUp=setup, tearDown=teardown, *tutorial_files)
 
 
 def nocompat_test_suite():

@@ -68,7 +68,7 @@ from dulwich.hooks import (
     CommitMsgShellHook,
     )
 
-from dulwich.refs import (
+from dulwich.refs import (  # noqa: F401
     check_ref_format,
     RefsContainer,
     DictRefsContainer,

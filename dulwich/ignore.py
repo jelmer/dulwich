@@ -24,6 +24,7 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
+import sys
 
 
 def translate(pat):
@@ -145,6 +146,8 @@ class IgnoreFilter(object):
         :return: None if file is not mentioned, True if it is included, False
             if it is explicitly excluded.
         """
+        if not isinstance(path, bytes):
+            path = path.encode(sys.getfilesystemencoding())
         status = None
         for pattern in self._patterns:
             if pattern[0:1] == b'!':
@@ -159,7 +162,7 @@ class IgnoreFilter(object):
 
     @classmethod
     def from_path(cls, path):
-        with open(path, 'r') as f:
+        with open(path, 'rb') as f:
             ret = cls(read_ignore_patterns(f))
             ret._path = path
             return ret

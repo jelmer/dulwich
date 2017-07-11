@@ -159,7 +159,8 @@ class ReportStatusParser(object):
                 ref_status[ref] = status
             # TODO(jelmer): don't assume encoding of refs is ascii.
             raise UpdateRefsError(', '.join([
-                ref.decode('ascii') for ref in ref_status if ref not in ok]) +
+                refname.decode('ascii') for refname in ref_status
+                if refname not in ok]) +
                 ' failed to update', ref_status=ref_status)
 
     def handle_packet(self, pkt):
@@ -360,7 +361,7 @@ class GitClient(object):
                     ok.add(ref)
                 ref_status[ref] = status
             raise UpdateRefsError(', '.join([
-                ref for ref in ref_status if ref not in ok]) +
+                refname for refname in ref_status if refname not in ok]) +
                 b' failed to update', ref_status=ref_status)
 
     def _read_side_band64k_data(self, proto, channel_callbacks):

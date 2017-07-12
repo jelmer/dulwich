@@ -206,10 +206,10 @@ def default_user_ignore_filter_path(config):
     except KeyError:
         pass
 
-    if os.environ.get('XDG_CONFIG_HOME', ''):
-        return os.path.join(os.environ['XDG_CONFIG_HOME'], 'git', 'ignore')
-    else:
-        return os.path.join(os.environ['HOME'], '.config', 'git', 'ignore')
+    xdg_config_home = os.environ.get(
+        "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
+    )
+    return os.path.join(xdg_config_home, 'git', 'ignore')
 
 
 class IgnoreFilterManager(object):

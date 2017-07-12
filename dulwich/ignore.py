@@ -240,6 +240,8 @@ class IgnoreFilterManager(object):
         :return: None if the file is not mentioned, True if it is included,
             False if it is explicitly excluded.
         """
+        if not os.path.isabs(path):
+            path = os.path.join(self._top_path, path)
         dirname = path
         while dirname not in (self._top_path, '/'):
             dirname = os.path.dirname(dirname)
@@ -250,7 +252,7 @@ class IgnoreFilterManager(object):
                 if status is not None:
                     return status
         for ignore_filter in self._global_filters:
-            relpath = os.path.relpath(path, dirname)
+            relpath = os.path.relpath(path, self._top_path)
             status = ignore_filter.is_ignored(relpath)
             if status is not None:
                 return status

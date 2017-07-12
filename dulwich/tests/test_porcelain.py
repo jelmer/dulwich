@@ -276,6 +276,18 @@ class AddTests(PorcelainTestCase):
         porcelain.add(self.repo.path, paths=["foo"])
         self.assertIn(b"foo", self.repo.open_index())
 
+    def test_add_ignored(self):
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write("foo")
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
+            f.write("BAR")
+        (added, ignored) = porcelain.add(self.repo.path, paths=["foo", "bar"])
+        self.assertIn(b"bar", self.repo.open_index())
+        self.assertEqual(set(['bar']), set(added))
+        self.assertEqual(set(['foo']), ignored)
+
     def test_add_file_absolute_path(self):
         # Absolute paths are (not yet) supported
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:

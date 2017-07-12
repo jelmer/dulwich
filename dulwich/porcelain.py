@@ -79,6 +79,7 @@ from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
     )
+from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import get_unstaged_changes
 from dulwich.objects import (
     Commit,
@@ -312,8 +313,11 @@ def add(repo=".", paths=None):
 
     :param repo: Repository for the files
     :param paths: Paths to add.  No value passed stages all modified files.
+    :return: Tuple with set of added files and ignored files
     """
+    ignored = set()
     with open_repo_closing(repo) as r:
+        ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
             paths = list(
                 get_untracked_paths(os.getcwd(), r.path, r.open_index()))
@@ -322,6 +326,10 @@ def add(repo=".", paths=None):
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
+            if ignore_manager.is_ignored(p):
+                ignored.add(p)
+                continue
+
             # FIXME: Support patterns, directories.
             if os.path.isabs(p) and p.startswith(repo.path):
                 relpath = os.path.relpath(p, repo.path)
@@ -329,6 +337,7 @@ def add(repo=".", paths=None):
                 relpath = p
             relpaths.append(relpath)
         r.stage(relpaths)
+    return (relpaths, ignored)
 
 
 def rm(repo=".", paths=None):

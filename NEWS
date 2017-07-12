@@ -17,7 +17,7 @@
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.
-    Note that this is not yet hooked into the other parts of Dulwich.
+    ``dulwich.porcelain.add`` now honors ignores.
     (Jelmer Vernooĳ, #524)
 
  DOCUMENTATION

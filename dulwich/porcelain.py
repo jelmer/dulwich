@@ -24,6 +24,7 @@ Currently implemented:
  * archive
  * add
  * branch{_create,_delete,_list}
+ * check-ignore
  * clone
  * commit
  * commit-tree
@@ -1043,3 +1044,26 @@ def remote_add(repo, name, url):
             raise RemoteExists(section)
         c.set(section, b"url", url)
         c.write_to_path()
+
+
+def check_ignore(repo, paths, no_index=False):
+    """Debug gitignore files.
+
+    :param repo: Path to the repository
+    :param paths: List of paths to check for
+    :param no_index: Don't check index
+    :return: List of ignored files
+    """
+    with open_repo_closing(repo) as r:
+        index = r.open_index()
+        ignore_manager = IgnoreFilterManager.from_repo(r)
+        for path in paths:
+            if os.path.isdir(path):
+                continue
+            if os.path.isabs(path):
+                path = os.path.relpath(path, r.path)
+            if (not no_index and
+                    path.encode(sys.getfilesystemencoding()) in index):
+                continue
+            if ignore_manager.is_ignored(path):
+                yield path

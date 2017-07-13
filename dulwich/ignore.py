@@ -226,7 +226,7 @@ class IgnoreFilterManager(object):
         except KeyError:
             pass
 
-        p = os.path.join(path, '.gitignore')
+        p = os.path.join(self._top_path, path, '.gitignore')
         try:
             self._path_filters[path] = IgnoreFilter.from_path(p)
         except IOError:
@@ -240,22 +240,20 @@ class IgnoreFilterManager(object):
         :return: None if the file is not mentioned, True if it is included,
             False if it is explicitly excluded.
         """
-        if not os.path.isabs(path):
-            path = os.path.join(self._top_path, path)
-        dirname = path
-        while dirname not in (self._top_path, '/'):
-            dirname = os.path.dirname(dirname)
-            ignore_filter = self._load_path(dirname)
-            if ignore_filter is not None:
-                relpath = os.path.relpath(path, dirname)
-                status = ignore_filter.is_ignored(relpath)
+        if os.path.isabs(path):
+            path = os.path.relpath(path, self._top_path)
+        filters = [(0, f) for f in self._global_filters]
+        parts = path.split(os.path.sep)
+        for i in range(len(parts)+1):
+            dirname = os.path.sep.join(parts[:i])
+            for s, f in filters:
+                relpath = os.path.sep.join(parts[s:i])
+                status = f.is_ignored(relpath)
                 if status is not None:
                     return status
-        for ignore_filter in self._global_filters:
-            relpath = os.path.relpath(path, self._top_path)
-            status = ignore_filter.is_ignored(relpath)
-            if status is not None:
-                return status
+            ignore_filter = self._load_path(dirname)
+            if ignore_filter is not None:
+                filters.insert(0, (i, ignore_filter))
         return None
 
     @classmethod

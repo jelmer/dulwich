@@ -243,11 +243,11 @@ class IgnoreFilterManager(object):
         if os.path.isabs(path):
             path = os.path.relpath(path, self._top_path)
         filters = [(0, f) for f in self._global_filters]
-        parts = path.split(os.path.sep)
+        parts = path.split('/')
         for i in range(len(parts)+1):
-            dirname = os.path.sep.join(parts[:i])
+            dirname = '/'.join(parts[:i])
             for s, f in filters:
-                relpath = os.path.sep.join(parts[s:i])
+                relpath = '/'.join(parts[s:i])
                 status = f.is_ignored(relpath)
                 if status is not None:
                     return status

@@ -20,6 +20,9 @@
     ``dulwich.porcelain.add`` now honors ignores.
     (Jelmer Vernooĳ, #524)
 
+ * New ``dulwich.porcelain.check_ignore`` command.
+   (Jelmer Vernooĳ)
+
  DOCUMENTATION
 
   * Clarified docstrings for Client.{send_pack,fetch_pack} implementations.

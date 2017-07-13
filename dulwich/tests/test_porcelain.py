@@ -982,3 +982,30 @@ class RemoteAddTests(PorcelainTestCase):
             self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
         self.assertRaises(porcelain.RemoteExists, porcelain.remote_add,
                           self.repo, 'jelmer', 'git://jelmer.uk/code/dulwich')
+
+
+class CheckIgnoreTests(PorcelainTestCase):
+
+    def test_check_ignored(self):
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write("foo")
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
+            f.write("BAR")
+        self.assertEqual(
+            ['foo'],
+            list(porcelain.check_ignore(self.repo, ['foo'])))
+        self.assertEqual([], list(porcelain.check_ignore(self.repo, ['bar'])))
+
+    def test_check_added(self):
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        self.repo.stage(['foo'])
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write("foo\n")
+        self.assertEqual(
+            [], list(porcelain.check_ignore(self.repo, ['foo'])))
+        self.assertEqual(
+            ['foo'],
+            list(porcelain.check_ignore(self.repo, ['foo'], no_index=True)))

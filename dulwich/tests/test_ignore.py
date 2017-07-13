@@ -167,6 +167,7 @@ class IgnoreFilterManagerTests(TestCase):
         repo = Repo.init(tmp_dir)
         with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
             f.write(b'/foo/bar\n')
+            f.write(b'/dir2\n')
         os.mkdir(os.path.join(repo.path, 'dir'))
         with open(os.path.join(repo.path, 'dir', '.gitignore'), 'wb') as f:
             f.write(b'/blie\n')
@@ -176,9 +177,11 @@ class IgnoreFilterManagerTests(TestCase):
         with open(p, 'wb') as f:
             f.write(b'/excluded\n')
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'dir', 'blie')))
+        self.assertTrue(m.is_ignored(os.path.join('dir', 'blie')))
         self.assertIs(None,
                       m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
         self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir')))
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'foo', 'bar')))
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))
+        self.assertTrue(m.is_ignored(os.path.join(
+            repo.path, 'dir2', 'fileinignoreddir')))

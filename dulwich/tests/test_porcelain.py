@@ -802,6 +802,23 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(set(['.gitignore', 'notignored']),
                          set(porcelain.status(self.repo).untracked))
 
+    def test_get_untracked_paths_nested(self):
+        with open(os.path.join(self.repo.path, 'notignored'), 'w') as f:
+            f.write('blah\n')
+        subrepo = Repo.init(os.path.join(self.repo.path, 'nested'), mkdir=True)
+        with open(os.path.join(subrepo.path, 'another'), 'w') as f:
+            f.write('foo\n')
+
+        self.assertEqual(
+            set(['notignored']),
+            set(porcelain.get_untracked_paths(self.repo.path, self.repo.path,
+                                              self.repo.open_index())))
+        self.assertEqual(
+            set(['another']),
+            set(porcelain.get_untracked_paths(subrepo.path, subrepo.path,
+                                              subrepo.open_index())))
+
+
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
 

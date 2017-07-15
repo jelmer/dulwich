@@ -136,28 +136,32 @@ class IgnoreFilter(object):
 
     def append_pattern(self, pattern):
         """Add a pattern to the set."""
-        self._patterns.append(pattern)
+        pattern_str = pattern
+        if pattern[0:1] == b'!':
+            is_exclude = False
+            pattern = pattern[1:]
+        else:
+            if pattern[0:1] == b'\\':
+                pattern = pattern[1:]
+            is_exclude = True
+        self._patterns.append(
+            (is_exclude, re.compile(translate(pattern)), pattern_str))
 
     def is_ignored(self, path):
         """Check whether a path is ignored.
 
         For directories, include a trailing slash.
 
-        :return: None if file is not mentioned, True if it is included, False
-            if it is explicitly excluded.
+        :return: status is None if file is not mentioned, True if it is
+            included, False if it is explicitly excluded.
         """
         if not isinstance(path, bytes):
             path = path.encode(sys.getfilesystemencoding())
         status = None
-        for pattern in self._patterns:
-            if pattern[0:1] == b'!':
-                if match_pattern(path, pattern[1:]):
-                    status = False
-            else:
-                if pattern[0:1] == b'\\':
-                    pattern = pattern[1:]
-                if match_pattern(path, pattern):
-                    status = True
+        matched = None
+        for (is_exclude, compiled, pattern_str) in self._patterns:
+            if compiled.match(path):
+                status = is_exclude
         return status
 
     @classmethod

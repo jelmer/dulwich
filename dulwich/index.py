@@ -579,7 +579,6 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
-        # TODO(jelmer): handle S_ISGITLINK(entry.mode) here
         try:
             blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         except OSError as e:
@@ -591,8 +590,19 @@ def get_unstaged_changes(index, root_path):
         except IOError as e:
             if e.errno != errno.EISDIR:
                 raise
-            # The file was changed to a directory, so consider it removed.
-            yield tree_path
+            # This is actually a directory
+            if os.path.exists(os.path.join(tree_path, '.git')):
+                # Submodule
+                from dulwich.errors import NotGitRepository
+                from dulwich.repo import Repo
+                try:
+                    if entry.sha != Repo(tree_path).head():
+                        yield tree_path
+                except NotGitRepository:
+                    yield tree_path
+            else:
+                # The file was changed to a directory, so consider it removed.
+                yield tree_path
         else:
             if blob.id != entry.sha:
                 yield tree_path

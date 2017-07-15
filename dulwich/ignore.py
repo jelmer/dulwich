@@ -143,6 +143,9 @@ class Pattern(object):
     def __bytes__(self):
         return self.pattern
 
+    def __str__(self):
+        return self.pattern.decode(sys.getfilesystemencoding())
+
     def __eq__(self, other):
         return (type(self) == type(other) and self.pattern == other.pattern)
 

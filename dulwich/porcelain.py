@@ -782,6 +782,12 @@ def get_untracked_paths(frompath, basepath, index):
         # Skip .git and below.
         if '.git' in dirnames:
             dirnames.remove('.git')
+            if dirpath != frompath:
+                continue
+        if '.git' in filenames:
+            filenames.remove('.git')
+            if dirpath != frompath:
+                continue
         for filename in filenames:
             p = os.path.join(dirpath[len(basepath)+1:], filename)
             if p not in index:

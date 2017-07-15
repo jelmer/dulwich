@@ -67,13 +67,18 @@ ext_modules = [
 ]
 
 
+if sys.platform == 'win32':
+    # Win32 setup breaks with non-ascii characters.
+    author = "Jelmer Vernooij"
+else:
+    author = "Jelmer Vernooĳ"
+
 setup(name='dulwich',
       description='Python Git Library',
       keywords='git',
       version=dulwich_version_string,
       url='https://www.dulwich.io/',
       license='Apachev2 or later or GPLv2',
-      author='Jelmer Vernooĳ',
       author_email='jelmer@jelmer.uk',
       long_description="""
       Python implementation of the Git file formats and protocols,

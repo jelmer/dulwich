@@ -31,6 +31,7 @@ from dulwich.ignore import (
     IgnoreFilter,
     IgnoreFilterManager,
     IgnoreFilterStack,
+    Pattern,
     match_pattern,
     read_ignore_patterns,
     translate,
@@ -135,15 +136,28 @@ class IgnoreFilterTests(TestCase):
         filter = IgnoreFilter([b'a.c', b'b.c'])
         self.assertTrue(filter.is_ignored(b'a.c'))
         self.assertIs(None, filter.is_ignored(b'c.c'))
+        self.assertEqual(
+            [Pattern(b'a.c')],
+            list(filter.find_matching(b'a.c')))
+        self.assertEqual(
+            [],
+            list(filter.find_matching(b'c.c')))
 
     def test_excluded(self):
         filter = IgnoreFilter([b'a.c', b'b.c', b'!c.c'])
         self.assertFalse(filter.is_ignored(b'c.c'))
         self.assertIs(None, filter.is_ignored(b'd.c'))
+        self.assertEqual(
+            [Pattern(b'!c.c')],
+            list(filter.find_matching(b'c.c')))
+        self.assertEqual([], list(filter.find_matching(b'd.c')))
 
     def test_include_exclude_include(self):
         filter = IgnoreFilter([b'a.c', b'!a.c', b'a.c'])
         self.assertTrue(filter.is_ignored(b'a.c'))
+        self.assertEqual(
+            [Pattern(b'a.c'), Pattern(b'!a.c'), Pattern(b'a.c')],
+            list(filter.find_matching(b'a.c')))
 
 
 class IgnoreFilterStackTests(TestCase):

@@ -127,6 +127,29 @@ def match_pattern(path, pattern):
     return re.match(re_pattern, path)
 
 
+class Pattern(object):
+
+    def __init__(self, pattern):
+        self.pattern = pattern
+        if pattern[0:1] == b'!':
+            self.is_exclude = False
+            pattern = pattern[1:]
+        else:
+            if pattern[0:1] == b'\\':
+                pattern = pattern[1:]
+            self.is_exclude = True
+        self._re = re.compile(translate(pattern))
+
+    def __bytes__(self):
+        return self.pattern
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and self.pattern == other.pattern)
+
+    def match(self, path):
+        return self._re.match(path)
+
+
 class IgnoreFilter(object):
 
     def __init__(self, patterns):
@@ -136,16 +159,19 @@ class IgnoreFilter(object):
 
     def append_pattern(self, pattern):
         """Add a pattern to the set."""
-        pattern_str = pattern
-        if pattern[0:1] == b'!':
-            is_exclude = False
-            pattern = pattern[1:]
-        else:
-            if pattern[0:1] == b'\\':
-                pattern = pattern[1:]
-            is_exclude = True
-        self._patterns.append(
-            (is_exclude, re.compile(translate(pattern)), pattern_str))
+        self._patterns.append(Pattern(pattern))
+
+    def find_matching(self, path):
+        """Yield all matching patterns for path.
+
+        :param path: Path to match
+        :return: Iterator over  iterators
+        """
+        if not isinstance(path, bytes):
+            path = path.encode(sys.getfilesystemencoding())
+        for pattern in self._patterns:
+            if pattern.match(path):
+                yield pattern
 
     def is_ignored(self, path):
         """Check whether a path is ignored.
@@ -155,13 +181,9 @@ class IgnoreFilter(object):
         :return: status is None if file is not mentioned, True if it is
             included, False if it is explicitly excluded.
         """
-        if not isinstance(path, bytes):
-            path = path.encode(sys.getfilesystemencoding())
         status = None
-        matched = None
-        for (is_exclude, compiled, pattern_str) in self._patterns:
-            if compiled.match(path):
-                status = is_exclude
+        for pattern in self.find_matching(path):
+            status = pattern.is_exclude
         return status
 
     @classmethod
@@ -242,12 +264,13 @@ class IgnoreFilterManager(object):
             self._path_filters[path] = None
         return self._path_filters[path]
 
-    def is_ignored(self, path):
-        """Check whether a path is explicitly included or excluded in ignores.
+    def find_matching(self, path):
+        """Find matching patterns for path.
+
+        Stops after the first ignore file with matches.
 
         :param path: Path to check
-        :return: None if the file is not mentioned, True if it is included,
-            False if it is explicitly excluded.
+        :return: Iterator over Pattern instances
         """
         if os.path.isabs(path):
             path = os.path.relpath(path, self._top_path)
@@ -257,12 +280,24 @@ class IgnoreFilterManager(object):
             dirname = '/'.join(parts[:i])
             for s, f in filters:
                 relpath = '/'.join(parts[s:i])
-                status = f.is_ignored(relpath)
-                if status is not None:
-                    return status
+                matches = list(f.find_matching(relpath))
+                if matches:
+                    return iter(matches)
             ignore_filter = self._load_path(dirname)
             if ignore_filter is not None:
                 filters.insert(0, (i, ignore_filter))
+        return iter([])
+
+    def is_ignored(self, path):
+        """Check whether a path is explicitly included or excluded in ignores.
+
+        :param path: Path to check
+        :return: None if the file is not mentioned, True if it is included,
+            False if it is explicitly excluded.
+        """
+        matches = list(self.find_matching(path))
+        if matches:
+            return matches[-1].is_exclude
         return None
 
     @classmethod

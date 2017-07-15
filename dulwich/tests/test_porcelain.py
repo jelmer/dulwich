@@ -788,6 +788,19 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(len(changes['modify']), 0)
         self.assertEqual(len(changes['delete']), 1)
 
+    def test_get_untracked_paths(self):
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write('ignored\n')
+        with open(os.path.join(self.repo.path, 'ignored'), 'w') as f:
+            f.write('blah\n')
+        with open(os.path.join(self.repo.path, 'notignored'), 'w') as f:
+            f.write('blah\n')
+        self.assertEqual(
+            set(['ignored', 'notignored', '.gitignore']),
+            set(porcelain.get_untracked_paths(self.repo.path, self.repo.path,
+                                              self.repo.open_index())))
+        self.assertEqual(set(['.gitignore', 'notignored']),
+                         set(porcelain.status(self.repo).untracked))
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

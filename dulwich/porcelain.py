@@ -755,13 +755,18 @@ def status(repo="."):
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """
+    # TODO(jelmer): support --ignored
     with open_repo_closing(repo) as r:
         # 1. Get status of staged
         tracked_changes = get_tree_changes(r)
         # 2. Get status of unstaged
         index = r.open_index()
         unstaged_changes = list(get_unstaged_changes(index, r.path))
-        untracked_changes = list(get_untracked_paths(r.path, r.path, index))
+        ignore_manager = IgnoreFilterManager.from_repo(r)
+        untracked_changes = [
+                p for p in
+                get_untracked_paths(r.path, r.path, index)
+                if not ignore_manager.is_ignored(p)]
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 

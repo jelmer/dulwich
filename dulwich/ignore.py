@@ -278,6 +278,8 @@ class IgnoreFilterManager(object):
         if os.path.isabs(path):
             path = os.path.relpath(path, self._top_path)
         filters = [(0, f) for f in self._global_filters]
+        if os.path.sep != '/':
+            path = path.replace(os.path.sep, '/')
         parts = path.split('/')
         for i in range(len(parts)+1):
             dirname = '/'.join(parts[:i])

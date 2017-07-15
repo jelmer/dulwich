@@ -14,6 +14,9 @@
    add from current working directory rather than repository root.
    (Jelmer Vernooĳ, #521)
 
+  * Properly deal with submodules in 'porcelain.status'.
+   (Jelmer Vernooĳ, #517)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

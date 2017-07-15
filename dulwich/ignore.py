@@ -220,6 +220,11 @@ class IgnoreFilterManager(object):
         self._top_path = top_path
         self._global_filters = global_filters
 
+    def __repr__(self):
+        return "%s(%s, %r)" % (
+            type(self).__name__, self._top_path,
+            self._global_filters)
+
     def _load_path(self, path):
         try:
             return self._path_filters[path]

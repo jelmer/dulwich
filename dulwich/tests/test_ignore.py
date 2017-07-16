@@ -171,6 +171,20 @@ class IgnoreFilterTests(TestCase):
             [Pattern(b'a.c'), Pattern(b'!a.c'), Pattern(b'a.c')],
             list(filter.find_matching(b'a.c')))
 
+    def test_manpage(self):
+        # A specific example from the gitignore manpage
+        filter = IgnoreFilter([
+            b'/*',
+            b'!/foo',
+            b'/foo/*',
+            b'!/foo/bar'])
+        self.assertTrue(filter.is_ignored(b'a.c'))
+        self.assertTrue(filter.is_ignored(b'foo/blie'))
+        self.assertFalse(filter.is_ignored(b'foo'))
+        self.assertFalse(filter.is_ignored(b'foo/bar'))
+        self.assertFalse(filter.is_ignored(b'foo/bar/'))
+        self.assertFalse(filter.is_ignored(b'foo/bar/bloe'))
+
 
 class IgnoreFilterStackTests(TestCase):
 

@@ -143,6 +143,15 @@ class IgnoreFilterTests(TestCase):
             [],
             list(filter.find_matching(b'c.c')))
 
+    def test_included_ignorecase(self):
+        filter = IgnoreFilter([b'a.c', b'b.c'], ignorecase=False)
+        self.assertTrue(filter.is_ignored(b'a.c'))
+        self.assertFalse(filter.is_ignored(b'A.c'))
+        filter = IgnoreFilter([b'a.c', b'b.c'], ignorecase=True)
+        self.assertTrue(filter.is_ignored(b'a.c'))
+        self.assertTrue(filter.is_ignored(b'A.c'))
+        self.assertTrue(filter.is_ignored(b'A.C'))
+
     def test_excluded(self):
         filter = IgnoreFilter([b'a.c', b'b.c', b'!c.c'])
         self.assertFalse(filter.is_ignored(b'c.c'))
@@ -199,3 +208,17 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))
         self.assertTrue(m.is_ignored(os.path.join(
             repo.path, 'dir2', 'fileinignoreddir')))
+
+    def test_load_ignore_ignorecase(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        config = repo.get_config()
+        config.set(b'core', b'ignorecase', True)
+        config.write_to_path()
+        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
+            f.write(b'/foo/bar\n')
+            f.write(b'/dir\n')
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertTrue(m.is_ignored(os.path.join('dir', 'blie')))
+        self.assertTrue(m.is_ignored(os.path.join('DIR', 'blie')))

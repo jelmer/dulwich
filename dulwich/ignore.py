@@ -129,8 +129,9 @@ def match_pattern(path, pattern):
 
 class Pattern(object):
 
-    def __init__(self, pattern):
+    def __init__(self, pattern, ignorecase=False):
         self.pattern = pattern
+        self.ignorecase = ignorecase
         if pattern[0:1] == b'!':
             self.is_exclude = False
             pattern = pattern[1:]
@@ -138,7 +139,10 @@ class Pattern(object):
             if pattern[0:1] == b'\\':
                 pattern = pattern[1:]
             self.is_exclude = True
-        self._re = re.compile(translate(pattern))
+        flags = 0
+        if self.ignorecase:
+            flags = re.IGNORECASE
+        self._re = re.compile(translate(pattern), flags)
 
     def __bytes__(self):
         return self.pattern
@@ -147,7 +151,12 @@ class Pattern(object):
         return self.pattern.decode(sys.getfilesystemencoding())
 
     def __eq__(self, other):
-        return (type(self) == type(other) and self.pattern == other.pattern)
+        return (type(self) == type(other) and
+                self.pattern == other.pattern and
+                self.ignorecase == other.ignorecase)
+    def __repr__(self):
+        return "%s(%s, %r)" % (
+            type(self).__name__, self.pattern, self.ignorecase)
 
     def match(self, path):
         return self._re.match(path)
@@ -155,14 +164,15 @@ class Pattern(object):
 
 class IgnoreFilter(object):
 
-    def __init__(self, patterns):
+    def __init__(self, patterns, ignorecase=False):
         self._patterns = []
+        self._ignorecase = ignorecase
         for pattern in patterns:
             self.append_pattern(pattern)
 
     def append_pattern(self, pattern):
         """Add a pattern to the set."""
-        self._patterns.append(Pattern(pattern))
+        self._patterns.append(Pattern(pattern, self._ignorecase))
 
     def find_matching(self, path):
         """Yield all matching patterns for path.
@@ -190,9 +200,9 @@ class IgnoreFilter(object):
         return status
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path, ignorecase=False):
         with open(path, 'rb') as f:
-            ret = cls(read_ignore_patterns(f))
+            ret = cls(read_ignore_patterns(f), ignorecase)
             ret._path = path
             return ret
 
@@ -244,15 +254,17 @@ def default_user_ignore_filter_path(config):
 class IgnoreFilterManager(object):
     """Ignore file manager."""
 
-    def __init__(self, top_path, global_filters):
+    def __init__(self, top_path, global_filters, ignorecase):
         self._path_filters = {}
         self._top_path = top_path
         self._global_filters = global_filters
+        self._ignorecase = ignorecase
 
     def __repr__(self):
-        return "%s(%s, %r)" % (
+        return "%s(%s, %r, %r)" % (
             type(self).__name__, self._top_path,
-            self._global_filters)
+            self._global_filters,
+            self._ignorecase)
 
     def _load_path(self, path):
         try:
@@ -262,7 +274,8 @@ class IgnoreFilterManager(object):
 
         p = os.path.join(self._top_path, path, '.gitignore')
         try:
-            self._path_filters[path] = IgnoreFilter.from_path(p)
+            self._path_filters[path] = IgnoreFilter.from_path(
+                p, self._ignorecase)
         except IOError:
             self._path_filters[path] = None
         return self._path_filters[path]
@@ -315,4 +328,6 @@ class IgnoreFilterManager(object):
                 global_filters.append(IgnoreFilter.from_path(p))
             except IOError:
                 pass
-        return cls(repo.path, global_filters)
+        config = repo.get_config_stack()
+        ignorecase = config.get_boolean((b'core'), (b'ignorecase'), False)
+        return cls(repo.path, global_filters, ignorecase)

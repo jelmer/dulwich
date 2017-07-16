@@ -11,23 +11,23 @@
     (Jelmer Vernooĳ, #504)
 
   * In ``dulwich.porcelain.add``, if no files are specified,
-   add from current working directory rather than repository root.
-   (Jelmer Vernooĳ, #521)
+    add from current working directory rather than repository root.
+    (Jelmer Vernooĳ, #521)
 
   * Properly deal with submodules in 'porcelain.status'.
-   (Jelmer Vernooĳ, #517)
+    (Jelmer Vernooĳ, #517)
 
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.
     ``dulwich.porcelain.add`` and ``dulwich.porcelain.status`` now honor
-   ignores. (Jelmer Vernooĳ, Segev Finer, #524)
+    ignores. (Jelmer Vernooĳ, Segev Finer, #524)
 
   * New ``dulwich.porcelain.check_ignore`` command.
-   (Jelmer Vernooĳ)
+    (Jelmer Vernooĳ)
 
   * ``dulwich.porcelain.status`` now supports a ``ignored`` argument.
-   (Jelmer Vernooĳ)
+    (Jelmer Vernooĳ)
 
  DOCUMENTATION
 
@@ -48,62 +48,62 @@
 
  BUG FIXES
 
- * Add workaround for
-   https://bitbucket.org/pypy/pypy/issues/2499/cpyext-pystring_asstring-doesnt-work,
-   fixing Dulwich when used with C extensions on pypy < 5.6. (Victor Stinner)
+  * Add workaround for
+    https://bitbucket.org/pypy/pypy/issues/2499/cpyext-pystring_asstring-doesnt-work,
+    fixing Dulwich when used with C extensions on pypy < 5.6. (Victor Stinner)
 
- * Properly quote config values with a '#' character in them.
-   (Jelmer Vernooij, #511)
+  * Properly quote config values with a '#' character in them.
+    (Jelmer Vernooij, #511)
 
 0.17.1	2017-03-01
 
  IMPROVEMENTS
 
- * Add basic 'dulwich pull' command. (Jelmer Vernooĳ)
+  * Add basic 'dulwich pull' command. (Jelmer Vernooĳ)
 
  BUG FIXES
 
- * Cope with existing submodules during pull.
-   (Jelmer Vernooĳ, #505)
+  * Cope with existing submodules during pull.
+    (Jelmer Vernooĳ, #505)
 
 0.17.0	2017-03-01
 
  TEST FIXES
 
- * Skip test that requires sync to synchronize filesystems if os.sync is
-   not available. (Koen Martens)
+  * Skip test that requires sync to synchronize filesystems if os.sync is
+    not available. (Koen Martens)
 
  IMPROVEMENTS
 
- * Implement MemoryRepo.{set_description,get_description}.
-   (Jelmer Vernooĳ)
+  * Implement MemoryRepo.{set_description,get_description}.
+    (Jelmer Vernooĳ)
 
- * Raise exception in Repo.stage() when absolute paths are
-   passed in. Allow passing in relative paths to
-   porcelain.add().(Jelmer Vernooij)
+  * Raise exception in Repo.stage() when absolute paths are
+    passed in. Allow passing in relative paths to
+    porcelain.add().(Jelmer Vernooij)
 
  BUG FIXES
 
- * Handle multi-line quoted values in config files.
-   (Jelmer Vernooĳ, #495)
+  * Handle multi-line quoted values in config files.
+    (Jelmer Vernooĳ, #495)
 
- * Allow porcelain.clone of repository without HEAD.
-   (Jelmer Vernooĳ, #501)
+  * Allow porcelain.clone of repository without HEAD.
+    (Jelmer Vernooĳ, #501)
 
- * Support passing tag ids to Walker()'s include argument.
-   (Jelmer Vernooĳ)
+  * Support passing tag ids to Walker()'s include argument.
+    (Jelmer Vernooĳ)
 
- * Don't strip trailing newlines from extra headers.
-   (Nicolas Dandrimont)
+  * Don't strip trailing newlines from extra headers.
+    (Nicolas Dandrimont)
 
- * Set bufsize=0 for subprocess interaction with SSH client.
-   Fixes hangs on Python 3. (René Stern, #434)
+  * Set bufsize=0 for subprocess interaction with SSH client.
+    Fixes hangs on Python 3. (René Stern, #434)
 
- * Don't drop first slash for SSH paths, except for those
-   starting with "~". (Jelmer Vernooij, René Stern, #463)
+  * Don't drop first slash for SSH paths, except for those
+    starting with "~". (Jelmer Vernooij, René Stern, #463)
 
- * Properly log off after retrieving just refs.
-   (Jelmer Vernooij)
+  * Properly log off after retrieving just refs.
+    (Jelmer Vernooij)
 
 0.16.3	2016-01-14
 
@@ -541,51 +541,51 @@ API CHANGES
 
  IMPROVEMENTS
 
- * Add support for recursive add in 'git add'.
-   (Ryan Faulkner, Jelmer Vernooĳ)
+  * Add support for recursive add in 'git add'.
+    (Ryan Faulkner, Jelmer Vernooĳ)
 
- * Add porcelain 'list_tags'. (Ryan Faulkner)
+  * Add porcelain 'list_tags'. (Ryan Faulkner)
 
- * Add porcelain 'push'. (Ryan Faulkner)
+  * Add porcelain 'push'. (Ryan Faulkner)
 
- * Add porcelain 'pull'. (Ryan Faulkner)
+  * Add porcelain 'pull'. (Ryan Faulkner)
 
- * Support 'http.proxy' in HttpGitClient.
-   (Jelmer Vernooĳ, #1096030)
+  * Support 'http.proxy' in HttpGitClient.
+    (Jelmer Vernooĳ, #1096030)
 
- * Support 'http.useragent' in HttpGitClient.
-   (Jelmer Vernooĳ)
+  * Support 'http.useragent' in HttpGitClient.
+    (Jelmer Vernooĳ)
 
- * In server, wait for clients to send empty list of
-   wants when talking to empty repository.
-   (Damien Tournoud)
+  * In server, wait for clients to send empty list of
+    wants when talking to empty repository.
+    (Damien Tournoud)
 
- * Various changes to improve compatibility with
-   Python 3. (Gary van der Merwe)
+  * Various changes to improve compatibility with
+    Python 3. (Gary van der Merwe)
 
  BUG FIXES
 
- * Support unseekable 'wsgi.input' streams.
-   (Jonas Haag)
+  * Support unseekable 'wsgi.input' streams.
+    (Jonas Haag)
 
- * Raise TypeError when passing unicode() object
-   to Repo.__getitem__.
-   (Jonas Haag)
+  * Raise TypeError when passing unicode() object
+    to Repo.__getitem__.
+    (Jonas Haag)
 
- * Fix handling of `reset` command in dulwich.fastexport.
-   (Jelmer Vernooĳ, #1249029)
+  * Fix handling of `reset` command in dulwich.fastexport.
+    (Jelmer Vernooĳ, #1249029)
 
- * In client, don't wait for server to close connection
-   first. Fixes hang when used against GitHub
-   server implementation. (Siddharth Agarwal)
+  * In client, don't wait for server to close connection
+    first. Fixes hang when used against GitHub
+    server implementation. (Siddharth Agarwal)
 
- * DeltaChainIterator: fix a corner case where an object is inflated as an
-   object already in the repository.
-   (Damien Tournoud, #135)
+  * DeltaChainIterator: fix a corner case where an object is inflated as an
+    object already in the repository.
+    (Damien Tournoud, #135)
 
- * Stop leaking file handles during pack reload. (Damien Tournoud)
+  * Stop leaking file handles during pack reload. (Damien Tournoud)
 
- * Avoid reopening packs during pack cache reload. (Jelmer Vernooĳ)
+  * Avoid reopening packs during pack cache reload. (Jelmer Vernooĳ)
 
  API CHANGES
 
@@ -595,63 +595,63 @@ API CHANGES
 
  IMPROVEMENTS
 
- * Add porcelain 'tag'. (Ryan Faulkner)
+  * Add porcelain 'tag'. (Ryan Faulkner)
 
- * New module `dulwich.objectspec` for parsing strings referencing
-   objects and commit ranges. (Jelmer Vernooĳ)
+  * New module `dulwich.objectspec` for parsing strings referencing
+    objects and commit ranges. (Jelmer Vernooĳ)
 
- * Add shallow branch support. (milki)
+  * Add shallow branch support. (milki)
 
- * Allow passing urllib2 `opener` into HttpGitClient.
-   (Dov Feldstern, #909037)
+  * Allow passing urllib2 `opener` into HttpGitClient.
+    (Dov Feldstern, #909037)
 
  CHANGES
 
- * Drop support for Python 2.4 and 2.5. (Jelmer Vernooĳ)
+  * Drop support for Python 2.4 and 2.5. (Jelmer Vernooĳ)
 
  API CHANGES
 
- * Remove long deprecated ``Repo.commit``, ``Repo.get_blob``,
-   ``Repo.tree`` and ``Repo.tag``. (Jelmer Vernooĳ)
+  * Remove long deprecated ``Repo.commit``, ``Repo.get_blob``,
+    ``Repo.tree`` and ``Repo.tag``. (Jelmer Vernooĳ)
 
- * Remove long deprecated ``Repo.revision_history`` and ``Repo.ref``.
-   (Jelmer Vernooĳ)
+  * Remove long deprecated ``Repo.revision_history`` and ``Repo.ref``.
+    (Jelmer Vernooĳ)
 
- * Remove long deprecated ``Tree.entries``. (Jelmer Vernooĳ)
+  * Remove long deprecated ``Tree.entries``. (Jelmer Vernooĳ)
 
  BUG FIXES
 
- * Raise KeyError rather than TypeError when passing in
-   unicode object of length 20 or 40 to Repo.__getitem__.
-   (Jelmer Vernooĳ)
+  * Raise KeyError rather than TypeError when passing in
+    unicode object of length 20 or 40 to Repo.__getitem__.
+    (Jelmer Vernooĳ)
 
- * Use 'rm' rather than 'unlink' in tests, since the latter
-   does not exist on OpenBSD and other platforms.
-   (Dmitrij D. Czarkoff)
+  * Use 'rm' rather than 'unlink' in tests, since the latter
+    does not exist on OpenBSD and other platforms.
+    (Dmitrij D. Czarkoff)
 
 0.9.4	2013-11-30
 
  IMPROVEMENTS
 
- * Add ssh_kwargs attribute to ParamikoSSHVendor. (milki)
+  * Add ssh_kwargs attribute to ParamikoSSHVendor. (milki)
 
- * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
+  * Add Repo.set_description(). (Víðir Valberg Guðmundsson)
 
- * Add a basic `dulwich.porcelain` module. (Jelmer Vernooĳ, Marcin Kuzminski)
+  * Add a basic `dulwich.porcelain` module. (Jelmer Vernooĳ, Marcin Kuzminski)
 
- * Various performance improvements for object access.
+  * Various performance improvements for object access.
    (Jelmer Vernooĳ)
 
- * New function `get_transport_and_path_from_url`,
-   similar to `get_transport_and_path` but only
-   supports URLs.
-   (Jelmer Vernooĳ)
+  * New function `get_transport_and_path_from_url`,
+    similar to `get_transport_and_path` but only
+    supports URLs.
+    (Jelmer Vernooĳ)
 
- * Add support for file:// URLs in `get_transport_and_path_from_url`.
-   (Jelmer Vernooĳ)
+  * Add support for file:// URLs in `get_transport_and_path_from_url`.
+    (Jelmer Vernooĳ)
 
- * Add LocalGitClient implementation.
-   (Jelmer Vernooĳ)
+  * Add LocalGitClient implementation.
+    (Jelmer Vernooĳ)
 
  BUG FIXES
 
@@ -955,11 +955,11 @@ FEATURES
   * Smart protocol clients can now change refs even if they are
     not uploading new data. (Jelmer Vernooĳ, #855993)
 
- * Don't compile C extensions when running in pypy.
-   (Ronny Pfannschmidt, #881546)
+  * Don't compile C extensions when running in pypy.
+    (Ronny Pfannschmidt, #881546)
 
- * Use different name for strnlen replacement function to avoid clashing
-   with system strnlen. (Jelmer Vernooĳ, #880362)
+  * Use different name for strnlen replacement function to avoid clashing
+    with system strnlen. (Jelmer Vernooĳ, #880362)
 
  API CHANGES
 
@@ -1557,4 +1557,4 @@ note: This list is most likely incomplete for 0.6.0.
 
 0.1.0	2009-01-24
 
- * Initial release.
+  * Initial release.

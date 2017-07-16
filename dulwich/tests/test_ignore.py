@@ -191,6 +191,7 @@ class IgnoreFilterManagerTests(TestCase):
         with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
             f.write(b'/foo/bar\n')
             f.write(b'/dir2\n')
+            f.write(b'/dir3/\n')
         os.mkdir(os.path.join(repo.path, 'dir'))
         with open(os.path.join(repo.path, 'dir', '.gitignore'), 'wb') as f:
             f.write(b'/blie\n')
@@ -208,6 +209,9 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))
         self.assertTrue(m.is_ignored(os.path.join(
             repo.path, 'dir2', 'fileinignoreddir')))
+        self.assertFalse(m.is_ignored(b'dir3'))
+        self.assertTrue(m.is_ignored(b'dir3/'))
+        self.assertTrue(m.is_ignored(b'dir3/bla'))
 
     def test_load_ignore_ignorecase(self):
         tmp_dir = tempfile.mkdtemp()

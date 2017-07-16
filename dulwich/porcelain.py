@@ -151,6 +151,18 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
+def path_to_tree_path(repo, path):
+    """Convert a path to a path usable in e.g. an index.
+
+    :param repo: Repository
+    :param path: A path
+    :return: A path formatted for use in e.g. an index
+    """
+    if os.path.sep != '/':
+        path = path.replace(os.path.sep, '/')
+    return path.encode(sys.getfilesystemencoding())
+
+
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
             errstream=default_bytes_err_stream):
     """Create an archive.
@@ -350,7 +362,8 @@ def rm(repo=".", paths=None):
     with open_repo_closing(repo) as r:
         index = r.open_index()
         for p in paths:
-            del index[p.encode(sys.getfilesystemencoding())]
+            p = path_to_tree_path(r, p)
+            del index[p]
         index.write()
 
 
@@ -1073,8 +1086,7 @@ def check_ignore(repo, paths, no_index=False):
                 continue
             if os.path.isabs(path):
                 path = os.path.relpath(path, r.path)
-            if (not no_index and
-                    path.encode(sys.getfilesystemencoding()) in index):
+            if not no_index and path_to_tree_path(r, path) in index:
                 continue
             if ignore_manager.is_ignored(path):
                 yield path

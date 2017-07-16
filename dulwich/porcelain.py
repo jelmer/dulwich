@@ -1150,4 +1150,5 @@ def annotate(repo, path, committish=None):
         commit_id = parse_commit(r, committish).id
         return annotate_lines(r.object_store, commit_id, path)
 
+
 blame = annotate

@@ -17,25 +17,3 @@
 # MA  02110-1301, USA.
 
 """Tests for annotate support."""
-
-import tarfile
-
-from dulwich.archive import tar_stream
-from dulwich.object_store import (
-    MemoryObjectStore,
-    )
-from dulwich.objects import (
-    Blob,
-    Tree,
-    )
-from dulwich.tests import (
-    TestCase,
-    )
-from dulwich.tests.utils import (
-    build_commit_graph,
-    )
-
-
-class AnnotateTests(TestCase):
-
-    def test_onerev(self):

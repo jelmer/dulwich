@@ -228,9 +228,10 @@ class AddTests(PorcelainTestCase):
 
     def test_add_default_paths(self):
         # create a file for initial commit
-        with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'blah')
+        with open(fullpath, 'w') as f:
             f.write("\n")
-        porcelain.add(repo=self.repo.path, paths=['blah'])
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
         porcelain.commit(repo=self.repo.path, message=b'test',
                          author=b'test', committer=b'test')
 
@@ -271,9 +272,10 @@ class AddTests(PorcelainTestCase):
         self.assertEqual(sorted(index), [b'foo/blie'])
 
     def test_add_file(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
             f.write("BAR")
-        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.add(self.repo.path, paths=[fullpath])
         self.assertIn(b"foo", self.repo.open_index())
 
     def test_add_ignored(self):
@@ -283,7 +285,9 @@ class AddTests(PorcelainTestCase):
             f.write("BAR")
         with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
             f.write("BAR")
-        (added, ignored) = porcelain.add(self.repo.path, paths=["foo", "bar"])
+        (added, ignored) = porcelain.add(self.repo.path, paths=[
+            os.path.join(self.repo.path, "foo"),
+            os.path.join(self.repo.path, "bar")])
         self.assertIn(b"bar", self.repo.open_index())
         self.assertEqual(set(['bar']), set(added))
         self.assertEqual(set(['foo']), ignored)
@@ -299,9 +303,10 @@ class AddTests(PorcelainTestCase):
 class RemoveTests(PorcelainTestCase):
 
     def test_remove_file(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
             f.write("BAR")
-        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.add(self.repo.path, paths=[fullpath])
         porcelain.commit(repo=self.repo, message=b'test', author=b'test',
                          committer=b'test')
         self.assertTrue(os.path.exists(os.path.join(self.repo.path, 'foo')))
@@ -314,12 +319,13 @@ class RemoveTests(PorcelainTestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo.path, 'foo')))
 
     def test_remove_file_staged(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
             f.write("BAR")
         cwd = os.getcwd()
         try:
             os.chdir(self.repo.path)
-            porcelain.add(self.repo.path, paths=["foo"])
+            porcelain.add(self.repo.path, paths=[fullpath])
             self.assertRaises(Exception, porcelain.rm, self.repo.path,
                               paths=["foo"])
         finally:
@@ -520,9 +526,10 @@ class TagDeleteTests(PorcelainTestCase):
 class ResetTests(PorcelainTestCase):
 
     def test_hard_head(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
             f.write("BAR")
-        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.add(self.repo.path, paths=[fullpath])
         porcelain.commit(self.repo.path, message=b"Some message",
                          committer=b"Jane <jane@example.com>",
                          author=b"John <john@example.com>")
@@ -540,16 +547,17 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([], changes)
 
     def test_hard_commit(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
             f.write("BAR")
-        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.add(self.repo.path, paths=[fullpath])
         sha = porcelain.commit(self.repo.path, message=b"Some message",
                                committer=b"Jane <jane@example.com>",
                                author=b"John <john@example.com>")
 
-        with open(os.path.join(self.repo.path, 'foo'), 'wb') as f:
+        with open(fullpath, 'wb') as f:
             f.write(b"BAZ")
-        porcelain.add(self.repo.path, paths=["foo"])
+        porcelain.add(self.repo.path, paths=[fullpath])
         porcelain.commit(self.repo.path, message=b"Some other message",
                          committer=b"Jane <jane@example.com>",
                          author=b"John <john@example.com>")
@@ -591,7 +599,7 @@ class PushTests(PorcelainTestCase):
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
         os.close(handle)
-        porcelain.add(repo=clone_path, paths=[os.path.basename(fullpath)])
+        porcelain.add(repo=clone_path, paths=[fullpath])
         porcelain.commit(repo=clone_path, message=b'push',
                          author=b'', committer=b'')
 
@@ -660,8 +668,7 @@ class PullTests(PorcelainTestCase):
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test',
                          author=b'test', committer=b'test')
 
@@ -675,8 +682,7 @@ class PullTests(PorcelainTestCase):
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test2',
                          author=b'test2', committer=b'test2')
 
@@ -725,7 +731,7 @@ class StatusTests(PorcelainTestCase):
         with open(fullpath, 'w') as f:
             f.write('origstuff')
 
-        porcelain.add(repo=self.repo.path, paths=['foo'])
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
 
@@ -740,7 +746,7 @@ class StatusTests(PorcelainTestCase):
         fullpath = os.path.join(self.repo.path, filename_add)
         with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename_add)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
 
         results = porcelain.status(self.repo)
 
@@ -753,16 +759,18 @@ class StatusTests(PorcelainTestCase):
 
         # Make a dummy file, stage
         filename = 'bar'
-        with open(os.path.join(self.repo.path, filename), 'w') as f:
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
 
         filename = 'foo'
-        with open(os.path.join(self.repo.path, filename), 'w') as f:
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         changes = porcelain.get_tree_changes(self.repo.path)
 
         self.assertEqual(changes['add'][0], filename.encode('ascii'))
@@ -778,12 +786,12 @@ class StatusTests(PorcelainTestCase):
         fullpath = os.path.join(self.repo.path, filename)
         with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
         with open(fullpath, 'w') as f:
             f.write('otherstuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         changes = porcelain.get_tree_changes(self.repo.path)
 
         self.assertEqual(changes['modify'][0], filename.encode('ascii'))
@@ -796,9 +804,10 @@ class StatusTests(PorcelainTestCase):
 
         # Make a dummy file, stage, commit, remove
         filename = 'foo'
-        with open(os.path.join(self.repo.path, filename), 'w') as f:
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
         cwd = os.getcwd()
@@ -868,9 +877,10 @@ class ReceivePackTests(PorcelainTestCase):
 
     def test_receive_pack(self):
         filename = 'foo'
-        with open(os.path.join(self.repo.path, filename), 'w') as f:
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, 'w') as f:
             f.write('stuff')
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         self.repo.do_commit(message=b'test status',
                             author=b'', committer=b'',
                             author_timestamp=1402354300,
@@ -940,8 +950,7 @@ class FetchTests(PorcelainTestCase):
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test',
                          author=b'test', committer=b'test')
 
@@ -954,8 +963,7 @@ class FetchTests(PorcelainTestCase):
         # create a second file to be pushed
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.commit(repo=self.repo.path, message=b'test2',
                          author=b'test2', committer=b'test2')
 
@@ -979,8 +987,7 @@ class RepackTests(PorcelainTestCase):
     def test_simple(self):
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
-        filename = os.path.basename(fullpath)
-        porcelain.add(repo=self.repo.path, paths=filename)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.repack(self.repo)
 
 
@@ -1000,7 +1007,7 @@ class LsTreeTests(PorcelainTestCase):
         with open(fullpath, 'w') as f:
             f.write('origstuff')
 
-        porcelain.add(repo=self.repo.path, paths=['foo'])
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
 

@@ -98,7 +98,7 @@ def read_ignore_patterns(f):
     """
 
     for l in f:
-        l = l.rstrip(b"\n")
+        l = l.rstrip(b"\r\n")
 
         # Ignore blank lines, they're used for readability.
         if not l:

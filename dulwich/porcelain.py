@@ -759,16 +759,16 @@ def pull(repo, remote_location=None, refspecs=None,
         r.reset_index(tree=tree)
 
 
-def status(repo="."):
+def status(repo=".", ignored=False):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository or repository object
+    :param ignored: Whether to include ignoed files in `untracked`
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """
-    # TODO(jelmer): support --ignored
     with open_repo_closing(repo) as r:
         # 1. Get status of staged
         tracked_changes = get_tree_changes(r)
@@ -776,10 +776,13 @@ def status(repo="."):
         index = r.open_index()
         unstaged_changes = list(get_unstaged_changes(index, r.path))
         ignore_manager = IgnoreFilterManager.from_repo(r)
-        untracked_changes = [
-                p for p in
-                get_untracked_paths(r.path, r.path, index)
-                if not ignore_manager.is_ignored(p)]
+        untracked_paths = get_untracked_paths(r.path, r.path, index)
+        if ignored:
+            untracked_changes = list(untracked_paths)
+        else:
+            untracked_changes = [
+                    p for p in untracked_paths
+                    if not ignore_manager.is_ignored(p)]
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 

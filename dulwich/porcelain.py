@@ -369,9 +369,9 @@ def remove(repo=".", paths=None, cached=False):
         index = r.open_index()
         for p in paths:
             full_path = os.path.abspath(p).encode(sys.getfilesystemencoding())
-            index_path = path_to_tree_path(r, p)
+            tree_path = path_to_tree_path(r, p)
             try:
-                index_sha = index[index_path].sha
+                index_sha = index[tree_path].sha
             except KeyError:
                 raise Exception('%s did not match any files' % p)
 
@@ -388,7 +388,7 @@ def remove(repo=".", paths=None, cached=False):
                     else:
                         try:
                             committed_sha = tree_lookup_path(
-                                r.__getitem__, r[r.head()].tree, p)[1]
+                                r.__getitem__, r[r.head()].tree, tree_path)[1]
                         except KeyError:
                             committed_sha = None
 
@@ -401,7 +401,7 @@ def remove(repo=".", paths=None, cached=False):
                             raise Exception(
                                 'file has staged changes: %s' % p)
                         os.remove(full_path)
-            del index[index_path]
+            del index[tree_path]
         index.write()
 
 

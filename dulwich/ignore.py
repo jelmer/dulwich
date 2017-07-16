@@ -296,7 +296,7 @@ class IgnoreFilterManager(object):
         :return: Iterator over Pattern instances
         """
         if os.path.isabs(path):
-            path = os.path.relpath(path, self._top_path)
+            raise ValueError('%s is an absolute path' % path)
         filters = [(0, f) for f in self._global_filters]
         if os.path.sep != '/':
             path = path.replace(os.path.sep, '/')

@@ -41,6 +41,7 @@ from dulwich.repo import Repo
 
 POSITIVE_MATCH_TESTS = [
     (b"foo.c", b"*.c"),
+    (b".c", b"*.c"),
     (b"foo/foo.c", b"*.c"),
     (b"foo/foo.c", b"foo.c"),
     (b"foo.c", b"/*.c"),
@@ -66,9 +67,9 @@ NEGATIVE_MATCH_TESTS = [
 
 
 TRANSLATE_TESTS = [
-    (b"*.c", b'(?ms)(.*/)?[^/]+\\.c/?\\Z'),
+    (b"*.c", b'(?ms)(.*/)?[^/]*\\.c/?\\Z'),
     (b"foo.c", b'(?ms)(.*/)?foo\\.c/?\\Z'),
-    (b"/*.c", b'(?ms)[^/]+\\.c/?\\Z'),
+    (b"/*.c", b'(?ms)[^/]*\\.c/?\\Z'),
     (b"/foo.c", b'(?ms)foo\\.c/?\\Z'),
     (b"foo.c", b'(?ms)(.*/)?foo\\.c/?\\Z'),
     (b"foo.[ch]", b'(?ms)(.*/)?foo\\.[ch]/?\\Z'),

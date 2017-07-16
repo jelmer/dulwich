@@ -81,7 +81,13 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.ignore import IgnoreFilterManager
-from dulwich.index import get_unstaged_changes
+from dulwich.index import (
+    blob_from_path_and_stat,
+    get_unstaged_changes,
+    )
+from dulwich.object_store import (
+    tree_lookup_path,
+    )
 from dulwich.objects import (
     Commit,
     Tag,
@@ -353,7 +359,7 @@ def add(repo=".", paths=None):
     return (relpaths, ignored)
 
 
-def rm(repo=".", paths=None):
+def remove(repo=".", paths=None, cached=False):
     """Remove files from the staging area.
 
     :param repo: Repository for the files
@@ -362,9 +368,44 @@ def rm(repo=".", paths=None):
     with open_repo_closing(repo) as r:
         index = r.open_index()
         for p in paths:
-            p = path_to_tree_path(r, p)
-            del index[p]
+            full_path = os.path.abspath(p).encode(sys.getfilesystemencoding())
+            index_path = path_to_tree_path(r, p)
+            try:
+                index_sha = index[index_path].sha
+            except KeyError:
+                raise Exception('%s did not match any files' % p)
+
+            if not cached:
+                try:
+                    st = os.lstat(full_path)
+                except OSError:
+                    pass
+                else:
+                    try:
+                        blob = blob_from_path_and_stat(full_path, st)
+                    except IOError:
+                        pass
+                    else:
+                        try:
+                            committed_sha = tree_lookup_path(
+                                r.__getitem__, r[r.head()].tree, p)[1]
+                        except KeyError:
+                            committed_sha = None
+
+                        if blob.id != index_sha and index_sha != committed_sha:
+                            raise Exception(
+                                'file has staged content differing '
+                                'from both the file and head: %s' % p)
+
+                        if index_sha != committed_sha:
+                            raise Exception(
+                                'file has staged changes: %s' % p)
+                        os.remove(full_path)
+            del index[index_path]
         index.write()
+
+
+rm = remove
 
 
 def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):

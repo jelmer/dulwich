@@ -17,6 +17,9 @@
   * Properly deal with submodules in 'porcelain.status'.
     (Jelmer Vernooĳ, #517)
 
+  * ``dulwich.porcelain.remove`` now actually removes files from
+    disk, not just from the index. (Jelmer Vernooĳ, #488)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

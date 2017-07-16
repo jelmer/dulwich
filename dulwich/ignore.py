@@ -60,7 +60,7 @@ def translate(pat):
         c = pat[i:i+1]
         i = i+1
         if c == b'*':
-            res = res + b'[^/]+'
+            res = res + b'[^/]*'
         elif c == b'?':
             res = res + b'.'
         elif c == b'[':

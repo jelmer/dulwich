@@ -308,7 +308,7 @@ class IgnoreFilterManager(object):
                 if i < len(parts):
                     # Paths leading up to the final part are all directories,
                     # so need a trailing slash.
-                    relpath += b'/'
+                    relpath += '/'
                 matches = list(f.find_matching(relpath))
                 if matches:
                     return iter(matches)

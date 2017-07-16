@@ -220,12 +220,12 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored('dir/blie'))
         self.assertIs(None,
-                      m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
-        self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir')))
-        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'foo', 'bar')))
-        self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))
+                      m.is_ignored(os.path.join('dir', 'bloe')))
+        self.assertIs(None, m.is_ignored('dir'))
+        self.assertTrue(m.is_ignored(os.path.join('foo', 'bar')))
+        self.assertTrue(m.is_ignored(os.path.join('excluded')))
         self.assertTrue(m.is_ignored(os.path.join(
-            repo.path, 'dir2', 'fileinignoreddir')))
+            'dir2', 'fileinignoreddir')))
         self.assertFalse(m.is_ignored('dir3'))
         self.assertTrue(m.is_ignored('dir3/'))
         self.assertTrue(m.is_ignored('dir3/bla'))

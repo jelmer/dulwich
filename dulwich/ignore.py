@@ -116,11 +116,12 @@ def read_ignore_patterns(f):
         yield l
 
 
-def match_pattern(path, pattern, ignorecase):
+def match_pattern(path, pattern, ignorecase=False):
     """Match a gitignore-style pattern against a path.
 
     :param path: Path to match
     :param pattern: Pattern to match
+    :param ignorecase: Whether to do case-sensitive matching
     :return: bool indicating whether the pattern matched
     """
     return Pattern(pattern, ignorecase).match(path)
@@ -304,6 +305,10 @@ class IgnoreFilterManager(object):
             dirname = '/'.join(parts[:i])
             for s, f in filters:
                 relpath = '/'.join(parts[s:i])
+                if i < len(parts):
+                    # Paths leading up to the final part are all directories,
+                    # so need a trailing slash.
+                    relpath += b'/'
                 matches = list(f.find_matching(relpath))
                 if matches:
                     return iter(matches)

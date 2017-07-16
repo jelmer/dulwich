@@ -801,6 +801,9 @@ class StatusTests(PorcelainTestCase):
                                               self.repo.open_index())))
         self.assertEqual(set(['.gitignore', 'notignored']),
                          set(porcelain.status(self.repo).untracked))
+        self.assertEqual(set(['.gitignore', 'notignored', 'ignored']),
+                         set(porcelain.status(self.repo, ignored=True)
+                             .untracked))
 
     def test_get_untracked_paths_nested(self):
         with open(os.path.join(self.repo.path, 'notignored'), 'w') as f:

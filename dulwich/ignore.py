@@ -116,18 +116,18 @@ def read_ignore_patterns(f):
         yield l
 
 
-def match_pattern(path, pattern):
+def match_pattern(path, pattern, ignorecase):
     """Match a gitignore-style pattern against a path.
 
     :param path: Path to match
     :param pattern: Pattern to match
     :return: bool indicating whether the pattern matched
     """
-    re_pattern = translate(pattern)
-    return re.match(re_pattern, path)
+    return Pattern(pattern, ignorecase).match(path)
 
 
 class Pattern(object):
+    """A single ignore pattern."""
 
     def __init__(self, pattern, ignorecase=False):
         self.pattern = pattern
@@ -154,12 +154,18 @@ class Pattern(object):
         return (type(self) == type(other) and
                 self.pattern == other.pattern and
                 self.ignorecase == other.ignorecase)
+
     def __repr__(self):
         return "%s(%s, %r)" % (
             type(self).__name__, self.pattern, self.ignorecase)
 
     def match(self, path):
-        return self._re.match(path)
+        """Try to match a path against this ignore pattern.
+
+        :param path: Path to match (relative to ignore location)
+        :return: boolean
+        """
+        return bool(self._re.match(path))
 
 
 class IgnoreFilter(object):
@@ -320,6 +326,11 @@ class IgnoreFilterManager(object):
 
     @classmethod
     def from_repo(cls, repo):
+        """Create a IgnoreFilterManager from a repository.
+
+        :param repo: Repository object
+        :return: A `IgnoreFilterManager` object
+        """
         global_filters = []
         for p in [
                 os.path.join(repo.controldir(), 'info', 'exclude'),

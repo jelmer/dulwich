@@ -302,7 +302,28 @@ class RemoveTests(PorcelainTestCase):
         with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
             f.write("BAR")
         porcelain.add(self.repo.path, paths=["foo"])
-        porcelain.rm(self.repo.path, paths=["foo"])
+        porcelain.commit(repo=self.repo, message=b'test', author=b'test',
+                         committer=b'test')
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, 'foo')))
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            porcelain.remove(self.repo.path, paths=["foo"])
+        finally:
+            os.chdir(cwd)
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, 'foo')))
+
+    def test_remove_file_staged(self):
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write("BAR")
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            porcelain.add(self.repo.path, paths=["foo"])
+            self.assertRaises(Exception, porcelain.rm, self.repo.path,
+                              paths=["foo"])
+        finally:
+            os.chdir(cwd)
 
 
 class LogTests(PorcelainTestCase):
@@ -780,7 +801,12 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=filename)
         porcelain.commit(repo=self.repo.path, message=b'test status',
                          author=b'', committer=b'')
-        porcelain.rm(repo=self.repo.path, paths=[filename])
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            porcelain.remove(repo=self.repo.path, paths=[filename])
+        finally:
+            os.chdir(cwd)
         changes = porcelain.get_tree_changes(self.repo.path)
 
         self.assertEqual(changes['delete'][0], filename.encode('ascii'))

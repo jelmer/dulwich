@@ -218,7 +218,7 @@ class IgnoreFilterManagerTests(TestCase):
         with open(p, 'wb') as f:
             f.write(b'/excluded\n')
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertTrue(m.is_ignored(os.path.join('dir', 'blie')))
+        self.assertTrue(m.is_ignored('dir/blie'))
         self.assertIs(None,
                       m.is_ignored(os.path.join(repo.path, 'dir', 'bloe')))
         self.assertIs(None, m.is_ignored(os.path.join(repo.path, 'dir')))

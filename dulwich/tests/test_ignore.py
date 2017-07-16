@@ -56,6 +56,7 @@ POSITIVE_MATCH_TESTS = [
     (b"foo/bla/bar", b"foo/**/bar"),
     (b"foo/bar/", b"bar/"),
     (b"foo/bar/", b"bar"),
+    (b"foo/bar/", b"foo/bar/*"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
@@ -78,6 +79,7 @@ TRANSLATE_TESTS = [
     (b"foo/**/blie.c", b'(?ms)foo(/.*)?\\/blie\\.c/?\\Z'),
     (b"**/bla.c", b'(?ms)(.*/)?bla\\.c/?\\Z'),
     (b"foo/**/bar", b'(?ms)foo(/.*)?\\/bar/?\\Z'),
+    (b"foo/bar/*", b'(?ms)foo\\/bar\\/[^/]*/?\\Z'),
 ]
 
 

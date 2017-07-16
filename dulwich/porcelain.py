@@ -157,13 +157,14 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def path_to_tree_path(repo, path):
+def path_to_tree_path(repopath, path):
     """Convert a path to a path usable in e.g. an index.
 
     :param repo: Repository
     :param path: A path
     :return: A path formatted for use in e.g. an index
     """
+    os.path.relpath(path, repopath)
     if os.path.sep != '/':
         path = path.replace(os.path.sep, '/')
     return path.encode(sys.getfilesystemencoding())
@@ -340,17 +341,12 @@ def add(repo=".", paths=None):
         if not paths:
             paths = list(
                 get_untracked_paths(os.getcwd(), r.path, r.open_index()))
-        # TODO(jelmer): Possibly allow passing in absolute paths?
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
+            relpath = os.path.relpath(p, r.path)
             # FIXME: Support patterns, directories.
-            if os.path.isabs(p) and p.startswith(repo.path):
-                relpath = os.path.relpath(p, repo.path)
-            else:
-                relpath = p
-
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue
@@ -369,7 +365,7 @@ def remove(repo=".", paths=None, cached=False):
         index = r.open_index()
         for p in paths:
             full_path = os.path.abspath(p).encode(sys.getfilesystemencoding())
-            tree_path = path_to_tree_path(r, p)
+            tree_path = path_to_tree_path(r.path, p)
             try:
                 index_sha = index[tree_path].sha
             except KeyError:
@@ -839,16 +835,17 @@ def get_untracked_paths(frompath, basepath, index):
         # Skip .git and below.
         if '.git' in dirnames:
             dirnames.remove('.git')
-            if dirpath != frompath:
+            if dirpath != basepath:
                 continue
         if '.git' in filenames:
             filenames.remove('.git')
-            if dirpath != frompath:
+            if dirpath != basepath:
                 continue
         for filename in filenames:
-            p = os.path.join(dirpath[len(basepath)+1:], filename)
-            if p not in index:
-                yield p
+            ap = os.path.join(dirpath, filename)
+            ip = path_to_tree_path(basepath, ap)
+            if ip not in index:
+                yield os.path.relpath(ap, frompath)
 
 
 def get_tree_changes(repo):
@@ -1130,7 +1127,7 @@ def check_ignore(repo, paths, no_index=False):
                 continue
             if os.path.isabs(path):
                 path = os.path.relpath(path, r.path)
-            if not no_index and path_to_tree_path(r, path) in index:
+            if not no_index and path_to_tree_path(r.path, path) in index:
                 continue
             if ignore_manager.is_ignored(path):
                 yield path

@@ -209,9 +209,9 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertTrue(m.is_ignored(os.path.join(repo.path, 'excluded')))
         self.assertTrue(m.is_ignored(os.path.join(
             repo.path, 'dir2', 'fileinignoreddir')))
-        self.assertFalse(m.is_ignored(b'dir3'))
-        self.assertTrue(m.is_ignored(b'dir3/'))
-        self.assertTrue(m.is_ignored(b'dir3/bla'))
+        self.assertFalse(m.is_ignored('dir3'))
+        self.assertTrue(m.is_ignored('dir3/'))
+        self.assertTrue(m.is_ignored('dir3/bla'))
 
     def test_load_ignore_ignorecase(self):
         tmp_dir = tempfile.mkdtemp()

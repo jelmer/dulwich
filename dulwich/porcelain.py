@@ -345,15 +345,15 @@ def add(repo=".", paths=None):
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            if ignore_manager.is_ignored(p):
-                ignored.add(p)
-                continue
-
             # FIXME: Support patterns, directories.
             if os.path.isabs(p) and p.startswith(repo.path):
                 relpath = os.path.relpath(p, repo.path)
             else:
                 relpath = p
+
+            if ignore_manager.is_ignored(relpath):
+                ignored.add(relpath)
+                continue
             relpaths.append(relpath)
         r.stage(relpaths)
     return (relpaths, ignored)

@@ -28,7 +28,6 @@ Python's difflib.
 
 import difflib
 
-from dulwich.object_store import tree_lookup_path
 from dulwich.walk import (
     ORDER_DATE,
     Walker,
@@ -39,7 +38,8 @@ from dulwich.walk import (
 # When checking each revision, find lines that according to difflib.Differ()
 # are common between versions.
 # Any lines that are not in common were introduced by the newer revision.
-# If there were no lines kept from the older version, stop going deeper in the graph.
+# If there were no lines kept from the older version, stop going deeper in the
+# graph.
 
 def update_lines(annotated_lines, new_history_data, new_blob):
     """Update annotation lines with old blob lines.
@@ -61,7 +61,8 @@ def update_lines(annotated_lines, new_history_data, new_blob):
     return ret
 
 
-def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=True):
+def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None,
+                   follow=True):
     """Annotate the lines of a blob.
 
     :param store: Object store to retrieve objects from
@@ -74,7 +75,7 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=
         commit is the oldest commit that changed a line
     """
     walker = Walker(store, include=[commit_id], paths=[path], order=order,
-        follow=follow)
+                    follow=follow)
     revs = []
     for log_entry in walker:
         for tree_change in log_entry.changes():

@@ -20,6 +20,11 @@
   * ``dulwich.porcelain.remove`` now actually removes files from
     disk, not just from the index. (Jelmer Vernooĳ, #488)
 
+  * Fix handling of "reset" command with markers and without
+    "from". (Antoine Pietri)
+
+  * Fix handling of "merge" command with markers. (Antoine Pietri)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

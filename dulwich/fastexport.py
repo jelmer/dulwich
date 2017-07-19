@@ -30,6 +30,7 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tag,
+    ZERO_SHA,
     )
 from fastimport import __version__ as fastimport_version
 if (fastimport_version <= (0, 9, 5) and
@@ -215,17 +216,24 @@ class GitImportProcessor(processor.ImportProcessor):
             commit_id = self.markers[commit_id[1:]]
         if self.last_commit == commit_id:
             return
-        self.last_commit = commit_id
         self._contents = {}
-        tree_id = self.repo[commit_id].tree
-        for (path, mode, hexsha) in (
-                self.repo.object_store.iter_tree_contents(tree_id)):
-            self._contents[path] = (mode, hexsha)
+        if commit_id != ZERO_SHA:
+            self.last_commit = commit_id
+            tree_id = self.repo[commit_id].tree
+            for (path, mode, hexsha) in (
+                    self.repo.object_store.iter_tree_contents(tree_id)):
+                self._contents[path] = (mode, hexsha)
+        else:
+            self.last_commit = None
 
     def reset_handler(self, cmd):
         """Process a ResetCommand."""
-        self._reset_base(cmd.from_)
-        self.repo.refs[cmd.ref] = cmd.from_
+        if cmd.from_ is None:
+            from_ = ZERO_SHA
+        else:
+            from_ = cmd.from_
+        self._reset_base(from_)
+        self.repo.refs[cmd.ref] = from_
 
     def tag_handler(self, cmd):
         """Process a TagCommand."""

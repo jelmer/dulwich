@@ -129,7 +129,7 @@ class GitImportProcessor(processor.ImportProcessor):
     def __init__(self, repo, params=None, verbose=False, outf=None):
         processor.ImportProcessor.__init__(self, params, verbose)
         self.repo = repo
-        self.last_commit = None
+        self.last_commit = ZERO_SHA
         self.markers = {}
         self._contents = {}
 
@@ -198,7 +198,7 @@ class GitImportProcessor(processor.ImportProcessor):
             self.repo.object_store,
             ((path, hexsha, mode) for (path, (mode, hexsha)) in
                 self._contents.items()))
-        if self.last_commit is not None:
+        if self.last_commit != ZERO_SHA:
             commit.parents.append(self.last_commit)
         for merge in cmd.merges:
             if merge.startswith(b':'):
@@ -215,19 +215,15 @@ class GitImportProcessor(processor.ImportProcessor):
         pass
 
     def _reset_base(self, commit_id):
-        if commit_id.startswith(b":"):
-            commit_id = self.markers[commit_id[1:]]
         if self.last_commit == commit_id:
             return
         self._contents = {}
+        self.last_commit = commit_id
         if commit_id != ZERO_SHA:
-            self.last_commit = commit_id
             tree_id = self.repo[commit_id].tree
             for (path, mode, hexsha) in (
                     self.repo.object_store.iter_tree_contents(tree_id)):
                 self._contents[path] = (mode, hexsha)
-        else:
-            self.last_commit = None
 
     def reset_handler(self, cmd):
         """Process a ResetCommand."""
@@ -235,6 +231,8 @@ class GitImportProcessor(processor.ImportProcessor):
             from_ = ZERO_SHA
         else:
             from_ = cmd.from_
+            if from_.startswith(b":"):
+                from_ = self.markers[from_[1:]]
         self._reset_base(from_)
         self.repo.refs[cmd.ref] = from_
 

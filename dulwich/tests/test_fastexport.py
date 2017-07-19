@@ -29,6 +29,7 @@ from dulwich.objects import (
     Blob,
     Commit,
     Tree,
+    ZERO_SHA,
     )
 from dulwich.repo import (
     MemoryRepo,
@@ -107,6 +108,22 @@ class GitImportProcessorTests(TestCase):
         cmd = commands.ResetCommand(b"refs/heads/foo", c1.id)
         self.processor.reset_handler(cmd)
         self.assertEqual(c1.id, self.repo.get_refs()[b"refs/heads/foo"])
+        self.assertEqual(c1.id, self.processor.last_commit)
+
+    def test_reset_handler_marker(self):
+        from fastimport import commands
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.processor.markers[b'10'] = c1.id
+        cmd = commands.ResetCommand(b"refs/heads/foo", b':10')
+        self.processor.reset_handler(cmd)
+        self.assertEqual(c1.id, self.repo.get_refs()[b"refs/heads/foo"])
+
+    def test_reset_handler_default(self):
+        from fastimport import commands
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        cmd = commands.ResetCommand(b"refs/heads/foo", None)
+        self.processor.reset_handler(cmd)
+        self.assertEqual(ZERO_SHA, self.repo.get_refs()[b"refs/heads/foo"])
 
     def test_commit_handler(self):
         from fastimport import commands

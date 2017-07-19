@@ -211,6 +211,8 @@ class GitImportProcessor(processor.ImportProcessor):
         pass
 
     def _reset_base(self, commit_id):
+        if commit_id.startswith(b":"):
+            commit_id = self.markers[commit_id[1:]]
         if self.last_commit == commit_id:
             return
         self.last_commit = commit_id

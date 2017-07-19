@@ -1123,8 +1123,6 @@ def check_ignore(repo, paths, no_index=False):
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         for path in paths:
-            if os.path.isdir(path):
-                continue
             if os.path.isabs(path):
                 path = os.path.relpath(path, r.path)
             if not no_index and path_to_tree_path(r.path, path) in index:

@@ -200,7 +200,10 @@ class GitImportProcessor(processor.ImportProcessor):
                 self._contents.items()))
         if self.last_commit is not None:
             commit.parents.append(self.last_commit)
-        commit.parents += cmd.merges
+        for merge in cmd.merges:
+            if merge.startswith(b':'):
+                merge = self.markers[merge[1:]]
+            commit.parents.append(merge)
         self.repo.object_store.add_object(commit)
         self.repo[cmd.ref] = commit.id
         self.last_commit = commit.id

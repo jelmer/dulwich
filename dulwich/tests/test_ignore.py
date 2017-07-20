@@ -56,7 +56,7 @@ POSITIVE_MATCH_TESTS = [
     (b"foo/bla/bar", b"foo/**/bar"),
     (b"foo/bar/", b"bar/"),
     (b"foo/bar/", b"bar"),
-    (b"foo/bar/", b"foo/bar/*"),
+    (b"foo/bar/something", b"foo/bar/*"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
@@ -64,6 +64,7 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo/foo.c", b"/foo.c"),
     (b"foo/foo.c", b"/*.c"),
     (b"foo/bar/", b"/bar/"),
+    (b"foo/bar/", b"foo/bar/*"),
 ]
 
 
@@ -79,7 +80,7 @@ TRANSLATE_TESTS = [
     (b"foo/**/blie.c", b'(?ms)foo(/.*)?\\/blie\\.c/?\\Z'),
     (b"**/bla.c", b'(?ms)(.*/)?bla\\.c/?\\Z'),
     (b"foo/**/bar", b'(?ms)foo(/.*)?\\/bar/?\\Z'),
-    (b"foo/bar/*", b'(?ms)foo\\/bar\\/[^/]*/?\\Z'),
+    (b"foo/bar/*", b'(?ms)foo\\/bar\\/[^/]+/?\\Z'),
 ]
 
 
@@ -243,3 +244,17 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored(os.path.join('dir', 'blie')))
         self.assertTrue(m.is_ignored(os.path.join('DIR', 'blie')))
+
+    def test_ignored_contents(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
+            f.write(b'a/*\n')
+            f.write(b'!a/*.txt\n')
+        m = IgnoreFilterManager.from_repo(repo)
+        os.mkdir(os.path.join(repo.path, 'a'))
+        self.assertIs(None, m.is_ignored('a'))
+        self.assertIs(None, m.is_ignored('a/'))
+        self.assertFalse(m.is_ignored('a/b.txt'))
+        self.assertTrue(m.is_ignored('a/c.dat'))

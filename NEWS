@@ -25,6 +25,9 @@
 
   * Fix handling of "merge" command with markers. (Antoine Pietri)
 
+  * Support treeish argument to porcelain.reset(), rather than
+    requiring a ref/commit id. (Jelmer Vernooĳ)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

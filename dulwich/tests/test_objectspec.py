@@ -33,6 +33,7 @@ from dulwich.objectspec import (
     parse_refs,
     parse_reftuple,
     parse_reftuples,
+    parse_tree,
     )
 from dulwich.repo import MemoryRepo
 from dulwich.tests import (
@@ -190,3 +191,18 @@ class ParseReftuplesTests(TestCase):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
                          parse_reftuples(r, r, b"refs/heads/foo"))
+
+
+class ParseTreeTests(TestCase):
+    """Test parse_tree."""
+
+    def test_nonexistent(self):
+        r = MemoryRepo()
+        self.assertRaises(KeyError, parse_tree, r, "thisdoesnotexist")
+
+    def test_from_commit(self):
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(
+                r.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
+        self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))

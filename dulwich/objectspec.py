@@ -39,6 +39,21 @@ def parse_object(repo, objectish):
     return repo[objectish]
 
 
+def parse_tree(repo, treeish):
+    """Parse a string referring to a tree.
+
+    :param repo: A `Repo` object
+    :param treeish: A string referring to a tree
+    :return: A git object
+    :raise KeyError: If the object can not be found
+    """
+    treeish = to_bytes(treeish)
+    o = repo[treeish]
+    if o.type_name == b"commit":
+        return repo[o.tree]
+    return o
+
+
 def parse_ref(container, refspec):
     """Parse a string referring to a reference.
 

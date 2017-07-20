@@ -98,6 +98,7 @@ from dulwich.objects import (
 from dulwich.objectspec import (
     parse_object,
     parse_reftuples,
+    parse_tree,
     )
 from dulwich.pack import (
     write_pack_index,
@@ -698,19 +699,20 @@ def tag_delete(repo, name):
             del r.refs[b"refs/tags/" + name]
 
 
-def reset(repo, mode, committish="HEAD"):
+def reset(repo, mode, treeish="HEAD"):
     """Reset current HEAD to the specified state.
 
     :param repo: Path to repository
     :param mode: Mode ("hard", "soft", "mixed")
+    :param treeish: Treeish to reset to
     """
 
     if mode != "hard":
         raise ValueError("hard is the only mode currently supported")
 
     with open_repo_closing(repo) as r:
-        tree = r[committish].tree
-        r.reset_index(tree)
+        tree = parse_tree(r, treeish)
+        r.reset_index(tree.id)
 
 
 def push(repo, remote_location, refspecs,
@@ -1063,7 +1065,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
         write_pack_index(idxf, entries, data_sum)
 
 
-def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
+def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
             name_only=False):
     """List contents of a tree.
 
@@ -1083,12 +1085,9 @@ def ls_tree(repo, tree_ish=None, outstream=sys.stdout, recursive=False,
                 outstream.write(pretty_format_tree_entry(name, mode, sha))
             if stat.S_ISDIR(mode):
                 list_tree(store, sha, name)
-    if tree_ish is None:
-        tree_ish = "HEAD"
     with open_repo_closing(repo) as r:
-        c = r[tree_ish]
-        treeid = c.tree
-        list_tree(r.object_store, treeid, "")
+        tree = parse_tree(r, treeish)
+        list_tree(r.object_store, tree.id, "")
 
 
 def remote_add(repo, name, url):

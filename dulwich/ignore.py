@@ -27,6 +27,41 @@ import re
 import sys
 
 
+def _translate_segment(segment):
+    if segment == b"*":
+        return b'[^/]+'
+    res = b""
+    i, n = 0, len(segment)
+    while i < n:
+        c = segment[i:i+1]
+        i = i+1
+        if c == b'*':
+            res += b'[^/]*'
+        elif c == b'?':
+            res += b'.'
+        elif c == b'[':
+            j = i
+            if j < n and segment[j:j+1] == b'!':
+                j = j+1
+            if j < n and segment[j:j+1] == b']':
+                j = j+1
+            while j < n and segment[j:j+1] != b']':
+                j = j+1
+            if j >= n:
+                res += b'\\['
+            else:
+                stuff = segment[i:j].replace(b'\\', b'\\\\')
+                i = j+1
+                if stuff.startswith(b'!'):
+                    stuff = b'^' + stuff[1:]
+                elif stuff.startswith(b'^'):
+                    stuff = b'\\' + stuff
+                res += b'[' + stuff + b']'
+        else:
+            res += re.escape(c)
+    return res
+
+
 def translate(pat):
     """Translate a shell PATTERN to a regular expression.
 
@@ -40,52 +75,26 @@ def translate(pat):
 
     if b'/' not in pat[:-1]:
         # If there's no slash, this is a filename-based match
-        res = res + b'(.*/)?'
+        res += b'(.*/)?'
 
     if pat.startswith(b'**/'):
         # Leading **/
         pat = pat[2:]
-        res = res + b'(.*/)?'
+        res += b'(.*/)?'
 
     if pat.startswith(b'/'):
         pat = pat[1:]
 
-    i, n = 0, len(pat)
-
-    while i < n:
-        if pat[i:i+3] == b'/**':
-            res = res + b'(/.*)?'
-            i = i+3
+    for i, segment in enumerate(pat.split(b'/')):
+        if segment == b'**':
+            res += b'(/.*)?'
             continue
-        c = pat[i:i+1]
-        i = i+1
-        if c == b'*':
-            res = res + b'[^/]*'
-        elif c == b'?':
-            res = res + b'.'
-        elif c == b'[':
-            j = i
-            if j < n and pat[j:j+1] == b'!':
-                j = j+1
-            if j < n and pat[j:j+1] == b']':
-                j = j+1
-            while j < n and pat[j:j+1] != b']':
-                j = j+1
-            if j >= n:
-                res = res + b'\\['
-            else:
-                stuff = pat[i:j].replace(b'\\', b'\\\\')
-                i = j+1
-                if stuff.startswith(b'!'):
-                    stuff = b'^' + stuff[1:]
-                elif stuff.startswith(b'^'):
-                    stuff = b'\\' + stuff
-                res = res + b'[' + stuff + b']'
         else:
-            res = res + re.escape(c)
+            res += ((re.escape(b'/') if i > 0 else b'') +
+                    _translate_segment(segment))
 
-    if not res.endswith(b'/'):
-        res = res + b'/?'
+    if not pat.endswith(b'/'):
+        res += b'/?'
 
     return res + b'\Z'
 

@@ -512,8 +512,11 @@ class cmd_check_ignore(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
+        ret = 1
         for path in porcelain.check_ignore('.', args):
             print(path)
+            ret = 0
+        return ret
 
 
 class cmd_help(Command):

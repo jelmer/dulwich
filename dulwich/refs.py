@@ -26,10 +26,6 @@ import errno
 import os
 import sys
 
-from dulwich.errors import (
-    PackedRefsException,
-    RefFormatError,
-    )
 from dulwich.objects import (
     git_line,
     valid_hexsha,
@@ -45,6 +41,14 @@ SYMREF = b'ref: '
 LOCAL_BRANCH_PREFIX = b'refs/heads/'
 BAD_REF_CHARS = set(b'\177 ~^:?*[')
 ANNOTATED_TAG_SUFFIX = b'^{}'
+
+
+class PackedRefsException(Exception):
+    """Indicates an error parsing a packed-refs file."""
+
+
+class RefFormatError(Exception):
+    """Indicates an invalid ref name."""
 
 
 def check_ref_format(refname):

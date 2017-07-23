@@ -264,7 +264,7 @@ static PyMethodDef py_objects_methods[] = {
 static PyObject *
 moduleinit(void)
 {
-	PyObject *m, *objects_mod, *errors_mod;
+	PyObject *m, *objects_mod;
 
 #if PY_MAJOR_VERSION >= 3
 	static struct PyModuleDef moduledef = {
@@ -286,22 +286,17 @@ moduleinit(void)
 		return NULL;
 	}
 
-	errors_mod = PyImport_ImportModule("dulwich.errors");
-	if (errors_mod == NULL) {
-		return NULL;
-	}
-
-	object_format_exception_cls = PyObject_GetAttrString(
-		errors_mod, "ObjectFormatException");
-	Py_DECREF(errors_mod);
-	if (object_format_exception_cls == NULL) {
-		return NULL;
-	}
-
 	/* This is a circular import but should be safe since this module is
 	 * imported at at the very bottom of objects.py. */
 	objects_mod = PyImport_ImportModule("dulwich.objects");
 	if (objects_mod == NULL) {
+		return NULL;
+	}
+
+	object_format_exception_cls = PyObject_GetAttrString(
+		objects_mod, "ObjectFormatException");
+	if (object_format_exception_cls == NULL) {
+		Py_DECREF(objects_mod);
 		return NULL;
 	}
 

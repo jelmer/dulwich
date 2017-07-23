@@ -60,13 +60,10 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
-from dulwich.errors import (
+from dulwich.protocol import (
     GitProtocolError,
-    NotGitRepository,
     SendPackError,
     UpdateRefsError,
-    )
-from dulwich.protocol import (
     _RBUFSIZE,
     capability_agent,
     CAPABILITY_DELETE_REFS,
@@ -97,6 +94,13 @@ from dulwich.pack import (
 from dulwich.refs import (
     read_info_refs,
     )
+
+
+class NotGitRepository(Exception):
+    """Indicates that no Git repository was found."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
 
 
 def _fileno_can_read(fileno):

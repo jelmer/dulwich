@@ -593,8 +593,7 @@ def get_unstaged_changes(index, root_path):
             # This is actually a directory
             if os.path.exists(os.path.join(tree_path, '.git')):
                 # Submodule
-                from dulwich.errors import NotGitRepository
-                from dulwich.repo import Repo
+                from dulwich.repo import NotGitRepository, Repo
                 try:
                     if entry.sha != Repo(tree_path).head():
                         yield tree_path

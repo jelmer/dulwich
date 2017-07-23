@@ -28,10 +28,6 @@ from os import (
 import socket
 
 import dulwich
-from dulwich.errors import (
-    HangupException,
-    GitProtocolError,
-    )
 
 TCP_GIT_PORT = 9418
 
@@ -81,6 +77,47 @@ COMMAND_UNSHALLOW = b'unshallow'
 COMMAND_DONE = b'done'
 COMMAND_WANT = b'want'
 COMMAND_HAVE = b'have'
+
+
+class GitProtocolError(Exception):
+    """Git protocol exception."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class SendPackError(GitProtocolError):
+    """An error occurred during send_pack."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
+
+class UpdateRefsError(GitProtocolError):
+    """The server reported errors updating refs."""
+
+    def __init__(self, *args, **kwargs):
+        self.ref_status = kwargs.pop('ref_status')
+        Exception.__init__(self, *args, **kwargs)
+
+
+class HangupException(GitProtocolError):
+    """Hangup exception."""
+
+    def __init__(self):
+        Exception.__init__(
+            self, "The remote server unexpectedly closed the connection.")
+
+
+class UnexpectedCommandError(GitProtocolError):
+    """Unexpected command received in a proto line."""
+
+    def __init__(self, command):
+        if command is None:
+            command = 'flush-pkt'
+        else:
+            command = 'command %s' % command
+        GitProtocolError.__init__(self, 'Protocol got unexpected %s' % command)
 
 
 class ProtocolFile(object):

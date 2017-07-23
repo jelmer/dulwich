@@ -31,14 +31,6 @@ import warnings
 import zlib
 from hashlib import sha1
 
-from dulwich.errors import (
-    ChecksumMismatch,
-    NotBlobError,
-    NotCommitError,
-    NotTagError,
-    NotTreeError,
-    ObjectFormatException,
-    )
 from dulwich.file import GitFile
 
 
@@ -61,6 +53,68 @@ _TAGGER_HEADER = b'tagger'
 
 
 S_IFGITLINK = 0o160000
+
+
+class ChecksumMismatch(Exception):
+    """A checksum didn't match the expected contents."""
+
+    def __init__(self, expected, got, extra=None):
+        if len(expected) == 20:
+            expected = binascii.hexlify(expected)
+        if len(got) == 20:
+            got = binascii.hexlify(got)
+        self.expected = expected
+        self.got = got
+        self.extra = extra
+        if self.extra is None:
+            Exception.__init__(
+                self, "Checksum mismatch: Expected %s, got %s" %
+                (expected, got))
+        else:
+            Exception.__init__(
+                self, "Checksum mismatch: Expected %s, got %s; %s" %
+                (expected, got, extra))
+
+
+class ObjectFormatException(Exception):
+    """Indicates an error parsing an object."""
+
+
+class WrongObjectException(Exception):
+    """Baseclass for all the _ is not a _ exceptions on objects.
+
+    Do not instantiate directly.
+
+    Subclasses should define a type_name attribute that indicates what
+    was expected if they were raised.
+    """
+
+    def __init__(self, sha, *args, **kwargs):
+        Exception.__init__(self, "%s is not a %s" % (sha, self.type_name))
+
+
+class NotCommitError(WrongObjectException):
+    """Indicates that the sha requested does not point to a commit."""
+
+    type_name = 'commit'
+
+
+class NotTreeError(WrongObjectException):
+    """Indicates that the sha requested does not point to a tree."""
+
+    type_name = 'tree'
+
+
+class NotTagError(WrongObjectException):
+    """Indicates that the sha requested does not point to a tag."""
+
+    type_name = 'tag'
+
+
+class NotBlobError(WrongObjectException):
+    """Indicates that the sha requested does not point to a blob."""
+
+    type_name = 'blob'
 
 
 def S_ISGITLINK(m):

@@ -33,9 +33,6 @@ from dulwich.diff_tree import (
     tree_changes_for_merge,
     RenameDetector,
     )
-from dulwich.errors import (
-    MissingCommitError,
-    )
 from dulwich.objects import (
     Tag,
     )
@@ -47,6 +44,14 @@ ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 
 # Maximum number of commits to walk past a commit time boundary.
 _MAX_EXTRA_COMMITS = 5
+
+
+class MissingCommitError(Exception):
+    """Indicates that a commit was not found in the repository"""
+
+    def __init__(self, sha, *args, **kwargs):
+        self.sha = sha
+        Exception.__init__(self, "%s is not in the revision store" % sha)
 
 
 class WalkEntry(object):

@@ -76,10 +76,6 @@ from dulwich.diff_tree import (
     CHANGE_COPY,
     RENAME_CHANGE_TYPES,
     )
-from dulwich.errors import (
-    SendPackError,
-    UpdateRefsError,
-    )
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
     blob_from_path_and_stat,
@@ -106,6 +102,8 @@ from dulwich.pack import (
     )
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import (
+    SendPackError,
+    UpdateRefsError,
     Protocol,
     ZERO_SHA,
     )

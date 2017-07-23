@@ -25,9 +25,8 @@ import subprocess
 import sys
 import tempfile
 
-from dulwich.errors import (
-    HookError,
-)
+class HookError(Exception):
+    """An error occurred while executing a hook."""
 
 
 class Hook(object):

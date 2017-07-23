@@ -72,15 +72,12 @@ else:
 if sys.platform == 'Plan9':
     has_mmap = False
 
-from dulwich.errors import (  # noqa: E402
-    ApplyDeltaError,
-    ChecksumMismatch,
-    )
 from dulwich.file import GitFile  # noqa: E402
 from dulwich.lru_cache import (  # noqa: E402
     LRUSizeCache,
     )
 from dulwich.objects import (  # noqa: E402
+    ChecksumMismatch,
     ShaFile,
     hex_to_sha,
     sha_to_hex,
@@ -95,6 +92,13 @@ DELTA_TYPES = (OFS_DELTA, REF_DELTA)
 
 
 DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
+
+
+class ApplyDeltaError(Exception):
+    """Indicates that applying a delta failed."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
 
 
 def take_msb_bytes(read, crc32=None):

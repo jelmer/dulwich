@@ -52,24 +52,21 @@ try:
 except ImportError:
     import socketserver as SocketServer
 
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-    GitProtocolError,
-    NotGitRepository,
-    UnexpectedCommandError,
-    ObjectFormatException,
-    )
 from dulwich import log_utils
 from dulwich.objects import (
+    ChecksumMismatch,
+    ObjectFormatException,
     Commit,
     valid_hexsha,
     )
 from dulwich.pack import (
+    ApplyDeltaError,
     write_pack_objects,
     )
 from dulwich.protocol import (  # noqa: F401
     BufferedPktLineWriter,
+    GitProtocolError,
+    UnexpectedCommandError,
     capability_agent,
     CAPABILITIES_REF,
     CAPABILITY_DELETE_REFS,
@@ -110,6 +107,7 @@ from dulwich.refs import (
     write_info_refs,
     )
 from dulwich.repo import (
+    NotGitRepository,
     Repo,
     )
 

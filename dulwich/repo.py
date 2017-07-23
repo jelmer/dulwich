@@ -34,17 +34,6 @@ import os
 import sys
 import stat
 
-from dulwich.errors import (
-    NoIndexPresent,
-    NotBlobError,
-    NotCommitError,
-    NotGitRepository,
-    NotTreeError,
-    NotTagError,
-    CommitError,
-    RefFormatError,
-    HookError,
-    )
 from dulwich.file import (
     GitFile,
     )
@@ -54,6 +43,10 @@ from dulwich.object_store import (
     ObjectStoreGraphWalker,
     )
 from dulwich.objects import (
+    NotCommitError,
+    NotBlobError,
+    NotTreeError,
+    NotTagError,
     check_hexsha,
     Blob,
     Commit,
@@ -63,6 +56,7 @@ from dulwich.objects import (
     )
 
 from dulwich.hooks import (
+    HookError,
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
@@ -70,6 +64,7 @@ from dulwich.hooks import (
 
 from dulwich.refs import (  # noqa: F401
     check_ref_format,
+    RefFormatError,
     RefsContainer,
     DictRefsContainer,
     InfoRefsContainer,
@@ -104,6 +99,21 @@ BASE_DIRECTORIES = [
     ]
 
 DEFAULT_REF = b'refs/heads/master'
+
+
+class NoIndexPresent(Exception):
+    """No index is present."""
+
+
+class CommitError(Exception):
+    """An error occurred while performing a commit."""
+
+
+class NotGitRepository(Exception):
+    """Indicates that no Git repository was found."""
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
 
 
 def parse_graftpoints(graftpoints):

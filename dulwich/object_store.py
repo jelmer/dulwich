@@ -35,11 +35,9 @@ from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
     )
-from dulwich.errors import (
-    NotTreeError,
-    )
 from dulwich.file import GitFile
 from dulwich.objects import (
+    NotTreeError,
     Commit,
     ShaFile,
     Tag,

@@ -45,6 +45,13 @@
   * Clarified docstrings for Client.{send_pack,fetch_pack} implementations.
     (Jelmer Vernooĳ, #523)
 
+ CHANGES
+
+  * Errors have been moved out of ``dulwich.errors`` into their respective
+    modules. ``dulwich.errors`` also still provides them, but will in the future
+    print a deprecation warning (and at a further point, removed).
+    (Jelmer Vernooĳ)
+
 0.17.3	2017-03-20
 
  PLATFORM SUPPORT

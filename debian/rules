@@ -41,8 +41,8 @@ ifneq (,$(findstring pypy,$(pyflavours)))
 	rm -rf debian/tmp/usr/lib/pypy/bin
 endif
 	# Install everything excluding the *_d.so debug extensions to python-dulwich and python3-dulwich
-	dh_install -X"*_d.so" "debian/tmp/usr/lib/python2*/*-packages" -p python-dulwich
-	dh_install -X"*_d.so" "debian/tmp/usr/lib/python3*/*-packages" -p python3-dulwich
+	dh_install -X"*_d.so" -Xpypy "debian/tmp/usr/lib/python2*/*-packages" -p python-dulwich
+	dh_install -X"*_d.so" -Xpypy "debian/tmp/usr/lib/python3*/*-packages" -p python3-dulwich
 	# Install the debug extensions to python-dulwich-dbg
 	dh_install "debian/tmp/usr/lib/python*/*-packages/dulwich/*_d.so" -p python-dulwich-dbg
 ifneq (,$(findstring pypy,$(pyflavours)))

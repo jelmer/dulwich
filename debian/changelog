@@ -1,3 +1,9 @@
+dulwich (0.17.3-2) UNRELEASED; urgency=medium
+
+  * Stop shipping pypy C extensions in python-dulwich. Closes: #868542
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 24 Jul 2017 23:51:07 +0000
+
 dulwich (0.17.3-1) unstable; urgency=medium
 
   * New upstream release.

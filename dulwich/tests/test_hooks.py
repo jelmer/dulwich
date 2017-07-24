@@ -24,13 +24,12 @@ import stat
 import shutil
 import tempfile
 
-from dulwich import errors
-
 from dulwich.hooks import (
+    HookError,
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
-)
+    )
 
 from dulwich.tests import TestCase
 
@@ -62,7 +61,7 @@ exit 0
             f.write(pre_commit_fail)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute)
+        self.assertRaises(HookError, hook.execute)
 
         with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)
@@ -91,7 +90,7 @@ exit 0
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute, b'failed commit')
+        self.assertRaises(HookError, hook.execute, b'failed commit')
 
         with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
@@ -122,7 +121,7 @@ exit 1
             f.write(post_commit_msg_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute)
+        self.assertRaises(HookError, hook.execute)
 
         with open(post_commit, 'w') as f:
             f.write(post_commit_msg)

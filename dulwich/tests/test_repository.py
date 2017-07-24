@@ -29,14 +29,14 @@ import sys
 import tempfile
 import warnings
 
-from dulwich import errors
 from dulwich.object_store import (
     tree_lookup_path,
     )
 from dulwich import objects
 from dulwich.config import Config
-from dulwich.errors import NotGitRepository
 from dulwich.repo import (
+    CommitError,
+    NotGitRepository,
     Repo,
     MemoryRepo,
     )
@@ -436,7 +436,7 @@ exit 0
             f.write(pre_commit_fail)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.CommitError, r.do_commit, 'failed commit',
+        self.assertRaises(CommitError, r.do_commit, 'failed commit',
                           committer='Test Committer <test@nodomain.com>',
                           author='Test Author <test@nodomain.com>',
                           commit_timestamp=12345, commit_timezone=0,
@@ -477,7 +477,7 @@ exit 0
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.CommitError, r.do_commit, b'failed commit',
+        self.assertRaises(CommitError, r.do_commit, b'failed commit',
                           committer=b'Test Committer <test@nodomain.com>',
                           author=b'Test Author <test@nodomain.com>',
                           commit_timestamp=12345, commit_timezone=0,
@@ -767,7 +767,7 @@ class BuildRepoRootTests(TestCase):
         r.refs.add_if_new = add_if_new
 
         old_shas = set(r.object_store)
-        self.assertRaises(errors.CommitError, r.do_commit, b'failed commit',
+        self.assertRaises(CommitError, r.do_commit, b'failed commit',
                           committer=b'Test Committer <test@nodomain.com>',
                           author=b'Test Author <test@nodomain.com>',
                           commit_timestamp=12345, commit_timezone=0,

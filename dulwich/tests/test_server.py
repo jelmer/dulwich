@@ -27,17 +27,17 @@ import tempfile
 
 import sys
 
-from dulwich.errors import (
-    GitProtocolError,
-    NotGitRepository,
-    UnexpectedCommandError,
-    HangupException,
-    )
 from dulwich.object_store import (
     MemoryObjectStore,
     )
+from dulwich.protocol import (
+    GitProtocolError,
+    UnexpectedCommandError,
+    HangupException,
+    )
 from dulwich.repo import (
     MemoryRepo,
+    NotGitRepository,
     Repo,
     )
 from dulwich.server import (

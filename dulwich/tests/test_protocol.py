@@ -23,10 +23,8 @@
 
 from io import BytesIO
 
-from dulwich.errors import (
-    HangupException,
-    )
 from dulwich.protocol import (
+    HangupException,
     GitProtocolError,
     PktLineParser,
     Protocol,

@@ -30,9 +30,6 @@ from dulwich.diff_tree import (
     TreeChange,
     RenameDetector,
     )
-from dulwich.errors import (
-    MissingCommitError,
-    )
 from dulwich.object_store import (
     MemoryObjectStore,
     )
@@ -41,6 +38,7 @@ from dulwich.objects import (
     Blob,
     )
 from dulwich.walk import (
+    MissingCommitError,
     ORDER_TOPO,
     WalkEntry,
     Walker,

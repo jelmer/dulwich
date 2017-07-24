@@ -26,12 +26,13 @@ import os
 import sys
 import tempfile
 
-from dulwich import errors
 from dulwich.file import (
     GitFile,
     )
 from dulwich.objects import ZERO_SHA
 from dulwich.refs import (
+    PackedRefsException,
+    RefFormatError,
     DictRefsContainer,
     InfoRefsContainer,
     check_ref_format,
@@ -88,11 +89,11 @@ FOURS = b'4' * 40
 class PackedRefsFileTests(TestCase):
 
     def test_split_ref_line_errors(self):
-        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+        self.assertRaises(PackedRefsException, _split_ref_line,
                           b'singlefield')
-        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+        self.assertRaises(PackedRefsException, _split_ref_line,
                           b'badsha name')
-        self.assertRaises(errors.PackedRefsException, _split_ref_line,
+        self.assertRaises(PackedRefsException, _split_ref_line,
                           ONES + b' bad/../refname')
 
     def test_read_without_peeled(self):
@@ -107,7 +108,7 @@ class PackedRefsFileTests(TestCase):
         f = BytesIO(b'\n'.join([
             ONES + b' ref/1',
             b'^' + TWOS]))
-        self.assertRaises(errors.PackedRefsException, list,
+        self.assertRaises(PackedRefsException, list,
                           read_packed_refs(f))
 
     def test_read_with_peeled(self):
@@ -126,14 +127,14 @@ class PackedRefsFileTests(TestCase):
         f = BytesIO(b'\n'.join([
             b'^' + TWOS,
             ONES + b' ref/1']))
-        self.assertRaises(errors.PackedRefsException, list,
+        self.assertRaises(PackedRefsException, list,
                           read_packed_refs(f))
 
         f = BytesIO(b'\n'.join([
                 ONES + b' ref/1',
                 b'^' + TWOS,
                 b'^' + THREES]))
-        self.assertRaises(errors.PackedRefsException, list,
+        self.assertRaises(PackedRefsException, list,
                           read_packed_refs(f))
 
     def test_write_with_peeled(self):
@@ -194,7 +195,7 @@ class RefsContainerTests(object):
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'refs/some/ref'])
         self.assertRaises(
-            errors.RefFormatError, self._refs.__setitem__,
+            RefFormatError, self._refs.__setitem__,
             b'notrefs/foo', b'42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_set_if_equals(self):
@@ -250,9 +251,9 @@ class RefsContainerTests(object):
         self._refs._check_refname(b'refs/stash')
         self._refs._check_refname(b'refs/heads/foo')
 
-        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+        self.assertRaises(RefFormatError, self._refs._check_refname,
                           b'refs')
-        self.assertRaises(errors.RefFormatError, self._refs._check_refname,
+        self.assertRaises(RefFormatError, self._refs._check_refname,
                           b'notrefs/foo')
 
     def test_contains(self):

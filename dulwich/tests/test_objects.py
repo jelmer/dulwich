@@ -33,10 +33,8 @@ import stat
 import warnings
 from contextlib import contextmanager
 
-from dulwich.errors import (
-    ObjectFormatException,
-    )
 from dulwich.objects import (
+    ObjectFormatException,
     Blob,
     Tree,
     Commit,

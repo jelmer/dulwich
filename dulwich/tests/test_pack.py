@@ -29,10 +29,6 @@ import shutil
 import tempfile
 import zlib
 
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-    )
 from dulwich.file import (
     GitFile,
     )
@@ -40,6 +36,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     )
 from dulwich.objects import (
+    ChecksumMismatch,
     hex_to_sha,
     sha_to_hex,
     Commit,
@@ -47,6 +44,7 @@ from dulwich.objects import (
     Blob,
     )
 from dulwich.pack import (
+    ApplyDeltaError,
     OFS_DELTA,
     REF_DELTA,
     MemoryPackIndex,

@@ -30,10 +30,8 @@ import tempfile
 from dulwich.index import (
     commit_tree,
     )
-from dulwich.errors import (
-    NotTreeError,
-    )
 from dulwich.objects import (
+    NotTreeError,
     sha_to_hex,
     Blob,
     Tree,

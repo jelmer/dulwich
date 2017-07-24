@@ -23,9 +23,9 @@ import os
 import tempfile
 import shutil
 
-from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
 from dulwich.objects import (
+    ObjectFormatException,
     Tree,
     )
 from dulwich.repo import (

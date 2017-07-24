@@ -1,4 +1,4 @@
-dulwich (0.17.3-2) UNRELEASED; urgency=medium
+dulwich (0.17.3-2) unstable; urgency=medium
 
   * Stop shipping pypy C extensions in python-dulwich. Closes: #868542
 

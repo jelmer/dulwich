@@ -21,8 +21,9 @@
 
 """Dulwich-related exception classes and utility functions."""
 
-from dulwich.hooks import HookError
-from dulwich.objects import (
+
+from dulwich.hooks import HookError  # noqa: F401
+from dulwich.objects import (  # noqa: F401
     ChecksumMismatch,
     ObjectFormatException,
     WrongObjectException,
@@ -31,24 +32,23 @@ from dulwich.objects import (
     NotTreeError,
     NotTagError,
     )
-from dulwich.pack import ApplyDeltaError
-from dulwich.protocol import (
+from dulwich.pack import ApplyDeltaError  # noqa: F401
+from dulwich.protocol import (  # noqa: F401
     GitProtocolError,
     HangupException,
     UnexpectedCommandError,
     SendPackError,
     UpdateRefsError,
     )
-from dulwich.refs import (
+from dulwich.refs import (  # noqa: F401
     PackedRefsException,
     RefFormatError,
     )
-from dulwich.repo import (
+from dulwich.repo import (  # noqa: F401
     NotGitRepository,
     NoIndexPresent,
     CommitError,
     )
-from dulwich.walk import (
+from dulwich.walk import (  # noqa: F401
     MissingCommitError,
     )
-

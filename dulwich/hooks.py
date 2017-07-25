@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 
+
 class HookError(Exception):
     """An error occurred while executing a hook."""
 

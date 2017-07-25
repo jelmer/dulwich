@@ -1,0 +1,73 @@
+From: Jelmer Vernooĳ <jelmer@debian.org>
+Subject: Automatically generated patch (0.17.3-2)
+
+Last (up to) 3 git changes, FYI:
+
+commit 1c5c53d182358669aa689f3f5f39d62a7a2d4eae
+Author: Jelmer Vernooĳ <jelmer@jelmer.uk>
+Date:   Mon Jul 24 23:57:53 2017 +0000
+
+    releasing package dulwich version 0.17.3-2
+
+commit e0eb92b4f51b3ee27a8850ea7e0e651baa14971e
+Author: Jelmer Vernooĳ <jelmer@jelmer.uk>
+Date:   Mon Jul 24 23:51:11 2017 +0000
+
+    Stop shipping pypy C extensions in python-dulwich. Closes: #868542
+
+commit 37c5565d970b4886cabd4193a7f8170b025d1b5b
+Author: Jelmer Vernooĳ <jelmer@jelmer.uk>
+Date:   Sun Jun 18 20:14:49 2017 +0000
+
+    releasing package dulwich version 0.17.3-1
+---
+
+--- dulwich-0.17.3.orig/.travis.yml
++++ dulwich-0.17.3/.travis.yml
+@@ -1,38 +1,12 @@
+-language: python
+-sudo: false
+-cache: pip
++sudo: required
++language: generic
+ 
+-python:
+-  - 2.7
+-  - 3.3
+-  - 3.4
+-  - 3.5
+-  - 3.5-dev
+-  - 3.6
+-  - 3.6-dev
+-  - 3.7-dev
+-  - pypy3.3-5.2-alpha1
+-
+-env:
+-  - PYTHONHASHSEED=random
+-    TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+-
+-matrix:
+-  include:
+-    - python: pypy
+-      env: TEST_REQUIRE=fastimport
+-
+-install:
+-  - travis_retry pip install -U pip coverage codecov $TEST_REQUIRE
++services:
++  - docker
+ 
+ script:
+-  # Test without c extensions
+-  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+-
+-  # Test with c extensions
+-  - python setup.py build_ext -i
+-  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
++  - wget -O- http://travis.debian.net/script.sh | sh -
+ 
+-after_success:
+-  - python -m coverage combine
+-  - codecov
++branches:
++  except:
++    - /^debian\/\d/

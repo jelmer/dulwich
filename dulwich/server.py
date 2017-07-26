@@ -502,7 +502,7 @@ class ProtocolGraphWalker(object):
     The work of determining which acks to send is passed on to the
     implementation instance stored in _impl. The reason for this is that we do
     not know at object creation time what ack level the protocol requires. A
-    call to set_ack_level() is required to set up the implementation, before
+    call to set_ack_type() is required to set up the implementation, before
     any calls to next() or ack() are made.
     """
     def __init__(self, handler, object_store, get_peeled):

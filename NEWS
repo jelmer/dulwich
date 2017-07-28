@@ -28,6 +28,9 @@
   * Support treeish argument to porcelain.reset(), rather than
     requiring a ref/commit id. (Jelmer Vernooĳ)
 
+  * Handle race condition when mtime doesn't change between writes/reads.
+    (Jelmer Vernooĳ, #541)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

@@ -620,7 +620,7 @@ class PushTests(PorcelainTestCase):
                 b'refs/heads/foo': r_clone[b'HEAD'].id,
                 b'refs/heads/master': new_id,
                 }, self.repo.get_refs())
-            self.assertEqual(r_clone[b'HEAD'].id, self.repo.refs[refs_path])
+            self.assertEqual(r_clone[b'HEAD'].id, self.repo[refs_path].id)
 
             # Get the change in the target repo corresponding to the add
             # this will be in the foo branch.

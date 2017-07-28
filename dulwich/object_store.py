@@ -22,7 +22,6 @@
 
 """Git object store interfaces and implementation."""
 
-
 from io import BytesIO
 import errno
 from itertools import chain
@@ -30,6 +29,7 @@ import os
 import stat
 import sys
 import tempfile
+import time
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -481,7 +481,8 @@ class DiskObjectStore(PackBasedObjectStore):
                 self.close()
                 return
             raise
-        self._pack_cache_time = os.stat(self.pack_dir).st_mtime
+        self._pack_cache_time = max(
+                os.stat(self.pack_dir).st_mtime, time.time())
         pack_files = set()
         for name in pack_dir_contents:
             if name.startswith("pack-") and name.endswith(".pack"):
@@ -502,7 +503,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _pack_cache_stale(self):
         try:
-            return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
+            return os.stat(self.pack_dir).st_mtime >= self._pack_cache_time
         except OSError as e:
             if e.errno == errno.ENOENT:
                 return True

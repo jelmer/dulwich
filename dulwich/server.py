@@ -1068,9 +1068,10 @@ def main(argv=sys.argv):
         gitdir = args[1]
     else:
         gitdir = '.'
-    from dulwich import porcelain
-    porcelain.daemon(gitdir, address=options.listen_address,
-                     port=options.port)
+    # TODO(jelmer): Support git-daemon-export-ok and --export-all.
+    backend = FileSystemBackend(gitdir)
+    server = TCPGitServer(backend, options.listen_address, options.port)
+    server.serve_forever()
 
 
 def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,

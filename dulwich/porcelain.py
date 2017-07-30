@@ -56,6 +56,7 @@ from contextlib import (
     closing,
     contextmanager,
 )
+from io import BytesIO
 import os
 import posixpath
 import stat
@@ -470,9 +471,19 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
     :param outstream: Stream to write to
     """
     print_commit(commit, decode=decode, outstream=outstream)
-    parent_commit = repo[commit.parents[0]]
+    if commit.parents:
+        parent_commit = repo[commit.parents[0]]
+        base_tree = parent_commit.tree
+    else:
+        base_tree = None
+    diffstream = BytesIO()
     write_tree_diff(
-        outstream, repo.object_store, parent_commit.tree, commit.tree)
+        diffstream,
+        repo.object_store, base_tree, commit.tree)
+    diffstream.seek(0)
+    outstream.write(
+        diffstream.getvalue().decode(
+                commit.encoding or DEFAULT_ENCODING, 'replace'))
 
 
 def show_tree(repo, tree, decode, outstream=sys.stdout):

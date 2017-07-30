@@ -31,6 +31,9 @@
   * Handle race condition when mtime doesn't change between writes/reads.
     (Jelmer Vernooĳ, #541)
 
+  * Fix ``dulwich.porcelain.show`` on commits with Python 3.
+    (Jelmer Vernooĳ, #532)
+
  IMPROVEMENTS
 
   * Add basic support for reading ignore files in ``dulwich.ignore``.

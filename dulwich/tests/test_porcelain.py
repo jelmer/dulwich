@@ -45,6 +45,7 @@ from dulwich.tests import (
     )
 from dulwich.tests.utils import (
     build_commit_graph,
+    make_commit,
     make_object,
     )
 
@@ -375,6 +376,64 @@ class ShowTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.show(self.repo.path, objects=[b.id], outstream=outstream)
         self.assertEqual(outstream.getvalue(), "The Foo\n")
+
+    def test_commit_no_parent(self):
+        a = Blob.from_string(b"The Foo\n")
+        ta = Tree()
+        ta.add(b"somename", 0o100644, a.id)
+        ca = make_commit(tree=ta.id)
+        self.repo.object_store.add_objects([(a, None), (ta, None), (ca, None)])
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=[ca.id], outstream=outstream)
+        self.assertEqual(outstream.getvalue(), """\
+--------------------------------------------------
+commit: 344da06c1bb85901270b3e8875c988a027ec087d
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Test message.
+
+diff --git /dev/null b/somename
+new mode 100644
+index 0000000..ea5c7bf 100644
+--- /dev/null
++++ b/somename
+@@ -1,0 +1,1 @@
++The Foo
+""")
+
+    def test_commit_with_change(self):
+        a = Blob.from_string(b"The Foo\n")
+        ta = Tree()
+        ta.add(b"somename", 0o100644, a.id)
+        ca = make_commit(tree=ta.id)
+        b = Blob.from_string(b"The Bar\n")
+        tb = Tree()
+        tb.add(b"somename", 0o100644, a.id)
+        cb = make_commit(tree=tb.id)
+        self.repo.object_store.add_objects(
+            [(a, None), (b, None), (ta, None), (tb, None),
+             (ca, None), (cb, None)])
+        outstream = StringIO()
+        porcelain.show(self.repo.path, objects=[cb.id], outstream=outstream)
+        self.assertEqual(outstream.getvalue(), """\
+--------------------------------------------------
+commit: 344da06c1bb85901270b3e8875c988a027ec087d
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Test message.
+
+diff --git /dev/null b/somename
+new mode 100644
+index 0000000..ea5c7bf 100644
+--- /dev/null
++++ b/somename
+@@ -1,0 +1,1 @@
++The Foo
+""")
 
 
 class SymbolicRefTests(PorcelainTestCase):

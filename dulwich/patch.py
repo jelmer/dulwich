@@ -236,7 +236,6 @@ def write_blob_diff(f, old_file, new_file):
                  old_path, new_path))
 
 
-# TODO(jelmer): Support writing unicode, rather than bytes.
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """Write tree diff.
 

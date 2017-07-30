@@ -690,7 +690,7 @@ API CHANGES
   * Add a basic `dulwich.porcelain` module. (Jelmer Vernooĳ, Marcin Kuzminski)
 
   * Various performance improvements for object access.
-   (Jelmer Vernooĳ)
+    (Jelmer Vernooĳ)
 
   * New function `get_transport_and_path_from_url`,
     similar to `get_transport_and_path` but only

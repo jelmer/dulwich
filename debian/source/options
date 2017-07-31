@@ -1,0 +1,2 @@
+extend-diff-ignore = "^\.travis.yml$"
+extend-diff-ignore = "^\dulwich.egg-info/SOURCES.txt$"

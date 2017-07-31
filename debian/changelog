@@ -1,3 +1,9 @@
+dulwich (0.17.3-3) UNRELEASED; urgency=medium
+
+  * Refresh upstream signing key.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 01:15:59 +0000
+
 dulwich (0.17.3-2) unstable; urgency=medium
 
   * Stop shipping pypy C extensions in python-dulwich. Closes: #868542

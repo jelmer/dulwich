@@ -1,5 +1,6 @@
-dulwich (0.17.3-3) UNRELEASED; urgency=medium
+dulwich (0.18.0-1) UNRELEASED; urgency=medium
 
+  * New upstream release.
   * Refresh upstream signing key.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 01:15:59 +0000

@@ -1,0 +1,57 @@
+.. _tutorial-tag:
+
+Tagging
+=======
+
+This tutorial will demonstrate how to add a tag to a commit via dulwich.
+
+First let's initialize the repository:
+
+    >>> from dulwich.repo import Repo
+    >>> _repo = Repo("myrepo", mkdir=True)
+
+Next we build the commit object and add it to the object store:
+
+    >>> from dulwich.objects import Blob, Tree, Commit, parse_timezone
+    >>> permissions = 0100644
+    >>> author = "John Smith"
+    >>> blob = Blob.from_string("empty")
+    >>> tree = Tree()
+    >>> tree.add(tag, permissions, blob.id)
+    >>> commit = Commit()
+    >>> commit.tree = tree.id
+    >>> commit.author = commit.committer = author
+    >>> commit.commit_time = commit.author_time = int(time())
+    >>> tz = parse_timezone('-0200')[0]
+    >>> commit.commit_timezone = commit.author_timezone = tz
+    >>> commit.encoding = "UTF-8"
+    >>> commit.message = 'Tagging repo: ' + message
+
+Add objects to the repo store instance:
+
+    >>> object_store = _repo.object_store
+    >>> object_store.add_object(blob)
+    >>> object_store.add_object(tree)
+    >>> object_store.add_object(commit)
+    >>> master_branch = 'master'
+    >>> _repo.refs['refs/heads/' + master_branch] = commit.id
+
+Finally, add the tag top the repo:
+
+    >>> _repo['refs/tags/' + commit] = commit.id
+
+Alternatively, we can use the tag object if we'd like to annotate the tag:
+
+    >>> from dulwich.objects import Blob, Tree, Commit, parse_timezone, Tag
+    >>> tag_message = "Tag Annotation"
+    >>> tag = Tag()
+    >>> tag.tagger = author
+    >>> tag.message = message
+    >>> tag.name = "v0.1"
+    >>> tag.object = (Commit, commit.id)
+    >>> tag.tag_time = commit.author_time
+    >>> tag.tag_timezone = tz
+    >>> object_store.add_object(tag)
+    >>> _repo['refs/tags/' + tag] = tag.id
+
+

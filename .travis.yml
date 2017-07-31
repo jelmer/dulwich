@@ -1,0 +1,41 @@
+language: python
+sudo: false
+cache: pip
+
+python:
+  - 2.7
+  - 3.3
+  - 3.4
+  - 3.5
+  - 3.5-dev
+  - 3.6
+  - 3.6-dev
+  - 3.7-dev
+  - pypy3.3-5.2-alpha1
+
+env:
+  - PYTHONHASHSEED=random
+    TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+
+matrix:
+  include:
+    - python: pypy
+      env: TEST_REQUIRE=fastimport
+
+install:
+  - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
+
+script:
+  # Test without c extensions
+  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+
+  # Test with c extensions
+  - python setup.py build_ext -i
+  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+
+  # Style
+  - make style
+
+after_success:
+  - python -m coverage combine
+  - codecov

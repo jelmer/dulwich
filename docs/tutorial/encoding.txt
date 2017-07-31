@@ -1,0 +1,26 @@
+Encoding
+========
+
+You will notice that all lower-level functions in Dulwich take byte strings
+rather than unicode strings. This is intentional.
+
+Although `C git`_ recommends the use of UTF-8 for encoding, this is not
+strictly enforced and C git treats filenames as sequences of non-NUL bytes.
+There are repositories in the wild that use non-UTF-8 encoding for filenames
+and commit messages.
+
+.. _C git: https://github.com/git/git/blob/master/Documentation/i18n.txt
+
+The library should be able to read *all* existing git repositories,
+irregardless of what encoding they use. This is the main reason why Dulwich
+does not convert paths to unicode strings.
+
+A further consideration is that converting back and forth to unicode
+is an extra performance penalty. E.g. if you are just iterating over file
+contents, there is no need to consider encoded strings. Users of the library
+may have specific assumptions they can make about the encoding - e.g. they
+could just decide that all their data is latin-1, or the default Python
+encoding.
+
+Higher level functions, such as the porcelain in dulwich.porcelain, will
+automatically convert unicode strings to UTF-8 bytestrings.

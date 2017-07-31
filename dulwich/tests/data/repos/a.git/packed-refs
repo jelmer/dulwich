@@ -1,0 +1,3 @@
+# pack-refs with: peeled 
+b0931cadc54336e78a1d980420e3268903b57a50 refs/tags/mytag-packed
+^2a72d929692c41d8554c07f6301757ba18a65d91

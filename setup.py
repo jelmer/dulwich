@@ -8,15 +8,17 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 from distutils.core import Distribution
+import os
+import sys
 
-dulwich_version_string = '0.17.3'
+dulwich_version_string = '0.18.0'
 
 include_dirs = []
 # Windows MSVC support
-import os
-import sys
-if sys.platform == 'win32':
+if sys.platform == 'win32' and sys.version_info[:2] < (3, 6):
+    # Include dulwich/ for fallback stdint.h
     include_dirs.append('dulwich')
+
 
 class DulwichDistribution(Distribution):
 
@@ -33,6 +35,7 @@ class DulwichDistribution(Distribution):
 
     pure = False
 
+
 if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
     # distutils.sysconfig
@@ -48,23 +51,27 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
-if not '__pypy__' in sys.modules and not sys.platform == 'win32':
+
+
+if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
-if sys.version_info[0] > 2 and sys.platform == 'win32':
-    # C Modules don't build for python3 windows, and prevent tests from running
-    ext_modules = []
-else:
-    ext_modules = [
-        Extension('dulwich._objects', ['dulwich/_objects.c'],
-                  include_dirs=include_dirs),
-        Extension('dulwich._pack', ['dulwich/_pack.c'],
-                  include_dirs=include_dirs),
-        Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-                  include_dirs=include_dirs),
-    ]
+ext_modules = [
+    Extension('dulwich._objects', ['dulwich/_objects.c'],
+              include_dirs=include_dirs),
+    Extension('dulwich._pack', ['dulwich/_pack.c'],
+              include_dirs=include_dirs),
+    Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
+              include_dirs=include_dirs),
+]
 
+
+if sys.platform == 'win32':
+    # Win32 setup breaks with non-ascii characters.
+    author = "Jelmer Vernooij"
+else:
+    author = "Jelmer Vernooĳ"
 
 setup(name='dulwich',
       description='Python Git Library',
@@ -72,7 +79,6 @@ setup(name='dulwich',
       version=dulwich_version_string,
       url='https://www.dulwich.io/',
       license='Apachev2 or later or GPLv2',
-      author='Jelmer Vernooĳ',
       author_email='jelmer@jelmer.uk',
       long_description="""
       Python implementation of the Git file formats and protocols,
@@ -81,10 +87,11 @@ setup(name='dulwich',
       All functionality is available in pure Python. Optional
       C extensions can be built for improved performance.
 
-      The project is named after the part of London that Mr. and Mrs. Git live in
-      in the particular Monty Python sketch.
+      The project is named after the part of London that Mr. and Mrs. Git live
+      in in the particular Monty Python sketch.
       """,
-      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat', 'dulwich.contrib'],
+      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
+                'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       classifiers=[
@@ -98,6 +105,7 @@ setup(name='dulwich',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX',
+          'Operating System :: Microsoft :: Windows',
           'Topic :: Software Development :: Version Control',
       ],
       ext_modules=ext_modules,

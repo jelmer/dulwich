@@ -160,7 +160,7 @@ class DumbHandlersTestCase(WebTestCase):
         xs = b'x' * bufsize
         f = BytesIO(2 * xs)
         self.assertEqual([xs, xs],
-                          list(send_file(self._req, f, 'some/thing')))
+                         list(send_file(self._req, f, 'some/thing')))
         self.assertEqual(HTTP_OK, self._status)
         self.assertContentTypeEquals('some/thing')
         self.assertTrue(f.closed)
@@ -229,7 +229,8 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertEqual(HTTP_ERROR, self._status)
 
     def test_get_pack_file(self):
-        pack_name = os.path.join('objects', 'pack', 'pack-%s.pack' % ('1' * 40))
+        pack_name = os.path.join(
+            'objects', 'pack', 'pack-%s.pack' % ('1' * 40))
         backend = _test_backend([], named_files={pack_name: b'pack contents'})
         mat = re.search('.*', pack_name)
         output = b''.join(get_pack_file(self._req, backend, mat))
@@ -268,10 +269,10 @@ class DumbHandlersTestCase(WebTestCase):
 
         mat = re.search('.*', '//info/refs')
         self.assertEqual([blob1.id + b'\trefs/heads/master\n',
-                           blob3.id + b'\trefs/tags/blob-tag\n',
-                           tag1.id + b'\trefs/tags/tag-tag\n',
-                           blob2.id + b'\trefs/tags/tag-tag^{}\n'],
-                          list(get_info_refs(self._req, backend, mat)))
+                          blob3.id + b'\trefs/tags/blob-tag\n',
+                          tag1.id + b'\trefs/tags/tag-tag\n',
+                          blob2.id + b'\trefs/tags/tag-tag^{}\n'],
+                         list(get_info_refs(self._req, backend, mat)))
         self.assertEqual(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
         self.assertFalse(self._req.cached)
@@ -300,7 +301,8 @@ class DumbHandlersTestCase(WebTestCase):
         mat = re.search('.*', '//info/packs')
         output = b''.join(get_info_packs(self._req, backend, mat))
         expected = b''.join(
-            [(b'P pack-' + s + b'.pack\n') for s in [b'1' * 40, b'2' * 40, b'3' * 40]])
+            [(b'P pack-' + s + b'.pack\n')
+             for s in [b'1' * 40, b'2' * 40, b'3' * 40]])
         self.assertEqual(expected, output)
         self.assertEqual(HTTP_OK, self._status)
         self.assertContentTypeEquals('text/plain')
@@ -374,9 +376,9 @@ class SmartHandlersTestCase(WebTestCase):
         handler_output = b''.join(get_info_refs(self._req, b'backend', mat))
         write_output = self._output.getvalue()
         self.assertEqual((b'001e# service=git-upload-pack\n'
-                           b'0000'
-                           # input is ignored by the handler
-                           b'handled input: '), write_output)
+                          b'0000'
+                          # input is ignored by the handler
+                          b'handled input: '), write_output)
         # Ensure all output was written via the write callback.
         self.assertEqual(b'', handler_output)
         self.assertTrue(self._handler.advertise_refs)
@@ -412,7 +414,7 @@ class HTTPGitRequestTestCase(WebTestCase):
         self.assertEqual(message.encode('ascii'), self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
-                          set(self._headers))
+                         set(self._headers))
 
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
@@ -420,7 +422,7 @@ class HTTPGitRequestTestCase(WebTestCase):
         self.assertEqual(message.encode('ascii'), self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertEqual(set([('Content-Type', 'text/plain')]),
-                          set(self._headers))
+                         set(self._headers))
 
     def test_respond_ok(self):
         self._req.respond()
@@ -526,7 +528,8 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.)
         """
         zstream, zlength = self._get_zstream(self.example_text)
-        self._test_call(self.example_text,
+        self._test_call(
+            self.example_text,
             MinimalistWSGIInputStream(zstream.read()), zlength)
 
     def test_call_no_working_seek(self):
@@ -535,5 +538,6 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         (but defunct).  See https://github.com/jonashaag/klaus/issues/154.
         """
         zstream, zlength = self._get_zstream(self.example_text)
-        self._test_call(self.example_text,
-            MinimalistWSGIInputStream2(zstream.read()), zlength)
+        self._test_call(
+                self.example_text,
+                MinimalistWSGIInputStream2(zstream.read()), zlength)

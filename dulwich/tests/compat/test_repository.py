@@ -26,8 +26,6 @@ from itertools import chain
 import os
 import tempfile
 
-import sys
-
 from dulwich.objects import (
     hex_to_sha,
     )
@@ -94,7 +92,8 @@ class ObjectStoreTestCase(CompatTestCase):
     # TODO(dborowitz): peeled ref tests
 
     def _get_loose_shas(self):
-        output = self._run_git(['rev-list', '--all', '--objects', '--unpacked'])
+        output = self._run_git(
+            ['rev-list', '--all', '--objects', '--unpacked'])
         return self._parse_objects(output)
 
     def _get_all_shas(self):
@@ -110,8 +109,8 @@ class ObjectStoreTestCase(CompatTestCase):
         self.assertEqual(expected_shas, actual_shas)
 
     def test_loose_objects(self):
-        # TODO(dborowitz): This is currently not very useful since fast-imported
-        # repos only contained packed objects.
+        # TODO(dborowitz): This is currently not very useful since
+        # fast-imported repos only contained packed objects.
         expected_shas = self._get_loose_shas()
         self.assertShasMatch(expected_shas,
                              self._repo.object_store._iter_loose_objects())
@@ -147,7 +146,8 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
     def setUp(self):
         super(WorkingTreeTestCase, self).setUp()
-        self._worktree_path = self.create_new_worktree(self._repo.path, 'branch')
+        self._worktree_path = self.create_new_worktree(
+            self._repo.path, 'branch')
         self._worktree_repo = Repo(self._worktree_path)
         self.addCleanup(self._worktree_repo.close)
         self._mainworktree_repo = self._repo
@@ -184,8 +184,8 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.assertEqual(os.path.normcase(worktrees[0][0]),
                          os.path.normcase(self._mainworktree_repo.path))
 
-        output = run_git_or_fail(['worktree', 'list'],
-            cwd=self._mainworktree_repo.path)
+        output = run_git_or_fail(
+            ['worktree', 'list'], cwd=self._mainworktree_repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
         self.assertEqual(worktrees[0][1], '(bare)')

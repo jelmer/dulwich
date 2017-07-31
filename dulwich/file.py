@@ -26,6 +26,7 @@ import os
 import sys
 import tempfile
 
+
 def ensure_dir_exists(dirname):
     """Ensure a directory exists, creating if necessary."""
     try:
@@ -105,10 +106,12 @@ class _GitFile(object):
     PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'read',
                      'readline', 'readlines', 'seek', 'tell',
                      'truncate', 'write', 'writelines')
+
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
-        fd = os.open(self._lockfilename,
+        fd = os.open(
+            self._lockfilename,
             os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
@@ -137,12 +140,12 @@ class _GitFile(object):
         """Close this file, saving the lockfile over the original.
 
         :note: If this method fails, it will attempt to delete the lockfile.
-            However, it is not guaranteed to do so (e.g. if a filesystem becomes
-            suddenly read-only), which will prevent future writes to this file
-            until the lockfile is removed manually.
-        :raises OSError: if the original file could not be overwritten. The lock
-            file is still closed, so further attempts to write to the same file
-            object will raise ValueError.
+            However, it is not guaranteed to do so (e.g. if a filesystem
+            becomes suddenly read-only), which will prevent future writes to
+            this file until the lockfile is removed manually.
+        :raises OSError: if the original file could not be overwritten. The
+            lock file is still closed, so further attempts to write to the same
+            file object will raise ValueError.
         """
         if self._closed:
             return
@@ -152,7 +155,8 @@ class _GitFile(object):
                 os.rename(self._lockfilename, self._filename)
             except OSError as e:
                 if sys.platform == 'win32' and e.errno == errno.EEXIST:
-                    # Windows versions prior to Vista don't support atomic renames
+                    # Windows versions prior to Vista don't support atomic
+                    # renames
                     _fancy_rename(self._lockfilename, self._filename)
                 else:
                     raise

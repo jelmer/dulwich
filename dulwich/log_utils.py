@@ -31,7 +31,8 @@ http://docs.python.org/library/logging.html#configuring-logging-for-a-library
 
 For many modules, the only function from the logging module they need is
 getLogger; this module exports that function for convenience. If a calling
-module needs something else, it can import the standard logging module directly.
+module needs something else, it can import the standard logging module
+directly.
 """
 
 import logging

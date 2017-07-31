@@ -172,12 +172,13 @@ class ConfigDict(Config, MutableMapping):
 
 def _format_string(value):
     if (value.startswith(b" ") or
-        value.startswith(b"\t") or
-        value.endswith(b" ") or
-        b'#' in value or
-        value.endswith(b"\t")):
+            value.startswith(b"\t") or
+            value.endswith(b" ") or
+            b'#' in value or
+            value.endswith(b"\t")):
         return b'"' + _escape_value(value) + b'"'
-    return _escape_value(value)
+    else:
+        return _escape_value(value)
 
 
 _ESCAPE_TABLE = {
@@ -189,6 +190,7 @@ _ESCAPE_TABLE = {
     }
 _COMMENT_CHARS = [ord(b"#"), ord(b";")]
 _WHITESPACE_CHARS = [ord(b"\t"), ord(b" ")]
+
 
 def _parse_string(value):
     value = bytearray(value.strip())
@@ -208,8 +210,8 @@ def _parse_string(value):
                     (value, i))
             except KeyError:
                 raise ValueError(
-                    "escape character followed by unknown character %s at %d in %r" %
-                    (value[i], i, value))
+                    "escape character followed by unknown character "
+                    "%s at %d in %r" % (value[i], i, value))
             if whitespace:
                 ret.extend(whitespace)
                 whitespace = bytearray()
@@ -236,7 +238,11 @@ def _parse_string(value):
 
 def _escape_value(value):
     """Escape a value."""
-    return value.replace(b"\\", b"\\\\").replace(b"\n", b"\\n").replace(b"\t", b"\\t").replace(b"\"", b"\\\"")
+    value = value.replace(b"\\", b"\\\\")
+    value = value.replace(b"\n", b"\\n")
+    value = value.replace(b"\t", b"\\t")
+    value = value.replace(b"\"", b"\\\"")
+    return value
 
 
 def _check_variable_name(name):
@@ -295,8 +301,8 @@ class ConfigFile(ConfigDict):
                         section = (pts[0], pts[1])
                     else:
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" %
-                                    pts[0])
+                            raise ValueError(
+                                "invalid section name %r" % pts[0])
                         pts = pts[0].split(b".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])
@@ -359,7 +365,8 @@ class ConfigFile(ConfigDict):
             if subsection_name is None:
                 f.write(b"[" + section_name + b"]\n")
             else:
-                f.write(b"[" + section_name + b" \"" + subsection_name + b"\"]\n")
+                f.write(b"[" + section_name +
+                        b" \"" + subsection_name + b"\"]\n")
             for key, value in values.items():
                 if value is True:
                     value = b"true"

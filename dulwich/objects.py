@@ -136,7 +136,8 @@ def filename_to_hex(filename):
 
 def object_header(num_type, length):
     """Return an object header for the given numeric type and text length."""
-    return object_class(num_type).type_name + b' ' + str(length).encode('ascii') + b'\0'
+    return (object_class(num_type).type_name +
+            b' ' + str(length).encode('ascii') + b'\0')
 
 
 def serializable_property(name, docstring=None):
@@ -145,6 +146,7 @@ def serializable_property(name, docstring=None):
     def set(obj, value):
         setattr(obj, "_"+name, value)
         obj._needs_serialization = True
+
     def get(obj):
         return getattr(obj, "_"+name)
     return property(get, set, doc=docstring)
@@ -182,9 +184,9 @@ def check_identity(identity, error_msg):
     email_start = identity.find(b'<')
     email_end = identity.find(b'>')
     if (email_start < 0 or email_end < 0 or email_end <= email_start
-        or identity.find(b'<', email_start + 1) >= 0
-        or identity.find(b'>', email_end + 1) >= 0
-        or not identity.endswith(b'>')):
+            or identity.find(b'<', email_start + 1) >= 0
+            or identity.find(b'>', email_end + 1) >= 0
+            or not identity.endswith(b'>')):
         raise ObjectFormatException(error_msg)
 
 
@@ -514,7 +516,7 @@ class ShaFile(object):
     def __cmp__(self, other):
         if not isinstance(other, ShaFile):
             raise TypeError
-        return cmp(self.id, other.id)
+        return cmp(self.id, other.id)  # noqa: F821
 
 
 class Blob(ShaFile):
@@ -551,7 +553,8 @@ class Blob(ShaFile):
     def _deserialize(self, chunks):
         self._chunked_text = chunks
 
-    chunked = property(_get_chunked, _set_chunked,
+    chunked = property(
+        _get_chunked, _set_chunked,
         "The text within the blob object, as chunks (not necessarily lines).")
 
     @classmethod
@@ -713,10 +716,12 @@ class Tag(ShaFile):
                 chunks.append(git_line(_TAGGER_HEADER, self._tagger))
             else:
                 chunks.append(git_line(
-                    _TAGGER_HEADER, self._tagger, str(self._tag_time).encode('ascii'),
-                    format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)))
+                    _TAGGER_HEADER, self._tagger,
+                    str(self._tag_time).encode('ascii'),
+                    format_timezone(
+                        self._tag_timezone, self._tag_timezone_neg_utc)))
         if self._message is not None:
-            chunks.append(b'\n') # To close headers
+            chunks.append(b'\n')  # To close headers
             chunks.append(self._message)
         return chunks
 
@@ -747,10 +752,11 @@ class Tag(ShaFile):
                 else:
                     self._tagger = value[0:sep+1]
                     try:
-                        (timetext, timezonetext) = value[sep+2:].rsplit(b' ', 1)
+                        (timetext, timezonetext) = (
+                                value[sep+2:].rsplit(b' ', 1))
                         self._tag_time = int(timetext)
-                        self._tag_timezone, self._tag_timezone_neg_utc = \
-                                parse_timezone(timezonetext)
+                        self._tag_timezone, self._tag_timezone_neg_utc = (
+                                parse_timezone(timezonetext))
                     except ValueError as e:
                         raise ObjectFormatException(e)
             elif field is None:
@@ -772,15 +778,18 @@ class Tag(ShaFile):
     object = property(_get_object, _set_object)
 
     name = serializable_property("name", "The name of this tag")
-    tagger = serializable_property("tagger",
-        "Returns the name of the person who created this tag")
-    tag_time = serializable_property("tag_time",
-        "The creation timestamp of the tag.  As the number of seconds "
-        "since the epoch")
-    tag_timezone = serializable_property("tag_timezone",
-        "The timezone that tag_time is in.")
+    tagger = serializable_property(
+            "tagger",
+            "Returns the name of the person who created this tag")
+    tag_time = serializable_property(
+            "tag_time",
+            "The creation timestamp of the tag.  As the number of seconds "
+            "since the epoch")
+    tag_timezone = serializable_property(
+            "tag_timezone",
+            "The timezone that tag_time is in.")
     message = serializable_property(
-        "message", "The message attached to this tag")
+            "message", "The message attached to this tag")
 
 
 class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
@@ -828,7 +837,8 @@ def serialize_tree(items):
     :return: Serialized tree text as chunks
     """
     for name, mode, hexsha in items:
-        yield ("%04o" % mode).encode('ascii') + b' ' + name + b'\0' + hex_to_sha(hexsha)
+        yield (("%04o" % mode).encode('ascii') + b' ' + name +
+               b'\0' + hex_to_sha(hexsha))
 
 
 def sorted_tree_items(entries, name_order):
@@ -969,7 +979,8 @@ class Tree(ShaFile):
         except ValueError as e:
             raise ObjectFormatException(e)
         # TODO: list comprehension is for efficiency in the common (small)
-        # case; if memory efficiency in the large case is a concern, use a genexp.
+        # case; if memory efficiency in the large case is a concern, use a
+        # genexp.
         self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
 
     def check(self):
@@ -1069,7 +1080,8 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
         offset = -offset
     else:
         sign = '+'
-    return ('%c%02d%02d' % (sign, offset / 3600, (offset / 60) % 60)).encode('ascii')
+    return ('%c%02d%02d' %
+            (sign, offset / 3600, (offset / 60) % 60)).encode('ascii')
 
 
 def parse_commit(chunks):
@@ -1102,7 +1114,8 @@ def parse_commit(chunks):
         elif field == _COMMITTER_HEADER:
             committer, timetext, timezonetext = value.rsplit(b' ', 2)
             commit_time = int(timetext)
-            commit_info = (committer, commit_time, parse_timezone(timezonetext))
+            commit_info = (
+                    committer, commit_time, parse_timezone(timezonetext))
         elif field == _ENCODING_HEADER:
             encoding = value
         elif field == _MERGETAG_HEADER:
@@ -1148,12 +1161,12 @@ class Commit(ShaFile):
 
     def _deserialize(self, chunks):
         (self._tree, self._parents, author_info, commit_info, self._encoding,
-                self._mergetag, self._gpgsig, self._message, self._extra) = (
+         self._mergetag, self._gpgsig, self._message, self._extra) = (
                         parse_commit(chunks))
-        (self._author, self._author_time, (self._author_timezone,
-             self._author_timezone_neg_utc)) = author_info
-        (self._committer, self._commit_time, (self._commit_timezone,
-             self._commit_timezone_neg_utc)) = commit_info
+        (self._author, self._author_time,
+         (self._author_timezone, self._author_timezone_neg_utc)) = author_info
+        (self._committer, self._commit_time,
+         (self._commit_timezone, self._commit_timezone_neg_utc)) = commit_info
 
     def check(self):
         """Check this object for internal consistency.
@@ -1193,16 +1206,19 @@ class Commit(ShaFile):
 
     def _serialize(self):
         chunks = []
-        tree_bytes = self._tree.id if isinstance(self._tree, Tree) else self._tree
+        tree_bytes = (
+                self._tree.id if isinstance(self._tree, Tree) else self._tree)
         chunks.append(git_line(_TREE_HEADER, tree_bytes))
         for p in self._parents:
             chunks.append(git_line(_PARENT_HEADER, p))
         chunks.append(git_line(
-            _AUTHOR_HEADER, self._author, str(self._author_time).encode('ascii'),
-            format_timezone(self._author_timezone,
-                            self._author_timezone_neg_utc)))
+            _AUTHOR_HEADER, self._author,
+            str(self._author_time).encode('ascii'),
+            format_timezone(
+                    self._author_timezone, self._author_timezone_neg_utc)))
         chunks.append(git_line(
-            _COMMITTER_HEADER, self._committer, str(self._commit_time).encode('ascii'),
+            _COMMITTER_HEADER, self._committer,
+            str(self._commit_time).encode('ascii'),
             format_timezone(self._commit_timezone,
                             self._commit_timezone_neg_utc)))
         if self.encoding:
@@ -1251,28 +1267,35 @@ class Commit(ShaFile):
         """Return extra settings of this commit."""
         return self._extra
 
-    extra = property(_get_extra,
+    extra = property(
+        _get_extra,
         doc="Extra header fields not understood (presumably added in a "
             "newer version of git). Kept verbatim so the object can "
             "be correctly reserialized. For private commit metadata, use "
             "pseudo-headers in Commit.message, rather than this field.")
 
-    author = serializable_property("author",
+    author = serializable_property(
+        "author",
         "The name of the author of the commit")
 
-    committer = serializable_property("committer",
+    committer = serializable_property(
+        "committer",
         "The name of the committer of the commit")
 
     message = serializable_property(
         "message", "The commit message")
 
-    commit_time = serializable_property("commit_time",
-        "The timestamp of the commit. As the number of seconds since the epoch.")
+    commit_time = serializable_property(
+        "commit_time",
+        "The timestamp of the commit. As the number of seconds since the "
+        "epoch.")
 
-    commit_timezone = serializable_property("commit_timezone",
+    commit_timezone = serializable_property(
+        "commit_timezone",
         "The zone the commit time is in")
 
-    author_time = serializable_property("author_time",
+    author_time = serializable_property(
+        "author_time",
         "The timestamp the commit was written. As the number of "
         "seconds since the epoch.")
 

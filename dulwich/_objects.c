@@ -22,10 +22,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#if (PY_VERSION_HEX < 0x02050000)
-typedef int Py_ssize_t;
-#endif
-
 #if PY_MAJOR_VERSION >= 3
 #define PyInt_Check(obj) 0
 #define PyInt_CheckExact(obj) 0
@@ -65,7 +61,8 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 {
 	char *text, *start, *end;
-	int len, namelen, strict;
+	int len, strict;
+	size_t namelen;
 	PyObject *ret, *item, *name, *sha, *py_strict = NULL;
 	static char *kwlist[] = {"text", "strict", NULL};
 
@@ -147,7 +144,8 @@ int cmp_tree_item(const void *_a, const void *_b)
 {
 	const struct tree_item *a = _a, *b = _b;
 	const char *remain_a, *remain_b;
-	int ret, common;
+	int ret;
+	size_t common;
 	if (strlen(a->name) > strlen(b->name)) {
 		common = strlen(b->name);
 		remain_a = a->name + common;
@@ -175,9 +173,9 @@ int cmp_tree_item_name_order(const void *_a, const void *_b) {
 static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 {
 	struct tree_item *qsort_entries = NULL;
-	int name_order, num_entries, n = 0, i;
+	int name_order, n = 0, i;
 	PyObject *entries, *py_name_order, *ret, *key, *value, *py_mode, *py_sha;
-	Py_ssize_t pos = 0;
+	Py_ssize_t pos = 0, num_entries;
 	int (*cmp)(const void *, const void *);
 
 	if (!PyArg_ParseTuple(args, "OO", &entries, &py_name_order))

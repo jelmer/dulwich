@@ -90,8 +90,8 @@ def url_prefix(mat):
 
     :param mat: A regex match object.
     :returns: The URL prefix, defined as the text before the match in the
-        original string. Normalized to start with one leading slash and end with
-        zero.
+        original string. Normalized to start with one leading slash and end
+        with zero.
     """
     return '/' + mat.string[:mat.start()].strip('/')
 
@@ -182,11 +182,13 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden('Unsupported service')
             return
         req.nocache()
-        write = req.respond(HTTP_OK, 'application/x-%s-advertisement' % service)
+        write = req.respond(
+            HTTP_OK, 'application/x-%s-advertisement' % service)
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
                               http_req=req, advertise_refs=True)
-        handler.proto.write_pkt_line(b'# service=' + service.encode('ascii') + b'\n')
+        handler.proto.write_pkt_line(
+            b'# service=' + service.encode('ascii') + b'\n')
         handler.proto.write_pkt_line(None)
         handler.handle()
     else:
@@ -323,9 +325,12 @@ class HTTPGitApplication(object):
       ('GET', re.compile('/objects/info/alternates$')): get_text_file,
       ('GET', re.compile('/objects/info/http-alternates$')): get_text_file,
       ('GET', re.compile('/objects/info/packs$')): get_info_packs,
-      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')): get_loose_object,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')): get_pack_file,
-      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')): get_idx_file,
+      ('GET', re.compile('/objects/([0-9a-f]{2})/([0-9a-f]{38})$')):
+      get_loose_object,
+      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.pack$')):
+      get_pack_file,
+      ('GET', re.compile('/objects/pack/pack-([0-9a-f]{40})\\.idx$')):
+      get_idx_file,
 
       ('POST', re.compile('/git-upload-pack$')): handle_service_request,
       ('POST', re.compile('/git-receive-pack$')): handle_service_request,
@@ -385,7 +390,8 @@ class GunzipFilter(object):
                 shutil.copyfileobj(environ['wsgi.input'], wsgi_input)
                 wsgi_input.seek(0)
 
-            environ['wsgi.input'] = gzip.GzipFile(filename=None, fileobj=wsgi_input, mode='r')
+            environ['wsgi.input'] = gzip.GzipFile(
+                filename=None, fileobj=wsgi_input, mode='r')
             del environ['HTTP_CONTENT_ENCODING']
             if 'CONTENT_LENGTH' in environ:
                 del environ['CONTENT_LENGTH']
@@ -456,7 +462,7 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
         """Handle a single HTTP request"""
 
         self.raw_requestline = self.rfile.readline()
-        if not self.parse_request(): # An error code has been sent, just exit
+        if not self.parse_request():  # An error code has been sent, just exit
             return
 
         handler = ServerHandlerLogger(
@@ -470,7 +476,9 @@ class WSGIServerLogger(WSGIServer):
 
     def handle_error(self, request, client_address):
         """Handle an error. """
-        logger.exception('Exception happened during processing of request from %s' % str(client_address))
+        logger.exception(
+            'Exception happened during processing of request from %s' %
+            str(client_address))
 
 
 def main(argv=sys.argv):

@@ -124,8 +124,10 @@ def write_cache_entry(f, entry):
     (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
     write_cache_time(f, ctime)
     write_cache_time(f, mtime)
-    flags = len(name) | (flags &~ 0x0fff)
-    f.write(struct.pack(b'>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF, mode, uid, gid, size, hex_to_sha(sha), flags))
+    flags = len(name) | (flags & ~0x0fff)
+    f.write(struct.pack(
+            b'>LLLLLL20sH', dev & 0xFFFFFFFF, ino & 0xFFFFFFFF,
+            mode, uid, gid, size, hex_to_sha(sha), flags))
     f.write(name)
     real_size = ((f.tell() - beginoffset + 8) & ~7)
     f.write(b'\0' * ((beginoffset + real_size) - f.tell()))
@@ -243,7 +245,8 @@ class Index(object):
     def __getitem__(self, name):
         """Retrieve entry by relative path.
 
-        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
+        :return: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha,
+            flags)
         """
         return self._byname[name]
 
@@ -292,13 +295,14 @@ class Index(object):
         :param object_store: Object store to use for retrieving tree contents
         :param tree: SHA1 of the root tree
         :param want_unchanged: Whether unchanged files should be reported
-        :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
+        :return: Iterator over tuples with (oldpath, newpath), (oldmode,
+            newmode), (oldsha, newsha)
         """
         def lookup_entry(path):
             entry = self[path]
             return entry.sha, entry.mode
-        for (name, mode, sha) in changes_from_tree(self._byname.keys(),
-                lookup_entry, object_store, tree,
+        for (name, mode, sha) in changes_from_tree(
+                self._byname.keys(), lookup_entry, object_store, tree,
                 want_unchanged=want_unchanged):
             yield (name, mode, sha)
 
@@ -363,7 +367,7 @@ def commit_index(object_store, index):
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
-        want_unchanged=False):
+                      want_unchanged=False):
     """Find the differences between the contents of a tree and
     a working copy.
 
@@ -435,6 +439,12 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
         # FIXME: This will fail on Windows. What should we do instead?
         if oldstat:
             os.unlink(target_path)
+        if sys.platform == 'win32' and sys.version_info[0] == 3:
+            # os.readlink on Python3 on Windows requires a unicode string.
+            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
+            tree_encoding = sys.getfilesystemencoding()
+            contents = contents.decode(tree_encoding)
+            target_path = target_path.decode(tree_encoding)
         os.symlink(contents, target_path)
     else:
         if oldstat is not None and oldstat.st_size == len(contents):
@@ -489,8 +499,8 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     :param object_store: Non-empty object store holding tree contents
     :param honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
-    :param validate_path_element: Function to validate path elements to check out;
-        default just refuses .git and .. directories.
+    :param validate_path_element: Function to validate path elements to check
+        out; default just refuses .git and .. directories.
 
     :note:: existing index is wiped and contents are not merged
         in a working dir. Suitable only for fresh clones.
@@ -516,8 +526,8 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             # TODO(jelmer): record and return submodule paths
         else:
             obj = object_store[entry.sha]
-            st = build_file_from_blob(obj, entry.mode, full_path,
-                honor_filemode=honor_filemode)
+            st = build_file_from_blob(
+                obj, entry.mode, full_path, honor_filemode=honor_filemode)
         # Add file to index
         if not honor_filemode or S_ISGITLINK(entry.mode):
             # we can not use tuple slicing to build a new tuple,
@@ -545,7 +555,14 @@ def blob_from_path_and_stat(fs_path, st):
         with open(fs_path, 'rb') as f:
             blob.data = f.read()
     else:
-        blob.data = os.readlink(fs_path)
+        if sys.platform == 'win32' and sys.version_info[0] == 3:
+            # os.readlink on Python3 on Windows requires a unicode string.
+            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
+            tree_encoding = sys.getfilesystemencoding()
+            fs_path = fs_path.decode(tree_encoding)
+            blob.data = os.readlink(fs_path).encode(tree_encoding)
+        else:
+            blob.data = os.readlink(fs_path)
     return blob
 
 
@@ -562,7 +579,6 @@ def get_unstaged_changes(index, root_path):
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
-        # TODO(jelmer): handle S_ISGITLINK(entry.mode) here
         try:
             blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
         except OSError as e:
@@ -574,8 +590,19 @@ def get_unstaged_changes(index, root_path):
         except IOError as e:
             if e.errno != errno.EISDIR:
                 raise
-            # The file was changed to a directory, so consider it removed.
-            yield tree_path
+            # This is actually a directory
+            if os.path.exists(os.path.join(tree_path, '.git')):
+                # Submodule
+                from dulwich.errors import NotGitRepository
+                from dulwich.repo import Repo
+                try:
+                    if entry.sha != Repo(tree_path).head():
+                        yield tree_path
+                except NotGitRepository:
+                    yield tree_path
+            else:
+                # The file was changed to a directory, so consider it removed.
+                yield tree_path
         else:
             if blob.id != entry.sha:
                 yield tree_path

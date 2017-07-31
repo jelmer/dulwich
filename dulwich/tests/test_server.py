@@ -152,7 +152,8 @@ class HandlerTestCase(TestCase):
         self.assertSucceeds(set_caps, [b'cap2', b'ignoreme'])
 
     def test_has_capability(self):
-        self.assertRaises(GitProtocolError, self._handler.has_capability, b'cap')
+        self.assertRaises(GitProtocolError, self._handler.has_capability,
+                          b'cap')
         caps = self._handler.capabilities()
         self._handler.set_client_capabilities(caps)
         for cap in caps:
@@ -205,7 +206,7 @@ class UploadPackHandlerTestCase(TestCase):
         caps = list(self._handler.required_capabilities()) + [b'include-tag']
         self._handler.set_client_capabilities(caps)
         self.assertEqual({b'1234' * 10: ONE, b'5678' * 10: TWO},
-                          self._handler.get_tagged(refs, repo=self._repo))
+                         self._handler.get_tagged(refs, repo=self._repo))
 
         # non-include-tag case
         caps = self._handler.required_capabilities()
@@ -291,6 +292,7 @@ class TestUploadPackHandler(UploadPackHandler):
     def required_capabilities(self):
         return ()
 
+
 class ReceivePackHandlerTestCase(TestCase):
 
     def setUp(self):
@@ -319,8 +321,9 @@ class ProtocolGraphWalkerEmptyTestCase(TestCase):
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b'/': self._repo})
         self._walker = ProtocolGraphWalker(
-            TestUploadPackHandler(backend, [b'/', b'host=lolcats'], TestProto()),
-            self._repo.object_store, self._repo.get_peeled)
+                TestUploadPackHandler(backend, [b'/', b'host=lolcats'],
+                                      TestProto()),
+                self._repo.object_store, self._repo.get_peeled)
 
     def test_empty_repository(self):
         # The server should wait for a flush packet.
@@ -331,7 +334,6 @@ class ProtocolGraphWalkerEmptyTestCase(TestCase):
         self._walker.proto.set_output([None])
         self.assertEqual([], self._walker.determine_wants({}))
         self.assertEqual(None, self._walker.proto.get_received_line())
-
 
 
 class ProtocolGraphWalkerTestCase(TestCase):
@@ -352,8 +354,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._repo = MemoryRepo.init_bare(commits, {})
         backend = DictBackend({b'/': self._repo})
         self._walker = ProtocolGraphWalker(
-            TestUploadPackHandler(backend, [b'/', b'host=lolcats'], TestProto()),
-            self._repo.object_store, self._repo.get_peeled)
+                TestUploadPackHandler(backend, [b'/', b'host=lolcats'],
+                                      TestProto()),
+                self._repo.object_store, self._repo.get_peeled)
 
     def test_all_wants_satisfied_no_haves(self):
         self._walker.set_wants([ONE])
@@ -391,9 +394,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
     def test_split_proto_line(self):
         allowed = (b'want', b'done', None)
         self.assertEqual((b'want', ONE),
-                          _split_proto_line(b'want ' + ONE + b'\n', allowed))
+                         _split_proto_line(b'want ' + ONE + b'\n', allowed))
         self.assertEqual((b'want', TWO),
-                          _split_proto_line(b'want ' + TWO + b'\n', allowed))
+                         _split_proto_line(b'want ' + TWO + b'\n', allowed))
         self.assertRaises(GitProtocolError, _split_proto_line,
                           b'want xxxx\n', allowed)
         self.assertRaises(UnexpectedCommandError, _split_proto_line,
@@ -401,7 +404,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertRaises(GitProtocolError, _split_proto_line,
                           b'foo ' + FOUR + b'\n', allowed)
         self.assertRaises(GitProtocolError, _split_proto_line, b'bar', allowed)
-        self.assertEqual((b'done', None), _split_proto_line(b'done\n', allowed))
+        self.assertEqual((b'done', None),
+                         _split_proto_line(b'done\n', allowed))
         self.assertEqual((None, None), _split_proto_line(b'', allowed))
 
     def test_determine_wants(self):
@@ -427,16 +431,20 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.advertise_refs = False
 
         self._walker.proto.set_output([b'want ' + FOUR + b' multi_ack', None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(GitProtocolError, self._walker.determine_wants,
+                          heads)
 
         self._walker.proto.set_output([None])
         self.assertEqual([], self._walker.determine_wants(heads))
 
-        self._walker.proto.set_output([b'want ' + ONE + b' multi_ack', b'foo', None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self._walker.proto.set_output(
+                [b'want ' + ONE + b' multi_ack', b'foo', None])
+        self.assertRaises(GitProtocolError, self._walker.determine_wants,
+                          heads)
 
         self._walker.proto.set_output([b'want ' + FOUR + b' multi_ack', None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(GitProtocolError, self._walker.determine_wants,
+                          heads)
 
     def test_determine_wants_advertisement(self):
         self._walker.proto.set_output([None])
@@ -554,8 +562,8 @@ class TestProtocolGraphWalker(object):
             return
         # Whether or not PACK is sent after is determined by this, so
         # record this value.
-        self.pack_sent = self._impl.handle_done(self.done_required,
-            self.done_received)
+        self.pack_sent = self._impl.handle_done(
+                self.done_required, self.done_received)
         return self.pack_sent
 
     def notify_done(self):
@@ -1001,8 +1009,8 @@ class FileSystemBackendTests(TestCase):
             self.backend = FileSystemBackend()
 
     def test_nonexistant(self):
-        self.assertRaises(NotGitRepository,
-            self.backend.open_repository, "/does/not/exist/unless/foo")
+        self.assertRaises(NotGitRepository, self.backend.open_repository,
+                          "/does/not/exist/unless/foo")
 
     def test_absolute(self):
         repo = self.backend.open_repository(self.path)
@@ -1011,8 +1019,9 @@ class FileSystemBackendTests(TestCase):
             os.path.normcase(os.path.abspath(self.repo.path)))
 
     def test_child(self):
-        self.assertRaises(NotGitRepository,
-            self.backend.open_repository, os.path.join(self.path, "foo"))
+        self.assertRaises(
+                NotGitRepository,
+                self.backend.open_repository, os.path.join(self.path, "foo"))
 
     def test_bad_repo_path(self):
         backend = FileSystemBackend()
@@ -1027,8 +1036,9 @@ class DictBackendTests(TestCase):
     def test_nonexistant(self):
         repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b'/': repo})
-        self.assertRaises(NotGitRepository,
-            backend.open_repository, "/does/not/exist/unless/foo")
+        self.assertRaises(
+                NotGitRepository, backend.open_repository,
+                "/does/not/exist/unless/foo")
 
     def test_bad_repo_path(self):
         repo = MemoryRepo.init_bare([], {})
@@ -1046,19 +1056,22 @@ class ServeCommandTests(TestCase):
         self.backend = DictBackend({})
 
     def serve_command(self, handler_cls, args, inf, outf):
-        return serve_command(handler_cls, [b"test"] + args, backend=self.backend,
-            inf=inf, outf=outf)
+        return serve_command(
+                handler_cls, [b"test"] + args, backend=self.backend, inf=inf,
+                outf=outf)
 
     def test_receive_pack(self):
         commit = make_commit(id=ONE, parents=[], commit_time=111)
         self.backend.repos[b"/"] = MemoryRepo.init_bare(
             [commit], {b"refs/heads/master": commit.id})
         outf = BytesIO()
-        exitcode = self.serve_command(ReceivePackHandler, [b"/"], BytesIO(b"0000"), outf)
+        exitcode = self.serve_command(ReceivePackHandler, [b"/"],
+                                      BytesIO(b"0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual(2, len(outlines))
-        self.assertEqual(b"1111111111111111111111111111111111111111 refs/heads/master",
-            outlines[0][4:].split(b"\x00")[0])
+        self.assertEqual(
+                b"1111111111111111111111111111111111111111 refs/heads/master",
+                outlines[0][4:].split(b"\x00")[0])
         self.assertEqual(b"0000", outlines[-1])
         self.assertEqual(0, exitcode)
 
@@ -1076,7 +1089,8 @@ class UpdateServerInfoTests(TestCase):
         update_server_info(self.repo)
         with open(os.path.join(self.path, ".git", "info", "refs"), 'rb') as f:
             self.assertEqual(b'', f.read())
-        with open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'rb') as f:
+        p = os.path.join(self.path, ".git", "objects", "info", "packs")
+        with open(p, 'rb') as f:
             self.assertEqual(b'', f.read())
 
     def test_simple(self):
@@ -1087,5 +1101,6 @@ class UpdateServerInfoTests(TestCase):
         update_server_info(self.repo)
         with open(os.path.join(self.path, ".git", "info", "refs"), 'rb') as f:
             self.assertEqual(f.read(), commit_id + b'\trefs/heads/foo\n')
-        with open(os.path.join(self.path, ".git", "objects", "info", "packs"), 'rb') as f:
+        p = os.path.join(self.path, ".git", "objects", "info", "packs")
+        with open(p, 'rb') as f:
             self.assertEqual(f.read(), b'')

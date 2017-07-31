@@ -97,14 +97,15 @@ class GitClientTests(TestCase):
                                   self.rout.write)
 
     def test_caps(self):
-        agent_cap = ('agent=dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')
+        agent_cap = (
+            'agent=dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')
         self.assertEqual(set([b'multi_ack', b'side-band-64k', b'ofs-delta',
-                               b'thin-pack', b'multi_ack_detailed',
-                               agent_cap]),
-                          set(self.client._fetch_capabilities))
+                              b'thin-pack', b'multi_ack_detailed',
+                              agent_cap]),
+                         set(self.client._fetch_capabilities))
         self.assertEqual(set([b'ofs-delta', b'report-status', b'side-band-64k',
                               agent_cap]),
-                          set(self.client._send_capabilities))
+                         set(self.client._send_capabilities))
 
     def test_archive_ack(self):
         self.rin.write(
@@ -117,6 +118,7 @@ class GitClientTests(TestCase):
     def test_fetch_empty(self):
         self.rin.write(b'0000')
         self.rin.seek(0)
+
         def check_heads(heads):
             self.assertIs(heads, None)
             return []
@@ -125,11 +127,13 @@ class GitClientTests(TestCase):
 
     def test_fetch_pack_ignores_magic_ref(self):
         self.rin.write(
-            b'00000000000000000000000000000000000000000000 capabilities^{}\x00 multi_ack '
+            b'00000000000000000000000000000000000000000000 capabilities^{}'
+            b'\x00 multi_ack '
             b'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
             b'include-tag\n'
             b'0000')
         self.rin.seek(0)
+
         def check_heads(heads):
             self.assertEquals({}, heads)
             return []
@@ -157,7 +161,7 @@ class GitClientTests(TestCase):
                 b"ng refs/foo/bar pre-receive hook declined",
                 b'']
         for pkt in pkts:
-            if pkt ==  b'':
+            if pkt == b'':
                 self.rin.write(b"0000")
             else:
                 self.rin.write(("%04x" % (len(pkt)+4)).encode('ascii') + pkt)
@@ -193,7 +197,8 @@ class GitClientTests(TestCase):
 
         def determine_wants(refs):
             return {
-                b'refs/heads/master': b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
+                b'refs/heads/master':
+                    b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
         def generate_pack_contents(have, want):
@@ -266,7 +271,8 @@ class GitClientTests(TestCase):
             return {
                 b'refs/heads/blah12':
                 b'310ca9477129b8586fa2afc779c1f57cf64bba6c',
-                b'refs/heads/master': b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
+                b'refs/heads/master':
+                    b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
         def generate_pack_contents(have, want):
@@ -308,7 +314,8 @@ class GitClientTests(TestCase):
         def determine_wants(refs):
             return {
                 b'refs/heads/blah12': commit.id,
-                b'refs/heads/master': b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
+                b'refs/heads/master':
+                    b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
         def generate_pack_contents(have, want):
@@ -320,9 +327,11 @@ class GitClientTests(TestCase):
         self.assertIn(
             self.rout.getvalue(),
             [b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00report-status ofs-delta0000' + f.getvalue(),
+             b' refs/heads/blah12\x00report-status ofs-delta0000' +
+             f.getvalue(),
              b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00ofs-delta report-status0000' + f.getvalue()])
+             b' refs/heads/blah12\x00ofs-delta report-status0000' +
+             f.getvalue()])
 
     def test_send_pack_no_deleteref_delete_only(self):
         pkts = [b'310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'
@@ -545,7 +554,8 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual('/bar/baz', path)
 
     def test_ssh_homepath(self):
-        c, path = get_transport_and_path_from_url('git+ssh://foo.com/~/bar/baz')
+        c, path = get_transport_and_path_from_url(
+            'git+ssh://foo.com/~/bar/baz')
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual('foo.com', c.host)
         self.assertEqual(None, c.port)
@@ -561,21 +571,25 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual('/~/bar/baz', path)
 
     def test_ssh_host_relpath(self):
-        self.assertRaises(ValueError, get_transport_and_path_from_url,
+        self.assertRaises(
+            ValueError, get_transport_and_path_from_url,
             'foo.com:bar/baz')
 
     def test_ssh_user_host_relpath(self):
-        self.assertRaises(ValueError, get_transport_and_path_from_url,
+        self.assertRaises(
+            ValueError, get_transport_and_path_from_url,
             'user@foo.com:bar/baz')
 
     def test_local_path(self):
-        self.assertRaises(ValueError, get_transport_and_path_from_url,
+        self.assertRaises(
+            ValueError, get_transport_and_path_from_url,
             'foo.bar/baz')
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
-        self.assertRaises(ValueError, get_transport_and_path_from_url,
+        self.assertRaises(
+            ValueError, get_transport_and_path_from_url,
             'prospero://bar/baz')
 
     def test_http(self):
@@ -599,15 +613,13 @@ class TestSSHVendor(object):
         self.port = None
 
     def run_command(self, host, command, username=None, port=None):
-        if not isinstance(command, bytes):
-            raise TypeError(command)
-
         self.host = host
         self.command = command
         self.username = username
         self.port = port
 
-        class Subprocess: pass
+        class Subprocess:
+            pass
         setattr(Subprocess, 'read', lambda: None)
         setattr(Subprocess, 'write', lambda: None)
         setattr(Subprocess, 'close', lambda: None)
@@ -645,20 +657,22 @@ class SSHGitClientTests(TestCase):
         self.assertEqual('ssh://user@git.samba.org:2222/tmp/repo.git', url)
 
     def test_default_command(self):
-        self.assertEqual(b'git-upload-pack',
-                self.client._get_cmd_path(b'upload-pack'))
+        self.assertEqual(
+            b'git-upload-pack',
+            self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path(self):
         self.client.alternative_paths[b'upload-pack'] = (
             b'/usr/lib/git/git-upload-pack')
-        self.assertEqual(b'/usr/lib/git/git-upload-pack',
+        self.assertEqual(
+            b'/usr/lib/git/git-upload-pack',
             self.client._get_cmd_path(b'upload-pack'))
 
     def test_alternative_command_path_spaces(self):
         self.client.alternative_paths[b'upload-pack'] = (
             b'/usr/lib/git/git-upload-pack -ibla')
         self.assertEqual(b"/usr/lib/git/git-upload-pack -ibla",
-            self.client._get_cmd_path(b'upload-pack'))
+                         self.client._get_cmd_path(b'upload-pack'))
 
     def test_connect(self):
         server = self.server
@@ -670,11 +684,11 @@ class SSHGitClientTests(TestCase):
         client._connect(b"command", b"/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual(b"git-command '/path/to/repo'", server.command)
+        self.assertEqual("git-command '/path/to/repo'", server.command)
 
         client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual(b"git-relative-command '~/path/to/repo'",
-                          server.command)
+        self.assertEqual("git-relative-command '~/path/to/repo'",
+                         server.command)
 
 
 class ReportStatusParserTests(TestCase):
@@ -723,16 +737,19 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = {}
-        ret = c.fetch_pack(s.path, lambda heads: [], graph_walker=walker,
-            pack_data=out.write)
+        ret = c.fetch_pack(
+            s.path, lambda heads: [], graph_walker=walker, pack_data=out.write)
         self.assertEqual({
             b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
             b'refs/heads/master': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
             b'refs/tags/mytag': b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
-            b'refs/tags/mytag-packed': b'b0931cadc54336e78a1d980420e3268903b57a50'
+            b'refs/tags/mytag-packed':
+                b'b0931cadc54336e78a1d980420e3268903b57a50'
             }, ret)
-        self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
-            b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e", out.getvalue())
+        self.assertEqual(
+                b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
+                b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e",
+                out.getvalue())
 
     def test_fetch_pack_none(self):
         c = LocalGitClient()
@@ -740,11 +757,13 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = MemoryRepo().get_graph_walker()
-        c.fetch_pack(s.path,
+        c.fetch_pack(
+            s.path,
             lambda heads: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             graph_walker=walker, pack_data=out.write)
         # Hardcoding is not ideal, but we'll fix that some other day..
-        self.assertTrue(out.getvalue().startswith(b'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
+        self.assertTrue(out.getvalue().startswith(
+                b'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))
 
     def test_send_pack_without_changes(self):
         local = open_repo('a.git')
@@ -773,11 +792,11 @@ class LocalGitClientTests(TestCase):
         self.assertDictEqual(local.refs.as_dict(), refs)
 
     def send_and_verify(self, branch, local, target):
-        """Send a branch from local to remote repository and verify it worked."""
+        """Send branch from local to remote repository and verify it worked."""
         client = LocalGitClient()
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
-                                    lambda _: { ref_name: local.refs[ref_name] },
+                                    lambda _: {ref_name: local.refs[ref_name]},
                                     local.object_store.generate_pack_contents)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])
@@ -797,6 +816,14 @@ class HttpGitClientTests(TestCase):
         url = c.get_url(path)
         self.assertEqual('https://github.com/jelmer/dulwich', url)
 
+    def test_get_url_bytes_path(self):
+        base_url = 'https://github.com/jelmer/dulwich'
+        path_bytes = b'/jelmer/dulwich'
+        c = HttpGitClient(base_url)
+
+        url = c.get_url(path_bytes)
+        self.assertEqual('https://github.com/jelmer/dulwich', url)
+
     def test_get_url_with_username_and_passwd(self):
         base_url = 'https://github.com/jelmer/dulwich'
         path = '/jelmer/dulwich'
@@ -812,7 +839,8 @@ class HttpGitClientTests(TestCase):
         self.assertEqual('user', c._username)
         self.assertEqual('passwd', c._password)
         [pw_handler] = [
-            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+            h for h in c.opener.handlers
+            if getattr(h, 'passwd', None) is not None]
         self.assertEqual(
             ('user', 'passwd'),
             pw_handler.passwd.find_user_password(
@@ -825,7 +853,8 @@ class HttpGitClientTests(TestCase):
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
         pw_handler = [
-            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+            h for h in c.opener.handlers
+            if getattr(h, 'passwd', None) is not None]
         self.assertEqual(0, len(pw_handler))
 
     def test_from_parsedurl_on_url_with_quoted_credentials(self):
@@ -844,7 +873,8 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
         [pw_handler] = [
-            h for h in c.opener.handlers if getattr(h, 'passwd', None) is not None]
+            h for h in c.opener.handlers
+            if getattr(h, 'passwd', None) is not None]
         self.assertEqual(
             (original_username, original_password),
             pw_handler.passwd.find_user_password(
@@ -865,7 +895,7 @@ class TCPGitClientTests(TestCase):
         host = 'github.com'
         path = '/jelmer/dulwich'
         port = 9090
-        c = TCPGitClient(host, port=9090)
+        c = TCPGitClient(host, port=port)
 
         url = c.get_url(path)
         self.assertEqual('git://github.com:9090/jelmer/dulwich', url)

@@ -233,10 +233,12 @@ class CompatTestCase(TestCase):
 
         :param name: The name of the repository export file, relative to
             dulwich/tests/data/repos.
-        :returns: An initialized Repo object that lives in a temporary directory.
+        :returns: An initialized Repo object that lives in a temporary
+            directory.
         """
         path = import_repo_to_dir(name)
         repo = Repo(path)
+
         def cleanup():
             repo.close()
             rmtree_ro(os.path.dirname(path.rstrip(os.sep)))

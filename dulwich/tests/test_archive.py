@@ -21,7 +21,6 @@
 """Tests for archive support."""
 
 from io import BytesIO
-import sys
 import tarfile
 
 from dulwich.archive import tar_stream

@@ -42,12 +42,14 @@ import gevent
 from gevent import monkey
 monkey.patch_all()
 
-from dulwich import server
-from dulwich import repo
-from dulwich import index
-from dulwich import client
-from dulwich import objects
-from dulwich.contrib import swift
+from dulwich (  # noqa:E402
+    server,
+    repo,
+    index,
+    client,
+    objects,
+    )
+from dulwich.contrib import swift  # noqa:E402
 
 
 class DulwichServer():
@@ -202,7 +204,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         files = ('testfile', 'testfile2', 'dir/testfile3')
         i = 0
         for f in files:
-            file(os.path.join(self.temp_d, f), 'w').write("DATA %s" % i)
+            open(os.path.join(self.temp_d, f), 'w').write("DATA %s" % i)
             i += 1
         local_repo.stage(files)
         local_repo.do_commit('Test commit', 'fbo@localhost',
@@ -252,7 +254,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         files = ('testfile11', 'testfile22', 'test/testfile33')
         i = 0
         for f in files:
-            file(os.path.join(self.temp_d, f), 'w').write("DATA %s" % i)
+            open(os.path.join(self.temp_d, f), 'w').write("DATA %s" % i)
             i += 1
         local_repo.stage(files)
         local_repo.do_commit('Test commit', 'fbo@localhost',

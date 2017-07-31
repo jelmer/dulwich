@@ -264,15 +264,6 @@ moduleinit(void)
 	PyObject *m;
 	PyObject *errors_module;
 
-	errors_module = PyImport_ImportModule("dulwich.errors");
-	if (errors_module == NULL)
-		return NULL;
-
-	PyExc_ApplyDeltaError = PyObject_GetAttrString(errors_module, "ApplyDeltaError");
-	Py_DECREF(errors_module);
-	if (PyExc_ApplyDeltaError == NULL)
-		return NULL;
-
 #if PY_MAJOR_VERSION >= 3
 	static struct PyModuleDef moduledef = {
 	  PyModuleDef_HEAD_INIT,
@@ -285,6 +276,18 @@ moduleinit(void)
 	  NULL,            /* m_clear*/
 	  NULL,            /* m_free */
 	};
+#endif
+
+	errors_module = PyImport_ImportModule("dulwich.errors");
+	if (errors_module == NULL)
+		return NULL;
+
+	PyExc_ApplyDeltaError = PyObject_GetAttrString(errors_module, "ApplyDeltaError");
+	Py_DECREF(errors_module);
+	if (PyExc_ApplyDeltaError == NULL)
+		return NULL;
+
+#if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
 #else
 	m = Py_InitModule3("_pack", py_pack_methods, NULL);

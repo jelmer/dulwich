@@ -50,9 +50,9 @@ from dulwich.pack import (
     create_delta,
     )
 from dulwich.repo import Repo
-from dulwich.tests import (
-    SkipTest,
+from dulwich.tests import (  # noqa: F401
     skipIf,
+    SkipTest,
     )
 
 
@@ -92,7 +92,8 @@ def make_object(cls, **attrs):
     """Make an object for testing and assign some members.
 
     This method creates a new subclass to allow arbitrary attribute
-    reassignment, which is not otherwise possible with objects having __slots__.
+    reassignment, which is not otherwise possible with objects having
+    __slots__.
 
     :param attrs: dict of attributes to set on the new object.
     :return: A newly initialized object of type cls.
@@ -101,9 +102,9 @@ def make_object(cls, **attrs):
     class TestObject(cls):
         """Class that inherits from the given class, but without __slots__.
 
-        Note that classes with __slots__ can't have arbitrary attributes monkey-
-        patched in, so this is a class that is exactly the same only with a
-        __dict__ instead of __slots__.
+        Note that classes with __slots__ can't have arbitrary attributes
+        monkey-patched in, so this is a class that is exactly the same only
+        with a __dict__ instead of __slots__.
         """
         pass
     TestObject.__name__ = 'TestObject_' + cls.__name__
@@ -286,15 +287,15 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
 
     :param object_store: An ObjectStore to commit objects to.
     :param commit_spec: An iterable of iterables of ints defining the commit
-        graph. Each entry defines one commit, and entries must be in topological
-        order. The first element of each entry is a commit number, and the
-        remaining elements are its parents. The commit numbers are only
+        graph. Each entry defines one commit, and entries must be in
+        topological order. The first element of each entry is a commit number,
+        and the remaining elements are its parents. The commit numbers are only
         meaningful for the call to make_commits; since real commit objects are
         created, they will get created with real, opaque SHAs.
     :param trees: An optional dict of commit number -> tree spec for building
-        trees for commits. The tree spec is an iterable of (path, blob, mode) or
-        (path, blob) entries; if mode is omitted, it defaults to the normal file
-        mode (0100644).
+        trees for commits. The tree spec is an iterable of (path, blob, mode)
+        or (path, blob) entries; if mode is omitted, it defaults to the normal
+        file mode (0100644).
     :param attrs: A dict of commit number -> (dict of attribute -> value) for
         assigning additional values to the commits.
     :return: The list of commit objects created.

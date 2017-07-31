@@ -22,7 +22,6 @@
 
 """Git object store interfaces and implementation."""
 
-
 from io import BytesIO
 import errno
 from itertools import chain
@@ -30,6 +29,7 @@ import os
 import stat
 import sys
 import tempfile
+import time
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -74,8 +74,8 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.items()
-                if not sha in self and not ref.endswith(b"^{}") and
-                   not sha == ZERO_SHA]
+                if sha not in self and not ref.endswith(b"^{}") and
+                not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.
@@ -173,12 +173,14 @@ class BaseObjectStore(object):
         :param wants: Iterable over SHAs of objects to fetch.
         :param progress: Simple progress function that will be called with
             updated progress strings.
-        :param get_tagged: Function that returns a dict of pointed-to sha -> tag
-            sha for including tags.
-        :param get_parents: Optional function for getting the parents of a commit.
+        :param get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+        :param get_parents: Optional function for getting the parents of a
+            commit.
         :return: Iterator over (sha, path) pairs.
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged, get_parents=get_parents)
+        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged,
+                                     get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -210,8 +212,8 @@ class BaseObjectStore(object):
 
         :param sha: The object SHA to peel.
         :return: The fully-peeled SHA1 of a tag object, after peeling all
-            intermediate tags; if the original ref does not point to a tag, this
-            will equal the original SHA1.
+            intermediate tags; if the original ref does not point to a tag,
+            this will equal the original SHA1.
         """
         obj = self[sha]
         obj_class = object_class(obj.type_name)
@@ -227,7 +229,8 @@ class BaseObjectStore(object):
         :param heads: commits to start from
         :param common: commits to end at, or empty set to walk repository
             completely
-        :param get_parents: Optional function for getting the parents of a commit.
+        :param get_parents: Optional function for getting the parents of a
+            commit.
         :return: a tuple (A, B) where A - all commits reachable
             from heads but not present in common, B - common (shared) elements
             that are directly reachable from heads
@@ -338,7 +341,8 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = list(self.packs) + [self._iter_loose_objects()] + [self._iter_alternate_objects()]
+        iterables = (list(self.packs) + [self._iter_loose_objects()] +
+                     [self._iter_alternate_objects()])
         return chain(*iterables)
 
     def contains_loose(self, sha):
@@ -428,8 +432,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _read_alternate_paths(self):
         try:
-            f = GitFile(os.path.join(self.path, INFODIR, "alternates"),
-                    'rb')
+            f = GitFile(os.path.join(self.path, INFODIR, "alternates"), 'rb')
         except (OSError, IOError) as e:
             if e.errno == errno.ENOENT:
                 return
@@ -442,7 +445,8 @@ class DiskObjectStore(PackBasedObjectStore):
                 if os.path.isabs(l):
                     yield l.decode(sys.getfilesystemencoding())
                 else:
-                    yield os.path.join(self.path, l).decode(sys.getfilesystemencoding())
+                    yield os.path.join(self.path, l).decode(
+                        sys.getfilesystemencoding())
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
@@ -477,12 +481,13 @@ class DiskObjectStore(PackBasedObjectStore):
                 self.close()
                 return
             raise
-        self._pack_cache_time = os.stat(self.pack_dir).st_mtime
+        self._pack_cache_time = max(
+                os.stat(self.pack_dir).st_mtime, time.time())
         pack_files = set()
         for name in pack_dir_contents:
-            assert isinstance(name, basestring if sys.version_info[0] == 2 else str)
             if name.startswith("pack-") and name.endswith(".pack"):
-                # verify that idx exists first (otherwise the pack was not yet fully written)
+                # verify that idx exists first (otherwise the pack was not yet
+                # fully written)
                 idx_name = os.path.splitext(name)[0] + ".idx"
                 if idx_name in pack_dir_contents:
                     pack_name = name[:-len(".pack")]
@@ -498,7 +503,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _pack_cache_stale(self):
         try:
-            return os.stat(self.pack_dir).st_mtime > self._pack_cache_time
+            return os.stat(self.pack_dir).st_mtime >= self._pack_cache_time
         except OSError as e:
             if e.errno == errno.ENOENT:
                 return True
@@ -599,12 +604,12 @@ class DiskObjectStore(PackBasedObjectStore):
     def add_thin_pack(self, read_all, read_some):
         """Add a new thin pack to this object store.
 
-        Thin packs are packs that contain deltas with parents that exist outside
-        the pack. They should never be placed in the object store directly, and
-        always indexed and completed as they are copied.
+        Thin packs are packs that contain deltas with parents that exist
+        outside the pack. They should never be placed in the object store
+        directly, and always indexed and completed as they are copied.
 
-        :param read_all: Read function that blocks until the number of requested
-            bytes are read.
+        :param read_all: Read function that blocks until the number of
+            requested bytes are read.
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         :return: A Pack object pointing at the now-completed thin pack in the
@@ -645,6 +650,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
+
         def commit():
             os.fsync(fd)
             f.close()
@@ -653,6 +659,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 os.remove(path)
                 return None
+
         def abort():
             f.close()
             os.remove(path)
@@ -671,7 +678,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if e.errno != errno.EEXIST:
                 raise
         if os.path.exists(path):
-            return # Already there, no need to write again
+            return  # Already there, no need to write again
         with GitFile(path, 'wb') as f:
             f.write(obj.as_legacy_object())
 
@@ -759,11 +766,13 @@ class MemoryObjectStore(BaseObjectStore):
             call when the pack is finished.
         """
         f = BytesIO()
+
         def commit():
             p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
             f.close()
             for obj in PackInflater.for_pack_data(p, self.get_raw):
                 self.add_object(obj)
+
         def abort():
             pass
         return f, commit, abort
@@ -794,19 +803,20 @@ class MemoryObjectStore(BaseObjectStore):
     def add_thin_pack(self, read_all, read_some):
         """Add a new thin pack to this object store.
 
-        Thin packs are packs that contain deltas with parents that exist outside
-        the pack. Because this object store doesn't support packs, we extract
-        and add the individual objects.
+        Thin packs are packs that contain deltas with parents that exist
+        outside the pack. Because this object store doesn't support packs, we
+        extract and add the individual objects.
 
-        :param read_all: Read function that blocks until the number of requested
-            bytes are read.
+        :param read_all: Read function that blocks until the number of
+            requested bytes are read.
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         """
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(read_all, read_some, f,
+                                      delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except:
@@ -1054,7 +1064,8 @@ class MissingObjectFinder(object):
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress(("counting objects: %d\r" % len(self.sha_done)).encode('ascii'))
+        self.progress(("counting objects: %d\r" %
+                       len(self.sha_done)).encode('ascii'))
         return (sha, name)
 
     __next__ = next
@@ -1109,7 +1120,8 @@ class ObjectStoreGraphWalker(object):
             ret = self.heads.pop()
             ps = self.get_parents(ret)
             self.parents[ret] = ps
-            self.heads.update([p for p in ps if not p in self.parents])
+            self.heads.update(
+                [p for p in ps if p not in self.parents])
             return ret
         return None
 

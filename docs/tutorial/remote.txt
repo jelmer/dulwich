@@ -28,7 +28,7 @@ The smart server protocol can be accessed over either plain TCP (git://),
 SSH (git+ssh://) or tunneled over HTTP (http://).
 
 Dulwich provides support for accessing remote repositories in
-``dulwich.client``. To create a new client, you can either construct
+``dulwich.client``. To create a new client, you can construct
 one manually::
 
    >>> from dulwich.client import TCPGitClient

@@ -1,6 +1,7 @@
 PYTHON = python
 PYFLAKES = pyflakes
 PEP8 = pep8
+FLAKE8 ?= flake8
 SETUP = $(PYTHON) setup.py
 PYDOCTOR ?= pydoctor
 TESTRUNNER ?= unittest
@@ -56,6 +57,9 @@ flakes:
 
 pep8:
 	$(PEP8) dulwich
+
+style:
+	$(FLAKE8) --exclude=build,.git,build-pypy,.tox
 
 before-push: check
 	git diff origin/master | $(PEP8) --diff

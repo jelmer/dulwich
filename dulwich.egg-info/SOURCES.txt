@@ -47,6 +47,7 @@ dulwich/fastexport.py
 dulwich/file.py
 dulwich/greenthreads.py
 dulwich/hooks.py
+dulwich/ignore.py
 dulwich/index.py
 dulwich/log_utils.py
 dulwich/lru_cache.py
@@ -86,6 +87,7 @@ dulwich/tests/test_file.py
 dulwich/tests/test_grafts.py
 dulwich/tests/test_greenthreads.py
 dulwich/tests/test_hooks.py
+dulwich/tests/test_ignore.py
 dulwich/tests/test_index.py
 dulwich/tests/test_lru_cache.py
 dulwich/tests/test_missing_obj_finder.py

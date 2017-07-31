@@ -34,6 +34,7 @@ import paramiko
 import paramiko.client
 import threading
 
+
 class _ParamikoWrapper(object):
     STDERR_READ_N = 2048  # 2k
 
@@ -116,8 +117,6 @@ class ParamikoSSHVendor(object):
 
     def run_command(self, host, command, username=None, port=None,
                     progress_stderr=None):
-        if not isinstance(command, bytes):
-            raise TypeError(command)
         # Paramiko needs an explicit port. None is not valid
         if port is None:
             port = 22

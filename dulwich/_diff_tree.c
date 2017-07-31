@@ -25,12 +25,8 @@
 typedef unsigned short mode_t;
 #endif
 
-#if (PY_VERSION_HEX < 0x02050000)
-typedef int Py_ssize_t;
-#endif
-
-#if (PY_VERSION_HEX < 0x02060000)
-#define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
+#if PY_MAJOR_VERSION < 3
+typedef long Py_hash_t;
 #endif
 
 #if PY_MAJOR_VERSION >= 3
@@ -300,11 +296,11 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 	return result;
 }
 
-static int add_hash(PyObject *get, PyObject *set, char *str, int n)
+static Py_hash_t add_hash(PyObject *get, PyObject *set, char *str, int n)
 {
 	PyObject *str_obj = NULL, *hash_obj = NULL, *value = NULL,
 		*set_value = NULL;
-	long hash;
+	Py_hash_t hash;
 
 	/* It would be nice to hash without copying str into a PyString, but that
 	 * isn't exposed by the API. */

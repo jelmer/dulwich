@@ -53,6 +53,14 @@ except ImportError:
 import os
 import sys
 
+from hashlib import sha1
+from os import (
+    SEEK_CUR,
+    SEEK_END,
+    )
+from struct import unpack_from
+import zlib
+
 try:
     import mmap
 except ImportError:
@@ -64,23 +72,15 @@ else:
 if sys.platform == 'Plan9':
     has_mmap = False
 
-from hashlib import sha1
-from os import (
-    SEEK_CUR,
-    SEEK_END,
-    )
-from struct import unpack_from
-import zlib
-
-from dulwich.errors import (
+from dulwich.errors import (  # noqa: E402
     ApplyDeltaError,
     ChecksumMismatch,
     )
-from dulwich.file import GitFile
-from dulwich.lru_cache import (
+from dulwich.file import GitFile  # noqa: E402
+from dulwich.lru_cache import (  # noqa: E402
     LRUSizeCache,
     )
-from dulwich.objects import (
+from dulwich.objects import (  # noqa: E402
     ShaFile,
     hex_to_sha,
     sha_to_hex,
@@ -309,8 +309,8 @@ def load_pack_index_file(path, f):
     if contents[:4] == b'\377tOc':
         version = struct.unpack(b'>L', contents[4:8])[0]
         if version == 2:
-            return PackIndex2(path, file=f, contents=contents,
-                size=size)
+            return PackIndex2(
+                path, file=f, contents=contents, size=size)
         else:
             raise KeyError('Unknown pack index format %d' % version)
     else:
@@ -451,7 +451,8 @@ class FilePackIndex(PackIndex):
     is the end of the group that shares the same starting byte. Subtract one
     from the starting byte and index again to find the start of the group.
     The values are sorted by sha id within the group, so do the math to find
-    the start and end offset and then bisect in to find if the value is present.
+    the start and end offset and then bisect in to find if the value is
+    present.
     """
 
     def __init__(self, filename, file=None, contents=None, size=None):
@@ -475,7 +476,7 @@ class FilePackIndex(PackIndex):
     def __eq__(self, other):
         # Quick optimization:
         if (isinstance(other, FilePackIndex) and
-            self._fan_out_table != other._fan_out_table):
+                self._fan_out_table != other._fan_out_table):
             return False
 
         return super(FilePackIndex, self).__eq__(other)
@@ -506,7 +507,8 @@ class FilePackIndex(PackIndex):
         raise NotImplementedError(self._unpack_offset)
 
     def _unpack_crc32_checksum(self, i):
-        """Unpack the crc32 checksum for the i-th object from the index file."""
+        """Unpack the crc32 checksum for the ith object from the index file.
+        """
         raise NotImplementedError(self._unpack_crc32_checksum)
 
     def _itersha(self):
@@ -525,7 +527,8 @@ class FilePackIndex(PackIndex):
     def _read_fan_out_table(self, start_offset):
         ret = []
         for i in range(0x100):
-            fanout_entry = self._contents[start_offset+i*4:start_offset+(i+1)*4]
+            fanout_entry = self._contents[
+                start_offset+i*4:start_offset+(i+1)*4]
             ret.append(struct.unpack('>L', fanout_entry)[0])
         return ret
 
@@ -616,8 +619,8 @@ class PackIndex2(FilePackIndex):
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
         self._pack_offset_table_offset = (self._crc32_table_offset +
                                           4 * len(self))
-        self._pack_offset_largetable_offset = (self._pack_offset_table_offset +
-                                          4 * len(self))
+        self._pack_offset_largetable_offset = (
+            self._pack_offset_table_offset + 4 * len(self))
 
     def _unpack_entry(self, i):
         return (self._unpack_name(i), self._unpack_offset(i),
@@ -631,21 +634,23 @@ class PackIndex2(FilePackIndex):
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from('>L', self._contents, offset)[0]
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset&(2**31-1)) * 8
+            offset = (
+                self._pack_offset_largetable_offset +
+                (offset & (2 ** 31 - 1)) * 8)
             offset = unpack_from('>Q', self._contents, offset)[0]
         return offset
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from('>L', self._contents,
-                          self._crc32_table_offset + i * 4)[0]
+                           self._crc32_table_offset + i * 4)[0]
 
 
 def read_pack_header(read):
     """Read the header of a pack file.
 
     :param read: Read function
-    :return: Tuple of (pack version, number of objects). If no data is available
-        to read, returns (None, None).
+    :return: Tuple of (pack version, number of objects). If no data is
+        available to read, returns (None, None).
     """
     header = read(12)
     if not header:
@@ -779,7 +784,8 @@ class PackStreamReader(object):
         else:
             to_pop = max(n + tn - 20, 0)
             to_add = n
-        self.sha.update(bytes(bytearray([self._trailer.popleft() for _ in range(to_pop)])))
+        self.sha.update(
+            bytes(bytearray([self._trailer.popleft() for _ in range(to_pop)])))
         self._trailer.extend(data[-to_add:])
 
         # hash everything but the trailer
@@ -880,8 +886,8 @@ class PackStreamCopier(PackStreamReader):
     def __init__(self, read_all, read_some, outfile, delta_iter=None):
         """Initialize the copier.
 
-        :param read_all: Read function that blocks until the number of requested
-            bytes are read.
+        :param read_all: Read function that blocks until the number of
+            requested bytes are read.
         :param read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         :param outfile: File-like object to write output through.
@@ -924,7 +930,7 @@ def obj_sha(type, chunks):
     return sha.digest()
 
 
-def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1<<16):
+def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
     """Hash a portion of a file into a new SHA.
 
     :param f: A file-like object to read from that supports seek().
@@ -981,8 +987,8 @@ class PackData(object):
     def __init__(self, filename, file=None, size=None):
         """Create a PackData object representing the pack in the given filename.
 
-        The file must exist and stay readable until the object is disposed of. It
-        must also stay the same size. It will be mapped whenever needed.
+        The file must exist and stay readable until the object is disposed of.
+        It must also stay the same size. It will be mapped whenever needed.
 
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
@@ -995,8 +1001,8 @@ class PackData(object):
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
-        self._offset_cache = LRUSizeCache(1024*1024*20,
-            compute_size=_compute_object_size)
+        self._offset_cache = LRUSizeCache(
+            1024*1024*20, compute_size=_compute_object_size)
         self.pack = None
 
     @property
@@ -1076,12 +1082,6 @@ class PackData(object):
             if base_type == OFS_DELTA:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages
-                assert (
-                    isinstance(base_offset, int)
-                    or isinstance(base_offset, long))
-                assert (
-                    isinstance(delta_offset, int)
-                    or isinstance(base_offset, long))
                 base_offset = base_offset - delta_offset
                 base_type, base_obj = self.get_object_at(base_offset)
                 assert isinstance(base_type, int)
@@ -1116,7 +1116,8 @@ class PackData(object):
                 progress(i, self._num_objects)
             yield (offset, unpacked.pack_type_num, unpacked._obj(),
                    unpacked.crc32)
-            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
+            # Back up over unused data.
+            self._file.seek(-len(unused), SEEK_CUR)
 
     def _iter_unpacked(self):
         # TODO(dborowitz): Merge this with iterobjects, if we can change its
@@ -1132,7 +1133,8 @@ class PackData(object):
               self._file.read, compute_crc32=False)
             unpacked.offset = offset
             yield unpacked
-            self._file.seek(-len(unused), SEEK_CUR)  # Back up over unused data.
+            # Back up over unused data.
+            self._file.seek(-len(unused), SEEK_CUR)
 
     def iterentries(self, progress=None):
         """Yield entries summarizing the contents of this pack.
@@ -1305,9 +1307,9 @@ class DeltaChainIterator(object):
             try:
                 type_num, chunks = self._resolve_ext_ref(base_sha)
             except KeyError:
-                # Not an external ref, but may depend on one. Either it will get
-                # popped via a _follow_chain call, or we will raise an error
-                # below.
+                # Not an external ref, but may depend on one. Either it will
+                # get popped via a _follow_chain call, or we will raise an
+                # error below.
                 continue
             self._ext_refs.append(base_sha)
             self._pending_ref.pop(base_sha)
@@ -1373,7 +1375,7 @@ class PackInflater(DeltaChainIterator):
 
 
 class SHA1Reader(object):
-    """Wrapper around a file-like object that remembers the SHA1 of its data."""
+    """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
         self.f = f
@@ -1397,7 +1399,7 @@ class SHA1Reader(object):
 
 
 class SHA1Writer(object):
-    """Wrapper around a file-like object that remembers the SHA1 of its data."""
+    """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
         self.f = f
@@ -1492,8 +1494,8 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
     :return: Tuple with checksum of pack file and index file
     """
     with GitFile(filename + '.pack', 'wb') as f:
-        entries, data_sum = write_pack_objects(f, objects,
-            delta_window_size=delta_window_size, deltify=deltify)
+        entries, data_sum = write_pack_objects(
+            f, objects, delta_window_size=delta_window_size, deltify=deltify)
     entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
@@ -1634,6 +1636,7 @@ def _delta_encode_size(size):
 # 24-bit lengths in copy operations, but we always make version 2 packs.
 _MAX_COPY_LEN = 0xffff
 
+
 def _encode_copy_operation(start, length):
     scratch = []
     op = 0x80
@@ -1664,7 +1667,7 @@ def create_delta(base_buf, target_buf):
     seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
-        #if opcode == 'replace' or opcode == 'delete':
+        # if opcode == 'replace' or opcode == 'delete':
         #    pass
         if opcode == 'equal':
             # If they are equal, unpacker will use data from base_buf
@@ -1704,6 +1707,7 @@ def apply_delta(src_buf, delta):
     out = []
     index = 0
     delta_length = len(delta)
+
     def get_delta_header_size(delta, index):
         size = 0
         i = 0
@@ -1738,8 +1742,8 @@ def apply_delta(src_buf, delta):
             if cp_size == 0:
                 cp_size = 0x10000
             if (cp_off + cp_size < cp_size or
-                cp_off + cp_size > src_size or
-                cp_size > dest_size):
+                    cp_off + cp_size > src_size or
+                    cp_size > dest_size):
                 break
             out.append(src_buf[cp_off:cp_off+cp_size])
         elif cmd != 0:
@@ -1945,8 +1949,8 @@ class Pack(object):
     def keep(self, msg=None):
         """Add a .keep file for the pack, preventing git from garbage collecting it.
 
-        :param msg: A message written inside the .keep file; can be used later to
-                    determine whether or not a .keep file is obsolete.
+        :param msg: A message written inside the .keep file; can be used later
+            to determine whether or not a .keep file is obsolete.
         :return: The path of the .keep file, as a string.
         """
         keepfile_name = '%s.keep' % self._basename
@@ -1958,6 +1962,6 @@ class Pack(object):
 
 
 try:
-    from dulwich._pack import apply_delta, bisect_find_sha
+    from dulwich._pack import apply_delta, bisect_find_sha  # noqa: F811
 except ImportError:
     pass

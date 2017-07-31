@@ -39,6 +39,21 @@ def parse_object(repo, objectish):
     return repo[objectish]
 
 
+def parse_tree(repo, treeish):
+    """Parse a string referring to a tree.
+
+    :param repo: A `Repo` object
+    :param treeish: A string referring to a tree
+    :return: A git object
+    :raise KeyError: If the object can not be found
+    """
+    treeish = to_bytes(treeish)
+    o = repo[treeish]
+    if o.type_name == b"commit":
+        return repo[o.tree]
+    return o
+
+
 def parse_ref(container, refspec):
     """Parse a string referring to a reference.
 
@@ -93,7 +108,7 @@ def parse_reftuple(lh_container, rh_container, refspec):
             rh = parse_ref(rh_container, rh)
         except KeyError:
             # TODO: check force?
-            if not b"/" in rh:
+            if b"/" not in rh:
                 rh = b"refs/heads/" + rh
     return (lh, rh, force)
 
@@ -157,7 +172,7 @@ def parse_commit(repo, committish):
     :raise ValueError: If the range can not be parsed
     """
     committish = to_bytes(committish)
-    return repo[committish] # For now..
+    return repo[committish]  # For now..
 
 
 # TODO: parse_path_in_tree(), which handles e.g. v1.0:Documentation

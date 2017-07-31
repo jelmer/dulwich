@@ -37,7 +37,6 @@ from dulwich.errors import (
     MissingCommitError,
     )
 from dulwich.objects import (
-    Commit,
     Tag,
     )
 
@@ -67,8 +66,8 @@ class WalkEntry(object):
             use to filter changes. Must be a directory name. Must be
             a full, valid, path reference (no partial names or wildcards).
         :return: For commits with up to one parent, a list of TreeChange
-            objects; if the commit has no parents, these will be relative to the
-            empty tree. For merge commits, a list of lists of TreeChange
+            objects; if the commit has no parents, these will be relative to
+            the empty tree. For merge commits, a list of lists of TreeChange
             objects; see dulwich.diff.tree_changes_for_merge.
         """
         cached = self._changes.get(path_prefix)
@@ -88,7 +87,8 @@ class WalkEntry(object):
                     parent = self._store[subtree_sha]
             else:
                 changes_func = tree_changes_for_merge
-                parent = [self._store[p].tree for p in self._get_parents(commit)]
+                parent = [
+                        self._store[p].tree for p in self._get_parents(commit)]
                 if path_prefix:
                     parent_trees = [self._store[p] for p in parent]
                     parent = []
@@ -192,20 +192,20 @@ class _CommitTimeQueue(object):
                                     for _, c in self._pq):
                     _, n = self._pq[0]
                     if self._last and n.commit_time >= self._last.commit_time:
-                        # If the next commit is newer than the last one, we need
-                        # to keep walking in case its parents (which we may not
-                        # have seen yet) are excluded. This gives the excluded
-                        # set a chance to "catch up" while the commit is still
-                        # in the Walker's output queue.
+                        # If the next commit is newer than the last one, we
+                        # need to keep walking in case its parents (which we
+                        # may not have seen yet) are excluded. This gives the
+                        # excluded set a chance to "catch up" while the commit
+                        # is still in the Walker's output queue.
                         reset_extra_commits = True
                     else:
                         reset_extra_commits = False
 
             if (self._min_time is not None and
-                commit.commit_time < self._min_time):
+                    commit.commit_time < self._min_time):
                 # We want to stop walking at min_time, but commits at the
-                # boundary may be out of order with respect to their parents. So
-                # we walk _MAX_EXTRA_COMMITS more commits once we hit this
+                # boundary may be out of order with respect to their parents.
+                # So we walk _MAX_EXTRA_COMMITS more commits once we hit this
                 # boundary.
                 reset_extra_commits = False
 
@@ -245,8 +245,8 @@ class Walker(object):
             ancestors.
         :param exclude: Iterable of SHAs of commits to exclude along with their
             ancestors, overriding includes.
-        :param order: ORDER_* constant specifying the order of results. Anything
-            other than ORDER_DATE may result in O(n) memory usage.
+        :param order: ORDER_* constant specifying the order of results.
+            Anything other than ORDER_DATE may result in O(n) memory usage.
         :param reverse: If True, reverse the order of output, requiring O(n)
             memory.
         :param max_entries: The maximum number of entries to yield, or None for
@@ -320,8 +320,8 @@ class Walker(object):
         """Determine if a walk entry should be returned..
 
         :param entry: The WalkEntry to consider.
-        :return: True if the WalkEntry should be returned by this walk, or False
-            otherwise (e.g. if it doesn't match any requested paths).
+        :return: True if the WalkEntry should be returned by this walk, or
+            False otherwise (e.g. if it doesn't match any requested paths).
         """
         commit = entry.commit
         if self.since is not None and commit.commit_time < self.since:
@@ -368,8 +368,8 @@ class Walker(object):
 
         :param results: An iterator of WalkEntry objects, in the order returned
             from the queue_cls.
-        :return: An iterator or list of WalkEntry objects, in the order required
-            by the Walker.
+        :return: An iterator or list of WalkEntry objects, in the order
+            required by the Walker.
         """
         if self.order == ORDER_TOPO:
             results = _topo_reorder(results, self.get_parents)

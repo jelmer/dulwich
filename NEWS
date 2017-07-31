@@ -1,3 +1,10 @@
+0.18.1	2017-07-31
+
+ BUG FIXES
+
+  * Fix syntax error in dulwich.contrib.test_swift_smoke.
+    (Jelmer Vernooĳ)
+
 0.18.0	2017-07-31
 
  BUG FIXES

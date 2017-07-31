@@ -42,7 +42,7 @@ import gevent
 from gevent import monkey
 monkey.patch_all()
 
-from dulwich (  # noqa:E402
+from dulwich import (  # noqa:E402
     server,
     repo,
     index,

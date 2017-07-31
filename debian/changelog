@@ -1,3 +1,10 @@
+dulwich (0.18.1-2) unstable; urgency=medium
+
+  * Make build-dependency on git optional, since it's not available on
+    all platforms and only used for the testsuite.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 22:21:12 +0000
+
 dulwich (0.18.1-1) unstable; urgency=medium
 
   * New upstream release.

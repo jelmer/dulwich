@@ -1,6 +1,7 @@
 dulwich (0.18.2-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Only build-depend on git on platforms where it is available.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 01 Aug 2017 23:19:14 +0000
 

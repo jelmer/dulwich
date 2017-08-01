@@ -126,7 +126,7 @@ def make_commit(**attrs):
     :param attrs: dict of attributes to overwrite from the default values.
     :return: A newly initialized Commit object.
     """
-    default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
+    default_time = 1262304000  # 2010-01-01 00:00:00
     all_attrs = {'author': b'Test Author <test@nodomain.com>',
                  'author_time': default_time,
                  'author_timezone': 0,

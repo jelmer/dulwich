@@ -1,4 +1,4 @@
-dulwich (0.18.2-1) UNRELEASED; urgency=medium
+dulwich (0.18.2-1) unstable; urgency=medium
 
   * New upstream release.
   * Only build-depend on git on platforms where it is available.

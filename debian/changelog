@@ -1,0 +1,495 @@
+dulwich (0.18.2-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Only build-depend on git on platforms where it is available.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 01 Aug 2017 23:19:14 +0000
+
+dulwich (0.18.1-2) unstable; urgency=medium
+
+  * Make build-dependency on git optional, since it's not available on
+    all platforms and only used for the testsuite.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 22:21:12 +0000
+
+dulwich (0.18.1-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 09:36:13 +0000
+
+dulwich (0.18.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Refresh upstream signing key.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Jul 2017 01:15:59 +0000
+
+dulwich (0.17.3-2) unstable; urgency=medium
+
+  * Stop shipping pypy C extensions in python-dulwich. Closes: #868542
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 24 Jul 2017 23:51:07 +0000
+
+dulwich (0.17.3-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump standards version to 4.0.0 (no changes).
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 18 Jun 2017 19:39:41 +0000
+
+dulwich (0.17.1-1) experimental; urgency=medium
+
+  * Remove -dbg packages and migrate to -dbgsym packages.
+  * New upstream version.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 01 Mar 2017 20:37:39 +0000
+
+dulwich (0.16.3-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop upstream applied patch 'older-git'.
+  * Update homepage to www.dulwich.io.
+  * Drop (now unnecessary) workaround for #799485.
+  * Add autopkgtest for python3 testsuite.
+  * Disable pypy-dulwich build on architectures where pypy is not
+    available (hurd-any, m68k, sh4, x32).
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 08 Jan 2017 02:12:51 +0000
+
+dulwich (0.16.1-2) unstable; urgency=low
+
+  * Add patch older-git: skip worktree list test against older versions
+    of git.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 26 Dec 2016 11:24:46 +0000
+
+dulwich (0.16.1-1) unstable; urgency=medium
+
+  * New upstream release.
+   + Fixes Python3 compatibility of `dulwich.contrib.release_robot`.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 25 Dec 2016 13:42:56 +0000
+
+dulwich (0.16.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 24 Dec 2016 23:51:50 +0000
+
+dulwich (0.15.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update debian/copyright to reflect that dulwich is now licensed under
+    dual GPLv2+/Apache-2.
+  * Extend lintian overrides for testdata.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 09 Oct 2016 12:54:38 +0000
+
+dulwich (0.14.1-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 05 Jul 2016 23:04:21 +0000
+
+dulwich (0.14.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop patch 01_refs_unicode: applied upstream.
+  * Bump standards version to 3.9.8 (no changes).
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 03 Jul 2016 19:17:25 +0000
+
+dulwich (0.13.0-1) unstable; urgency=medium
+
+  [ Jelmer Vernooij ]
+  * New upstream release.
+   + Add Build-Depends: python3-fastimport.
+   + Add Recommends: python3-fastimport to python3-dulwich.
+
+  [ Ondřej Nový ]
+  * Fixed VCS URL (https)
+
+  [ Jelmer Vernooĳ ]
+  * Bump standards version to 3.9.7.
+  * Add some lintian overrides for git files that are used for testing.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 24 Apr 2016 15:34:54 +0000
+
+dulwich (0.12.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Drop patch 02_cgit_c: applied upstream.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 13 Dec 2015 15:34:54 +0000
+
+dulwich (0.11.2-1) unstable; urgency=medium
+
+  [ Jelmer Vernooij ]
+  * New upstream release.
+  * Add patch 02_cgit_c: support building under different locale.
+    Closes: #799076
+
+  [ Scott Kitterman ]
+  * Team upload.
+  * Fix python3 depends. Closes: #799185
+  * Remove obsolete provides.
+
+  [ Jelmer Vernooij ]
+  * Force CFLAGS to -I/usr/lib/pypy, to work around bug #799485.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 19 Sep 2015 00:19:21 +0000
+
+dulwich (0.11.1-1) unstable; urgency=medium
+
+  * New upstream release.
+   + Fixes formatting in assertion. Closes: #789546
+   + Fixes FTBFS on some architectures. Closes: #798565
+  * debian/copyright: Fix license header to be unique.
+  * debian/watch: Fix watch URL to use pypi redirector service.
+  * Add 01_refs_unicode: Support running on platforms that can't encode
+    certain characters.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 13 Sep 2015 18:15:59 +0000
+
+dulwich (0.10.1+git20150525-1) experimental; urgency=medium
+
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 25 May 2015 12:18:15 +0000
+
+dulwich (0.10.1+git20150425-1) experimental; urgency=medium
+
+  * New upstream snapshot.
+  * Add Python3 binary package.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 26 Apr 2015 13:08:13 +0000
+
+dulwich (0.10.1-1) unstable; urgency=medium
+
+  * New upstream release.
+   + Drop 02_unpure_pypy: applied upstream.
+   + Fixes CVE-2015-0838: buffer overflow in C implementation of pack
+     apply_delta(). Closes: #780958
+   + Fixes CVE-2014-9706: does not prevent to write files in commits with
+     invalid paths to working tree. Closes: #780989
+  * Update Vcs-Git, Vcs-Browser and Maintainer fields to reflect the
+    dulwich package is now maintained by the Debian Python Modules
+    packaging team.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 07 Feb 2015 17:44:28 +0100
+
+dulwich (0.9.8-2) unstable; urgency=medium
+
+  * Add pypy package.
+  * Add patch 02_unpure_pypy to enable C bindings in pypy.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 Nov 2014 17:56:46 +0000
+
+dulwich (0.9.8-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Bump standards version to 3.9.6 (no changes).
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 Nov 2014 17:32:33 +0000
+
+dulwich (0.9.7-2) unstable; urgency=medium
+
+  * Require at least Python 2.7. Closes: #753519
+  * Add branch to Vcs-Git header.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 02 Jul 2014 21:20:48 +0200
+
+dulwich (0.9.7-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Use canonical URL in Vcs-Git.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 25 Apr 2014 02:29:17 +0200
+
+dulwich (0.9.6-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Allow output to stderr in autopktest.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 23 Apr 2014 01:41:04 +0200
+
+dulwich (0.9.5-2) unstable; urgency=medium
+
+  * Don't write progress to stderr during testsuite run, as autopkgtest
+    assumes that indicates failure.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 25 Feb 2014 02:02:42 +0000
+
+dulwich (0.9.5-1) unstable; urgency=medium
+
+  * Add upstream PGP signing key.
+  * Enable autopkgtest.
+  * New upstream release.
+  * Bump standards version to 3.9.5 (no changes).
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 29 Jan 2014 00:30:26 +0000
+
+dulwich (0.9.4-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 30 Nov 2013 16:21:10 +0000
+
+dulwich (0.9.1-1) unstable; urgency=low
+
+  * Bump standards version to 3.9.4.
+  * Add Vcs-Browser header.
+  * Add changelog entry for 0.9.1.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 22 Sep 2013 21:31:40 +0100
+
+dulwich (0.9.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 31 May 2013 00:58:42 +0100
+
+dulwich (0.8.6-1) experimental; urgency=low
+
+  * New upstream release.
+   + Drop 01_less_strict_index_tests: applied upstream.
+  * Migrate to Git; replace Vcs-Bzr header with Vcs-Git header.
+  * Remove duplicate field copyright in copyright file.
+  * Use build flags from dpkg-buildflags.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 09 Nov 2012 23:44:30 +0100
+
+dulwich (0.8.5-2) unstable; urgency=low
+
+  * Make index tests a bit less strict, fixes FTBFS on some systems.
+    Closes: #666328
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 02 Apr 2012 12:49:38 +0200
+
+dulwich (0.8.5-1) unstable; urgency=low
+
+  * Install upstream changelog.
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 29 Mar 2012 15:38:35 +0200
+
+dulwich (0.8.4-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump standards version to 3.9.3 (no changes).
+  * Fix header of copyright file format.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 28 Mar 2012 14:23:05 +0200
+
+dulwich (0.8.3-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 21 Jan 2012 22:24:12 +0100
+
+dulwich (0.8.2-1) unstable; urgency=low
+
+  * Fix Vcs URL.
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 18 Dec 2011 21:35:03 +0100
+
+dulwich (0.8.1-1) unstable; urgency=low
+
+  * New upstream release.
+   + Now provides access to remote http(s) smart server repositories.
+     Closes: #636331
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 31 Oct 2011 13:07:39 -0700
+
+dulwich (0.8.0-1) unstable; urgency=low
+
+  * New upstream release.
+   + Adds support for IPv6 to git:// client. Closes: #631490
+   + Fixes use of ~username in git:// URLs. Closes: #631483
+  * Bump standards version to 3.9.2 (no changes).
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 07 Aug 2011 15:03:44 +0200
+
+dulwich (0.7.1-3) unstable; urgency=low
+
+  * Bump standards version to 3.9.2 (no changes).
+  * Add python-dulwich-dbg package.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 18 Jun 2011 17:04:43 +0200
+
+dulwich (0.7.1-2) unstable; urgency=low
+
+  * Explicitly make debhelper use dh_python2. Closes: #626414
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 11 May 2011 22:29:56 +0200
+
+dulwich (0.7.1-1) unstable; urgency=low
+
+  * Add missing Breaks: field to python-dulwich.
+  * Switch to debhelper 7, drop cdbs.
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 12 Apr 2011 22:18:19 +0200
+
+dulwich (0.7.0-2) unstable; urgency=low
+
+  * Switch to dh_python2.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 07 Mar 2011 03:19:45 +0100
+
+dulwich (0.7.0-1) unstable; urgency=low
+
+  * New upstream release.
+   + Changes default test runner from nose to testtools.
+  * Drop Pure- from the description.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 21 Jan 2011 19:38:13 +0100
+
+dulwich (0.6.2+bzr702-1) unstable; urgency=low
+
+  * Recommend python-fastimport. Closes: #600392
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 06 Nov 2010 22:56:35 +0100
+
+dulwich (0.6.2-1) unstable; urgency=low
+
+  * Build older versions of Python modules as well. Closes: #593751
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 16 Oct 2010 19:49:12 +0200
+
+dulwich (0.6.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump standards version to 3.9.1.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 30 Jul 2010 13:22:11 +0200
+
+dulwich (0.6.0-5) unstable; urgency=low
+
+  * Support building on older platforms that still have C Git as git-
+    core.
+  * Avoid use of versioned shebang lines. Thanks Stefano Rivera. Closes:
+    #587362
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 20 Jul 2010 16:27:44 +0200
+
+dulwich (0.6.0-4) unstable; urgency=low
+
+  * Switch to python-support. Closes: #583114
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 30 May 2010 20:12:30 +0200
+
+dulwich (0.6.0-3) unstable; urgency=low
+
+  * Clean up properly in clean target. Closes: #583130
+  * Rebuild with proper version of pycentral. Closes: #583114
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Fri, 28 May 2010 03:17:32 +0200
+
+dulwich (0.6.0-2) unstable; urgency=high
+
+  * Add dependency on git, required for the testsuite. Closes: #582740
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 24 May 2010 16:13:32 +0200
+
+dulwich (0.6.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 22 May 2010 23:06:20 +0200
+
+dulwich (0.5.0-1) unstable; urgency=low
+
+  * New upstream release.
+  * Switch to dpkg-source 3.0 (quilt) format.
+  * Bump standards version to 3.8.4.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 03 Mar 2010 16:43:41 +0100
+
+dulwich (0.4.1-1) unstable; urgency=low
+
+  * New upstream release.
+   + Supports time-less tags. Closes: #543240
+  * Rebuilt against newer version of python-central. Closes: #551893
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 03 Jan 2010 16:40:19 +0100
+
+dulwich (0.4.0-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump standards version to 3.8.3.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 07 Oct 2009 12:08:10 +0200
+
+dulwich (0.3.3-1) unstable; urgency=low
+
+  * Run the testsuite during build.
+  * New upstream release.
+  * Avoid hard dependency on python2.4. Thanks doko for the help
+    debugging this. Closes: #534758.
+  * Bump standards version to 3.8.2.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 23 Jul 2009 22:35:11 +0200
+
+dulwich (0.3.2-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Wed, 20 May 2009 19:04:00 +0200
+
+dulwich (0.3.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 10 May 2009 16:18:27 +0200
+
+dulwich (0.2.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 30 Apr 2009 14:45:32 +0200
+
+dulwich (0.1.1+bzr220-1) unstable; urgency=low
+
+  * Update package description to mention optimized modules. (Closes: #521839)
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Mon, 06 Apr 2009 15:48:41 +0200
+
+dulwich (0.1.1+bzr214-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * Bump standards version.
+  * Fix long description. (Closes: #521003)
+  * Switch to Arch: any, since the package now contains compiled
+    optimized versions of some modules.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 29 Mar 2009 16:14:39 +0200
+
+dulwich (0.1.1~bzr153-1) unstable; urgency=low
+
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sun, 08 Mar 2009 07:02:00 +0100
+
+dulwich (0.1.0+bzr138-2) unstable; urgency=low
+
+  * Add watch file.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Tue, 27 Jan 2009 04:26:55 +0100
+
+dulwich (0.1.0+bzr138-1) unstable; urgency=low
+
+  * New upstream snapshot.
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Sat, 24 Jan 2009 22:58:17 +0100
+
+dulwich (0.1.0-1) unstable; urgency=low
+
+  * Initial release. (Closes: #512897)
+
+ -- Jelmer Vernooij <jelmer@debian.org>  Thu, 01 Jan 2009 04:15:38 +0100

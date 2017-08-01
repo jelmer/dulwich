@@ -1,0 +1,26 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: dulwich
+Upstream-Contact: Jelmer Vernooĳ <jelmer@jelmer.uk>
+Source: https://www.dulwich.io/
+Debianized-By: Jelmer Vernooĳ <jelmer@debian.org>
+Debianized-Date: Tue, 13 Jan 2009 16:56:47 +0100
+
+License: GPL-2+
+ On Debian systems the full text of the GNU General Public License version 2
+ can be found in the `/usr/share/common-licenses/GPL-2' file.
+
+License: Apache-2
+ On Debian systems the full text of the Apache License version 2
+ can be found in the `/usr/share/common-licenses/Apache-2.0' file.
+
+Files: *
+Copyright:
+  2007 James Westby <jw+debian@jameswestby.net>
+  2007-2015 Jelmer Vernooĳ <jelmer@jelmer.uk>
+  2008 John Carr <john.carr@unrouted.co.uk>
+  2010 Google, Inc. <dborowitz@google.com>
+License: GPL-2+ or Apache-2
+
+Files: debian/*
+Copyright: 2009-2015 Jelmer Vernooĳ <jelmer@debian.org>
+License: GPL-2+ or Apache-2

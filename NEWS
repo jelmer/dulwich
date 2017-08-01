@@ -1,4 +1,9 @@
-0.18.2	UNRELEASED
+0.18.2	2017-08-01
+
+ TEST FIXES
+
+  * Use constant timestamp so tests pass in all timezones, not just BST.
+    (Jelmer Vernooĳ)
 
 0.18.1	2017-07-31
 

@@ -385,7 +385,7 @@ class ShowTests(PorcelainTestCase):
         self.repo.object_store.add_objects([(a, None), (ta, None), (ca, None)])
         outstream = StringIO()
         porcelain.show(self.repo.path, objects=[ca.id], outstream=outstream)
-        self.assertEqual(outstream.getvalue(), """\
+        self.assertMultiLineEqual(outstream.getvalue(), """\
 --------------------------------------------------
 commit: 344da06c1bb85901270b3e8875c988a027ec087d
 Author: Test Author <test@nodomain.com>
@@ -410,29 +410,29 @@ index 0000000..ea5c7bf 100644
         ca = make_commit(tree=ta.id)
         b = Blob.from_string(b"The Bar\n")
         tb = Tree()
-        tb.add(b"somename", 0o100644, a.id)
-        cb = make_commit(tree=tb.id)
+        tb.add(b"somename", 0o100644, b.id)
+        cb = make_commit(tree=tb.id, parents=[ca.id])
         self.repo.object_store.add_objects(
             [(a, None), (b, None), (ta, None), (tb, None),
              (ca, None), (cb, None)])
         outstream = StringIO()
         porcelain.show(self.repo.path, objects=[cb.id], outstream=outstream)
-        self.assertEqual(outstream.getvalue(), """\
+        self.assertMultiLineEqual(outstream.getvalue(), """\
 --------------------------------------------------
-commit: 344da06c1bb85901270b3e8875c988a027ec087d
+commit: 2c6b6c9cb72c130956657e1fdae58e5b103744fa
 Author: Test Author <test@nodomain.com>
 Committer: Test Committer <test@nodomain.com>
 Date:   Fri Jan 01 2010 00:00:00 +0000
 
 Test message.
 
-diff --git /dev/null b/somename
-new mode 100644
-index 0000000..ea5c7bf 100644
---- /dev/null
+diff --git a/somename b/somename
+index ea5c7bf..fd38bcb 100644
+--- a/somename
 +++ b/somename
-@@ -1,0 +1,1 @@
-+The Foo
+@@ -1,1 +1,1 @@
+-The Foo
++The Bar
 """)
 
 

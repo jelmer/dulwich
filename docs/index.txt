@@ -1,0 +1,36 @@
+.. _index:
+
+======================================
+dulwich - Python implementation of Git
+======================================
+
+Overview
+========
+
+.. include:: ../README.md
+
+Documentation
+=============
+
+
+.. toctree::
+    :maxdepth: 2
+
+    performance
+    protocol
+
+    tutorial/index
+
+
+Changelog
+=========
+
+.. include:: ../NEWS
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+

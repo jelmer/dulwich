@@ -1,0 +1,99 @@
+blob
+mark :1
+data 13
+foo contents
+
+reset refs/heads/master
+commit refs/heads/master
+mark :2
+author Dave Borowitz <dborowitz@google.com> 1265755064 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755064 -0800
+data 16
+initial checkin
+M 100644 :1 foo
+
+blob
+mark :3
+data 13
+baz contents
+
+blob
+mark :4
+data 21
+updated foo contents
+
+commit refs/heads/master
+mark :5
+author Dave Borowitz <dborowitz@google.com> 1265755140 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755140 -0800
+data 15
+master checkin
+from :2
+M 100644 :3 baz
+M 100644 :4 foo
+
+blob
+mark :6
+data 24
+updated foo contents v2
+
+commit refs/heads/master
+mark :7
+author Dave Borowitz <dborowitz@google.com> 1265755287 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755287 -0800
+data 17
+master checkin 2
+from :5
+M 100644 :6 foo
+
+blob
+mark :8
+data 24
+updated foo contents v3
+
+commit refs/heads/master
+mark :9
+author Dave Borowitz <dborowitz@google.com> 1265755295 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755295 -0800
+data 17
+master checkin 3
+from :7
+M 100644 :8 foo
+
+blob
+mark :10
+data 22
+branched bar contents
+
+blob
+mark :11
+data 22
+branched foo contents
+
+commit refs/heads/branch
+mark :12
+author Dave Borowitz <dborowitz@google.com> 1265755111 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755111 -0800
+data 15
+branch checkin
+from :2
+M 100644 :10 bar
+M 100644 :11 foo
+
+blob
+mark :13
+data 25
+branched bar contents v2
+
+commit refs/heads/branch
+mark :14
+author Dave Borowitz <dborowitz@google.com> 1265755319 -0800
+committer Dave Borowitz <dborowitz@google.com> 1265755319 -0800
+data 17
+branch checkin 2
+from :12
+M 100644 :13 bar
+
+reset refs/heads/master
+from :9
+

@@ -25,6 +25,7 @@ on.
 """
 
 from difflib import SequenceMatcher
+import difflib
 import email.parser
 import time
 
@@ -84,37 +85,6 @@ def get_summary(commit):
     :return: Summary string
     """
     return commit.message.splitlines()[0].replace(" ", "-")
-
-
-def unified_diff(a, b, fromfile, tofile, n=3):
-    """difflib.unified_diff that doesn't write any dates or trailing spaces.
-
-    Based on the same function in Python2.6.5-rc2's difflib.py
-    """
-    started = False
-    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
-        if not started:
-            yield b'--- ' + fromfile + b'\n'
-            yield b'+++ ' + tofile + b'\n'
-            started = True
-        i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        sizes = "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
-        yield sizes.encode('ascii')
-        for tag, i1, i2, j1, j2 in group:
-            if tag == 'equal':
-                for line in a[i1:i2]:
-                    yield b' ' + line
-                continue
-            if tag == 'replace' or tag == 'delete':
-                for line in a[i1:i2]:
-                    if not line[-1:] == b'\n':
-                        line += b'\n\\ No newline at end of file\n'
-                    yield b'-' + line
-            if tag == 'replace' or tag == 'insert':
-                for line in b[j1:j2]:
-                    if not line[-1:] == b'\n':
-                        line += b'\n\\ No newline at end of file\n'
-                    yield b'+' + line
 
 
 def is_binary(content):
@@ -178,7 +148,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         f.write(b"Binary files " + old_path + b" and " + new_path +
                 b" differ\n")
     else:
-        f.writelines(unified_diff(lines(old_content), lines(new_content),
+        f.writelines(difflib.unified_diff(lines(old_content), lines(new_content),
                      old_path, new_path))
 
 
@@ -232,7 +202,7 @@ def write_blob_diff(f, old_file, new_file):
         (getattr(old_blob, "id", None), getattr(new_blob, "id", None))))
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
-    f.writelines(unified_diff(old_contents, new_contents,
+    f.writelines(difflib.unified_diff(old_contents, new_contents,
                  old_path, new_path))
 
 

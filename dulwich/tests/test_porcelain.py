@@ -399,7 +399,7 @@ new mode 100644
 index 0000000..ea5c7bf 100644
 --- /dev/null
 +++ b/somename
-@@ -0,0 +1,1 @@
+@@ -0,0 +1 @@
 +The Foo
 """)
 

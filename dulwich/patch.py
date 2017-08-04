@@ -24,7 +24,6 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-from difflib import SequenceMatcher
 import difflib
 import email.parser
 import time

@@ -327,7 +327,7 @@ class DiffTests(TestCase):
             b'index 0000000..76d4bb8 644',
             b'--- /dev/null',
             b'+++ b/added.txt',
-            b'@@ -0,0 +1,1 @@',
+            b'@@ -0,0 +1 @@',
             b'+add',
             b'diff --git a/changed.txt b/changed.txt',
             b'index bf84e48..1be2436 644',
@@ -342,7 +342,7 @@ class DiffTests(TestCase):
             b'index 2c3f0b3..0000000',
             b'--- a/removed.txt',
             b'+++ /dev/null',
-            b'@@ -1,1 +0,0 @@',
+            b'@@ -1 +0,0 @@',
             b'-removed',
             ], f.getvalue().splitlines())
 
@@ -451,10 +451,8 @@ class DiffTests(TestCase):
             b' \x00\x00\x00',
             b'-IHDR\x00\x00\x01\xd5\x00\x00\x00'
             b'\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
-            b'\\ No newline at end of file',
             b'+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f'
             b'\x08\x03\x00\x00\x00\x98\xd3\xb3',
-            b'\\ No newline at end of file'
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob(self):

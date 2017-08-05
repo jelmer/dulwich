@@ -1,5 +1,10 @@
 0.18.3	UNRELEASED
 
+ BUG FIXES
+
+  * Read config during porcelain operations that involve remotes.
+    (Jelmer Vernooĳ, #545)
+
 0.18.2	2017-08-01
 
  TEST FIXES

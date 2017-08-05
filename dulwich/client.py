@@ -833,7 +833,7 @@ class SubprocessGitClient(TraditionalGitClient):
 class LocalGitClient(GitClient):
     """Git Client that just uses a local Repo."""
 
-    def __init__(self, thin_packs=True, report_activity=None):
+    def __init__(self, thin_packs=True, report_activity=None, config=None):
         """Create a new LocalGitClient instance.
 
         :param thin_packs: Whether or not thin packs should be retrieved
@@ -1019,7 +1019,8 @@ get_ssh_vendor = SubprocessSSHVendor
 
 class SSHGitClient(TraditionalGitClient):
 
-    def __init__(self, host, port=None, username=None, vendor=None, **kwargs):
+    def __init__(self, host, port=None, username=None, vendor=None,
+                 config=None, **kwargs):
         self.host = host
         self.port = port
         self.username = username

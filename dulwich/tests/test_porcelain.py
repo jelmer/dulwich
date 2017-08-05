@@ -399,7 +399,7 @@ new mode 100644
 index 0000000..ea5c7bf 100644
 --- /dev/null
 +++ b/somename
-@@ -1,0 +1,1 @@
+@@ -0,0 +1 @@
 +The Foo
 """)
 
@@ -430,7 +430,7 @@ diff --git a/somename b/somename
 index ea5c7bf..fd38bcb 100644
 --- a/somename
 +++ b/somename
-@@ -1,1 +1,1 @@
+@@ -1 +1 @@
 -The Foo
 +The Bar
 """)

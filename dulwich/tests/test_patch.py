@@ -281,7 +281,7 @@ class DiffTests(TestCase):
              b'index 0000000..a116b51 644',
              b'--- /dev/null',
              b'+++ b/bar.txt',
-             b'@@ -1,0 +1,2 @@',
+             b'@@ -0,0 +1,2 @@',
              b'+new',
              b'+same'
             ], f.getvalue().splitlines())
@@ -297,7 +297,7 @@ class DiffTests(TestCase):
             b'index a116b51..0000000',
             b'--- a/bar.txt',
             b'+++ /dev/null',
-            b'@@ -1,2 +1,0 @@',
+            b'@@ -1,2 +0,0 @@',
             b'-new',
             b'-same'
             ], f.getvalue().splitlines())
@@ -327,7 +327,7 @@ class DiffTests(TestCase):
             b'index 0000000..76d4bb8 644',
             b'--- /dev/null',
             b'+++ b/added.txt',
-            b'@@ -1,0 +1,1 @@',
+            b'@@ -0,0 +1 @@',
             b'+add',
             b'diff --git a/changed.txt b/changed.txt',
             b'index bf84e48..1be2436 644',
@@ -342,7 +342,7 @@ class DiffTests(TestCase):
             b'index 2c3f0b3..0000000',
             b'--- a/removed.txt',
             b'+++ /dev/null',
-            b'@@ -1,1 +1,0 @@',
+            b'@@ -1 +0,0 @@',
             b'-removed',
             ], f.getvalue().splitlines())
 
@@ -362,7 +362,7 @@ class DiffTests(TestCase):
             b'index 06d0bdd..cc97564 160000',
             b'--- a/asubmodule',
             b'+++ b/asubmodule',
-            b'@@ -1,1 +1,1 @@',
+            b'@@ -1 +1 @@',
             b'-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
             b'+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
             ], f.getvalue().splitlines())
@@ -399,7 +399,7 @@ class DiffTests(TestCase):
              b'index 0000000..a116b51 644',
              b'--- /dev/null',
              b'+++ b/bar.txt',
-             b'@@ -1,0 +1,2 @@',
+             b'@@ -0,0 +1,2 @@',
              b'+new',
              b'+same'
             ], f.getvalue().splitlines())
@@ -417,7 +417,7 @@ class DiffTests(TestCase):
             b'index a116b51..0000000',
             b'--- a/bar.txt',
             b'+++ /dev/null',
-            b'@@ -1,2 +1,0 @@',
+            b'@@ -1,2 +0,0 @@',
             b'-new',
             b'-same'
             ], f.getvalue().splitlines())
@@ -532,7 +532,7 @@ class DiffTests(TestCase):
             b'index a116b51..06d0bdd 160000',
             b'--- a/bar.txt',
             b'+++ b/bar.txt',
-            b'@@ -1,2 +1,1 @@',
+            b'@@ -1,2 +1 @@',
             b'-new',
             b'-same',
             b'+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',

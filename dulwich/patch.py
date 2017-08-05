@@ -307,27 +307,38 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             started = True
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
             todate = '\t{}'.format(tofiledate) if tofiledate else ''
-            yield '--- {}{}{}'.format(fromfile.decode("ascii"), fromdate, lineterm).encode('ascii')
-            yield '+++ {}{}{}'.format(tofile.decode("ascii"), todate, lineterm).encode('ascii')
-
+            yield '--- {}{}{}'.format(
+                fromfile.decode("ascii"),
+                fromdate,
+                lineterm
+                ).encode('ascii')
+            yield '+++ {}{}{}'.format(
+                tofile.decode("ascii"),
+                todate,
+                lineterm
+                ).encode('ascii')
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield '@@ -{} +{} @@{}'.format(file1_range, file2_range, lineterm).encode('ascii')
+        yield '@@ -{} +{} @@{}'.format(
+            file1_range,
+            file2_range,
+            lineterm
+             ).encode('ascii')
 
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
-                    yield b' %s' % line
+                    yield b' ' + line
                 continue
             if tag in ('replace', 'delete'):
                 for line in a[i1:i2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'
-                    yield b'-%s' % line
+                    yield b'-' + line
             if tag in ('replace', 'insert'):
                 for line in b[j1:j2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'
-                    yield b'+%s' % line
+                    yield b'+' + line

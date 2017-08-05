@@ -290,12 +290,12 @@ def parse_patch_message(msg, encoding=None):
 def _format_range_unified(start, stop):
     'Convert range to the "ed" format'
     # Per the diff spec at http://www.unix.org/single_unix_specification/
-    beginning = start + 1 # lines start numbering with one
+    beginning = start + 1  # lines start numbering with one
     length = stop - start
     if length == 1:
         return '{}'.format(beginning)
     if not length:
-        beginning -= 1 # empty ranges begin at line just before the range
+        beginning -= 1  # empty ranges begin at line just before the range
     return '{},{}'.format(beginning, length)
 
 
@@ -307,26 +307,26 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             started = True
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
             todate = '\t{}'.format(tofiledate) if tofiledate else ''
-            yield '--- {}{}{}'.format(fromfile, fromdate, lineterm)
-            yield '+++ {}{}{}'.format(tofile, todate, lineterm)
+            yield b'--- {}{}{}'.format(fromfile, fromdate, lineterm)
+            yield b'+++ {}{}{}'.format(tofile, todate, lineterm)
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield '@@ -{} +{} @@{}'.format(file1_range, file2_range, lineterm)
+        yield b'@@ -{} +{} @@{}'.format(file1_range, file2_range, lineterm)
 
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
-                    yield ' ' + line
+                    yield b' ' + line
                 continue
             if tag in ('replace', 'delete'):
                 for line in a[i1:i2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'
-                    yield '-' + line
+                    yield b'-' + line
             if tag in ('replace', 'insert'):
                 for line in b[j1:j2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'
-                    yield '+' + line
+                    yield b'+' + line

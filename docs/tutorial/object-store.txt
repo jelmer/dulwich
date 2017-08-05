@@ -175,7 +175,7 @@ write_tree_diff::
   index c55063a..16ee268 100644
   --- a/spam
   +++ b/spam
-  @@ -1,1 +1,1 @@
+  @@ -1 +1 @@
   -My file content
   +My new file content
 

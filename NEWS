@@ -5,6 +5,8 @@
   * Read config during porcelain operations that involve remotes.
     (Jelmer Vernooĳ, #545)
 
+  * Fix headers of empty chunks in unified diffs. (Taras Postument, #543)
+
 0.18.2	2017-08-01
 
  TEST FIXES

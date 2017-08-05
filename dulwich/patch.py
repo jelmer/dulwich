@@ -24,7 +24,7 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-import difflib
+from difflib import SequenceMatcher
 import email.parser
 import time
 
@@ -147,7 +147,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         f.write(b"Binary files " + old_path + b" and " + new_path +
                 b" differ\n")
     else:
-        f.writelines(difflib.unified_diff(lines(old_content), lines(new_content),
+        f.writelines(unified_diff(lines(old_content), lines(new_content),
                      old_path, new_path))
 
 
@@ -201,7 +201,7 @@ def write_blob_diff(f, old_file, new_file):
         (getattr(old_blob, "id", None), getattr(new_blob, "id", None))))
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
-    f.writelines(difflib.unified_diff(old_contents, new_contents,
+    f.writelines(unified_diff(old_contents, new_contents,
                  old_path, new_path))
 
 
@@ -284,3 +284,51 @@ def parse_patch_message(msg, encoding=None):
     except StopIteration:
         version = None
     return c, diff, version
+
+
+########################################################################
+###  Unified Diff
+########################################################################
+
+def _format_range_unified(start, stop):
+    'Convert range to the "ed" format'
+    # Per the diff spec at http://www.unix.org/single_unix_specification/
+    beginning = start + 1     # lines start numbering with one
+    length = stop - start
+    if length == 1:
+        return '{}'.format(beginning)
+    if not length:
+        beginning -= 1        # empty ranges begin at line just before the range
+    return '{},{}'.format(beginning, length)
+
+def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
+                 tofiledate='', n=3, lineterm='\n'):
+    started = False
+    for group in SequenceMatcher(None,a,b).get_grouped_opcodes(n):
+        if not started:
+            started = True
+            fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
+            todate = '\t{}'.format(tofiledate) if tofiledate else ''
+            yield '--- {}{}{}'.format(fromfile, fromdate, lineterm)
+            yield '+++ {}{}{}'.format(tofile, todate, lineterm)
+
+        first, last = group[0], group[-1]
+        file1_range = _format_range_unified(first[1], last[2])
+        file2_range = _format_range_unified(first[3], last[4])
+        yield '@@ -{} +{} @@{}'.format(file1_range, file2_range, lineterm)
+
+        for tag, i1, i2, j1, j2 in group:
+            if tag == 'equal':
+                for line in a[i1:i2]:
+                    if not line[-1:] == b'\n':
+                      line += b'\n\\ No newline at end of file\n'
+                    yield ' ' + line
+                continue
+            if tag in ('replace', 'delete'):
+                for line in a[i1:i2]:
+                    yield '-' + line
+            if tag in ('replace', 'insert'):
+                for line in b[j1:j2]:
+                    if not line[-1:] == b'\n':
+                       line += b'\n\\ No newline at end of file\n'
+                    yield '+' + line

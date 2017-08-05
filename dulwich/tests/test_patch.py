@@ -451,8 +451,10 @@ class DiffTests(TestCase):
             b' \x00\x00\x00',
             b'-IHDR\x00\x00\x01\xd5\x00\x00\x00'
             b'\x9f\x08\x04\x00\x00\x00\x05\x04\x8b',
+            b'\\ No newline at end of file',
             b'+IHDR\x00\x00\x01\xd5\x00\x00\x00\x9f'
             b'\x08\x03\x00\x00\x00\x98\xd3\xb3',
+            b'\\ No newline at end of file'
             ], f.getvalue().splitlines())
 
     def test_object_diff_bin_blob(self):

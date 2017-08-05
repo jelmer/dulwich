@@ -286,25 +286,23 @@ def parse_patch_message(msg, encoding=None):
     return c, diff, version
 
 
-########################################################################
-###  Unified Diff
-########################################################################
-
+#  Unified Diff
 def _format_range_unified(start, stop):
     'Convert range to the "ed" format'
     # Per the diff spec at http://www.unix.org/single_unix_specification/
-    beginning = start + 1     # lines start numbering with one
+    beginning = start + 1 # lines start numbering with one
     length = stop - start
     if length == 1:
         return '{}'.format(beginning)
     if not length:
-        beginning -= 1        # empty ranges begin at line just before the range
+        beginning -= 1 # empty ranges begin at line just before the range
     return '{},{}'.format(beginning, length)
+
 
 def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
                  tofiledate='', n=3, lineterm='\n'):
     started = False
-    for group in SequenceMatcher(None,a,b).get_grouped_opcodes(n):
+    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
             started = True
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
@@ -325,10 +323,10 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             if tag in ('replace', 'delete'):
                 for line in a[i1:i2]:
                     if not line[-1:] == b'\n':
-                          line += b'\n\\ No newline at end of file\n'
+                        line += b'\n\\ No newline at end of file\n'
                     yield '-' + line
             if tag in ('replace', 'insert'):
                 for line in b[j1:j2]:
                     if not line[-1:] == b'\n':
-                       line += b'\n\\ No newline at end of file\n'
+                        line += b'\n\\ No newline at end of file\n'
                     yield '+' + line

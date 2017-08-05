@@ -320,12 +320,12 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
-                    if not line[-1:] == b'\n':
-                      line += b'\n\\ No newline at end of file\n'
                     yield ' ' + line
                 continue
             if tag in ('replace', 'delete'):
                 for line in a[i1:i2]:
+                    if not line[-1:] == b'\n':
+                          line += b'\n\\ No newline at end of file\n'
                     yield '-' + line
             if tag in ('replace', 'insert'):
                 for line in b[j1:j2]:

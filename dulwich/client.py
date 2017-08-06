@@ -76,6 +76,7 @@ from dulwich.protocol import (
     CAPABILITY_OFS_DELTA,
     CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SYMREF,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
     CAPABILITIES_REF,
@@ -93,6 +94,7 @@ from dulwich.protocol import (
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
+    parse_capability,
     )
 from dulwich.pack import (
     write_pack_objects,
@@ -463,9 +465,16 @@ class GitClient(object):
             extract_capability_names(server_capabilities) -
             KNOWN_UPLOAD_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
+        symrefs = {}
+        for capability in server_capabilities:
+            k, v = parse_capability(capability)
+            if k == CAPABILITY_SYMREF:
+                (src, dst) = v.split(b':', 1)
+                symrefs[src] = dst
+
         negotiated_capabilities = (
             self._fetch_capabilities & server_capabilities)
-        return negotiated_capabilities
+        return (negotiated_capabilities, symrefs)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):
@@ -656,8 +665,9 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
             refs, server_capabilities = read_pkt_refs(proto)
-            negotiated_capabilities = self._negotiate_upload_pack_capabilities(
-                    server_capabilities)
+            negotiated_capabilities, symrefs = \
+                    self._negotiate_upload_pack_capabilities(
+                            server_capabilities)
 
             if refs is None:
                 proto.write_pkt_line(None)
@@ -1283,8 +1293,9 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
-        negotiated_capabilities = self._negotiate_upload_pack_capabilities(
-            server_capabilities)
+        negotiated_capabilities, symrefs = \
+                self._negotiate_upload_pack_capabilities(
+                        server_capabilities)
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]

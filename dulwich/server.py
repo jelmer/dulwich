@@ -229,12 +229,11 @@ class PackHandler(Handler):
         self._done_received = False
 
     @classmethod
-    def capability_line(cls):
-        return b"".join([b" " + c for c in cls.capabilities()])
+    def capability_line(cls, capabilities):
+        return b"".join([b" " + c for c in capabilities])
 
-    @classmethod
-    def capabilities(cls):
-        raise NotImplementedError(cls.capabilities)
+    def capabilities(self):
+        raise NotImplementedError(self.capabilities)
 
     @classmethod
     def innocuous_capabilities(cls):
@@ -286,8 +285,7 @@ class UploadPackHandler(PackHandler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
-    @classmethod
-    def capabilities(cls):
+    def capabilities(self):
         return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
                 CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
@@ -547,7 +545,9 @@ class ProtocolGraphWalker(object):
             for i, (ref, sha) in enumerate(sorted(heads.items())):
                 line = sha + b' ' + ref
                 if not i:
-                    line += b'\x00' + self.handler.capability_line()
+                    line += (b'\x00' +
+                             self.handler.capability_line(
+                                 self.handler.capabilities()))
                 self.proto.write_pkt_line(line + b'\n')
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
@@ -870,8 +870,7 @@ class ReceivePackHandler(PackHandler):
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
-    @classmethod
-    def capabilities(cls):
+    def capabilities(self):
         return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
@@ -907,7 +906,7 @@ class ReceivePackHandler(PackHandler):
             ref_status = b'ok'
             try:
                 if sha == ZERO_SHA:
-                    if CAPABILITY_DELETE_REFS not in self.capabilities():
+                    if not self.has_capability(CAPABILITY_DELETE_REFS):
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')
@@ -959,7 +958,7 @@ class ReceivePackHandler(PackHandler):
                 refs = [(CAPABILITIES_REF, ZERO_SHA)]
             self.proto.write_pkt_line(
               refs[0][1] + b' ' + refs[0][0] + b'\0' +
-              self.capability_line() + b'\n')
+              self.capability_line(self.capabilities()) + b'\n')
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.proto.write_pkt_line(ref[1] + b' ' + ref[0] + b'\n')

@@ -207,6 +207,11 @@ def read_pkt_refs(proto):
 
 
 class FetchPackResult(object):
+    """Result of a fetch-pack operation.
+
+    :var refs: Dictionary with all remote refs
+    :var symrefs: Dictionary with remote symrefs
+    """
 
     _FORWARDED_ATTRS = [
             'clear', 'copy', 'fromkeys', 'get', 'has_key', 'items',

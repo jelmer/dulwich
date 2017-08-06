@@ -1170,7 +1170,8 @@ def update_head(repo, target, detached=False, new_branch=None):
             to_set = b"HEAD"
         if detached:
             # TODO(jelmer): Provide some way so that the actual ref gets
-            # updated rather than what it points to, so the delete isn't necessary.
+            # updated rather than what it points to, so the delete isn't
+            # necessary.
             del r.refs[to_set]
             r.refs[to_set] = parse_commit(r, target).id
         else:

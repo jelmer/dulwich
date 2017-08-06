@@ -105,7 +105,14 @@ def capability_symref(from_ref, to_ref):
 
 
 def extract_capability_names(capabilities):
-    return set(c.split(b'=')[0] for c in capabilities)
+    return set(parse_capability(c)[0] for c in capabilities)
+
+
+def parse_capability(capability):
+    parts = capability.split('=', 1)
+    if len(parts) == 1:
+        return (parts[0], None)
+    return tuple(parts)
 
 
 COMMAND_DEEPEN = b'deepen'

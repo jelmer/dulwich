@@ -47,6 +47,17 @@ BAD_REF_CHARS = set(b'\177 ~^:?*[')
 ANNOTATED_TAG_SUFFIX = b'^{}'
 
 
+def parse_symref_value(contents):
+    """Parse a symref value.
+
+    :param contents: Contents to parse
+    :return: Destination
+    """
+    if contents.startswith(SYMREF):
+        return contents[len(SYMREF):].rstrip(b'\r\n')
+    raise ValueError(contents)
+
+
 def check_ref_format(refname):
     """Check if a refname is correctly formatted.
 

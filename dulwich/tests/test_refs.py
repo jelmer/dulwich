@@ -36,6 +36,7 @@ from dulwich.refs import (
     InfoRefsContainer,
     check_ref_format,
     _split_ref_line,
+    parse_symref_value,
     read_packed_refs_with_peeled,
     read_packed_refs,
     write_packed_refs,
@@ -527,3 +528,14 @@ class InfoRefsContainerTests(TestCase):
         self.assertEqual(
             _TEST_REFS[b'refs/heads/master'],
             refs.get_peeled(b'refs/heads/master'))
+
+
+class ParseSymrefValueTests(TestCase):
+
+    def test_valid(self):
+        self.assertEqual(
+                b'refs/heads/foo',
+                parse_symref_value(b'ref: refs/heads/foo'))
+
+    def test_invalid(self):
+        self.assertRaises(ValueError, parse_symref_value, b'foobar')

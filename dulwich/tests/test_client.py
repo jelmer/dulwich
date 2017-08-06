@@ -123,7 +123,8 @@ class GitClientTests(TestCase):
             self.assertIs(heads, None)
             return []
         ret = self.client.fetch_pack(b'/', check_heads, None, None)
-        self.assertIs(None, ret)
+        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.symrefs)
 
     def test_fetch_pack_ignores_magic_ref(self):
         self.rin.write(
@@ -138,17 +139,23 @@ class GitClientTests(TestCase):
             self.assertEquals({}, heads)
             return []
         ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
-        self.assertIs(None, ret)
+        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_fetch_pack_none(self):
         self.rin.write(
-            b'008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD.multi_ack '
+            b'008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD\x00multi_ack '
             b'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
             b'include-tag\n'
             b'0000')
         self.rin.seek(0)
-        self.client.fetch_pack(b'bla', lambda heads: [], None, None, None)
+        ret = self.client.fetch_pack(
+                b'bla', lambda heads: [], None, None, None)
+        self.assertEqual(
+                {b'HEAD': b'55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7'},
+                ret.refs)
+        self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_no_sideband64k_with_update_ref_error(self):
@@ -745,7 +752,10 @@ class LocalGitClientTests(TestCase):
             b'refs/tags/mytag': b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
             b'refs/tags/mytag-packed':
                 b'b0931cadc54336e78a1d980420e3268903b57a50'
-            }, ret)
+            }, ret.refs)
+        self.assertEqual(
+                {b'HEAD': b'refs/heads/master'},
+                ret.symrefs)
         self.assertEqual(
                 b"PACK\x00\x00\x00\x02\x00\x00\x00\x00\x02\x9d\x08"
                 b"\x82;\xd8\xa8\xea\xb5\x10\xadj\xc7\\\x82<\xfd>\xd3\x1e",
@@ -757,10 +767,18 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         out = BytesIO()
         walker = MemoryRepo().get_graph_walker()
-        c.fetch_pack(
+        ret = c.fetch_pack(
             s.path,
             lambda heads: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             graph_walker=walker, pack_data=out.write)
+        self.assertEqual({b'HEAD': b'refs/heads/master'}, ret.symrefs)
+        self.assertEqual({
+            b'HEAD': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/heads/master': b'a90fa2d900a17e99b433217e988c4eb4a2e9a097',
+            b'refs/tags/mytag': b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a',
+            b'refs/tags/mytag-packed':
+            b'b0931cadc54336e78a1d980420e3268903b57a50'
+            }, ret.refs)
         # Hardcoding is not ideal, but we'll fix that some other day..
         self.assertTrue(out.getvalue().startswith(
                 b'PACK\x00\x00\x00\x02\x00\x00\x00\x07'))

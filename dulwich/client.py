@@ -206,6 +206,28 @@ def read_pkt_refs(proto):
     return refs, set(server_capabilities)
 
 
+class FetchPackResult(object):
+
+    _FORWARDED_ATTRS = [
+            'clear', 'copy', 'fromkeys', 'get', 'has_key', 'items',
+            'iteritems', 'iterkeys', 'itervalues', 'keys', 'pop', 'popitem',
+            'setdefault', 'update', 'values', 'viewitems', 'viewkeys',
+            'viewvalues']
+
+    def __init__(self, refs, symrefs):
+        self.refs = refs
+        self.symrefs = symrefs
+
+    def __getattribute__(self, name):
+        if name in type(self)._FORWARDED_ATTRS:
+            import warnings
+            warnings.warn(
+                "Use FetchPackResult.refs instead.",
+                DeprecationWarning, stacklevel=2)
+            return getattr(self.refs, name)
+        return super(FetchPackResult, self).__getattribute__(name)
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
@@ -320,7 +342,7 @@ class GitClient(object):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
-        :return: Dictionary with all remote refs (not just those fetched)
+        :return: FetchPackResult object
         """
         raise NotImplementedError(self.fetch_pack)
 
@@ -660,7 +682,7 @@ class TraditionalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
-        :return: Dictionary with all remote refs (not just those fetched)
+        :return: FetchPackResult object
         """
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
@@ -671,7 +693,7 @@ class TraditionalGitClient(GitClient):
 
             if refs is None:
                 proto.write_pkt_line(None)
-                return refs
+                return FetchPackResult(refs, symrefs)
 
             try:
                 wants = determine_wants(refs)
@@ -682,13 +704,13 @@ class TraditionalGitClient(GitClient):
                 wants = [cid for cid in wants if cid != ZERO_SHA]
             if not wants:
                 proto.write_pkt_line(None)
-                return refs
+                return FetchPackResult(refs, symrefs)
             self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read)
             self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return refs
+            return FetchPackResult(refs, symrefs)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
@@ -967,18 +989,19 @@ class LocalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
-        :return: Dictionary with all remote refs (not just those fetched)
+        :return: FetchPackResult object
         """
         with self._open_repo(path) as r:
             objects_iter = r.fetch_objects(
                 determine_wants, graph_walker, progress)
+            symrefs = r.refs.get_symrefs()
 
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
-                return
+                return FetchPackResult(None, symrefs)
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
-            return r.get_refs()
+            return FetchPackResult(r.get_refs(), symrefs)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
@@ -1288,7 +1311,7 @@ class HttpGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
-        :return: Dictionary with all remote refs (not just those fetched)
+        :return: FetchPackResult object
         """
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
@@ -1300,7 +1323,7 @@ class HttpGitClient(GitClient):
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
-            return refs
+            return FetchPackResult(refs, symrefs)
         if self.dumb:
             raise NotImplementedError(self.send_pack)
         req_data = BytesIO()
@@ -1315,7 +1338,7 @@ class HttpGitClient(GitClient):
             self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return refs
+            return FetchPackResult(refs, symrefs)
         finally:
             resp.close()
 

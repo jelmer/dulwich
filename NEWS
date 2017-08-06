@@ -11,6 +11,9 @@
 
   * Add ``dulwich.porcelain.update_head``. (Jelmer Vernooĳ, #439)
 
+  * ``GitClient.fetch_pack`` now returns symrefs.
+    (Jelmer Vernooĳ, #485)
+
 0.18.2	2017-08-01
 
  TEST FIXES

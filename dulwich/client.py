@@ -426,6 +426,15 @@ class GitClient(object):
         proto.write_pkt_line(None)
         return (have, want)
 
+    def _negotiate_receive_pack_capabilities(self, server_capabilities):
+        negotiated_capabilities = (
+            self._send_capabilities & server_capabilities)
+        unknown_capabilities = (  # noqa: F841
+            extract_capability_names(server_capabilities) -
+            KNOWN_RECEIVE_CAPABILITIES)
+        # TODO(jelmer): warn about unknown capabilities
+        return negotiated_capabilities
+
     def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
 
@@ -433,7 +442,7 @@ class GitClient(object):
         :param capabilities: List of negotiated capabilities
         :param progress: Optional progress reporting function
         """
-        if b"side-band-64k" in capabilities:
+        if CAPABILITY_SIDE_BAND_64K in capabilities:
             if progress is None:
                 def progress(x):
                     pass
@@ -448,6 +457,15 @@ class GitClient(object):
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
             self._report_status_parser.check()
+
+    def _negotiate_upload_pack_capabilities(self, server_capabilities):
+        unknown_capabilities = (  # noqa: F841
+            extract_capability_names(server_capabilities) -
+            KNOWN_UPLOAD_CAPABILITIES)
+        # TODO(jelmer): warn about unknown capabilities
+        negotiated_capabilities = (
+            self._fetch_capabilities & server_capabilities)
+        return negotiated_capabilities
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):
@@ -569,12 +587,8 @@ class TraditionalGitClient(GitClient):
         proto, unused_can_read = self._connect(b'receive-pack', path)
         with proto:
             old_refs, server_capabilities = read_pkt_refs(proto)
-            negotiated_capabilities = (
-                self._send_capabilities & server_capabilities)
-            unknown_capabilities = (  # noqa: F841
-                extract_capability_names(server_capabilities) -
-                KNOWN_RECEIVE_CAPABILITIES)
-            # TODO(jelmer): warn about unknown capabilities
+            negotiated_capabilities = \
+                self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
             report_status_parser = self._report_status_parser
@@ -642,12 +656,8 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
             refs, server_capabilities = read_pkt_refs(proto)
-            unknown_capabilities = (  # noqa: F841
-                extract_capability_names(server_capabilities) -
-                KNOWN_UPLOAD_CAPABILITIES)
-            # TODO(jelmer): warn about unknown capabilities
-            negotiated_capabilities = (
-                self._fetch_capabilities & server_capabilities)
+            negotiated_capabilities = self._negotiate_upload_pack_capabilities(
+                    server_capabilities)
 
             if refs is None:
                 proto.write_pkt_line(None)
@@ -1229,11 +1239,8 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
             b"git-receive-pack", url)
-        unknown_capabilities = (  # noqa: F841
-            extract_capability_names(server_capabilities) -
-            KNOWN_RECEIVE_CAPABILITIES)
-        # TODO(jelmer): warn about unknown capabilities
-        negotiated_capabilities = self._send_capabilities & server_capabilities
+        negotiated_capabilities = self._negotiate_receive_pack_capabilities(
+                server_capabilities)
 
         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
             self._report_status_parser = ReportStatusParser()
@@ -1276,12 +1283,8 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
-        unknown_capabilities = (  # noqa: F841
-            extract_capability_names(server_capabilities) -
-            KNOWN_UPLOAD_CAPABILITIES)
-        # TODO(jelmer): warn about unknown capabilities
-        negotiated_capabilities = (
-            self._fetch_capabilities & server_capabilities)
+        negotiated_capabilities = self._negotiate_upload_pack_capabilities(
+            server_capabilities)
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]

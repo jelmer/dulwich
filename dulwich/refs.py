@@ -317,6 +317,21 @@ class RefsContainer(object):
         """
         self.remove_if_equals(name, None)
 
+    def get_symrefs(self):
+        """Get a dict with all symrefs in this container.
+
+        :return: Dictionary mapping source ref to target ref
+        """
+        ret = {}
+        for src in self.allkeys():
+            try:
+                dst = parse_symref_value(self.read_ref(src))
+            except ValueError:
+                pass
+            else:
+                ret[src] = dst
+        return ret
+
 
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.

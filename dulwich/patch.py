@@ -107,7 +107,7 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
     Based on the same function in Python2.7 difflib.py
     """
     started = False
-    for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
+    for group in SequenceMatcher(a=a, b=b).get_grouped_opcodes(n):
         if not started:
             started = True
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''

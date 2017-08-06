@@ -98,6 +98,7 @@ class BlackboxTestCase(TestCase):
 
 def self_test_suite():
     names = [
+        'annotate',
         'archive',
         'blackbox',
         'client',

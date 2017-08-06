@@ -61,6 +61,7 @@ CAPABILITY_SHALLOW = b'shallow'
 CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
 CAPABILITY_THIN_PACK = b'thin-pack'
 CAPABILITY_AGENT = b'agent'
+CAPABILITY_SYMREF = b'symref'
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -73,6 +74,10 @@ def agent_string():
 
 def capability_agent():
     return CAPABILITY_AGENT + b'=' + agent_string()
+
+
+def capability_symref(from_ref, to_ref):
+    return CAPABILITY_SYMREF + b'=' + from_ref + b':' + to_ref
 
 
 COMMAND_DEEPEN = b'deepen'

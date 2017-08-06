@@ -547,6 +547,7 @@ class _ProtocolGraphWalker(object):
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
         """
+        symrefs = self.get_symrefs()
         values = set(heads.values())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.items())):
@@ -555,7 +556,7 @@ class _ProtocolGraphWalker(object):
                     line += (b'\x00' +
                              self.handler.capability_line(
                                  self.handler.capabilities() +
-                                 symref_capabilities(self.get_symrefs().items())))
+                                 symref_capabilities(symrefs.items())))
                 self.proto.write_pkt_line(line + b'\n')
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:

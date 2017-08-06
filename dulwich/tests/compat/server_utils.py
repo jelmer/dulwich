@@ -28,6 +28,9 @@ import tempfile
 
 from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha
+from dulwich.protocol import (
+    CAPABILITY_SIDE_BAND_64K,
+    )
 from dulwich.server import (
     ReceivePackHandler,
     )
@@ -300,8 +303,8 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
 
     @classmethod
     def capabilities(cls):
-        return tuple(c for c in ReceivePackHandler.capabilities()
-                     if c != b'side-band-64k')
+        return [c for c in ReceivePackHandler.capabilities()
+                if c != CAPABILITY_SIDE_BAND_64K]
 
 
 def ignore_error(error):

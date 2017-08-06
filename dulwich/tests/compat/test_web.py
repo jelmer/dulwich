@@ -111,8 +111,8 @@ def patch_capabilities(handler, caps_removed):
     # Patch a handler's capabilities by specifying a list of them to be
     # removed, and return the original classmethod for restoration.
     original_capabilities = handler.capabilities
-    filtered_capabilities = tuple(
-        i for i in original_capabilities() if i not in caps_removed)
+    filtered_capabilities = [
+        i for i in original_capabilities() if i not in caps_removed]
 
     def capabilities(cls):
         return filtered_capabilities

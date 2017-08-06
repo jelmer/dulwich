@@ -69,6 +69,7 @@ from dulwich.errors import (
 from dulwich.protocol import (
     _RBUFSIZE,
     capability_agent,
+    extract_capability_names,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -76,8 +77,11 @@ from dulwich.protocol import (
     CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_SYMREF,
     CAPABILITY_THIN_PACK,
     CAPABILITIES_REF,
+    KNOWN_RECEIVE_CAPABILITIES,
+    KNOWN_UPLOAD_CAPABILITIES,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_WANT,
@@ -118,10 +122,10 @@ def _win32_peek_avail(handle):
 
 
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
-FETCH_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
-                       CAPABILITY_MULTI_ACK_DETAILED] +
-                      COMMON_CAPABILITIES)
-SEND_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
+UPLOAD_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
+                        CAPABILITY_MULTI_ACK_DETAILED] +
+                        COMMON_CAPABILITIES)
+RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
 
 
 class ReportStatusParser(object):
@@ -219,9 +223,9 @@ class GitClient(object):
         """
         self._report_activity = report_activity
         self._report_status_parser = None
-        self._fetch_capabilities = set(FETCH_CAPABILITIES)
+        self._fetch_capabilities = set(UPLOAD_CAPABILITIES)
         self._fetch_capabilities.add(capability_agent())
-        self._send_capabilities = set(SEND_CAPABILITIES)
+        self._send_capabilities = set(RECEIVE_CAPABILITIES)
         self._send_capabilities.add(capability_agent())
         if quiet:
             self._send_capabilities.add(CAPABILITY_QUIET)
@@ -569,7 +573,10 @@ class TraditionalGitClient(GitClient):
             old_refs, server_capabilities = read_pkt_refs(proto)
             negotiated_capabilities = (
                 self._send_capabilities & server_capabilities)
-
+            unknown_capabilities = (
+                extract_capability_names(server_capabilities) -
+                KNOWN_RECEIVE_CAPABILITIES)
+            # TODO(jelmer): warn about unknown capabilities
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
             report_status_parser = self._report_status_parser
@@ -637,6 +644,10 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
             refs, server_capabilities = read_pkt_refs(proto)
+            unknown_capabilities = (
+                extract_capability_names(server_capabilities) -
+                KNOWN_UPLOAD_CAPABILITIES)
+            # TODO(jelmer): warn about unknown capabilities
             negotiated_capabilities = (
                 self._fetch_capabilities & server_capabilities)
 
@@ -1220,6 +1231,10 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         old_refs, server_capabilities = self._discover_references(
             b"git-receive-pack", url)
+        unknown_capabilities = (
+            extract_capability_names(server_capabilities) -
+            KNOWN_RECEIVE_CAPABILITIES)
+        # TODO(jelmer): warn about unknown capabilities
         negotiated_capabilities = self._send_capabilities & server_capabilities
 
         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
@@ -1263,6 +1278,10 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
+        unknown_capabilities = (
+            extract_capability_names(server_capabilities) -
+            KNOWN_UPLOAD_CAPABILITIES)
+        # TODO(jelmer): warn about unknown capabilities
         negotiated_capabilities = (
             self._fetch_capabilities & server_capabilities)
         wants = determine_wants(refs)

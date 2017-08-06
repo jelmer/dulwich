@@ -131,7 +131,9 @@ class HandlerTestCase(TestCase):
             self.fail(e)
 
     def test_capability_line(self):
-        self.assertEqual(b' cap1 cap2 cap3', self._handler.capability_line())
+        self.assertEqual(
+                b' cap1 cap2 cap3',
+                self._handler.capability_line(['cap1', 'cap2', 'cap3']))
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
@@ -308,6 +310,7 @@ class ReceivePackHandlerTestCase(TestCase):
             b'refs/heads/fake-branch': ONE}
         self._repo.refs._update(refs)
         update_refs = [[ONE, ZERO_SHA, b'refs/heads/fake-branch'], ]
+        self._handler.set_client_capabilities([b'delete-refs'])
         status = self._handler._apply_pack(update_refs)
         self.assertEqual(status[0][0], b'unpack')
         self.assertEqual(status[0][1], b'ok')

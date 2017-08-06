@@ -172,7 +172,15 @@ def parse_commit(repo, committish):
     :raise ValueError: If the range can not be parsed
     """
     committish = to_bytes(committish)
-    return repo[committish]  # For now..
+    try:
+        return repo[committish]
+    except KeyError:
+        pass
+    try:
+        return repo[parse_ref(repo, committish)]
+    except KeyError:
+        pass
+    raise KeyError(committish)
 
 
 # TODO: parse_path_in_tree(), which handles e.g. v1.0:Documentation

@@ -7,6 +7,10 @@
 
   * Fix headers of empty chunks in unified diffs. (Taras Postument, #543)
 
+ IMPROVEMENTS
+
+  * Add ``dulwich.porcelain.update_head``. (Jelmer Vernooĳ, #439)
+
 0.18.2	2017-08-01
 
  TEST FIXES

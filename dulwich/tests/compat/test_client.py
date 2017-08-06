@@ -205,8 +205,8 @@ class DulwichClientTestBase(object):
     def test_fetch_pack(self):
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
-            refs = c.fetch(self._build_path('/server_new.export'), dest)
-            for r in refs.items():
+            result = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
@@ -217,8 +217,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         repo_dir = os.path.join(self.gitroot, 'server_new.export')
         with repo.Repo(repo_dir) as dest:
-            refs = c.fetch(self._build_path('/dest'), dest)
-            for r in refs.items():
+            result = c.fetch(self._build_path('/dest'), dest)
+            for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
@@ -226,8 +226,8 @@ class DulwichClientTestBase(object):
         c = self._client()
         c._fetch_capabilities.remove(b'side-band-64k')
         with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
-            refs = c.fetch(self._build_path('/server_new.export'), dest)
-            for r in refs.items():
+            result = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
@@ -236,10 +236,10 @@ class DulwichClientTestBase(object):
         # be ignored
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
-            refs = c.fetch(
+            result = c.fetch(
                 self._build_path('/server_new.export'), dest,
                 lambda refs: [protocol.ZERO_SHA])
-            for r in refs.items():
+            for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
 
     def test_send_remove_branch(self):

@@ -60,7 +60,7 @@ which we will write to a ``BytesIO`` object::
 
    >>> from io import BytesIO
    >>> f = BytesIO()
-   >>> remote_refs = client.fetch_pack(b"/", determine_wants,
+   >>> result = client.fetch_pack(b"/", determine_wants,
    ...    DummyGraphWalker(), pack_data=f.write)
 
 ``f`` will now contain a full pack file::

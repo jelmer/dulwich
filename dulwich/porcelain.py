@@ -25,6 +25,7 @@ Currently implemented:
  * add
  * branch{_create,_delete,_list}
  * check-ignore
+ * checkout
  * clone
  * commit
  * commit-tree
@@ -100,7 +101,9 @@ from dulwich.objects import (
     pretty_format_tree_entry,
     )
 from dulwich.objectspec import (
+    parse_commit,
     parse_object,
+    parse_ref,
     parse_reftuples,
     parse_tree,
     )
@@ -1148,3 +1151,29 @@ def check_ignore(repo, paths, no_index=False):
                 continue
             if ignore_manager.is_ignored(path):
                 yield path
+
+
+def update_head(repo, target, detached=False, new_branch=None):
+    """Update HEAD to point at a new branch/commit.
+
+    Note that this does not actually update the working tree.
+
+    :param repo: Path to the repository
+    :param detach: Create a detached head
+    :param target: Branch or committish to switch to
+    :param new_branch: New branch to create
+    """
+    with open_repo_closing(repo) as r:
+        if new_branch is not None:
+            to_set = b"refs/heads/" + new_branch.encode(DEFAULT_ENCODING)
+        else:
+            to_set = b"HEAD"
+        if detached:
+            # TODO(jelmer): Provide some way so that the actual ref gets
+            # updated rather than what it points to, so the delete isn't necessary.
+            del r.refs[to_set]
+            r.refs[to_set] = parse_commit(r, target).id
+        else:
+            r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
+        if new_branch is not None:
+            r.refs.set_symbolic_ref(b"HEAD", to_set)

@@ -232,8 +232,9 @@ class PackHandler(Handler):
     def capability_line(cls, capabilities):
         return b"".join([b" " + c for c in capabilities])
 
-    def capabilities(self):
-        raise NotImplementedError(self.capabilities)
+    @classmethod
+    def capabilities(cls):
+        raise NotImplementedError(cls.capabilities)
 
     @classmethod
     def innocuous_capabilities(cls):
@@ -285,7 +286,8 @@ class UploadPackHandler(PackHandler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
                 CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
@@ -870,7 +872,8 @@ class ReceivePackHandler(PackHandler):
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
-    def capabilities(self):
+    @classmethod
+    def capabilities(cls):
         return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
@@ -906,7 +909,7 @@ class ReceivePackHandler(PackHandler):
             ref_status = b'ok'
             try:
                 if sha == ZERO_SHA:
-                    if not self.has_capability(CAPABILITY_DELETE_REFS):
+                    if CAPABILITY_DELETE_REFS not in self.capabilities():
                         raise GitProtocolError(
                           'Attempted to delete refs without delete-refs '
                           'capability.')

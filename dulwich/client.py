@@ -665,9 +665,9 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
             refs, server_capabilities = read_pkt_refs(proto)
-            negotiated_capabilities, symrefs = \
+            negotiated_capabilities, symrefs = (
                     self._negotiate_upload_pack_capabilities(
-                            server_capabilities)
+                            server_capabilities))
 
             if refs is None:
                 proto.write_pkt_line(None)
@@ -1293,9 +1293,9 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
-        negotiated_capabilities, symrefs = \
+        negotiated_capabilities, symrefs = (
                 self._negotiate_upload_pack_capabilities(
-                        server_capabilities)
+                        server_capabilities))
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]

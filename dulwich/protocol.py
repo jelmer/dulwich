@@ -115,6 +115,10 @@ def parse_capability(capability):
     return tuple(parts)
 
 
+def symref_capabilities(symrefs):
+    return [capability_symref(*k) for k in symrefs]
+
+
 COMMAND_DEEPEN = b'deepen'
 COMMAND_SHALLOW = b'shallow'
 COMMAND_UNSHALLOW = b'unshallow'

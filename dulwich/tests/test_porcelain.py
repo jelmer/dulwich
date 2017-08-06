@@ -951,7 +951,8 @@ class ReceivePackTests(PorcelainTestCase):
         outlines = outf.getvalue().splitlines()
         self.assertEqual([
             b'00919e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00 report-status '  # noqa: E501
-            b'delete-refs quiet ofs-delta side-band-64k no-done symref=HEAD:refs/heads/master',
+            b'delete-refs quiet ofs-delta side-band-64k'
+            b'no-done symref=HEAD:refs/heads/master',
             b'003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
             b'0000'], outlines)
         self.assertEqual(0, exitcode)

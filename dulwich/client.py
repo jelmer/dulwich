@@ -68,8 +68,10 @@ from dulwich.errors import (
     )
 from dulwich.protocol import (
     _RBUFSIZE,
+    agent_string,
     capability_agent,
     extract_capability_names,
+    CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -211,6 +213,7 @@ class FetchPackResult(object):
 
     :var refs: Dictionary with all remote refs
     :var symrefs: Dictionary with remote symrefs
+    :var agent: User agent string
     """
 
     _FORWARDED_ATTRS = [
@@ -219,9 +222,10 @@ class FetchPackResult(object):
             'setdefault', 'update', 'values', 'viewitems', 'viewkeys',
             'viewvalues']
 
-    def __init__(self, refs, symrefs):
+    def __init__(self, refs, symrefs, agent):
         self.refs = refs
         self.symrefs = symrefs
+        self.agent = agent
 
     def __getattribute__(self, name):
         if name in type(self)._FORWARDED_ATTRS:
@@ -493,15 +497,18 @@ class GitClient(object):
             KNOWN_UPLOAD_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
         symrefs = {}
+        agent = None
         for capability in server_capabilities:
             k, v = parse_capability(capability)
             if k == CAPABILITY_SYMREF:
                 (src, dst) = v.split(b':', 1)
                 symrefs[src] = dst
+            if k == CAPABILITY_AGENT:
+                agent = v
 
         negotiated_capabilities = (
             self._fetch_capabilities & server_capabilities)
-        return (negotiated_capabilities, symrefs)
+        return (negotiated_capabilities, symrefs, agent)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
                                  wants, can_read):
@@ -692,13 +699,13 @@ class TraditionalGitClient(GitClient):
         proto, can_read = self._connect(b'upload-pack', path)
         with proto:
             refs, server_capabilities = read_pkt_refs(proto)
-            negotiated_capabilities, symrefs = (
+            negotiated_capabilities, symrefs, agent = (
                     self._negotiate_upload_pack_capabilities(
                             server_capabilities))
 
             if refs is None:
                 proto.write_pkt_line(None)
-                return FetchPackResult(refs, symrefs)
+                return FetchPackResult(refs, symrefs, agent)
 
             try:
                 wants = determine_wants(refs)
@@ -709,13 +716,13 @@ class TraditionalGitClient(GitClient):
                 wants = [cid for cid in wants if cid != ZERO_SHA]
             if not wants:
                 proto.write_pkt_line(None)
-                return FetchPackResult(refs, symrefs)
+                return FetchPackResult(refs, symrefs, agent)
             self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read)
             self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs)
+            return FetchPackResult(refs, symrefs, agent)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
@@ -1000,13 +1007,14 @@ class LocalGitClient(GitClient):
             objects_iter = r.fetch_objects(
                 determine_wants, graph_walker, progress)
             symrefs = r.refs.get_symrefs()
+            agent = agent_string()
 
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
-                return FetchPackResult(None, symrefs)
+                return FetchPackResult(None, symrefs, agent)
             write_pack_objects(ProtocolFile(None, pack_data), objects_iter)
-            return FetchPackResult(r.get_refs(), symrefs)
+            return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
@@ -1321,14 +1329,14 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, server_capabilities = self._discover_references(
             b"git-upload-pack", url)
-        negotiated_capabilities, symrefs = (
+        negotiated_capabilities, symrefs, agent = (
                 self._negotiate_upload_pack_capabilities(
                         server_capabilities))
         wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:
-            return FetchPackResult(refs, symrefs)
+            return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
             raise NotImplementedError(self.send_pack)
         req_data = BytesIO()
@@ -1343,7 +1351,7 @@ class HttpGitClient(GitClient):
             self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs)
+            return FetchPackResult(refs, symrefs, agent)
         finally:
             resp.close()
 

@@ -227,12 +227,39 @@ class FetchPackResult(object):
         self.symrefs = symrefs
         self.agent = agent
 
+    def _warn_deprecated(self):
+        import warnings
+        warnings.warn(
+            "Use FetchPackResult.refs instead.",
+            DeprecationWarning, stacklevel=3)
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            self._warn_deprecated()
+            return (self.refs == other)
+        return (self.refs == other.refs and
+                self.symrefs == other.symrefs and
+                self.agent == other.agent)
+
+    def __contains__(self, name):
+        self._warn_deprecated()
+        return name in self.refs
+
+    def __getitem__(self, name):
+        self._warn_deprecated()
+        return self.refs[name]
+
+    def __len__(self):
+        self._warn_deprecated()
+        return len(self.refs)
+
+    def __iter__(self):
+        self._warn_deprecated()
+        return iter(self.refs)
+
     def __getattribute__(self, name):
         if name in type(self)._FORWARDED_ATTRS:
-            import warnings
-            warnings.warn(
-                "Use FetchPackResult.refs instead.",
-                DeprecationWarning, stacklevel=2)
+            self._warn_deprecated()
             return getattr(self.refs, name)
         return super(FetchPackResult, self).__getattribute__(name)
 

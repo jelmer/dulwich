@@ -1166,7 +1166,7 @@ def default_user_agent_string():
 def default_urllib2_opener(config):
     if config is not None:
         try:
-            proxy_server = config.get("http", "proxy")
+            proxy_server = config.get(b"http", b"proxy")
         except KeyError:
             proxy_server = None
     else:
@@ -1177,7 +1177,7 @@ def default_urllib2_opener(config):
     opener = urllib2.build_opener(*handlers)
     if config is not None:
         try:
-            user_agent = config.get("http", "useragent")
+            user_agent = config.get(b"http", b"useragent")
         except KeyError:
             user_agent = None
     else:

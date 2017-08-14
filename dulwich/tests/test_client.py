@@ -940,6 +940,5 @@ class DefaultUrllib2OpenerTest(TestCase):
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
         opener = default_urllib2_opener(config=config)
-        self.assertTrue(
-                any([isinstance(handler, urllib2.ProxyHandler)
-                    for handler in opener.handlers]))
+        self.assertIn(urllib2.ProxyHandler,
+                      list(map(lambda x: x.__class__, opener.handlers)))

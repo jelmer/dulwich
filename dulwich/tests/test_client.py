@@ -22,7 +22,11 @@ from io import BytesIO
 import sys
 import shutil
 import tempfile
-import urllib2
+
+try:
+    import urllib2
+except ImportError:
+    import urllib.request as urllib2
 
 try:
     from urllib import quote as urlquote
@@ -934,7 +938,7 @@ class DefaultUrllib2OpenerTest(TestCase):
 
     def test_config_proxy(self):
         config = ConfigDict()
-        config.set('http', 'proxy', 'http://localhost:3128/')
+        config.set(b'http', b'proxy', b'http://localhost:3128/')
         opener = default_urllib2_opener(config=config)
         self.assertTrue(
                 any([isinstance(handler, urllib2.ProxyHandler)

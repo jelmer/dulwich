@@ -22,6 +22,7 @@ from io import BytesIO
 import sys
 import shutil
 import tempfile
+import urllib2
 
 try:
     from urllib import quote as urlquote
@@ -46,8 +47,12 @@ from dulwich.client import (
     ReportStatusParser,
     SendPackError,
     UpdateRefsError,
+    default_urllib2_opener,
     get_transport_and_path,
     get_transport_and_path_from_url,
+    )
+from dulwich.config import (
+    ConfigDict,
     )
 from dulwich.tests import (
     TestCase,
@@ -917,3 +922,20 @@ class TCPGitClientTests(TestCase):
 
         url = c.get_url(path)
         self.assertEqual('git://github.com:9090/jelmer/dulwich', url)
+
+
+class DefaultUrllib2OpenerTest(TestCase):
+
+    def test_no_config(self):
+        default_urllib2_opener(config=None)
+
+    def test_config_no_proxy(self):
+        default_urllib2_opener(config=ConfigDict())
+
+    def test_config_proxy(self):
+        config = ConfigDict()
+        config.set('http', 'proxy', 'http://localhost:3128/')
+        opener = default_urllib2_opener(config=config)
+        self.assertTrue(
+                any([isinstance(handler, urllib2.ProxyHandler)
+                    for handler in opener.handlers]))

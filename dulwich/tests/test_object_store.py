@@ -529,7 +529,7 @@ class CommitTreeChangesTests(TestCase):
                     (b'd', 0o100644, blob_d.id)])
         self.assertEqual(
             new_tree[b'd'],
-            (33188, 'c59d9b6344f1af00e504ba698129f07a34bbed8d'))
+            (33188, b'c59d9b6344f1af00e504ba698129f07a34bbed8d'))
 
     def test_add_blob_in_dir(self):
         blob_d = make_object(Blob, data=b'd')
@@ -538,26 +538,26 @@ class CommitTreeChangesTests(TestCase):
                     (b'e/f/d', 0o100644, blob_d.id)])
         self.assertEqual(
             new_tree.items(), [
-                TreeEntry(path=b'a', mode=stat.S_IFREG|0o100644,
+                TreeEntry(path=b'a', mode=stat.S_IFREG | 0o100644,
                           sha=self.blob_a.id),
                 TreeEntry(path=b'ad', mode=stat.S_IFDIR,
-                          sha='0e2ce2cd7725ff4817791be31ccd6e627e801f4a'),
-                TreeEntry(path=b'c', mode=stat.S_IFREG|0o100644,
+                          sha=b'0e2ce2cd7725ff4817791be31ccd6e627e801f4a'),
+                TreeEntry(path=b'c', mode=stat.S_IFREG | 0o100644,
                           sha=self.blob_c.id),
                 TreeEntry(path=b'e', mode=stat.S_IFDIR,
-                          sha='6ab344e288724ac2fb38704728b8896e367ed108')
+                          sha=b'6ab344e288724ac2fb38704728b8896e367ed108')
                 ])
         e_tree = self.store[new_tree[b'e'][1]]
         self.assertEqual(
             e_tree.items(), [
                 TreeEntry(path=b'f', mode=stat.S_IFDIR,
-                          sha='24d2c94d8af232b15a0978c006bf61ef4479a0a5')
+                          sha=b'24d2c94d8af232b15a0978c006bf61ef4479a0a5')
                 ])
         f_tree = self.store[e_tree[b'f'][1]]
         self.assertEqual(
             f_tree.items(), [
-                TreeEntry(path=b'd', mode=stat.S_IFREG|0o100644,
-                    sha=blob_d.id)
+                TreeEntry(path=b'd', mode=stat.S_IFREG | 0o100644,
+                          sha=blob_d.id)
                 ])
 
     def test_delete_blob(self):

@@ -17,6 +17,9 @@
   * The server now supports providing symrefs.
     (Jelmer Vernooĳ, #485)
 
+  * Add ``dulwich.object_store.commit_tree_changes`` to incrementally
+    commit changes to a tree structure. (Jelmer Vernooĳ)
+
 0.18.2	2017-08-01
 
  TEST FIXES

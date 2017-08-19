@@ -442,7 +442,9 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                         if len(authorization) == 2:
                             env['REMOTE_USER'] = authorization[0]
         # XXX REMOTE_IDENT
-        env['CONTENT_TYPE'] = self.headers.get('content-type')
+        content_type = self.headers.get('content-type')
+        if content_type:
+            env['CONTENT_TYPE'] = content_type
         length = self.headers.get('content-length')
         if length:
             env['CONTENT_LENGTH'] = length

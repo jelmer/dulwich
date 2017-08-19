@@ -473,6 +473,10 @@ class FilePackIndex(PackIndex):
         else:
             self._contents, self._size = (contents, size)
 
+    @property
+    def path(self):
+        return self._filename
+
     def __eq__(self, other):
         # Quick optimization:
         if (isinstance(other, FilePackIndex) and
@@ -1008,6 +1012,10 @@ class PackData(object):
     @property
     def filename(self):
         return os.path.basename(self._filename)
+
+    @property
+    def path(self):
+        return self._filename
 
     @classmethod
     def from_file(cls, file, size):

@@ -326,6 +326,9 @@ class PackBasedObjectStore(BaseObjectStore):
     def _remove_loose_object(self, sha):
         raise NotImplementedError(self._remove_loose_object)
 
+    def _remove_pack(self, name):
+        raise NotImplementedError(self._remove_pack)
+
     def pack_loose_objects(self):
         """Pack loose objects.
 
@@ -337,6 +340,28 @@ class PackBasedObjectStore(BaseObjectStore):
         self.add_objects(list(objects))
         for obj, path in objects:
             self._remove_loose_object(obj.id)
+        return len(objects)
+
+    def repack(self):
+        """Repack the packs in this repository.
+
+        Note that this implementation is fairly naive and currently keeps all
+        objects in memory while it repacks.
+        """
+        loose_objects = set()
+        for sha in self._iter_loose_objects():
+            loose_objects.add(self._get_loose_object(sha))
+        objects = {(obj, None) for obj in loose_objects}
+        old_packs = list(self.packs)
+        for pack in old_packs:
+            objects.update((obj, None) for obj in pack.iterobjects())
+
+        self.add_objects(objects)
+
+        for obj in loose_objects:
+            self._remove_loose_object(obj.id)
+        for pack in old_packs:
+            self._remove_pack(pack)
         return len(objects)
 
     def __iter__(self):
@@ -531,6 +556,10 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
+
+    def _remove_pack(self, pack):
+        os.remove(pack.data.path)
+        os.remove(pack.index.path)
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)

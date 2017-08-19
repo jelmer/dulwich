@@ -38,9 +38,10 @@ Known capabilities that are not supported:
  * include-tag
 """
 
+from StringIO import StringIO
 from contextlib import closing
 from io import BytesIO, BufferedReader
-import dulwich
+import gzip
 import select
 import socket
 import subprocess
@@ -60,6 +61,7 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
+import dulwich
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -1235,7 +1237,16 @@ class HttpGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
-    def _http_request(self, url, headers={}, data=None):
+    def _http_request(self, url, headers={}, data=None,
+                      allow_compression=False):
+        if headers is None:
+            headers = dict(headers.items())
+        headers["Accept"] = "*/*"
+        headers["Pragma"] = "no-cache"
+        if allow_compression:
+            headers["Accept-Encoding"] = "gzip"
+        else:
+            headers["Accept-Encoding"] = "identity"
         req = urllib2.Request(url, headers=headers, data=data)
         try:
             resp = self.opener.open(req)
@@ -1243,8 +1254,14 @@ class HttpGitClient(GitClient):
             if e.code == 404:
                 raise NotGitRepository()
             if e.code != 200:
-                raise GitProtocolError("unexpected http response %d" % e.code)
-        return resp
+                raise GitProtocolError("unexpected http response %d for %s" %
+                                       (e.code, url))
+        if resp.info().get('Content-Encoding') == 'gzip':
+            read = gzip.GzipFile(fileobj=StringIO(resp.read())).read
+        else:
+            read = resp.read
+
+        return resp, read
 
     def _discover_references(self, service, url):
         assert url[-1] == "/"
@@ -1252,9 +1269,8 @@ class HttpGitClient(GitClient):
         headers = {}
         if self.dumb is not False:
             url += "?service=%s" % service.decode('ascii')
-            headers["Content-Type"] = "application/x-%s-request" % (
-                service.decode('ascii'))
-        resp = self._http_request(url, headers)
+        resp, read = self._http_request(url, headers, allow_compression=True)
+
         try:
             content_type = resp.info().gettype()
         except AttributeError:
@@ -1262,7 +1278,7 @@ class HttpGitClient(GitClient):
         try:
             self.dumb = (not content_type.startswith("application/x-git-"))
             if not self.dumb:
-                proto = Protocol(resp.read, None)
+                proto = Protocol(read, None)
                 # The first line should mention the service
                 try:
                     [pkt] = list(proto.read_pkt_seq())
@@ -1284,7 +1300,7 @@ class HttpGitClient(GitClient):
         headers = {
             "Content-Type": "application/x-%s-request" % service
         }
-        resp = self._http_request(url, headers, data)
+        resp, read = self._http_request(url, headers, data)
         try:
             content_type = resp.info().gettype()
         except AttributeError:
@@ -1293,7 +1309,7 @@ class HttpGitClient(GitClient):
                 "application/x-%s-result" % service):
             raise GitProtocolError("Invalid content-type from server: %s"
                                    % content_type)
-        return resp
+        return resp, read
 
     def send_pack(self, path, update_refs, generate_pack_contents,
                   progress=None, write_pack=write_pack_objects):
@@ -1339,10 +1355,10 @@ class HttpGitClient(GitClient):
         objects = generate_pack_contents(have, want)
         if len(objects) > 0:
             write_pack(req_proto.write_file(), objects)
-        resp = self._smart_request("git-receive-pack", url,
-                                   data=req_data.getvalue())
+        resp, read = self._smart_request("git-receive-pack", url,
+                                         data=req_data.getvalue())
         try:
-            resp_proto = Protocol(resp.read, None)
+            resp_proto = Protocol(resp, None)
             self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
             return new_refs
@@ -1377,10 +1393,10 @@ class HttpGitClient(GitClient):
         self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
                 lambda: False)
-        resp = self._smart_request(
+        resp, read = self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:
-            resp_proto = Protocol(resp.read, None)
+            resp_proto = Protocol(read, None)
             self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)

@@ -7,6 +7,8 @@
 
   * Fix headers of empty chunks in unified diffs. (Taras Postument, #543)
 
+  * Properly follow redirects over HTTP. (Jelmer Vernooĳ, #117)
+
  IMPROVEMENTS
 
   * Add ``dulwich.porcelain.update_head``. (Jelmer Vernooĳ, #439)

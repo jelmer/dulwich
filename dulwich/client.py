@@ -1241,7 +1241,6 @@ class HttpGitClient(GitClient):
                       allow_compression=False):
         if headers is None:
             headers = dict(headers.items())
-        headers["Accept"] = "*/*"
         headers["Pragma"] = "no-cache"
         if allow_compression:
             headers["Accept-Encoding"] = "gzip"
@@ -1263,13 +1262,22 @@ class HttpGitClient(GitClient):
 
         return resp, read
 
-    def _discover_references(self, service, url):
-        assert url[-1] == "/"
-        url = urlparse.urljoin(url, "info/refs")
-        headers = {}
+    def _discover_references(self, service, base_url):
+        assert base_url[-1] == "/"
+        tail = "info/refs"
+        headers = {"Accept": "*/*"}
         if self.dumb is not False:
-            url += "?service=%s" % service.decode('ascii')
+            tail += "?service=%s" % service.decode('ascii')
+        url = urlparse.urljoin(base_url, tail)
         resp, read = self._http_request(url, headers, allow_compression=True)
+
+        if url != resp.geturl():
+            # Something changed (redirect!), so let's update the base URL
+            if not resp.geturl().endswith(tail):
+                raise GitProtocolError(
+                        "Redirected from URL %s to URL %s without %s" % (
+                            url, resp.geturl(), tail))
+            base_url = resp.geturl()[:-len(tail)]
 
         try:
             content_type = resp.info().gettype()
@@ -1288,9 +1296,9 @@ class HttpGitClient(GitClient):
                 if pkt.rstrip(b'\n') != (b'# service=' + service):
                     raise GitProtocolError(
                         "unexpected first line %r from smart server" % pkt)
-                return read_pkt_refs(proto)
+                return read_pkt_refs(proto) + (base_url, )
             else:
-                return read_info_refs(resp), set()
+                return read_info_refs(resp), set(), base_url
         finally:
             resp.close()
 
@@ -1332,7 +1340,7 @@ class HttpGitClient(GitClient):
             {refname: new_ref}, including deleted refs.
         """
         url = self._get_url(path)
-        old_refs, server_capabilities = self._discover_references(
+        old_refs, server_capabilities, url = self._discover_references(
             b"git-receive-pack", url)
         negotiated_capabilities = self._negotiate_receive_pack_capabilities(
                 server_capabilities)
@@ -1358,7 +1366,7 @@ class HttpGitClient(GitClient):
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())
         try:
-            resp_proto = Protocol(resp, None)
+            resp_proto = Protocol(resp.read, None)
             self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
             return new_refs
@@ -1376,7 +1384,7 @@ class HttpGitClient(GitClient):
         :return: FetchPackResult object
         """
         url = self._get_url(path)
-        refs, server_capabilities = self._discover_references(
+        refs, server_capabilities, url = self._discover_references(
             b"git-upload-pack", url)
         negotiated_capabilities, symrefs, agent = (
                 self._negotiate_upload_pack_capabilities(
@@ -1407,7 +1415,7 @@ class HttpGitClient(GitClient):
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)
-        refs, _ = self._discover_references(
+        refs, _, _ = self._discover_references(
             b"git-upload-pack", url)
         return refs
 

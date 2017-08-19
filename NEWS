@@ -20,6 +20,9 @@
   * Add ``dulwich.object_store.commit_tree_changes`` to incrementally
     commit changes to a tree structure. (Jelmer Vernooĳ)
 
+  * Add basic ``PackBasedObjectStore.repack`` method.
+    (Jelmer Vernooĳ, #296, #549)
+
 0.18.2	2017-08-01
 
  TEST FIXES

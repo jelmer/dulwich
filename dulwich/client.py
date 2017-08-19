@@ -38,7 +38,6 @@ Known capabilities that are not supported:
  * include-tag
 """
 
-from StringIO import StringIO
 from contextlib import closing
 from io import BytesIO, BufferedReader
 import gzip
@@ -1256,7 +1255,7 @@ class HttpGitClient(GitClient):
                 raise GitProtocolError("unexpected http response %d for %s" %
                                        (e.code, url))
         if resp.info().get('Content-Encoding') == 'gzip':
-            read = gzip.GzipFile(fileobj=StringIO(resp.read())).read
+            read = gzip.GzipFile(fileobj=BytesIO(resp.read())).read
         else:
             read = resp.read
 

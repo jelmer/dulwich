@@ -296,7 +296,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
                          set(self.store))
         self.assertEqual(2, len(self.store.packs))
         self.assertEqual(6, self.store.repack())
-        self.assertNotEqual(1, len(self.store.packs))
+        self.assertEqual(1, len(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
 
 

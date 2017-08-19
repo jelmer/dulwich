@@ -362,6 +362,7 @@ class PackBasedObjectStore(BaseObjectStore):
             self._remove_loose_object(obj.id)
         for pack in old_packs:
             self._remove_pack(pack)
+        self._update_pack_cache()
         return len(objects)
 
     def __iter__(self):

@@ -60,7 +60,7 @@ And to print it using porcelain:
 Further documentation
 ---------------------
 
-The dulwich documentation can be found in doc/ and
+The dulwich documentation can be found in docs/ and
 [on the web](https://www.dulwich.io/docs/).
 
 The API reference can be generated using pydoctor, by running "make pydoctor",

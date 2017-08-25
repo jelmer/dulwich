@@ -295,12 +295,15 @@ class PackBasedObjectStore(BaseObjectStore):
         """
         self._pack_cache[base_name] = pack
 
-    def close(self):
+    def _flush_pack_cache(self):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
             (name, pack) = pack_cache.popitem()
             pack.close()
+
+    def close(self):
+        self._flush_pack_cache()
 
     @property
     def packs(self):
@@ -326,7 +329,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def _remove_loose_object(self, sha):
         raise NotImplementedError(self._remove_loose_object)
 
-    def _remove_pack(self, name):
+    def _remove_pack(self, name, keep=None):
         raise NotImplementedError(self._remove_pack)
 
     def pack_loose_objects(self):
@@ -355,13 +358,18 @@ class PackBasedObjectStore(BaseObjectStore):
         old_packs = list(self.packs)
         for pack in old_packs:
             objects.update((obj, None) for obj in pack.iterobjects())
+        self._flush_pack_cache()
 
-        self.add_objects(objects)
+        # The name of the consolidated pack might match the name of a
+        # pre-existing pack. Take care not to remove the newly created
+        # consolidated pack.
+
+        consolidated = self.add_objects(objects)
 
         for obj in loose_objects:
             self._remove_loose_object(obj.id)
         for pack in old_packs:
-            self._remove_pack(pack)
+            self._remove_pack(pack, keep=consolidated)
         self._update_pack_cache()
         return len(objects)
 
@@ -558,9 +566,12 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
 
-    def _remove_pack(self, pack):
-        os.remove(pack.data.path)
-        os.remove(pack.index.path)
+    def _remove_pack(self, pack, keep=None):
+        if keep and keep.data.path == pack.data.path:
+            assert keep.index.path == pack.index.path
+        else:
+            os.remove(pack.data.path)
+            os.remove(pack.index.path)
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)

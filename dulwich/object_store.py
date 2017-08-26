@@ -695,6 +695,7 @@ class DiskObjectStore(PackBasedObjectStore):
         f = os.fdopen(fd, 'wb')
 
         def commit():
+            f.flush()
             os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:

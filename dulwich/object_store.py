@@ -293,7 +293,11 @@ class PackBasedObjectStore(BaseObjectStore):
         """Add a newly appeared pack to the cache by path.
 
         """
-        self._pack_cache[base_name] = pack
+        prev_pack = self._pack_cache.get(base_name)
+        if prev_pack is not pack:
+            self._pack_cache[base_name] = pack
+            if prev_pack:
+                prev_pack.close()
 
     def _flush_pack_cache(self):
         pack_cache = self._pack_cache

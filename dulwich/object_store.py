@@ -365,10 +365,7 @@ class PackBasedObjectStore(BaseObjectStore):
         # consolidated pack.
 
         consolidated = self.add_objects(objects)
-        try:
-            del old_packs[consolidated.name()]
-        except KeyError:
-            pass
+        old_packs.pop(consolidated.name(), None)
 
         for obj in loose_objects:
             self._remove_loose_object(obj.id)

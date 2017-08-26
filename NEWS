@@ -23,7 +23,7 @@
     commit changes to a tree structure. (Jelmer Vernooĳ)
 
   * Add basic ``PackBasedObjectStore.repack`` method.
-    (Jelmer Vernooĳ, #296, #549)
+    (Jelmer Vernooĳ, Earl Chew, #296, #549, #552)
 
 0.18.2	2017-08-01
 

@@ -329,7 +329,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def _remove_loose_object(self, sha):
         raise NotImplementedError(self._remove_loose_object)
 
-    def _remove_pack(self, name, keep=None):
+    def _remove_pack(self, name):
         raise NotImplementedError(self._remove_pack)
 
     def pack_loose_objects(self):
@@ -355,8 +355,8 @@ class PackBasedObjectStore(BaseObjectStore):
         for sha in self._iter_loose_objects():
             loose_objects.add(self._get_loose_object(sha))
         objects = {(obj, None) for obj in loose_objects}
-        old_packs = list(self.packs)
-        for pack in old_packs:
+        old_packs = {p.name(): p for p in self.packs}
+        for name, pack in old_packs.items():
             objects.update((obj, None) for obj in pack.iterobjects())
         self._flush_pack_cache()
 
@@ -365,11 +365,15 @@ class PackBasedObjectStore(BaseObjectStore):
         # consolidated pack.
 
         consolidated = self.add_objects(objects)
+        try:
+            del old_packs[consolidated.name()]
+        except KeyError:
+            pass
 
         for obj in loose_objects:
             self._remove_loose_object(obj.id)
-        for pack in old_packs:
-            self._remove_pack(pack, keep=consolidated)
+        for name, pack in old_packs.items():
+            self._remove_pack(pack)
         self._update_pack_cache()
         return len(objects)
 
@@ -566,12 +570,9 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
 
-    def _remove_pack(self, pack, keep=None):
-        if keep and keep.data.path == pack.data.path:
-            assert keep.index.path == pack.index.path
-        else:
-            os.remove(pack.data.path)
-            os.remove(pack.index.path)
+    def _remove_pack(self, pack):
+        os.remove(pack.data.path)
+        os.remove(pack.index.path)
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)

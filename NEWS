@@ -1,3 +1,30 @@
+0.18.3	2017-09-03
+
+ BUG FIXES
+
+  * Read config during porcelain operations that involve remotes.
+    (Jelmer Vernooĳ, #545)
+
+  * Fix headers of empty chunks in unified diffs. (Taras Postument, #543)
+
+  * Properly follow redirects over HTTP. (Jelmer Vernooĳ, #117)
+
+ IMPROVEMENTS
+
+  * Add ``dulwich.porcelain.update_head``. (Jelmer Vernooĳ, #439)
+
+  * ``GitClient.fetch_pack`` now returns symrefs.
+    (Jelmer Vernooĳ, #485)
+
+  * The server now supports providing symrefs.
+    (Jelmer Vernooĳ, #485)
+
+  * Add ``dulwich.object_store.commit_tree_changes`` to incrementally
+    commit changes to a tree structure. (Jelmer Vernooĳ)
+
+  * Add basic ``PackBasedObjectStore.repack`` method.
+    (Jelmer Vernooĳ, Earl Chew, #296, #549, #552)
+
 0.18.2	2017-08-01
 
  TEST FIXES
@@ -671,7 +698,7 @@ API CHANGES
   * Add a basic `dulwich.porcelain` module. (Jelmer Vernooĳ, Marcin Kuzminski)
 
   * Various performance improvements for object access.
-   (Jelmer Vernooĳ)
+    (Jelmer Vernooĳ)
 
   * New function `get_transport_and_path_from_url`,
     similar to `get_transport_and_path` but only

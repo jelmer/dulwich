@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
-[![Windows Build status](https://ci.appveyor.com/api/projects/status/cnothr6pxprfx2lf/branch/master?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich-njb6g/branch/master)
+[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich/branch/master)
 
 This is the Dulwich project.
 
@@ -60,7 +60,7 @@ And to print it using porcelain:
 Further documentation
 ---------------------
 
-The dulwich documentation can be found in doc/ and
+The dulwich documentation can be found in docs/ and
 [on the web](https://www.dulwich.io/docs/).
 
 The API reference can be generated using pydoctor, by running "make pydoctor",

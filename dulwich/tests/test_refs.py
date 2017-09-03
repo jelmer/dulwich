@@ -36,6 +36,7 @@ from dulwich.refs import (
     InfoRefsContainer,
     check_ref_format,
     _split_ref_line,
+    parse_symref_value,
     read_packed_refs_with_peeled,
     read_packed_refs,
     write_packed_refs,
@@ -164,6 +165,7 @@ _TEST_REFS = {
     b'refs/heads/packed': b'42d06bd4b77fed026b154d16493e5deab78f02ec',
     b'refs/tags/refs-0.1': b'df6800012397fb85c56e7418dd4eb9405dee075c',
     b'refs/tags/refs-0.2': b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
+    b'refs/heads/loop': b'ref: refs/heads/loop',
     }
 
 
@@ -172,8 +174,6 @@ class RefsContainerTests(object):
     def test_keys(self):
         actual_keys = set(self._refs.keys())
         self.assertEqual(set(self._refs.allkeys()), actual_keys)
-        # ignore the symref loop if it exists
-        actual_keys.discard(b'refs/heads/loop')
         self.assertEqual(set(_TEST_REFS.keys()), actual_keys)
 
         actual_keys = self._refs.keys(b'refs/heads')
@@ -186,7 +186,18 @@ class RefsContainerTests(object):
 
     def test_as_dict(self):
         # refs/heads/loop does not show up even if it exists
-        self.assertEqual(_TEST_REFS, self._refs.as_dict())
+        expected_refs = dict(_TEST_REFS)
+        del expected_refs[b'refs/heads/loop']
+        self.assertEqual(expected_refs, self._refs.as_dict())
+
+    def test_get_symrefs(self):
+        self._refs.set_symbolic_ref(b'refs/heads/src', b'refs/heads/dst')
+        symrefs = self._refs.get_symrefs()
+        if b'HEAD' in symrefs:
+            symrefs.pop(b'HEAD')
+        self.assertEqual({b'refs/heads/src': b'refs/heads/dst',
+                          b'refs/heads/loop': b'refs/heads/loop'},
+                         symrefs)
 
     def test_setitem(self):
         self._refs[b'refs/some/ref'] = (
@@ -288,6 +299,7 @@ class DictRefsContainerTests(RefsContainerTests, TestCase):
         # some way of injecting invalid refs.
         self._refs._refs[b'refs/stash'] = b'00' * 20
         expected_refs = dict(_TEST_REFS)
+        del expected_refs[b'refs/heads/loop']
         expected_refs[b'refs/stash'] = b'00' * 20
         self.assertEqual(expected_refs, self._refs.as_dict())
 
@@ -468,6 +480,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         expected_refs = dict(_TEST_REFS)
         expected_refs[encoded_ref] = b'00' * 20
+        del expected_refs[b'refs/heads/loop']
 
         self.assertEqual(expected_refs, self._repo.get_refs())
 
@@ -489,16 +502,16 @@ class InfoRefsContainerTests(TestCase):
         expected_refs = dict(_TEST_REFS)
         del expected_refs[b'HEAD']
         expected_refs[b'refs/stash'] = b'00' * 20
+        del expected_refs[b'refs/heads/loop']
         self.assertEqual(expected_refs, refs.as_dict())
 
     def test_keys(self):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         actual_keys = set(refs.keys())
         self.assertEqual(set(refs.allkeys()), actual_keys)
-        # ignore the symref loop if it exists
-        actual_keys.discard(b'refs/heads/loop')
         expected_refs = dict(_TEST_REFS)
         del expected_refs[b'HEAD']
+        del expected_refs[b'refs/heads/loop']
         self.assertEqual(set(expected_refs.keys()), actual_keys)
 
         actual_keys = refs.keys(b'refs/heads')
@@ -514,6 +527,7 @@ class InfoRefsContainerTests(TestCase):
         # refs/heads/loop does not show up even if it exists
         expected_refs = dict(_TEST_REFS)
         del expected_refs[b'HEAD']
+        del expected_refs[b'refs/heads/loop']
         self.assertEqual(expected_refs, refs.as_dict())
 
     def test_contains(self):
@@ -527,3 +541,14 @@ class InfoRefsContainerTests(TestCase):
         self.assertEqual(
             _TEST_REFS[b'refs/heads/master'],
             refs.get_peeled(b'refs/heads/master'))
+
+
+class ParseSymrefValueTests(TestCase):
+
+    def test_valid(self):
+        self.assertEqual(
+                b'refs/heads/foo',
+                parse_symref_value(b'ref: refs/heads/foo'))
+
+    def test_invalid(self):
+        self.assertRaises(ValueError, parse_symref_value, b'foobar')

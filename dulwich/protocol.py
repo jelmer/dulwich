@@ -48,6 +48,9 @@ SIDE_BAND_CHANNEL_PROGRESS = 2
 # fatal error message just before stream aborts
 SIDE_BAND_CHANNEL_FATAL = 3
 
+CAPABILITY_DEEPEN_SINCE = b'deepen-since'
+CAPABILITY_DEEPEN_NOT = b'deepen-not'
+CAPABILITY_DEEPEN_RELATIVE = b'deepen-relative'
 CAPABILITY_DELETE_REFS = b'delete-refs'
 CAPABILITY_INCLUDE_TAG = b'include-tag'
 CAPABILITY_MULTI_ACK = b'multi_ack'
@@ -58,13 +61,35 @@ CAPABILITY_OFS_DELTA = b'ofs-delta'
 CAPABILITY_QUIET = b'quiet'
 CAPABILITY_REPORT_STATUS = b'report-status'
 CAPABILITY_SHALLOW = b'shallow'
+CAPABILITY_SIDE_BAND = b'side-band'
 CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
 CAPABILITY_THIN_PACK = b'thin-pack'
 CAPABILITY_AGENT = b'agent'
+CAPABILITY_SYMREF = b'symref'
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
 CAPABILITIES_REF = b'capabilities^{}'
+
+COMMON_CAPABILITIES = [
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_SIDE_BAND,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_AGENT,
+    CAPABILITY_NO_PROGRESS]
+KNOWN_UPLOAD_CAPABILITIES = set(COMMON_CAPABILITIES + [
+    CAPABILITY_THIN_PACK,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_DEEPEN_SINCE,
+    CAPABILITY_SYMREF,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_DEEPEN_NOT,
+    CAPABILITY_DEEPEN_RELATIVE,
+    ])
+KNOWN_RECEIVE_CAPABILITIES = set(COMMON_CAPABILITIES + [
+    CAPABILITY_REPORT_STATUS])
 
 
 def agent_string():
@@ -73,6 +98,25 @@ def agent_string():
 
 def capability_agent():
     return CAPABILITY_AGENT + b'=' + agent_string()
+
+
+def capability_symref(from_ref, to_ref):
+    return CAPABILITY_SYMREF + b'=' + from_ref + b':' + to_ref
+
+
+def extract_capability_names(capabilities):
+    return set(parse_capability(c)[0] for c in capabilities)
+
+
+def parse_capability(capability):
+    parts = capability.split(b'=', 1)
+    if len(parts) == 1:
+        return (parts[0], None)
+    return tuple(parts)
+
+
+def symref_capabilities(symrefs):
+    return [capability_symref(*k) for k in symrefs]
 
 
 COMMAND_DEEPEN = b'deepen'

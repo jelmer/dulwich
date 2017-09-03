@@ -293,14 +293,21 @@ class PackBasedObjectStore(BaseObjectStore):
         """Add a newly appeared pack to the cache by path.
 
         """
-        self._pack_cache[base_name] = pack
+        prev_pack = self._pack_cache.get(base_name)
+        if prev_pack is not pack:
+            self._pack_cache[base_name] = pack
+            if prev_pack:
+                prev_pack.close()
 
-    def close(self):
+    def _flush_pack_cache(self):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
             (name, pack) = pack_cache.popitem()
             pack.close()
+
+    def close(self):
+        self._flush_pack_cache()
 
     @property
     def packs(self):
@@ -326,6 +333,9 @@ class PackBasedObjectStore(BaseObjectStore):
     def _remove_loose_object(self, sha):
         raise NotImplementedError(self._remove_loose_object)
 
+    def _remove_pack(self, name):
+        raise NotImplementedError(self._remove_pack)
+
     def pack_loose_objects(self):
         """Pack loose objects.
 
@@ -337,6 +347,35 @@ class PackBasedObjectStore(BaseObjectStore):
         self.add_objects(list(objects))
         for obj, path in objects:
             self._remove_loose_object(obj.id)
+        return len(objects)
+
+    def repack(self):
+        """Repack the packs in this repository.
+
+        Note that this implementation is fairly naive and currently keeps all
+        objects in memory while it repacks.
+        """
+        loose_objects = set()
+        for sha in self._iter_loose_objects():
+            loose_objects.add(self._get_loose_object(sha))
+        objects = {(obj, None) for obj in loose_objects}
+        old_packs = {p.name(): p for p in self.packs}
+        for name, pack in old_packs.items():
+            objects.update((obj, None) for obj in pack.iterobjects())
+        self._flush_pack_cache()
+
+        # The name of the consolidated pack might match the name of a
+        # pre-existing pack. Take care not to remove the newly created
+        # consolidated pack.
+
+        consolidated = self.add_objects(objects)
+        old_packs.pop(consolidated.name(), None)
+
+        for obj in loose_objects:
+            self._remove_loose_object(obj.id)
+        for name, pack in old_packs.items():
+            self._remove_pack(pack)
+        self._update_pack_cache()
         return len(objects)
 
     def __iter__(self):
@@ -532,6 +571,10 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
 
+    def _remove_pack(self, pack):
+        os.remove(pack.data.path)
+        os.remove(pack.index.path)
+
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)
         # TODO: Handle self.pack_dir being bytes
@@ -652,6 +695,7 @@ class DiskObjectStore(PackBasedObjectStore):
         f = os.fdopen(fd, 'wb')
 
         def commit():
+            f.flush()
             os.fsync(fd)
             f.close()
             if os.path.getsize(path) > 0:
@@ -1126,3 +1170,51 @@ class ObjectStoreGraphWalker(object):
         return None
 
     __next__ = next
+
+
+def commit_tree_changes(object_store, tree, changes):
+    """Commit a specified set of changes to a tree structure.
+
+    This will apply a set of changes on top of an existing tree, storing new
+    objects in object_store.
+
+    changes are a list of tuples with (path, mode, object_sha).
+    Paths can be both blobs and trees. See the mode and
+    object sha to None deletes the path.
+
+    This method works especially well if there are only a small
+    number of changes to a big tree. For a large number of changes
+    to a large tree, use e.g. commit_tree.
+
+    :param object_store: Object store to store new objects in
+        and retrieve old ones from.
+    :param tree: Original tree root
+    :param changes: changes to apply
+    :return: New tree root object
+    """
+    # TODO(jelmer): Save up the objects and add them using .add_objects
+    # rather than with individual calls to .add_object.
+    nested_changes = {}
+    for (path, new_mode, new_sha) in changes:
+        try:
+            (dirname, subpath) = path.split(b'/', 1)
+        except ValueError:
+            if new_sha is None:
+                del tree[path]
+            else:
+                tree[path] = (new_mode, new_sha)
+        else:
+            nested_changes.setdefault(dirname, []).append(
+                (subpath, new_mode, new_sha))
+    for name, subchanges in nested_changes.items():
+        try:
+            orig_subtree = object_store[tree[name][1]]
+        except KeyError:
+            orig_subtree = Tree()
+        subtree = commit_tree_changes(object_store, orig_subtree, subchanges)
+        if len(subtree) == 0:
+            del tree[name]
+        else:
+            tree[name] = (stat.S_IFDIR, subtree.id)
+    object_store.add_object(tree)
+    return tree

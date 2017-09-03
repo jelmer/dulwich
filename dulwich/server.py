@@ -39,6 +39,7 @@ Currently supported capabilities:
  * report-status
  * delete-refs
  * shallow
+ * symref
 """
 
 import collections
@@ -104,6 +105,7 @@ from dulwich.protocol import (  # noqa: F401
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    symref_capabilities,
     )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
@@ -229,8 +231,9 @@ class PackHandler(Handler):
         self._done_received = False
 
     @classmethod
-    def capability_line(cls):
-        return b"".join([b" " + c for c in cls.capabilities()])
+    def capability_line(cls, capabilities):
+        logger.info('Sending capabilities: %s', capabilities)
+        return b"".join([b" " + c for c in capabilities])
 
     @classmethod
     def capabilities(cls):
@@ -238,9 +241,9 @@ class PackHandler(Handler):
 
     @classmethod
     def innocuous_capabilities(cls):
-        return (CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
+        return [CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
                 CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA,
-                capability_agent())
+                capability_agent()]
 
     @classmethod
     def required_capabilities(cls):
@@ -288,10 +291,10 @@ class UploadPackHandler(PackHandler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
+        return [CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_MULTI_ACK,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
                 CAPABILITY_OFS_DELTA, CAPABILITY_NO_PROGRESS,
-                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW, CAPABILITY_NO_DONE)
+                CAPABILITY_INCLUDE_TAG, CAPABILITY_SHALLOW, CAPABILITY_NO_DONE]
 
     @classmethod
     def required_capabilities(cls):
@@ -337,8 +340,9 @@ class UploadPackHandler(PackHandler):
         def write(x):
             return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
 
-        graph_walker = ProtocolGraphWalker(
-                self, self.repo.object_store, self.repo.get_peeled)
+        graph_walker = _ProtocolGraphWalker(
+                self, self.repo.object_store, self.repo.get_peeled,
+                self.repo.refs.get_symrefs)
         objects_iter = self.repo.fetch_objects(
             graph_walker.determine_wants, graph_walker, self.progress,
             get_tagged=self.get_tagged)
@@ -496,7 +500,7 @@ def _all_wants_satisfied(store, haves, wants):
     return True
 
 
-class ProtocolGraphWalker(object):
+class _ProtocolGraphWalker(object):
     """A graph walker that knows the git protocol.
 
     As a graph walker, this class implements ack(), next(), and reset(). It
@@ -509,10 +513,11 @@ class ProtocolGraphWalker(object):
     call to set_ack_type() is required to set up the implementation, before
     any calls to next() or ack() are made.
     """
-    def __init__(self, handler, object_store, get_peeled):
+    def __init__(self, handler, object_store, get_peeled, get_symrefs):
         self.handler = handler
         self.store = object_store
         self.get_peeled = get_peeled
+        self.get_symrefs = get_symrefs
         self.proto = handler.proto
         self.http_req = handler.http_req
         self.advertise_refs = handler.advertise_refs
@@ -542,12 +547,16 @@ class ProtocolGraphWalker(object):
         :param heads: a dict of refname->SHA1 to advertise
         :return: a list of SHA1s requested by the client
         """
+        symrefs = self.get_symrefs()
         values = set(heads.values())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.items())):
                 line = sha + b' ' + ref
                 if not i:
-                    line += b'\x00' + self.handler.capability_line()
+                    line += (b'\x00' +
+                             self.handler.capability_line(
+                                 self.handler.capabilities() +
+                                 symref_capabilities(symrefs.items())))
                 self.proto.write_pkt_line(line + b'\n')
                 peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
@@ -872,9 +881,9 @@ class ReceivePackHandler(PackHandler):
 
     @classmethod
     def capabilities(cls):
-        return (CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
+        return [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
-                CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE)
+                CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE]
 
     def _apply_pack(self, refs):
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
@@ -954,12 +963,14 @@ class ReceivePackHandler(PackHandler):
     def handle(self):
         if self.advertise_refs or not self.http_req:
             refs = sorted(self.repo.get_refs().items())
+            symrefs = sorted(self.repo.refs.get_symrefs().items())
 
             if not refs:
                 refs = [(CAPABILITIES_REF, ZERO_SHA)]
             self.proto.write_pkt_line(
               refs[0][1] + b' ' + refs[0][0] + b'\0' +
-              self.capability_line() + b'\n')
+              self.capability_line(
+                  self.capabilities() + symref_capabilities(symrefs)) + b'\n')
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.proto.write_pkt_line(ref[1] + b' ' + ref[0] + b'\n')

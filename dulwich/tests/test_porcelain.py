@@ -399,7 +399,7 @@ new mode 100644
 index 0000000..ea5c7bf 100644
 --- /dev/null
 +++ b/somename
-@@ -1,0 +1,1 @@
+@@ -0,0 +1 @@
 +The Foo
 """)
 
@@ -430,7 +430,7 @@ diff --git a/somename b/somename
 index ea5c7bf..fd38bcb 100644
 --- a/somename
 +++ b/somename
-@@ -1,1 +1,1 @@
+@@ -1 +1 @@
 -The Foo
 +The Bar
 """)
@@ -950,8 +950,9 @@ class ReceivePackTests(PorcelainTestCase):
                 self.repo.path, BytesIO(b"0000"), outf)
         outlines = outf.getvalue().splitlines()
         self.assertEqual([
-            b'00739e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00 report-status '  # noqa: E501
-            b'delete-refs quiet ofs-delta side-band-64k no-done',
+            b'00919e65bdcf4a22cdd4f3700604a275cd2aaf146b23 HEAD\x00 report-status '  # noqa: E501
+            b'delete-refs quiet ofs-delta side-band-64k '
+            b'no-done symref=HEAD:refs/heads/master',
             b'003f9e65bdcf4a22cdd4f3700604a275cd2aaf146b23 refs/heads/master',
             b'0000'], outlines)
         self.assertEqual(0, exitcode)
@@ -1134,3 +1135,36 @@ class CheckIgnoreTests(PorcelainTestCase):
         self.assertEqual(
             ['foo'],
             list(porcelain.check_ignore(self.repo, ['foo'], no_index=True)))
+
+
+class UpdateHeadTests(PorcelainTestCase):
+
+    def test_set_to_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/blah"] = c1.id
+        porcelain.update_head(self.repo, "blah")
+        self.assertEqual(c1.id, self.repo.head())
+        self.assertEqual(b'ref: refs/heads/blah',
+                         self.repo.refs.read_ref('HEAD'))
+
+    def test_set_to_branch_detached(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/blah"] = c1.id
+        porcelain.update_head(self.repo, "blah", detached=True)
+        self.assertEqual(c1.id, self.repo.head())
+        self.assertEqual(c1.id, self.repo.refs.read_ref(b'HEAD'))
+
+    def test_set_to_commit_detached(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/blah"] = c1.id
+        porcelain.update_head(self.repo, c1.id, detached=True)
+        self.assertEqual(c1.id, self.repo.head())
+        self.assertEqual(c1.id, self.repo.refs.read_ref(b'HEAD'))
+
+    def test_set_new_branch(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/blah"] = c1.id
+        porcelain.update_head(self.repo, "blah", new_branch="bar")
+        self.assertEqual(c1.id, self.repo.head())
+        self.assertEqual(b'ref: refs/heads/bar',
+                         self.repo.refs.read_ref(b'HEAD'))

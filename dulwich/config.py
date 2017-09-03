@@ -388,6 +388,10 @@ class StackedConfig(Config):
         return "<%s for %r>" % (self.__class__.__name__, self.backends)
 
     @classmethod
+    def default(cls):
+        return cls(cls.default_backends())
+
+    @classmethod
     def default_backends(cls):
         """Retrieve the default configuration.
 

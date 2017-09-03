@@ -25,6 +25,7 @@ from contextlib import closing
 from io import BytesIO
 import os
 import shutil
+import stat
 import tempfile
 
 from dulwich.index import (
@@ -43,6 +44,7 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     ObjectStoreGraphWalker,
+    commit_tree_changes,
     tree_lookup_path,
     )
 from dulwich.pack import (
@@ -270,9 +272,50 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.store.add_object(b1)
         b2 = make_object(Blob, data=b"more yummy data")
         self.store.add_object(b2)
-        self.assertEqual([], list(self.store.packs))
+        b3 = make_object(Blob, data=b"even more yummy data")
+        b4 = make_object(Blob, data=b"and more yummy data")
+        self.store.add_objects([(b3, None), (b4, None)])
+        self.assertEqual({b1.id, b2.id, b3.id, b4.id}, set(self.store))
+        self.assertEqual(1, len(self.store.packs))
         self.assertEqual(2, self.store.pack_loose_objects())
         self.assertNotEqual([], list(self.store.packs))
+        self.assertEqual(0, self.store.pack_loose_objects())
+
+    def test_repack(self):
+        b1 = make_object(Blob, data=b"yummy data")
+        self.store.add_object(b1)
+        b2 = make_object(Blob, data=b"more yummy data")
+        self.store.add_object(b2)
+        b3 = make_object(Blob, data=b"even more yummy data")
+        b4 = make_object(Blob, data=b"and more yummy data")
+        self.store.add_objects([(b3, None), (b4, None)])
+        b5 = make_object(Blob, data=b"and more data")
+        b6 = make_object(Blob, data=b"and some more data")
+        self.store.add_objects([(b5, None), (b6, None)])
+        self.assertEqual({b1.id, b2.id, b3.id, b4.id, b5.id, b6.id},
+                         set(self.store))
+        self.assertEqual(2, len(self.store.packs))
+        self.assertEqual(6, self.store.repack())
+        self.assertEqual(1, len(self.store.packs))
+        self.assertEqual(0, self.store.pack_loose_objects())
+
+    def test_repack_existing(self):
+        b1 = make_object(Blob, data=b"yummy data")
+        self.store.add_object(b1)
+        b2 = make_object(Blob, data=b"more yummy data")
+        self.store.add_object(b2)
+        self.store.add_objects([(b1, None), (b2, None)])
+        self.store.add_objects([(b2, None)])
+        self.assertEqual({b1.id, b2.id}, set(self.store))
+        self.assertEqual(2, len(self.store.packs))
+        self.assertEqual(2, self.store.repack())
+        self.assertEqual(1, len(self.store.packs))
+        self.assertEqual(0, self.store.pack_loose_objects())
+
+        self.assertEqual({b1.id, b2.id}, set(self.store))
+        self.assertEqual(1, len(self.store.packs))
+        self.assertEqual(2, self.store.repack())
+        self.assertEqual(1, len(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
 
 
@@ -493,3 +536,75 @@ class ObjectStoreGraphWalkerTests(TestCase):
                          sorted(walk))
         self.assertLess(walk.index(b"a" * 40), walk.index(b"c" * 40))
         self.assertLess(walk.index(b"b" * 40), walk.index(b"d" * 40))
+
+
+class CommitTreeChangesTests(TestCase):
+
+    def setUp(self):
+        super(CommitTreeChangesTests, self).setUp()
+        self.store = MemoryObjectStore()
+        self.blob_a = make_object(Blob, data=b'a')
+        self.blob_b = make_object(Blob, data=b'b')
+        self.blob_c = make_object(Blob, data=b'c')
+        for blob in [self.blob_a, self.blob_b, self.blob_c]:
+            self.store.add_object(blob)
+
+        blobs = [
+          (b'a', self.blob_a.id, 0o100644),
+          (b'ad/b', self.blob_b.id, 0o100644),
+          (b'ad/bd/c', self.blob_c.id, 0o100755),
+          (b'ad/c', self.blob_c.id, 0o100644),
+          (b'c', self.blob_c.id, 0o100644),
+          ]
+        self.tree_id = commit_tree(self.store, blobs)
+
+    def test_no_changes(self):
+        self.assertEqual(
+                self.store[self.tree_id],
+                commit_tree_changes(self.store, self.store[self.tree_id], []))
+
+    def test_add_blob(self):
+        blob_d = make_object(Blob, data=b'd')
+        new_tree = commit_tree_changes(
+                self.store, self.store[self.tree_id], [
+                    (b'd', 0o100644, blob_d.id)])
+        self.assertEqual(
+            new_tree[b'd'],
+            (33188, b'c59d9b6344f1af00e504ba698129f07a34bbed8d'))
+
+    def test_add_blob_in_dir(self):
+        blob_d = make_object(Blob, data=b'd')
+        new_tree = commit_tree_changes(
+                self.store, self.store[self.tree_id], [
+                    (b'e/f/d', 0o100644, blob_d.id)])
+        self.assertEqual(
+            new_tree.items(), [
+                TreeEntry(path=b'a', mode=stat.S_IFREG | 0o100644,
+                          sha=self.blob_a.id),
+                TreeEntry(path=b'ad', mode=stat.S_IFDIR,
+                          sha=b'0e2ce2cd7725ff4817791be31ccd6e627e801f4a'),
+                TreeEntry(path=b'c', mode=stat.S_IFREG | 0o100644,
+                          sha=self.blob_c.id),
+                TreeEntry(path=b'e', mode=stat.S_IFDIR,
+                          sha=b'6ab344e288724ac2fb38704728b8896e367ed108')
+                ])
+        e_tree = self.store[new_tree[b'e'][1]]
+        self.assertEqual(
+            e_tree.items(), [
+                TreeEntry(path=b'f', mode=stat.S_IFDIR,
+                          sha=b'24d2c94d8af232b15a0978c006bf61ef4479a0a5')
+                ])
+        f_tree = self.store[e_tree[b'f'][1]]
+        self.assertEqual(
+            f_tree.items(), [
+                TreeEntry(path=b'd', mode=stat.S_IFREG | 0o100644,
+                          sha=blob_d.id)
+                ])
+
+    def test_delete_blob(self):
+        new_tree = commit_tree_changes(
+                self.store, self.store[self.tree_id], [
+                    (b'ad/bd/c', None, None)])
+        self.assertEqual(set(new_tree), {b'a', b'ad', b'c'})
+        ad_tree = self.store[new_tree[b'ad'][1]]
+        self.assertEqual(set(ad_tree), {b'b', b'c'})

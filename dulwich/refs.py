@@ -47,6 +47,17 @@ BAD_REF_CHARS = set(b'\177 ~^:?*[')
 ANNOTATED_TAG_SUFFIX = b'^{}'
 
 
+def parse_symref_value(contents):
+    """Parse a symref value.
+
+    :param contents: Contents to parse
+    :return: Destination
+    """
+    if contents.startswith(SYMREF):
+        return contents[len(SYMREF):].rstrip(b'\r\n')
+    raise ValueError(contents)
+
+
 def check_ref_format(refname):
     """Check if a refname is correctly formatted.
 
@@ -306,6 +317,21 @@ class RefsContainer(object):
         """
         self.remove_if_equals(name, None)
 
+    def get_symrefs(self):
+        """Get a dict with all symrefs in this container.
+
+        :return: Dictionary mapping source ref to target ref
+        """
+        ret = {}
+        for src in self.allkeys():
+            try:
+                dst = parse_symref_value(self.read_ref(src))
+            except ValueError:
+                pass
+            else:
+                ret[src] = dst
+        return ret
+
 
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.
@@ -538,7 +564,7 @@ class DiskRefsContainer(RefsContainer):
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
         except IOError as e:
-            if e.errno == errno.ENOENT:
+            if e.errno in (errno.ENOENT, errno.EISDIR):
                 return None
             raise
 

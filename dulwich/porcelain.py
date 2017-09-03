@@ -25,6 +25,7 @@ Currently implemented:
  * add
  * branch{_create,_delete,_list}
  * check-ignore
+ * checkout
  * clone
  * commit
  * commit-tree
@@ -69,6 +70,9 @@ from dulwich.archive import (
 from dulwich.client import (
     get_transport_and_path,
     )
+from dulwich.config import (
+    StackedConfig,
+    )
 from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_DELETE,
@@ -97,7 +101,9 @@ from dulwich.objects import (
     pretty_format_tree_entry,
     )
 from dulwich.objectspec import (
+    parse_commit,
     parse_object,
+    parse_ref,
     parse_reftuples,
     parse_tree,
     )
@@ -283,7 +289,9 @@ def clone(source, target=None, bare=False, checkout=None,
         checkout = (not bare)
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
-    client, host_path = get_transport_and_path(source)
+
+    config = StackedConfig.default()
+    client, host_path = get_transport_and_path(source, config=config)
 
     if target is None:
         target = host_path.split("/")[-1]
@@ -742,7 +750,8 @@ def push(repo, remote_location, refspecs,
     with open_repo_closing(repo) as r:
 
         # Get the client and path
-        client, path = get_transport_and_path(remote_location)
+        client, path = get_transport_and_path(
+                remote_location, config=r.get_config_stack())
 
         selected_refs = []
 
@@ -796,7 +805,8 @@ def pull(repo, remote_location=None, refspecs=None,
             selected_refs.extend(
                 parse_reftuples(remote_refs, r.refs, refspecs))
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
-        client, path = get_transport_and_path(remote_location)
+        client, path = get_transport_and_path(
+                remote_location, config=r.get_config_stack())
         remote_refs = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
@@ -1032,7 +1042,8 @@ def fetch(repo, remote_location, outstream=sys.stdout,
     :return: Dictionary with refs on the remote
     """
     with open_repo_closing(repo) as r:
-        client, path = get_transport_and_path(remote_location)
+        client, path = get_transport_and_path(
+                remote_location, config=r.get_config_stack())
         remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs
 
@@ -1043,7 +1054,8 @@ def ls_remote(remote):
     :param remote: Remote repository location
     :return: Dictionary with remote refs
     """
-    client, host_path = get_transport_and_path(remote)
+    config = StackedConfig.default()
+    client, host_path = get_transport_and_path(remote, config=config)
     return client.get_refs(host_path)
 
 
@@ -1139,3 +1151,30 @@ def check_ignore(repo, paths, no_index=False):
                 continue
             if ignore_manager.is_ignored(path):
                 yield path
+
+
+def update_head(repo, target, detached=False, new_branch=None):
+    """Update HEAD to point at a new branch/commit.
+
+    Note that this does not actually update the working tree.
+
+    :param repo: Path to the repository
+    :param detach: Create a detached head
+    :param target: Branch or committish to switch to
+    :param new_branch: New branch to create
+    """
+    with open_repo_closing(repo) as r:
+        if new_branch is not None:
+            to_set = b"refs/heads/" + new_branch.encode(DEFAULT_ENCODING)
+        else:
+            to_set = b"HEAD"
+        if detached:
+            # TODO(jelmer): Provide some way so that the actual ref gets
+            # updated rather than what it points to, so the delete isn't
+            # necessary.
+            del r.refs[to_set]
+            r.refs[to_set] = parse_commit(r, target).id
+        else:
+            r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
+        if new_branch is not None:
+            r.refs.set_symbolic_ref(b"HEAD", to_set)

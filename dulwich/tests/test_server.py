@@ -50,7 +50,7 @@ from dulwich.server import (
     _split_proto_line,
     serve_command,
     _find_shallow,
-    ProtocolGraphWalker,
+    _ProtocolGraphWalker,
     ReceivePackHandler,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
@@ -111,11 +111,11 @@ class TestGenericPackHandler(PackHandler):
 
     @classmethod
     def capabilities(cls):
-        return (b'cap1', b'cap2', b'cap3')
+        return [b'cap1', b'cap2', b'cap3']
 
     @classmethod
     def required_capabilities(cls):
-        return (b'cap2',)
+        return [b'cap2']
 
 
 class HandlerTestCase(TestCase):
@@ -131,7 +131,9 @@ class HandlerTestCase(TestCase):
             self.fail(e)
 
     def test_capability_line(self):
-        self.assertEqual(b' cap1 cap2 cap3', self._handler.capability_line())
+        self.assertEqual(
+                b' cap1 cap2 cap3',
+                self._handler.capability_line([b'cap1', b'cap2', b'cap3']))
 
     def test_set_client_capabilities(self):
         set_caps = self._handler.set_client_capabilities
@@ -288,9 +290,10 @@ class FindShallowTests(TestCase):
 
 
 class TestUploadPackHandler(UploadPackHandler):
+
     @classmethod
     def required_capabilities(self):
-        return ()
+        return []
 
 
 class ReceivePackHandlerTestCase(TestCase):
@@ -308,6 +311,7 @@ class ReceivePackHandlerTestCase(TestCase):
             b'refs/heads/fake-branch': ONE}
         self._repo.refs._update(refs)
         update_refs = [[ONE, ZERO_SHA, b'refs/heads/fake-branch'], ]
+        self._handler.set_client_capabilities([b'delete-refs'])
         status = self._handler._apply_pack(update_refs)
         self.assertEqual(status[0][0], b'unpack')
         self.assertEqual(status[0][1], b'ok')
@@ -320,10 +324,11 @@ class ProtocolGraphWalkerEmptyTestCase(TestCase):
         super(ProtocolGraphWalkerEmptyTestCase, self).setUp()
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b'/': self._repo})
-        self._walker = ProtocolGraphWalker(
+        self._walker = _ProtocolGraphWalker(
                 TestUploadPackHandler(backend, [b'/', b'host=lolcats'],
                                       TestProto()),
-                self._repo.object_store, self._repo.get_peeled)
+                self._repo.object_store, self._repo.get_peeled,
+                self._repo.refs.get_symrefs)
 
     def test_empty_repository(self):
         # The server should wait for a flush packet.
@@ -353,10 +358,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
           ]
         self._repo = MemoryRepo.init_bare(commits, {})
         backend = DictBackend({b'/': self._repo})
-        self._walker = ProtocolGraphWalker(
+        self._walker = _ProtocolGraphWalker(
                 TestUploadPackHandler(backend, [b'/', b'host=lolcats'],
                                       TestProto()),
-                self._repo.object_store, self._repo.get_peeled)
+                self._repo.object_store, self._repo.get_peeled,
+                self._repo.refs.get_symrefs)
 
     def test_all_wants_satisfied_no_haves(self):
         self._walker.set_wants([ONE])

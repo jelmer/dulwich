@@ -86,31 +86,63 @@ def get_summary(commit):
     return commit.message.splitlines()[0].replace(" ", "-")
 
 
-def unified_diff(a, b, fromfile, tofile, n=3):
-    """difflib.unified_diff that doesn't write any dates or trailing spaces.
+#  Unified Diff
+def _format_range_unified(start, stop):
+    'Convert range to the "ed" format'
+    # Per the diff spec at http://www.unix.org/single_unix_specification/
+    beginning = start + 1  # lines start numbering with one
+    length = stop - start
+    if length == 1:
+        return '{}'.format(beginning)
+    if not length:
+        beginning -= 1  # empty ranges begin at line just before the range
+    return '{},{}'.format(beginning, length)
 
-    Based on the same function in Python2.6.5-rc2's difflib.py
+
+def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
+                 tofiledate='', n=3, lineterm='\n'):
+    """difflib.unified_diff that can detect "No newline at end of file" as
+    original "git diff" does.
+
+    Based on the same function in Python2.7 difflib.py
     """
     started = False
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
-            yield b'--- ' + fromfile + b'\n'
-            yield b'+++ ' + tofile + b'\n'
             started = True
-        i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        sizes = "@@ -%d,%d +%d,%d @@\n" % (i1+1, i2-i1, j1+1, j2-j1)
-        yield sizes.encode('ascii')
+            fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
+            todate = '\t{}'.format(tofiledate) if tofiledate else ''
+            yield '--- {}{}{}'.format(
+                fromfile.decode("ascii"),
+                fromdate,
+                lineterm
+                ).encode('ascii')
+            yield '+++ {}{}{}'.format(
+                tofile.decode("ascii"),
+                todate,
+                lineterm
+                ).encode('ascii')
+
+        first, last = group[0], group[-1]
+        file1_range = _format_range_unified(first[1], last[2])
+        file2_range = _format_range_unified(first[3], last[4])
+        yield '@@ -{} +{} @@{}'.format(
+            file1_range,
+            file2_range,
+            lineterm
+             ).encode('ascii')
+
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':
                 for line in a[i1:i2]:
                     yield b' ' + line
                 continue
-            if tag == 'replace' or tag == 'delete':
+            if tag in ('replace', 'delete'):
                 for line in a[i1:i2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'
                     yield b'-' + line
-            if tag == 'replace' or tag == 'insert':
+            if tag in ('replace', 'insert'):
                 for line in b[j1:j2]:
                     if not line[-1:] == b'\n':
                         line += b'\n\\ No newline at end of file\n'

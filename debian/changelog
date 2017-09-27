@@ -1,3 +1,9 @@
+dulwich (0.18.3-2) UNRELEASED; urgency=medium
+
+  * Fix argument order to dh_install.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 28 Sep 2017 00:47:21 +0100
+
 dulwich (0.18.3-1) unstable; urgency=low
 
   * New upstream release.

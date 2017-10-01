@@ -98,7 +98,7 @@ command with the name of the repository to create:
 
 The repository name will be the container that will contain all the Git
 objects for the repository. Then standard c Git client can be used to
-perform operations againt this repository.
+perform operations against this repository.
 
 As an example we can clone the previously empty bare repository:
 

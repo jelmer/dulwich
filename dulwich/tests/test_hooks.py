@@ -125,10 +125,10 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
         os.mkdir(os.path.join(repo_dir, 'hooks'))
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        post_commit_msg = """#!/bin/sh
+        post_commit_success = """#!/bin/sh
 rm """ + path + "\n"
 
-        post_commit_msg_fail = """#!/bin/sh
+        post_commit_fail = """#!/bin/sh
 exit 1
 """
 
@@ -139,7 +139,7 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
         hook = PostCommitShellHook(repo_dir)
 
         with open(post_commit, 'w') as f:
-            f.write(post_commit_msg_fail)
+            f.write(post_commit_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
@@ -151,7 +151,7 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
         hook.execute()
 
         with open(post_commit, 'w') as f:
-            f.write(post_commit_msg)
+            f.write(post_commit_success)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute()

@@ -1,6 +1,7 @@
 dulwich (0.18.4-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Bump standards version to 4.1.1 (no changes).
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 01 Oct 2017 01:57:31 +0100
 

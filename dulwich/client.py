@@ -1161,7 +1161,9 @@ class SSHGitClient(TraditionalGitClient):
 
 
 def default_user_agent_string():
-    return "dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
+    # Start user agent with "git/", because GitHub requires this. :-( See
+    # https://github.com/jelmer/dulwich/issues/562 for details.
+    return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
 def default_urllib2_opener(config):

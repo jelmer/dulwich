@@ -1,3 +1,9 @@
+dulwich (0.18.4-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 01 Oct 2017 01:57:31 +0100
+
 dulwich (0.18.3-2) unstable; urgency=medium
 
   * Fix dh_install invocation.

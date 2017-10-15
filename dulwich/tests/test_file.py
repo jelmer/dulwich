@@ -25,7 +25,7 @@ import shutil
 import sys
 import tempfile
 
-from dulwich.file import GitFile, _fancy_rename
+from dulwich.file import FileLocked, GitFile, _fancy_rename
 from dulwich.tests import (
     SkipTest,
     TestCase,
@@ -158,8 +158,8 @@ class GitFileTests(TestCase):
         try:
             f2 = GitFile(foo, 'wb')
             self.fail()
-        except OSError as e:
-            self.assertEqual(errno.EEXIST, e.errno)
+        except FileLocked as e:
+            pass
         else:
             f2.close()
         f1.write(b' contents')

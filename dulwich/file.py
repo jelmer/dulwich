@@ -90,6 +90,15 @@ def GitFile(filename, mode='rb', bufsize=-1):
         return io.open(filename, mode, bufsize)
 
 
+class FileLocked(Exception):
+    """File is already locked."""
+
+    def __init__(self, filename, lockfilename):
+        self.filename = filename
+        self.lockfilename = lockfilename
+        super(FileLocked, self).__init__(filename, lockfilename)
+
+
 class _GitFile(object):
     """File that follows the git locking protocol for writes.
 
@@ -110,9 +119,14 @@ class _GitFile(object):
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
         self._lockfilename = '%s.lock' % self._filename
-        fd = os.open(
-            self._lockfilename,
-            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+        try:
+            fd = os.open(
+                self._lockfilename,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0))
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                raise FileLocked(filename, self._lockfilename)
+            raise
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 
@@ -149,6 +163,7 @@ class _GitFile(object):
         """
         if self._closed:
             return
+        os.fsync(self._file.fileno())
         self._file.close()
         try:
             try:

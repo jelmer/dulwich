@@ -4,6 +4,9 @@
 
   * Fix cwd for hooks. (Fabian Grünbichler)
 
+  * Fix setting of origin in config when non-standard origin is passed into
+    ``Repo.clone``. (Kenneth Lareau, #565)
+
  API CHANGES
 
   * GitFile now raises ``FileLocked`` when encountering a lock

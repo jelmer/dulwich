@@ -157,7 +157,7 @@ class GitFileTests(TestCase):
         try:
             f2 = GitFile(foo, 'wb')
             self.fail()
-        except FileLocked as e:
+        except FileLocked:
             pass
         else:
             f2.close()

@@ -880,6 +880,12 @@ class BuildRepoRootTests(TestCase):
         r.stage(['a'])
         r.stage(['a'])  # double-stage a deleted path
 
+    def test_stage_directory(self):
+        r = self._repo
+        os.mkdir(os.path.join(r.path, 'c'))
+        r.stage(['c'])
+        self.assertEqual(['a'], list(r.open_index()))
+
     @skipIf(sys.platform == 'win32' and sys.version_info[:2] >= (3, 6),
             'tries to implicitly decode as utf8')
     def test_commit_no_encode_decode(self):

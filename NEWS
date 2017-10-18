@@ -7,6 +7,11 @@
   * Fix setting of origin in config when non-standard origin is passed into
     ``Repo.clone``. (Kenneth Lareau, #565)
 
+ IMPROVEMENTS
+
+  * Silently ignored directories in ``Repo.stage``.
+    (Jelmer Vernooĳ, #564)
+
  API CHANGES
 
   * GitFile now raises ``FileLocked`` when encountering a lock

@@ -276,6 +276,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param checkout: Whether or not to check-out HEAD after cloning
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
+    :param origin: Name of remote from the repository used to clone
     :return: The new repository
     """
     if outstream is not None:
@@ -323,10 +324,10 @@ def clone(source, target=None, bare=False, checkout=None,
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
-        target_config.set((b'remote', b'origin'), b'url', source)
+        target_config.set((b'remote', origin), b'url', source)
         target_config.set(
-            (b'remote', b'origin'), b'fetch',
-            b'+refs/heads/*:refs/remotes/origin/*')
+            (b'remote', origin), b'fetch',
+            b'+refs/heads/*:refs/remotes/' + origin + b'/*')
         target_config.write_to_path()
         if checkout and b"HEAD" in r.refs:
             errstream.write(b'Checking out HEAD\n')

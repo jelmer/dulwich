@@ -276,7 +276,7 @@ class Index(object):
         assert isinstance(name, bytes)
         assert len(x) == 10
         # Remove the old entry if any
-        self._byname[name] = x
+        self._byname[name] = IndexEntry(*x)
 
     def __delitem__(self, name):
         assert isinstance(name, bytes)

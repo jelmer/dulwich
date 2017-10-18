@@ -18,7 +18,6 @@
 # License, Version 2.0.
 #
 
-import errno
 import io
 import os
 import shutil

@@ -52,7 +52,8 @@ class ShellHook(Hook):
     """
 
     def __init__(self, name, path, numparam,
-                 pre_exec_callback=None, post_exec_callback=None):
+                 pre_exec_callback=None, post_exec_callback=None,
+                 cwd=None):
         """Setup shell hook definition
 
         :param name: name of hook for error messages
@@ -66,6 +67,7 @@ class ShellHook(Hook):
             Defaults to None. Takes in a boolean for hook success and the
             modified argument list and returns the final hook return value
             if applicable
+        :param cwd: working directory to switch to when executing the hook
         """
         self.name = name
         self.filepath = path
@@ -73,6 +75,8 @@ class ShellHook(Hook):
 
         self.pre_exec_callback = pre_exec_callback
         self.post_exec_callback = post_exec_callback
+
+        self.cwd = cwd
 
         if sys.version_info[0] == 2 and sys.platform == 'win32':
             # Python 2 on windows does not support unicode file paths
@@ -91,7 +95,7 @@ class ShellHook(Hook):
             args = self.pre_exec_callback(*args)
 
         try:
-            ret = subprocess.call([self.filepath] + list(args))
+            ret = subprocess.call([self.filepath] + list(args), cwd=self.cwd)
             if ret != 0:
                 if (self.post_exec_callback is not None):
                     self.post_exec_callback(0, *args)
@@ -110,7 +114,7 @@ class PreCommitShellHook(ShellHook):
     def __init__(self, controldir):
         filepath = os.path.join(controldir, 'hooks', 'pre-commit')
 
-        ShellHook.__init__(self, 'pre-commit', filepath, 0)
+        ShellHook.__init__(self, 'pre-commit', filepath, 0, cwd=controldir)
 
 
 class PostCommitShellHook(ShellHook):
@@ -119,7 +123,7 @@ class PostCommitShellHook(ShellHook):
     def __init__(self, controldir):
         filepath = os.path.join(controldir, 'hooks', 'post-commit')
 
-        ShellHook.__init__(self, 'post-commit', filepath, 0)
+        ShellHook.__init__(self, 'post-commit', filepath, 0, cwd=controldir)
 
 
 class CommitMsgShellHook(ShellHook):
@@ -149,4 +153,4 @@ class CommitMsgShellHook(ShellHook):
             os.unlink(args[0])
 
         ShellHook.__init__(self, 'commit-msg', filepath, 1,
-                           prepare_msg, clean_msg)
+                           prepare_msg, clean_msg, controldir)

@@ -1,3 +1,26 @@
+0.18.5	2017-10-29
+
+ BUG FIXES
+
+  * Fix cwd for hooks. (Fabian Grünbichler)
+
+  * Fix setting of origin in config when non-standard origin is passed into
+    ``Repo.clone``. (Kenneth Lareau, #565)
+
+  * Prevent setting SSH arguments from SSH URLs when using SSH through a
+    subprocess. Note that Dulwich doesn't support cloning submodules.
+    (CVE 2017-1000117) (Jelmer Vernooĳ)
+
+ IMPROVEMENTS
+
+  * Silently ignored directories in ``Repo.stage``.
+    (Jelmer Vernooĳ, #564)
+
+ API CHANGES
+
+  * GitFile now raises ``FileLocked`` when encountering a lock
+    rather than OSError(EEXIST). (Jelmer Vernooĳ)
+
 0.18.4	2017-10-01
 
  BUG FIXES

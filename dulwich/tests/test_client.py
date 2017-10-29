@@ -50,6 +50,8 @@ from dulwich.client import (
     HttpGitClient,
     ReportStatusParser,
     SendPackError,
+    StrangeHostname,
+    SubprocessSSHVendor,
     UpdateRefsError,
     default_urllib2_opener,
     get_transport_and_path,
@@ -942,3 +944,11 @@ class DefaultUrllib2OpenerTest(TestCase):
         opener = default_urllib2_opener(config=config)
         self.assertIn(urllib2.ProxyHandler,
                       list(map(lambda x: x.__class__, opener.handlers)))
+
+
+class SubprocessSSHVendorTests(TestCase):
+
+    def test_run_command_dashes(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
+                          'git-clone-url')

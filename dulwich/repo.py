@@ -869,9 +869,15 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                blob = blob_from_path_and_stat(full_path, st)
-                self.object_store.add_object(blob)
-                index[tree_path] = index_entry_from_stat(st, blob.id, 0)
+                if not stat.S_ISDIR(st.st_mode):
+                    blob = blob_from_path_and_stat(full_path, st)
+                    self.object_store.add_object(blob)
+                    index[tree_path] = index_entry_from_stat(st, blob.id, 0)
+                else:
+                    try:
+                        del index[tree_path]
+                    except KeyError:
+                        pass
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,

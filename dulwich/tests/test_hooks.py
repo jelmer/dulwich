@@ -43,6 +43,10 @@ class ShellHookTests(TestCase):
             self.skipTest('shell hook tests requires POSIX shell')
 
     def test_hook_pre_commit(self):
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
+
         pre_commit_fail = """#!/bin/sh
 exit 1
 """
@@ -50,10 +54,8 @@ exit 1
         pre_commit_success = """#!/bin/sh
 exit 0
 """
-
-        repo_dir = os.path.join(tempfile.mkdtemp())
-        os.mkdir(os.path.join(repo_dir, 'hooks'))
-        self.addCleanup(shutil.rmtree, repo_dir)
+        pre_commit_cwd = """#!/bin/sh
+if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)
@@ -65,12 +67,22 @@ exit 0
         self.assertRaises(errors.HookError, hook.execute)
 
         with open(pre_commit, 'w') as f:
+            f.write(pre_commit_cwd)
+        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        hook.execute()
+
+        with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute()
 
     def test_hook_commit_msg(self):
+
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, 'hooks'))
+        self.addCleanup(shutil.rmtree, repo_dir)
 
         commit_msg_fail = """#!/bin/sh
 exit 1
@@ -80,9 +92,8 @@ exit 1
 exit 0
 """
 
-        repo_dir = os.path.join(tempfile.mkdtemp())
-        os.mkdir(os.path.join(repo_dir, 'hooks'))
-        self.addCleanup(shutil.rmtree, repo_dir)
+        commit_msg_cwd = """#!/bin/sh
+if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         commit_msg = os.path.join(repo_dir, 'hooks', 'commit-msg')
         hook = CommitMsgShellHook(repo_dir)
@@ -92,6 +103,12 @@ exit 0
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute, b'failed commit')
+
+        with open(commit_msg, 'w') as f:
+            f.write(commit_msg_cwd)
+        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        hook.execute(b'cwd test commit')
 
         with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
@@ -104,28 +121,37 @@ exit 0
         (fd, path) = tempfile.mkstemp()
         os.close(fd)
 
-        post_commit_msg = """#!/bin/sh
-rm """ + path + "\n"
-
-        post_commit_msg_fail = """#!/bin/sh
-exit 1
-"""
-
         repo_dir = os.path.join(tempfile.mkdtemp())
         os.mkdir(os.path.join(repo_dir, 'hooks'))
         self.addCleanup(shutil.rmtree, repo_dir)
+
+        post_commit_success = """#!/bin/sh
+rm """ + path + "\n"
+
+        post_commit_fail = """#!/bin/sh
+exit 1
+"""
+
+        post_commit_cwd = """#!/bin/sh
+if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         post_commit = os.path.join(repo_dir, 'hooks', 'post-commit')
         hook = PostCommitShellHook(repo_dir)
 
         with open(post_commit, 'w') as f:
-            f.write(post_commit_msg_fail)
+            f.write(post_commit_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
         with open(post_commit, 'w') as f:
-            f.write(post_commit_msg)
+            f.write(post_commit_cwd)
+        os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        hook.execute()
+
+        with open(post_commit, 'w') as f:
+            f.write(post_commit_success)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         hook.execute()

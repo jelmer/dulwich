@@ -7,6 +7,10 @@
   * Fix setting of origin in config when non-standard origin is passed into
     ``Repo.clone``. (Kenneth Lareau, #565)
 
+  * Prevent setting SSH arguments from SSH URLs when using SSH through a
+    subprocess. Note that Dulwich doesn't support cloning submodules.
+    (CVE 2017-1000117) (Jelmer Vernooĳ)
+
  IMPROVEMENTS
 
   * Silently ignored directories in ``Repo.stage``.

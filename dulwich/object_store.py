@@ -477,14 +477,14 @@ class DiskObjectStore(PackBasedObjectStore):
                 return
             raise
         with f:
-            for l in f.readlines():
-                l = l.rstrip(b"\n")
-                if l[0] == b"#":
+            for line in f.readlines():
+                line = line.rstrip(b"\n")
+                if line[0] == b"#":
                     continue
-                if os.path.isabs(l):
-                    yield l.decode(sys.getfilesystemencoding())
+                if os.path.isabs(line):
+                    yield line.decode(sys.getfilesystemencoding())
                 else:
-                    yield os.path.join(self.path, l).decode(
+                    yield os.path.join(self.path, line).decode(
                         sys.getfilesystemencoding())
 
     def add_alternate_path(self, path):

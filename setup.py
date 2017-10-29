@@ -48,7 +48,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
         if (line.startswith('Xcode') and
-            int(line.split()[1].split('.')[0]) >= 4):
+                int(line.split()[1].split('.')[0]) >= 4):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']

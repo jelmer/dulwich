@@ -810,8 +810,8 @@ def parse_tree(text, strict=False):
     :raise ObjectFormatException: if the object was malformed in some way
     """
     count = 0
-    l = len(text)
-    while count < l:
+    length = len(text)
+    while count < length:
         mode_end = text.index(b' ', count)
         mode_text = text[count:mode_end]
         if strict and mode_text.startswith(b'0'):

@@ -435,7 +435,7 @@ class PackBasedObjectStore(BaseObjectStore):
         f, commit, abort = self.add_pack()
         try:
             write_pack_objects(f, objects)
-        except:
+        except BaseException:
             abort()
             raise
         else:
@@ -863,7 +863,7 @@ class MemoryObjectStore(BaseObjectStore):
                                       delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
-        except:
+        except BaseException:
             abort()
             raise
         else:

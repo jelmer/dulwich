@@ -332,7 +332,7 @@ def clone(source, target=None, bare=False, checkout=None,
         if checkout and b"HEAD" in r.refs:
             errstream.write(b'Checking out HEAD\n')
             r.reset_index()
-    except:
+    except BaseException:
         r.close()
         raise
 

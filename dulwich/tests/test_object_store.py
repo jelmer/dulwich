@@ -224,7 +224,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         try:
             b = make_object(Blob, data=b"more yummy data")
             write_pack_objects(f, [(b, None)])
-        except:
+        except BaseException:
             abort()
             raise
         else:
@@ -377,7 +377,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         try:
             b = make_object(Blob, data=b"more yummy data")
             write_pack_objects(f, [(b, None)])
-        except:
+        except BaseException:
             abort()
             raise
         else:

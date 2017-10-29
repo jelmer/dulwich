@@ -520,9 +520,9 @@ class SwiftPackReader(object):
     def _read(self, more=False):
         if more:
             self.buff_length = self.buff_length * 2
-        l = self.base_offset
+        offset = self.base_offset
         r = min(self.base_offset + self.buff_length, self.pack_length)
-        ret = self.scon.get_object(self.filename, range="%s-%s" % (l, r))
+        ret = self.scon.get_object(self.filename, range="%s-%s" % (offset, r))
         self.buff = ret
 
     def read(self, length):

@@ -622,18 +622,18 @@ def _parse_message(chunks):
     #
     # Headers can contain newlines. The next line is indented with a space.
     # We store the latest key as 'k', and the accumulated value as 'v'.
-    for l in f:
-        if l.startswith(b' '):
+    for line in f:
+        if line.startswith(b' '):
             # Indented continuation of the previous line
-            v += l[1:]
+            v += line[1:]
         else:
             if k is not None:
                 # We parsed a new header, return its value
                 yield (k, _strip_last_newline(v))
-            if l == b'\n':
+            if line == b'\n':
                 # Empty line indicates end of headers
                 break
-            (k, v) = l.split(b' ', 1)
+            (k, v) = line.split(b' ', 1)
 
     else:
         # We reached end of file before the headers ended. We still need to

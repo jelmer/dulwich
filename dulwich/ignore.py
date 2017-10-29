@@ -106,23 +106,23 @@ def read_ignore_patterns(f):
     :return: List of patterns
     """
 
-    for l in f:
-        l = l.rstrip(b"\r\n")
+    for line in f:
+        line = line.rstrip(b"\r\n")
 
         # Ignore blank lines, they're used for readability.
-        if not l:
+        if not line:
             continue
 
-        if l.startswith(b'#'):
+        if line.startswith(b'#'):
             # Comment
             continue
 
         # Trailing spaces are ignored unless they are quoted with a backslash.
-        while l.endswith(b' ') and not l.endswith(b'\\ '):
-            l = l[:-1]
-        l = l.replace(b'\\ ', b' ')
+        while line.endswith(b' ') and not line.endswith(b'\\ '):
+            line = line[:-1]
+        line = line.replace(b'\\ ', b' ')
 
-        yield l
+        yield line
 
 
 def match_pattern(path, pattern, ignorecase=False):

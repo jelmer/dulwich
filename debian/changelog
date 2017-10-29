@@ -1,3 +1,12 @@
+dulwich (0.18.5-1) UNRELEASED; urgency=high
+
+  * New upstream release.
+   + Prevents setting SSH arguments from SSH URLs when using SSH through a
+     subprocess. Note that Dulwich doesn't support cloning submodules.
+     (CVE 2017-1000117)
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 29 Oct 2017 16:44:59 +0000
+
 dulwich (0.18.4-1) unstable; urgency=medium
 
   * New upstream release.

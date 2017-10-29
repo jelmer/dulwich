@@ -1080,6 +1080,13 @@ class SSHVendor(object):
         raise NotImplementedError(self.run_command)
 
 
+class StrangeHostname(Exception):
+    """Refusing to connect to strange SSH hostname."""
+
+    def __init__(self, hostname):
+        super(StrangeHostname, self).__init__(hostname)
+
+
 class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
@@ -1090,6 +1097,8 @@ class SubprocessSSHVendor(SSHVendor):
             args.extend(['-p', str(port)])
         if username is not None:
             host = '%s@%s' % (username, host)
+        if host.startswith('-'):
+            raise StrangeHostname(hostname=host)
         args.append(host)
         proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,

@@ -8,6 +8,12 @@
   * Raise an error when attempting to add paths that are not under the
     repository. (Jelmer Vernooĳ)
 
+  IMPROVEMENTS
+
+  * Enforce date field parsing consistency. This also add checks on
+    those date fields for potential overflow.
+    (Antoine R. Dumont, #567)
+
 0.18.5	2017-10-29
 
  BUG FIXES

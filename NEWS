@@ -11,7 +11,7 @@
 
   * Prevent setting SSH arguments from SSH URLs when using SSH through a
     subprocess. Note that Dulwich doesn't support cloning submodules.
-    (CVE 2017-1000117) (Jelmer Vernooĳ)
+    (CVE-2017-16228) (Jelmer Vernooĳ)
 
  IMPROVEMENTS
 

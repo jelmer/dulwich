@@ -63,6 +63,9 @@ _TAGGER_HEADER = b'tagger'
 S_IFGITLINK = 0o160000
 
 
+MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
+
+
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
@@ -188,6 +191,20 @@ def check_identity(identity, error_msg):
             or identity.find(b'>', email_end + 1) >= 0
             or not identity.endswith(b'>')):
         raise ObjectFormatException(error_msg)
+
+
+def check_time(time_seconds):
+    """Check if the specified time is not prone to overflow error.
+
+    This will raise an exception if the time is not valid.
+
+    :param time_info: author/committer/tagger info
+
+    """
+    # Prevent overflow error
+    if time_seconds > MAX_TIME:
+        raise ObjectFormatException(
+            'Date field should not exceed %s' % MAX_TIME)
 
 
 def git_line(*items):
@@ -694,6 +711,9 @@ class Tag(ShaFile):
         if getattr(self, "_tagger", None):
             check_identity(self._tagger, "invalid tagger")
 
+        self._check_has_member("_tag_time", "missing tag time")
+        check_time(self._tag_time)
+
         last = None
         for field, _ in _parse_message(self._chunked_text):
             if field == _OBJECT_HEADER and last is not None:
@@ -742,23 +762,10 @@ class Tag(ShaFile):
             elif field == _TAG_HEADER:
                 self._name = value
             elif field == _TAGGER_HEADER:
-                try:
-                    sep = value.index(b'> ')
-                except ValueError:
-                    self._tagger = value
-                    self._tag_time = None
-                    self._tag_timezone = None
-                    self._tag_timezone_neg_utc = False
-                else:
-                    self._tagger = value[0:sep+1]
-                    try:
-                        (timetext, timezonetext) = (
-                                value[sep+2:].rsplit(b' ', 1))
-                        self._tag_time = int(timetext)
-                        self._tag_timezone, self._tag_timezone_neg_utc = (
-                                parse_timezone(timezonetext))
-                    except ValueError as e:
-                        raise ObjectFormatException(e)
+                (self._tagger,
+                 self._tag_time,
+                 (self._tag_timezone,
+                  self._tag_timezone_neg_utc)) = parse_time_entry(value)
             elif field is None:
                 self._message = value
             else:
@@ -1084,6 +1091,29 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
             (sign, offset / 3600, (offset / 60) % 60)).encode('ascii')
 
 
+def parse_time_entry(value):
+    """Parse time entry behavior
+
+    :param value: Bytes representing a git commit/tag line
+    :raise: ObjectFormatException in case of parsing error (malformed
+            field date)
+    :return: Tuple of (author, time, (timezone, timezone_neg_utc))
+    """
+    try:
+        sep = value.index(b'> ')
+    except ValueError:
+        return (value, None, (None, False))
+    try:
+        person = value[0:sep+1]
+        rest = value[sep+2:]
+        timetext, timezonetext = rest.rsplit(b' ', 1)
+        time = int(timetext)
+        timezone, timezone_neg_utc = parse_timezone(timezonetext)
+    except ValueError as e:
+        raise ObjectFormatException(e)
+    return person, time, (timezone, timezone_neg_utc)
+
+
 def parse_commit(chunks):
     """Parse a commit object from chunks.
 
@@ -1108,14 +1138,9 @@ def parse_commit(chunks):
         elif field == _PARENT_HEADER:
             parents.append(value)
         elif field == _AUTHOR_HEADER:
-            author, timetext, timezonetext = value.rsplit(b' ', 2)
-            author_time = int(timetext)
-            author_info = (author, author_time, parse_timezone(timezonetext))
+            author_info = parse_time_entry(value)
         elif field == _COMMITTER_HEADER:
-            committer, timetext, timezonetext = value.rsplit(b' ', 2)
-            commit_time = int(timetext)
-            commit_info = (
-                    committer, commit_time, parse_timezone(timezonetext))
+            commit_info = parse_time_entry(value)
         elif field == _ENCODING_HEADER:
             encoding = value
         elif field == _MERGETAG_HEADER:
@@ -1177,7 +1202,8 @@ class Commit(ShaFile):
         self._check_has_member("_tree", "missing tree")
         self._check_has_member("_author", "missing author")
         self._check_has_member("_committer", "missing committer")
-        # times are currently checked when set
+        self._check_has_member("_author_time", "missing author time")
+        self._check_has_member("_commit_time", "missing commit time")
 
         for parent in self._parents:
             check_hexsha(parent, "invalid parent sha")
@@ -1185,6 +1211,9 @@ class Commit(ShaFile):
 
         check_identity(self._author, "invalid author")
         check_identity(self._committer, "invalid committer")
+
+        check_time(self._author_time)
+        check_time(self._commit_time)
 
         last = None
         for field, _ in _parse_message(self._chunked_text):

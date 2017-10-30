@@ -56,6 +56,7 @@ from dulwich.objects import (
     _parse_tree_py,
     sorted_tree_items,
     _sorted_tree_items_py,
+    MAX_TIME
     )
 from dulwich.tests import (
     TestCase,
@@ -639,6 +640,38 @@ class CommitParseTests(ShaFileCheckTests):
             else:
                 self.assertCheckFails(Commit, text)
 
+    def test_check_commit_with_unparseable_time(self):
+        identity_with_wrong_time = (
+            b'Igor Sysoev <igor@sysoev.ru> 18446743887488505614+42707004')
+
+        # Those fail at reading time
+        self.assertCheckFails(
+            Commit,
+            self.make_commit_text(author=default_committer,
+                                  committer=identity_with_wrong_time))
+        self.assertCheckFails(
+            Commit,
+            self.make_commit_text(author=identity_with_wrong_time,
+                                  committer=default_committer))
+
+    def test_check_commit_with_overflow_date(self):
+        """Date with overflow should raise an ObjectFormatException when checked
+
+        """
+        identity_with_wrong_time = (
+            b'Igor Sysoev <igor@sysoev.ru> 18446743887488505614 +42707004')
+        commit0 = Commit.from_string(self.make_commit_text(
+                author=identity_with_wrong_time,
+                committer=default_committer))
+        commit1 = Commit.from_string(self.make_commit_text(
+                author=default_committer,
+                committer=identity_with_wrong_time))
+
+        # Those fails when triggering the check() method
+        for commit in [commit0, commit1]:
+            with self.assertRaises(ObjectFormatException):
+                commit.check()
+
     def test_parse_gpgsig(self):
         c = Commit.from_string(b"""tree aaff74984cccd156a469afa7d9ab10e4777beb24
 author Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
@@ -1003,6 +1036,21 @@ class TagParseTests(ShaFileCheckTests):
                     b'Sun 7 Jul 2007 12:54:34 +0700')))
         self.assertCheckFails(Tag, self.make_tag_text(object_sha=b'xxx'))
 
+    def test_check_tag_with_unparseable_field(self):
+        self.assertCheckFails(Tag, self.make_tag_text(
+            tagger=(b'Linus Torvalds <torvalds@woody.linux-foundation.org> '
+                    b'423423+0000')))
+
+    def test_check_tag_with_overflow_time(self):
+        """Date with overflow should raise an ObjectFormatException when checked
+
+        """
+        author = 'Some Dude <some@dude.org> %s +0000' % (MAX_TIME+1, )
+        tag = Tag.from_string(self.make_tag_text(
+            tagger=(author.encode())))
+        with self.assertRaises(ObjectFormatException):
+            tag.check()
+
     def test_check_duplicates(self):
         # duplicate each of the header fields
         for i in range(4):
@@ -1217,6 +1265,14 @@ class ShaFileSerializeTests(TestCase):
 
         with self.assert_serialization_on_change(tag):
             tag.message = b'new message'
+
+    def test_tag_serialize_time_error(self):
+        with self.assertRaises(ObjectFormatException):
+            tag = make_object(
+                Tag, name=b'tag', message=b'some message',
+                tagger=b'Tagger <test@example.com> 1174773719+0000',
+                object=(Commit, b'0' * 40))
+            tag._deserialize(tag._serialize())
 
 
 class PrettyFormatTreeEntryTests(TestCase):

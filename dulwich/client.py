@@ -203,7 +203,7 @@ def read_pkt_refs(proto):
         refs[ref] = sha
 
     if len(refs) == 0:
-        return None, set([])
+        return {}, set([])
     if refs == {CAPABILITIES_REF: ZERO_SHA}:
         refs = {}
     return refs, set(server_capabilities)

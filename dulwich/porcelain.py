@@ -317,10 +317,6 @@ def clone(source, target=None, bare=False, checkout=None,
             {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
                 if n.startswith(b'refs/tags/') and
                 not n.endswith(ANNOTATED_TAG_SUFFIX)})
-        if b"HEAD" in remote_refs and not bare:
-            # TODO(jelmer): Support symref capability,
-            # https://github.com/jelmer/dulwich/issues/485
-            r[b"HEAD"] = remote_refs[b"HEAD"]
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -329,9 +325,17 @@ def clone(source, target=None, bare=False, checkout=None,
             (b'remote', origin), b'fetch',
             b'+refs/heads/*:refs/remotes/' + origin + b'/*')
         target_config.write_to_path()
-        if checkout and b"HEAD" in r.refs:
-            errstream.write(b'Checking out HEAD\n')
-            r.reset_index()
+        if checkout and not bare:
+            # TODO(jelmer): Support symref capability,
+            # https://github.com/jelmer/dulwich/issues/485
+            try:
+                head = r[remote_refs[b"HEAD"]]
+            except KeyError:
+                pass
+            else:
+                r[b'HEAD'] = head.id
+                errstream.write(b'Checking out ' + head.id + b'\n')
+                r.reset_index(head.tree)
     except BaseException:
         r.close()
         raise

@@ -125,7 +125,7 @@ class CloneTests(PorcelainTestCase):
                             checkout=False, errstream=errstream)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
-        self.assertEqual(target_repo.head(), c3.id)
+        self.assertRaises(KeyError, target_repo.head)
         self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))

@@ -1,5 +1,10 @@
 0.18.6	UNRELEASED
 
+ BUG FIXES
+
+  * Fix handling of empty repositories in ``porcelain.clone``.
+   (#570, Jelmer Vernooĳ)
+
 0.18.5	2017-10-29
 
  BUG FIXES

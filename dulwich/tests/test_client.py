@@ -131,10 +131,10 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def check_heads(heads):
-            self.assertIs(heads, None)
+            self.assertEqual(heads, {})
             return []
         ret = self.client.fetch_pack(b'/', check_heads, None, None)
-        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.refs)
         self.assertEqual({}, ret.symrefs)
 
     def test_fetch_pack_ignores_magic_ref(self):
@@ -150,7 +150,7 @@ class GitClientTests(TestCase):
             self.assertEquals({}, heads)
             return []
         ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
-        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.refs)
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 

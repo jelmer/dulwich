@@ -54,13 +54,10 @@ class PorcelainTestCase(TestCase):
 
     def setUp(self):
         super(PorcelainTestCase, self).setUp()
-        repo_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, repo_dir)
-        self.repo = Repo.init(repo_dir)
-
-    def tearDown(self):
-        super(PorcelainTestCase, self).tearDown()
-        self.repo.close()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo = Repo.init(os.path.join(self.test_dir, 'repo'), mkdir=True)
+        self.addCleanup(self.repo.close)
 
 
 class ArchiveTests(PorcelainTestCase):
@@ -299,6 +296,19 @@ class AddTests(PorcelainTestCase):
             f.write("BAR")
         porcelain.add(self.repo, paths=[os.path.join(self.repo.path, "foo")])
         self.assertIn(b"foo", self.repo.open_index())
+
+    def test_add_not_in_repo(self):
+        with open(os.path.join(self.test_dir, 'foo'), 'w') as f:
+            f.write("BAR")
+        self.assertRaises(
+            ValueError,
+            porcelain.add, self.repo,
+            paths=[os.path.join(self.test_dir, "foo")])
+        self.assertRaises(
+            ValueError,
+            porcelain.add, self.repo,
+            paths=["../foo"])
+        self.assertEqual([], list(self.repo.open_index()))
 
 
 class RemoveTests(PorcelainTestCase):

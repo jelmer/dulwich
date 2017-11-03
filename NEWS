@@ -5,6 +5,9 @@
   * Fix handling of empty repositories in ``porcelain.clone``.
    (#570, Jelmer Vernooĳ)
 
+  * Raise an error when attempting to add paths that are not under the
+    repository. (Jelmer Vernooĳ)
+
 0.18.5	2017-10-29
 
  BUG FIXES

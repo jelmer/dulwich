@@ -679,6 +679,14 @@ class DiskObjectStore(PackBasedObjectStore):
             basename = self._get_pack_basepath(entries)
             with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
+        if self._pack_cache is None or self._pack_cache_stale():
+            self._update_pack_cache()
+        try:
+            return self._pack_cache[basename]
+        except KeyError:
+            pass
+        else:
+            os.unlink(path)
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)

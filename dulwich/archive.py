@@ -26,6 +26,8 @@
 import posixpath
 import stat
 import tarfile
+import struct
+from os import SEEK_END
 from io import BytesIO
 from contextlib import closing
 
@@ -76,12 +78,23 @@ def tar_stream(store, tree, mtime, format=''):
     :param store: Object store to retrieve objects from
     :param tree: Tree object for the tree root
     :param mtime: UNIX timestamp that is assigned as the modification time for
-        all files
+        all files, and the gzip header modification time if format='gz'
     :param format: Optional compression format for tarball
     :return: Bytestrings
     """
     buf = BytesIO()
     with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
+        if format == 'gz':
+            # Manually correct the gzip header file modification time so that
+            # archives created from the same Git tree are always identical. 
+            # The gzip header file modification time is not currenctly
+            # accessible from the tarfile API, see: https://bugs.python.org/issue31526
+            buf.seek(0)
+            assert buf.read(2) == b'\x1f\x8b', 'Invalid gzip header'
+            buf.seek(4)
+            buf.write(struct.pack('<L', mtime))
+            buf.seek(0, SEEK_END)
+
         for entry_abspath, entry in _walk_tree(store, tree):
             try:
                 blob = store[entry.sha]

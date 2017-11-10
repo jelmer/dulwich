@@ -95,7 +95,10 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[core]\nfoo = \"bar\"la\n")
         self.assertEqual(b"barla", cf.get((b"core", ), b"foo"))
 
-    def test_from_file_with_open_quoted(self):
+    def test_from_file_section_with_open_brackets(self):
+        self.assertRaises(ValueError, self.from_file, b"[core\nfoo = bar\n")
+
+    def test_from_file_value_with_open_quoted(self):
         self.assertRaises(ValueError, self.from_file, b"[core]\nfoo = \"bar\n")
 
     def test_from_file_with_quotes(self):

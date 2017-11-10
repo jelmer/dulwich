@@ -8,6 +8,8 @@
   * Raise an error when attempting to add paths that are not under the
     repository. (Jelmer Vernooĳ)
 
+  * Fix error message for missing trailing ]. (Daniel Andersson)
+
   IMPROVEMENTS
 
   * Enforce date field parsing consistency. This also add checks on

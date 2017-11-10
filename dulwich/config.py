@@ -283,8 +283,9 @@ class ConfigFile(ConfigDict):
                 # Parse section header ("[bla]")
                 if len(line) > 0 and line[:1] == b"[":
                     line = _strip_comments(line).rstrip()
-                    last = line.index(b"]")
-                    if last == -1:
+                    try:
+                        last = line.index(b"]")
+                    except ValueError:
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(b" ", 1)
                     line = line[last+1:]

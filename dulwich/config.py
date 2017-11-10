@@ -262,8 +262,16 @@ def _check_section_name(name):
 
 
 def _strip_comments(line):
-    line = line.split(b"#")[0]
-    line = line.split(b";")[0]
+    comment_bytes = {ord(b"#"), ord(b";")}
+    quote = ord(b'"')
+    string_open = False
+    # Normalize line to bytearray for simple 2/3 compatibility
+    for i, character in enumerate(bytearray(line)):
+        # Comment characters outside balanced quotes denote comment start
+        if character == quote:
+            string_open = not string_open
+        elif not string_open and character in comment_bytes:
+            return line[:i]
     return line
 
 

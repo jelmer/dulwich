@@ -81,6 +81,16 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[section]\nbar= foo # a comment\n")
         self.assertEqual(ConfigFile({(b"section", ): {b"bar": b"foo"}}), cf)
 
+    def test_comment_character_within_value_string(self):
+        cf = self.from_file(b"[section]\nbar= \"foo#bar\"\n")
+        self.assertEqual(
+            ConfigFile({(b"section", ): {b"bar": b"foo#bar"}}), cf)
+
+    def test_comment_character_within_section_string(self):
+        cf = self.from_file(b"[branch \"foo#bar\"] # a comment\nbar= foo\n")
+        self.assertEqual(
+            ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
+
     def test_from_file_section(self):
         cf = self.from_file(b"[core]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core", ), b"foo"))

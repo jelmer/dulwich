@@ -88,7 +88,8 @@ def tar_stream(store, tree, mtime, format=''):
             # Manually correct the gzip header file modification time so that
             # archives created from the same Git tree are always identical.
             # The gzip header file modification time is not currenctly
-            # accessible from the tarfile API, see: https://bugs.python.org/issue31526
+            # accessible from the tarfile API, see:
+            # https://bugs.python.org/issue31526
             buf.seek(0)
             assert buf.read(2) == b'\x1f\x8b', 'Invalid gzip header'
             buf.seek(4)

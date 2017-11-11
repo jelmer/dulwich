@@ -86,7 +86,7 @@ def tar_stream(store, tree, mtime, format=''):
     with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
         if format == 'gz':
             # Manually correct the gzip header file modification time so that
-            # archives created from the same Git tree are always identical. 
+            # archives created from the same Git tree are always identical.
             # The gzip header file modification time is not currenctly
             # accessible from the tarfile API, see: https://bugs.python.org/issue31526
             buf.seek(0)

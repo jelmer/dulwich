@@ -147,7 +147,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def check_heads(heads):
-            self.assertEquals({}, heads)
+            self.assertEqual({}, heads)
             return []
         ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
         self.assertEqual({}, ret.refs)

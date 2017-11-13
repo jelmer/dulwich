@@ -17,6 +17,9 @@
 
   * Fix error message for missing trailing ]. (Daniel Andersson)
 
+  * Raise EmptyFileException when corruption (in the form of an empty
+    file) is detected. (Antoine R. Dumont, #582)
+
   IMPROVEMENTS
 
   * Enforce date field parsing consistency. This also add checks on

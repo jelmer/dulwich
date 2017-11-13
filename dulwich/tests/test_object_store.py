@@ -33,6 +33,7 @@ from dulwich.index import (
     )
 from dulwich.errors import (
     NotTreeError,
+    EmptyFileException,
     )
 from dulwich.objects import (
     sha_to_hex,
@@ -342,6 +343,33 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         store.add_alternate_path(alternate_dir)
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
+
+    def test_corrupted_object_raise_exception(self):
+        """Corrupted sha1 disk file should raise specific exception"""
+        self.store.add_object(testobject)
+        self.assertEqual((Blob.type_num, b'yummy data'),
+                         self.store.get_raw(testobject.id))
+        self.assertTrue(self.store.contains_loose(testobject.id))
+        self.assertIsNotNone(self.store._get_loose_object(testobject.id))
+
+        path = self.store._get_shafile_path(testobject.id)
+        with open(path, 'wb') as f:  # corrupt the file
+            f.write(b'')
+
+        expected_error_msg = 'Corrupted empty file detected'
+        try:
+            self.store.contains_loose(testobject.id)
+        except EmptyFileException as e:
+            self.assertEqual(str(e), expected_error_msg)
+
+        try:
+            self.store._get_loose_object(testobject.id)
+        except EmptyFileException as e:
+            self.assertEqual(str(e), expected_error_msg)
+
+        # this does not change iteration on loose objects though
+        self.assertEqual([testobject.id],
+                         list(self.store._iter_loose_objects()))
 
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)

@@ -5,6 +5,10 @@
   * Make `dulwich.archive` set the gzip header file modification time so that
     archives created from the same Git tree are always identical.
     (#577, Jonas Haag)
+
+  * Allow comment characters (#, ;) within configuration file strings
+    (Daniel Andersson, #579)
+
 0.18.6	2017-11-11
 
  BUG FIXES

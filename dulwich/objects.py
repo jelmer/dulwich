@@ -208,7 +208,7 @@ def check_time(time_seconds):
 
 
 def git_line(*items):
-    """Formats items into a space sepreated line."""
+    """Formats items into a space separated line."""
     return b' '.join(items) + b'\n'
 
 

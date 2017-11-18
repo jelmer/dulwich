@@ -25,6 +25,7 @@
 from io import BytesIO
 import errno
 from itertools import chain
+import logging
 import os
 import stat
 import sys
@@ -456,6 +457,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache_time = 0
         self._pack_cache = {}
         self._alternates = None
+        self.log = logging.getLogger('dulwich.object_store.DiskObjectStore')
 
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)

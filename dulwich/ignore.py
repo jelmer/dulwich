@@ -257,7 +257,7 @@ def default_user_ignore_filter_path(config):
     :return: Path to a global ignore file
     """
     try:
-        return config.get(('core', ), 'excludesFile')
+        return config.get((b'core', ), b'excludesFile')
     except KeyError:
         pass
 

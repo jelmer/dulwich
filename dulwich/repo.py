@@ -939,8 +939,8 @@ class Repo(BaseRepo):
             tree = self[b'HEAD'].tree
         config = self.get_config()
         honor_filemode = config.get_boolean(
-            'core', 'filemode', os.name != "nt")
-        if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
+            b'core', b'filemode', os.name != "nt")
+        if config.get_boolean(b'core', b'core.protectNTFS', os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default

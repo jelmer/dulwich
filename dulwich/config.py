@@ -437,6 +437,12 @@ class StackedConfig(Config):
         return backends
 
     def get(self, section, name):
+        if not isinstance(section, tuple):
+            section = (section, )
+        if not all([isinstance(subsection, bytes) for subsection in section]):
+            raise TypeError(section)
+        if not isinstance(name, bytes):
+            raise TypeError(name)
         for backend in self.backends:
             try:
                 return backend.get(section, name)

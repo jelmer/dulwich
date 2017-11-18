@@ -1315,16 +1315,18 @@ class HttpGitClient(GitClient):
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, service)
+        result_content_type = "application/x-%s-result" % service
         headers = {
-            "Content-Type": "application/x-%s-request" % service
+            "Content-Type": "application/x-%s-request" % service,
+            "Accept": result_content_type,
+            "Content-Length": str(len(data)),
         }
         resp, read = self._http_request(url, headers, data)
         try:
             content_type = resp.info().gettype()
         except AttributeError:
             content_type = resp.info().get_content_type()
-        if content_type != (
-                "application/x-%s-result" % service):
+        if content_type != result_content_type:
             raise GitProtocolError("Invalid content-type from server: %s"
                                    % content_type)
         return resp, read
@@ -1354,6 +1356,7 @@ class HttpGitClient(GitClient):
             b"git-receive-pack", url)
         negotiated_capabilities = self._negotiate_receive_pack_capabilities(
                 server_capabilities)
+        negotiated_capabilities.add(capability_agent())
 
         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
             self._report_status_parser = ReportStatusParser()

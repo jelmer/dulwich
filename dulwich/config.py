@@ -38,6 +38,9 @@ from collections import (
 from dulwich.file import GitFile
 
 
+DEFAULT_ENCODING = 'utf-8'
+
+
 class Config(object):
     """A Git configuration."""
 
@@ -147,6 +150,10 @@ class ConfigDict(Config, MutableMapping):
     def get(self, section, name):
         if not isinstance(section, tuple):
             section = (section, )
+        if not all([isinstance(subsection, bytes) for subsection in section]):
+            raise TypeError(section)
+        if not isinstance(name, bytes):
+            raise TypeError(name)
         if len(section) > 1:
             try:
                 return self._values[section][name]

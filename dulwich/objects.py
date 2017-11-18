@@ -38,6 +38,7 @@ from dulwich.errors import (
     NotTagError,
     NotTreeError,
     ObjectFormatException,
+    EmptyFileException,
     )
 from dulwich.file import GitFile
 
@@ -208,7 +209,7 @@ def check_time(time_seconds):
 
 
 def git_line(*items):
-    """Formats items into a space sepreated line."""
+    """Formats items into a space separated line."""
     return b' '.join(items) + b'\n'
 
 
@@ -362,6 +363,9 @@ class ShaFile(object):
     @classmethod
     def _parse_file(cls, f):
         map = f.read()
+        if not map:
+            raise EmptyFileException('Corrupted empty file detected')
+
         if cls._is_legacy_object(map):
             obj = cls._parse_legacy_object_header(map, f)
             obj._parse_legacy_object(map)

@@ -291,6 +291,7 @@ def git_am_patch_split(f, encoding=None):
     :return: Tuple with commit object, diff contents and git version
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
+    encoding = encoding or "ascii"
     contents = f.read()
     if (isinstance(contents, bytes) and
             getattr(email.parser, "BytesParser", None)):

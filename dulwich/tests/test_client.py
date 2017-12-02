@@ -747,7 +747,7 @@ class LocalGitClientTests(TestCase):
         t = MemoryRepo()
         s = open_repo('a.git')
         self.addCleanup(tear_down_repo, s)
-        self.assertEqual(s.get_refs(), c.fetch(s.path, t))
+        self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
 
     def test_fetch_empty(self):
         c = LocalGitClient()

@@ -1012,11 +1012,13 @@ class LocalGitClient(GitClient):
             to fetch. Receives dictionary of name->sha, should return
             list of shas to fetch. Defaults to all shas.
         :param progress: Optional progress function
-        :return: Dictionary with all remote refs (not just those fetched)
+        :return: FetchPackResult object
         """
         with self._open_repo(path) as r:
-            return r.fetch(target, determine_wants=determine_wants,
+            refs = r.fetch(target, determine_wants=determine_wants,
                            progress=progress)
+            return FetchPackResult(r.get_refs(), r.refs.get_symrefs(),
+                                   agent_string())
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None):

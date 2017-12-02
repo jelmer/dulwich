@@ -305,16 +305,16 @@ def clone(source, target=None, bare=False, checkout=None,
     else:
         r = Repo.init(target)
     try:
-        remote_refs = client.fetch(
+        fetch_result = client.fetch(
             host_path, r, determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
         r.refs.import_refs(
             b'refs/remotes/' + origin,
-            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.items()
+            {n[len(b'refs/heads/'):]: v for (n, v) in fetch_result.refs.items()
                 if n.startswith(b'refs/heads/')})
         r.refs.import_refs(
             b'refs/tags',
-            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
+            {n[len(b'refs/tags/'):]: v for (n, v) in fetch_result.refs.items()
                 if n.startswith(b'refs/tags/') and
                 not n.endswith(ANNOTATED_TAG_SUFFIX)})
         target_config = r.get_config()
@@ -328,7 +328,7 @@ def clone(source, target=None, bare=False, checkout=None,
         # TODO(jelmer): Support symref capability,
         # https://github.com/jelmer/dulwich/issues/485
         try:
-            head = r[remote_refs[b"HEAD"]]
+            head = r[fetch_result.refs[b"HEAD"]]
         except KeyError:
             head = None
         else:
@@ -814,12 +814,12 @@ def pull(repo, remote_location=None, refspecs=None,
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(
                 remote_location, config=r.get_config_stack())
-        remote_refs = client.fetch(
+        fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
-            r.refs[rh] = remote_refs[lh]
+            r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
-            r[b'HEAD'] = remote_refs[selected_refs[0][1]]
+            r[b'HEAD'] = fetch_result.refs[selected_refs[0][1]]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree

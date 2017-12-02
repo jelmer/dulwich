@@ -39,7 +39,10 @@ from dulwich.objects import (
     Tree,
     ZERO_SHA,
     )
-from dulwich.repo import Repo
+from dulwich.repo import (
+    NoIndexPresent,
+    Repo,
+    )
 from dulwich.tests import (
     TestCase,
     )
@@ -122,7 +125,7 @@ class CloneTests(PorcelainTestCase):
                             checkout=False, errstream=errstream)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
-        self.assertRaises(KeyError, target_repo.head)
+        self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
@@ -175,7 +178,8 @@ class CloneTests(PorcelainTestCase):
                 errstream=errstream) as r:
             self.assertEqual(r.path, target_path)
         with Repo(target_path) as r:
-            self.assertRaises(KeyError, r.head)
+            r.head()
+            self.assertRaises(NoIndexPresent, r.open_index)
         self.assertFalse(b'f1' in os.listdir(target_path))
         self.assertFalse(b'f2' in os.listdir(target_path))
 

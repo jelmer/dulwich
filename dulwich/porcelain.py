@@ -325,17 +325,17 @@ def clone(source, target=None, bare=False, checkout=None,
             (b'remote', origin), b'fetch',
             b'+refs/heads/*:refs/remotes/' + origin + b'/*')
         target_config.write_to_path()
-        if checkout and not bare:
-            # TODO(jelmer): Support symref capability,
-            # https://github.com/jelmer/dulwich/issues/485
-            try:
-                head = r[remote_refs[b"HEAD"]]
-            except KeyError:
-                pass
-            else:
-                r[b'HEAD'] = head.id
-                errstream.write(b'Checking out ' + head.id + b'\n')
-                r.reset_index(head.tree)
+        # TODO(jelmer): Support symref capability,
+        # https://github.com/jelmer/dulwich/issues/485
+        try:
+            head = r[remote_refs[b"HEAD"]]
+        except KeyError:
+            head = None
+        else:
+            r[b'HEAD'] = head.id
+        if checkout and not bare and head is not None:
+            errstream.write(b'Checking out ' + head.id + b'\n')
+            r.reset_index(head.tree)
     except BaseException:
         r.close()
         raise

@@ -267,7 +267,7 @@ def init(path=".", bare=False):
 
 def clone(source, target=None, bare=False, checkout=None,
           errstream=default_bytes_err_stream, outstream=None,
-          origin=b"origin"):
+          origin=b"origin", **kwargs):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -292,7 +292,7 @@ def clone(source, target=None, bare=False, checkout=None,
         raise ValueError("checkout and bare are incompatible")
 
     config = StackedConfig.default()
-    client, host_path = get_transport_and_path(source, config=config)
+    client, host_path = get_transport_and_path(source, config=config, **kwargs)
 
     if target is None:
         target = host_path.split("/")[-1]
@@ -743,7 +743,7 @@ def reset(repo, mode, treeish="HEAD"):
 
 def push(repo, remote_location, refspecs,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream):
+         errstream=default_bytes_err_stream, **kwargs):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -758,7 +758,7 @@ def push(repo, remote_location, refspecs,
 
         # Get the client and path
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
+                remote_location, config=r.get_config_stack(), **kwargs)
 
         selected_refs = []
 
@@ -789,7 +789,7 @@ def push(repo, remote_location, refspecs,
 
 def pull(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream):
+         errstream=default_bytes_err_stream, **kwargs):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -813,7 +813,7 @@ def pull(repo, remote_location=None, refspecs=None,
                 parse_reftuples(remote_refs, r.refs, refspecs))
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
+                remote_location, config=r.get_config_stack(), **kwargs)
         fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
@@ -1039,7 +1039,7 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, outstream=sys.stdout,
-          errstream=default_bytes_err_stream):
+          errstream=default_bytes_err_stream, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1050,19 +1050,21 @@ def fetch(repo, remote_location, outstream=sys.stdout,
     """
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
+                remote_location, config=r.get_config_stack(), **kwargs)
         remote_refs = client.fetch(path, r, progress=errstream.write)
     return remote_refs
 
 
-def ls_remote(remote):
+def ls_remote(remote, config=None, **kwargs):
     """List the refs in a remote.
 
     :param remote: Remote repository location
+    :param config: Configuration to use
     :return: Dictionary with remote refs
     """
-    config = StackedConfig.default()
-    client, host_path = get_transport_and_path(remote, config=config)
+    if config is None:
+        config = StackedConfig.default()
+    client, host_path = get_transport_and_path(remote, config=config, **kwargs)
     return client.get_refs(host_path)
 
 

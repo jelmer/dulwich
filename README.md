@@ -28,6 +28,12 @@ or if you are installing from pip::
 
     $ pip install dulwich --global-option="--pure"
 
+Note that you can also specify --global-option in a
+[requirements.txt](https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers)
+file, e.g. like this::
+
+    dulwich --global-option=--pure
+
 Getting started
 ---------------
 

@@ -1017,7 +1017,7 @@ class LocalGitClient(GitClient):
         with self._open_repo(path) as r:
             refs = r.fetch(target, determine_wants=determine_wants,
                            progress=progress)
-            return FetchPackResult(r.get_refs(), r.refs.get_symrefs(),
+            return FetchPackResult(refs, r.refs.get_symrefs(),
                                    agent_string())
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,

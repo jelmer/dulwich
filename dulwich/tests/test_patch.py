@@ -166,7 +166,7 @@ Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
  dulwich.object_store.tree_lookup_path.
 
-From: Jelmer Vernooy <jelmer@debian.org>
+From: Jelmer Vernooij <jelmer@debian.org>
 
 * dulwich/tests/test_object_store.py
   (TreeLookupPathTests): This test case contains a few tests that ensure the
@@ -180,7 +180,7 @@ From: Jelmer Vernooy <jelmer@debian.org>
 1.7.0.4
 """  # noqa: W291
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
-        self.assertEqual(b"Jelmer Vernooy <jelmer@debian.org>", c.author)
+        self.assertEqual(b"Jelmer Vernooij <jelmer@debian.org>", c.author)
         self.assertEqual(b'''\
 Added unit tests for dulwich.object_store.tree_lookup_path.
 
@@ -197,7 +197,7 @@ Date: Thu, 15 Apr 2010 15:40:28 +0200
 Subject:  [Dulwich-users] [PATCH] Added unit tests for
  dulwich.object_store.tree_lookup_path.
 
-From: Jelmer Vernooy <jelmer@debian.org>
+From: Jelmer Vernooij <jelmer@debian.org>
 
 ---
  pixmaps/prey.ico |  Bin 9662 -> 9662 bytes

@@ -393,6 +393,16 @@ class PackIndex(object):
             sha = hex_to_sha(sha)
         return self._object_index(sha)
 
+    def object_sha1(self, index):
+        """Return the SHA1 corresponding to the index in the pack file.
+        """
+        # PERFORMANCE/TODO(jelmer): Avoid scanning entire index
+        for (name, offset, crc32) in self.iterentries():
+            if offset == index:
+                return name
+        else:
+            raise KeyError(index)
+
     def _object_index(self, sha):
         """See object_index.
 
@@ -422,8 +432,10 @@ class MemoryPackIndex(PackIndex):
         :param pack_checksum: Optional pack checksum
         """
         self._by_sha = {}
+        self._by_index = {}
         for name, idx, crc32 in entries:
             self._by_sha[name] = idx
+            self._by_index[idx] = name
         self._entries = entries
         self._pack_checksum = pack_checksum
 
@@ -435,6 +447,9 @@ class MemoryPackIndex(PackIndex):
 
     def _object_index(self, sha):
         return self._by_sha[sha][0]
+
+    def object_sha1(self, index):
+        return self._by_index[index]
 
     def _itersha(self):
         return iter(self._by_sha)
@@ -1220,6 +1235,18 @@ class PackData(object):
         if actual != stored:
             raise ChecksumMismatch(stored, actual)
 
+    def get_compressed_data_at(self, offset):
+        """Given offset in the packfile return compressed data that is there.
+
+        Using the associated index the location of an object can be looked up,
+        and then the packfile can be asked directly for that object using this
+        function.
+        """
+        assert offset >= self._header_size
+        self._file.seek(offset)
+        unpacked, _ = unpack_object(self._file.read, include_comp=True)
+        return (unpacked.pack_type_num, unpacked.delta_base, unpacked.comp_chunks)
+
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
 
@@ -1918,6 +1945,20 @@ class Pack(object):
             return True
         except KeyError:
             return False
+
+    def get_raw_unresolved(self, sha1):
+        """Get raw unresolved data for a SHA.
+
+        :param sha1: SHA to return data for
+        :return: Tuple with pack object type, delta base (if applicable),
+            list of data chunks
+        """
+        offset = self.index.object_index(sha1)
+        (obj_type, delta_base, chunks) = self.data.get_compressed_data_at(offset)
+        if obj_type == OFS_DELTA:
+            delta_base = sha_to_hex(self.index.object_sha1(offset - delta_base))
+            obj_type = REF_DELTA
+        return (obj_type, delta_base, chunks)
 
     def get_raw(self, sha1):
         offset = self.index.object_index(sha1)

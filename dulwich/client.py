@@ -309,7 +309,7 @@ class GitClient(object):
         raise NotImplementedError(cls.from_parsedurl)
 
     def send_pack(self, path, update_refs, generate_pack_contents,
-                  progress=None, write_pack=write_pack_objects):
+                  progress=None, write_pack=None):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
@@ -700,7 +700,7 @@ class TraditionalGitClient(GitClient):
                 return new_refs
             objects = generate_pack_contents(have, want)
 
-            dowrite = len(objects) > 0
+            dowrite = bool(objects)
             dowrite = dowrite or any(old_refs.get(ref) != sha
                                      for (ref, sha) in new_refs.items()
                                      if sha != ZERO_SHA)
@@ -1376,7 +1376,7 @@ class HttpGitClient(GitClient):
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
         objects = generate_pack_contents(have, want)
-        if len(objects) > 0:
+        if bool(objects):
             write_pack(req_proto.write_file(), objects)
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())

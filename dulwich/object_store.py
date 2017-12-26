@@ -959,6 +959,19 @@ class ObjectStoreIterator(ObjectIterator):
         """Return the number of objects."""
         return len(list(self.itershas()))
 
+    def empty(self):
+        iter = self.itershas()
+        try:
+            iter()
+        except StopIteration:
+            return True
+        else:
+            return False
+
+    def __bool__(self):
+        """Indicate whether this object has contents."""
+        return not self.empty()
+
 
 def tree_lookup_path(lookup_obj, root_sha, path):
     """Look up an object in a Git tree.

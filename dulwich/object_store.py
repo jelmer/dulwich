@@ -878,25 +878,6 @@ class MemoryObjectStore(BaseObjectStore):
             commit()
 
 
-class ObjectImporter(object):
-    """Interface for importing objects."""
-
-    def __init__(self, count):
-        """Create a new ObjectImporter.
-
-        :param count: Number of objects that's going to be imported.
-        """
-        self.count = count
-
-    def add_object(self, object):
-        """Add an object."""
-        raise NotImplementedError(self.add_object)
-
-    def finish(self, object):
-        """Finish the import and write objects to disk."""
-        raise NotImplementedError(self.finish)
-
-
 class ObjectIterator(object):
     """Interface for iterating over objects."""
 

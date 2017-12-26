@@ -1579,7 +1579,7 @@ def deltify_pack_objects(objects, window_size=None):
             possible_bases.pop()
 
 
-def write_pack_objects(f, objects, delta_window_size=None, deltify=False):
+def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     """Write a new pack data file.
 
     :param f: File to write to
@@ -1590,6 +1590,8 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=False):
     :param deltify: Whether to deltify objects
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
+    if deltify is None:
+        deltify = True
     if deltify:
         pack_contents = deltify_pack_objects(objects, delta_window_size)
     else:

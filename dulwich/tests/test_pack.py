@@ -130,6 +130,14 @@ class PackIndexTests(PackTests):
         self.assertEqual(p.object_index(tree_sha), 138)
         self.assertEqual(p.object_index(commit_sha), 12)
 
+    def test_object_sha1(self):
+        """Tests that the correct object offset is returned from the index."""
+        p = self.get_pack_index(pack1_sha)
+        self.assertRaises(KeyError, p.object_sha1, 876)
+        self.assertEqual(p.object_sha1(178), hex_to_sha(a_sha))
+        self.assertEqual(p.object_sha1(138), hex_to_sha(tree_sha))
+        self.assertEqual(p.object_sha1(12), hex_to_sha(commit_sha))
+
     def test_index_len(self):
         p = self.get_pack_index(pack1_sha)
         self.assertEqual(3, len(p))
@@ -523,6 +531,18 @@ class TestThinPack(PackTests):
             self.assertEqual(
                 (3, b'foo1234'),
                 p.get_raw(self.blobs[b'foo1234'].id))
+
+    def test_get_raw_unresolved(self):
+        with self.make_pack(False) as p:
+            self.assertEqual(
+                (7, '\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
+                    ['x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
+                p.get_raw_unresolved(self.blobs[b'foo1234'].id))
+        with self.make_pack(True) as p:
+            self.assertEqual(
+                (7, '\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
+                    ['x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
+                p.get_raw_unresolved(self.blobs[b'foo1234'].id))
 
     def test_iterobjects(self):
         with self.make_pack(False) as p:

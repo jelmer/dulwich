@@ -392,7 +392,7 @@ class PackBasedObjectStore(BaseObjectStore):
         return self._get_loose_object(sha) is not None
 
     def get_raw(self, name):
-        """Obtain the raw text for an object.
+        """Obtain the raw fulltext for an object.
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.

@@ -1591,7 +1591,9 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     if deltify is None:
-        deltify = True
+        # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too slow
+        # at the moment.
+        deltify = False
     if deltify:
         pack_contents = deltify_pack_objects(objects, delta_window_size)
     else:

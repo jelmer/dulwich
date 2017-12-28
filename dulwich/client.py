@@ -100,6 +100,8 @@ from dulwich.protocol import (
     parse_capability,
     )
 from dulwich.pack import (
+    pack_objects_to_data,
+    write_pack_data,
     write_pack_objects,
     )
 from dulwich.refs import (
@@ -309,7 +311,7 @@ class GitClient(object):
         raise NotImplementedError(cls.from_parsedurl)
 
     def send_pack(self, path, update_refs, generate_pack_contents,
-                  progress=None, write_pack=None):
+                  progress=None):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
@@ -319,8 +321,6 @@ class GitClient(object):
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
-        :param write_pack: Function called with (file, iterable of objects) to
-            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -636,7 +636,7 @@ class TraditionalGitClient(GitClient):
         raise NotImplementedError()
 
     def send_pack(self, path, update_refs, generate_pack_contents,
-                  progress=None, write_pack=write_pack_objects):
+                  progress=None):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
@@ -646,8 +646,6 @@ class TraditionalGitClient(GitClient):
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional callback called with progress updates
-        :param write_pack: Function called with (file, iterable of objects) to
-            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -700,12 +698,14 @@ class TraditionalGitClient(GitClient):
                 return new_refs
             objects = generate_pack_contents(have, want)
 
-            dowrite = bool(objects)
+            pack_data_count, pack_data = pack_objects_to_data(objects)
+
+            dowrite = bool(pack_data_count)
             dowrite = dowrite or any(old_refs.get(ref) != sha
                                      for (ref, sha) in new_refs.items()
                                      if sha != ZERO_SHA)
             if dowrite:
-                write_pack(proto.write_file(), objects)
+                write_pack_data(proto.write_file(), pack_data_count, pack_data)
 
             self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress)
@@ -949,7 +949,7 @@ class LocalGitClient(GitClient):
         return closing(Repo(path))
 
     def send_pack(self, path, update_refs, generate_pack_contents,
-                  progress=None, write_pack=write_pack_objects):
+                  progress=None):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
@@ -959,8 +959,6 @@ class LocalGitClient(GitClient):
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
-        :param write_pack: Function called with (file, iterable of objects) to
-            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -1335,7 +1333,7 @@ class HttpGitClient(GitClient):
         return resp, read
 
     def send_pack(self, path, update_refs, generate_pack_contents,
-                  progress=None, write_pack=write_pack_objects):
+                  progress=None):
         """Upload a pack to a remote repository.
 
         :param path: Repository path (as bytestring)
@@ -1345,8 +1343,6 @@ class HttpGitClient(GitClient):
         :param generate_pack_contents: Function that can return a sequence of
             the shas of the objects to upload.
         :param progress: Optional progress function
-        :param write_pack: Function called with (file, iterable of objects) to
-            write the objects returned by generate_pack_contents to the server.
 
         :raises SendPackError: if server rejects the pack data
         :raises UpdateRefsError: if the server supports report-status
@@ -1377,8 +1373,9 @@ class HttpGitClient(GitClient):
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
         objects = generate_pack_contents(have, want)
-        if bool(objects):
-            write_pack(req_proto.write_file(), objects)
+        pack_data_count, pack_data = pack_objects_to_data(objects)
+        if bool(pack_data_count):
+            write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())
         try:

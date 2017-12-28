@@ -1578,6 +1578,17 @@ def deltify_pack_objects(objects, window_size=None):
         while len(possible_bases) > window_size:
             possible_bases.pop()
 
+def pack_objects_to_data(objects):
+    """Create pack data from objects
+
+    :param objects: Pack objects
+    :return: Tuples with (type_num, hexdigest, delta base, object chunks)
+    """
+    count = len(objects)
+    return (count,
+            ((o.type_num, o.sha().digest(), None, o.as_raw_string())
+              for (o, path) in objects))
+
 
 def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     """Write a new pack data file.
@@ -1596,12 +1607,11 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
         deltify = False
     if deltify:
         pack_contents = deltify_pack_objects(objects, delta_window_size)
+        pack_contents_count = len(objects)
     else:
-        pack_contents = (
-            (o.type_num, o.sha().digest(), None, o.as_raw_string())
-            for (o, path) in objects)
+        pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
-    return write_pack_data(f, len(objects), pack_contents)
+    return write_pack_data(f, pack_contents_count, pack_contents)
 
 
 def write_pack_data(f, num_records, records):

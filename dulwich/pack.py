@@ -1245,7 +1245,8 @@ class PackData(object):
         assert offset >= self._header_size
         self._file.seek(offset)
         unpacked, _ = unpack_object(self._file.read, include_comp=True)
-        return (unpacked.pack_type_num, unpacked.delta_base, unpacked.comp_chunks)
+        return (unpacked.pack_type_num, unpacked.delta_base,
+                unpacked.comp_chunks)
 
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
@@ -1551,6 +1552,7 @@ def deltify_pack_objects(objects, window_size=None):
     :return: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
+    # TODO(jelmer): Use threads
     if window_size is None:
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
     # Build a list of objects ordered by the magic Linus heuristic
@@ -1578,6 +1580,7 @@ def deltify_pack_objects(objects, window_size=None):
         while len(possible_bases) > window_size:
             possible_bases.pop()
 
+
 def pack_objects_to_data(objects):
     """Create pack data from objects
 
@@ -1587,7 +1590,7 @@ def pack_objects_to_data(objects):
     count = len(objects)
     return (count,
             ((o.type_num, o.sha().digest(), None, o.as_raw_string())
-              for (o, path) in objects))
+             for (o, path) in objects))
 
 
 def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
@@ -1602,8 +1605,8 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     if deltify is None:
-        # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too slow
-        # at the moment.
+        # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
+        # slow at the moment.
         deltify = False
     if deltify:
         pack_contents = deltify_pack_objects(objects, delta_window_size)
@@ -1968,9 +1971,11 @@ class Pack(object):
             list of data chunks
         """
         offset = self.index.object_index(sha1)
-        (obj_type, delta_base, chunks) = self.data.get_compressed_data_at(offset)
+        (obj_type, delta_base, chunks) = self.data.get_compressed_data_at(
+                offset)
         if obj_type == OFS_DELTA:
-            delta_base = sha_to_hex(self.index.object_sha1(offset - delta_base))
+            delta_base = sha_to_hex(
+                    self.index.object_sha1(offset - delta_base))
             obj_type = REF_DELTA
         return (obj_type, delta_base, chunks)
 

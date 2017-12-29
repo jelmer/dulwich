@@ -100,7 +100,6 @@ from dulwich.protocol import (
     parse_capability,
     )
 from dulwich.pack import (
-    pack_objects_to_data,
     write_pack_data,
     write_pack_objects,
     )
@@ -310,7 +309,7 @@ class GitClient(object):
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, update_refs, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -318,8 +317,8 @@ class GitClient(object):
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_contents: Function that can return a sequence of
-            the shas of the objects to upload.
+        :param generate_pack_data: Function that can return a tuple
+            with number of objects and list of pack data to include
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -635,7 +634,7 @@ class TraditionalGitClient(GitClient):
         """
         raise NotImplementedError()
 
-    def send_pack(self, path, update_refs, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -643,8 +642,8 @@ class TraditionalGitClient(GitClient):
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_contents: Function that can return a sequence of
-            the shas of the objects to upload.
+        :param generate_pack_data: Function that can return a tuple with
+            number of objects and pack data to upload.
         :param progress: Optional callback called with progress updates
 
         :raises SendPackError: if server rejects the pack data
@@ -696,9 +695,9 @@ class TraditionalGitClient(GitClient):
             if (not want and
                     set(new_refs.items()).issubset(set(old_refs.items()))):
                 return new_refs
-            objects = generate_pack_contents(have, want)
-
-            pack_data_count, pack_data = pack_objects_to_data(objects)
+            pack_data_count, pack_data = generate_pack_data(
+                have, want,
+                ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
 
             dowrite = bool(pack_data_count)
             dowrite = dowrite or any(old_refs.get(ref) != sha
@@ -948,7 +947,7 @@ class LocalGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return closing(Repo(path))
 
-    def send_pack(self, path, update_refs, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -956,8 +955,8 @@ class LocalGitClient(GitClient):
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_contents: Function that can return a sequence of
-            the shas of the objects to upload.
+        :param generate_pack_data: Function that can return a tuple
+            with number of items and pack data to upload.
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -986,7 +985,8 @@ class LocalGitClient(GitClient):
                     set(new_refs.items()).issubset(set(old_refs.items()))):
                 return new_refs
 
-            target.object_store.add_objects(generate_pack_contents(have, want))
+            target.object_store.add_pack_data(
+                *generate_pack_data(have, want, ofs_delta=True))
 
             for refname, new_sha1 in new_refs.items():
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
@@ -1332,7 +1332,7 @@ class HttpGitClient(GitClient):
                                    % content_type)
         return resp, read
 
-    def send_pack(self, path, update_refs, generate_pack_contents,
+    def send_pack(self, path, update_refs, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -1340,8 +1340,8 @@ class HttpGitClient(GitClient):
         :param update_refs: Function to determine changes to remote refs.
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_contents: Function that can return a sequence of
-            the shas of the objects to upload.
+        :param generate_pack_data: Function that can return a tuple
+            with number of elements and pack data to upload.
         :param progress: Optional progress function
 
         :raises SendPackError: if server rejects the pack data
@@ -1372,9 +1372,10 @@ class HttpGitClient(GitClient):
             req_proto, negotiated_capabilities, old_refs, new_refs)
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
-        objects = generate_pack_contents(have, want)
-        pack_data_count, pack_data = pack_objects_to_data(objects)
-        if bool(pack_data_count):
+        pack_data_count, pack_data = generate_pack_data(
+                have, want,
+                ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
+        if pack_data_count:
             write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())

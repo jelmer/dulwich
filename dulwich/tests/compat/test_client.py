@@ -105,7 +105,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_contents)
+                        src.object_store.generate_pack_data)
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -125,7 +125,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_contents)
+                        src.object_store.generate_pack_data)
             self.assertDestEqualsSrc()
 
     def make_dummy_commit(self, dest):
@@ -152,7 +152,7 @@ class DulwichClientTestBase(object):
     def compute_send(self, src):
         sendrefs = dict(src.get_refs())
         del sendrefs[b'HEAD']
-        return sendrefs, src.object_store.generate_pack_contents
+        return sendrefs, src.object_store.generate_pack_data
 
     def test_send_pack_one_error(self):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
@@ -251,8 +251,8 @@ class DulwichClientTestBase(object):
             sendrefs[b'refs/heads/abranch'] = b"00" * 20
             del sendrefs[b'HEAD']
 
-            def gen_pack(have, want):
-                return []
+            def gen_pack(have, want, ofs_delta=False):
+                return 0, []
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
             c.send_pack(

@@ -56,10 +56,11 @@ from dulwich.pack import (
     PackData,
     PackInflater,
     iter_sha1,
+    pack_objects_to_data,
     write_pack_header,
     write_pack_index_v2,
+    write_pack_data,
     write_pack_object,
-    write_pack_objects,
     compute_file_sha,
     PackIndexer,
     PackStreamCopier,
@@ -135,6 +136,24 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_objects)
 
+    def add_pack_data(self, count, pack_data):
+        """Add pack data to this object store.
+
+        :param num_items: Number of items to add
+        :param pack_data: Iterator over pack data tuples
+        """
+        if count == 0:
+            # Don't bother writing an empty pack file
+            return
+        f, commit, abort = self.add_pack()
+        try:
+            write_pack_data(f, count, pack_data)
+        except BaseException:
+            abort()
+            raise
+        else:
+            return commit()
+
     def tree_changes(self, source, target, want_unchanged=False):
         """Find the differences between the contents of two trees
 
@@ -206,6 +225,18 @@ class BaseObjectStore(object):
         :param progress: Optional progress reporting method
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
+
+    def generate_pack_data(self, have, want, progress=None, ofs_delta=True):
+        """Generate pack data objects for a set of wants/haves.
+
+        :param have: List of SHA1s of objects that should not be sent
+        :param want: List of SHA1s of objects that should be sent
+        :param ofs_delta: Whether OFS deltas can be included
+        :param progress: Optional progress reporting method
+        """
+        # TODO(jelmer): More efficient implementation
+        return pack_objects_to_data(
+            self.generate_pack_contents(have, want, progress))
 
     def peel_sha(self, sha):
         """Peel all tags from a SHA.
@@ -429,17 +460,7 @@ class PackBasedObjectStore(BaseObjectStore):
             __len__.
         :return: Pack object of the objects written.
         """
-        if len(objects) == 0:
-            # Don't bother writing an empty pack file
-            return
-        f, commit, abort = self.add_pack()
-        try:
-            write_pack_objects(f, objects)
-        except BaseException:
-            abort()
-            raise
-        else:
-            return commit()
+        return self.add_pack_data(*pack_objects_to_data(objects))
 
 
 class DiskObjectStore(PackBasedObjectStore):

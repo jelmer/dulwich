@@ -30,6 +30,7 @@ import errno
 import os
 
 from collections import (
+    Iterable,
     OrderedDict,
     MutableMapping,
     )
@@ -39,6 +40,69 @@ from dulwich.file import GitFile
 
 
 DEFAULT_ENCODING = 'utf-8'
+SENTINAL = object()
+
+
+def lower_key(key):
+    if isinstance(key, (bytes, str)):
+        return key.lower()
+
+    if isinstance(key, Iterable):
+        return type(key)(
+            map(lower_key, key)
+        )
+
+    return key
+
+
+class CaseInsensitiveDict(OrderedDict):
+    @classmethod
+    def make(cls, dict_in=None):
+
+        if isinstance(dict_in, cls):
+            return dict_in
+
+        out = cls()
+
+        if dict_in is None:
+            return out
+
+        if not isinstance(dict_in, MutableMapping):
+            raise TypeError
+
+        for key, value in dict_in.items():
+            out[key] = value
+
+        return out
+
+    def __setitem__(self, key, value, **kwargs):
+        key = lower_key(key)
+
+        super(CaseInsensitiveDict, self).__setitem__(key, value,  **kwargs)
+
+    def __getitem__(self, item):
+        key = lower_key(item)
+
+        return super(CaseInsensitiveDict, self).__getitem__(key)
+
+    def get(self, key, default=SENTINAL):
+        try:
+            return self[key]
+        except KeyError:
+            pass
+
+        if default is SENTINAL:
+            return type(self)()
+
+        return default
+
+    def setdefault(self, key, default=SENTINAL):
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = self.get(key, default)
+
+        return self[key]
 
 
 class Config(object):
@@ -112,9 +176,7 @@ class ConfigDict(Config, MutableMapping):
 
     def __init__(self, values=None):
         """Create a new ConfigDict."""
-        if values is None:
-            values = OrderedDict()
-        self._values = values
+        self._values = CaseInsensitiveDict.make(values)
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._values)
@@ -147,31 +209,38 @@ class ConfigDict(Config, MutableMapping):
         else:
             return (parts[0], None, parts[1])
 
-    def get(self, section, name):
+    @staticmethod
+    def check_section_and_name(section, name):
         if not isinstance(section, tuple):
             section = (section, )
         if not all([isinstance(subsection, bytes) for subsection in section]):
             raise TypeError(section)
         if not isinstance(name, bytes):
             raise TypeError(name)
+
+        return section
+
+    def get(self, section, name):
+        section = self.check_section_and_name(section, name)
+
         if len(section) > 1:
             try:
                 return self._values[section][name]
             except KeyError:
                 pass
+
         return self._values[(section[0],)][name]
 
     def set(self, section, name, value):
-        if not isinstance(section, tuple):
-            section = (section, )
-        if not isinstance(name, bytes):
-            raise TypeError(name)
+        section = self.check_section_and_name(section, name)
+
         if type(value) not in (bool, bytes):
             raise TypeError(value)
-        self._values.setdefault(section, OrderedDict())[name] = value
+
+        self._values.setdefault(section)[name] = value
 
     def iteritems(self, section):
-        return self._values.get(section, OrderedDict()).items()
+        return self._values.get(section).items()
 
     def itersections(self):
         return self._values.keys()
@@ -324,7 +393,7 @@ class ConfigFile(ConfigDict):
                             section = (pts[0], pts[1])
                         else:
                             section = (pts[0], )
-                    ret._values[section] = OrderedDict()
+                    ret._values.setdefault(section)
                 if _strip_comments(line).strip() == b"":
                     continue
                 if section is None:

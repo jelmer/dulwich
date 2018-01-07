@@ -13,6 +13,8 @@
 
   * Add a fastimport ``extra``. (Jelmer Vernooĳ)
 
+  * Start writing reflog entries. (Jelmer Vernooĳ)
+
  API CHANGES
 
   * ``GitClient.send_pack`` now accepts a ``generate_pack_data``

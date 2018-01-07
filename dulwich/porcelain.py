@@ -308,15 +308,18 @@ def clone(source, target=None, bare=False, checkout=None,
         fetch_result = client.fetch(
             host_path, r, determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
+        ref_message = b"clone: from " + source.encode('utf-8')
         r.refs.import_refs(
             b'refs/remotes/' + origin,
             {n[len(b'refs/heads/'):]: v for (n, v) in fetch_result.refs.items()
-                if n.startswith(b'refs/heads/')})
+                if n.startswith(b'refs/heads/')},
+            message=ref_message)
         r.refs.import_refs(
             b'refs/tags',
             {n[len(b'refs/tags/'):]: v for (n, v) in fetch_result.refs.items()
                 if n.startswith(b'refs/tags/') and
-                not n.endswith(ANNOTATED_TAG_SUFFIX)})
+                not n.endswith(ANNOTATED_TAG_SUFFIX)},
+            message=ref_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -1025,9 +1028,12 @@ def branch_create(repo, name, objectish=None, force=False):
             objectish = "HEAD"
         object = parse_object(r, objectish)
         refname = b"refs/heads/" + name
-        if refname in r.refs and not force:
-            raise KeyError("Branch with name %s already exists." % name)
-        r.refs[refname] = object.id
+        ref_message = b"branch: Created from " + objectish.encode('utf-8')
+        if force:
+            r.refs.set_if_equals(refname, None, object.id, message=ref_message)
+        else:
+            if not r.refs.add_if_new(refname, object.id, message=ref_message):
+                raise KeyError("Branch with name %s already exists." % name)
 
 
 def branch_list(repo):

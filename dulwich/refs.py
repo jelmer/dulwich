@@ -139,7 +139,8 @@ class RefsContainer(object):
     def import_refs(self, base, other, committer=None, timestamp=None,
                     timezone=None, message=None):
         for name, value in other.items():
-            self.set_if_equals(b'/'.join((base, name)), None, value, message=message)
+            self.set_if_equals(b'/'.join((base, name)), None, value,
+                               message=message)
 
     def allkeys(self):
         """All refs present in this container."""

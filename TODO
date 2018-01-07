@@ -1,2 +1,6 @@
 - 'git annotate' equivalent
-- repacking
+- reflog handling
+
+Performance:
+ - more efficient pack iteration
+ - more efficient delta generation

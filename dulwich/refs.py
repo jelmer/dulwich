@@ -94,11 +94,25 @@ def check_ref_format(refname):
 class RefsContainer(object):
     """A container for refs."""
 
-    def set_symbolic_ref(self, name, other):
+    def __init__(self, logger=None):
+        self._logger = logger
+
+    def _log(self, ref, old_sha, new_sha, committer=None, timestamp=None,
+             timezone=None, message=None):
+        if self._logger is None:
+            return
+        if message is None:
+            return
+        self._logger(ref, old_sha, new_sha, committer, timestamp,
+                     timezone, message)
+
+    def set_symbolic_ref(self, name, other, committer=None, timestamp=None,
+                         timezone=None, message=None):
         """Make a ref point at another ref.
 
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
+        :param message: Optional message
         """
         raise NotImplementedError(self.set_symbolic_ref)
 
@@ -122,9 +136,10 @@ class RefsContainer(object):
         """
         return None
 
-    def import_refs(self, base, other):
+    def import_refs(self, base, other, committer=None, timestamp=None,
+                    timezone=None, message=None):
         for name, value in other.items():
-            self[b'/'.join((base, name))] = value
+            self.set_if_equals(b'/'.join((base, name)), None, value, message=message)
 
     def allkeys(self):
         """All refs present in this container."""
@@ -256,7 +271,8 @@ class RefsContainer(object):
             raise KeyError(name)
         return sha
 
-    def set_if_equals(self, name, old_ref, new_ref):
+    def set_if_equals(self, name, old_ref, new_ref, committer=None,
+                      timestamp=None, timezone=None, message=None):
         """Set a refname to new_ref only if it currently equals old_ref.
 
         This method follows all symbolic references if applicable for the
@@ -267,12 +283,18 @@ class RefsContainer(object):
         :param old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
         :param new_ref: The new sha the refname will refer to.
+        :param message: Message for reflog
         :return: True if the set was successful, False otherwise.
         """
         raise NotImplementedError(self.set_if_equals)
 
     def add_if_new(self, name, ref):
-        """Add a new reference only if it does not already exist."""
+        """Add a new reference only if it does not already exist.
+
+        :param name: Ref name
+        :param ref: Ref value
+        :param message: Message for reflog
+        """
         raise NotImplementedError(self.add_if_new)
 
     def __setitem__(self, name, ref):
@@ -289,7 +311,8 @@ class RefsContainer(object):
         """
         self.set_if_equals(name, None, ref)
 
-    def remove_if_equals(self, name, old_ref):
+    def remove_if_equals(self, name, old_ref, committer=None,
+                         timestamp=None, timezone=None, message=None):
         """Remove a refname only if it currently equals old_ref.
 
         This method does not follow symbolic references, even if applicable for
@@ -299,6 +322,7 @@ class RefsContainer(object):
         :param name: The refname to delete.
         :param old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+        :param message: Message for reflog
         :return: True if the delete was successful, False otherwise.
         """
         raise NotImplementedError(self.remove_if_equals)
@@ -340,7 +364,8 @@ class DictRefsContainer(RefsContainer):
     threadsafe.
     """
 
-    def __init__(self, refs):
+    def __init__(self, refs, logger=None):
+        super(DictRefsContainer, self).__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
 
@@ -353,31 +378,46 @@ class DictRefsContainer(RefsContainer):
     def get_packed_refs(self):
         return {}
 
-    def set_symbolic_ref(self, name, other):
+    def set_symbolic_ref(self, name, other, committer=None,
+                         timestamp=None, timezone=None, message=None):
+        old = self.follow(name)[-1]
         self._refs[name] = SYMREF + other
+        self._log(name, old, old, committer=committer, timestamp=timestamp,
+                  timezone=timezone, message=message)
 
-    def set_if_equals(self, name, old_ref, new_ref):
+    def set_if_equals(self, name, old_ref, new_ref, committer=None,
+                      timestamp=None, timezone=None, message=None):
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         realnames, _ = self.follow(name)
         for realname in realnames:
             self._check_refname(realname)
+            old = self._refs.get(realname)
             self._refs[realname] = new_ref
+            self._log(realname, old, new_ref, committer=committer,
+                      timestamp=timestamp, timezone=timezone, message=message)
         return True
 
-    def add_if_new(self, name, ref):
+    def add_if_new(self, name, ref, committer=None, timestamp=None,
+                   timezone=None, message=None):
         if name in self._refs:
             return False
         self._refs[name] = ref
+        self._log(name, None, ref, committer=committer, timestamp=timestamp,
+                  timezone=timezone, message=message)
         return True
 
-    def remove_if_equals(self, name, old_ref):
+    def remove_if_equals(self, name, old_ref, committer=None, timestamp=None,
+                         timezone=None, message=None):
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         try:
-            del self._refs[name]
+            old = self._refs.pop(name)
         except KeyError:
             pass
+        else:
+            self._log(name, old, None, committer=committer,
+                      timestamp=timestamp, timezone=timezone, message=message)
         return True
 
     def get_peeled(self, name):
@@ -431,7 +471,8 @@ class InfoRefsContainer(RefsContainer):
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
-    def __init__(self, path, worktree_path=None):
+    def __init__(self, path, worktree_path=None, logger=None):
+        super(DiskRefsContainer, self).__init__(logger=logger)
         self.path = path
         self.worktree_path = worktree_path or path
         self._packed_refs = None
@@ -589,11 +630,13 @@ class DiskRefsContainer(RefsContainer):
         finally:
             f.abort()
 
-    def set_symbolic_ref(self, name, other):
+    def set_symbolic_ref(self, name, other, committer=None, timestamp=None,
+                         timezone=None, message=None):
         """Make a ref point at another ref.
 
         :param name: Name of the ref to set
         :param other: Name of the ref to point at
+        :param message: Optional message to describe the change
         """
         self._check_refname(name)
         self._check_refname(other)
@@ -605,10 +648,16 @@ class DiskRefsContainer(RefsContainer):
             except (IOError, OSError):
                 f.abort()
                 raise
+            else:
+                sha = self.follow(name)[-1]
+                self._log(name, sha, sha, committer=committer,
+                          timestamp=timestamp, timezone=timezone,
+                          message=message)
         finally:
             f.close()
 
-    def set_if_equals(self, name, old_ref, new_ref):
+    def set_if_equals(self, name, old_ref, new_ref, committer=None,
+                      timestamp=None, timezone=None, message=None):
         """Set a refname to new_ref only if it currently equals old_ref.
 
         This method follows all symbolic references, and can be used to perform
@@ -618,6 +667,7 @@ class DiskRefsContainer(RefsContainer):
         :param old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
         :param new_ref: The new sha the refname will refer to.
+        :param message: Set message for reflog
         :return: True if the set was successful, False otherwise.
         """
         self._check_refname(name)
@@ -647,9 +697,12 @@ class DiskRefsContainer(RefsContainer):
             except (OSError, IOError):
                 f.abort()
                 raise
+            self._log(realname, old_ref, new_ref, committer=committer,
+                      timestamp=timestamp, timezone=timezone, message=message)
         return True
 
-    def add_if_new(self, name, ref):
+    def add_if_new(self, name, ref, committer=None, timestamp=None,
+                   timezone=None, message=None):
         """Add a new reference only if it does not already exist.
 
         This method follows symrefs, and only ensures that the last ref in the
@@ -657,6 +710,7 @@ class DiskRefsContainer(RefsContainer):
 
         :param name: The refname to set.
         :param ref: The new sha the refname will refer to.
+        :param message: Optional message for reflog
         :return: True if the add was successful, False otherwise.
         """
         try:
@@ -678,9 +732,14 @@ class DiskRefsContainer(RefsContainer):
             except (OSError, IOError):
                 f.abort()
                 raise
+            else:
+                self._log(name, None, ref, committer=committer,
+                          timestamp=timestamp, timezone=timezone,
+                          message=message)
         return True
 
-    def remove_if_equals(self, name, old_ref):
+    def remove_if_equals(self, name, old_ref, committer=None, timestamp=None,
+                         timezone=None, message=None):
         """Remove a refname only if it currently equals old_ref.
 
         This method does not follow symbolic references. It can be used to
@@ -689,6 +748,7 @@ class DiskRefsContainer(RefsContainer):
         :param name: The refname to delete.
         :param old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+        :param message: Optional message
         :return: True if the delete was successful, False otherwise.
         """
         self._check_refname(name)
@@ -709,6 +769,8 @@ class DiskRefsContainer(RefsContainer):
                 if e.errno != errno.ENOENT:
                     raise
             self._remove_packed_ref(name)
+            self._log(name, old_ref, None, committer=committer,
+                      timestamp=timestamp, timezone=timezone, message=message)
         finally:
             # never write, we just wanted the lock
             f.abort()

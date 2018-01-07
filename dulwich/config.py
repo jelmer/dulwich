@@ -38,7 +38,8 @@ from collections import (
 from dulwich.file import GitFile
 
 
-DEFAULT_ENCODING = 'utf-8'
+# TODO(jelmer): Allow passing in unicode strings; default encoding to
+# sys.getdefaultencoding()
 
 
 class Config(object):

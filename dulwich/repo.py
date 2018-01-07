@@ -534,7 +534,8 @@ class BaseRepo(object):
             import getpass
             user = getpass.getuser()
         if email is None:
-            import getpass, socket
+            import getpass
+            import socket
             email = b"%s@%s" % (getpass.getuser(), socket.gethostname())
         return (user + b" <" + email + b">")
 
@@ -656,8 +657,8 @@ class BaseRepo(object):
             except KeyError:
                 c.parents = merge_heads
                 self.object_store.add_object(c)
-                ok = self.refs.add_if_new(ref, c.id,
-                        message=b"commit: " + message,
+                ok = self.refs.add_if_new(
+                        ref, c.id, message=b"commit: " + message,
                         committer=committer, timestamp=commit_timestamp,
                         timezone=commit_timezone)
             if not ok:
@@ -755,7 +756,7 @@ class Repo(BaseRepo):
         path = os.path.join(self.controldir(), 'logs', ref)
         try:
             os.makedirs(os.path.dirname(path))
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         if committer is None:

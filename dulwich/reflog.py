@@ -48,7 +48,7 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
     if old_sha is None:
         old_sha = ZERO_SHA
     return (old_sha + b' ' + new_sha + b' ' + committer + b' ' +
-            str(timestamp).encode('ascii') + b' ' +
+            str(int(timestamp)).encode('ascii') + b' ' +
             format_timezone(timezone) + b'\t' + message)
 
 

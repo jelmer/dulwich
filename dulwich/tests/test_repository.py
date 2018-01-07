@@ -758,11 +758,11 @@ class BuildRepoRootTests(TestCase):
     def test_commit_fail_ref(self):
         r = self._repo
 
-        def set_if_equals(name, old_ref, new_ref):
+        def set_if_equals(name, old_ref, new_ref, **kwargs):
             return False
         r.refs.set_if_equals = set_if_equals
 
-        def add_if_new(name, new_ref):
+        def add_if_new(name, new_ref, **kwargs):
             self.fail('Unexpected call to add_if_new')
         r.refs.add_if_new = add_if_new
 

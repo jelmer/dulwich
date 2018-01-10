@@ -168,6 +168,8 @@ class GitImportProcessor(processor.ImportProcessor):
         commit.message = cmd.message
         commit.parents = []
         if cmd.from_:
+            if cmd.from_.startswith(b":"):
+                cmd.from_ = self.markers[cmd.from_[1:]]
             self._reset_base(cmd.from_)
         for filecmd in cmd.iter_files():
             if filecmd.name == b"filemodify":

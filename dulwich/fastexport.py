@@ -133,6 +133,11 @@ class GitImportProcessor(processor.ImportProcessor):
         self.markers = {}
         self._contents = {}
 
+    def lookup_object(self, objectish):
+        if objectish.startswith(b":"):
+            return self.markers[objectish[1:]]
+        return objectish
+
     def import_stream(self, stream):
         p = parser.ImportParser(stream)
         self.process(p.iter_commands)
@@ -168,8 +173,7 @@ class GitImportProcessor(processor.ImportProcessor):
         commit.message = cmd.message
         commit.parents = []
         if cmd.from_:
-            if cmd.from_.startswith(b":"):
-                cmd.from_ = self.markers[cmd.from_[1:]]
+            cmd.from_ = self.lookup_object(cmd.from_)
             self._reset_base(cmd.from_)
         for filecmd in cmd.iter_files():
             if filecmd.name == b"filemodify":
@@ -178,10 +182,7 @@ class GitImportProcessor(processor.ImportProcessor):
                     self.repo.object_store.add(blob)
                     blob_id = blob.id
                 else:
-                    assert filecmd.dataref.startswith(b":"), \
-                           ("non-marker refs not supported yet (%r)" %
-                            filecmd.dataref)
-                    blob_id = self.markers[filecmd.dataref[1:]]
+                    blob_id = self.lookup_object(filecmd.dataref)
                 self._contents[filecmd.path] = (filecmd.mode, blob_id)
             elif filecmd.name == b"filedelete":
                 del self._contents[filecmd.path]
@@ -203,9 +204,7 @@ class GitImportProcessor(processor.ImportProcessor):
         if self.last_commit != ZERO_SHA:
             commit.parents.append(self.last_commit)
         for merge in cmd.merges:
-            if merge.startswith(b':'):
-                merge = self.markers[merge[1:]]
-            commit.parents.append(merge)
+            commit.parents.append(self.lookup_object(merge))
         self.repo.object_store.add_object(commit)
         self.repo[cmd.ref] = commit.id
         self.last_commit = commit.id
@@ -232,9 +231,7 @@ class GitImportProcessor(processor.ImportProcessor):
         if cmd.from_ is None:
             from_ = ZERO_SHA
         else:
-            from_ = cmd.from_
-            if from_.startswith(b":"):
-                from_ = self.markers[from_[1:]]
+            from_ = self.lookup_object(cmd.from_)
         self._reset_base(from_)
         self.repo.refs[cmd.ref] = from_
 

@@ -96,10 +96,15 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"core", ), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
-    def test_from_file_section_case_insensitive(self):
+    def test_from_file_section_case_insensitive_lower(self):
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core", ), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
+
+    def test_from_file_section_case_insensitive_mixed(self):
+        cf = self.from_file(b"[cOre]\nfOo = bar\n")
+        self.assertEqual(b"bar", cf.get((b"core", ), b"fOo"))
+        self.assertEqual(b"bar", cf.get((b"cOre", b"fOo"), b"fOo"))
 
     def test_from_file_with_mixed_quoted(self):
         cf = self.from_file(b"[core]\nfoo = \"bar\"la\n")

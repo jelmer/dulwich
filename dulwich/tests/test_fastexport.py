@@ -144,6 +144,19 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(3600, commit.author_timezone)
         self.assertEqual(commit, self.repo[b"refs/heads/foo"])
 
+    def test_commit_handler_marker(self):
+        from fastimport import commands
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.processor.markers[b'10'] = c1.id
+        cmd = commands.CommitCommand(
+                b"refs/heads/foo",  b"mrkr",
+                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+                b"FOO", b":10", [], [])
+        self.processor.commit_handler(cmd)
+        commit = self.repo[self.processor.last_commit]
+        self.assertEqual(c1.id, commit.parents[0])
+
     def test_import_stream(self):
         markers = self.processor.import_stream(BytesIO(b"""blob
 mark :1

@@ -58,6 +58,7 @@ def lower_key(key):
 
 
 class CaseInsensitiveDict(OrderedDict):
+
     @classmethod
     def make(cls, dict_in=None):
 
@@ -212,7 +213,7 @@ class ConfigDict(Config, MutableMapping):
             return (parts[0], None, parts[1])
 
     @staticmethod
-    def check_section_and_name(section, name):
+    def _check_section_and_name(section, name):
         if not isinstance(section, tuple):
             section = (section, )
         if not all([isinstance(subsection, bytes) for subsection in section]):
@@ -220,10 +221,10 @@ class ConfigDict(Config, MutableMapping):
         if not isinstance(name, bytes):
             raise TypeError(name)
 
-        return section
+        return section, name
 
     def get(self, section, name):
-        section = self.check_section_and_name(section, name)
+        section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
             try:
@@ -234,7 +235,7 @@ class ConfigDict(Config, MutableMapping):
         return self._values[(section[0],)][name]
 
     def set(self, section, name, value):
-        section = self.check_section_and_name(section, name)
+        section, name = self._check_section_and_name(section, name)
 
         if type(value) not in (bool, bytes):
             raise TypeError(value)
@@ -375,7 +376,6 @@ class ConfigFile(ConfigDict):
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(b" ", 1)
                     line = line[last+1:]
-                    pts[0] = pts[0].lower()
                     if len(pts) == 2:
                         if pts[1][:1] != b"\"" or pts[1][-1:] != b"\"":
                             raise ValueError(
@@ -405,7 +405,7 @@ class ConfigFile(ConfigDict):
                 except ValueError:
                     setting = line
                     value = b"true"
-                setting = setting.strip().lower()
+                setting = setting.strip()
                 if not _check_variable_name(setting):
                     raise ValueError("invalid variable name %s" % setting)
                 if value.endswith(b"\\\n"):

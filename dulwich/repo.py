@@ -536,8 +536,8 @@ class BaseRepo(object):
         if email is None:
             import getpass
             import socket
-            email = ("%s@%s" % (getpass.getuser(), socket.gethostname())
-                    ).encode(sys.getdefaultencoding())
+            email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
+                     .encode(sys.getdefaultencoding()))
         return (user + b" <" + email + b">")
 
     def _add_graftpoints(self, updated_graftpoints):

@@ -535,13 +535,15 @@ class TestThinPack(PackTests):
     def test_get_raw_unresolved(self):
         with self.make_pack(False) as p:
             self.assertEqual(
-                (7, b'\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
-                    [b'x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
+                (7,
+                 b'\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
+                 [b'x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
                 p.get_raw_unresolved(self.blobs[b'foo1234'].id))
         with self.make_pack(True) as p:
             self.assertEqual(
-                (7, b'\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
-                    [b'x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
+                (7,
+                 b'\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c',
+                 [b'x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l']),
                 p.get_raw_unresolved(self.blobs[b'foo1234'].id))
 
     def test_iterobjects(self):

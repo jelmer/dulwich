@@ -195,14 +195,14 @@ class BaseRepo(object):
         self._put_named_file('description', b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        cf.set(b"core", b"repositoryformatversion", b"0")
+        cf.set("core", "repositoryformatversion", "0")
         if self._determine_file_mode():
-            cf.set(b"core", b"filemode", True)
+            cf.set("core", "filemode", True)
         else:
-            cf.set(b"core", b"filemode", False)
+            cf.set("core", "filemode", False)
 
-        cf.set(b"core", b"bare", bare)
-        cf.set(b"core", b"logallrefupdates", True)
+        cf.set("core", "bare", bare)
+        cf.set("core", "logallrefupdates", True)
         cf.write_to_file(f)
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), b'')
@@ -522,21 +522,22 @@ class BaseRepo(object):
         config = self.get_config_stack()
         if user is None:
             try:
-                user = config.get((b"user", ), b"name")
+                user = config.get(("user", ), "name")
             except KeyError:
                 user = None
         if email is None:
             try:
-                email = config.get((b"user", ), b"email")
+                email = config.get(("user", ), "email")
             except KeyError:
                 email = None
         if user is None:
             import getpass
-            user = getpass.getuser()
+            user = getpass.getuser().encode(sys.getdefaultencoding())
         if email is None:
             import getpass
             import socket
-            email = b"%s@%s" % (getpass.getuser(), socket.gethostname())
+            email = ("%s@%s" % (getpass.getuser(), socket.gethostname())
+                    ).encode(sys.getdefaultencoding())
         return (user + b" <" + email + b">")
 
     def _add_graftpoints(self, updated_graftpoints):
@@ -753,7 +754,9 @@ class Repo(BaseRepo):
     def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
                       timezone, message):
         from .reflog import format_reflog_line
-        path = os.path.join(self.controldir(), 'logs', ref)
+        path = os.path.join(
+                self.controldir(), 'logs',
+                ref.decode(sys.getfilesystemencoding()))
         try:
             os.makedirs(os.path.dirname(path))
         except OSError as e:
@@ -956,9 +959,9 @@ class Repo(BaseRepo):
         except KeyError:
             pass
         target_config = target.get_config()
-        target_config.set((b'remote', b'origin'), b'url', encoded_path)
-        target_config.set((b'remote', b'origin'), b'fetch',
-                          b'+refs/heads/*:refs/remotes/origin/*')
+        target_config.set(('remote', 'origin'), 'url', encoded_path)
+        target_config.set(('remote', 'origin'), 'fetch',
+                          '+refs/heads/*:refs/remotes/origin/*')
         target_config.write_to_path()
 
         # Update target head

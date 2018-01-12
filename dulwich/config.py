@@ -28,6 +28,7 @@ TODO:
 
 import errno
 import os
+import sys
 
 from collections import (
     Iterable,
@@ -38,9 +39,6 @@ from collections import (
 
 from dulwich.file import GitFile
 
-
-# TODO(jelmer): Allow passing in unicode strings; default encoding to
-# sys.getdefaultencoding()
 
 SENTINAL = object()
 
@@ -177,8 +175,11 @@ class Config(object):
 class ConfigDict(Config, MutableMapping):
     """Git configuration stored in a dictionary."""
 
-    def __init__(self, values=None):
+    def __init__(self, values=None, encoding=None):
         """Create a new ConfigDict."""
+        if encoding is None:
+            encoding = sys.getdefaultencoding()
+        self.encoding = encoding
         self._values = CaseInsensitiveDict.make(values)
 
     def __repr__(self):
@@ -212,14 +213,18 @@ class ConfigDict(Config, MutableMapping):
         else:
             return (parts[0], None, parts[1])
 
-    @staticmethod
-    def _check_section_and_name(section, name):
+    def _check_section_and_name(self, section, name):
         if not isinstance(section, tuple):
             section = (section, )
-        if not all([isinstance(subsection, bytes) for subsection in section]):
-            raise TypeError(section)
+
+        section = tuple([
+            subsection.encode(self.encoding)
+            if not isinstance(subsection, bytes) else subsection
+            for subsection in section
+            ])
+
         if not isinstance(name, bytes):
-            raise TypeError(name)
+            name = name.encode(self.encoding)
 
         return section, name
 
@@ -238,7 +243,7 @@ class ConfigDict(Config, MutableMapping):
         section, name = self._check_section_and_name(section, name)
 
         if type(value) not in (bool, bytes):
-            raise TypeError(value)
+            value = value.encode(self.encoding)
 
         self._values.setdefault(section)[name] = value
 
@@ -510,10 +515,6 @@ class StackedConfig(Config):
     def get(self, section, name):
         if not isinstance(section, tuple):
             section = (section, )
-        if not all([isinstance(subsection, bytes) for subsection in section]):
-            raise TypeError(section)
-        if not isinstance(name, bytes):
-            raise TypeError(name)
         for backend in self.backends:
             try:
                 return backend.get(section, name)

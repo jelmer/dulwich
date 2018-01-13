@@ -168,11 +168,12 @@ def open_repo_closing(path_or_repo):
 def path_to_tree_path(repopath, path):
     """Convert a path to a path usable in e.g. an index.
 
-    :param repo: Repository
+    :param repopath: Repository
     :param path: A path
     :return: A path formatted for use in e.g. an index
     """
-    os.path.relpath(path, repopath)
+    if os.path.isabs(path):
+        path = os.path.relpath(path, repopath)
     if os.path.sep != '/':
         path = path.replace(os.path.sep, '/')
     return path.encode(sys.getfilesystemencoding())

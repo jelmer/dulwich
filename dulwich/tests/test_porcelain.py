@@ -796,17 +796,27 @@ class StatusTests(PorcelainTestCase):
             results.staged)
         self.assertEqual([], results.unstaged)
 
+    def commit_file(self, name, content='original', author=b'', committer=b''):
+        fullpath = os.path.join(self.repo.path, name)
+
+        with open(fullpath, 'w') as f:
+            f.write(content)
+
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=u'Add {}'.format(name).encode('utf-8'),
+            author=author,
+            committer=committer,
+        )
+
+        return fullpath
+
     def test_status(self):
         """Integration test for `status` functionality."""
 
         # Commit a dummy file then modify it
-        fullpath = os.path.join(self.repo.path, 'foo')
-        with open(fullpath, 'w') as f:
-            f.write('origstuff')
-
-        porcelain.add(repo=self.repo.path, paths=[fullpath])
-        porcelain.commit(repo=self.repo.path, message=b'test status',
-                         author=b'', committer=b'')
+        fullpath = self.commit_file('foo')
 
         # modify access and modify time of path
         os.utime(fullpath, (0, 0))
@@ -826,6 +836,21 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(results.staged['add'][0],
                          filename_add.encode('ascii'))
         self.assertEqual(results.unstaged, [b'foo'])
+
+    def test_status_clean(self):
+        """Integration test for `status` functionality."""
+
+        self.commit_file('foo')
+
+        results = porcelain.status(self.repo)
+
+        self.assertEqual(results.staged, {
+            'add': [],
+            'delete': [],
+            'modify': [],
+        })
+        self.assertEqual(results.unstaged, [])
+        self.assertEqual(results.untracked, [])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""

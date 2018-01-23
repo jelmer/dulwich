@@ -159,6 +159,7 @@ class BlobReadTests(TestCase):
         self.assertEqual(b'test 5\n', b.data)
         b.chunked = [b'te', b'st', b' 6\n']
         self.assertEqual(b'test 6\n', b.as_raw_string())
+        self.assertEqual(b'test 6\n', bytes(b))
 
     def test_parse_legacy_blob(self):
         string = b'test 3\n'
@@ -793,6 +794,8 @@ class TreeTests(ShaFileCheckTests):
         x[b'myname'] = (0o100755, myhexsha)
         self.assertEqual(b'100755 myname\0' + hex_to_sha(myhexsha),
                          x.as_raw_string())
+        self.assertEqual(b'100755 myname\0' + hex_to_sha(myhexsha),
+                         bytes(x))
 
     def test_tree_update_id(self):
         x = Tree()

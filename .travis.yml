@@ -10,7 +10,6 @@ python:
   - 3.5-dev
   - 3.6
   - 3.6-dev
-  - 3.7-dev
   - pypy3.3-5.2-alpha1
 
 env:
@@ -20,6 +19,8 @@ env:
 matrix:
   include:
     - python: pypy
+      env: TEST_REQUIRE=fastimport
+    - python: 3.7-dev
       env: TEST_REQUIRE=fastimport
 
 install:

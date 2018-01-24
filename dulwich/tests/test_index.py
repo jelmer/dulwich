@@ -587,7 +587,8 @@ class GetUnstagedChangesTests(TestCase):
                 f.write(b'origstuff')
 
             repo.stage(['foo1', 'foo2'])
-            repo.do_commit(b'test status', author=b'', committer=b'')
+            repo.do_commit(b'test status', author=b'author <email>',
+                           committer=b'committer <email>')
 
             with open(foo1_fullpath, 'wb') as f:
                 f.write(b'newstuff')
@@ -612,7 +613,8 @@ class GetUnstagedChangesTests(TestCase):
                 f.write(b'origstuff')
 
             repo.stage(['foo1'])
-            repo.do_commit(b'test status', author=b'', committer=b'')
+            repo.do_commit(b'test status', author=b'author <email>',
+                           committer=b'committer <email>')
 
             os.unlink(foo1_fullpath)
 

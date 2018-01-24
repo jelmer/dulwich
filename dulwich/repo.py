@@ -107,6 +107,27 @@ BASE_DIRECTORIES = [
 DEFAULT_REF = b'refs/heads/master'
 
 
+class InvalidUserIdentity(Exception):
+    """User identity is not of the format 'user <email>'"""
+
+    def __init__(self, identity):
+        self.identity = identity
+
+
+def check_user_identity(identity):
+    """Verify that a user identity is formatted correctly.
+
+    :param identity: User identity bytestring
+    :raise InvalidUserIdentity: Raised when identity is invalid
+    """
+    try:
+        fst, snd = identity.split(b' <', 1)
+    except ValueError:
+        raise InvalidUserIdentity(identity)
+    if not b'>' in snd:
+        raise InvalidUserIdentity(identity)
+
+
 def parse_graftpoints(graftpoints):
     """Convert a list of graftpoints into a dict
 
@@ -606,6 +627,7 @@ class BaseRepo(object):
             merge_heads = []
         if committer is None:
             committer = self._get_user_identity()
+        check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
             # FIXME: Support GIT_COMMITTER_DATE environment variable
@@ -620,6 +642,7 @@ class BaseRepo(object):
             # variables
             author = committer
         c.author = author
+        check_user_identity(author)
         if author_timestamp is None:
             # FIXME: Support GIT_AUTHOR_DATE environment variable
             author_timestamp = commit_timestamp
@@ -764,6 +787,7 @@ class Repo(BaseRepo):
                 raise
         if committer is None:
             committer = self._get_user_identity()
+        check_user_identity(committer)
         if timestamp is None:
             timestamp = int(time.time())
         if timezone is None:

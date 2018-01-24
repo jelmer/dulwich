@@ -37,8 +37,10 @@ from dulwich import objects
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository
 from dulwich.repo import (
+    InvalidUserIdentity,
     Repo,
     MemoryRepo,
+    check_user_identity,
     )
 from dulwich.tests import (
     TestCase,
@@ -927,3 +929,19 @@ class BuildRepoRootTests(TestCase):
     def test_discover_notrepo(self):
         with self.assertRaises(NotGitRepository):
             Repo.discover('/')
+
+
+class CheckUserIdentityTests(TestCase):
+
+    def test_valid(self):
+        check_user_identity(b'Me <me@example.com>')
+
+    def test_invalid(self):
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'No Email')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname <missing')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname missing>')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname >order<>')

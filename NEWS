@@ -9,6 +9,9 @@
   * Allow comment characters (#, ;) within configuration file strings
     (Daniel Andersson, #579)
 
+  * Raise exception when passing in invalid author/committer values
+    to Repo.do_commit(). (Jelmer Vernooĳ, #602)
+
  IMPROVEMENTS
 
   * Add a fastimport ``extra``. (Jelmer Vernooĳ)

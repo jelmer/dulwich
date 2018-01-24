@@ -124,7 +124,7 @@ def check_user_identity(identity):
         fst, snd = identity.split(b' <', 1)
     except ValueError:
         raise InvalidUserIdentity(identity)
-    if not b'>' in snd:
+    if b'>' not in snd:
         raise InvalidUserIdentity(identity)
 
 

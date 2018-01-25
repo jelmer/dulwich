@@ -60,6 +60,9 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
+import urllib3
+import urllib3.util
+
 import dulwich
 from dulwich.errors import (
     GitProtocolError,
@@ -1176,47 +1179,57 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib2_opener(config):
+def default_urllib3_manager(config):
+    proxy_server = user_agent = None
+
     if config is not None:
         try:
             proxy_server = config.get(b"http", b"proxy")
         except KeyError:
-            proxy_server = None
-    else:
-        proxy_server = None
-    handlers = []
-    if proxy_server is not None:
-        handlers.append(urllib2.ProxyHandler({"http": proxy_server}))
-    opener = urllib2.build_opener(*handlers)
-    if config is not None:
+            pass
         try:
             user_agent = config.get(b"http", b"useragent")
         except KeyError:
-            user_agent = None
-    else:
-        user_agent = None
+            pass
+
     if user_agent is None:
         user_agent = default_user_agent_string()
-    opener.addheaders = [('User-agent', user_agent)]
-    return opener
+
+    headers = {"User-agent": user_agent}
+    if proxy_server is not None:
+        # `urllib3` requires a `str` object in both Python 2 and 3, while
+        # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
+        if not isinstance(proxy_server, str):
+            proxy_server = proxy_server.decode()
+        manager = urllib3.ProxyManager(proxy_server, headers=headers)
+    else:
+        manager = urllib3.PoolManager(headers=headers)
+
+    return manager
 
 
 class HttpGitClient(GitClient):
 
-    def __init__(self, base_url, dumb=None, opener=None, config=None,
+    def __init__(self, base_url, dumb=None, pool_manager=None, config=None,
                  username=None, password=None, **kwargs):
         self._base_url = base_url.rstrip("/") + "/"
         self._username = username
         self._password = password
         self.dumb = dumb
-        if opener is None:
-            self.opener = default_urllib2_opener(config)
+        self.headers = {}
+
+        if pool_manager is None:
+            self.pool_manager = default_urllib3_manager(config)
         else:
-            self.opener = opener
+            self.pool_manager = pool_manager
+
         if username is not None:
-            pass_man = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            pass_man.add_password(None, base_url, username, password)
-            self.opener.add_handler(urllib2.HTTPBasicAuthHandler(pass_man))
+            # No escaping needed: ":" is not allowed in username:
+            # https://tools.ietf.org/html/rfc2617#section-2
+            credentials = "%s:%s" % (username, password)
+            basic_auth = urllib3.util.make_headers(basic_auth=credentials)
+            self.pool_manager.headers.update(basic_auth)
+
         GitClient.__init__(self, **kwargs)
 
     def get_url(self, path):
@@ -1248,28 +1261,52 @@ class HttpGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
-    def _http_request(self, url, headers={}, data=None,
+    def _http_request(self, url, headers=None, data=None,
                       allow_compression=False):
-        if headers is None:
-            headers = dict(headers.items())
-        headers["Pragma"] = "no-cache"
+        """Perform HTTP request.
+
+        :param url: Request URL.
+        :param headers: Optional custom headers to override defaults.
+        :param data: Request data.
+        :param allow_compression: Allow GZipped communication.
+        :return: Tuple (`response`, `read`), where response is an `urllib3`
+            response object with additional `content_type` and
+            `redirect_location` properties, and `read` is a consumable read
+            method for the response data.
+        """
+        req_headers = self.pool_manager.headers.copy()
+        if headers is not None:
+            req_headers.update(headers)
+        req_headers["Pragma"] = "no-cache"
         if allow_compression:
-            headers["Accept-Encoding"] = "gzip"
+            req_headers["Accept-Encoding"] = "gzip"
         else:
-            headers["Accept-Encoding"] = "identity"
-        req = urllib2.Request(url, headers=headers, data=data)
-        try:
-            resp = self.opener.open(req)
-        except urllib2.HTTPError as e:
-            if e.code == 404:
-                raise NotGitRepository()
-            if e.code != 200:
-                raise GitProtocolError("unexpected http response %d for %s" %
-                                       (e.code, url))
-        if resp.info().get('Content-Encoding') == 'gzip':
-            read = gzip.GzipFile(fileobj=BytesIO(resp.read())).read
+            req_headers["Accept-Encoding"] = "identity"
+
+        if data is None:
+            resp = self.pool_manager.request("GET", url, headers=req_headers)
         else:
-            read = resp.read
+            resp = self.pool_manager.request("POST", url, headers=req_headers,
+                                             body=data)
+
+        if resp.status == 404:
+            raise NotGitRepository()
+        elif resp.status != 200:
+            raise GitProtocolError("unexpected http resp %d for %s" %
+                                   (resp.status, url))
+
+        # TODO: Optimization available by adding `preload_content=False` to the
+        # request and just passing the `read` method on instead of going via
+        # `BytesIO`, if we can guarantee that the entire response is consumed
+        # before issuing the next to still allow for connection reuse from the
+        # pool.
+        if resp.getheader("Content-Encoding") == "gzip":
+            read = gzip.GzipFile(fileobj=BytesIO(resp.data)).read
+        else:
+            read = BytesIO(resp.data).read
+
+        resp.content_type = resp.getheader("Content-Type")
+        resp.redirect_location = resp.get_redirect_location()
 
         return resp, read
 
@@ -1282,20 +1319,16 @@ class HttpGitClient(GitClient):
         url = urlparse.urljoin(base_url, tail)
         resp, read = self._http_request(url, headers, allow_compression=True)
 
-        if url != resp.geturl():
+        if resp.redirect_location:
             # Something changed (redirect!), so let's update the base URL
-            if not resp.geturl().endswith(tail):
+            if not resp.redirect_location.endswith(tail):
                 raise GitProtocolError(
                         "Redirected from URL %s to URL %s without %s" % (
-                            url, resp.geturl(), tail))
-            base_url = resp.geturl()[:-len(tail)]
+                            url, resp.redirect_location, tail))
+            base_url = resp.redirect_location[:-len(tail)]
 
         try:
-            content_type = resp.info().gettype()
-        except AttributeError:
-            content_type = resp.info().get_content_type()
-        try:
-            self.dumb = (not content_type.startswith("application/x-git-"))
+            self.dumb = not resp.content_type.startswith("application/x-git-")
             if not self.dumb:
                 proto = Protocol(read, None)
                 # The first line should mention the service
@@ -1323,13 +1356,9 @@ class HttpGitClient(GitClient):
             "Content-Length": str(len(data)),
         }
         resp, read = self._http_request(url, headers, data)
-        try:
-            content_type = resp.info().gettype()
-        except AttributeError:
-            content_type = resp.info().get_content_type()
-        if content_type != result_content_type:
+        if resp.content_type != result_content_type:
             raise GitProtocolError("Invalid content-type from server: %s"
-                                   % content_type)
+                                   % resp.content_type)
         return resp, read
 
     def send_pack(self, path, update_refs, generate_pack_data,

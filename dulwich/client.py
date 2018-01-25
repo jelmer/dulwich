@@ -1380,7 +1380,7 @@ class HttpGitClient(GitClient):
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())
         try:
-            resp_proto = Protocol(resp.read, None)
+            resp_proto = Protocol(read, None)
             self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
             return new_refs

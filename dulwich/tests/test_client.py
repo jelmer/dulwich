@@ -19,14 +19,10 @@
 #
 
 from io import BytesIO
+import base64
 import sys
 import shutil
 import tempfile
-
-try:
-    import urllib2
-except ImportError:
-    import urllib.request as urllib2
 
 try:
     from urllib import quote as urlquote
@@ -37,6 +33,8 @@ try:
     import urlparse
 except ImportError:
     import urllib.parse as urlparse
+
+import urllib3
 
 import dulwich
 from dulwich import (
@@ -53,7 +51,7 @@ from dulwich.client import (
     StrangeHostname,
     SubprocessSSHVendor,
     UpdateRefsError,
-    default_urllib2_opener,
+    default_urllib3_manager,
     get_transport_and_path,
     get_transport_and_path_from_url,
     )
@@ -839,6 +837,14 @@ class LocalGitClientTests(TestCase):
 
 class HttpGitClientTests(TestCase):
 
+    @staticmethod
+    def b64encode(s):
+        """Python 2/3 compatible Base64 encoder. Returns string."""
+        try:
+            return base64.b64encode(s)
+        except TypeError:
+            return base64.b64encode(s.encode('latin1')).decode('ascii')
+
     def test_get_url(self):
         base_url = 'https://github.com/jelmer/dulwich'
         path = '/jelmer/dulwich'
@@ -869,13 +875,12 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient(url, config=None, username='user', password='passwd')
         self.assertEqual('user', c._username)
         self.assertEqual('passwd', c._password)
-        [pw_handler] = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(
-            ('user', 'passwd'),
-            pw_handler.passwd.find_user_password(
-                None, 'https://github.com/jelmer/dulwich'))
+
+        basic_auth = c.pool_manager.headers['authorization']
+        auth_string = '%s:%s' % ('user', 'passwd')
+        b64_credentials = self.b64encode(auth_string)
+        expected_basic_auth = 'Basic %s' % b64_credentials
+        self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_no_username_passwd(self):
         url = 'https://github.com/jelmer/dulwich'
@@ -883,10 +888,7 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient(url, config=None)
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
-        pw_handler = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(0, len(pw_handler))
+        self.assertNotIn('authorization', c.pool_manager.headers)
 
     def test_from_parsedurl_on_url_with_quoted_credentials(self):
         original_username = 'john|the|first'
@@ -903,13 +905,12 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
-        [pw_handler] = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(
-            (original_username, original_password),
-            pw_handler.passwd.find_user_password(
-                None, 'https://github.com/jelmer/dulwich'))
+
+        basic_auth = c.pool_manager.headers['authorization']
+        auth_string = '%s:%s' % (original_username, original_password)
+        b64_credentials = self.b64encode(auth_string)
+        expected_basic_auth = 'Basic %s' % str(b64_credentials)
+        self.assertEqual(basic_auth, expected_basic_auth)
 
 
 class TCPGitClientTests(TestCase):
@@ -932,20 +933,23 @@ class TCPGitClientTests(TestCase):
         self.assertEqual('git://github.com:9090/jelmer/dulwich', url)
 
 
-class DefaultUrllib2OpenerTest(TestCase):
+class DefaultUrllib3ManagerTest(TestCase):
 
     def test_no_config(self):
-        default_urllib2_opener(config=None)
+        default_urllib3_manager(config=None)
 
     def test_config_no_proxy(self):
-        default_urllib2_opener(config=ConfigDict())
+        default_urllib3_manager(config=ConfigDict())
 
     def test_config_proxy(self):
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
-        opener = default_urllib2_opener(config=config)
-        self.assertIn(urllib2.ProxyHandler,
-                      list(map(lambda x: x.__class__, opener.handlers)))
+        manager = default_urllib3_manager(config=config)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, 'proxy'))
+        self.assertEqual(manager.proxy.scheme, 'http')
+        self.assertEqual(manager.proxy.host, 'localhost')
+        self.assertEqual(manager.proxy.port, 3128)
 
 
 class SubprocessSSHVendorTests(TestCase):

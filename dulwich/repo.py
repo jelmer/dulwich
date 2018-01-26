@@ -777,9 +777,8 @@ class Repo(BaseRepo):
     def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
                       timezone, message):
         from .reflog import format_reflog_line
-        path = os.path.join(
-                self.controldir(), 'logs',
-                ref.decode(sys.getfilesystemencoding()))
+        cdir_path_bytes = self.controldir().encode(sys.getfilesystemencoding())
+        path = os.path.join(cdir_path_bytes, b'logs', ref)
         try:
             os.makedirs(os.path.dirname(path))
         except OSError as e:

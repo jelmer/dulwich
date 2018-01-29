@@ -34,6 +34,7 @@ try:
 except ImportError:
     import urllib.parse as urlparse
 
+import certifi
 import urllib3
 
 import dulwich
@@ -935,21 +936,35 @@ class TCPGitClientTests(TestCase):
 
 class DefaultUrllib3ManagerTest(TestCase):
 
+    def assert_verify_ssl(self, manager, assertion=True):
+        pool_keywords = tuple(manager.connection_pool_kw.items())
+        assert_method = self.assertIn if assertion else self.assertNotIn
+        assert_method(('cert_reqs', 'CERT_REQUIRED'), pool_keywords)
+        assert_method(('ca_certs', certifi.where()), pool_keywords)
+
     def test_no_config(self):
-        default_urllib3_manager(config=None)
+        manager = default_urllib3_manager(config=None)
+        self.assert_verify_ssl(manager)
 
     def test_config_no_proxy(self):
-        default_urllib3_manager(config=ConfigDict())
+        manager = default_urllib3_manager(config=ConfigDict())
+        self.assert_verify_ssl(manager)
 
     def test_config_proxy(self):
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
         manager = default_urllib3_manager(config=config)
+
         self.assertIsInstance(manager, urllib3.ProxyManager)
         self.assertTrue(hasattr(manager, 'proxy'))
         self.assertEqual(manager.proxy.scheme, 'http')
         self.assertEqual(manager.proxy.host, 'localhost')
         self.assertEqual(manager.proxy.port, 3128)
+        self.assert_verify_ssl(manager)
+
+    def test_config_no_verify_ssl(self):
+        manager = default_urllib3_manager(config=None, verify_ssl=False)
+        self.assert_verify_ssl(manager, assertion=False)
 
 
 class SubprocessSSHVendorTests(TestCase):

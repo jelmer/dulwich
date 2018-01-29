@@ -60,6 +60,7 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
+import certifi
 import urllib3
 import urllib3.util
 
@@ -109,6 +110,13 @@ from dulwich.pack import (
 from dulwich.refs import (
     read_info_refs,
     )
+
+
+if sys.version_info < (2, 7, 9):
+    # Before Python 2.7.9 the `ssl` module lacks SNI support and lags behind in
+    # security updates. Use pyOpenSSL instead.
+    import urllib3.contrib.pyopenssl
+    urllib3.contrib.pyopenssl.inject_into_urllib3()
 
 
 def _fileno_can_read(fileno):
@@ -1179,7 +1187,16 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(config):
+def default_urllib3_manager(config, verify_ssl=True):
+    """Return `urllib3` connection pool manager.
+
+    Honour detected proxy configurations.
+
+    :param config: `dulwich.config.ConfigDict` instance with Git configuration.
+    :param verify_ssl: Whether SSL verification is enabled.
+    :return: `urllib3.ProxyManager` instance for proxy configurations,
+        `urllib3.PoolManager` otherwise.
+    """
     proxy_server = user_agent = None
 
     if config is not None:
@@ -1192,18 +1209,24 @@ def default_urllib3_manager(config):
         except KeyError:
             pass
 
+    ssl_kwargs = {}
+    if verify_ssl:
+        ssl_kwargs.update(cert_reqs="CERT_REQUIRED", ca_certs=certifi.where())
+
     if user_agent is None:
         user_agent = default_user_agent_string()
 
     headers = {"User-agent": user_agent}
+
     if proxy_server is not None:
         # `urllib3` requires a `str` object in both Python 2 and 3, while
         # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
-        manager = urllib3.ProxyManager(proxy_server, headers=headers)
+        manager = urllib3.ProxyManager(proxy_server, headers=headers,
+                                       **ssl_kwargs)
     else:
-        manager = urllib3.PoolManager(headers=headers)
+        manager = urllib3.PoolManager(headers=headers, **ssl_kwargs)
 
     return manager
 

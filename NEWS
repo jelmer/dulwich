@@ -1,4 +1,4 @@
-0.18.7	UNRELEASED
+0.19.0	UNRELEASED
 
  BUG FIXES
 
@@ -23,6 +23,12 @@
   * ``GitClient.send_pack`` now accepts a ``generate_pack_data``
     rather than a ``generate_pack_contents`` function for
     performance reasons. (Jelmer Vernooĳ)
+
+  * Dulwich now uses urllib3 internally for HTTP requests.
+    The `opener` argument to `dulwich.client.HttpGitClient` that took a
+    `urllib2` opener instance has been replaced by a `pool_manager` argument
+    that takes a `urllib3` pool manager instance.
+    (Daniel Andersson)
 
 0.18.6	2017-11-11
 

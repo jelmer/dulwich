@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
-[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich/branch/master)
+[![Build Status](https://travis-ci.org/dulwich/dulwich.png?branch=master)](https://travis-ci.org/dulwich/dulwich)
+[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/dulwich/dulwich/branch/master)
 
 This is the Dulwich project.
 
@@ -86,7 +86,7 @@ Contributing
 For a full list of contributors, see the git logs or [AUTHORS](AUTHORS).
 
 If you'd like to contribute to Dulwich, see the [CONTRIBUTING](CONTRIBUTING.md)
-file and [list of open issues](https://github.com/jelmer/dulwich/issues).
+file and [list of open issues](https://github.com/dulwich/dulwich/issues).
 
 Supported versions of Python
 ----------------------------

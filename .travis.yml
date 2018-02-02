@@ -20,8 +20,6 @@ matrix:
   include:
     - python: pypy
       env: TEST_REQUIRE=fastimport
-    - python: 3.7-dev
-      env: TEST_REQUIRE=fastimport
 
 install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE

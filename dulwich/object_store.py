@@ -154,17 +154,20 @@ class BaseObjectStore(object):
         else:
             return commit()
 
-    def tree_changes(self, source, target, want_unchanged=False):
+    def tree_changes(self, source, target, want_unchanged=False,
+                     include_trees=False):
         """Find the differences between the contents of two trees
 
         :param source: SHA1 of the source tree
         :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
+        :param include_trees: Whether to include trees
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
         for change in tree_changes(self, source, target,
-                                   want_unchanged=want_unchanged):
+                                   want_unchanged=want_unchanged,
+                                   include_trees=include_trees):
             yield ((change.old.path, change.new.path),
                    (change.old.mode, change.new.mode),
                    (change.old.sha, change.new.sha))
@@ -180,7 +183,7 @@ class BaseObjectStore(object):
             tree.
         """
         for entry, _ in walk_trees(self, tree_id, None):
-            if not stat.S_ISDIR(entry.mode) or include_trees:
+            if (entry.mode is not None and not stat.S_ISDIR(entry.mode)) or include_trees:
                 yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,

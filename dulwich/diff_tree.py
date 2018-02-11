@@ -153,14 +153,14 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         yield entry1, entry2
 
 
-def _skip_tree(entry):
-    if entry.mode is None or stat.S_ISDIR(entry.mode):
+def _skip_tree(entry, include_trees):
+    if entry.mode is None or (not include_trees and stat.S_ISDIR(entry.mode)):
         return _NULL_ENTRY
     return entry
 
 
 def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
-                 rename_detector=None):
+                 rename_detector=None, include_trees=False):
     """Find the differences between the contents of two trees.
 
     :param store: An ObjectStore for looking up objects.
@@ -168,10 +168,14 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
     :param tree2_id: The SHA of the target tree.
     :param want_unchanged: If True, include TreeChanges for unmodified entries
         as well.
+    :param include_trees: Whether to include trees
     :param rename_detector: RenameDetector object for detecting renames.
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
     """
+    if include_trees and rename_detector is not None:
+        raise NotImplementedError(
+            'rename_detector and include_trees are mutually exclusive')
     if (rename_detector is not None and tree1_id is not None and
             tree2_id is not None):
         for change in rename_detector.changes_with_renames(
@@ -186,8 +190,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
             continue
 
         # Treat entries for trees as missing.
-        entry1 = _skip_tree(entry1)
-        entry2 = _skip_tree(entry2)
+        entry1 = _skip_tree(entry1, include_trees)
+        entry2 = _skip_tree(entry2, include_trees)
 
         if entry1 != _NULL_ENTRY and entry2 != _NULL_ENTRY:
             if stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode):

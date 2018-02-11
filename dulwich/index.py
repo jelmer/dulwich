@@ -379,6 +379,7 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
     :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
         (oldsha, newsha)
     """
+    # TODO(jelmer): Support a include_trees option
     other_names = set(names)
 
     if tree is not None:
@@ -646,3 +647,30 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     else:
         tree_path = fs_path_bytes
     return tree_path
+
+
+def refresh_index(index, root_path):
+    """Refresh the contents of an index.
+
+    This is the equivalent to running 'git commit -a'.
+
+    :param index: Index to update
+    :param root_path: Root filesystem path
+    """
+    for path in set(index):
+        p = _tree_to_fs_path(root_path, path)
+        try:
+            st = os.lstat(p)
+            blob = blob_from_path_and_stat(p, st)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                del index[path]
+            else:
+                raise
+        except IOError as e:
+            if e.errno == errno.EISDIR:
+                del index[path]
+            else:
+                raise
+        else:
+            index[path] = index_entry_from_stat(st, blob.id, 0)

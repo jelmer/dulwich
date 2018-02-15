@@ -1,6 +1,7 @@
 dulwich (0.18.5-2) UNRELEASED; urgency=medium
 
   * d/control: Set Vcs-* to salsa.debian.org
+  * d/watch: Use https protocol
 
  -- Ondřej Nový <onovy@debian.org>  Tue, 13 Feb 2018 10:17:05 +0100
 

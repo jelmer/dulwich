@@ -183,7 +183,8 @@ class BaseObjectStore(object):
             tree.
         """
         for entry, _ in walk_trees(self, tree_id, None):
-            if (entry.mode is not None and not stat.S_ISDIR(entry.mode)) or include_trees:
+            if ((entry.mode is not None and
+                 not stat.S_ISDIR(entry.mode)) or include_trees):
                 yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,

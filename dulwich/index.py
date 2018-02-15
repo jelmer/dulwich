@@ -649,13 +649,12 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     return tree_path
 
 
-def refresh_index(index, root_path):
-    """Refresh the contents of an index.
+def iter_fresh_entries(index, root_path):
+    """Iterate over current versions of index entries on disk.
 
-    This is the equivalent to running 'git commit -a'.
-
-    :param index: Index to update
-    :param root_path: Root filesystem path
+    :param index: Index file
+    :param root_path: Root path to access from
+    :return: Iterator over path, index_entry
     """
     for path in set(index):
         p = _tree_to_fs_path(root_path, path)
@@ -673,4 +672,28 @@ def refresh_index(index, root_path):
             else:
                 raise
         else:
-            index[path] = index_entry_from_stat(st, blob.id, 0)
+            yield path, index_entry_from_stat(st, blob.id, 0)
+
+
+def iter_fresh_blobs(index, root_path):
+    """Iterate over versions of blobs on disk referenced by index.
+
+    :param index: Index file
+    :param root_path: Root path to access from
+    :return: Iterator over path, sha, mode
+    """
+    for path, entry in iter_fresh_entries(index, root_path):
+        entry = IndexEntry(*entry)
+        yield path, entry.sha, cleanup_mode(entry.mode)
+
+
+def refresh_index(index, root_path):
+    """Refresh the contents of an index.
+
+    This is the equivalent to running 'git commit -a'.
+
+    :param index: Index to update
+    :param root_path: Root filesystem path
+    """
+    for path, entry in iter_fresh_entries(index, root_path):
+        index[path] = path

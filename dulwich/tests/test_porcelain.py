@@ -1059,12 +1059,55 @@ class FetchTests(PorcelainTestCase):
         target_repo.close()
 
         # Fetch changes into the cloned repo
-        porcelain.fetch(target_path, self.repo.path, outstream=outstream,
-                        errstream=errstream)
+        porcelain.fetch(target_path, self.repo.path,
+                        outstream=outstream, errstream=errstream)
 
         # Check the target repo for pushed changes
         with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
+
+    def test_with_remote_name(self):
+        remote_name = b'origin'
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # create a file for initial commit
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
+        porcelain.commit(repo=self.repo.path, message=b'test',
+                         author=b'test <email>',
+                         committer=b'test <email>')
+
+        # Setup target repo
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target_repo = porcelain.clone(self.repo.path, target=target_path,
+                                      errstream=errstream)
+
+        # Capture current refs
+        target_refs = target_repo.get_refs()
+
+        # create a second file to be pushed
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
+        porcelain.add(repo=self.repo.path, paths=fullpath)
+        porcelain.commit(repo=self.repo.path, message=b'test2',
+                         author=b'test2 <email>',
+                         committer=b'test2 <email>')
+
+        self.assertFalse(self.repo[b'HEAD'].id in target_repo)
+        target_repo.close()
+
+        # Fetch changes into the cloned repo
+        porcelain.fetch(target_path, self.repo.path, remote_name=remote_name,
+                        outstream=outstream, errstream=errstream)
+
+        # Check the target repo for pushed changes, as well as updates
+        # for the refs
+        with Repo(target_path) as r:
+            self.assertTrue(self.repo[b'HEAD'].id in r)
+            self.assertNotEqual(self.repo.get_refs(), target_refs)
 
 
 class RepackTests(PorcelainTestCase):

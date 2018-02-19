@@ -1026,6 +1026,14 @@ class BranchDeleteTests(PorcelainTestCase):
         porcelain.branch_delete(self.repo, b'foo')
         self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
 
+    def test_simple_unicode(self):
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        porcelain.branch_create(self.repo, 'foo')
+        self.assertTrue(b"foo" in porcelain.branch_list(self.repo))
+        porcelain.branch_delete(self.repo, 'foo')
+        self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
+
 
 class FetchTests(PorcelainTestCase):
 

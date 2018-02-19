@@ -221,7 +221,7 @@ def symbolic_ref(repo, ref_name, force=False):
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None):
+def commit(repo=".", message=None, author=None, committer=None, encoding=None):
     """Create a new commit.
 
     :param repo: Path to repository
@@ -232,8 +232,15 @@ def commit(repo=".", message=None, author=None, committer=None):
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
+    if getattr(message, 'encode', None):
+        message = message.encode(encoding or DEFAULT_ENCODING)
+    if getattr(author, 'encode', None):
+        author = author.encode(encoding or DEFAULT_ENCODING)
+    if getattr(committer, 'encode', None):
+        committer = committer.encode(encoding or DEFAULT_ENCODING)
     with open_repo_closing(repo) as r:
-        return r.do_commit(message=message, author=author, committer=committer)
+        return r.do_commit(
+                message=message, author=author, committer=committer, encoding=encoding)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):

@@ -215,7 +215,7 @@ def symbolic_ref(repo, ref_name, force=False):
     :param force: force settings without checking if it exists in refs/heads
     """
     with open_repo_closing(repo) as repo_obj:
-        ref_path = b'refs/heads/' + ref_name
+        ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
             raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
@@ -998,6 +998,12 @@ def receive_pack(path=".", inf=None, outf=None):
     return 0
 
 
+def _make_branch_ref(name):
+    if getattr(name, 'encode', None):
+        name = name.encode(DEFAULT_ENCODING)
+    return b"refs/heads/" + name
+
+
 def branch_delete(repo, name):
     """Delete a branch.
 
@@ -1005,14 +1011,12 @@ def branch_delete(repo, name):
     :param name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, bytes):
-            names = [name]
-        elif isinstance(name, list):
+        if isinstance(name, list):
             names = name
         else:
-            raise TypeError("Unexpected branch name type %r" % name)
+            names = [name]
         for name in names:
-            del r.refs[b"refs/heads/" + name]
+            del r.refs[_make_branch_ref(name)]
 
 
 def branch_create(repo, name, objectish=None, force=False):
@@ -1027,7 +1031,7 @@ def branch_create(repo, name, objectish=None, force=False):
         if objectish is None:
             objectish = "HEAD"
         object = parse_object(r, objectish)
-        refname = b"refs/heads/" + name
+        refname = _make_branch_ref(name)
         ref_message = b"branch: Created from " + objectish.encode('utf-8')
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
@@ -1181,7 +1185,7 @@ def update_head(repo, target, detached=False, new_branch=None):
     """
     with open_repo_closing(repo) as r:
         if new_branch is not None:
-            to_set = b"refs/heads/" + new_branch.encode(DEFAULT_ENCODING)
+            to_set = _make_branch_ref(new_branch)
         else:
             to_set = b"HEAD"
         if detached:

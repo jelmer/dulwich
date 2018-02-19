@@ -104,6 +104,17 @@ class CommitTests(PorcelainTestCase):
         self.assertTrue(isinstance(sha, bytes))
         self.assertEqual(len(sha), 40)
 
+    def test_unicode(self):
+        c1, c2, c3 = build_commit_graph(
+                self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+                self.repo.path, message="Some message",
+                author="Joe <joe@example.com>",
+                committer="Bob <bob@example.com>")
+        self.assertTrue(isinstance(sha, bytes))
+        self.assertEqual(len(sha), 40)
+
 
 class CloneTests(PorcelainTestCase):
 

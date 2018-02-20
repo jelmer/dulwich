@@ -699,7 +699,7 @@ def tag_create(
         else:
             tag_id = object.id
 
-        r.refs[b'refs/tags/' + tag] = tag_id
+        r.refs[_make_tag_ref(tag)] = tag_id
 
 
 def list_tags(*args, **kwargs):
@@ -734,7 +734,7 @@ def tag_delete(repo, name):
         else:
             raise TypeError("Unexpected tag name type %r" % name)
         for name in names:
-            del r.refs[b"refs/tags/" + name]
+            del r.refs[_make_tag_ref(name)]
 
 
 def reset(repo, mode, treeish="HEAD"):
@@ -1011,6 +1011,12 @@ def _make_branch_ref(name):
     if getattr(name, 'encode', None):
         name = name.encode(DEFAULT_ENCODING)
     return b"refs/heads/" + name
+
+
+def _make_tag_ref(name):
+    if getattr(name, 'encode', None):
+        name = name.encode(DEFAULT_ENCODING)
+    return b"refs/tags/" + name
 
 
 def branch_delete(repo, name):

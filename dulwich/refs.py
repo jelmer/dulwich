@@ -882,3 +882,9 @@ def write_info_refs(refs, store):
 
 def is_local_branch(x):
     return x.startswith(b'refs/heads/')
+
+
+def strip_peeled_refs(refs):
+    """Remove all peeled refs"""
+    return {ref: sha for (ref, sha) in refs.items()
+            if not ref.endswith(ANNOTATED_TAG_SUFFIX)}

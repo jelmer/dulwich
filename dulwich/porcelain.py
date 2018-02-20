@@ -242,7 +242,8 @@ def commit(repo=".", message=None, author=None, committer=None, encoding=None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
     with open_repo_closing(repo) as r:
         return r.do_commit(
-                message=message, author=author, committer=committer, encoding=encoding)
+                message=message, author=author, committer=committer,
+                encoding=encoding)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):

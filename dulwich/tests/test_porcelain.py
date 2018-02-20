@@ -583,6 +583,18 @@ class TagCreateTests(PorcelainTestCase):
         self.repo[b'refs/tags/tryme']
         self.assertEqual(list(tags.values()), [self.repo.head()])
 
+    def test_unannotated_unicode(self):
+        c1, c2, c3 = build_commit_graph(
+                self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs[b"HEAD"] = c3.id
+
+        porcelain.tag_create(self.repo.path, "tryme", annotated=False)
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"tryme"])
+        self.repo[b'refs/tags/tryme']
+        self.assertEqual(list(tags.values()), [self.repo.head()])
+
 
 class TagListTests(PorcelainTestCase):
 

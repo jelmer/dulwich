@@ -118,7 +118,10 @@ from dulwich.protocol import (
     Protocol,
     ZERO_SHA,
     )
-from dulwich.refs import ANNOTATED_TAG_SUFFIX
+from dulwich.refs import (
+    ANNOTATED_TAG_SUFFIX,
+    strip_peeled_refs,
+)
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import (
     FileSystemBackend,
@@ -1065,12 +1068,13 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout,
+def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           errstream=default_bytes_err_stream, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
     :param remote_location: String identifying a remote server
+    :param remote_name: Name for remote server
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     :return: Dictionary with refs on the remote
@@ -1078,8 +1082,10 @@ def fetch(repo, remote_location, outstream=sys.stdout,
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
                 remote_location, config=r.get_config_stack(), **kwargs)
-        remote_refs = client.fetch(path, r, progress=errstream.write)
-    return remote_refs
+        fetch_result = client.fetch(path, r, progress=errstream.write)
+        ref_name = b'refs/remotes/' + remote_name
+        r.refs.import_refs(ref_name, strip_peeled_refs(fetch_result.refs))
+    return fetch_result.refs
 
 
 def ls_remote(remote, config=None, **kwargs):

@@ -50,6 +50,8 @@ Currently implemented:
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
+
+Functions should generally accept both unicode strings and bytestrings
 """
 
 from collections import namedtuple

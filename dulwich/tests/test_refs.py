@@ -39,6 +39,7 @@ from dulwich.refs import (
     parse_symref_value,
     read_packed_refs_with_peeled,
     read_packed_refs,
+    strip_peeled_refs,
     write_packed_refs,
     )
 from dulwich.repo import Repo
@@ -552,3 +553,27 @@ class ParseSymrefValueTests(TestCase):
 
     def test_invalid(self):
         self.assertRaises(ValueError, parse_symref_value, b'foobar')
+
+
+class StripPeeledRefsTests(TestCase):
+
+    all_refs = {
+        b'refs/heads/master': b'8843d7f92416211de9ebb963ff4ce28125932878',
+        b'refs/heads/testing': b'186a005b134d8639a58b6731c7c1ea821a6eedba',
+        b'refs/tags/1.0.0': b'a93db4b0360cc635a2b93675010bac8d101f73f0',
+        b'refs/tags/1.0.0^{}': b'a93db4b0360cc635a2b93675010bac8d101f73f0',
+        b'refs/tags/2.0.0': b'0749936d0956c661ac8f8d3483774509c165f89e',
+        b'refs/tags/2.0.0^{}': b'0749936d0956c661ac8f8d3483774509c165f89e',
+    }
+    non_peeled_refs = {
+        b'refs/heads/master': b'8843d7f92416211de9ebb963ff4ce28125932878',
+        b'refs/heads/testing': b'186a005b134d8639a58b6731c7c1ea821a6eedba',
+        b'refs/tags/1.0.0': b'a93db4b0360cc635a2b93675010bac8d101f73f0',
+        b'refs/tags/2.0.0': b'0749936d0956c661ac8f8d3483774509c165f89e',
+    }
+
+    def test_strip_peeled_refs(self):
+        # Simple check of two dicts
+        self.assertEqual(
+            strip_peeled_refs(self.all_refs),
+            self.non_peeled_refs)

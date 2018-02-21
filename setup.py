@@ -7,6 +7,9 @@ try:
     from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
+    has_setuptools = False
+else:
+    has_setuptools = True
 from distutils.core import Distribution
 import os
 import sys
@@ -58,6 +61,7 @@ if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
+
 ext_modules = [
     Extension('dulwich._objects', ['dulwich/_objects.c'],
               include_dirs=include_dirs),
@@ -66,6 +70,15 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
               include_dirs=include_dirs),
 ]
+
+setup_kwargs = {}
+
+if has_setuptools:
+    setup_kwargs['extras_require'] = { 'fastimport': ['fastimport']}
+    setup_kwargs['install_requires'] = ['urllib3[secure]>=1.21']
+    setup_kwargs['include_package_data'] = True
+    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
+    setup_kwargs['tests_require'] = tests_require
 
 
 if sys.platform == 'win32':
@@ -109,13 +122,7 @@ setup(name='dulwich',
           'Operating System :: Microsoft :: Windows',
           'Topic :: Software Development :: Version Control',
       ],
-      extras_require={
-          'fastimport': ['fastimport'],
-      },
       ext_modules=ext_modules,
-      install_requires=['urllib3[secure]>=1.21'],
-      test_suite='dulwich.tests.test_suite',
-      tests_require=tests_require,
       distclass=DulwichDistribution,
-      include_package_data=True,
+      **setup_kwargs
       )

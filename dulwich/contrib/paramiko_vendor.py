@@ -111,22 +111,57 @@ class _ParamikoWrapper(object):
 
 
 class ParamikoSSHVendor(object):
+    # http://docs.paramiko.org/en/2.4/api/client.html
 
-    def __init__(self):
-        self.ssh_kwargs = {}
+    def __init__(self, **kwargs):
+        self.ssh_kwargs = {
+            'port': 22,
+            'username': None,
+            'password': None,
+            'pkey': None,
+            'key_filename': None,
+            'timeout': None,
+            'allow_agent': True,
+            'look_for_keys': True,
+            'compress': False,
+            'sock': None,
+            'gss_auth': False,
+            'gss_kex': False,
+            'gss_deleg_creds': True,
+            'gss_host': None,
+            'banner_timeout': None,
+            # commented due missing in old paramiko version
+            #'auth_timeout': None,
+            #'gss_trust_dns': True,
+            #'passphrase': None,
+        }
+        self.ssh_kwargs.update(kwargs)
 
-    def run_command(self, host, command, username=None, port=None,
-                    progress_stderr=None):
-        # Paramiko needs an explicit port. None is not valid
-        if port is None:
-            port = 22
+    def run_command(self, host, command,
+                    username=None, port=None,
+                    progress_stderr=None,
+                    password=None, pkey=None,
+                    key_filename=None, **kwargs):
 
         client = paramiko.SSHClient()
 
+        connection_kwargs = {'hostname': host}
+        connection_kwargs.update(self.ssh_kwargs)
+        if username:
+            connection_kwargs['username'] = username
+        if port:
+            connection_kwargs['port'] = port
+        if password:
+            connection_kwargs['password'] = password
+        if pkey:
+            connection_kwargs['pkey'] = pkey
+        if key_filename:
+            connection_kwargs['key_filename'] = key_filename
+        connection_kwargs.update(kwargs)
+
         policy = paramiko.client.MissingHostKeyPolicy()
         client.set_missing_host_key_policy(policy)
-        client.connect(host, username=username, port=port,
-                       **self.ssh_kwargs)
+        client.connect(**connection_kwargs)
 
         # Open SSH session
         channel = client.get_transport().open_session()

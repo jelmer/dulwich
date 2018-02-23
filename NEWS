@@ -18,6 +18,8 @@
 
   * Start writing reflog entries. (Jelmer Vernooĳ)
 
+  * Add ability to use password and keyfile ssh options with SSHVendor. (Filipp Kucheryavy)
+
  API CHANGES
 
   * ``GitClient.send_pack`` now accepts a ``generate_pack_data``

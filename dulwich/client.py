@@ -1070,15 +1070,18 @@ default_local_git_client_cls = LocalGitClient
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(self, host, command, username=None, port=None):
+    def connect_ssh(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
         # This function was deprecated in 0.9.1
         import warnings
         warnings.warn(
             "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
             DeprecationWarning)
-        return self.run_command(host, command, username=username, port=port)
+        return self.run_command(host, command, username=username, port=port,
+                                password=password, key_filename=key_filename)
 
-    def run_command(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
         """Connect to an SSH server.
 
         Run a command remotely and return a file-like object for interaction
@@ -1088,6 +1091,8 @@ class SSHVendor(object):
         :param command: Command to run (as argv array)
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
+        :param password: Optional ssh password for login
+        :param key_filename: Optional path to private keyfile
         """
         raise NotImplementedError(self.run_command)
 
@@ -1102,16 +1107,49 @@ class StrangeHostname(Exception):
 class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
-    def run_command(self, host, command, username=None, port=None):
-        # FIXME: This has no way to deal with passwords..
-        args = ['ssh', '-x']
-        if port is not None:
-            args.extend(['-p', str(port)])
-        if username is not None:
+    def run_command(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
+        if password and key_filename:
+            raise NotImplementedError(
+                "You can't set passphrase for ssh key with SubprocessSSHVendor, " \
+                "use ParamikoSSHVendor instead"
+            )
+
+        if sys.platform == 'win32':
+            args = ['putty.exe', '-ssh']
+            if password:
+                args.extend(['-pw', str(password)])
+        else:
+            if password:
+                try:
+                    subprocess.call(["sshpass"])
+                except OSError as e:
+                    import warnings
+                    warnings.warn(
+                        "You need sshpass for using password option, " \
+                        "you can use ssh-add or private key without password " \
+                        "or ParamikoSSHVendor"
+                    )
+                    raise e
+                args = ['sshpass', '-p', str(password)]
+            else:
+                args = ['ssh', '-x']
+
+        if port:
+            if sys.platform == 'win32':
+                args.extend(['-P', str(port)])
+            else:
+                args.extend(['-p', str(port)])
+
+        if key_filename:
+            args.extend(['-i', str(key_filename)])
+
+        if username:
             host = '%s@%s' % (username, host)
         if host.startswith('-'):
             raise StrangeHostname(hostname=host)
         args.append(host)
+
         proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
@@ -1134,10 +1172,12 @@ get_ssh_vendor = SubprocessSSHVendor
 class SSHGitClient(TraditionalGitClient):
 
     def __init__(self, host, port=None, username=None, vendor=None,
-                 config=None, **kwargs):
+                 config=None, password=None, key_filename=None, **kwargs):
         self.host = host
         self.port = port
         self.username = username
+        self.password = password
+        self.key_filename = key_filename
         super(SSHGitClient, self).__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
@@ -1175,7 +1215,8 @@ class SSHGitClient(TraditionalGitClient):
         argv = (self._get_cmd_path(cmd).decode(self._remote_path_encoding) +
                 " '" + path + "'")
         con = self.ssh_vendor.run_command(
-            self.host, argv, port=self.port, username=self.username)
+            self.host, argv, port=self.port, username=self.username,
+            password=self.password, key_filename=self.key_filename)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
                 con.can_read)

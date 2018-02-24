@@ -632,7 +632,7 @@ class TestSSHVendor(object):
         self.port = None
 
     def run_command(self, host, command, username=None, port=None,
-		    password=None, key_filename=None):
+                    password=None, key_filename=None):
         self.host = host
         self.command = command
         self.username = username

@@ -131,9 +131,9 @@ class ParamikoSSHVendor(object):
             'gss_host': None,
             'banner_timeout': None,
             # commented due missing in old paramiko version
-            #'auth_timeout': None,
-            #'gss_trust_dns': True,
-            #'passphrase': None,
+            # 'auth_timeout': None,
+            # 'gss_trust_dns': True,
+            # 'passphrase': None,
         }
         self.ssh_kwargs.update(kwargs)
 

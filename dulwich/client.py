@@ -1111,8 +1111,8 @@ class SubprocessSSHVendor(SSHVendor):
                     password=None, key_filename=None):
         if password and key_filename:
             raise NotImplementedError(
-                "You can't set passphrase for ssh key with SubprocessSSHVendor, " \
-                "use ParamikoSSHVendor instead"
+                "You can't set passphrase for ssh key with "
+                "SubprocessSSHVendor, use ParamikoSSHVendor instead"
             )
 
         if sys.platform == 'win32':
@@ -1126,8 +1126,9 @@ class SubprocessSSHVendor(SSHVendor):
                 except OSError as e:
                     import warnings
                     warnings.warn(
-                        "You need sshpass for using password option, " \
-                        "you can use ssh-add or private key without password " \
+                        "You need sshpass for using password option, "
+                        "you can use ssh-add "
+                        "or private key without password "
                         "or ParamikoSSHVendor"
                     )
                     raise e

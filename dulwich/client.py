@@ -1091,7 +1091,7 @@ class SSHVendor(object):
         :param command: Command to run (as argv array)
         :param username: Optional ame of user to log in as
         :param port: Optional SSH port to use
-        :param password: Optional ssh password for login
+        :param password: Optional ssh password for login or private key
         :param key_filename: Optional path to private keyfile
         """
         raise NotImplementedError(self.run_command)
@@ -1109,38 +1109,55 @@ class SubprocessSSHVendor(SSHVendor):
 
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
+
+        if password:
+            raise NotImplementedError(
+                "You can't set password or passphrase for ssh key "
+                "with SubprocessSSHVendor, use ParamikoSSHVendor instead"
+            )
+
+        args = ['ssh', '-x']
+
+        if port:
+            args.extend(['-p', str(port)])
+
+        if key_filename:
+            args.extend(['-i', str(key_filename)])
+
+        if username:
+            host = '%s@%s' % (username, host)
+        if host.startswith('-'):
+            raise StrangeHostname(hostname=host)
+        args.append(host)
+
+        proc = subprocess.Popen(args + [command], bufsize=0,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        return SubprocessWrapper(proc)
+
+
+class PuttySSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'putty' command."""
+
+    def run_command(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
+
         if password and key_filename:
             raise NotImplementedError(
-                "You can't set passphrase for ssh key with "
-                "SubprocessSSHVendor, use ParamikoSSHVendor instead"
+                "You can't set passphrase for ssh key "
+                "with PuttySSHVendor, use ParamikoSSHVendor instead"
             )
 
         if sys.platform == 'win32':
             args = ['putty.exe', '-ssh']
-            if password:
-                args.extend(['-pw', str(password)])
         else:
-            if password:
-                try:
-                    subprocess.call(["sshpass"])
-                except OSError as e:
-                    import warnings
-                    warnings.warn(
-                        "You need sshpass for using password option, "
-                        "you can use ssh-add "
-                        "or private key without password "
-                        "or ParamikoSSHVendor"
-                    )
-                    raise e
-                args = ['sshpass', '-p', str(password)]
-            else:
-                args = ['ssh', '-x']
+            args = ['putty', '-ssh']
+
+        if password:
+            args.extend(['-pw', str(password)])
 
         if port:
-            if sys.platform == 'win32':
-                args.extend(['-P', str(port)])
-            else:
-                args.extend(['-p', str(port)])
+            args.extend(['-P', str(port)])
 
         if key_filename:
             args.extend(['-i', str(key_filename)])

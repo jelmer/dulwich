@@ -23,6 +23,7 @@ import base64
 import sys
 import shutil
 import tempfile
+import mock
 
 try:
     from urllib import quote as urlquote
@@ -51,6 +52,7 @@ from dulwich.client import (
     SendPackError,
     StrangeHostname,
     SubprocessSSHVendor,
+    PuttySSHVendor,
     UpdateRefsError,
     default_urllib3_manager,
     get_transport_and_path,
@@ -630,6 +632,8 @@ class TestSSHVendor(object):
         self.command = ""
         self.username = None
         self.port = None
+        self.password = None
+        self.key_filename = None
 
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
@@ -637,6 +641,8 @@ class TestSSHVendor(object):
         self.command = command
         self.username = username
         self.port = port
+        self.password = password
+        self.key_filename = key_filename
 
         class Subprocess:
             pass
@@ -974,3 +980,91 @@ class SubprocessSSHVendorTests(TestCase):
         vendor = SubprocessSSHVendor()
         self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
                           'git-clone-url')
+
+    def test_run_command_password(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command, 'host',
+                          'git-clone-url', password='12345')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    @mock.patch('dulwich.client.subprocess.Popen')
+    def test_run_command_with_port_username_and_privkey(self, mocked_popen):
+        expected = ['ssh', '-x', '-p', '2200',
+                    '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
+
+        mocked_popen.return_value.stdout = BytesIO(b"stdout")
+        mocked_popen.return_value.stderr = BytesIO(b"stderr")
+        mocked_popen.return_value.wait.return_value = False
+        mocked_popen.return_value.returncode = 0
+        mocked_popen.return_value.communicate.return_value = ('Running', '')
+
+        vendor = SubprocessSSHVendor()
+        vendor.run_command('host', 'git-clone-url',
+                           username='user', port='2200',
+                           key_filename='/tmp/id_rsa')
+
+        args, kwargs = mocked_popen.call_args
+        self.assertListEqual(expected, args[0])
+
+
+class PuttySSHVendorTests(TestCase):
+
+    def test_run_command_dashes(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
+                          'git-clone-url')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    @mock.patch('dulwich.client.subprocess.Popen')
+    def test_run_command_password(self, mocked_popen):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + ['-pw', '12345', 'host', 'git-clone-url']
+
+        mocked_popen.return_value.stdout = BytesIO(b"stdout")
+        mocked_popen.return_value.stderr = BytesIO(b"stderr")
+        mocked_popen.return_value.wait.return_value = False
+        mocked_popen.return_value.returncode = 0
+        mocked_popen.return_value.communicate.return_value = ('Running', '')
+
+        vendor = PuttySSHVendor()
+        vendor.run_command('host', 'git-clone-url', password='12345')
+
+        args, kwargs = mocked_popen.call_args
+        self.assertListEqual(expected, args[0])
+
+    @mock.patch('dulwich.client.subprocess.Popen')
+    def test_run_command_with_port_username_and_privkey(self, mocked_popen):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + [
+            '-P', '2200', '-i', '/tmp/id_rsa',
+            'user@host', 'git-clone-url']
+
+        mocked_popen.return_value.stdout = BytesIO(b"stdout")
+        mocked_popen.return_value.stderr = BytesIO(b"stderr")
+        mocked_popen.return_value.wait.return_value = False
+        mocked_popen.return_value.returncode = 0
+        mocked_popen.return_value.communicate.return_value = ('Running', '')
+
+        vendor = PuttySSHVendor()
+        vendor.run_command('host', 'git-clone-url',
+                           username='user', port='2200',
+                           key_filename='/tmp/id_rsa')
+
+        args, kwargs = mocked_popen.call_args
+        self.assertListEqual(expected, args[0])

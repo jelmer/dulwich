@@ -44,6 +44,7 @@ from dulwich.objects import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    OverlayObjectStore,
     ObjectStoreGraphWalker,
     commit_tree_changes,
     tree_lookup_path,
@@ -211,6 +212,14 @@ class ObjectStoreTests(object):
         # For now, just check that close doesn't barf.
         self.store.add_object(testobject)
         self.store.close()
+
+
+class OverlayObjectStoreTests(ObjectStoreTests, TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        self.bases = [MemoryObjectStore(), MemoryObjectStore()]
+        self.store = OverlayObjectStore(self.bases, self.bases[0])
 
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):

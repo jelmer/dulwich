@@ -114,28 +114,7 @@ class ParamikoSSHVendor(object):
     # http://docs.paramiko.org/en/2.4/api/client.html
 
     def __init__(self, **kwargs):
-        self.ssh_kwargs = {
-            'port': 22,
-            'username': None,
-            'password': None,
-            'pkey': None,
-            'key_filename': None,
-            'timeout': None,
-            'allow_agent': True,
-            'look_for_keys': True,
-            'compress': False,
-            'sock': None,
-            'gss_auth': False,
-            'gss_kex': False,
-            'gss_deleg_creds': True,
-            'gss_host': None,
-            'banner_timeout': None,
-            # commented due missing in old paramiko version
-            # 'auth_timeout': None,
-            # 'gss_trust_dns': True,
-            # 'passphrase': None,
-        }
-        self.ssh_kwargs.update(kwargs)
+        self.kwargs = kwargs
 
     def run_command(self, host, command,
                     username=None, port=None,
@@ -146,7 +125,7 @@ class ParamikoSSHVendor(object):
         client = paramiko.SSHClient()
 
         connection_kwargs = {'hostname': host}
-        connection_kwargs.update(self.ssh_kwargs)
+        connection_kwargs.update(self.kwargs)
         if username:
             connection_kwargs['username'] = username
         if port:

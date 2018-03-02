@@ -23,7 +23,6 @@ import base64
 import sys
 import shutil
 import tempfile
-import mock
 
 try:
     from urllib import quote as urlquote
@@ -98,6 +97,23 @@ class DummyClient(TraditionalGitClient):
 
     def _connect(self, service, path):
         return Protocol(self.read, self.write), self.can_read
+
+
+class DummyPopen():
+
+    def __init__(self, *args, **kwards):
+        self.stdin = BytesIO(b"stdin")
+        self.stdout = BytesIO(b"stdout")
+        self.stderr = BytesIO(b"stderr")
+        self.returncode = 0
+        self.args = args
+        self.kwargs = kwards
+
+    def communicate(self, *args, **kwards):
+        return ('Running', '')
+
+    def wait(self, *args, **kwards):
+        return False
 
 
 # TODO(durin42): add unit-level tests of GitClient
@@ -992,23 +1008,25 @@ class SubprocessSSHVendorTests(TestCase):
                           'host', 'git-clone-url',
                           password='12345', key_filename='/tmp/id_rsa')
 
-    @mock.patch('dulwich.client.subprocess.Popen')
-    def test_run_command_with_port_username_and_privkey(self, mocked_popen):
+    def test_run_command_with_port_username_and_privkey(self):
         expected = ['ssh', '-x', '-p', '2200',
                     '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
 
-        mocked_popen.return_value.stdout = BytesIO(b"stdout")
-        mocked_popen.return_value.stderr = BytesIO(b"stderr")
-        mocked_popen.return_value.wait.return_value = False
-        mocked_popen.return_value.returncode = 0
-        mocked_popen.return_value.communicate.return_value = ('Running', '')
+        # Monkey Patch client subprocess popen
+        orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
 
         vendor = SubprocessSSHVendor()
-        vendor.run_command('host', 'git-clone-url',
-                           username='user', port='2200',
-                           key_filename='/tmp/id_rsa')
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
 
-        args, kwargs = mocked_popen.call_args
+        args = command.proc.args
+
+        # Revert Monkey Patch
+        dulwich.client.subprocess.Popen = orig_popen
+
         self.assertListEqual(expected, args[0])
 
 
@@ -1025,28 +1043,28 @@ class PuttySSHVendorTests(TestCase):
                           'host', 'git-clone-url',
                           password='12345', key_filename='/tmp/id_rsa')
 
-    @mock.patch('dulwich.client.subprocess.Popen')
-    def test_run_command_password(self, mocked_popen):
+    def test_run_command_password(self):
         if sys.platform == 'win32':
             binary = ['putty.exe', '-ssh']
         else:
             binary = ['putty', '-ssh']
         expected = binary + ['-pw', '12345', 'host', 'git-clone-url']
 
-        mocked_popen.return_value.stdout = BytesIO(b"stdout")
-        mocked_popen.return_value.stderr = BytesIO(b"stderr")
-        mocked_popen.return_value.wait.return_value = False
-        mocked_popen.return_value.returncode = 0
-        mocked_popen.return_value.communicate.return_value = ('Running', '')
+        # Monkey Patch client subprocess popen
+        orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
 
         vendor = PuttySSHVendor()
-        vendor.run_command('host', 'git-clone-url', password='12345')
+        command = vendor.run_command('host', 'git-clone-url', password='12345')
 
-        args, kwargs = mocked_popen.call_args
+        args = command.proc.args
+
+        # Revert Monkey Patch
+        dulwich.client.subprocess.Popen = orig_popen
+
         self.assertListEqual(expected, args[0])
 
-    @mock.patch('dulwich.client.subprocess.Popen')
-    def test_run_command_with_port_username_and_privkey(self, mocked_popen):
+    def test_run_command_with_port_username_and_privkey(self):
         if sys.platform == 'win32':
             binary = ['putty.exe', '-ssh']
         else:
@@ -1055,16 +1073,19 @@ class PuttySSHVendorTests(TestCase):
             '-P', '2200', '-i', '/tmp/id_rsa',
             'user@host', 'git-clone-url']
 
-        mocked_popen.return_value.stdout = BytesIO(b"stdout")
-        mocked_popen.return_value.stderr = BytesIO(b"stderr")
-        mocked_popen.return_value.wait.return_value = False
-        mocked_popen.return_value.returncode = 0
-        mocked_popen.return_value.communicate.return_value = ('Running', '')
+        # Monkey Patch client subprocess popen
+        orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
 
         vendor = PuttySSHVendor()
-        vendor.run_command('host', 'git-clone-url',
-                           username='user', port='2200',
-                           key_filename='/tmp/id_rsa')
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
 
-        args, kwargs = mocked_popen.call_args
+        args = command.proc.args
+
+        # Revert Monkey Patch
+        dulwich.client.subprocess.Popen = orig_popen
+
         self.assertListEqual(expected, args[0])

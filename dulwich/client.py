@@ -1156,9 +1156,8 @@ class PuttySSHVendor(SSHVendor):
         if password:
             import warnings
             warnings.warn(
-                "Putty show you password in clear text "
-                "in the list of arguments, so use ParamikoSSHVendor "
-                "instead if you care about security")
+                "Invoking Putty with a password exposes the password in the "
+                "process list.")
             args.extend(['-pw', str(password)])
 
         if port:

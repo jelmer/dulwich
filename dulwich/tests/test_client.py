@@ -23,6 +23,7 @@ import base64
 import sys
 import shutil
 import tempfile
+import warnings
 
 try:
     from urllib import quote as urlquote
@@ -84,6 +85,7 @@ from dulwich.tests import skipIf
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
+    setup_warning_catcher,
     )
 
 
@@ -992,6 +994,14 @@ class DefaultUrllib3ManagerTest(TestCase):
 
 class SubprocessSSHVendorTests(TestCase):
 
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
+
     def test_run_command_dashes(self):
         vendor = SubprocessSSHVendor()
         self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
@@ -1012,10 +1022,6 @@ class SubprocessSSHVendorTests(TestCase):
         expected = ['ssh', '-x', '-p', '2200',
                     '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
 
-        # Monkey Patch client subprocess popen
-        orig_popen = dulwich.client.subprocess.Popen
-        dulwich.client.subprocess.Popen = DummyPopen
-
         vendor = SubprocessSSHVendor()
         command = vendor.run_command(
             'host', 'git-clone-url',
@@ -1024,13 +1030,18 @@ class SubprocessSSHVendorTests(TestCase):
 
         args = command.proc.args
 
-        # Revert Monkey Patch
-        dulwich.client.subprocess.Popen = orig_popen
-
         self.assertListEqual(expected, args[0])
 
 
 class PuttySSHVendorTests(TestCase):
+
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
 
     def test_run_command_dashes(self):
         vendor = PuttySSHVendor()
@@ -1050,17 +1061,29 @@ class PuttySSHVendorTests(TestCase):
             binary = ['putty', '-ssh']
         expected = binary + ['-pw', '12345', 'host', 'git-clone-url']
 
-        # Monkey Patch client subprocess popen
-        orig_popen = dulwich.client.subprocess.Popen
-        dulwich.client.subprocess.Popen = DummyPopen
-
         vendor = PuttySSHVendor()
+
+        warnings.simplefilter("always", UserWarning)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list, restore_warnings = setup_warning_catcher()
+        self.addCleanup(restore_warnings)
+
         command = vendor.run_command('host', 'git-clone-url', password='12345')
 
-        args = command.proc.args
+        expected_warning = UserWarning(
+            'Invoking Putty with a password exposes the password in the '
+            'process list.')
 
-        # Revert Monkey Patch
-        dulwich.client.subprocess.Popen = orig_popen
+        for w in warnings_list:
+            if (type(w) == type(expected_warning) and
+                    w.args == expected_warning.args):
+                break
+        else:
+            raise AssertionError(
+                'Expected warning %r not in %r' %
+                (expected_warning, warnings_list))
+
+        args = command.proc.args
 
         self.assertListEqual(expected, args[0])
 
@@ -1073,10 +1096,6 @@ class PuttySSHVendorTests(TestCase):
             '-P', '2200', '-i', '/tmp/id_rsa',
             'user@host', 'git-clone-url']
 
-        # Monkey Patch client subprocess popen
-        orig_popen = dulwich.client.subprocess.Popen
-        dulwich.client.subprocess.Popen = DummyPopen
-
         vendor = PuttySSHVendor()
         command = vendor.run_command(
             'host', 'git-clone-url',
@@ -1084,8 +1103,5 @@ class PuttySSHVendorTests(TestCase):
             key_filename='/tmp/id_rsa')
 
         args = command.proc.args
-
-        # Revert Monkey Patch
-        dulwich.client.subprocess.Popen = orig_popen
 
         self.assertListEqual(expected, args[0])

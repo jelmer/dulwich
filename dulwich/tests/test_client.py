@@ -23,6 +23,7 @@ import base64
 import sys
 import shutil
 import tempfile
+import warnings
 
 try:
     from urllib import quote as urlquote
@@ -51,6 +52,7 @@ from dulwich.client import (
     SendPackError,
     StrangeHostname,
     SubprocessSSHVendor,
+    PuttySSHVendor,
     UpdateRefsError,
     default_urllib3_manager,
     get_transport_and_path,
@@ -83,6 +85,7 @@ from dulwich.tests import skipIf
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
+    setup_warning_catcher,
     )
 
 
@@ -96,6 +99,23 @@ class DummyClient(TraditionalGitClient):
 
     def _connect(self, service, path):
         return Protocol(self.read, self.write), self.can_read
+
+
+class DummyPopen():
+
+    def __init__(self, *args, **kwards):
+        self.stdin = BytesIO(b"stdin")
+        self.stdout = BytesIO(b"stdout")
+        self.stderr = BytesIO(b"stderr")
+        self.returncode = 0
+        self.args = args
+        self.kwargs = kwards
+
+    def communicate(self, *args, **kwards):
+        return ('Running', '')
+
+    def wait(self, *args, **kwards):
+        return False
 
 
 # TODO(durin42): add unit-level tests of GitClient
@@ -630,12 +650,17 @@ class TestSSHVendor(object):
         self.command = ""
         self.username = None
         self.port = None
+        self.password = None
+        self.key_filename = None
 
-    def run_command(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
         self.host = host
         self.command = command
         self.username = username
         self.port = port
+        self.password = password
+        self.key_filename = key_filename
 
         class Subprocess:
             pass
@@ -969,7 +994,114 @@ class DefaultUrllib3ManagerTest(TestCase):
 
 class SubprocessSSHVendorTests(TestCase):
 
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
+
     def test_run_command_dashes(self):
         vendor = SubprocessSSHVendor()
         self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
                           'git-clone-url')
+
+    def test_run_command_password(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command, 'host',
+                          'git-clone-url', password='12345')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    def test_run_command_with_port_username_and_privkey(self):
+        expected = ['ssh', '-x', '-p', '2200',
+                    '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])
+
+
+class PuttySSHVendorTests(TestCase):
+
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
+
+    def test_run_command_dashes(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
+                          'git-clone-url')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    def test_run_command_password(self):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + ['-pw', '12345', 'host', 'git-clone-url']
+
+        vendor = PuttySSHVendor()
+
+        warnings.simplefilter("always", UserWarning)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list, restore_warnings = setup_warning_catcher()
+        self.addCleanup(restore_warnings)
+
+        command = vendor.run_command('host', 'git-clone-url', password='12345')
+
+        expected_warning = UserWarning(
+            'Invoking Putty with a password exposes the password in the '
+            'process list.')
+
+        for w in warnings_list:
+            if (type(w) == type(expected_warning) and
+                    w.args == expected_warning.args):
+                break
+        else:
+            raise AssertionError(
+                'Expected warning %r not in %r' %
+                (expected_warning, warnings_list))
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])
+
+    def test_run_command_with_port_username_and_privkey(self):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + [
+            '-P', '2200', '-i', '/tmp/id_rsa',
+            'user@host', 'git-clone-url']
+
+        vendor = PuttySSHVendor()
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])

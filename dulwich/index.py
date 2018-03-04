@@ -48,6 +48,11 @@ IndexEntry = collections.namedtuple(
         'flags'])
 
 
+FLAG_STAGEMASK = 0x3000
+FLAG_VALID = 0x8000
+FLAG_EXTENDED = 0x4000
+
+
 def pathsplit(path):
     """Split a /-delimited path into a directory part and a basename.
 

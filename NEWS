@@ -20,6 +20,9 @@
 
   * Add ability to use password and keyfile ssh options with SSHVendor. (Filipp Kucheryavy)
 
+  * Add ``change_type_same`` flag to ``tree_changes``.
+    (Jelmer Vernooĳ)
+
  API CHANGES
 
   * ``GitClient.send_pack`` now accepts a ``generate_pack_data``

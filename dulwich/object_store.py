@@ -155,19 +155,22 @@ class BaseObjectStore(object):
             return commit()
 
     def tree_changes(self, source, target, want_unchanged=False,
-                     include_trees=False):
+                     include_trees=False, change_type_same=False):
         """Find the differences between the contents of two trees
 
         :param source: SHA1 of the source tree
         :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
         :param include_trees: Whether to include trees
+        :param change_type_same: Whether to report files changing
+            type in the same entry.
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
         for change in tree_changes(self, source, target,
                                    want_unchanged=want_unchanged,
-                                   include_trees=include_trees):
+                                   include_trees=include_trees,
+                                   change_type_same=change_type_same):
             yield ((change.old.path, change.new.path),
                    (change.old.mode, change.new.mode),
                    (change.old.sha, change.new.sha))

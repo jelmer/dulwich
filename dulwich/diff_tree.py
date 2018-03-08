@@ -160,7 +160,8 @@ def _skip_tree(entry, include_trees):
 
 
 def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
-                 rename_detector=None, include_trees=False):
+                 rename_detector=None, include_trees=False,
+                 change_type_same=False):
     """Find the differences between the contents of two trees.
 
     :param store: An ObjectStore for looking up objects.
@@ -170,6 +171,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
         as well.
     :param include_trees: Whether to include trees
     :param rename_detector: RenameDetector object for detecting renames.
+    :param change_type_same: Whether to report change types in the same
+        entry or as delete+add.
     :return: Iterator over TreeChange instances for each change between the
         source and target tree.
     """
@@ -194,7 +197,8 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
         entry2 = _skip_tree(entry2, include_trees)
 
         if entry1 != _NULL_ENTRY and entry2 != _NULL_ENTRY:
-            if stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode):
+            if (stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode)
+                    and not change_type_same):
                 # File type changed: report as delete/add.
                 yield TreeChange.delete(entry1)
                 entry1 = _NULL_ENTRY

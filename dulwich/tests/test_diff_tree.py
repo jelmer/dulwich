@@ -220,6 +220,16 @@ class TreeChangesTest(DiffTestCase):
              TreeChange.add((b'a', 0o120000, blob_a2.id))],
             tree1, tree2)
 
+    def test_tree_changes_change_type_same(self):
+        blob_a1 = make_object(Blob, data=b'a')
+        blob_a2 = make_object(Blob, data=b'/foo/bar')
+        tree1 = self.commit_tree([(b'a', blob_a1, 0o100644)])
+        tree2 = self.commit_tree([(b'a', blob_a2, 0o120000)])
+        self.assertChangesEqual(
+            [TreeChange(CHANGE_MODIFY, (b'a', 0o100644, blob_a1.id),
+                        (b'a', 0o120000, blob_a2.id))],
+            tree1, tree2, change_type_same=True)
+
     def test_tree_changes_to_tree(self):
         blob_a = make_object(Blob, data=b'a')
         blob_x = make_object(Blob, data=b'x')

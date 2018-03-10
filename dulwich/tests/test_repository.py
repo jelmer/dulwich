@@ -37,8 +37,10 @@ from dulwich import objects
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository
 from dulwich.repo import (
+    InvalidUserIdentity,
     Repo,
     MemoryRepo,
+    check_user_identity,
     )
 from dulwich.tests import (
     TestCase,
@@ -758,11 +760,11 @@ class BuildRepoRootTests(TestCase):
     def test_commit_fail_ref(self):
         r = self._repo
 
-        def set_if_equals(name, old_ref, new_ref):
+        def set_if_equals(name, old_ref, new_ref, **kwargs):
             return False
         r.refs.set_if_equals = set_if_equals
 
-        def add_if_new(name, new_ref):
+        def add_if_new(name, new_ref, **kwargs):
             self.fail('Unexpected call to add_if_new')
         r.refs.add_if_new = add_if_new
 
@@ -927,3 +929,19 @@ class BuildRepoRootTests(TestCase):
     def test_discover_notrepo(self):
         with self.assertRaises(NotGitRepository):
             Repo.discover('/')
+
+
+class CheckUserIdentityTests(TestCase):
+
+    def test_valid(self):
+        check_user_identity(b'Me <me@example.com>')
+
+    def test_invalid(self):
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'No Email')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname <missing')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname missing>')
+        self.assertRaises(InvalidUserIdentity,
+                          check_user_identity, b'Fullname >order<>')

@@ -56,10 +56,11 @@ from dulwich.pack import (
     PackData,
     PackInflater,
     iter_sha1,
+    pack_objects_to_data,
     write_pack_header,
     write_pack_index_v2,
+    write_pack_data,
     write_pack_object,
-    write_pack_objects,
     compute_file_sha,
     PackIndexer,
     PackStreamCopier,
@@ -135,17 +136,41 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_objects)
 
-    def tree_changes(self, source, target, want_unchanged=False):
+    def add_pack_data(self, count, pack_data):
+        """Add pack data to this object store.
+
+        :param num_items: Number of items to add
+        :param pack_data: Iterator over pack data tuples
+        """
+        if count == 0:
+            # Don't bother writing an empty pack file
+            return
+        f, commit, abort = self.add_pack()
+        try:
+            write_pack_data(f, count, pack_data)
+        except BaseException:
+            abort()
+            raise
+        else:
+            return commit()
+
+    def tree_changes(self, source, target, want_unchanged=False,
+                     include_trees=False, change_type_same=False):
         """Find the differences between the contents of two trees
 
         :param source: SHA1 of the source tree
         :param target: SHA1 of the target tree
         :param want_unchanged: Whether unchanged files should be reported
+        :param include_trees: Whether to include trees
+        :param change_type_same: Whether to report files changing
+            type in the same entry.
         :return: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
         for change in tree_changes(self, source, target,
-                                   want_unchanged=want_unchanged):
+                                   want_unchanged=want_unchanged,
+                                   include_trees=include_trees,
+                                   change_type_same=change_type_same):
             yield ((change.old.path, change.new.path),
                    (change.old.mode, change.new.mode),
                    (change.old.sha, change.new.sha))
@@ -161,7 +186,8 @@ class BaseObjectStore(object):
             tree.
         """
         for entry, _ in walk_trees(self, tree_id, None):
-            if not stat.S_ISDIR(entry.mode) or include_trees:
+            if ((entry.mode is not None and
+                 not stat.S_ISDIR(entry.mode)) or include_trees):
                 yield entry
 
     def find_missing_objects(self, haves, wants, progress=None,
@@ -206,6 +232,18 @@ class BaseObjectStore(object):
         :param progress: Optional progress reporting method
         """
         return self.iter_shas(self.find_missing_objects(have, want, progress))
+
+    def generate_pack_data(self, have, want, progress=None, ofs_delta=True):
+        """Generate pack data objects for a set of wants/haves.
+
+        :param have: List of SHA1s of objects that should not be sent
+        :param want: List of SHA1s of objects that should be sent
+        :param ofs_delta: Whether OFS deltas can be included
+        :param progress: Optional progress reporting method
+        """
+        # TODO(jelmer): More efficient implementation
+        return pack_objects_to_data(
+            self.generate_pack_contents(have, want, progress))
 
     def peel_sha(self, sha):
         """Peel all tags from a SHA.
@@ -392,7 +430,7 @@ class PackBasedObjectStore(BaseObjectStore):
         return self._get_loose_object(sha) is not None
 
     def get_raw(self, name):
-        """Obtain the raw text for an object.
+        """Obtain the raw fulltext for an object.
 
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
@@ -429,17 +467,7 @@ class PackBasedObjectStore(BaseObjectStore):
             __len__.
         :return: Pack object of the objects written.
         """
-        if len(objects) == 0:
-            # Don't bother writing an empty pack file
-            return
-        f, commit, abort = self.add_pack()
-        try:
-            write_pack_objects(f, objects)
-        except:
-            abort()
-            raise
-        else:
-            return commit()
+        return self.add_pack_data(*pack_objects_to_data(objects))
 
 
 class DiskObjectStore(PackBasedObjectStore):
@@ -477,14 +505,14 @@ class DiskObjectStore(PackBasedObjectStore):
                 return
             raise
         with f:
-            for l in f.readlines():
-                l = l.rstrip(b"\n")
-                if l[0] == b"#":
+            for line in f.readlines():
+                line = line.rstrip(b"\n")
+                if line[0] == b"#":
                     continue
-                if os.path.isabs(l):
-                    yield l.decode(sys.getfilesystemencoding())
+                if os.path.isabs(line):
+                    yield line.decode(sys.getfilesystemencoding())
                 else:
-                    yield os.path.join(self.path, l).decode(
+                    yield os.path.join(self.path, line).decode(
                         sys.getfilesystemencoding())
 
     def add_alternate_path(self, path):
@@ -679,6 +707,14 @@ class DiskObjectStore(PackBasedObjectStore):
             basename = self._get_pack_basepath(entries)
             with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
+        if self._pack_cache is None or self._pack_cache_stale():
+            self._update_pack_cache()
+        try:
+            return self._pack_cache[basename]
+        except KeyError:
+            pass
+        else:
+            os.unlink(path)
         os.rename(path, basename + ".pack")
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
@@ -863,30 +899,11 @@ class MemoryObjectStore(BaseObjectStore):
                                       delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
-        except:
+        except BaseException:
             abort()
             raise
         else:
             commit()
-
-
-class ObjectImporter(object):
-    """Interface for importing objects."""
-
-    def __init__(self, count):
-        """Create a new ObjectImporter.
-
-        :param count: Number of objects that's going to be imported.
-        """
-        self.count = count
-
-    def add_object(self, object):
-        """Add an object."""
-        raise NotImplementedError(self.add_object)
-
-    def finish(self, object):
-        """Finish the import and write objects to disk."""
-        raise NotImplementedError(self.finish)
 
 
 class ObjectIterator(object):
@@ -950,6 +967,19 @@ class ObjectStoreIterator(ObjectIterator):
     def __len__(self):
         """Return the number of objects."""
         return len(list(self.itershas()))
+
+    def empty(self):
+        iter = self.itershas()
+        try:
+            iter()
+        except StopIteration:
+            return True
+        else:
+            return False
+
+    def __bool__(self):
+        """Indicate whether this object has contents."""
+        return not self.empty()
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):
@@ -1218,3 +1248,59 @@ def commit_tree_changes(object_store, tree, changes):
             tree[name] = (stat.S_IFDIR, subtree.id)
     object_store.add_object(tree)
     return tree
+
+
+class OverlayObjectStore(BaseObjectStore):
+    """Object store that can overlay multiple object stores."""
+
+    def __init__(self, bases, add_store=None):
+        self.bases = bases
+        self.add_store = add_store
+
+    def add_object(self, object):
+        if self.add_store is None:
+            raise NotImplementedError(self.add_object)
+        return self.add_store.add_object(object)
+
+    def add_objects(self, objects):
+        if self.add_store is None:
+            raise NotImplementedError(self.add_object)
+        return self.add_store.add_objects(objects)
+
+    @property
+    def packs(self):
+        ret = []
+        for b in self.bases:
+            ret.extend(b.packs)
+        return ret
+
+    def __iter__(self):
+        done = set()
+        for b in self.bases:
+            for o_id in b:
+                if o_id not in done:
+                    yield o_id
+                    done.add(o_id)
+
+    def get_raw(self, sha_id):
+        for b in self.bases:
+            try:
+                return b.get_raw(sha_id)
+            except KeyError:
+                pass
+        else:
+            raise KeyError(sha_id)
+
+    def contains_packed(self, sha):
+        for b in self.bases:
+            if b.contains_packed(sha):
+                return True
+        else:
+            return False
+
+    def contains_loose(self, sha):
+        for b in self.bases:
+            if b.contains_loose(sha):
+                return True
+        else:
+            return False

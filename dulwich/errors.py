@@ -164,6 +164,13 @@ class ObjectFormatException(FileFormatException):
     """Indicates an error parsing an object."""
 
 
+class EmptyFileException(FileFormatException):
+    """Indicates an empty file instead of the object's disk
+       representation.
+
+    """
+
+
 class NoIndexPresent(Exception):
     """No index is present."""
 

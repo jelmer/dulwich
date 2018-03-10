@@ -33,6 +33,7 @@ import errno
 import os
 import sys
 import stat
+import time
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -104,6 +105,27 @@ BASE_DIRECTORIES = [
     ]
 
 DEFAULT_REF = b'refs/heads/master'
+
+
+class InvalidUserIdentity(Exception):
+    """User identity is not of the format 'user <email>'"""
+
+    def __init__(self, identity):
+        self.identity = identity
+
+
+def check_user_identity(identity):
+    """Verify that a user identity is formatted correctly.
+
+    :param identity: User identity bytestring
+    :raise InvalidUserIdentity: Raised when identity is invalid
+    """
+    try:
+        fst, snd = identity.split(b' <', 1)
+    except ValueError:
+        raise InvalidUserIdentity(identity)
+    if b'>' not in snd:
+        raise InvalidUserIdentity(identity)
 
 
 def parse_graftpoints(graftpoints):
@@ -194,14 +216,14 @@ class BaseRepo(object):
         self._put_named_file('description', b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        cf.set(b"core", b"repositoryformatversion", b"0")
+        cf.set("core", "repositoryformatversion", "0")
         if self._determine_file_mode():
-            cf.set(b"core", b"filemode", True)
+            cf.set("core", "filemode", True)
         else:
-            cf.set(b"core", b"filemode", False)
+            cf.set("core", "filemode", False)
 
-        cf.set(b"core", b"bare", bare)
-        cf.set(b"core", b"logallrefupdates", True)
+        cf.set("core", "bare", bare)
+        cf.set("core", "logallrefupdates", True)
         cf.write_to_file(f)
         self._put_named_file('config', f.getvalue())
         self._put_named_file(os.path.join('info', 'exclude'), b'')
@@ -516,9 +538,28 @@ class BaseRepo(object):
     def _get_user_identity(self):
         """Determine the identity to use for new commits.
         """
+        user = os.environ.get("GIT_COMMITTER_NAME")
+        email = os.environ.get("GIT_COMMITTER_EMAIL")
         config = self.get_config_stack()
-        return (config.get((b"user", ), b"name") + b" <" +
-                config.get((b"user", ), b"email") + b">")
+        if user is None:
+            try:
+                user = config.get(("user", ), "name")
+            except KeyError:
+                user = None
+        if email is None:
+            try:
+                email = config.get(("user", ), "email")
+            except KeyError:
+                email = None
+        if user is None:
+            import getpass
+            user = getpass.getuser().encode(sys.getdefaultencoding())
+        if email is None:
+            import getpass
+            import socket
+            email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
+                     .encode(sys.getdefaultencoding()))
+        return (user + b" <" + email + b">")
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
@@ -585,9 +626,8 @@ class BaseRepo(object):
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
         if committer is None:
-            # FIXME: Support GIT_COMMITTER_NAME/GIT_COMMITTER_EMAIL environment
-            # variables
             committer = self._get_user_identity()
+        check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
             # FIXME: Support GIT_COMMITTER_DATE environment variable
@@ -602,6 +642,7 @@ class BaseRepo(object):
             # variables
             author = committer
         c.author = author
+        check_user_identity(author)
         if author_timestamp is None:
             # FIXME: Support GIT_AUTHOR_DATE environment variable
             author_timestamp = commit_timestamp
@@ -633,11 +674,17 @@ class BaseRepo(object):
                 old_head = self.refs[ref]
                 c.parents = [old_head] + merge_heads
                 self.object_store.add_object(c)
-                ok = self.refs.set_if_equals(ref, old_head, c.id)
+                ok = self.refs.set_if_equals(
+                    ref, old_head, c.id, message=b"commit: " + message,
+                    committer=committer, timestamp=commit_timestamp,
+                    timezone=commit_timezone)
             except KeyError:
                 c.parents = merge_heads
                 self.object_store.add_object(c)
-                ok = self.refs.add_if_new(ref, c.id)
+                ok = self.refs.add_if_new(
+                        ref, c.id, message=b"commit: " + message,
+                        committer=committer, timestamp=commit_timestamp,
+                        timezone=commit_timezone)
             if not ok:
                 # Fail if the atomic compare-and-swap failed, leaving the
                 # commit and all its objects as garbage.
@@ -707,7 +754,8 @@ class Repo(BaseRepo):
         self.path = root
         object_store = DiskObjectStore(
             os.path.join(self.commondir(), OBJECTDIR))
-        refs = DiskRefsContainer(self.commondir(), self._controldir)
+        refs = DiskRefsContainer(self.commondir(), self._controldir,
+                                 logger=self._write_reflog)
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}
@@ -725,6 +773,28 @@ class Repo(BaseRepo):
         self.hooks['pre-commit'] = PreCommitShellHook(self.controldir())
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
+
+    def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
+                      timezone, message):
+        from .reflog import format_reflog_line
+        path = os.path.join(
+                self.controldir(), 'logs',
+                ref.decode(sys.getfilesystemencoding()))
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        if committer is None:
+            committer = self._get_user_identity()
+        check_user_identity(committer)
+        if timestamp is None:
+            timestamp = int(time.time())
+        if timezone is None:
+            timezone = 0  # FIXME
+        with open(path, 'ab') as f:
+            f.write(format_reflog_line(old_sha, new_sha, committer,
+                    timestamp, timezone, message) + b'\n')
 
     @classmethod
     def discover(cls, start='.'):
@@ -896,27 +966,33 @@ class Repo(BaseRepo):
         else:
             target = self.init_bare(target_path, mkdir=mkdir)
         self.fetch(target)
-        target.refs.import_refs(
-            b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'))
-        target.refs.import_refs(
-            b'refs/tags', self.refs.as_dict(b'refs/tags'))
-        try:
-            target.refs.add_if_new(DEFAULT_REF, self.refs[DEFAULT_REF])
-        except KeyError:
-            pass
-        target_config = target.get_config()
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
             encoded_path = encoded_path.encode(sys.getfilesystemencoding())
-        target_config.set((b'remote', b'origin'), b'url', encoded_path)
-        target_config.set((b'remote', b'origin'), b'fetch',
-                          b'+refs/heads/*:refs/remotes/origin/*')
+        ref_message = b"clone: from " + encoded_path
+        target.refs.import_refs(
+            b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'),
+            message=ref_message)
+        target.refs.import_refs(
+            b'refs/tags', self.refs.as_dict(b'refs/tags'),
+            message=ref_message)
+        try:
+            target.refs.add_if_new(
+                    DEFAULT_REF, self.refs[DEFAULT_REF],
+                    message=ref_message)
+        except KeyError:
+            pass
+        target_config = target.get_config()
+        target_config.set(('remote', 'origin'), 'url', encoded_path)
+        target_config.set(('remote', 'origin'), 'fetch',
+                          '+refs/heads/*:refs/remotes/origin/*')
         target_config.write_to_path()
 
         # Update target head
         head_chain, head_sha = self.refs.follow(b'HEAD')
         if head_chain and head_sha is not None:
-            target.refs.set_symbolic_ref(b'HEAD', head_chain[-1])
+            target.refs.set_symbolic_ref(b'HEAD', head_chain[-1],
+                                         message=ref_message)
             target[b'HEAD'] = head_sha
 
             if not bare:
@@ -939,8 +1015,8 @@ class Repo(BaseRepo):
             tree = self[b'HEAD'].tree
         config = self.get_config()
         honor_filemode = config.get_boolean(
-            'core', 'filemode', os.name != "nt")
-        if config.get_boolean('core', 'core.protectNTFS', os.name == "nt"):
+            b'core', b'filemode', os.name != "nt")
+        if config.get_boolean(b'core', b'core.protectNTFS', os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default
@@ -1092,11 +1168,16 @@ class MemoryRepo(BaseRepo):
 
     def __init__(self):
         from dulwich.config import ConfigFile
-        BaseRepo.__init__(self, MemoryObjectStore(), DictRefsContainer({}))
+        self._reflog = []
+        refs_container = DictRefsContainer({}, logger=self._append_reflog)
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)
         self._named_files = {}
         self.bare = True
         self._config = ConfigFile()
         self._description = None
+
+    def _append_reflog(self, *args):
+        self._reflog.append(args)
 
     def set_description(self, description):
         self._description = description
@@ -1161,6 +1242,6 @@ class MemoryRepo(BaseRepo):
         for obj in objects:
             ret.object_store.add_object(obj)
         for refname, sha in refs.items():
-            ret.refs[refname] = sha
+            ret.refs.add_if_new(refname, sha)
         ret._init_files(bare=True)
         return ret

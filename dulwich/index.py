@@ -48,6 +48,11 @@ IndexEntry = collections.namedtuple(
         'flags'])
 
 
+FLAG_STAGEMASK = 0x3000
+FLAG_VALID = 0x8000
+FLAG_EXTENDED = 0x4000
+
+
 def pathsplit(path):
     """Split a /-delimited path into a directory part and a basename.
 
@@ -379,6 +384,7 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
     :return: Iterator over tuples with (oldpath, newpath), (oldmode, newmode),
         (oldsha, newsha)
     """
+    # TODO(jelmer): Support a include_trees option
     other_names = set(names)
 
     if tree is not None:
@@ -646,3 +652,53 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     else:
         tree_path = fs_path_bytes
     return tree_path
+
+
+def iter_fresh_entries(index, root_path):
+    """Iterate over current versions of index entries on disk.
+
+    :param index: Index file
+    :param root_path: Root path to access from
+    :return: Iterator over path, index_entry
+    """
+    for path in set(index):
+        p = _tree_to_fs_path(root_path, path)
+        try:
+            st = os.lstat(p)
+            blob = blob_from_path_and_stat(p, st)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                del index[path]
+            else:
+                raise
+        except IOError as e:
+            if e.errno == errno.EISDIR:
+                del index[path]
+            else:
+                raise
+        else:
+            yield path, index_entry_from_stat(st, blob.id, 0)
+
+
+def iter_fresh_blobs(index, root_path):
+    """Iterate over versions of blobs on disk referenced by index.
+
+    :param index: Index file
+    :param root_path: Root path to access from
+    :return: Iterator over path, sha, mode
+    """
+    for path, entry in iter_fresh_entries(index, root_path):
+        entry = IndexEntry(*entry)
+        yield path, entry.sha, cleanup_mode(entry.mode)
+
+
+def refresh_index(index, root_path):
+    """Refresh the contents of an index.
+
+    This is the equivalent to running 'git commit -a'.
+
+    :param index: Index to update
+    :param root_path: Root filesystem path
+    """
+    for path, entry in iter_fresh_entries(index, root_path):
+        index[path] = path

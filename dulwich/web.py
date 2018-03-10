@@ -119,13 +119,10 @@ def send_file(req, f, content_type):
             if not data:
                 break
             yield data
-        f.close()
     except IOError:
-        f.close()
         yield req.error('Error reading file')
-    except:
+    finally:
         f.close()
-        raise
 
 
 def _url_to_path(url):

@@ -19,14 +19,11 @@
 #
 
 from io import BytesIO
+import base64
 import sys
 import shutil
 import tempfile
-
-try:
-    import urllib2
-except ImportError:
-    import urllib.request as urllib2
+import warnings
 
 try:
     from urllib import quote as urlquote
@@ -37,6 +34,9 @@ try:
     import urlparse
 except ImportError:
     import urllib.parse as urlparse
+
+import certifi
+import urllib3
 
 import dulwich
 from dulwich import (
@@ -52,8 +52,9 @@ from dulwich.client import (
     SendPackError,
     StrangeHostname,
     SubprocessSSHVendor,
+    PuttySSHVendor,
     UpdateRefsError,
-    default_urllib2_opener,
+    default_urllib3_manager,
     get_transport_and_path,
     get_transport_and_path_from_url,
     )
@@ -68,6 +69,8 @@ from dulwich.protocol import (
     Protocol,
     )
 from dulwich.pack import (
+    pack_objects_to_data,
+    write_pack_data,
     write_pack_objects,
     )
 from dulwich.objects import (
@@ -82,6 +85,7 @@ from dulwich.tests import skipIf
 from dulwich.tests.utils import (
     open_repo,
     tear_down_repo,
+    setup_warning_catcher,
     )
 
 
@@ -95,6 +99,23 @@ class DummyClient(TraditionalGitClient):
 
     def _connect(self, service, path):
         return Protocol(self.read, self.write), self.can_read
+
+
+class DummyPopen():
+
+    def __init__(self, *args, **kwards):
+        self.stdin = BytesIO(b"stdin")
+        self.stdout = BytesIO(b"stdout")
+        self.stderr = BytesIO(b"stderr")
+        self.returncode = 0
+        self.args = args
+        self.kwargs = kwards
+
+    def communicate(self, *args, **kwards):
+        return ('Running', '')
+
+    def wait(self, *args, **kwards):
+        return False
 
 
 # TODO(durin42): add unit-level tests of GitClient
@@ -131,10 +152,10 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def check_heads(heads):
-            self.assertIs(heads, None)
+            self.assertEqual(heads, {})
             return []
         ret = self.client.fetch_pack(b'/', check_heads, None, None)
-        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.refs)
         self.assertEqual({}, ret.symrefs)
 
     def test_fetch_pack_ignores_magic_ref(self):
@@ -147,10 +168,10 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def check_heads(heads):
-            self.assertEquals({}, heads)
+            self.assertEqual({}, heads)
             return []
         ret = self.client.fetch_pack(b'bla', check_heads, None, None, None)
-        self.assertIs(None, ret.refs)
+        self.assertEqual({}, ret.refs)
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
@@ -198,12 +219,12 @@ class GitClientTests(TestCase):
         def determine_wants(refs):
             return {b'refs/foo/bar': commit.id, }
 
-        def generate_pack_contents(have, want):
-            return [(commit, None), (tree, ''), ]
+        def generate_pack_data(have, want, ofs_delta=False):
+            return pack_objects_to_data([(commit, None), (tree, ''), ])
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, "blah",
-                          determine_wants, generate_pack_contents)
+                          determine_wants, generate_pack_data)
 
     def test_send_pack_none(self):
         self.rin.write(
@@ -219,10 +240,10 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_contents(have, want):
-            return {}
+        def generate_pack_data(have, want, ofs_delta=False):
+            return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_contents)
+        self.client.send_pack(b'/', determine_wants, generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):
@@ -238,10 +259,10 @@ class GitClientTests(TestCase):
         def determine_wants(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_contents(have, want):
-            return {}
+        def generate_pack_data(have, want, ofs_delta=False):
+            return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_contents)
+        self.client.send_pack(b'/', determine_wants, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -263,10 +284,10 @@ class GitClientTests(TestCase):
         def determine_wants(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_contents(have, want):
-            return {}
+        def generate_pack_data(have, want, ofs_delta=False):
+            return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_contents)
+        self.client.send_pack(b'/', determine_wants, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -293,12 +314,12 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_contents(have, want):
-            return {}
+        def generate_pack_data(have, want, ofs_delta=False):
+            return 0, []
 
         f = BytesIO()
         write_pack_objects(f, {})
-        self.client.send_pack('/', determine_wants, generate_pack_contents)
+        self.client.send_pack('/', determine_wants, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f0000000000000000000000000000000000000000 '
@@ -336,12 +357,12 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_contents(have, want):
-            return [(commit, None), (tree, b''), ]
+        def generate_pack_data(have, want, ofs_delta=False):
+            return pack_objects_to_data([(commit, None), (tree, b''), ])
 
         f = BytesIO()
-        write_pack_objects(f, generate_pack_contents(None, None))
-        self.client.send_pack(b'/', determine_wants, generate_pack_contents)
+        write_pack_data(f, *generate_pack_data(None, None))
+        self.client.send_pack(b'/', determine_wants, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f0000000000000000000000000000000000000000 ' + commit.id +
@@ -366,12 +387,12 @@ class GitClientTests(TestCase):
         def determine_wants(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_contents(have, want):
-            return {}
+        def generate_pack_data(have, want, ofs_delta=False):
+            return 0, []
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, b"/",
-                          determine_wants, generate_pack_contents)
+                          determine_wants, generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
 
@@ -629,12 +650,17 @@ class TestSSHVendor(object):
         self.command = ""
         self.username = None
         self.port = None
+        self.password = None
+        self.key_filename = None
 
-    def run_command(self, host, command, username=None, port=None):
+    def run_command(self, host, command, username=None, port=None,
+                    password=None, key_filename=None):
         self.host = host
         self.command = command
         self.username = username
         self.port = port
+        self.password = password
+        self.key_filename = key_filename
 
         class Subprocess:
             pass
@@ -747,7 +773,7 @@ class LocalGitClientTests(TestCase):
         t = MemoryRepo()
         s = open_repo('a.git')
         self.addCleanup(tear_down_repo, s)
-        self.assertEqual(s.get_refs(), c.fetch(s.path, t))
+        self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
 
     def test_fetch_empty(self):
         c = LocalGitClient()
@@ -826,7 +852,7 @@ class LocalGitClientTests(TestCase):
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
                                     lambda _: {ref_name: local.refs[ref_name]},
-                                    local.object_store.generate_pack_contents)
+                                    local.object_store.generate_pack_data)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])
 
@@ -836,6 +862,14 @@ class LocalGitClientTests(TestCase):
 
 
 class HttpGitClientTests(TestCase):
+
+    @staticmethod
+    def b64encode(s):
+        """Python 2/3 compatible Base64 encoder. Returns string."""
+        try:
+            return base64.b64encode(s)
+        except TypeError:
+            return base64.b64encode(s.encode('latin1')).decode('ascii')
 
     def test_get_url(self):
         base_url = 'https://github.com/jelmer/dulwich'
@@ -867,13 +901,12 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient(url, config=None, username='user', password='passwd')
         self.assertEqual('user', c._username)
         self.assertEqual('passwd', c._password)
-        [pw_handler] = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(
-            ('user', 'passwd'),
-            pw_handler.passwd.find_user_password(
-                None, 'https://github.com/jelmer/dulwich'))
+
+        basic_auth = c.pool_manager.headers['authorization']
+        auth_string = '%s:%s' % ('user', 'passwd')
+        b64_credentials = self.b64encode(auth_string)
+        expected_basic_auth = 'Basic %s' % b64_credentials
+        self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_no_username_passwd(self):
         url = 'https://github.com/jelmer/dulwich'
@@ -881,10 +914,7 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient(url, config=None)
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
-        pw_handler = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(0, len(pw_handler))
+        self.assertNotIn('authorization', c.pool_manager.headers)
 
     def test_from_parsedurl_on_url_with_quoted_credentials(self):
         original_username = 'john|the|first'
@@ -901,13 +931,12 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
-        [pw_handler] = [
-            h for h in c.opener.handlers
-            if getattr(h, 'passwd', None) is not None]
-        self.assertEqual(
-            (original_username, original_password),
-            pw_handler.passwd.find_user_password(
-                None, 'https://github.com/jelmer/dulwich'))
+
+        basic_auth = c.pool_manager.headers['authorization']
+        auth_string = '%s:%s' % (original_username, original_password)
+        b64_credentials = self.b64encode(auth_string)
+        expected_basic_auth = 'Basic %s' % str(b64_credentials)
+        self.assertEqual(basic_auth, expected_basic_auth)
 
 
 class TCPGitClientTests(TestCase):
@@ -930,25 +959,149 @@ class TCPGitClientTests(TestCase):
         self.assertEqual('git://github.com:9090/jelmer/dulwich', url)
 
 
-class DefaultUrllib2OpenerTest(TestCase):
+class DefaultUrllib3ManagerTest(TestCase):
+
+    def assert_verify_ssl(self, manager, assertion=True):
+        pool_keywords = tuple(manager.connection_pool_kw.items())
+        assert_method = self.assertIn if assertion else self.assertNotIn
+        assert_method(('cert_reqs', 'CERT_REQUIRED'), pool_keywords)
+        assert_method(('ca_certs', certifi.where()), pool_keywords)
 
     def test_no_config(self):
-        default_urllib2_opener(config=None)
+        manager = default_urllib3_manager(config=None)
+        self.assert_verify_ssl(manager)
 
     def test_config_no_proxy(self):
-        default_urllib2_opener(config=ConfigDict())
+        manager = default_urllib3_manager(config=ConfigDict())
+        self.assert_verify_ssl(manager)
 
     def test_config_proxy(self):
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
-        opener = default_urllib2_opener(config=config)
-        self.assertIn(urllib2.ProxyHandler,
-                      list(map(lambda x: x.__class__, opener.handlers)))
+        manager = default_urllib3_manager(config=config)
+
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, 'proxy'))
+        self.assertEqual(manager.proxy.scheme, 'http')
+        self.assertEqual(manager.proxy.host, 'localhost')
+        self.assertEqual(manager.proxy.port, 3128)
+        self.assert_verify_ssl(manager)
+
+    def test_config_no_verify_ssl(self):
+        manager = default_urllib3_manager(config=None, verify_ssl=False)
+        self.assert_verify_ssl(manager, assertion=False)
 
 
 class SubprocessSSHVendorTests(TestCase):
+
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
 
     def test_run_command_dashes(self):
         vendor = SubprocessSSHVendor()
         self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
                           'git-clone-url')
+
+    def test_run_command_password(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command, 'host',
+                          'git-clone-url', password='12345')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = SubprocessSSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    def test_run_command_with_port_username_and_privkey(self):
+        expected = ['ssh', '-x', '-p', '2200',
+                    '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])
+
+
+class PuttySSHVendorTests(TestCase):
+
+    def setUp(self):
+        # Monkey Patch client subprocess popen
+        self._orig_popen = dulwich.client.subprocess.Popen
+        dulwich.client.subprocess.Popen = DummyPopen
+
+    def tearDown(self):
+        dulwich.client.subprocess.Popen = self._orig_popen
+
+    def test_run_command_dashes(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
+                          'git-clone-url')
+
+    def test_run_command_password_and_privkey(self):
+        vendor = PuttySSHVendor()
+        self.assertRaises(NotImplementedError, vendor.run_command,
+                          'host', 'git-clone-url',
+                          password='12345', key_filename='/tmp/id_rsa')
+
+    def test_run_command_password(self):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + ['-pw', '12345', 'host', 'git-clone-url']
+
+        vendor = PuttySSHVendor()
+
+        warnings.simplefilter("always", UserWarning)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list, restore_warnings = setup_warning_catcher()
+        self.addCleanup(restore_warnings)
+
+        command = vendor.run_command('host', 'git-clone-url', password='12345')
+
+        expected_warning = UserWarning(
+            'Invoking Putty with a password exposes the password in the '
+            'process list.')
+
+        for w in warnings_list:
+            if (type(w) == type(expected_warning) and
+                    w.args == expected_warning.args):
+                break
+        else:
+            raise AssertionError(
+                'Expected warning %r not in %r' %
+                (expected_warning, warnings_list))
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])
+
+    def test_run_command_with_port_username_and_privkey(self):
+        if sys.platform == 'win32':
+            binary = ['putty.exe', '-ssh']
+        else:
+            binary = ['putty', '-ssh']
+        expected = binary + [
+            '-P', '2200', '-i', '/tmp/id_rsa',
+            'user@host', 'git-clone-url']
+
+        vendor = PuttySSHVendor()
+        command = vendor.run_command(
+            'host', 'git-clone-url',
+            username='user', port='2200',
+            key_filename='/tmp/id_rsa')
+
+        args = command.proc.args
+
+        self.assertListEqual(expected, args[0])

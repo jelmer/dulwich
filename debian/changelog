@@ -1,4 +1,4 @@
-dulwich (0.19.0-1) UNRELEASED; urgency=medium
+dulwich (0.19.0-1) unstable; urgency=medium
 
   * New upstream release.
    + Add dependencies on python-certifi and python-urllib3.

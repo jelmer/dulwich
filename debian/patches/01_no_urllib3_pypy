@@ -123,3 +123,16 @@ index eb1ccbea..881fabf5 100644
          manager = default_urllib3_manager(config=ConfigDict())
          self.assert_verify_ssl(manager)
  
+diff --git a/dulwich/tests/compat/test_client.py b/dulwich/tests/compat/test_client.py
+index d60be1a3..faafdbfe 100644
+--- a/dulwich/tests/compat/test_client.py
++++ b/dulwich/tests/compat/test_client.py
+@@ -519,6 +519,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
+     min_git_version = (1, 7, 0, 2)
+ 
+     def setUp(self):
++        if '__pypy__' in sys.modules:
++            self.skipTest('urllib3 not available for pypy in debian')
+         CompatTestCase.setUp(self)
+         DulwichClientTestBase.setUp(self)
+         self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)

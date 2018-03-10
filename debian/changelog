@@ -4,6 +4,7 @@ dulwich (0.19.0-1) UNRELEASED; urgency=medium
    + Add dependencies on python-certifi and python-urllib3.
   * Add 01_no_urllib3_pypy: disable HTTP on pypy, since pypy-urllib3
     doesn't exist.
+  * Reorder paragraphs in copyright to make lintian happy.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 10 Mar 2018 21:31:25 +0000
 

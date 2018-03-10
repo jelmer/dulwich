@@ -291,6 +291,7 @@ def git_am_patch_split(f, encoding=None):
     :return: Tuple with commit object, diff contents and git version
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
+    encoding = encoding or "ascii"
     contents = f.read()
     if (isinstance(contents, bytes) and
             getattr(email.parser, "BytesParser", None)):
@@ -326,22 +327,22 @@ def parse_patch_message(msg, encoding=None):
     lines = body.splitlines(True)
     line_iter = iter(lines)
 
-    for l in line_iter:
-        if l == b"---\n":
+    for line in line_iter:
+        if line == b"---\n":
             break
         if first:
-            if l.startswith(b"From: "):
-                c.author = l[len(b"From: "):].rstrip()
+            if line.startswith(b"From: "):
+                c.author = line[len(b"From: "):].rstrip()
             else:
-                c.message += b"\n" + l
+                c.message += b"\n" + line
             first = False
         else:
-            c.message += l
+            c.message += line
     diff = b""
-    for l in line_iter:
-        if l == b"-- \n":
+    for line in line_iter:
+        if line == b"-- \n":
             break
-        diff += l
+        diff += line
     try:
         version = next(line_iter).rstrip(b"\n")
     except StopIteration:

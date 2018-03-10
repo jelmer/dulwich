@@ -28,14 +28,82 @@ TODO:
 
 import errno
 import os
+import sys
 
 from collections import (
+    Iterable,
     OrderedDict,
     MutableMapping,
     )
 
 
 from dulwich.file import GitFile
+
+
+SENTINAL = object()
+
+
+def lower_key(key):
+    if isinstance(key, (bytes, str)):
+        return key.lower()
+
+    if isinstance(key, Iterable):
+        return type(key)(
+            map(lower_key, key)
+        )
+
+    return key
+
+
+class CaseInsensitiveDict(OrderedDict):
+
+    @classmethod
+    def make(cls, dict_in=None):
+
+        if isinstance(dict_in, cls):
+            return dict_in
+
+        out = cls()
+
+        if dict_in is None:
+            return out
+
+        if not isinstance(dict_in, MutableMapping):
+            raise TypeError
+
+        for key, value in dict_in.items():
+            out[key] = value
+
+        return out
+
+    def __setitem__(self, key, value, **kwargs):
+        key = lower_key(key)
+
+        super(CaseInsensitiveDict, self).__setitem__(key, value,  **kwargs)
+
+    def __getitem__(self, item):
+        key = lower_key(item)
+
+        return super(CaseInsensitiveDict, self).__getitem__(key)
+
+    def get(self, key, default=SENTINAL):
+        try:
+            return self[key]
+        except KeyError:
+            pass
+
+        if default is SENTINAL:
+            return type(self)()
+
+        return default
+
+    def setdefault(self, key, default=SENTINAL):
+        try:
+            return self[key]
+        except KeyError:
+            self[key] = self.get(key, default)
+
+        return self[key]
 
 
 class Config(object):
@@ -107,11 +175,12 @@ class Config(object):
 class ConfigDict(Config, MutableMapping):
     """Git configuration stored in a dictionary."""
 
-    def __init__(self, values=None):
+    def __init__(self, values=None, encoding=None):
         """Create a new ConfigDict."""
-        if values is None:
-            values = OrderedDict()
-        self._values = values
+        if encoding is None:
+            encoding = sys.getdefaultencoding()
+        self.encoding = encoding
+        self._values = CaseInsensitiveDict.make(values)
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._values)
@@ -144,27 +213,42 @@ class ConfigDict(Config, MutableMapping):
         else:
             return (parts[0], None, parts[1])
 
-    def get(self, section, name):
+    def _check_section_and_name(self, section, name):
         if not isinstance(section, tuple):
             section = (section, )
+
+        section = tuple([
+            subsection.encode(self.encoding)
+            if not isinstance(subsection, bytes) else subsection
+            for subsection in section
+            ])
+
+        if not isinstance(name, bytes):
+            name = name.encode(self.encoding)
+
+        return section, name
+
+    def get(self, section, name):
+        section, name = self._check_section_and_name(section, name)
+
         if len(section) > 1:
             try:
                 return self._values[section][name]
             except KeyError:
                 pass
+
         return self._values[(section[0],)][name]
 
     def set(self, section, name, value):
-        if not isinstance(section, tuple):
-            section = (section, )
-        if not isinstance(name, bytes):
-            raise TypeError(name)
+        section, name = self._check_section_and_name(section, name)
+
         if type(value) not in (bool, bytes):
-            raise TypeError(value)
-        self._values.setdefault(section, OrderedDict())[name] = value
+            value = value.encode(self.encoding)
+
+        self._values.setdefault(section)[name] = value
 
     def iteritems(self, section):
-        return self._values.get(section, OrderedDict()).items()
+        return self._values.get(section).items()
 
     def itersections(self):
         return self._values.keys()
@@ -262,8 +346,16 @@ def _check_section_name(name):
 
 
 def _strip_comments(line):
-    line = line.split(b"#")[0]
-    line = line.split(b";")[0]
+    comment_bytes = {ord(b"#"), ord(b";")}
+    quote = ord(b'"')
+    string_open = False
+    # Normalize line to bytearray for simple 2/3 compatibility
+    for i, character in enumerate(bytearray(line)):
+        # Comment characters outside balanced quotes denote comment start
+        if character == quote:
+            string_open = not string_open
+        elif not string_open and character in comment_bytes:
+            return line[:i]
     return line
 
 
@@ -283,12 +375,12 @@ class ConfigFile(ConfigDict):
                 # Parse section header ("[bla]")
                 if len(line) > 0 and line[:1] == b"[":
                     line = _strip_comments(line).rstrip()
-                    last = line.index(b"]")
-                    if last == -1:
+                    try:
+                        last = line.index(b"]")
+                    except ValueError:
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(b" ", 1)
                     line = line[last+1:]
-                    pts[0] = pts[0].lower()
                     if len(pts) == 2:
                         if pts[1][:1] != b"\"" or pts[1][-1:] != b"\"":
                             raise ValueError(
@@ -308,7 +400,7 @@ class ConfigFile(ConfigDict):
                             section = (pts[0], pts[1])
                         else:
                             section = (pts[0], )
-                    ret._values[section] = OrderedDict()
+                    ret._values.setdefault(section)
                 if _strip_comments(line).strip() == b"":
                     continue
                 if section is None:
@@ -318,7 +410,7 @@ class ConfigFile(ConfigDict):
                 except ValueError:
                     setting = line
                     value = b"true"
-                setting = setting.strip().lower()
+                setting = setting.strip()
                 if not _check_variable_name(setting):
                     raise ValueError("invalid variable name %s" % setting)
                 if value.endswith(b"\\\n"):
@@ -421,6 +513,8 @@ class StackedConfig(Config):
         return backends
 
     def get(self, section, name):
+        if not isinstance(section, tuple):
+            section = (section, )
         for backend in self.backends:
             try:
                 return backend.get(section, name)

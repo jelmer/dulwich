@@ -50,6 +50,8 @@ Currently implemented:
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
+
+Functions should generally accept both unicode strings and bytestrings
 """
 
 from collections import namedtuple
@@ -116,7 +118,10 @@ from dulwich.protocol import (
     Protocol,
     ZERO_SHA,
     )
-from dulwich.refs import ANNOTATED_TAG_SUFFIX
+from dulwich.refs import (
+    ANNOTATED_TAG_SUFFIX,
+    strip_peeled_refs,
+)
 from dulwich.repo import (BaseRepo, Repo)
 from dulwich.server import (
     FileSystemBackend,
@@ -215,13 +220,13 @@ def symbolic_ref(repo, ref_name, force=False):
     :param force: force settings without checking if it exists in refs/heads
     """
     with open_repo_closing(repo) as repo_obj:
-        ref_path = b'refs/heads/' + ref_name
+        ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
             raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None):
+def commit(repo=".", message=None, author=None, committer=None, encoding=None):
     """Create a new commit.
 
     :param repo: Path to repository
@@ -232,8 +237,16 @@ def commit(repo=".", message=None, author=None, committer=None):
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
+    if getattr(message, 'encode', None):
+        message = message.encode(encoding or DEFAULT_ENCODING)
+    if getattr(author, 'encode', None):
+        author = author.encode(encoding or DEFAULT_ENCODING)
+    if getattr(committer, 'encode', None):
+        committer = committer.encode(encoding or DEFAULT_ENCODING)
     with open_repo_closing(repo) as r:
-        return r.do_commit(message=message, author=author, committer=committer)
+        return r.do_commit(
+                message=message, author=author, committer=committer,
+                encoding=encoding)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -267,7 +280,7 @@ def init(path=".", bare=False):
 
 def clone(source, target=None, bare=False, checkout=None,
           errstream=default_bytes_err_stream, outstream=None,
-          origin=b"origin"):
+          origin=b"origin", **kwargs):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -292,7 +305,7 @@ def clone(source, target=None, bare=False, checkout=None,
         raise ValueError("checkout and bare are incompatible")
 
     config = StackedConfig.default()
-    client, host_path = get_transport_and_path(source, config=config)
+    client, host_path = get_transport_and_path(source, config=config, **kwargs)
 
     if target is None:
         target = host_path.split("/")[-1]
@@ -305,22 +318,21 @@ def clone(source, target=None, bare=False, checkout=None,
     else:
         r = Repo.init(target)
     try:
-        remote_refs = client.fetch(
+        fetch_result = client.fetch(
             host_path, r, determine_wants=r.object_store.determine_wants_all,
             progress=errstream.write)
+        ref_message = b"clone: from " + source.encode('utf-8')
         r.refs.import_refs(
             b'refs/remotes/' + origin,
-            {n[len(b'refs/heads/'):]: v for (n, v) in remote_refs.items()
-                if n.startswith(b'refs/heads/')})
+            {n[len(b'refs/heads/'):]: v for (n, v) in fetch_result.refs.items()
+                if n.startswith(b'refs/heads/')},
+            message=ref_message)
         r.refs.import_refs(
             b'refs/tags',
-            {n[len(b'refs/tags/'):]: v for (n, v) in remote_refs.items()
+            {n[len(b'refs/tags/'):]: v for (n, v) in fetch_result.refs.items()
                 if n.startswith(b'refs/tags/') and
-                not n.endswith(ANNOTATED_TAG_SUFFIX)})
-        if b"HEAD" in remote_refs and not bare:
-            # TODO(jelmer): Support symref capability,
-            # https://github.com/jelmer/dulwich/issues/485
-            r[b"HEAD"] = remote_refs[b"HEAD"]
+                not n.endswith(ANNOTATED_TAG_SUFFIX)},
+            message=ref_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -329,10 +341,18 @@ def clone(source, target=None, bare=False, checkout=None,
             (b'remote', origin), b'fetch',
             b'+refs/heads/*:refs/remotes/' + origin + b'/*')
         target_config.write_to_path()
-        if checkout and b"HEAD" in r.refs:
-            errstream.write(b'Checking out HEAD\n')
-            r.reset_index()
-    except:
+        # TODO(jelmer): Support symref capability,
+        # https://github.com/jelmer/dulwich/issues/485
+        try:
+            head = r[fetch_result.refs[b"HEAD"]]
+        except KeyError:
+            head = None
+        else:
+            r[b'HEAD'] = head.id
+        if checkout and not bare and head is not None:
+            errstream.write(b'Checking out ' + head.id + b'\n')
+            r.reset_index(head.tree)
+    except BaseException:
         r.close()
         raise
 
@@ -357,6 +377,8 @@ def add(repo=".", paths=None):
             paths = [paths]
         for p in paths:
             relpath = os.path.relpath(p, r.path)
+            if relpath.startswith('../'):
+                raise ValueError('path %r is not in repo' % relpath)
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
@@ -681,7 +703,7 @@ def tag_create(
         else:
             tag_id = object.id
 
-        r.refs[b'refs/tags/' + tag] = tag_id
+        r.refs[_make_tag_ref(tag)] = tag_id
 
 
 def list_tags(*args, **kwargs):
@@ -716,7 +738,7 @@ def tag_delete(repo, name):
         else:
             raise TypeError("Unexpected tag name type %r" % name)
         for name in names:
-            del r.refs[b"refs/tags/" + name]
+            del r.refs[_make_tag_ref(name)]
 
 
 def reset(repo, mode, treeish="HEAD"):
@@ -737,7 +759,7 @@ def reset(repo, mode, treeish="HEAD"):
 
 def push(repo, remote_location, refspecs,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream):
+         errstream=default_bytes_err_stream, **kwargs):
     """Remote push with dulwich via dulwich.client
 
     :param repo: Path to repository
@@ -752,7 +774,7 @@ def push(repo, remote_location, refspecs,
 
         # Get the client and path
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
+                remote_location, config=r.get_config_stack(), **kwargs)
 
         selected_refs = []
 
@@ -771,7 +793,8 @@ def push(repo, remote_location, refspecs,
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(
-                path, update_refs, r.object_store.generate_pack_contents,
+                path, update_refs,
+                generate_pack_data=r.object_store.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
@@ -783,7 +806,7 @@ def push(repo, remote_location, refspecs,
 
 def pull(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream):
+         errstream=default_bytes_err_stream, **kwargs):
     """Pull from remote via dulwich.client
 
     :param repo: Path to repository
@@ -807,13 +830,13 @@ def pull(repo, remote_location=None, refspecs=None,
                 parse_reftuples(remote_refs, r.refs, refspecs))
             return [remote_refs[lh] for (lh, rh, force) in selected_refs]
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
-        remote_refs = client.fetch(
+                remote_location, config=r.get_config_stack(), **kwargs)
+        fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force) in selected_refs:
-            r.refs[rh] = remote_refs[lh]
+            r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
-            r[b'HEAD'] = remote_refs[selected_refs[0][1]]
+            r[b'HEAD'] = fetch_result.refs[selected_refs[0][1]]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree
@@ -988,6 +1011,18 @@ def receive_pack(path=".", inf=None, outf=None):
     return 0
 
 
+def _make_branch_ref(name):
+    if getattr(name, 'encode', None):
+        name = name.encode(DEFAULT_ENCODING)
+    return b"refs/heads/" + name
+
+
+def _make_tag_ref(name):
+    if getattr(name, 'encode', None):
+        name = name.encode(DEFAULT_ENCODING)
+    return b"refs/tags/" + name
+
+
 def branch_delete(repo, name):
     """Delete a branch.
 
@@ -995,14 +1030,12 @@ def branch_delete(repo, name):
     :param name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, bytes):
-            names = [name]
-        elif isinstance(name, list):
+        if isinstance(name, list):
             names = name
         else:
-            raise TypeError("Unexpected branch name type %r" % name)
+            names = [name]
         for name in names:
-            del r.refs[b"refs/heads/" + name]
+            del r.refs[_make_branch_ref(name)]
 
 
 def branch_create(repo, name, objectish=None, force=False):
@@ -1017,10 +1050,13 @@ def branch_create(repo, name, objectish=None, force=False):
         if objectish is None:
             objectish = "HEAD"
         object = parse_object(r, objectish)
-        refname = b"refs/heads/" + name
-        if refname in r.refs and not force:
-            raise KeyError("Branch with name %s already exists." % name)
-        r.refs[refname] = object.id
+        refname = _make_branch_ref(name)
+        ref_message = b"branch: Created from " + objectish.encode('utf-8')
+        if force:
+            r.refs.set_if_equals(refname, None, object.id, message=ref_message)
+        else:
+            if not r.refs.add_if_new(refname, object.id, message=ref_message):
+                raise KeyError("Branch with name %s already exists." % name)
 
 
 def branch_list(repo):
@@ -1032,31 +1068,36 @@ def branch_list(repo):
         return r.refs.keys(base=b"refs/heads/")
 
 
-def fetch(repo, remote_location, outstream=sys.stdout,
-          errstream=default_bytes_err_stream):
+def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
+          errstream=default_bytes_err_stream, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
     :param remote_location: String identifying a remote server
+    :param remote_name: Name for remote server
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     :return: Dictionary with refs on the remote
     """
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack())
-        remote_refs = client.fetch(path, r, progress=errstream.write)
-    return remote_refs
+                remote_location, config=r.get_config_stack(), **kwargs)
+        fetch_result = client.fetch(path, r, progress=errstream.write)
+        ref_name = b'refs/remotes/' + remote_name
+        r.refs.import_refs(ref_name, strip_peeled_refs(fetch_result.refs))
+    return fetch_result.refs
 
 
-def ls_remote(remote):
+def ls_remote(remote, config=None, **kwargs):
     """List the refs in a remote.
 
     :param remote: Remote repository location
+    :param config: Configuration to use
     :return: Dictionary with remote refs
     """
-    config = StackedConfig.default()
-    client, host_path = get_transport_and_path(remote, config=config)
+    if config is None:
+        config = StackedConfig.default()
+    client, host_path = get_transport_and_path(remote, config=config, **kwargs)
     return client.get_refs(host_path)
 
 
@@ -1166,7 +1207,7 @@ def update_head(repo, target, detached=False, new_branch=None):
     """
     with open_repo_closing(repo) as r:
         if new_branch is not None:
-            to_set = b"refs/heads/" + new_branch.encode(DEFAULT_ENCODING)
+            to_set = _make_branch_ref(new_branch)
         else:
             to_set = b"HEAD"
         if detached:

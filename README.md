@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/jelmer/dulwich.png?branch=master)](https://travis-ci.org/jelmer/dulwich)
-[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich/branch/master)
+[![Build Status](https://travis-ci.org/dulwich/dulwich.png?branch=master)](https://travis-ci.org/dulwich/dulwich)
+[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/dulwich/dulwich/branch/master)
 
 This is the Dulwich project.
 
@@ -27,6 +27,12 @@ If you don't want to install the C bindings, specify the --pure argument to setu
 or if you are installing from pip::
 
     $ pip install dulwich --global-option="--pure"
+
+Note that you can also specify --global-option in a
+[requirements.txt](https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers)
+file, e.g. like this::
+
+    dulwich --global-option=--pure
 
 Getting started
 ---------------
@@ -80,7 +86,7 @@ Contributing
 For a full list of contributors, see the git logs or [AUTHORS](AUTHORS).
 
 If you'd like to contribute to Dulwich, see the [CONTRIBUTING](CONTRIBUTING.md)
-file and [list of open issues](https://github.com/jelmer/dulwich/issues).
+file and [list of open issues](https://github.com/dulwich/dulwich/issues).
 
 Supported versions of Python
 ----------------------------

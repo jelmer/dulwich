@@ -7,11 +7,14 @@ try:
     from setuptools import setup, Extension
 except ImportError:
     from distutils.core import setup, Extension
+    has_setuptools = False
+else:
+    has_setuptools = True
 from distutils.core import Distribution
 import os
 import sys
 
-dulwich_version_string = '0.18.5'
+dulwich_version_string = '0.19.0'
 
 include_dirs = []
 # Windows MSVC support
@@ -44,10 +47,11 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
         ['/usr/bin/xcodebuild', '-version'], stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, env={})
     out, err = p.communicate()
-    for l in out.splitlines():
-        l = l.decode("utf8")
+    for line in out.splitlines():
+        line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if l.startswith('Xcode') and int(l.split()[1].split('.')[0]) >= 4:
+        if (line.startswith('Xcode') and
+                int(line.split()[1].split('.')[0]) >= 4):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
@@ -57,6 +61,7 @@ if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
 
+
 ext_modules = [
     Extension('dulwich._objects', ['dulwich/_objects.c'],
               include_dirs=include_dirs),
@@ -65,6 +70,15 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
               include_dirs=include_dirs),
 ]
+
+setup_kwargs = {}
+
+if has_setuptools:
+    setup_kwargs['extras_require'] = {'fastimport': ['fastimport']}
+    setup_kwargs['install_requires'] = ['urllib3[secure]>=1.21']
+    setup_kwargs['include_package_data'] = True
+    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
+    setup_kwargs['tests_require'] = tests_require
 
 
 if sys.platform == 'win32':
@@ -109,8 +123,6 @@ setup(name='dulwich',
           'Topic :: Software Development :: Version Control',
       ],
       ext_modules=ext_modules,
-      test_suite='dulwich.tests.test_suite',
-      tests_require=tests_require,
       distclass=DulwichDistribution,
-      include_package_data=True,
+      **setup_kwargs
       )

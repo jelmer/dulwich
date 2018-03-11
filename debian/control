@@ -14,7 +14,7 @@ XS-Testsuite: autopkgtest
 
 Package: python-dulwich
 Architecture: any
-Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}, python-urllib3, python-certifi
 Breaks: bzr-git (<< 0.6.2)
 Recommends: python-fastimport
 Description: Python Git library
@@ -48,7 +48,7 @@ Description: Python Git library - pypy module
 
 Package: python3-dulwich
 Architecture: any
-Depends: ${python3:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Depends: ${python3:Depends}, ${misc:Depends}, ${shlibs:Depends}, python3-urllib3, python3-certifi
 Breaks: bzr-git (<< 0.6.2)
 Recommends: python3-fastimport
 Description: Python Git library - Python3 module

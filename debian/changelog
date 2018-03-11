@@ -1,3 +1,9 @@
+dulwich (0.19.0-2) UNRELEASED; urgency=medium
+
+  * Add missing dependencies on urllib3 and certifi.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 11 Mar 2018 18:18:11 +0000
+
 dulwich (0.19.0-1) unstable; urgency=medium
 
   * New upstream release.

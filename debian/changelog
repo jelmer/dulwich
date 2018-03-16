@@ -2,6 +2,7 @@ dulwich (0.19.0-3) UNRELEASED; urgency=medium
 
   * d/control: Set Vcs-* to salsa.debian.org
   * d/watch: Use https protocol
+  * d/control: Remove XS-Testsuite field, not needed anymore
 
  -- Ondřej Nový <onovy@debian.org>  Sun, 11 Mar 2018 20:17:05 +0100
 

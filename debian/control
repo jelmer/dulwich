@@ -10,7 +10,6 @@ X-Python-Version: >= 2.7
 X-Python3-Version: >= 3.2
 Vcs-Git: https://salsa.debian.org/python-team/modules/dulwich.git
 Vcs-Browser: https://salsa.debian.org/python-team/modules/dulwich
-XS-Testsuite: autopkgtest
 
 Package: python-dulwich
 Architecture: any

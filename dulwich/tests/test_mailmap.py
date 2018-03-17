@@ -30,7 +30,7 @@ from dulwich.mailmap import Mailmap, read_mailmap
 class ReadMailmapTests(TestCase):
 
     def test_read(self):
-        b = BytesIO("""\
+        b = BytesIO(b"""\
 Jane Doe         <jane@desktop.(none)>
 Joe R. Developer <joe@example.com>
 # A comment
@@ -41,16 +41,16 @@ Other Author <other@author.xx>         <nick2@company.xx>
 Santa Claus <santa.claus@northpole.xx> <me@company.xx>
 """)
         self.assertEqual([
-            (('Jane Doe', 'jane@desktop.(none)'), None),
-            (('Joe R. Developer', 'joe@example.com'), None),
-            ((None, 'cto@company.xx'), (None, 'cto@coompany.xx')),
-            (('Some Dude', 'some@dude.xx'), ('nick1', 'bugs@company.xx')),
-            (('Other Author', 'other@author.xx'),
-                ('nick2', 'bugs@company.xx')),
-            (('Other Author', 'other@author.xx'),
-                (None, 'nick2@company.xx')),
-            (('Santa Claus', 'santa.claus@northpole.xx'),
-                (None, 'me@company.xx'))],
+            ((b'Jane Doe', b'jane@desktop.(none)'), None),
+            ((b'Joe R. Developer', b'joe@example.com'), None),
+            ((None, b'cto@company.xx'), (None, b'cto@coompany.xx')),
+            ((b'Some Dude', b'some@dude.xx'), (b'nick1', b'bugs@company.xx')),
+            ((b'Other Author', b'other@author.xx'),
+                (b'nick2', b'bugs@company.xx')),
+            ((b'Other Author', b'other@author.xx'),
+                (None, b'nick2@company.xx')),
+            ((b'Santa Claus', b'santa.claus@northpole.xx'),
+                (None, b'me@company.xx'))],
             list(read_mailmap(b)))
 
 
@@ -58,33 +58,33 @@ class MailmapTests(TestCase):
 
     def test_lookup(self):
         m = Mailmap()
-        m.add_entry(('Jane Doe', 'jane@desktop.(none)'), (None, None))
-        m.add_entry(('Joe R. Developer', 'joe@example.com'), None)
-        m.add_entry((None, 'cto@company.xx'), (None, 'cto@coompany.xx'))
+        m.add_entry((b'Jane Doe', b'jane@desktop.(none)'), (None, None))
+        m.add_entry((b'Joe R. Developer', b'joe@example.com'), None)
+        m.add_entry((None, b'cto@company.xx'), (None, b'cto@coompany.xx'))
         m.add_entry(
-                ('Some Dude', 'some@dude.xx'),
-                ('nick1', 'bugs@company.xx'))
+                (b'Some Dude', b'some@dude.xx'),
+                (b'nick1', b'bugs@company.xx'))
         m.add_entry(
-                ('Other Author', 'other@author.xx'),
-                ('nick2', 'bugs@company.xx'))
+                (b'Other Author', b'other@author.xx'),
+                (b'nick2', b'bugs@company.xx'))
         m.add_entry(
-                ('Other Author', 'other@author.xx'),
-                (None, 'nick2@company.xx'))
+                (b'Other Author', b'other@author.xx'),
+                (None, b'nick2@company.xx'))
         m.add_entry(
-                ('Santa Claus', 'santa.claus@northpole.xx'),
-                (None, 'me@company.xx'))
+                (b'Santa Claus', b'santa.claus@northpole.xx'),
+                (None, b'me@company.xx'))
         self.assertEqual(
-            'Jane Doe <jane@desktop.(none)>',
-            m.lookup('Jane Doe <jane@desktop.(none)>'))
+            b'Jane Doe <jane@desktop.(none)>',
+            m.lookup(b'Jane Doe <jane@desktop.(none)>'))
         self.assertEqual(
-            'Jane Doe <jane@desktop.(none)>',
-            m.lookup('Jane Doe <jane@example.com>'))
+            b'Jane Doe <jane@desktop.(none)>',
+            m.lookup(b'Jane Doe <jane@example.com>'))
         self.assertEqual(
-            'Jane Doe <jane@desktop.(none)>',
-            m.lookup('Jane D. <jane@desktop.(none)>'))
+            b'Jane Doe <jane@desktop.(none)>',
+            m.lookup(b'Jane D. <jane@desktop.(none)>'))
         self.assertEqual(
-            'Some Dude <some@dude.xx>',
-            m.lookup('nick1 <bugs@company.xx>'))
+            b'Some Dude <some@dude.xx>',
+            m.lookup(b'nick1 <bugs@company.xx>'))
         self.assertEqual(
-            'CTO <cto@company.xx>',
-            m.lookup('CTO <cto@coompany.xx>'))
+            b'CTO <cto@company.xx>',
+            m.lookup(b'CTO <cto@coompany.xx>'))

@@ -1279,16 +1279,16 @@ class MailmapTests(PorcelainTestCase):
 
     def test_no_mailmap(self):
         self.assertEqual(
-            'Jelmer Vernooij <jelmer@samba.org>',
+            b'Jelmer Vernooij <jelmer@samba.org>',
             porcelain.check_mailmap(
-                self.repo, 'Jelmer Vernooij <jelmer@samba.org>'))
+                self.repo, b'Jelmer Vernooij <jelmer@samba.org>'))
 
     def test_mailmap_lookup(self):
-        with open(os.path.join(self.repo.path, '.mailmap'), 'w') as f:
-            f.write("""\
+        with open(os.path.join(self.repo.path, '.mailmap'), 'wb') as f:
+            f.write(b"""\
 Jelmer Vernooij <jelmer@debian.org>
 """)
         self.assertEqual(
-            'Jelmer Vernooij <jelmer@debian.org>',
+            b'Jelmer Vernooij <jelmer@debian.org>',
             porcelain.check_mailmap(
-                self.repo, 'Jelmer Vernooij <jelmer@samba.org>'))
+                self.repo, b'Jelmer Vernooij <jelmer@samba.org>'))

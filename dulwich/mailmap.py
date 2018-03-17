@@ -43,12 +43,12 @@ def read_mailmap(f):
     """
     for line in f:
         # Remove comments
-        line = line.split('#')[0]
+        line = line.split(b'#')[0]
         line = line.strip()
         if not line:
             continue
-        (canonical_identity, from_identity) = line.split('>', 1)
-        canonical_identity += ">"
+        (canonical_identity, from_identity) = line.split(b'>', 1)
+        canonical_identity += b">"
         if from_identity.strip():
             parsed_from_identity = parse_identity(from_identity)
         else:
@@ -103,9 +103,9 @@ class Mailmap(object):
         if was_tuple:
             return identity
         else:
-            return "%s <%s>" % identity
+            return identity[0] + b" <" + identity[1] + b">"
 
     @classmethod
     def from_path(cls, path):
-        with open(path, 'r') as f:
+        with open(path, 'rb') as f:
             return cls(read_mailmap(f))

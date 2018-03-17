@@ -1,5 +1,10 @@
 0.19.1	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add 'dulwich.mailmap' file for reading mailmap files.
+    (Jelmer Vernooĳ)
+
 0.19.0	2018-03-10
 
  BUG FIXES

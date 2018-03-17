@@ -1220,3 +1220,22 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
         if new_branch is not None:
             r.refs.set_symbolic_ref(b"HEAD", to_set)
+
+
+def check_mailmap(repo, contact):
+    """Check canonical name and email of contact.
+
+    :param repo: Path to the repository
+    :param contact: Contact name and/or email
+    :return: Canonical contact data
+    """
+    with open_repo_closing(repo) as r:
+        from dulwich.mailmap import Mailmap
+        import errno
+        try:
+            mailmap = Mailmap.from_path(os.path.join(r.path, '.mailmap'))
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            mailmap = Mailmap()
+        return mailmap.lookup(contact)

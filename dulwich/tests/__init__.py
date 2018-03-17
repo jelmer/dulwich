@@ -111,6 +111,7 @@ def self_test_suite():
         'ignore',
         'index',
         'lru_cache',
+        'mailmap',
         'objects',
         'objectspec',
         'object_store',

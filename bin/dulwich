@@ -532,6 +532,16 @@ class cmd_check_ignore(Command):
         return ret
 
 
+class cmd_check_mailmap(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for arg in args:
+            canonical_identity = porcelain.check_mailmap('.', arg)
+            print(canonical_identity)
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -558,6 +568,7 @@ commands = {
     "add": cmd_add,
     "archive": cmd_archive,
     "check-ignore": cmd_check_ignore,
+    "check-mailmap": cmd_check_mailmap,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,

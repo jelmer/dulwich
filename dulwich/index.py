@@ -267,11 +267,16 @@ class Index(object):
         """Return the POSIX file mode for the object at a path."""
         return self[path].mode
 
-    def iterblobs(self):
+    def iterobjects(self):
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
             yield path, entry.sha, cleanup_mode(entry.mode)
+
+    def iterblobs(self):
+        import warnings
+        warnings.warn(PendingDeprecationWarning, 'Use iterobjects() instead.')
+        return self.iterblobs()
 
     def clear(self):
         """Remove all contents from this index."""
@@ -317,7 +322,7 @@ class Index(object):
         :param object_store: Object store to save the tree in
         :return: Root tree SHA
         """
-        return commit_tree(object_store, self.iterblobs())
+        return commit_tree(object_store, self.iterobjects())
 
 
 def commit_tree(object_store, blobs):
@@ -368,7 +373,7 @@ def commit_index(object_store, index):
     :note: This function is deprecated, use index.commit() instead.
     :return: Root tree sha.
     """
-    return commit_tree(object_store, index.iterblobs())
+    return commit_tree(object_store, index.iterobjects())
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,

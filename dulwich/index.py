@@ -577,6 +577,24 @@ def blob_from_path_and_stat(fs_path, st):
     return blob
 
 
+def read_submodule_head(path):
+    """Read the head commit of a submodule.
+
+    :param path: path to the submodule
+    :return: HEAD sha, None if not a valid head/repository
+    """
+    from dulwich.errors import NotGitRepository
+    from dulwich.repo import Repo
+    try:
+        repo = Repo(path)
+    except NotGitRepository:
+        return None
+    try:
+        return repo.head()
+    except KeyError:
+        return None
+
+
 def get_unstaged_changes(index, root_path):
     """Walk through an index and check for differences against working tree.
 
@@ -604,12 +622,8 @@ def get_unstaged_changes(index, root_path):
             # This is actually a directory
             if os.path.exists(os.path.join(tree_path, '.git')):
                 # Submodule
-                from dulwich.errors import NotGitRepository
-                from dulwich.repo import Repo
-                try:
-                    if entry.sha != Repo(tree_path).head():
-                        yield tree_path
-                except NotGitRepository:
+                head = read_submodule_head(tree_path)
+                if entry.sha != head:
                     yield tree_path
             else:
                 # The file was changed to a directory, so consider it removed.

@@ -8,6 +8,7 @@ apidocs
 .testrepository
 *.pyc
 *.pyd
+*.pyo
 *.so
 *~
 *.swp

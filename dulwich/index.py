@@ -673,42 +673,88 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     return tree_path
 
 
-def iter_fresh_entries(index, root_path):
+def index_entry_from_path(path):
+    """Create an index from a filesystem path.
+
+    This returns an index value for files, symlinks
+    and tree references. for directories and
+    non-existant files it returns None
+
+    :param path: Path to create an index entry for
+    :return: An index entry
+    """
+    try:
+        st = os.lstat(path)
+        blob = blob_from_path_and_stat(path, st)
+    except EnvironmentError as e:
+        if e.errno == errno.ENOENT:
+            return None
+        if e.errno == errno.EISDIR:
+            if os.path.exists(os.path.join(path, '.git')):
+                head = read_submodule_head(path)
+                if head is None:
+                    return None
+                return index_entry_from_stat(
+                    st, head, 0, mode=S_IFGITLINK)
+            else:
+                return None
+        else:
+            raise
+    else:
+        return index_entry_from_stat(st, blob.id, 0)
+
+
+def iter_fresh_entries(paths, root_path):
     """Iterate over current versions of index entries on disk.
 
-    :param index: Index file
+    :param paths: Paths to iterate over
     :param root_path: Root path to access from
     :return: Iterator over path, index_entry
     """
-    for path in set(index):
+    for path in paths:
         p = _tree_to_fs_path(root_path, path)
-        try:
-            st = os.lstat(p)
-            blob = blob_from_path_and_stat(p, st)
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                del index[path]
-            else:
-                raise
-        except IOError as e:
-            if e.errno == errno.EISDIR:
-                del index[path]
-            else:
-                raise
-        else:
-            yield path, index_entry_from_stat(st, blob.id, 0)
+        entry = index_entry_from_path(p)
+        yield path, entry
 
 
 def iter_fresh_blobs(index, root_path):
     """Iterate over versions of blobs on disk referenced by index.
 
+    Don't use this function; it removes missing entries from index.
+
     :param index: Index file
     :param root_path: Root path to access from
+    :param include_deleted: Include deleted entries with sha and
+        mode set to None
     :return: Iterator over path, sha, mode
     """
-    for path, entry in iter_fresh_entries(index, root_path):
-        entry = IndexEntry(*entry)
-        yield path, entry.sha, cleanup_mode(entry.mode)
+    import warnings
+    warnings.warn(PendingDeprecationWarning,
+                  "Use iter_fresh_objects instead.")
+    for entry in iter_fresh_objects(
+            index, root_path, include_deleted=True):
+        if entry[1] is None:
+            del index[entry[0]]
+        else:
+            yield entry
+
+
+def iter_fresh_objects(paths, root_path, include_deleted=False):
+    """Iterate over versions of objecs on disk referenced by index.
+
+    :param index: Index file
+    :param root_path: Root path to access from
+    :param include_deleted: Include deleted entries with sha and
+        mode set to None
+    :return: Iterator over path, sha, mode
+    """
+    for path, entry in iter_fresh_entries(paths, root_path):
+        if entry is None:
+            if include_deleted:
+                yield path, None, None
+        else:
+            entry = IndexEntry(*entry)
+            yield path, entry.sha, cleanup_mode(entry.mode)
 
 
 def refresh_index(index, root_path):

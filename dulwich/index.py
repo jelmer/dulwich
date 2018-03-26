@@ -423,7 +423,9 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     """
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
-    return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
+
+    return IndexEntry(
+            stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
@@ -687,8 +689,6 @@ def index_entry_from_path(path):
         st = os.lstat(path)
         blob = blob_from_path_and_stat(path, st)
     except EnvironmentError as e:
-        if e.errno == errno.ENOENT:
-            return None
         if e.errno == errno.EISDIR:
             if os.path.exists(os.path.join(path, '.git')):
                 head = read_submodule_head(path)
@@ -697,7 +697,7 @@ def index_entry_from_path(path):
                 return index_entry_from_stat(
                     st, head, 0, mode=S_IFGITLINK)
             else:
-                return None
+                raise
         else:
             raise
     else:
@@ -713,7 +713,13 @@ def iter_fresh_entries(paths, root_path):
     """
     for path in paths:
         p = _tree_to_fs_path(root_path, path)
-        entry = index_entry_from_path(p)
+        try:
+            entry = index_entry_from_path(p)
+        except EnvironmentError as e:
+            if e.errno in (errno.ENOENT, errno.EISDIR):
+                entry = None
+            else:
+                raise
         yield path, entry
 
 

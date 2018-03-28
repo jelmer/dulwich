@@ -276,10 +276,6 @@ class FetchPackResult(object):
             return getattr(self.refs, name)
         return super(FetchPackResult, self).__getattribute__(name)
 
-    def __repr__(self):
-        return "%s(%r, %r, %r)" % (
-                self.__class__.__name__, self.refs, self.symrefs, self.agent)
-
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
@@ -1139,10 +1135,9 @@ class SubprocessSSHVendor(SSHVendor):
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
-
-class PuttySSHVendor(SSHVendor):
-    """SSH vendor that shells out to the local 'putty' command."""
-
+class _PuttySSHVendorBase(SSHVendor):
+    """Pseudo-abstract base class for PuttySSHVendor and PLinkSSHVendor"""
+    
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
@@ -1153,9 +1148,9 @@ class PuttySSHVendor(SSHVendor):
             )
 
         if sys.platform == 'win32':
-            args = ['putty.exe', '-ssh']
+            args = [self.putty_command+'.exe', '-ssh']
         else:
-            args = ['putty', '-ssh']
+            args = [self.putty_command, '-ssh']
 
         if password:
             import warnings
@@ -1180,6 +1175,18 @@ class PuttySSHVendor(SSHVendor):
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
+
+
+class PuttySSHVendor(_PuttySSHVendorBase):
+    """SSH vendor that shells out to the local 'putty' command."""
+    def __init__(self):
+        self.putty_command='putty'
+
+
+class PLinkSSHVendor(_PuttySSHVendorBase):
+    """SSH vendor that shells out to the local 'plink' command."""
+    def __init__(self):
+        self.putty_command='plink'
 
 
 def ParamikoSSHVendor(**kwargs):

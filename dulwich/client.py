@@ -276,6 +276,10 @@ class FetchPackResult(object):
             return getattr(self.refs, name)
         return super(FetchPackResult, self).__getattribute__(name)
 
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (
+                self.__class__.__name__, self.refs, self.symrefs, self.agent)
+
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers

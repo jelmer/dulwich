@@ -5,6 +5,9 @@
   * Add 'dulwich.mailmap' file for reading mailmap files.
     (Jelmer Vernooĳ)
 
+  * New 'client.PLinkSSHVendor' for creating connections using PuTTY's plink.exe.
+    (Adam Bradley)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

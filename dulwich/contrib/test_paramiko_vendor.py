@@ -70,4 +70,3 @@ class ParamikoSSHVendorTests(TestCase):
             vendor.run_command(
                 '127.0.0.1', 'test_run_command_with_privkey',
                 username='user', port=2200, pkey=CLIENT_KEY)
-

@@ -22,6 +22,7 @@
 
 from dulwich.tests import TestCase
 from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
+from paramiko.ssh_exception import NoValidConnectionsError
 
 
 CLIENT_KEY = """\
@@ -58,20 +59,15 @@ class ParamikoSSHVendorTests(TestCase):
 
     def test_run_command_password(self):
         vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
-        try:
+        with self.assertRaises(NoValidConnectionsError):
             vendor.run_command(
                 '127.0.0.1', 'test_run_command_password',
                 username='user', port=2200, password='pass')
-        except Exception as e:
-            assert type(e).__name__ == 'NoValidConnectionsError'
-            assert e.__class__.__name__ == 'NoValidConnectionsError'
 
     def test_run_command_with_privkey(self):
         vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
-        try:
+        with self.assertRaises(NoValidConnectionsError):
             vendor.run_command(
                 '127.0.0.1', 'test_run_command_with_privkey',
                 username='user', port=2200, pkey=CLIENT_KEY)
-        except Exception as e:
-            assert type(e).__name__ == 'NoValidConnectionsError'
-            assert e.__class__.__name__ == 'NoValidConnectionsError'
+

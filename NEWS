@@ -5,6 +5,13 @@
   * Add 'dulwich.mailmap' file for reading mailmap files.
     (Jelmer Vernooĳ)
 
+  * Dulwich no longer depends on urllib3[secure]. Instead,
+    "dulwich[https]" can be used to pull in the necessary
+    dependencies for HTTPS support. (Jelmer Vernooĳ, #616)
+
+  * Support the `http.sslVerify` and `http.sslCAInfo`
+    configuration options. (Jelmer Vernooĳ)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

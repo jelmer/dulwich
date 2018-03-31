@@ -35,7 +35,6 @@ try:
 except ImportError:
     import urllib.parse as urlparse
 
-import certifi
 import urllib3
 
 import dulwich
@@ -961,19 +960,29 @@ class TCPGitClientTests(TestCase):
 
 class DefaultUrllib3ManagerTest(TestCase):
 
-    def assert_verify_ssl(self, manager, assertion=True):
-        pool_keywords = tuple(manager.connection_pool_kw.items())
-        assert_method = self.assertIn if assertion else self.assertNotIn
-        assert_method(('cert_reqs', 'CERT_REQUIRED'), pool_keywords)
-        assert_method(('ca_certs', certifi.where()), pool_keywords)
-
     def test_no_config(self):
         manager = default_urllib3_manager(config=None)
-        self.assert_verify_ssl(manager)
+        pool_keywords = tuple(manager.connection_pool_kw.items())
+        self.assertEqual(manager.connection_pool_kw['cert_reqs'],
+                         'CERT_REQUIRED')
 
     def test_config_no_proxy(self):
         manager = default_urllib3_manager(config=ConfigDict())
-        self.assert_verify_ssl(manager)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+
+    def test_config_ssl(self):
+        config = ConfigDict()
+        config.set(b'http', b'sslVerify', b'true')
+        manager = default_urllib3_manager(config=config)
+        self.assertEqual(manager.connection_pool_kw['cert_reqs'],
+                         'CERT_REQUIRED')
+
+    def test_config_no_ssl(self):
+        config = ConfigDict()
+        config.set(b'http', b'sslVerify', b'false')
+        manager = default_urllib3_manager(config=config)
+        self.assertEqual(manager.connection_pool_kw['cert_reqs'],
+                         'CERT_NONE')
 
     def test_config_proxy(self):
         config = ConfigDict()
@@ -985,11 +994,10 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager.proxy.scheme, 'http')
         self.assertEqual(manager.proxy.host, 'localhost')
         self.assertEqual(manager.proxy.port, 3128)
-        self.assert_verify_ssl(manager)
 
     def test_config_no_verify_ssl(self):
-        manager = default_urllib3_manager(config=None, verify_ssl=False)
-        self.assert_verify_ssl(manager, assertion=False)
+        manager = default_urllib3_manager(config=None, cert_reqs="CERT_NONE")
+        self.assertEqual(manager.connection_pool_kw['cert_reqs'], 'CERT_NONE')
 
 
 class SubprocessSSHVendorTests(TestCase):

@@ -78,7 +78,7 @@ if has_setuptools:
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.21'],
         }
-    setup_kwargs['install_requires'] = ['urllib3[secure]>=1.21']
+    setup_kwargs['install_requires'] = ['urllib3>=1.21', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require

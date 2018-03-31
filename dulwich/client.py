@@ -60,7 +60,6 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
-import certifi
 import urllib3
 import urllib3.util
 
@@ -1247,17 +1246,18 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(config, verify_ssl=True):
+def default_urllib3_manager(config, **override_kwargs):
     """Return `urllib3` connection pool manager.
 
     Honour detected proxy configurations.
 
     :param config: `dulwich.config.ConfigDict` instance with Git configuration.
-    :param verify_ssl: Whether SSL verification is enabled.
+    :param kwargs: Additional arguments for urllib3.ProxyManager
     :return: `urllib3.ProxyManager` instance for proxy configurations,
         `urllib3.PoolManager` otherwise.
     """
     proxy_server = user_agent = None
+    ca_certs = ssl_verify = None
 
     if config is not None:
         try:
@@ -1269,14 +1269,43 @@ def default_urllib3_manager(config, verify_ssl=True):
         except KeyError:
             pass
 
-    ssl_kwargs = {}
-    if verify_ssl:
-        ssl_kwargs.update(cert_reqs="CERT_REQUIRED", ca_certs=certifi.where())
+        # TODO(jelmer): Support per-host settings
+        try:
+            ssl_verify = config.get_boolean(b"http", b"sslVerify")
+        except KeyError:
+            ssl_verify = True
+
+        try:
+            ca_certs = config.get_boolean(b"http", b"sslCAInfo")
+        except KeyError:
+            ca_certs = None
 
     if user_agent is None:
         user_agent = default_user_agent_string()
 
     headers = {"User-agent": user_agent}
+
+    kwargs = {}
+    if ssl_verify is True:
+        kwargs['cert_reqs'] = "CERT_REQUIRED"
+    elif ssl_verify is False:
+        kwargs['cert_reqs'] = 'CERT_NONE'
+    else:
+        # Default to SSL verification
+        kwargs['cert_reqs'] = "CERT_REQUIRED"
+
+    if ca_certs is not None:
+        kwargs['ca_certs'] = ca_certs
+    kwargs.update(override_kwargs)
+
+    # Try really hard to find a SSL certificate path
+    if 'ca_certs' not in kwargs and kwargs.get('cert_reqs') != 'CERT_NONE':
+        try:
+            import certifi
+        except ImportError:
+            pass
+        else:
+            kwargs['ca_certs'] = certifi.where()
 
     if proxy_server is not None:
         # `urllib3` requires a `str` object in both Python 2 and 3, while
@@ -1284,9 +1313,9 @@ def default_urllib3_manager(config, verify_ssl=True):
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
         manager = urllib3.ProxyManager(proxy_server, headers=headers,
-                                       **ssl_kwargs)
+                                       **kwargs)
     else:
-        manager = urllib3.PoolManager(headers=headers, **ssl_kwargs)
+        manager = urllib3.PoolManager(headers=headers, **kwargs)
 
     return manager
 

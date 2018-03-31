@@ -552,14 +552,24 @@ class cmd_stash_list(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        for name in porcelain.stash_list('.'):
-            print(name)
+        for i, entry in porcelain.stash_list('.'):
+            print("stash@{%d}: %s" % (i, entry.message.rstrip('\n')))
+
+
+class cmd_stash_push(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.stash_push('.')
+        print("Saved working directory and index state")
 
 
 class cmd_stash(SuperCommand):
 
     subcommands = {
         "list": cmd_stash_list,
+        "push": cmd_stash_push,
     }
 
 

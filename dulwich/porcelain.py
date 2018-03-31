@@ -1246,4 +1246,12 @@ def stash_list(repo):
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
         stash = Stash.from_repo(r)
-        return []
+        return enumerate(list(stash.stashes()))
+
+
+def stash_push(repo):
+    """Push a new stash onto the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        stash.create()

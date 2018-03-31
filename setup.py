@@ -74,7 +74,10 @@ ext_modules = [
 setup_kwargs = {}
 
 if has_setuptools:
-    setup_kwargs['extras_require'] = {'fastimport': ['fastimport']}
+    setup_kwargs['extras_require'] = {
+        'fastimport': ['fastimport'],
+        'https': ['urllib3[secure]>=1.21'],
+        }
     setup_kwargs['install_requires'] = ['urllib3[secure]>=1.21']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'

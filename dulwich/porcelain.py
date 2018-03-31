@@ -1239,3 +1239,11 @@ def check_mailmap(repo, contact):
                 raise
             mailmap = Mailmap()
         return mailmap.lookup(contact)
+
+
+def stash_list(repo):
+    """List all stashes in a repository."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        return []

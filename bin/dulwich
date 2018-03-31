@@ -547,6 +547,22 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
+class cmd_stash_list(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for name in porcelain.stash_list('.'):
+            print(name)
+
+
+class cmd_stash(SuperCommand):
+
+    subcommands = {
+        "list": cmd_stash_list,
+    }
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -599,6 +615,7 @@ commands = {
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
     "show": cmd_show,
+    "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
     "tag": cmd_tag,

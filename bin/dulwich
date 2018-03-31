@@ -501,11 +501,9 @@ class cmd_remote_add(Command):
         porcelain.remote_add('.', args[0], args[1])
 
 
-class cmd_remote(Command):
+class SuperCommand(Command):
 
-    subcommands = {
-        "add": cmd_remote_add,
-    }
+    subcommands = {}
 
     def run(self, args):
         if not args:
@@ -517,7 +515,14 @@ class cmd_remote(Command):
         except KeyError:
             print('No such subcommand: %s' % args[0])
             return False
-        return cmd_kls(args[1:])
+        return cmd_kls().run(args[1:])
+
+
+class cmd_remote(SuperCommand):
+
+    subcommands = {
+        "add": cmd_remote_add,
+    }
 
 
 class cmd_check_ignore(Command):

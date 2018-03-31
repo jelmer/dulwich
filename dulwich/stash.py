@@ -20,9 +20,100 @@
 
 """Stash handling."""
 
+from __future__ import absolute_import
+
+import errno
+import os
+
+from dulwich.file import GitFile
+from dulwich.index import (
+    commit_tree,
+    iter_fresh_objects,
+    )
+from dulwich.reflog import read_reflog
+
+
+DEFAULT_STASH_REF = b"refs/stash"
+
+
 class Stash(object):
-    """A Git stash."""
+    """A Git stash.
+
+    Note that this doesn't currently update the working tree.
+    """
+
+    def __init__(self, repo, ref=DEFAULT_STASH_REF):
+        self._ref = ref
+        self._repo = repo
+
+    def stashes(self):
+        reflog_path = os.path.join(
+            self._repo.commondir(), 'logs', self._ref)
+        try:
+            with GitFile(reflog_path, 'rb') as f:
+                return reversed(list(read_reflog(f)))
+        except EnvironmentError as e:
+            if e.errno == errno.ENOENT:
+                return []
+            raise
 
     @classmethod
     def from_repo(cls, repo):
-        return cls()
+        """Create a new stash from a Repo object."""
+        return cls(repo)
+
+    def drop(self, index):
+        """Drop entry with specified index."""
+        raise NotImplementedError(self.drop)
+
+    def pop(self, index):
+        raise NotImplementedError(self.drop)
+
+    def create(self, committer=None, author=None, message=None):
+        """Create a new stash.
+
+        :param committer: Optional committer name to use
+        :param author: Optional author name to use
+        :param message: Optional commit message
+        """
+        # First, create the index commit.
+        commit_kwargs = {}
+        if committer is not None:
+            commit_kwargs['committer'] = committer
+        if author is not None:
+            commit_kwargs['author'] = author
+
+        index = self._repo.open_index()
+        index_tree_id = index.commit(self._repo.object_store)
+        index_commit_id = self._repo.do_commit(
+            ref=None, tree=index_tree_id,
+            message=b"Index stash",
+            merge_heads=[self._repo.head()],
+            **commit_kwargs)
+
+        # Then, the working tree one.
+        stash_tree_id = commit_tree(
+                self._repo.object_store,
+                iter_fresh_objects(
+                    index, self._repo.path,
+                    object_store=self._repo.object_store))
+
+        if message is None:
+            message = b"A stash on " + self._repo.head()
+
+        # TODO(jelmer): Just pass parents into do_commit()?
+        self._repo.refs[self._ref] = self._repo.head()
+
+        cid = self._repo.do_commit(
+            ref=self._ref, tree=stash_tree_id,
+            message=message,
+            merge_heads=[index_commit_id],
+            **commit_kwargs)
+
+        return cid
+
+    def __getitem__(self, index):
+        return self._stashes()[index]
+
+    def __len__(self):
+        return len(self._stashes())

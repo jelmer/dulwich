@@ -19,12 +19,49 @@
 
 """Tests for paramiko_vendor."""
 
+import socket
+import paramiko
+import threading
 
 from dulwich.tests import TestCase
 from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
-from paramiko.ssh_exception import NoValidConnectionsError
+
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
+COMMANDS = []
+USER = 'testuser'
+PASSWORD = 'test'
+SERVER_KEY = """\
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAy/L1sSYAzxsMprtNXW4u/1jGXXkQmQ2xtmKVlR+RlIL3a1BH
+bzTpPlZyjltAAwzIP8XRh0iJFKz5y3zSQChhX47ZGN0NvQsVct8R+YwsUonwfAJ+
+JN0KBKKvC8fPHlzqBr3gX+ZxqsFH934tQ6wdQPH5eQWtdM8L826lMsH1737uyTGk
++mCSDjL3c6EzY83g7qhkJU2R4qbi6ne01FaWADzG8sOzXnHT+xpxtk8TTT8yCVUY
+MmBNsSoA/ka3iWz70ghB+6Xb0WpFJZXWq1oYovviPAfZGZSrxBZMxsWMye70SdLl
+TqsBEt0+miIcm9s0fvjWvQuhaHX6mZs5VO4r5QIDAQABAoIBAGYqeYWaYgFdrYLA
+hUrubUCg+g3NHdFuGL4iuIgRXl4lFUh+2KoOuWDu8Uf60iA1AQNhV0sLvQ/Mbv3O
+s4xMLisuZfaclctDiCUZNenqnDFkxEF7BjH1QJV94W5nU4wEQ3/JEmM4D2zYkfKb
+FJW33JeyH6TOgUvohDYYEU1R+J9V8qA243p+ui1uVtNI6Pb0TXJnG5y9Ny4vkSWH
+Fi0QoMPR1r9xJ4SEearGzA/crb4SmmDTKhGSoMsT3d5ATieLmwcS66xWz8w4oFGJ
+yzDq24s4Fp9ccNjMf/xR8XRiekJv835gjEqwF9IXyvgOaq6XJ1iCqGPFDKa25nui
+JnEstOkCgYEA/ZXk7aIanvdeJlTqpX578sJfCnrXLydzE8emk1b7+5mrzGxQ4/pM
+PBQs2f8glT3t0O0mRX9NoRqnwrid88/b+cY4NCOICFZeasX336/gYQxyVeRLJS6Z
+hnGEQqry8qS7PdKAyeHMNmZFrUh4EiHiObymEfQS+mkRUObn0cGBTw8CgYEAzeQU
+D2baec1DawjppKaRynAvWjp+9ry1lZx9unryKVRwjRjkEpw+b3/+hdaF1IvsVSce
+cNj+6W2guZ2tyHuPhZ64/4SJVyE2hKDSKD4xTb2nVjsMeN0bLD2UWXC9mwbx8nWa
+2tmtUZ7a/okQb2cSdosJinRewLNqXIsBXamT1csCgYEA0cXb2RCOQQ6U3dTFPx4A
+3vMXuA2iUKmrsqMoEx6T2LBow/Sefdkik1iFOdipVYwjXP+w9zC2QR1Rxez/DR/X
+8ymceNUjxPHdrSoTQQG29dFcC92MpDeGXQcuyA+uZjcLhbrLOzYEvsOfxBb87NMG
+14hNQPDNekTMREafYo9WrtUCgYAREK54+FVzcwf7fymedA/xb4r9N4v+d3W1iNsC
+8d3Qfyc1CrMct8aVB07ZWQaOr2pPRIbJY7L9NhD0UZVt4I/sy1MaGqonhqE2LP4+
+R6legDG2e/50ph7yc8gwAaA1kUXMiuLi8Nfkw/3yyvmJwklNegi4aRzRbA2Mzhi2
+4q9WMQKBgQCb0JNyxHG4pvLWCF/j0Sm1FfvrpnqSv5678n1j4GX7Ka/TubOK1Y4K
+U+Oib7dKa/zQMWehVFNTayrsq6bKVZ6q7zG+IHiRLw4wjeAxREFH6WUjDrn9vl2l
+D48DKbBuBwuVOJWyq3qbfgJXojscgNQklrsPdXVhDwOF0dYxP89HnA=="""
 CLIENT_KEY = """\
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAxvREKSElPOm/0z/nPO+j5rk2tjdgGcGc7We1QZ6TRXYLu7nN
@@ -55,18 +92,72 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 -----END RSA PRIVATE KEY-----"""
 
 
+class Server(paramiko.ServerInterface):
+    """http://docs.paramiko.org/en/2.4/api/server.html"""
+    def __init__(self, *args, **kwargs):
+        super(Server, self).__init__(*args, **kwargs)
+
+    def check_channel_exec_request(self, channel, command):
+        COMMANDS.append(command)
+        return True
+
+    def check_auth_password(self, username, password):
+        if (username == USER) and (password == PASSWORD):
+            return paramiko.AUTH_SUCCESSFUL
+        return paramiko.AUTH_FAILED
+
+    def check_auth_publickey(self, username, key):
+        pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
+        if (username == USER) and (key == pubkey):
+            return paramiko.AUTH_SUCCESSFUL
+        return paramiko.AUTH_FAILED
+
+    def check_channel_request(self, kind, chanid):
+        if kind == "session":
+            return paramiko.OPEN_SUCCEEDED
+        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+    def get_allowed_auths(self, username):
+        return "password,publickey"
+
+
 class ParamikoSSHVendorTests(TestCase):
+    def setUp(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind(('127.0.0.1', 0))
+        self.socket.listen(5)
+        self.port = self.socket.getsockname()[1]
+        self.thread = threading.Thread(target=self._run)
+        self.thread.start()
+
+    def tearDown(self):
+        if hasattr(self, 'transport'):
+            self.transport.close()
+        if hasattr(self, 'socket'):
+            self.socket.close()
+
+    def _run(self):
+        conn, addr = self.socket.accept()
+        self.transport = paramiko.Transport(conn)
+        host_key = paramiko.RSAKey.from_private_key(StringIO(SERVER_KEY))
+        self.transport.add_server_key(host_key)
+        server = Server()
+        self.transport.start_server(server=server)
 
     def test_run_command_password(self):
-        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
-        with self.assertRaises(NoValidConnectionsError):
-            vendor.run_command(
-                '127.0.0.1', 'test_run_command_password',
-                username='user', port=2200, password='pass')
+        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        vendor.run_command(
+            '127.0.0.1', 'test_run_command_password',
+            username=USER, port=self.port, password=PASSWORD)
+
+        self.assertTrue(b'test_run_command_password' in COMMANDS)
 
     def test_run_command_with_privkey(self):
-        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
-        with self.assertRaises(NoValidConnectionsError):
-            vendor.run_command(
-                '127.0.0.1', 'test_run_command_with_privkey',
-                username='user', port=2200, pkey=CLIENT_KEY)
+        key = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
+
+        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        vendor.run_command(
+            '127.0.0.1', 'test_run_command_with_privkey',
+            username=USER, port=self.port, pkey=key)
+
+        self.assertTrue(b'test_run_command_with_privkey' in COMMANDS)

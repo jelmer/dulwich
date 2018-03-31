@@ -112,13 +112,6 @@ from dulwich.refs import (
     )
 
 
-if sys.version_info < (2, 7, 9):
-    # Before Python 2.7.9 the `ssl` module lacks SNI support and lags behind in
-    # security updates. Use pyOpenSSL instead.
-    import urllib3.contrib.pyopenssl
-    urllib3.contrib.pyopenssl.inject_into_urllib3()
-
-
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0

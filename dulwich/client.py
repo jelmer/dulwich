@@ -60,9 +60,6 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
-import urllib3
-import urllib3.util
-
 import dulwich
 from dulwich.errors import (
     GitProtocolError,
@@ -1307,6 +1304,8 @@ def default_urllib3_manager(config, **override_kwargs):
         else:
             kwargs['ca_certs'] = certifi.where()
 
+    import urllib3
+
     if proxy_server is not None:
         # `urllib3` requires a `str` object in both Python 2 and 3, while
         # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
@@ -1339,6 +1338,7 @@ class HttpGitClient(GitClient):
             # No escaping needed: ":" is not allowed in username:
             # https://tools.ietf.org/html/rfc2617#section-2
             credentials = "%s:%s" % (username, password)
+            import urllib3.util
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)
             self.pool_manager.headers.update(basic_auth)
 

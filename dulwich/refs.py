@@ -43,6 +43,7 @@ from dulwich.file import (
 
 SYMREF = b'ref: '
 LOCAL_BRANCH_PREFIX = b'refs/heads/'
+LOCAL_TAG_PREFIX = b'refs/tags/'
 BAD_REF_CHARS = set(b'\177 ~^:?*[')
 ANNOTATED_TAG_SUFFIX = b'^{}'
 

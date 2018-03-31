@@ -675,7 +675,7 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     return tree_path
 
 
-def index_entry_from_path(path):
+def index_entry_from_path(path, object_store=None):
     """Create an index from a filesystem path.
 
     This returns an index value for files, symlinks
@@ -683,6 +683,8 @@ def index_entry_from_path(path):
     non-existant files it returns None
 
     :param path: Path to create an index entry for
+    :param object_store: Optional object store to
+        save new blobs in
     :return: An index entry
     """
     try:
@@ -701,20 +703,23 @@ def index_entry_from_path(path):
         else:
             raise
     else:
+        if object_store is not None:
+            object_store.add_object(blob)
         return index_entry_from_stat(st, blob.id, 0)
 
 
-def iter_fresh_entries(paths, root_path):
+def iter_fresh_entries(paths, root_path, object_store=None):
     """Iterate over current versions of index entries on disk.
 
     :param paths: Paths to iterate over
     :param root_path: Root path to access from
+    :param store: Optional store to save new blobs in
     :return: Iterator over path, index_entry
     """
     for path in paths:
         p = _tree_to_fs_path(root_path, path)
         try:
-            entry = index_entry_from_path(p)
+            entry = index_entry_from_path(p, object_store=object_store)
         except EnvironmentError as e:
             if e.errno in (errno.ENOENT, errno.EISDIR):
                 entry = None
@@ -745,16 +750,19 @@ def iter_fresh_blobs(index, root_path):
             yield entry
 
 
-def iter_fresh_objects(paths, root_path, include_deleted=False):
+def iter_fresh_objects(paths, root_path, include_deleted=False,
+                       object_store=None):
     """Iterate over versions of objecs on disk referenced by index.
 
     :param index: Index file
     :param root_path: Root path to access from
     :param include_deleted: Include deleted entries with sha and
         mode set to None
+    :param object_store: Optional object store to report new items to
     :return: Iterator over path, sha, mode
     """
-    for path, entry in iter_fresh_entries(paths, root_path):
+    for path, entry in iter_fresh_entries(paths, root_path,
+                                          object_store=object_store):
         if entry is None:
             if include_deleted:
                 yield path, None, None

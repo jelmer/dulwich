@@ -962,7 +962,6 @@ class DefaultUrllib3ManagerTest(TestCase):
 
     def test_no_config(self):
         manager = default_urllib3_manager(config=None)
-        pool_keywords = tuple(manager.connection_pool_kw.items())
         self.assertEqual(manager.connection_pool_kw['cert_reqs'],
                          'CERT_REQUIRED')
 

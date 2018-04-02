@@ -18,6 +18,9 @@
   * Fix repeat HTTP requests using the same smart HTTP client.
     (Jelmer Vernooĳ)
 
+  * New 'client.PLinkSSHVendor' for creating connections using PuTTY's plink.exe.
+    (Adam Bradley, Filipp Frizzy)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

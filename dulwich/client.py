@@ -1129,27 +1129,26 @@ class SubprocessSSHVendor(SSHVendor):
         return SubprocessWrapper(proc)
 
 
-class PuttySSHVendor(SSHVendor):
-    """SSH vendor that shells out to the local 'putty' command."""
-
+class PLinkSSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'plink' command."""
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
         if password and key_filename:
             raise NotImplementedError(
                 "You can't set passphrase for ssh key "
-                "with PuttySSHVendor, use ParamikoSSHVendor instead"
+                "with PLinkSSHVendor, use ParamikoSSHVendor instead"
             )
 
         if sys.platform == 'win32':
-            args = ['putty.exe', '-ssh']
+            args = ['plink.exe', '-ssh']
         else:
-            args = ['putty', '-ssh']
+            args = ['plink', '-ssh']
 
         if password:
             import warnings
             warnings.warn(
-                "Invoking Putty with a password exposes the password in the "
+                "Invoking PLink with a password exposes the password in the "
                 "process list.")
             args.extend(['-pw', str(password)])
 

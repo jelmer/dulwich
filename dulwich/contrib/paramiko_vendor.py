@@ -97,7 +97,7 @@ class _ParamikoWrapper(object):
 
         # Closed socket
         if not data:
-            return
+            return b''
 
         # Read more if needed
         if n and data_len < n:

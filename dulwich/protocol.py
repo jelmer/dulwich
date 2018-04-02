@@ -343,9 +343,10 @@ class ReceivableProtocol(Protocol):
     will still block until at least one byte is read.
     """
 
-    def __init__(self, recv, write, report_activity=None, rbufsize=_RBUFSIZE):
-        super(ReceivableProtocol, self).__init__(self.read, write,
-                                                 report_activity)
+    def __init__(self, recv, write, close=None, report_activity=None,
+                 rbufsize=_RBUFSIZE):
+        super(ReceivableProtocol, self).__init__(
+                self.read, write, close=close, report_activity=report_activity)
         self._recv = recv
         self._rbuf = BytesIO()
         self._rbufsize = rbufsize

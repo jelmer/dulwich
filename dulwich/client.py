@@ -1139,9 +1139,9 @@ class SubprocessSSHVendor(SSHVendor):
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
-class _PuttySSHVendorBase(SSHVendor):
-    """Pseudo-abstract base class for PuttySSHVendor and PLinkSSHVendor"""
-    
+
+class PLinkSSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'plink' command."""
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
@@ -1152,9 +1152,9 @@ class _PuttySSHVendorBase(SSHVendor):
             )
 
         if sys.platform == 'win32':
-            args = [self.putty_command+'.exe', '-ssh']
+            args = ['plink.exe', '-ssh']
         else:
-            args = [self.putty_command, '-ssh']
+            args = ['plink', '-ssh']
 
         if password:
             import warnings
@@ -1179,18 +1179,6 @@ class _PuttySSHVendorBase(SSHVendor):
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         return SubprocessWrapper(proc)
-
-
-class PuttySSHVendor(_PuttySSHVendorBase):
-    """SSH vendor that shells out to the local 'putty' command."""
-    def __init__(self):
-        self.putty_command='putty'
-
-
-class PLinkSSHVendor(_PuttySSHVendorBase):
-    """SSH vendor that shells out to the local 'plink' command."""
-    def __init__(self):
-        self.putty_command='plink'
 
 
 def ParamikoSSHVendor(**kwargs):

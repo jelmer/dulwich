@@ -1,4 +1,4 @@
-# paramiko_vendor.py
+# test_paramiko_vendor.py
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0

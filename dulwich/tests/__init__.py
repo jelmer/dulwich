@@ -124,6 +124,7 @@ def self_test_suite():
         'refs',
         'repository',
         'server',
+        'stash',
         'utils',
         'walk',
         'web',

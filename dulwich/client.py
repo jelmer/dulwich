@@ -1601,6 +1601,25 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
     raise ValueError("unknown scheme '%s'" % parsed.scheme)
 
 
+def parse_rsync_url(location):
+    """Parse a rsync-style URL."""
+    if ':' in location and '@' not in location:
+        # SSH with no user@, zero or one leading slash.
+        (host, path) = location.split(':', 1)
+        user = None
+    elif ':' in location:
+        # SSH with user@host:foo.
+        user_host, path = location.split(':', 1)
+        if '@' in user_host:
+            user, host = user_host.rsplit('@', 1)
+        else:
+            user = None
+            host = user_host
+    else:
+        raise ValueError('not a valid rsync-style URL')
+    return (user, host, path)
+
+
 def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
@@ -1622,19 +1641,10 @@ def get_transport_and_path(location, **kwargs):
         # Windows local path
         return default_local_git_client_cls(**kwargs), location
 
-    if ':' in location and '@' not in location:
-        # SSH with no user@, zero or one leading slash.
-        (hostname, path) = location.split(':', 1)
-        return SSHGitClient(hostname, **kwargs), path
-    elif ':' in location:
-        # SSH with user@host:foo.
-        user_host, path = location.split(':', 1)
-        if '@' in user_host:
-            user, host = user_host.rsplit('@', 1)
-        else:
-            user = None
-            host = user_host
-        return SSHGitClient(host, username=user, **kwargs), path
-
-    # Otherwise, assume it's a local path.
-    return default_local_git_client_cls(**kwargs), location
+    try:
+        (username, hostname, path) = parse_rsync_url(location)
+    except ValueError:
+        # Otherwise, assume it's a local path.
+        return default_local_git_client_cls(**kwargs), location
+    else:
+        return SSHGitClient(hostname, username=username, **kwargs), path

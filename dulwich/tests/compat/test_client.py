@@ -222,7 +222,6 @@ class DulwichClientTestBase(object):
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
-
     def test_incremental_fetch_pack(self):
         self.test_fetch_pack()
         dest, dummy = self.disable_ff_and_make_dummy_commit()

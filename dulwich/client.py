@@ -1426,7 +1426,7 @@ class HttpGitClient(GitClient):
         assert base_url[-1] == "/"
         tail = "info/refs"
         headers = {"Accept": "*/*"}
-        if self.dumb is not False:
+        if self.dumb is not True:
             tail += "?service=%s" % service.decode('ascii')
         url = urlparse.urljoin(base_url, tail)
         resp, read = self._http_request(url, headers, allow_compression=True)

@@ -210,6 +210,19 @@ class DulwichClientTestBase(object):
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
+    def test_repeat(self):
+        c = self._client()
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+            result = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
+            result = c.fetch(self._build_path('/server_new.export'), dest)
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
+
+
     def test_incremental_fetch_pack(self):
         self.test_fetch_pack()
         dest, dummy = self.disable_ff_and_make_dummy_commit()

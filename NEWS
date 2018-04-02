@@ -15,6 +15,9 @@
   * Factor out `dulwich.client.parse_rsync_url` function.
     (Jelmer Vernooĳ)
 
+  * Fix repeat HTTP requests using the same smart HTTP client.
+    (Jelmer Vernooĳ)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

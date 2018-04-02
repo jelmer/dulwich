@@ -32,7 +32,6 @@ except ImportError:
     from io import StringIO
 
 
-COMMANDS = []
 USER = 'testuser'
 PASSWORD = 'test'
 SERVER_KEY = """\
@@ -94,21 +93,22 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 
 class Server(paramiko.ServerInterface):
     """http://docs.paramiko.org/en/2.4/api/server.html"""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, commands, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
+        self.commands = commands
 
     def check_channel_exec_request(self, channel, command):
-        COMMANDS.append(command)
+        self.commands.append(command)
         return True
 
     def check_auth_password(self, username, password):
-        if (username == USER) and (password == PASSWORD):
+        if username == USER and password == PASSWORD:
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, key):
         pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
-        if (username == USER) and (key == pubkey):
+        if username == USER and key == pubkey:
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
 
@@ -123,25 +123,25 @@ class Server(paramiko.ServerInterface):
 
 class ParamikoSSHVendorTests(TestCase):
     def setUp(self):
+        self.commands = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(('127.0.0.1', 0))
         self.socket.listen(5)
+        self.addCleanup(self.socket.close)
         self.port = self.socket.getsockname()[1]
         self.thread = threading.Thread(target=self._run)
         self.thread.start()
 
     def tearDown(self):
-        if hasattr(self, 'transport'):
-            self.transport.close()
-        if hasattr(self, 'socket'):
-            self.socket.close()
+        pass
 
     def _run(self):
         conn, addr = self.socket.accept()
         self.transport = paramiko.Transport(conn)
+        self.addCleanup(self.transport.close)
         host_key = paramiko.RSAKey.from_private_key(StringIO(SERVER_KEY))
         self.transport.add_server_key(host_key)
-        server = Server()
+        server = Server(self.commands)
         self.transport.start_server(server=server)
 
     def test_run_command_password(self):
@@ -150,7 +150,7 @@ class ParamikoSSHVendorTests(TestCase):
             '127.0.0.1', 'test_run_command_password',
             username=USER, port=self.port, password=PASSWORD)
 
-        self.assertTrue(b'test_run_command_password' in COMMANDS)
+        self.assertIn(b'test_run_command_password', self.commands)
 
     def test_run_command_with_privkey(self):
         key = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
@@ -160,4 +160,4 @@ class ParamikoSSHVendorTests(TestCase):
             '127.0.0.1', 'test_run_command_with_privkey',
             username=USER, port=self.port, pkey=key)
 
-        self.assertTrue(b'test_run_command_with_privkey' in COMMANDS)
+        self.assertIn(b'test_run_command_with_privkey', self.commands)

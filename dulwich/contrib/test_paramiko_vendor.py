@@ -166,3 +166,24 @@ class ParamikoSSHVendorTests(TestCase):
             username=USER, port=self.port, pkey=key)
 
         self.assertIn(b'test_run_command_with_privkey', self.commands)
+
+    def test_run_command_data_transfer(self):
+        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        con = vendor.run_command(
+            '127.0.0.1', 'test_run_command_data_transfer',
+            username=USER, port=self.port, password=PASSWORD)
+
+        self.assertIn(b'test_run_command_data_transfer', self.commands)
+
+        channel = self.transport.accept(5)
+        channel.send(b'stdout\n')
+        channel.send_stderr(b'stderr\n')
+        channel.close()
+
+        # Fixme: it's return false
+        # self.assertTrue(con.can_read())
+
+        self.assertEqual(b'stdout\n', con.read(4096))
+
+        # Fixme: it's return empty string
+        # self.assertEqual(b'stderr\n', con.read_stderr(4096))

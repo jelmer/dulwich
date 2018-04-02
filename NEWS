@@ -12,6 +12,9 @@
   * Support the `http.sslVerify` and `http.sslCAInfo`
     configuration options. (Jelmer Vernooĳ)
 
+  * Factor out `dulwich.client.parse_rsync_url` function.
+    (Jelmer Vernooĳ)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

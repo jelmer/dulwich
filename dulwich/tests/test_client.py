@@ -56,6 +56,7 @@ from dulwich.client import (
     default_urllib3_manager,
     get_transport_and_path,
     get_transport_and_path_from_url,
+    parse_rsync_url,
     )
 from dulwich.config import (
     ConfigDict,
@@ -1112,3 +1113,17 @@ class PuttySSHVendorTests(TestCase):
         args = command.proc.args
 
         self.assertListEqual(expected, args[0])
+
+
+class RsyncUrlTests(TestCase):
+
+    def test_simple(self):
+        self.assertEqual(
+                parse_rsync_url('foo:bar/path'),
+                (None, 'foo', 'bar/path'))
+        self.assertEqual(
+                parse_rsync_url('user@foo:bar/path'),
+                ('user', 'foo', 'bar/path'))
+
+    def test_path(self):
+        self.assertRaises(ValueError, parse_rsync_url, '/path')

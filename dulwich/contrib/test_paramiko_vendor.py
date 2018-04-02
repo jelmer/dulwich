@@ -124,6 +124,8 @@ class Server(paramiko.ServerInterface):
 class ParamikoSSHVendorTests(TestCase):
     def setUp(self):
         self.commands = []
+        socket.setdefaulttimeout(10)
+        self.addCleanup(socket.setdefaulttimeout, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(('127.0.0.1', 0))
         self.socket.listen(5)
@@ -136,7 +138,10 @@ class ParamikoSSHVendorTests(TestCase):
         pass
 
     def _run(self):
-        conn, addr = self.socket.accept()
+        try:
+            conn, addr = self.socket.accept()
+        except:
+            return False
         self.transport = paramiko.Transport(conn)
         self.addCleanup(self.transport.close)
         host_key = paramiko.RSAKey.from_private_key(StringIO(SERVER_KEY))

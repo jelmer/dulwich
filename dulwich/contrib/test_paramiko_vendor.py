@@ -140,7 +140,7 @@ class ParamikoSSHVendorTests(TestCase):
     def _run(self):
         try:
             conn, addr = self.socket.accept()
-        except:
+        except socket.error:
             return False
         self.transport = paramiko.Transport(conn)
         self.addCleanup(self.transport.close)

@@ -60,10 +60,6 @@ except ImportError:
     import urllib.request as urllib2
     import urllib.parse as urlparse
 
-import certifi
-import urllib3
-import urllib3.util
-
 import dulwich
 from dulwich.errors import (
     GitProtocolError,
@@ -110,13 +106,6 @@ from dulwich.pack import (
 from dulwich.refs import (
     read_info_refs,
     )
-
-
-if sys.version_info < (2, 7, 9):
-    # Before Python 2.7.9 the `ssl` module lacks SNI support and lags behind in
-    # security updates. Use pyOpenSSL instead.
-    import urllib3.contrib.pyopenssl
-    urllib3.contrib.pyopenssl.inject_into_urllib3()
 
 
 def _fileno_can_read(fileno):
@@ -275,6 +264,10 @@ class FetchPackResult(object):
             self._warn_deprecated()
             return getattr(self.refs, name)
         return super(FetchPackResult, self).__getattribute__(name)
+
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (
+                self.__class__.__name__, self.refs, self.symrefs, self.agent)
 
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
@@ -1110,11 +1103,9 @@ class SubprocessSSHVendor(SSHVendor):
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
-        if password:
+        if password is not None:
             raise NotImplementedError(
-                "You can't set password or passphrase for ssh key "
-                "with SubprocessSSHVendor, use ParamikoSSHVendor instead"
-            )
+                "Setting password not supported by SubprocessSSHVendor.")
 
         args = ['ssh', '-x']
 
@@ -1136,27 +1127,21 @@ class SubprocessSSHVendor(SSHVendor):
         return SubprocessWrapper(proc)
 
 
-class PuttySSHVendor(SSHVendor):
-    """SSH vendor that shells out to the local 'putty' command."""
+class PLinkSSHVendor(SSHVendor):
+    """SSH vendor that shells out to the local 'plink' command."""
 
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
-        if password and key_filename:
-            raise NotImplementedError(
-                "You can't set passphrase for ssh key "
-                "with PuttySSHVendor, use ParamikoSSHVendor instead"
-            )
-
         if sys.platform == 'win32':
-            args = ['putty.exe', '-ssh']
+            args = ['plink.exe', '-ssh']
         else:
-            args = ['putty', '-ssh']
+            args = ['plink', '-ssh']
 
-        if password:
+        if password is not None:
             import warnings
             warnings.warn(
-                "Invoking Putty with a password exposes the password in the "
+                "Invoking PLink with a password exposes the password in the "
                 "process list.")
             args.extend(['-pw', str(password)])
 
@@ -1236,9 +1221,14 @@ class SSHGitClient(TraditionalGitClient):
             path = path[1:]
         argv = (self._get_cmd_path(cmd).decode(self._remote_path_encoding) +
                 " '" + path + "'")
+        kwargs = {}
+        if self.password is not None:
+            kwargs['password'] = self.password
+        if self.key_filename is not None:
+            kwargs['key_filename'] = self.key_filename
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username,
-            password=self.password, key_filename=self.key_filename)
+            **kwargs)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
                 con.can_read)
@@ -1250,17 +1240,18 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(config, verify_ssl=True):
+def default_urllib3_manager(config, **override_kwargs):
     """Return `urllib3` connection pool manager.
 
     Honour detected proxy configurations.
 
     :param config: `dulwich.config.ConfigDict` instance with Git configuration.
-    :param verify_ssl: Whether SSL verification is enabled.
+    :param kwargs: Additional arguments for urllib3.ProxyManager
     :return: `urllib3.ProxyManager` instance for proxy configurations,
         `urllib3.PoolManager` otherwise.
     """
     proxy_server = user_agent = None
+    ca_certs = ssl_verify = None
 
     if config is not None:
         try:
@@ -1272,14 +1263,45 @@ def default_urllib3_manager(config, verify_ssl=True):
         except KeyError:
             pass
 
-    ssl_kwargs = {}
-    if verify_ssl:
-        ssl_kwargs.update(cert_reqs="CERT_REQUIRED", ca_certs=certifi.where())
+        # TODO(jelmer): Support per-host settings
+        try:
+            ssl_verify = config.get_boolean(b"http", b"sslVerify")
+        except KeyError:
+            ssl_verify = True
+
+        try:
+            ca_certs = config.get_boolean(b"http", b"sslCAInfo")
+        except KeyError:
+            ca_certs = None
 
     if user_agent is None:
         user_agent = default_user_agent_string()
 
     headers = {"User-agent": user_agent}
+
+    kwargs = {}
+    if ssl_verify is True:
+        kwargs['cert_reqs'] = "CERT_REQUIRED"
+    elif ssl_verify is False:
+        kwargs['cert_reqs'] = 'CERT_NONE'
+    else:
+        # Default to SSL verification
+        kwargs['cert_reqs'] = "CERT_REQUIRED"
+
+    if ca_certs is not None:
+        kwargs['ca_certs'] = ca_certs
+    kwargs.update(override_kwargs)
+
+    # Try really hard to find a SSL certificate path
+    if 'ca_certs' not in kwargs and kwargs.get('cert_reqs') != 'CERT_NONE':
+        try:
+            import certifi
+        except ImportError:
+            pass
+        else:
+            kwargs['ca_certs'] = certifi.where()
+
+    import urllib3
 
     if proxy_server is not None:
         # `urllib3` requires a `str` object in both Python 2 and 3, while
@@ -1287,9 +1309,9 @@ def default_urllib3_manager(config, verify_ssl=True):
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
         manager = urllib3.ProxyManager(proxy_server, headers=headers,
-                                       **ssl_kwargs)
+                                       **kwargs)
     else:
-        manager = urllib3.PoolManager(headers=headers, **ssl_kwargs)
+        manager = urllib3.PoolManager(headers=headers, **kwargs)
 
     return manager
 
@@ -1313,6 +1335,7 @@ class HttpGitClient(GitClient):
             # No escaping needed: ":" is not allowed in username:
             # https://tools.ietf.org/html/rfc2617#section-2
             credentials = "%s:%s" % (username, password)
+            import urllib3.util
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)
             self.pool_manager.headers.update(basic_auth)
 
@@ -1400,7 +1423,7 @@ class HttpGitClient(GitClient):
         assert base_url[-1] == "/"
         tail = "info/refs"
         headers = {"Accept": "*/*"}
-        if self.dumb is not False:
+        if self.dumb is not True:
             tail += "?service=%s" % service.decode('ascii')
         url = urlparse.urljoin(base_url, tail)
         resp, read = self._http_request(url, headers, allow_compression=True)
@@ -1575,6 +1598,25 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
     raise ValueError("unknown scheme '%s'" % parsed.scheme)
 
 
+def parse_rsync_url(location):
+    """Parse a rsync-style URL."""
+    if ':' in location and '@' not in location:
+        # SSH with no user@, zero or one leading slash.
+        (host, path) = location.split(':', 1)
+        user = None
+    elif ':' in location:
+        # SSH with user@host:foo.
+        user_host, path = location.split(':', 1)
+        if '@' in user_host:
+            user, host = user_host.rsplit('@', 1)
+        else:
+            user = None
+            host = user_host
+    else:
+        raise ValueError('not a valid rsync-style URL')
+    return (user, host, path)
+
+
 def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
@@ -1596,19 +1638,10 @@ def get_transport_and_path(location, **kwargs):
         # Windows local path
         return default_local_git_client_cls(**kwargs), location
 
-    if ':' in location and '@' not in location:
-        # SSH with no user@, zero or one leading slash.
-        (hostname, path) = location.split(':', 1)
-        return SSHGitClient(hostname, **kwargs), path
-    elif ':' in location:
-        # SSH with user@host:foo.
-        user_host, path = location.split(':', 1)
-        if '@' in user_host:
-            user, host = user_host.rsplit('@', 1)
-        else:
-            user = None
-            host = user_host
-        return SSHGitClient(host, username=user, **kwargs), path
-
-    # Otherwise, assume it's a local path.
-    return default_local_git_client_cls(**kwargs), location
+    try:
+        (username, hostname, path) = parse_rsync_url(location)
+    except ValueError:
+        # Otherwise, assume it's a local path.
+        return default_local_git_client_cls(**kwargs), location
+    else:
+        return SSHGitClient(hostname, username=username, **kwargs), path

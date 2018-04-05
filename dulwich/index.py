@@ -267,11 +267,16 @@ class Index(object):
         """Return the POSIX file mode for the object at a path."""
         return self[path].mode
 
-    def iterblobs(self):
+    def iterobjects(self):
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
             yield path, entry.sha, cleanup_mode(entry.mode)
+
+    def iterblobs(self):
+        import warnings
+        warnings.warn(PendingDeprecationWarning, 'Use iterobjects() instead.')
+        return self.iterblobs()
 
     def clear(self):
         """Remove all contents from this index."""
@@ -317,7 +322,7 @@ class Index(object):
         :param object_store: Object store to save the tree in
         :return: Root tree SHA
         """
-        return commit_tree(object_store, self.iterblobs())
+        return commit_tree(object_store, self.iterobjects())
 
 
 def commit_tree(object_store, blobs):
@@ -368,7 +373,7 @@ def commit_index(object_store, index):
     :note: This function is deprecated, use index.commit() instead.
     :return: Root tree sha.
     """
-    return commit_tree(object_store, index.iterblobs())
+    return commit_tree(object_store, index.iterobjects())
 
 
 def changes_from_tree(names, lookup_entry, object_store, tree,
@@ -418,7 +423,9 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
     """
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
-    return (stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
+
+    return IndexEntry(
+            stat_val.st_ctime, stat_val.st_mtime, stat_val.st_dev,
             stat_val.st_ino, mode, stat_val.st_uid,
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
@@ -572,6 +579,24 @@ def blob_from_path_and_stat(fs_path, st):
     return blob
 
 
+def read_submodule_head(path):
+    """Read the head commit of a submodule.
+
+    :param path: path to the submodule
+    :return: HEAD sha, None if not a valid head/repository
+    """
+    from dulwich.errors import NotGitRepository
+    from dulwich.repo import Repo
+    try:
+        repo = Repo(path)
+    except NotGitRepository:
+        return None
+    try:
+        return repo.head()
+    except KeyError:
+        return None
+
+
 def get_unstaged_changes(index, root_path):
     """Walk through an index and check for differences against working tree.
 
@@ -599,12 +624,8 @@ def get_unstaged_changes(index, root_path):
             # This is actually a directory
             if os.path.exists(os.path.join(tree_path, '.git')):
                 # Submodule
-                from dulwich.errors import NotGitRepository
-                from dulwich.repo import Repo
-                try:
-                    if entry.sha != Repo(tree_path).head():
-                        yield tree_path
-                except NotGitRepository:
+                head = read_submodule_head(tree_path)
+                if entry.sha != head:
                     yield tree_path
             else:
                 # The file was changed to a directory, so consider it removed.
@@ -654,42 +675,100 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
     return tree_path
 
 
-def iter_fresh_entries(index, root_path):
-    """Iterate over current versions of index entries on disk.
+def index_entry_from_path(path, object_store=None):
+    """Create an index from a filesystem path.
 
-    :param index: Index file
-    :param root_path: Root path to access from
-    :return: Iterator over path, index_entry
+    This returns an index value for files, symlinks
+    and tree references. for directories and
+    non-existant files it returns None
+
+    :param path: Path to create an index entry for
+    :param object_store: Optional object store to
+        save new blobs in
+    :return: An index entry
     """
-    for path in set(index):
-        p = _tree_to_fs_path(root_path, path)
-        try:
-            st = os.lstat(p)
-            blob = blob_from_path_and_stat(p, st)
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                del index[path]
-            else:
-                raise
-        except IOError as e:
-            if e.errno == errno.EISDIR:
-                del index[path]
+    try:
+        st = os.lstat(path)
+        blob = blob_from_path_and_stat(path, st)
+    except EnvironmentError as e:
+        if e.errno == errno.EISDIR:
+            if os.path.exists(os.path.join(path, '.git')):
+                head = read_submodule_head(path)
+                if head is None:
+                    return None
+                return index_entry_from_stat(
+                    st, head, 0, mode=S_IFGITLINK)
             else:
                 raise
         else:
-            yield path, index_entry_from_stat(st, blob.id, 0)
+            raise
+    else:
+        if object_store is not None:
+            object_store.add_object(blob)
+        return index_entry_from_stat(st, blob.id, 0)
+
+
+def iter_fresh_entries(paths, root_path, object_store=None):
+    """Iterate over current versions of index entries on disk.
+
+    :param paths: Paths to iterate over
+    :param root_path: Root path to access from
+    :param store: Optional store to save new blobs in
+    :return: Iterator over path, index_entry
+    """
+    for path in paths:
+        p = _tree_to_fs_path(root_path, path)
+        try:
+            entry = index_entry_from_path(p, object_store=object_store)
+        except EnvironmentError as e:
+            if e.errno in (errno.ENOENT, errno.EISDIR):
+                entry = None
+            else:
+                raise
+        yield path, entry
 
 
 def iter_fresh_blobs(index, root_path):
     """Iterate over versions of blobs on disk referenced by index.
 
+    Don't use this function; it removes missing entries from index.
+
     :param index: Index file
     :param root_path: Root path to access from
+    :param include_deleted: Include deleted entries with sha and
+        mode set to None
     :return: Iterator over path, sha, mode
     """
-    for path, entry in iter_fresh_entries(index, root_path):
-        entry = IndexEntry(*entry)
-        yield path, entry.sha, cleanup_mode(entry.mode)
+    import warnings
+    warnings.warn(PendingDeprecationWarning,
+                  "Use iter_fresh_objects instead.")
+    for entry in iter_fresh_objects(
+            index, root_path, include_deleted=True):
+        if entry[1] is None:
+            del index[entry[0]]
+        else:
+            yield entry
+
+
+def iter_fresh_objects(paths, root_path, include_deleted=False,
+                       object_store=None):
+    """Iterate over versions of objecs on disk referenced by index.
+
+    :param index: Index file
+    :param root_path: Root path to access from
+    :param include_deleted: Include deleted entries with sha and
+        mode set to None
+    :param object_store: Optional object store to report new items to
+    :return: Iterator over path, sha, mode
+    """
+    for path, entry in iter_fresh_entries(paths, root_path,
+                                          object_store=object_store):
+        if entry is None:
+            if include_deleted:
+                yield path, None, None
+        else:
+            entry = IndexEntry(*entry)
+            yield path, entry.sha, cleanup_mode(entry.mode)
 
 
 def refresh_index(index, root_path):

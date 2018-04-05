@@ -1221,9 +1221,14 @@ class SSHGitClient(TraditionalGitClient):
             path = path[1:]
         argv = (self._get_cmd_path(cmd).decode(self._remote_path_encoding) +
                 " '" + path + "'")
+        kwargs = {}
+        if self.password is not None:
+            kwargs['password'] = self.password
+        if self.key_filename is not None:
+            kwargs['key_filename'] = self.key_filename
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username,
-            password=self.password, key_filename=self.key_filename)
+            **kwargs)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
                 con.can_read)

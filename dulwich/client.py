@@ -1103,11 +1103,9 @@ class SubprocessSSHVendor(SSHVendor):
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
 
-        if password:
+        if password is not None:
             raise NotImplementedError(
-                "You can't set password or passphrase for ssh key "
-                "with SubprocessSSHVendor, use ParamikoSSHVendor instead"
-            )
+                "Setting password not supported by SubprocessSSHVendor.")
 
         args = ['ssh', '-x']
 
@@ -1131,21 +1129,16 @@ class SubprocessSSHVendor(SSHVendor):
 
 class PLinkSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'plink' command."""
+
     def run_command(self, host, command, username=None, port=None,
                     password=None, key_filename=None):
-
-        if password and key_filename:
-            raise NotImplementedError(
-                "You can't set passphrase for ssh key "
-                "with PLinkSSHVendor, use ParamikoSSHVendor instead"
-            )
 
         if sys.platform == 'win32':
             args = ['plink.exe', '-ssh']
         else:
             args = ['plink', '-ssh']
 
-        if password:
+        if password is not None:
             import warnings
             warnings.warn(
                 "Invoking PLink with a password exposes the password in the "

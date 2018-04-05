@@ -14,7 +14,7 @@ from distutils.core import Distribution
 import os
 import sys
 
-dulwich_version_string = '0.19.0'
+dulwich_version_string = '0.19.1'
 
 include_dirs = []
 # Windows MSVC support
@@ -74,8 +74,11 @@ ext_modules = [
 setup_kwargs = {}
 
 if has_setuptools:
-    setup_kwargs['extras_require'] = {'fastimport': ['fastimport']}
-    setup_kwargs['install_requires'] = ['urllib3[secure]>=1.21']
+    setup_kwargs['extras_require'] = {
+        'fastimport': ['fastimport'],
+        'https': ['urllib3[secure]>=1.21'],
+        }
+    setup_kwargs['install_requires'] = ['urllib3>=1.21', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require

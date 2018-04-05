@@ -1273,3 +1273,22 @@ class UpdateHeadTests(PorcelainTestCase):
         self.assertEqual(c1.id, self.repo.head())
         self.assertEqual(b'ref: refs/heads/bar',
                          self.repo.refs.read_ref(b'HEAD'))
+
+
+class MailmapTests(PorcelainTestCase):
+
+    def test_no_mailmap(self):
+        self.assertEqual(
+            b'Jelmer Vernooij <jelmer@samba.org>',
+            porcelain.check_mailmap(
+                self.repo, b'Jelmer Vernooij <jelmer@samba.org>'))
+
+    def test_mailmap_lookup(self):
+        with open(os.path.join(self.repo.path, '.mailmap'), 'wb') as f:
+            f.write(b"""\
+Jelmer Vernooij <jelmer@debian.org>
+""")
+        self.assertEqual(
+            b'Jelmer Vernooij <jelmer@debian.org>',
+            porcelain.check_mailmap(
+                self.repo, b'Jelmer Vernooij <jelmer@samba.org>'))

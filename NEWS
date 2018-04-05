@@ -21,6 +21,11 @@
   * New 'client.PLinkSSHVendor' for creating connections using PuTTY's plink.exe.
     (Adam Bradley, Filipp Frizzy)
 
+  * Only pass in `key_filename` and `password` to SSHVendor
+    implementations if those parameters are set.
+    (This helps with older SSHVendor implementations)
+    (Jelmer Vernooĳ)
+
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.

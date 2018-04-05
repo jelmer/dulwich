@@ -1,55 +1,31 @@
-diff --git a/dulwich/client.py b/dulwich/client.py
-index b5f5f804..0db532d0 100644
---- a/dulwich/client.py
-+++ b/dulwich/client.py
-@@ -60,10 +60,6 @@ except ImportError:
-     import urllib.request as urllib2
-     import urllib.parse as urlparse
+diff --git a/dulwich/tests/compat/test_client.py b/dulwich/tests/compat/test_client.py
+index f7c3930e..39e6d97c 100644
+--- a/dulwich/tests/compat/test_client.py
++++ b/dulwich/tests/compat/test_client.py
+@@ -531,6 +531,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
+     min_git_version = (1, 7, 0, 2)
  
--import certifi
--import urllib3
--import urllib3.util
--
- import dulwich
- from dulwich.errors import (
-     GitProtocolError,
-@@ -1260,6 +1256,8 @@ def default_urllib3_manager(config, verify_ssl=True):
-     :return: `urllib3.ProxyManager` instance for proxy configurations,
-         `urllib3.PoolManager` otherwise.
-     """
-+    import urllib3
-+    import certifi
-     proxy_server = user_agent = None
- 
-     if config is not None:
-@@ -1298,6 +1296,7 @@ class HttpGitClient(GitClient):
- 
-     def __init__(self, base_url, dumb=None, pool_manager=None, config=None,
-                  username=None, password=None, **kwargs):
-+        import urllib3.util
-         self._base_url = base_url.rstrip("/") + "/"
-         self._username = username
-         self._password = password
+     def setUp(self):
++        if '__pypy__' in sys.modules:
++            self.skipTest('urllib3 not available for pypy in debian')
+         CompatTestCase.setUp(self)
+         DulwichClientTestBase.setUp(self)
+         self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
 diff --git a/dulwich/tests/test_client.py b/dulwich/tests/test_client.py
-index eb1ccbea..881fabf5 100644
+index 7d2c464b..01030f70 100644
 --- a/dulwich/tests/test_client.py
 +++ b/dulwich/tests/test_client.py
-@@ -35,8 +35,12 @@ try:
+@@ -35,7 +35,8 @@ try:
  except ImportError:
      import urllib.parse as urlparse
  
--import certifi
 -import urllib3
 +if '__pypy__' not in sys.modules:
-+    import certifi
 +    import urllib3
-+else:
-+    urllib3 = None
-+    certifi = None
  
  import dulwich
  from dulwich import (
-@@ -534,12 +538,20 @@ class TestGetTransportAndPath(TestCase):
+@@ -534,12 +535,20 @@ class TestGetTransportAndPath(TestCase):
          self.assertTrue(isinstance(c, SSHGitClient))
  
      def test_http(self):
@@ -70,7 +46,7 @@ index eb1ccbea..881fabf5 100644
          url = 'https://user:passwd@github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(url)
-@@ -550,6 +562,10 @@ class TestGetTransportAndPath(TestCase):
+@@ -550,6 +559,10 @@ class TestGetTransportAndPath(TestCase):
          self.assertEqual('passwd', c._password)
  
      def test_http_no_auth(self):
@@ -81,7 +57,7 @@ index eb1ccbea..881fabf5 100644
          url = 'https://github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(url)
-@@ -632,6 +648,9 @@ class TestGetTransportAndPathFromUrl(TestCase):
+@@ -632,6 +645,9 @@ class TestGetTransportAndPathFromUrl(TestCase):
              'prospero://bar/baz')
  
      def test_http(self):
@@ -91,7 +67,7 @@ index eb1ccbea..881fabf5 100644
          url = 'https://github.com/jelmer/dulwich'
          c, path = get_transport_and_path_from_url(url)
          self.assertTrue(isinstance(c, HttpGitClient))
-@@ -863,6 +882,11 @@ class LocalGitClientTests(TestCase):
+@@ -863,6 +879,11 @@ class LocalGitClientTests(TestCase):
  
  class HttpGitClientTests(TestCase):
  
@@ -103,7 +79,7 @@ index eb1ccbea..881fabf5 100644
      @staticmethod
      def b64encode(s):
          """Python 2/3 compatible Base64 encoder. Returns string."""
-@@ -961,6 +985,11 @@ class TCPGitClientTests(TestCase):
+@@ -961,12 +982,18 @@ class TCPGitClientTests(TestCase):
  
  class DefaultUrllib3ManagerTest(TestCase):
  
@@ -112,27 +88,13 @@ index eb1ccbea..881fabf5 100644
 +        if '__pypy__' in sys.modules:
 +            self.skipTest('urllib3 not available for pypy in debian')
 +
-     def assert_verify_ssl(self, manager, assertion=True):
-         pool_keywords = tuple(manager.connection_pool_kw.items())
-         assert_method = self.assertIn if assertion else self.assertNotIn
-@@ -972,6 +1001,7 @@ class DefaultUrllib3ManagerTest(TestCase):
-         self.assert_verify_ssl(manager)
+     def test_no_config(self):
+         manager = default_urllib3_manager(config=None)
+         self.assertEqual(manager.connection_pool_kw['cert_reqs'],
+                          'CERT_REQUIRED')
  
      def test_config_no_proxy(self):
 +
          manager = default_urllib3_manager(config=ConfigDict())
-         self.assert_verify_ssl(manager)
+         self.assertNotIsInstance(manager, urllib3.ProxyManager)
  
-diff --git a/dulwich/tests/compat/test_client.py b/dulwich/tests/compat/test_client.py
-index d60be1a3..faafdbfe 100644
---- a/dulwich/tests/compat/test_client.py
-+++ b/dulwich/tests/compat/test_client.py
-@@ -519,6 +519,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
-     min_git_version = (1, 7, 0, 2)
- 
-     def setUp(self):
-+        if '__pypy__' in sys.modules:
-+            self.skipTest('urllib3 not available for pypy in debian')
-         CompatTestCase.setUp(self)
-         DulwichClientTestBase.setUp(self)
-         self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)

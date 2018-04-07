@@ -275,8 +275,8 @@ class Index(object):
 
     def iterblobs(self):
         import warnings
-        warnings.warn(PendingDeprecationWarning, 'Use iterobjects() instead.')
-        return self.iterblobs()
+        warnings.warn('Use iterobjects() instead.', PendingDeprecationWarning)
+        return self.iterobjects()
 
     def clear(self):
         """Remove all contents from this index."""

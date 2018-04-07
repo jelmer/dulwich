@@ -887,6 +887,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertCheckFails(t, b'100644 .\0' + sha)
         self.assertCheckFails(t, b'100644 a/a\0' + sha)
         self.assertCheckFails(t, b'100644 ..\0' + sha)
+        self.assertCheckFails(t, b'100644 .git\0' + sha)
 
         # modes
         self.assertCheckSucceeds(t, b'100644 a\0' + sha)

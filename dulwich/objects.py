@@ -1014,7 +1014,7 @@ class Tree(ShaFile):
         for name, mode, sha in parse_tree(b''.join(self._chunked_text),
                                           True):
             check_hexsha(sha, 'invalid sha %s' % sha)
-            if b'/' in name or name in (b'', b'.', b'..'):
+            if b'/' in name or name in (b'', b'.', b'..', b'.git'):
                 raise ObjectFormatException('invalid name %s' % name)
 
             if mode not in allowed_modes:

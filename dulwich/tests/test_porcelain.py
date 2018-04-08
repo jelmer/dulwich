@@ -1304,7 +1304,7 @@ class FsckTests(PorcelainTestCase):
     def test_git_dir(self):
         obj = Tree()
         a = Blob()
-        a.data = "foo"
+        a.data = b"foo"
         obj.add(b".git", 0o100644, a.id)
         self.repo.object_store.add_objects(
             [(a, None), (obj, None)])

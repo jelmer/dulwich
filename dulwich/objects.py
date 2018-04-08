@@ -1015,7 +1015,9 @@ class Tree(ShaFile):
                                           True):
             check_hexsha(sha, 'invalid sha %s' % sha)
             if b'/' in name or name in (b'', b'.', b'..', b'.git'):
-                raise ObjectFormatException('invalid name %s' % name)
+                raise ObjectFormatException(
+                        'invalid name %s' %
+                        name.decode('utf-8', 'replace'))
 
             if mode not in allowed_modes:
                 raise ObjectFormatException('invalid mode %06o' % mode)

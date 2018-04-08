@@ -112,6 +112,15 @@ class cmd_fetch(Command):
             print("%s -> %s" % item)
 
 
+class cmd_fsck(Command):
+
+    def run(self, args):
+        opts, args = getopt(args, "", [])
+        opts = dict(opts)
+        for (obj, msg) in porcelain.fsck('.'):
+            print("%s: %s" % (obj, msg))
+
+
 class cmd_log(Command):
 
     def run(self, args):
@@ -584,6 +593,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "fsck": cmd_fsck,
     "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,

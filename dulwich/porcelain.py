@@ -1239,3 +1239,21 @@ def check_mailmap(repo, contact):
                 raise
             mailmap = Mailmap()
         return mailmap.lookup(contact)
+
+
+def fsck(repo):
+    """Check a repository.
+
+    :param repo: A path to the repository
+    :return: Iterator over errors/warnings
+    """
+    with open_repo_closing(repo) as r:
+        # TODO(jelmer): check pack files
+        # TODO(jelmer): check graph
+        # TODO(jelmer): check refs
+        for sha in r.object_store:
+            o = r.object_store[sha]
+            try:
+                o.check()
+            except Exception as e:
+                yield (sha, e)

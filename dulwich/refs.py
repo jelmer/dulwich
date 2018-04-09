@@ -487,9 +487,10 @@ class DiskRefsContainer(RefsContainer):
         subkeys = set()
         path = self.refpath(base).encode(sys.getfilesystemencoding())
         for root, unused_dirs, files in os.walk(path):
-            dir = root[len(path):].strip(b'/')
+            dir = root[len(path):]
             if os.path.sep != '/':
                 dir = dir.replace(os.path.sep, "/")
+            dir = dir.strip(b'/')
             for filename in files:
                 refname = b"/".join(([dir] if dir else []) + [filename])
                 # check_ref_format requires at least one /, so we prepend the

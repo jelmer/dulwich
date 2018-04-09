@@ -134,6 +134,7 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, errstream=errstream)
+        self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
         self.assertEqual(0, len(target_repo.open_index()))

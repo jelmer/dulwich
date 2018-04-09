@@ -715,7 +715,17 @@ class DiskObjectStore(PackBasedObjectStore):
             pass
         else:
             os.unlink(path)
-        os.rename(path, basename + ".pack")
+        try:
+            os.rename(path, basename + ".pack")
+        except OSError as e:
+            if e.errno == 183:
+                # File already exists, on Windows.
+                # It's safe to ignore this, since if the file already exists,
+                # it should have the same contents as the one we just
+                # generated.
+                os.unlink(path)
+            else:
+                raise
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
         return final_pack

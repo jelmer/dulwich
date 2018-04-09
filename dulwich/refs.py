@@ -485,12 +485,13 @@ class DiskRefsContainer(RefsContainer):
 
     def subkeys(self, base):
         subkeys = set()
-        path = self.refpath(base)
-        for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        path = self.refpath(base).encode(sys.getfilesystemencoding())
+        for root, unused_dirs, files in os.walk(path):
+            dir = root[len(path):].strip(b'/')
+            if os.path.sep != '/':
+                dir = dir.replace(os.path.sep, "/")
             for filename in files:
-                refname = (("%s/%s" % (dir, filename))
-                           .strip("/").encode(sys.getfilesystemencoding()))
+                refname = b"/".join(([dir] if dir else []) + [filename])
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format(base + b'/' + refname):
@@ -505,12 +506,13 @@ class DiskRefsContainer(RefsContainer):
         if os.path.exists(self.refpath(b'HEAD')):
             allkeys.add(b'HEAD')
         path = self.refpath(b'')
-        for root, dirs, files in os.walk(self.refpath(b'refs')):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        refspath = self.refpath('refs').encode(sys.getfilesystemencoding())
+        for root, unused_dirs, files in os.walk(refspath):
+            dir = root[len(path):]
+            if os.path.sep != '/':
+                dir = dir.strip(os.path.sep).replace(os.path.sep, "/")
             for filename in files:
-                refname = (
-                    "%s/%s" % (dir, filename)).encode(
-                            sys.getfilesystemencoding())
+                refname = b"/".join([dir, filename])
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())

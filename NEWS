@@ -5,6 +5,11 @@
   * Add really basic `dulwich.porcelain.fsck` implementation.
     (Jelmer Vernooĳ)
 
+
+ BUG FIXES
+
+  * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)
+
 0.19.2	2018-04-07
 
  BUG FIXES

@@ -485,6 +485,24 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         self.assertEqual(expected_refs, self._repo.get_refs())
 
+    def test_cyrillic(self):
+        # reported in https://github.com/dulwich/dulwich/issues/608
+        name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
+        encoded_ref = b'refs/heads/' + name
+        with open(os.path.join(
+            self._repo.path.encode(
+                sys.getfilesystemencoding()), encoded_ref), 'w') as f:
+            f.write('00' * 20)
+
+        expected_refs = set(_TEST_REFS.keys())
+        expected_refs.add(encoded_ref)
+
+        self.assertEqual(expected_refs,
+                         set(self._repo.refs.allkeys()))
+        self.assertEqual({r[len(b'refs/'):] for r in expected_refs
+                          if r.startswith(b'refs/')},
+                         set(self._repo.refs.subkeys(b'refs/')))
+
 
 _TEST_REFS_SERIALIZED = (
     b'42d06bd4b77fed026b154d16493e5deab78f02ec\t'

@@ -718,8 +718,8 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             os.rename(path, basename + ".pack")
         except OSError as e:
-            if e.errno == 183:
-                # File already exists, on Windows.
+            if e.errno == errno.EEXIST:
+                # This can happen on Windows..
                 # It's safe to ignore this, since if the file already exists,
                 # it should have the same contents as the one we just
                 # generated.

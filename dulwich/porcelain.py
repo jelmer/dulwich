@@ -377,7 +377,7 @@ def add(repo=".", paths=None):
             paths = [paths]
         for p in paths:
             relpath = os.path.relpath(p, r.path)
-            if relpath.startswith('../'):
+            if relpath.startswith('..' + os.path.sep):
                 raise ValueError('path %r is not in repo' % relpath)
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):

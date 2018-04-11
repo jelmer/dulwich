@@ -5,6 +5,8 @@
   * Add really basic `dulwich.porcelain.fsck` implementation.
     (Jelmer Vernooĳ)
 
+  * When the `DULWICH_PDB` environment variable is set, make
+    SIGQUIT open pdb in the 'dulwich' command.
 
  BUG FIXES
 

@@ -37,6 +37,13 @@ import signal
 def signal_int(signal, frame):
     sys.exit(1)
 
+
+def signal_quit(signal, frame):
+    import pdb
+    pdb.set_trace()
+
+if 'DULWICH_PDB' in os.environ:
+    signal.signal(signal.SIGQUIT, signal_quit)
 signal.signal(signal.SIGINT, signal_int)
 
 from dulwich import porcelain

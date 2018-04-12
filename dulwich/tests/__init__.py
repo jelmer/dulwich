@@ -134,6 +134,13 @@ def self_test_suite():
 
 
 def tutorial_test_suite():
+    import dulwich.client
+    import dulwich.config
+    import dulwich.index
+    import dulwich.reflog
+    import dulwich.repo
+    import dulwich.server
+    import dulwich.patch
     tutorial = [
         'introduction',
         'file-format',
@@ -146,13 +153,15 @@ def tutorial_test_suite():
 
     def setup(test):
         test.__old_cwd = os.getcwd()
-        test.__dulwich_tempdir = tempfile.mkdtemp()
-        os.chdir(test.__dulwich_tempdir)
+        test.tempdir = tempfile.mkdtemp()
+        test.globs.update({'tempdir': test.tempdir})
+        os.chdir(test.tempdir)
 
     def teardown(test):
         os.chdir(test.__old_cwd)
-        shutil.rmtree(test.__dulwich_tempdir)
+        shutil.rmtree(test.tempdir)
     return doctest.DocFileSuite(
+            module_relative=True, package='dulwich.tests',
             setUp=setup, tearDown=teardown, *tutorial_files)
 
 

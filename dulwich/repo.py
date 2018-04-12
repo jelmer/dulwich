@@ -974,7 +974,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-              origin=b"origin"):
+              origin=b"origin", checkout=None):
         """Clone this repository.
 
         :param target_path: Target path
@@ -987,6 +987,8 @@ class Repo(BaseRepo):
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
         else:
+            if checkout:
+                raise ValueError("checkout and bare are incompatible")
             target = self.init_bare(target_path, mkdir=mkdir)
         self.fetch(target)
         encoded_path = self.path
@@ -1018,7 +1020,9 @@ class Repo(BaseRepo):
                                          message=ref_message)
             target[b'HEAD'] = head_sha
 
-            if not bare:
+            if checkout is None:
+                checkout = (not bare)
+            if checkout:
                 # Checkout HEAD to target dir
                 target.reset_index()
 

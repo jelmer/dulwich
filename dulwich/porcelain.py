@@ -292,6 +292,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param origin: Name of remote from the repository used to clone
     :return: The new repository
     """
+    # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
         import warnings
         warnings.warn(

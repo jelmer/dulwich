@@ -118,7 +118,10 @@ class _GitFile(object):
 
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
-        self._lockfilename = '%s.lock' % self._filename
+        if isinstance(self._filename, bytes):
+            self._lockfilename = self._filename + b'.lock'
+        else:
+            self._lockfilename = self._filename + '.lock'
         try:
             fd = os.open(
                 self._lockfilename,

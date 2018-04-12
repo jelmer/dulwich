@@ -1617,19 +1617,24 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     return write_pack_data(f, pack_contents_count, pack_contents)
 
 
-def write_pack_data(f, num_records, records):
+def write_pack_data(f, num_records, records, progress=None):
     """Write a new pack data file.
 
     :param f: File to write to
     :param num_records: Number of records
     :param records: Iterator over type_num, object_id, delta_base, raw
+    :param progress: Function to report progress to
     :return: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     # Write the pack
     entries = {}
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
-    for type_num, object_id, delta_base, raw in records:
+    for i, (type_num, object_id, delta_base, raw) in enumerate(records):
+        if progress is not None:
+            progress((
+                'writing pack data: %d/%d\r' %
+                (i, num_records)).encode('ascii'))
         offset = f.offset()
         if delta_base is not None:
             try:

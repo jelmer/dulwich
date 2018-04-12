@@ -325,6 +325,20 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         r.clone(tmp_dir, mkdir=False, bare=True)
 
+    def test_clone_bare(self):
+        r = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = r.clone(tmp_dir, mkdir=False)
+        t.close()
+
+    def test_clone_checkout_and_bare(self):
+        r = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        self.assertRaises(ValueError, r.clone, tmp_dir, mkdir=False,
+                          checkout=True, bare=True)
+
     def test_merge_history(self):
         r = self.open_repo('simple_merge.git')
         shas = [e.commit.id for e in r.get_walker()]

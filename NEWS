@@ -8,6 +8,9 @@
   * When the `DULWICH_PDB` environment variable is set, make
     SIGQUIT open pdb in the 'dulwich' command.
 
+  * Add `checkout` argument to `Repo.clone`.
+    (Jelmer Vernooĳ, #503)
+
  BUG FIXES
 
   * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)

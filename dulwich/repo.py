@@ -62,6 +62,9 @@ from dulwich.objects import (
     Tag,
     Tree,
     )
+from dulwich.pack import (
+    pack_objects_to_data,
+    )
 
 from dulwich.hooks import (
     PreCommitShellHook,
@@ -267,10 +270,30 @@ class BaseRepo(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
-        target.object_store.add_objects(
-            self.fetch_objects(determine_wants, target.get_graph_walker(),
-                               progress), progress=progress)
+        count, pack_data = self.fetch_pack_data(
+                determine_wants, target.get_graph_walker(), progress)
+        target.object_store.add_pack_data(count, pack_data, progress)
         return self.get_refs()
+
+    def fetch_pack_data(self, determine_wants, graph_walker, progress,
+                        get_tagged=None):
+        """Fetch the pack data required for a set of revisions.
+
+        :param determine_wants: Function that takes a dictionary with heads
+            and returns the list of heads to fetch.
+        :param graph_walker: Object that can iterate over the list of revisions
+            to fetch and has an "ack" method that will be called to acknowledge
+            that a revision is present.
+        :param progress: Simple progress function that will be called with
+            updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+        :return: count and iterator over pack data
+        """
+        # TODO(jelmer): Fetch pack data directly, don't create objects first.
+        objects = self.fetch_objects(determine_wants, graph_walker, progress,
+                                     get_tagged)
+        return pack_objects_to_data(objects)
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):

@@ -502,6 +502,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual({r[len(b'refs/'):] for r in expected_refs
                           if r.startswith(b'refs/')},
                          set(self._repo.refs.subkeys(b'refs/')))
+        expected_refs.remove(b'refs/heads/loop')
+        expected_refs.add(b'HEAD')
+        self.assertEqual(expected_refs,
+                         set(self._repo.get_refs().keys()))
 
 
 _TEST_REFS_SERIALIZED = (

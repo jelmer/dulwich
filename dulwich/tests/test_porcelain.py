@@ -1251,7 +1251,7 @@ class UpdateHeadTests(PorcelainTestCase):
         porcelain.update_head(self.repo, "blah")
         self.assertEqual(c1.id, self.repo.head())
         self.assertEqual(b'ref: refs/heads/blah',
-                         self.repo.refs.read_ref('HEAD'))
+                         self.repo.refs.read_ref(b'HEAD'))
 
     def test_set_to_branch_detached(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])

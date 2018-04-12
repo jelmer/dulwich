@@ -53,7 +53,7 @@ so only non-bare repositories will have an index, too. To open the index, simply
 call::
 
     >>> index = repo.open_index()
-    >>> print(index.path.decode(sys.getfilesystemencoding()))
+    >>> print(index.path)
     myrepo/.git/index
 
 Since the repository was just created, the index will be empty::

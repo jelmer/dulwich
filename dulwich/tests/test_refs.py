@@ -417,7 +417,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertRaises(KeyError, lambda: self._refs[b'HEAD'])
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'refs/heads/master'])
-        self.assertFalse(os.path.exists(os.path.join(self._refs.path, b'HEAD')))
+        self.assertFalse(
+            os.path.exists(os.path.join(self._refs.path, b'HEAD')))
 
     def test_remove_if_equals_symref(self):
         # HEAD is a symref, so shouldn't equal its dereferenced value

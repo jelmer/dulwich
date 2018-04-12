@@ -658,7 +658,7 @@ class DiskRefsContainer(RefsContainer):
             self._log(name, sha, sha, committer=committer,
                       timestamp=timestamp, timezone=timezone,
                       message=message)
-        except:
+        except BaseException:
             f.abort()
             raise
         else:

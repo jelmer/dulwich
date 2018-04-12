@@ -475,6 +475,8 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(self, path, worktree_path=None, logger=None):
         super(DiskRefsContainer, self).__init__(logger=logger)
+        if getattr(path, 'encode', None) is not None:
+            path = path.encode(sys.getfilesystemencoding())
         self.path = path
         self.worktree_path = worktree_path or path
         self._packed_refs = None
@@ -525,9 +527,6 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        if (getattr(self.path, "encode", None) and
-                getattr(name, "decode", None)):
-            name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
             name = name.replace("/", os.path.sep)
         # TODO: as the 'HEAD' reference is working tree specific, it

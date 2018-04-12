@@ -129,14 +129,14 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.add_object)
 
-    def add_objects(self, objects):
+    def add_objects(self, objects, progress=None):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of (object, path) tuples
         """
         raise NotImplementedError(self.add_objects)
 
-    def add_pack_data(self, count, pack_data):
+    def add_pack_data(self, count, pack_data, progress=None):
         """Add pack data to this object store.
 
         :param num_items: Number of items to add
@@ -147,7 +147,7 @@ class BaseObjectStore(object):
             return
         f, commit, abort = self.add_pack()
         try:
-            write_pack_data(f, count, pack_data)
+            write_pack_data(f, count, pack_data, progress)
         except BaseException:
             abort()
             raise
@@ -460,14 +460,16 @@ class PackBasedObjectStore(BaseObjectStore):
                 pass
         raise KeyError(hexsha)
 
-    def add_objects(self, objects):
+    def add_objects(self, objects, progress=None):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over (object, path) tuples, should support
             __len__.
         :return: Pack object of the objects written.
         """
-        return self.add_pack_data(*pack_objects_to_data(objects))
+        return self.add_pack_data(
+                *pack_objects_to_data(objects),
+                progress=progress)
 
 
 class DiskObjectStore(PackBasedObjectStore):
@@ -838,7 +840,7 @@ class MemoryObjectStore(BaseObjectStore):
         """
         self._data[obj.id] = obj.copy()
 
-    def add_objects(self, objects):
+    def add_objects(self, objects, progress=None):
         """Add a set of objects to this object store.
 
         :param objects: Iterable over a list of (object, path) tuples
@@ -1272,10 +1274,10 @@ class OverlayObjectStore(BaseObjectStore):
             raise NotImplementedError(self.add_object)
         return self.add_store.add_object(object)
 
-    def add_objects(self, objects):
+    def add_objects(self, objects, progress=None):
         if self.add_store is None:
             raise NotImplementedError(self.add_object)
-        return self.add_store.add_objects(objects)
+        return self.add_store.add_objects(objects, progress)
 
     @property
     def packs(self):

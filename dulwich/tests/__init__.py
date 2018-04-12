@@ -159,9 +159,8 @@ def tutorial_test_suite():
 def nocompat_test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
+    result.addTests(tutorial_test_suite())
     from dulwich.contrib import test_suite as contrib_test_suite
-    if sys.version_info[0] == 2:
-        result.addTests(tutorial_test_suite())
     result.addTests(contrib_test_suite())
     return result
 
@@ -176,7 +175,7 @@ def compat_test_suite():
 def test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
-    if sys.version_info[0] == 2 and sys.platform != 'win32':
+    if sys.platform != 'win32':
         result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
     result.addTests(compat_test_suite())

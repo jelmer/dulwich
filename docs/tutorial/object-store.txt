@@ -169,8 +169,10 @@ The diff between the previous head and the new one can be printed using
 write_tree_diff::
 
   >>> from dulwich.patch import write_tree_diff
-  >>> import sys
-  >>> write_tree_diff(sys.stdout, repo.object_store, commit.tree, tree.id)
+  >>> from io import BytesIO
+  >>> out = BytesIO()
+  >>> write_tree_diff(out, repo.object_store, commit.tree, tree.id)
+  >>> import sys; _ = sys.stdout.write(out.getvalue().decode('ascii'))
   diff --git a/spam b/spam
   index c55063a..16ee268 100644
   --- a/spam

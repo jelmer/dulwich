@@ -5,7 +5,7 @@ Most of the tests in this file require a Dulwich server, so let's start one:
     >>> from dulwich.repo import Repo
     >>> from dulwich.server import DictBackend, TCPGitServer
     >>> import threading
-    >>> repo = Repo.init(b"remote", mkdir=True)
+    >>> repo = Repo.init("remote", mkdir=True)
     >>> cid = repo.do_commit(b"message", committer=b"Jelmer <jelmer@samba.org>")
     >>> backend = DictBackend({b'/': repo})
     >>> dul_server = TCPGitServer(backend, b'localhost', 0)
@@ -32,7 +32,7 @@ Dulwich provides support for accessing remote repositories in
 one manually::
 
    >>> from dulwich.client import TCPGitClient
-   >>> client = TCPGitClient(server_address.encode('ascii'), server_port)
+   >>> client = TCPGitClient(server_address, server_port)
 
 Retrieving raw pack files
 -------------------------
@@ -76,7 +76,7 @@ in which case Dulwich takes care of providing the right graph walker, and
 importing the received pack file into the local repository::
 
    >>> from dulwich.repo import Repo
-   >>> local = Repo.init(b"local", mkdir=True)
+   >>> local = Repo.init("local", mkdir=True)
    >>> remote_refs = client.fetch(b"/", local)
 
 Let's shut down the server now that all tests have been run::

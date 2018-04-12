@@ -12,6 +12,8 @@
 
   * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)
 
+  * Fix tutorial tests on Python 3. (Jelmer Vernooĳ, #573)
+
 0.19.2	2018-04-07
 
  BUG FIXES

@@ -478,7 +478,11 @@ class DiskRefsContainer(RefsContainer):
         if getattr(path, 'encode', None) is not None:
             path = path.encode(sys.getfilesystemencoding())
         self.path = path
-        self.worktree_path = worktree_path or path
+        if worktree_path is None:
+            worktree_path = path
+        if getattr(worktree_path, 'encode', None) is not None:
+            worktree_path = worktree_path.encode(sys.getfilesystemencoding())
+        self.worktree_path = worktree_path
         self._packed_refs = None
         self._peeled_refs = None
 
@@ -487,7 +491,7 @@ class DiskRefsContainer(RefsContainer):
 
     def subkeys(self, base):
         subkeys = set()
-        path = self.refpath(base).encode(sys.getfilesystemencoding())
+        path = self.refpath(base)
         for root, unused_dirs, files in os.walk(path):
             dir = root[len(path):]
             if os.path.sep != '/':
@@ -510,7 +514,7 @@ class DiskRefsContainer(RefsContainer):
         if os.path.exists(self.refpath(b'HEAD')):
             allkeys.add(b'HEAD')
         path = self.refpath(b'')
-        refspath = self.refpath('refs').encode(sys.getfilesystemencoding())
+        refspath = self.refpath(b'refs')
         for root, unused_dirs, files in os.walk(refspath):
             dir = root[len(path):]
             if os.path.sep != '/':
@@ -531,7 +535,7 @@ class DiskRefsContainer(RefsContainer):
             name = name.replace("/", os.path.sep)
         # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
-        if name == 'HEAD':
+        if name == b'HEAD':
             return os.path.join(self.worktree_path, name)
         else:
             return os.path.join(self.path, name)
@@ -550,7 +554,7 @@ class DiskRefsContainer(RefsContainer):
             # None if and only if _packed_refs is also None.
             self._packed_refs = {}
             self._peeled_refs = {}
-            path = os.path.join(self.path, 'packed-refs')
+            path = os.path.join(self.path, b'packed-refs')
             try:
                 f = GitFile(path, 'rb')
             except IOError as e:
@@ -618,7 +622,7 @@ class DiskRefsContainer(RefsContainer):
     def _remove_packed_ref(self, name):
         if self._packed_refs is None:
             return
-        filename = os.path.join(self.path, 'packed-refs')
+        filename = os.path.join(self.path, b'packed-refs')
         # reread cached refs from disk, while holding the lock
         f = GitFile(filename, 'wb')
         try:
@@ -647,19 +651,17 @@ class DiskRefsContainer(RefsContainer):
         self._check_refname(name)
         self._check_refname(other)
         filename = self.refpath(name)
+        f = GitFile(filename, 'wb')
         try:
-            f = GitFile(filename, 'wb')
-            try:
-                f.write(SYMREF + other + b'\n')
-            except (IOError, OSError):
-                f.abort()
-                raise
-            else:
-                sha = self.follow(name)[-1]
-                self._log(name, sha, sha, committer=committer,
-                          timestamp=timestamp, timezone=timezone,
-                          message=message)
-        finally:
+            f.write(SYMREF + other + b'\n')
+            sha = self.follow(name)[-1]
+            self._log(name, sha, sha, committer=committer,
+                      timestamp=timestamp, timezone=timezone,
+                      message=message)
+        except:
+            f.abort()
+            raise
+        else:
             f.close()
 
     def set_if_equals(self, name, old_ref, new_ref, committer=None,

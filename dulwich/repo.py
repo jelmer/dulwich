@@ -269,7 +269,7 @@ class BaseRepo(object):
             determine_wants = target.object_store.determine_wants_all
         target.object_store.add_objects(
             self.fetch_objects(determine_wants, target.get_graph_walker(),
-                               progress))
+                               progress), progress=progress)
         return self.get_refs()
 
     def fetch_objects(self, determine_wants, graph_walker, progress,

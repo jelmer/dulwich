@@ -11,6 +11,8 @@
   * Add `checkout` argument to `Repo.clone`.
     (Jelmer Vernooĳ, #503)
 
+  * Add `Repo.get_shallow` method. (Jelmer Vernooĳ)
+
  BUG FIXES
 
   * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)

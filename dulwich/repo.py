@@ -453,6 +453,13 @@ class BaseRepo(object):
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
 
+    def get_shallow(self):
+        """Get the set of shallow commits.
+
+        :return: Set of shallow commits.
+        """
+        return set()
+
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 
@@ -906,6 +913,13 @@ class Repo(BaseRepo):
             if e.errno == errno.ENOENT:
                 return None
             raise
+
+    def get_shallow(self):
+        f = self.get_named_file('shallow')
+        if f is None:
+            return set()
+        with f:
+            return set(l.strip() for l in f)
 
     def index_path(self):
         """Return path to the index file."""

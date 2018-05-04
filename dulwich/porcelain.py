@@ -318,22 +318,10 @@ def clone(source, target=None, bare=False, checkout=None,
         r = Repo.init_bare(target)
     else:
         r = Repo.init(target)
+
+    reflog_message = b'clone: from ' + source.encode('utf-8')
     try:
-        fetch_result = client.fetch(
-            host_path, r, determine_wants=r.object_store.determine_wants_all,
-            progress=errstream.write)
-        ref_message = b"clone: from " + source.encode('utf-8')
-        r.refs.import_refs(
-            b'refs/remotes/' + origin,
-            {n[len(b'refs/heads/'):]: v for (n, v) in fetch_result.refs.items()
-                if n.startswith(b'refs/heads/')},
-            message=ref_message)
-        r.refs.import_refs(
-            b'refs/tags',
-            {n[len(b'refs/tags/'):]: v for (n, v) in fetch_result.refs.items()
-                if n.startswith(b'refs/tags/') and
-                not n.endswith(ANNOTATED_TAG_SUFFIX)},
-            message=ref_message)
+        fetch_result = fetch(r, host_path, origin, message=reflog_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -345,7 +333,7 @@ def clone(source, target=None, bare=False, checkout=None,
         # TODO(jelmer): Support symref capability,
         # https://github.com/jelmer/dulwich/issues/485
         try:
-            head = r[fetch_result.refs[b"HEAD"]]
+            head = r[fetch_result[b'HEAD']]
         except KeyError:
             head = None
         else:
@@ -1070,7 +1058,7 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
-          errstream=default_bytes_err_stream, **kwargs):
+          errstream=default_bytes_err_stream, message=None, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1078,14 +1066,26 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param remote_name: Name for remote server
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
+    :param message: Reflog message (defaults to b"fetch: from <remote_name>")
     :return: Dictionary with refs on the remote
     """
+    if message is None:
+        message = b'fetch: from ' + remote_location.encode("utf-8")
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack(), **kwargs)
+            remote_location, config=r.get_config_stack(), **kwargs)
         fetch_result = client.fetch(path, r, progress=errstream.write)
-        ref_name = b'refs/remotes/' + remote_name
-        r.refs.import_refs(ref_name, strip_peeled_refs(fetch_result.refs))
+        stripped_refs = strip_peeled_refs(fetch_result.refs)
+        branches = {
+            n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(b'refs/heads/')}
+        r.refs.import_refs(
+            b'refs/remotes/' + remote_name, branches, message=message)
+        tags = {
+            n[len(b'refs/tags/'):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(b'refs/tags/') and
+            not n.endswith(ANNOTATED_TAG_SUFFIX)}
+        r.refs.import_refs(b'refs/tags', tags, message=message)
     return fetch_result.refs
 
 

@@ -17,6 +17,8 @@
 
   * Fix tutorial tests on Python 3. (Jelmer Vernooĳ, #573)
 
+  * Fix remote refs created by `porcelain.fetch`. (Daniel Andersson, #623)
+
 0.19.2	2018-04-07
 
  BUG FIXES

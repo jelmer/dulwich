@@ -665,8 +665,8 @@ class BuildRepoRootTests(TestCase):
     def test_shallow(self):
         self.assertEqual(set(), self._repo.get_shallow())
         with open(os.path.join(self._repo.path, '.git', 'shallow'), 'wb') as f:
-            f.write('a90fa2d900a17e99b433217e988c4eb4a2e9a097\n')
-        self.assertEqual({'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
+            f.write(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097\n')
+        self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
                          self._repo.get_shallow())
 
     def test_build_repo(self):

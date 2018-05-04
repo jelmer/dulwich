@@ -1094,6 +1094,10 @@ class FetchTests(PorcelainTestCase):
         porcelain.fetch(target_path, self.repo.path,
                         outstream=outstream, errstream=errstream)
 
+        # Assert that fetch updated the local image of the remote
+        self.assert_correct_remote_refs(
+            target_repo.get_refs(), self.repo.get_refs())
+
         # Check the target repo for pushed changes
         with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
@@ -1135,11 +1139,31 @@ class FetchTests(PorcelainTestCase):
         porcelain.fetch(target_path, self.repo.path, remote_name=remote_name,
                         outstream=outstream, errstream=errstream)
 
+        # Assert that fetch updated the local image of the remote
+        self.assert_correct_remote_refs(
+            target_repo.get_refs(), self.repo.get_refs())
+
         # Check the target repo for pushed changes, as well as updates
         # for the refs
         with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
             self.assertNotEqual(self.repo.get_refs(), target_refs)
+
+    def assert_correct_remote_refs(
+            self, local_refs, remote_refs, remote_name=b'origin'):
+        """Assert that known remote refs corresponds to actual remote refs."""
+        local_ref_prefix = b'refs/heads'
+        remote_ref_prefix = b'refs/remotes/' + remote_name
+
+        locally_known_remote_refs = {
+            k[len(remote_ref_prefix) + 1:]: v for k, v in local_refs.items()
+            if k.startswith(remote_ref_prefix)}
+
+        normalized_remote_refs = {
+            k[len(local_ref_prefix) + 1:]: v for k, v in remote_refs.items()
+            if k.startswith(local_ref_prefix)}
+
+        self.assertEqual(locally_known_remote_refs, normalized_remote_refs)
 
 
 class RepackTests(PorcelainTestCase):

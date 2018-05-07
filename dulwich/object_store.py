@@ -1,5 +1,5 @@
 # object_store.py -- Object store for git objects
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #                         and others
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

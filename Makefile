@@ -65,7 +65,7 @@ before-push: check
 	git diff origin/master | $(PEP8) --diff
 
 coverage:
-	$(COVERAGE) run --source=dulwich -m unittest dulwich.tests.test_suite dulwich.contrib.test_suite
+	$(COVERAGE) run -m unittest dulwich.tests.test_suite dulwich.contrib.test_suite
 
 coverage-html: coverage
 	$(COVERAGE) html

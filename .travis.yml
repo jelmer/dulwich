@@ -27,11 +27,11 @@ install:
 
 script:
   # Test without c extensions
-  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+  - python -m coverage run -p -m unittest dulwich.tests.test_suite
 
   # Test with c extensions
   - python setup.py build_ext -i
-  - python -m coverage run -p --source=dulwich -m unittest dulwich.tests.test_suite
+  - python -m coverage run -p -m unittest dulwich.tests.test_suite
 
   # Style
   - make style

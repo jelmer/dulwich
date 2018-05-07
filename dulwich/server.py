@@ -1,6 +1,6 @@
 # server.py -- Implementation of the server side git protocols
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
-# Coprygith (C) 2011-2012 Jelmer Vernooij <jelmer@samba.org>
+# Coprygith (C) 2011-2012 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0

@@ -651,14 +651,16 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = self._get_pack_basepath(entries)
+        target_pack = pack_base_name + '.pack'
         if sys.platform == 'win32':
+            # Windows might have the target pack file lingering. Attempt
+            # removal, silently passing if the target does not exist.
             try:
-                os.rename(path, pack_base_name + '.pack')
-            except WindowsError:
-                os.remove(pack_base_name + '.pack')
-                os.rename(path, pack_base_name + '.pack')
-        else:
-            os.rename(path, pack_base_name + '.pack')
+                os.remove(target_pack)
+            except (IOError, OSError) as e:
+                if e.errno != errno.ENOENT:
+                    raise
+        os.rename(path, target_pack)
 
         # Write the index.
         index_file = GitFile(pack_base_name + '.idx', 'wb')
@@ -715,19 +717,16 @@ class DiskObjectStore(PackBasedObjectStore):
             return self._pack_cache[basename]
         except KeyError:
             pass
-        else:
-            os.unlink(path)
-        try:
-            os.rename(path, basename + ".pack")
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                # This can happen on Windows..
-                # It's safe to ignore this, since if the file already exists,
-                # it should have the same contents as the one we just
-                # generated.
-                os.unlink(path)
-            else:
-                raise
+        target_pack = basename + '.pack'
+        if sys.platform == 'win32':
+            # Windows might have the target pack file lingering. Attempt
+            # removal, silently passing if the target does not exist.
+            try:
+                os.remove(target_pack)
+            except (IOError, OSError) as e:
+                if e.errno != errno.ENOENT:
+                    raise
+        os.rename(path, target_pack)
         final_pack = Pack(basename)
         self._add_known_pack(basename, final_pack)
         return final_pack

@@ -174,7 +174,7 @@ class _GitFile(object):
                 os.replace(self._lockfilename, self._filename)
             else:
                 if sys.platform != 'win32':
-                     os.rename(self._lockfilename, self._filename)
+                    os.rename(self._lockfilename, self._filename)
                 else:
                     # Windows versions prior to Vista don't support atomic
                     # renames

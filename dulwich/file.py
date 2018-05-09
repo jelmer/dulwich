@@ -170,15 +170,15 @@ class _GitFile(object):
         os.fsync(self._file.fileno())
         self._file.close()
         try:
-            try:
-                os.rename(self._lockfilename, self._filename)
-            except OSError as e:
-                if sys.platform == 'win32' and e.errno == errno.EEXIST:
+            if getattr(os, 'replace', None) is not None:
+                os.replace(self._lockfilename, self._filename)
+            else:
+                if sys.platform != 'win32':
+                     os.rename(self._lockfilename, self._filename)
+                else:
                     # Windows versions prior to Vista don't support atomic
                     # renames
                     _fancy_rename(self._lockfilename, self._filename)
-                else:
-                    raise
         finally:
             self.abort()
 

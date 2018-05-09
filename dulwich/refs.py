@@ -532,7 +532,9 @@ class DiskRefsContainer(RefsContainer):
 
         """
         if os.path.sep != "/":
-            name = name.replace("/", os.path.sep)
+            name = name.replace(
+                    b"/",
+                    os.path.sep.encode(sys.getfilesystemencoding()))
         # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
         if name == b'HEAD':

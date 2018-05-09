@@ -59,7 +59,7 @@
  API CHANGES
 
   * Index.iterblobs has been renamed to Index.iterobjects.
-   (Jelmer Vernooĳ)
+    (Jelmer Vernooĳ)
 
 0.19.0	2018-03-10
 
@@ -103,7 +103,7 @@
  BUG FIXES
 
   * Fix handling of empty repositories in ``porcelain.clone``.
-   (#570, Jelmer Vernooĳ)
+    (#570, Jelmer Vernooĳ)
 
   * Raise an error when attempting to add paths that are not under the
     repository. (Jelmer Vernooĳ)

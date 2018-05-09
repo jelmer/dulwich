@@ -47,7 +47,7 @@ def _fancy_rename(oldname, newname):
 
     # destination file exists
     try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
         os.close(fd)
         os.remove(tmpfile)
     except OSError:

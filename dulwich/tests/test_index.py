@@ -68,6 +68,25 @@ from dulwich.tests.utils import (
     )
 
 
+def can_symlink():
+    """Return whether running process can create symlinks."""
+    if sys.platform != 'win32':
+        # Platforms other than Windows should allow symlinks without issues.
+        return True
+
+    if not hasattr(os, 'symlink'):
+        # Older Python versions do not have `os.symlink` on Windows.
+        return False
+
+    test_source = tempfile.mkdtemp()
+    test_target = test_source + 'can_symlink'
+    try:
+        os.symlink(test_source, test_target)
+    except OSError:
+        return False
+    return True
+
+
 class IndexTestCase(TestCase):
 
     datadir = os.path.join(os.path.dirname(__file__), 'data/indexes')
@@ -444,7 +463,7 @@ class BuildIndexTests(TestCase):
             with open(filea_path, 'rb') as fh:
                 self.assertEqual(b'file a', fh.read())
 
-    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
+    @skipIf(not can_symlink(), 'Requires symlink support')
     def test_symlink(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

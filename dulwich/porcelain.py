@@ -836,7 +836,7 @@ def status(repo=".", ignored=False):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository or repository object
-    :param ignored: Whether to include ignoed files in `untracked`
+    :param ignored: Whether to include ignored files in `untracked`
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)

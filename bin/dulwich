@@ -66,12 +66,18 @@ class Command(object):
 class cmd_archive(Command):
 
     def run(self, args):
-        opts, args = getopt(args, "", [])
-        client, path = get_transport_and_path(args.pop(0))
-        location = args.pop(0)
+        parser = optparse.OptionParser()
+        parser.add_option("--remote", type=str,
+                          help="Retrieve archive from specified remote repo")
+        options, args = parser.parse_args(args)
         committish = args.pop(0)
-        porcelain.archive(location, committish, outstream=sys.stdout,
-            errstream=sys.stderr)
+        if options.remote:
+            client, path = get_transport_and_path(options.remote)
+            client.archive(path, committish, sys.stdout.write,
+                    write_error=sys.stderr.write)
+        else:
+            porcelain.archive('.', committish, outstream=sys.stdout,
+                errstream=sys.stderr)
 
 
 class cmd_add(Command):

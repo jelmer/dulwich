@@ -890,7 +890,7 @@ def write_info_refs(refs, store):
 
 
 def is_local_branch(x):
-    return x.startswith(b'refs/heads/')
+    return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
 def strip_peeled_refs(refs):

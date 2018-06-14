@@ -1149,7 +1149,7 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
                 outstream.write(name + b"\n")
             else:
                 outstream.write(pretty_format_tree_entry(name, mode, sha))
-            if stat.S_ISDIR(mode):
+            if stat.S_ISDIR(mode) and recursive:
                 list_tree(store, sha, name)
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)

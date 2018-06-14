@@ -1206,6 +1206,30 @@ class LsTreeTests(PorcelainTestCase):
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')
 
+    def test_recursive(self):
+        # Create a directory then write a dummy file in it
+        dirpath = os.path.join(self.repo.path, 'adir')
+        filepath = os.path.join(dirpath, 'afile')
+        os.mkdir(dirpath)
+        with open(filepath, 'w') as f:
+            f.write('origstuff')
+        porcelain.add(repo=self.repo.path, paths=[filepath])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        self.assertEqual(
+                f.getvalue(),
+                '40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n')
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f, recursive=True)
+        self.assertEqual(
+                f.getvalue(),
+                '40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n'
+                '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tadir'
+                '/afile\n')
+
 
 class LsRemoteTests(PorcelainTestCase):
 

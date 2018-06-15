@@ -13,6 +13,8 @@
 
   * Add `Repo.get_shallow` method. (Jelmer Vernooĳ)
 
+  * Add basic `dulwich.stash` module. (Jelmer Vernooĳ)
+
  BUG FIXES
 
   * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)

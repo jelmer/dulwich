@@ -1258,3 +1258,27 @@ def fsck(repo):
                 o.check()
             except Exception as e:
                 yield (sha, e)
+
+
+def stash_list(repo):
+    """List all stashes in a repository."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        return enumerate(list(stash.stashes()))
+
+
+def stash_push(repo):
+    """Push a new stash onto the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        stash.push()
+
+
+def stash_pop(repo):
+    """Pop a new stash from the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        stash.pop()

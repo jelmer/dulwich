@@ -84,47 +84,13 @@ if has_setuptools:
     setup_kwargs['tests_require'] = tests_require
 
 
-if sys.platform == 'win32':
-    # Win32 setup breaks with non-ascii characters.
-    author = "Jelmer Vernooij"
-else:
-    author = "Jelmer Vernooĳ"
-
 setup(name='dulwich',
-      description='Python Git Library',
-      keywords='git',
       version=dulwich_version_string,
-      url='https://www.dulwich.io/',
       license='Apachev2 or later or GPLv2',
-      author_email='jelmer@jelmer.uk',
-      long_description="""
-      Python implementation of the Git file formats and protocols,
-      without the need to have git installed.
-
-      All functionality is available in pure Python. Optional
-      C extensions can be built for improved performance.
-
-      The project is named after the part of London that Mr. and Mrs. Git live
-      in in the particular Monty Python sketch.
-      """,
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
                 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
-      classifiers=[
-          'Development Status :: 4 - Beta',
-          'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 2.7',
-          'Programming Language :: Python :: 3.3',
-          'Programming Language :: Python :: 3.4',
-          'Programming Language :: Python :: 3.5',
-          'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: Implementation :: CPython',
-          'Programming Language :: Python :: Implementation :: PyPy',
-          'Operating System :: POSIX',
-          'Operating System :: Microsoft :: Windows',
-          'Topic :: Software Development :: Version Control',
-      ],
       ext_modules=ext_modules,
       distclass=DulwichDistribution,
       **setup_kwargs

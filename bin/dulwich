@@ -569,6 +569,42 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
+class cmd_stash_list(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for i, entry in porcelain.stash_list('.'):
+            print("stash@{%d}: %s" % (i, entry.message.rstrip('\n')))
+
+
+class cmd_stash_push(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.stash_push('.')
+        print("Saved working directory and index state")
+
+
+class cmd_stash_pop(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.stash_pop('.')
+        print("Restrored working directory and index state")
+
+
+class cmd_stash(SuperCommand):
+
+    subcommands = {
+        "list": cmd_stash_list,
+        "pop": cmd_stash_pop,
+        "push": cmd_stash_push,
+    }
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -622,6 +658,7 @@ commands = {
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
     "show": cmd_show,
+    "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
     "tag": cmd_tag,

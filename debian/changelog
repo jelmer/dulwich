@@ -1,4 +1,4 @@
-dulwich (0.19.3-1) UNRELEASED; urgency=medium
+dulwich (0.19.3-1) unstable; urgency=medium
 
   [ Ondřej Nový ]
   * d/control: Remove ancient X-Python-Version field
@@ -7,7 +7,7 @@ dulwich (0.19.3-1) UNRELEASED; urgency=medium
   [ Jelmer Vernooĳ ]
   * New upstream release.
 
- -- Ondřej Nový <onovy@debian.org>  Mon, 14 May 2018 08:04:38 +0200
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 17 Jun 2018 19:50:22 +0100
 
 dulwich (0.19.1-1) unstable; urgency=medium
 

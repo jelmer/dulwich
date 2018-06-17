@@ -1,4 +1,4 @@
-0.19.3	UNRELEASED
+0.19.3	2018-06-17
 
  IMPROVEMENTS
 
@@ -25,6 +25,14 @@
   * Fix tutorial tests on Python 3. (Jelmer Vernooĳ, #573)
 
   * Fix remote refs created by `porcelain.fetch`. (Daniel Andersson, #623)
+
+  * More robust pack creation on Windows. (Daniel Andersson)
+
+  * Fix recursive option for `porcelain.ls_tree`. (Romain Keramitas)
+
+ TESTS
+
+  * Some improvements to paramiko tests. (Filipp Frizzy)
 
 0.19.2	2018-04-07
 

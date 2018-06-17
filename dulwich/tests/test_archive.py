@@ -75,6 +75,12 @@ class ArchiveTests(TestCase):
         self.addCleanup(tf.close)
         self.assertEqual(["somename"], tf.getnames())
 
+    def test_prefix(self):
+        stream = self._get_example_tar_stream(mtime=0, prefix=b'blah')
+        tf = tarfile.TarFile(fileobj=stream)
+        self.addCleanup(tf.close)
+        self.assertEqual(["blah/somename"], tf.getnames())
+
     def test_gzip_mtime(self):
         stream = self._get_example_tar_stream(mtime=1234, format='gz')
         expected_mtime = struct.pack('<L', 1234)

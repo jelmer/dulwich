@@ -68,7 +68,7 @@ class ChunkedBytesIO(object):
         return b''.join(buf)
 
 
-def tar_stream(store, tree, mtime, format=''):
+def tar_stream(store, tree, mtime, prefix=b'', format=''):
     """Generate a tar stream for the contents of a Git tree.
 
     Returns a generator that lazily assembles a .tar.gz archive, yielding it in
@@ -96,7 +96,7 @@ def tar_stream(store, tree, mtime, format=''):
             buf.write(struct.pack('<L', mtime))
             buf.seek(0, SEEK_END)
 
-        for entry_abspath, entry in _walk_tree(store, tree):
+        for entry_abspath, entry in _walk_tree(store, tree, prefix):
             try:
                 blob = store[entry.sha]
             except KeyError:

@@ -15,6 +15,9 @@
 
   * Add basic `dulwich.stash` module. (Jelmer Vernooĳ)
 
+  * Support a `prefix` argument to `dulwich.archive.tar_stream`.
+    (Jelmer Vernooĳ)
+
  BUG FIXES
 
   * Fix handling of encoding for tags. (Jelmer Vernooĳ, #608)

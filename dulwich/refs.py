@@ -1,5 +1,5 @@
 # refs.py -- For dealing with git refs
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -475,8 +475,14 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(self, path, worktree_path=None, logger=None):
         super(DiskRefsContainer, self).__init__(logger=logger)
+        if getattr(path, 'encode', None) is not None:
+            path = path.encode(sys.getfilesystemencoding())
         self.path = path
-        self.worktree_path = worktree_path or path
+        if worktree_path is None:
+            worktree_path = path
+        if getattr(worktree_path, 'encode', None) is not None:
+            worktree_path = worktree_path.encode(sys.getfilesystemencoding())
+        self.worktree_path = worktree_path
         self._packed_refs = None
         self._peeled_refs = None
 
@@ -486,11 +492,14 @@ class DiskRefsContainer(RefsContainer):
     def subkeys(self, base):
         subkeys = set()
         path = self.refpath(base)
-        for root, dirs, files in os.walk(path):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        for root, unused_dirs, files in os.walk(path):
+            dir = root[len(path):]
+            if os.path.sep != '/':
+                dir = dir.replace(os.path.sep.encode(
+                    sys.getfilesystemencoding()), b"/")
+            dir = dir.strip(b'/')
             for filename in files:
-                refname = (("%s/%s" % (dir, filename))
-                           .strip("/").encode(sys.getfilesystemencoding()))
+                refname = b"/".join(([dir] if dir else []) + [filename])
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format(base + b'/' + refname):
@@ -505,12 +514,14 @@ class DiskRefsContainer(RefsContainer):
         if os.path.exists(self.refpath(b'HEAD')):
             allkeys.add(b'HEAD')
         path = self.refpath(b'')
-        for root, dirs, files in os.walk(self.refpath(b'refs')):
-            dir = root[len(path):].strip(os.path.sep).replace(os.path.sep, "/")
+        refspath = self.refpath(b'refs')
+        for root, unused_dirs, files in os.walk(refspath):
+            dir = root[len(path):]
+            if os.path.sep != '/':
+                dir = dir.replace(
+                    os.path.sep.encode(sys.getfilesystemencoding()), b"/")
             for filename in files:
-                refname = (
-                    "%s/%s" % (dir, filename)).encode(
-                            sys.getfilesystemencoding())
+                refname = b"/".join([dir, filename])
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())
@@ -520,14 +531,13 @@ class DiskRefsContainer(RefsContainer):
         """Return the disk path of a ref.
 
         """
-        if (getattr(self.path, "encode", None) and
-                getattr(name, "decode", None)):
-            name = name.decode(sys.getfilesystemencoding())
         if os.path.sep != "/":
-            name = name.replace("/", os.path.sep)
+            name = name.replace(
+                    b"/",
+                    os.path.sep.encode(sys.getfilesystemencoding()))
         # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
-        if name == 'HEAD':
+        if name == b'HEAD':
             return os.path.join(self.worktree_path, name)
         else:
             return os.path.join(self.path, name)
@@ -546,7 +556,7 @@ class DiskRefsContainer(RefsContainer):
             # None if and only if _packed_refs is also None.
             self._packed_refs = {}
             self._peeled_refs = {}
-            path = os.path.join(self.path, 'packed-refs')
+            path = os.path.join(self.path, b'packed-refs')
             try:
                 f = GitFile(path, 'rb')
             except IOError as e:
@@ -614,7 +624,7 @@ class DiskRefsContainer(RefsContainer):
     def _remove_packed_ref(self, name):
         if self._packed_refs is None:
             return
-        filename = os.path.join(self.path, 'packed-refs')
+        filename = os.path.join(self.path, b'packed-refs')
         # reread cached refs from disk, while holding the lock
         f = GitFile(filename, 'wb')
         try:
@@ -643,19 +653,17 @@ class DiskRefsContainer(RefsContainer):
         self._check_refname(name)
         self._check_refname(other)
         filename = self.refpath(name)
+        f = GitFile(filename, 'wb')
         try:
-            f = GitFile(filename, 'wb')
-            try:
-                f.write(SYMREF + other + b'\n')
-            except (IOError, OSError):
-                f.abort()
-                raise
-            else:
-                sha = self.follow(name)[-1]
-                self._log(name, sha, sha, committer=committer,
-                          timestamp=timestamp, timezone=timezone,
-                          message=message)
-        finally:
+            f.write(SYMREF + other + b'\n')
+            sha = self.follow(name)[-1]
+            self._log(name, sha, sha, committer=committer,
+                      timestamp=timestamp, timezone=timezone,
+                      message=message)
+        except BaseException:
+            f.abort()
+            raise
+        else:
             f.close()
 
     def set_if_equals(self, name, old_ref, new_ref, committer=None,
@@ -882,7 +890,7 @@ def write_info_refs(refs, store):
 
 
 def is_local_branch(x):
-    return x.startswith(b'refs/heads/')
+    return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
 def strip_peeled_refs(refs):

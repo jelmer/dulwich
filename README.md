@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/dulwich/dulwich.png?branch=master)](https://travis-ci.org/dulwich/dulwich)
-[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/dulwich/dulwich/branch/master)
+[![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich/branch/master)
 
 This is the Dulwich project.
 

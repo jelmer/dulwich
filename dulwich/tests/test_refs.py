@@ -1,6 +1,6 @@
 # test_refs.py -- tests for refs.py
 # encoding: utf-8
-# Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -335,7 +335,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_setitem(self):
         RefsContainerTests.test_setitem(self)
-        f = open(os.path.join(self._refs.path, 'refs', 'some', 'ref'), 'rb')
+        f = open(os.path.join(self._refs.path, b'refs', b'some', b'ref'), 'rb')
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          f.read()[:40])
         f.close()
@@ -346,13 +346,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(ones, self._refs[b'HEAD'])
 
         # ensure HEAD was not modified
-        f = open(os.path.join(self._refs.path, 'HEAD'), 'rb')
+        f = open(os.path.join(self._refs.path, b'HEAD'), 'rb')
         v = next(iter(f)).rstrip(b'\n\r')
         f.close()
         self.assertEqual(b'ref: refs/heads/master', v)
 
         # ensure the symbolic link was written through
-        f = open(os.path.join(self._refs.path, 'refs', 'heads', 'master'),
+        f = open(os.path.join(self._refs.path, b'refs', b'heads', b'master'),
                  'rb')
         self.assertEqual(ones, f.read()[:40])
         f.close()
@@ -365,9 +365,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # ensure lockfile was deleted
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
+            os.path.join(self._refs.path, b'refs', b'heads', b'master.lock')))
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, 'HEAD.lock')))
+            os.path.join(self._refs.path, b'HEAD.lock')))
 
     def test_add_if_new_packed(self):
         # don't overwrite packed ref
@@ -406,7 +406,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
-        ref_file = os.path.join(self._refs.path, 'refs', 'heads', 'master')
+        ref_file = os.path.join(self._refs.path, b'refs', b'heads', b'master')
         self.assertFalse(os.path.exists(ref_file))
         self.assertFalse(b'refs/heads/master' in self._refs.get_packed_refs())
 
@@ -417,7 +417,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertRaises(KeyError, lambda: self._refs[b'HEAD'])
         self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
                          self._refs[b'refs/heads/master'])
-        self.assertFalse(os.path.exists(os.path.join(self._refs.path, 'HEAD')))
+        self.assertFalse(
+            os.path.exists(os.path.join(self._refs.path, b'HEAD')))
 
     def test_remove_if_equals_symref(self):
         # HEAD is a symref, so shouldn't equal its dereferenced value
@@ -433,9 +434,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_loose_ref(b'HEAD'))
 
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, 'refs', 'heads', 'master.lock')))
+            os.path.join(self._refs.path, b'refs', b'heads', b'master.lock')))
         self.assertFalse(os.path.exists(
-            os.path.join(self._refs.path, 'HEAD.lock')))
+            os.path.join(self._refs.path, b'HEAD.lock')))
 
     def test_remove_packed_without_peeled(self):
         refs_file = os.path.join(self._repo.path, 'packed-refs')
@@ -475,7 +476,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         except UnicodeEncodeError:
             raise SkipTest(
                     "filesystem encoding doesn't support special character")
-        p = os.path.join(self._repo.path, 'refs', 'tags', u'schön')
+        p = os.path.join(
+                self._repo.path.encode(sys.getfilesystemencoding()),
+                encoded_ref)
         with open(p, 'w') as f:
             f.write('00' * 20)
 
@@ -484,6 +487,28 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         del expected_refs[b'refs/heads/loop']
 
         self.assertEqual(expected_refs, self._repo.get_refs())
+
+    def test_cyrillic(self):
+        # reported in https://github.com/dulwich/dulwich/issues/608
+        name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
+        encoded_ref = b'refs/heads/' + name
+        with open(os.path.join(
+            self._repo.path.encode(
+                sys.getfilesystemencoding()), encoded_ref), 'w') as f:
+            f.write('00' * 20)
+
+        expected_refs = set(_TEST_REFS.keys())
+        expected_refs.add(encoded_ref)
+
+        self.assertEqual(expected_refs,
+                         set(self._repo.refs.allkeys()))
+        self.assertEqual({r[len(b'refs/'):] for r in expected_refs
+                          if r.startswith(b'refs/')},
+                         set(self._repo.refs.subkeys(b'refs/')))
+        expected_refs.remove(b'refs/heads/loop')
+        expected_refs.add(b'HEAD')
+        self.assertEqual(expected_refs,
+                         set(self._repo.get_refs().keys()))
 
 
 _TEST_REFS_SERIALIZED = (

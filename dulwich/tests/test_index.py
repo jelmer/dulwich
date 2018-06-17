@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # test_index.py -- Tests for the git index
 # encoding: utf-8
-# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -30,6 +30,7 @@ import stat
 import struct
 import sys
 import tempfile
+import warnings
 
 from dulwich.index import (
     Index,
@@ -62,6 +63,28 @@ from dulwich.tests import (
     TestCase,
     skipIf,
     )
+from dulwich.tests.utils import (
+    setup_warning_catcher,
+    )
+
+
+def can_symlink():
+    """Return whether running process can create symlinks."""
+    if sys.platform != 'win32':
+        # Platforms other than Windows should allow symlinks without issues.
+        return True
+
+    if not hasattr(os, 'symlink'):
+        # Older Python versions do not have `os.symlink` on Windows.
+        return False
+
+    test_source = tempfile.mkdtemp()
+    test_target = test_source + 'can_symlink'
+    try:
+        os.symlink(test_source, test_target)
+    except OSError:
+        return False
+    return True
 
 
 class IndexTestCase(TestCase):
@@ -79,6 +102,32 @@ class SimpleIndexTestCase(IndexTestCase):
 
     def test_iter(self):
         self.assertEqual([b'bla'], list(self.get_simple_index("index")))
+
+    def test_iterobjects(self):
+        self.assertEqual(
+                [(b'bla', b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 33188)],
+                list(self.get_simple_index("index").iterobjects()))
+
+    def test_iterblobs(self):
+        warnings.simplefilter("always", UserWarning)
+        self.addCleanup(warnings.resetwarnings)
+        warnings_list, restore_warnings = setup_warning_catcher()
+        self.addCleanup(restore_warnings)
+
+        self.assertEqual(
+                [(b'bla', b'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 33188)],
+                list(self.get_simple_index("index").iterblobs()))
+
+        expected_warning = PendingDeprecationWarning(
+            'Use iterobjects() instead.')
+        for w in warnings_list:
+            if (type(w) == type(expected_warning) and
+                    w.args == expected_warning.args):
+                break
+        else:
+            raise AssertionError(
+                'Expected warning %r not in %r' %
+                (expected_warning, warnings_list))
 
     def test_getitem(self):
         self.assertEqual(
@@ -414,7 +463,7 @@ class BuildIndexTests(TestCase):
             with open(filea_path, 'rb') as fh:
                 self.assertEqual(b'file a', fh.read())
 
-    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
+    @skipIf(not can_symlink(), 'Requires symlink support')
     def test_symlink(self):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

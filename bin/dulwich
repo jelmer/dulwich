@@ -1,7 +1,7 @@
 #!/usr/bin/python -u
 #
 # dulwich - Simple command-line interface to Dulwich
-# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
 # vim: expandtab
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -37,6 +37,13 @@ import signal
 def signal_int(signal, frame):
     sys.exit(1)
 
+
+def signal_quit(signal, frame):
+    import pdb
+    pdb.set_trace()
+
+if 'DULWICH_PDB' in os.environ:
+    signal.signal(signal.SIGQUIT, signal_quit)
 signal.signal(signal.SIGINT, signal_int)
 
 from dulwich import porcelain
@@ -59,12 +66,18 @@ class Command(object):
 class cmd_archive(Command):
 
     def run(self, args):
-        opts, args = getopt(args, "", [])
-        client, path = get_transport_and_path(args.pop(0))
-        location = args.pop(0)
+        parser = optparse.OptionParser()
+        parser.add_option("--remote", type=str,
+                          help="Retrieve archive from specified remote repo")
+        options, args = parser.parse_args(args)
         committish = args.pop(0)
-        porcelain.archive(location, committish, outstream=sys.stdout,
-            errstream=sys.stderr)
+        if options.remote:
+            client, path = get_transport_and_path(options.remote)
+            client.archive(path, committish, sys.stdout.write,
+                    write_error=sys.stderr.write)
+        else:
+            porcelain.archive('.', committish, outstream=sys.stdout,
+                errstream=sys.stderr)
 
 
 class cmd_add(Command):
@@ -110,6 +123,15 @@ class cmd_fetch(Command):
         print("Remote refs:")
         for item in refs.items():
             print("%s -> %s" % item)
+
+
+class cmd_fsck(Command):
+
+    def run(self, args):
+        opts, args = getopt(args, "", [])
+        opts = dict(opts)
+        for (obj, msg) in porcelain.fsck('.'):
+            print("%s: %s" % (obj, msg))
 
 
 class cmd_log(Command):
@@ -547,6 +569,42 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
+class cmd_stash_list(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for i, entry in porcelain.stash_list('.'):
+            print("stash@{%d}: %s" % (i, entry.message.rstrip('\n')))
+
+
+class cmd_stash_push(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.stash_push('.')
+        print("Saved working directory and index state")
+
+
+class cmd_stash_pop(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        porcelain.stash_pop('.')
+        print("Restrored working directory and index state")
+
+
+class cmd_stash(SuperCommand):
+
+    subcommands = {
+        "list": cmd_stash_list,
+        "pop": cmd_stash_pop,
+        "push": cmd_stash_push,
+    }
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -584,6 +642,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "fsck": cmd_fsck,
     "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,
@@ -599,6 +658,7 @@ commands = {
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
     "show": cmd_show,
+    "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
     "tag": cmd_tag,

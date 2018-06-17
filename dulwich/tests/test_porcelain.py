@@ -1,5 +1,5 @@
 # test_porcelain.py -- porcelain tests
-# Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -134,6 +134,7 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(shutil.rmtree, target_path)
         r = porcelain.clone(self.repo.path, target_path,
                             checkout=False, errstream=errstream)
+        self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
         self.assertEqual(0, len(target_repo.open_index()))
@@ -1093,6 +1094,10 @@ class FetchTests(PorcelainTestCase):
         porcelain.fetch(target_path, self.repo.path,
                         outstream=outstream, errstream=errstream)
 
+        # Assert that fetch updated the local image of the remote
+        self.assert_correct_remote_refs(
+            target_repo.get_refs(), self.repo.get_refs())
+
         # Check the target repo for pushed changes
         with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
@@ -1134,11 +1139,31 @@ class FetchTests(PorcelainTestCase):
         porcelain.fetch(target_path, self.repo.path, remote_name=remote_name,
                         outstream=outstream, errstream=errstream)
 
+        # Assert that fetch updated the local image of the remote
+        self.assert_correct_remote_refs(
+            target_repo.get_refs(), self.repo.get_refs())
+
         # Check the target repo for pushed changes, as well as updates
         # for the refs
         with Repo(target_path) as r:
             self.assertTrue(self.repo[b'HEAD'].id in r)
             self.assertNotEqual(self.repo.get_refs(), target_refs)
+
+    def assert_correct_remote_refs(
+            self, local_refs, remote_refs, remote_name=b'origin'):
+        """Assert that known remote refs corresponds to actual remote refs."""
+        local_ref_prefix = b'refs/heads'
+        remote_ref_prefix = b'refs/remotes/' + remote_name
+
+        locally_known_remote_refs = {
+            k[len(remote_ref_prefix) + 1:]: v for k, v in local_refs.items()
+            if k.startswith(remote_ref_prefix)}
+
+        normalized_remote_refs = {
+            k[len(local_ref_prefix) + 1:]: v for k, v in remote_refs.items()
+            if k.startswith(local_ref_prefix)}
+
+        self.assertEqual(locally_known_remote_refs, normalized_remote_refs)
 
 
 class RepackTests(PorcelainTestCase):
@@ -1180,6 +1205,30 @@ class LsTreeTests(PorcelainTestCase):
         self.assertEqual(
                 f.getvalue(),
                 '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n')
+
+    def test_recursive(self):
+        # Create a directory then write a dummy file in it
+        dirpath = os.path.join(self.repo.path, 'adir')
+        filepath = os.path.join(dirpath, 'afile')
+        os.mkdir(dirpath)
+        with open(filepath, 'w') as f:
+            f.write('origstuff')
+        porcelain.add(repo=self.repo.path, paths=[filepath])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        self.assertEqual(
+                f.getvalue(),
+                '40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n')
+        f = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=f, recursive=True)
+        self.assertEqual(
+                f.getvalue(),
+                '40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n'
+                '100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tadir'
+                '/afile\n')
 
 
 class LsRemoteTests(PorcelainTestCase):
@@ -1250,7 +1299,7 @@ class UpdateHeadTests(PorcelainTestCase):
         porcelain.update_head(self.repo, "blah")
         self.assertEqual(c1.id, self.repo.head())
         self.assertEqual(b'ref: refs/heads/blah',
-                         self.repo.refs.read_ref('HEAD'))
+                         self.repo.refs.read_ref(b'HEAD'))
 
     def test_set_to_branch_detached(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
@@ -1292,3 +1341,22 @@ Jelmer Vernooij <jelmer@debian.org>
             b'Jelmer Vernooij <jelmer@debian.org>',
             porcelain.check_mailmap(
                 self.repo, b'Jelmer Vernooij <jelmer@samba.org>'))
+
+
+class FsckTests(PorcelainTestCase):
+
+    def test_none(self):
+        self.assertEqual(
+                [],
+                list(porcelain.fsck(self.repo)))
+
+    def test_git_dir(self):
+        obj = Tree()
+        a = Blob()
+        a.data = b"foo"
+        obj.add(b".git", 0o100644, a.id)
+        self.repo.object_store.add_objects(
+            [(a, None), (obj, None)])
+        self.assertEqual(
+                [(obj.id, 'invalid name .git')],
+                [(sha, str(e)) for (sha, e) in porcelain.fsck(self.repo)])

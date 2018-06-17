@@ -1,5 +1,5 @@
 # client.py -- Implementation of the client side git protocols
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -765,10 +765,17 @@ class TraditionalGitClient(GitClient):
             return refs
 
     def archive(self, path, committish, write_data, progress=None,
-                write_error=None):
+                write_error=None, format=None, subdirs=None, prefix=None):
         proto, can_read = self._connect(b'upload-archive', path)
         with proto:
+            if format is not None:
+                proto.write_pkt_line(b"argument --format=" + format)
             proto.write_pkt_line(b"argument " + committish)
+            if subdirs is not None:
+                for subdir in subdirs:
+                    proto.write_pkt_line(b"argument " + subdir)
+            if prefix is not None:
+                proto.write_pkt_line(b"argument --prefix=" + prefix)
             proto.write_pkt_line(None)
             pkt = proto.read_pkt_line()
             if pkt == b"NACK\n":

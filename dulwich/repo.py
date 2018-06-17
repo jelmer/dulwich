@@ -1,6 +1,6 @@
 # repo.py -- For dealing with git repositories.
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -61,6 +61,9 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    )
+from dulwich.pack import (
+    pack_objects_to_data,
     )
 
 from dulwich.hooks import (
@@ -267,10 +270,30 @@ class BaseRepo(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
-        target.object_store.add_objects(
-            self.fetch_objects(determine_wants, target.get_graph_walker(),
-                               progress))
+        count, pack_data = self.fetch_pack_data(
+                determine_wants, target.get_graph_walker(), progress)
+        target.object_store.add_pack_data(count, pack_data, progress)
         return self.get_refs()
+
+    def fetch_pack_data(self, determine_wants, graph_walker, progress,
+                        get_tagged=None):
+        """Fetch the pack data required for a set of revisions.
+
+        :param determine_wants: Function that takes a dictionary with heads
+            and returns the list of heads to fetch.
+        :param graph_walker: Object that can iterate over the list of revisions
+            to fetch and has an "ack" method that will be called to acknowledge
+            that a revision is present.
+        :param progress: Simple progress function that will be called with
+            updated progress strings.
+        :param get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+        :return: count and iterator over pack data
+        """
+        # TODO(jelmer): Fetch pack data directly, don't create objects first.
+        objects = self.fetch_objects(determine_wants, graph_walker, progress,
+                                     get_tagged)
+        return pack_objects_to_data(objects)
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
                       get_tagged=None):
@@ -429,6 +452,13 @@ class BaseRepo(object):
         from dulwich.config import StackedConfig
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
+
+    def get_shallow(self):
+        """Get the set of shallow commits.
+
+        :return: Set of shallow commits.
+        """
+        return set()
 
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
@@ -884,6 +914,13 @@ class Repo(BaseRepo):
                 return None
             raise
 
+    def get_shallow(self):
+        f = self.get_named_file('shallow')
+        if f is None:
+            return set()
+        with f:
+            return set(l.strip() for l in f)
+
     def index_path(self):
         """Return path to the index file."""
         return os.path.join(self.controldir(), INDEX_FILENAME)
@@ -951,7 +988,7 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(self, target_path, mkdir=True, bare=False,
-              origin=b"origin"):
+              origin=b"origin", checkout=None):
         """Clone this repository.
 
         :param target_path: Target path
@@ -964,6 +1001,8 @@ class Repo(BaseRepo):
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
         else:
+            if checkout:
+                raise ValueError("checkout and bare are incompatible")
             target = self.init_bare(target_path, mkdir=mkdir)
         self.fetch(target)
         encoded_path = self.path
@@ -995,7 +1034,9 @@ class Repo(BaseRepo):
                                          message=ref_message)
             target[b'HEAD'] = head_sha
 
-            if not bare:
+            if checkout is None:
+                checkout = (not bare)
+            if checkout:
                 # Checkout HEAD to target dir
                 target.reset_index()
 

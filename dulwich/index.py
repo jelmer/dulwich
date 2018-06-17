@@ -1,5 +1,5 @@
 # index.py -- File parser/writer for the git index file
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -275,8 +275,8 @@ class Index(object):
 
     def iterblobs(self):
         import warnings
-        warnings.warn(PendingDeprecationWarning, 'Use iterobjects() instead.')
-        return self.iterblobs()
+        warnings.warn('Use iterobjects() instead.', PendingDeprecationWarning)
+        return self.iterobjects()
 
     def clear(self):
         """Remove all contents from this index."""

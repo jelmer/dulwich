@@ -69,7 +69,7 @@ class Stash(object):
     def pop(self, index):
         raise NotImplementedError(self.drop)
 
-    def create(self, committer=None, author=None, message=None):
+    def push(self, committer=None, author=None, message=None):
         """Create a new stash.
 
         :param committer: Optional committer name to use

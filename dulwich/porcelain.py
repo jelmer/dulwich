@@ -1,5 +1,5 @@
 # porcelain.py -- Porcelain-like layer on top of Dulwich
-# Copyright (C) 2013 Jelmer Vernooij <jelmer@samba.org>
+# Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -292,6 +292,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param origin: Name of remote from the repository used to clone
     :return: The new repository
     """
+    # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
         import warnings
         warnings.warn(
@@ -317,22 +318,10 @@ def clone(source, target=None, bare=False, checkout=None,
         r = Repo.init_bare(target)
     else:
         r = Repo.init(target)
+
+    reflog_message = b'clone: from ' + source.encode('utf-8')
     try:
-        fetch_result = client.fetch(
-            host_path, r, determine_wants=r.object_store.determine_wants_all,
-            progress=errstream.write)
-        ref_message = b"clone: from " + source.encode('utf-8')
-        r.refs.import_refs(
-            b'refs/remotes/' + origin,
-            {n[len(b'refs/heads/'):]: v for (n, v) in fetch_result.refs.items()
-                if n.startswith(b'refs/heads/')},
-            message=ref_message)
-        r.refs.import_refs(
-            b'refs/tags',
-            {n[len(b'refs/tags/'):]: v for (n, v) in fetch_result.refs.items()
-                if n.startswith(b'refs/tags/') and
-                not n.endswith(ANNOTATED_TAG_SUFFIX)},
-            message=ref_message)
+        fetch_result = fetch(r, host_path, origin, message=reflog_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -344,7 +333,7 @@ def clone(source, target=None, bare=False, checkout=None,
         # TODO(jelmer): Support symref capability,
         # https://github.com/jelmer/dulwich/issues/485
         try:
-            head = r[fetch_result.refs[b"HEAD"]]
+            head = r[fetch_result[b'HEAD']]
         except KeyError:
             head = None
         else:
@@ -377,7 +366,7 @@ def add(repo=".", paths=None):
             paths = [paths]
         for p in paths:
             relpath = os.path.relpath(p, r.path)
-            if relpath.startswith('../'):
+            if relpath.startswith('..' + os.path.sep):
                 raise ValueError('path %r is not in repo' % relpath)
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):
@@ -847,7 +836,7 @@ def status(repo=".", ignored=False):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     :param repo: Path to repository or repository object
-    :param ignored: Whether to include ignoed files in `untracked`
+    :param ignored: Whether to include ignored files in `untracked`
     :return: GitStatus tuple,
         staged -    list of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -1069,7 +1058,7 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
-          errstream=default_bytes_err_stream, **kwargs):
+          errstream=default_bytes_err_stream, message=None, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1077,14 +1066,26 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param remote_name: Name for remote server
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
+    :param message: Reflog message (defaults to b"fetch: from <remote_name>")
     :return: Dictionary with refs on the remote
     """
+    if message is None:
+        message = b'fetch: from ' + remote_location.encode("utf-8")
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack(), **kwargs)
+            remote_location, config=r.get_config_stack(), **kwargs)
         fetch_result = client.fetch(path, r, progress=errstream.write)
-        ref_name = b'refs/remotes/' + remote_name
-        r.refs.import_refs(ref_name, strip_peeled_refs(fetch_result.refs))
+        stripped_refs = strip_peeled_refs(fetch_result.refs)
+        branches = {
+            n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(b'refs/heads/')}
+        r.refs.import_refs(
+            b'refs/remotes/' + remote_name, branches, message=message)
+        tags = {
+            n[len(b'refs/tags/'):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(b'refs/tags/') and
+            not n.endswith(ANNOTATED_TAG_SUFFIX)}
+        r.refs.import_refs(b'refs/tags', tags, message=message)
     return fetch_result.refs
 
 
@@ -1148,7 +1149,7 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
                 outstream.write(name + b"\n")
             else:
                 outstream.write(pretty_format_tree_entry(name, mode, sha))
-            if stat.S_ISDIR(mode):
+            if stat.S_ISDIR(mode) and recursive:
                 list_tree(store, sha, name)
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)
@@ -1239,3 +1240,45 @@ def check_mailmap(repo, contact):
                 raise
             mailmap = Mailmap()
         return mailmap.lookup(contact)
+
+
+def fsck(repo):
+    """Check a repository.
+
+    :param repo: A path to the repository
+    :return: Iterator over errors/warnings
+    """
+    with open_repo_closing(repo) as r:
+        # TODO(jelmer): check pack files
+        # TODO(jelmer): check graph
+        # TODO(jelmer): check refs
+        for sha in r.object_store:
+            o = r.object_store[sha]
+            try:
+                o.check()
+            except Exception as e:
+                yield (sha, e)
+
+
+def stash_list(repo):
+    """List all stashes in a repository."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        return enumerate(list(stash.stashes()))
+
+
+def stash_push(repo):
+    """Push a new stash onto the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        stash.push()
+
+
+def stash_pop(repo):
+    """Pop a new stash from the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+        stash = Stash.from_repo(r)
+        stash.pop()

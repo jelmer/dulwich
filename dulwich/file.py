@@ -47,7 +47,7 @@ def _fancy_rename(oldname, newname):
 
     # destination file exists
     try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname+".", dir=".")
+        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
         os.close(fd)
         os.remove(tmpfile)
     except OSError:
@@ -118,7 +118,10 @@ class _GitFile(object):
 
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
-        self._lockfilename = '%s.lock' % self._filename
+        if isinstance(self._filename, bytes):
+            self._lockfilename = self._filename + b'.lock'
+        else:
+            self._lockfilename = self._filename + '.lock'
         try:
             fd = os.open(
                 self._lockfilename,
@@ -167,15 +170,15 @@ class _GitFile(object):
         os.fsync(self._file.fileno())
         self._file.close()
         try:
-            try:
-                os.rename(self._lockfilename, self._filename)
-            except OSError as e:
-                if sys.platform == 'win32' and e.errno == errno.EEXIST:
+            if getattr(os, 'replace', None) is not None:
+                os.replace(self._lockfilename, self._filename)
+            else:
+                if sys.platform != 'win32':
+                    os.rename(self._lockfilename, self._filename)
+                else:
                     # Windows versions prior to Vista don't support atomic
                     # renames
                     _fancy_rename(self._lockfilename, self._filename)
-                else:
-                    raise
         finally:
             self.abort()
 

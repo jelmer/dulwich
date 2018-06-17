@@ -325,6 +325,20 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         r.clone(tmp_dir, mkdir=False, bare=True)
 
+    def test_clone_bare(self):
+        r = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = r.clone(tmp_dir, mkdir=False)
+        t.close()
+
+    def test_clone_checkout_and_bare(self):
+        r = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        self.assertRaises(ValueError, r.clone, tmp_dir, mkdir=False,
+                          checkout=True, bare=True)
+
     def test_merge_history(self):
         r = self.open_repo('simple_merge.git')
         shas = [e.commit.id for e in r.get_walker()]
@@ -647,6 +661,13 @@ class BuildRepoRootTests(TestCase):
                 author_timestamp=12345, author_timezone=0)
         self.assertEqual([], r[commit_sha].parents)
         self._root_commit = commit_sha
+
+    def test_shallow(self):
+        self.assertEqual(set(), self._repo.get_shallow())
+        with open(os.path.join(self._repo.path, '.git', 'shallow'), 'wb') as f:
+            f.write(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097\n')
+        self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
+                         self._repo.get_shallow())
 
     def test_build_repo(self):
         r = self._repo

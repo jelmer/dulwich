@@ -605,6 +605,15 @@ class cmd_stash(SuperCommand):
     }
 
 
+class cmd_ls_files(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for name in porcelain.ls_files('.'):
+            print(name)
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -646,6 +655,7 @@ commands = {
     "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,
+    "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,

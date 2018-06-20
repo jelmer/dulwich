@@ -1247,6 +1247,21 @@ class LsRemoteTests(PorcelainTestCase):
             porcelain.ls_remote(self.repo.path))
 
 
+class LsFilesTests(PorcelainTestCase):
+
+    def test_empty(self):
+        self.assertEqual([], list(porcelain.ls_files(self.repo)))
+
+    def test_simple(self):
+        # Commit a dummy file then modify it
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write('origstuff')
+
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        self.assertEqual([b'foo'], list(porcelain.ls_files(self.repo)))
+
+
 class RemoteAddTests(PorcelainTestCase):
 
     def test_new(self):

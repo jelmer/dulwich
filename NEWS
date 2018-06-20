@@ -1,5 +1,15 @@
 0.19.4	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add ``porcelain.ls_files``. (Jelmer Vernooĳ)
+
+ BUG FIXES
+
+  * Avoid unicode characters (e.g. the digraph ĳ in my surname) in setup.cfg,
+    since setuptools doesn't deal well with them. See
+    https://github.com/pypa/setuptools/issues/1062. (Jelmer Vernooĳ, #637)
+
 0.19.3	2018-06-17
 
  IMPROVEMENTS

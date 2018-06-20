@@ -33,6 +33,7 @@ Currently implemented:
  * diff-tree
  * fetch
  * init
+ * ls-files
  * ls-remote
  * ls-tree
  * pull
@@ -1282,3 +1283,9 @@ def stash_pop(repo):
         from dulwich.stash import Stash
         stash = Stash.from_repo(r)
         stash.pop()
+
+
+def ls_files(repo):
+    """List all files in an index."""
+    with open_repo_closing(repo) as r:
+        return sorted(r.open_index())

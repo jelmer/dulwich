@@ -4,6 +4,8 @@
 
   * Add ``porcelain.ls_files``. (Jelmer Vernooĳ)
 
+  * Add ``Index.iteritems``. (Jelmer Vernooĳ)
+
  BUG FIXES
 
   * Avoid unicode characters (e.g. the digraph ĳ in my surname) in setup.cfg,

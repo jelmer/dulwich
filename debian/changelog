@@ -1,3 +1,9 @@
+dulwich (0.19.4-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 24 Jun 2018 01:42:09 +0100
+
 dulwich (0.19.3-1) unstable; urgency=medium
 
   [ Ondřej Nový ]

@@ -4,7 +4,7 @@
 
   * Add ``porcelain.ls_files``. (Jelmer Vernooĳ)
 
-  * Add ``Index.iteritems``. (Jelmer Vernooĳ)
+  * Add ``Index.items``. (Jelmer Vernooĳ)
 
  BUG FIXES
 

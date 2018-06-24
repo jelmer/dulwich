@@ -295,6 +295,9 @@ class Index(object):
     def iteritems(self):
         return self._byname.items()
 
+    def items(self):
+        return self._byname.items()
+
     def update(self, entries):
         for name, value in entries.items():
             self[name] = value

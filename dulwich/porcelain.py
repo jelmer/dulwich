@@ -306,11 +306,8 @@ def clone(source, target=None, bare=False, checkout=None,
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
 
-    config = StackedConfig.default()
-    client, host_path = get_transport_and_path(source, config=config, **kwargs)
-
     if target is None:
-        target = host_path.split("/")[-1]
+        target = source.split("/")[-1]
 
     if not os.path.exists(target):
         os.mkdir(target)
@@ -322,7 +319,7 @@ def clone(source, target=None, bare=False, checkout=None,
 
     reflog_message = b'clone: from ' + source.encode('utf-8')
     try:
-        fetch_result = fetch(r, host_path, origin, message=reflog_message)
+        fetch_result = fetch(r, source, origin, message=reflog_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)

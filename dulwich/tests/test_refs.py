@@ -462,6 +462,23 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                 b'df6800012397fb85c56e7418dd4eb9405dee075c'))
         self.assertRaises(KeyError, lambda: self._refs[b'refs/tags/refs-0.1'])
 
+    def test_remove_parent(self):
+        self._refs[b'refs/heads/foo/bar'] = (
+            b'df6800012397fb85c56e7418dd4eb9405dee075c'
+        )
+        del self._refs[b'refs/heads/foo/bar']
+        ref_file = os.path.join(
+            self._refs.path, b'refs', b'heads', b'foo', b'bar',
+        )
+        self.assertFalse(os.path.exists(ref_file))
+        ref_file = os.path.join(self._refs.path, b'refs', b'heads', b'foo')
+        self.assertFalse(os.path.exists(ref_file))
+        ref_file = os.path.join(self._refs.path, b'refs', b'heads')
+        self.assertTrue(os.path.exists(ref_file))
+        self._refs[b'refs/heads/foo'] = (
+            b'df6800012397fb85c56e7418dd4eb9405dee075c'
+        )
+
     def test_read_ref(self):
         self.assertEqual(b'ref: refs/heads/master',
                          self._refs.read_ref(b'HEAD'))

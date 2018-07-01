@@ -614,6 +614,14 @@ class cmd_ls_files(Command):
             print(name)
 
 
+class cmd_describe(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        print(porcelain.describe('.'))
+
+
 class cmd_help(Command):
 
     def run(self, args):
@@ -644,6 +652,7 @@ commands = {
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
+    "describe": cmd_describe,
     "daemon": cmd_daemon,
     "diff": cmd_diff,
     "diff-tree": cmd_diff_tree,

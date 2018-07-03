@@ -1,5 +1,9 @@
 0.19.5	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Add ``porcelain.describe``. (Sylvia van Os)
+
  BUG FIXES
 
   * Fix regression in ``dulwich.porcelain.clone`` that prevented cloning

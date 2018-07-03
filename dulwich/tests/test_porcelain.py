@@ -1392,7 +1392,7 @@ class DescribeTests(PorcelainTestCase):
                 author=b"Joe <joe@example.com>",
                 committer=b"Bob <bob@example.com>")
         self.assertEqual(
-                'g{}'.format(str(sha)[:7]),
+                'g{}'.format(sha[:7].decode('ascii')),
                 porcelain.describe(self.repo.path))
 
     def test_tag(self):
@@ -1429,5 +1429,5 @@ class DescribeTests(PorcelainTestCase):
                 author=b"Joe <joe@example.com>",
                 committer=b"Bob <bob@example.com>")
         self.assertEqual(
-                'tryme-1-g{}'.format(str(sha)[:7]),
+                'tryme-1-g{}'.format(sha[:7].decode('ascii')),
                 porcelain.describe(self.repo.path))

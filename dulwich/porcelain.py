@@ -1319,7 +1319,7 @@ def describe(repo):
                 commit = r.get_object(commit[1])
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
-                commit.id.decode('utf-8'),
+                commit.id.decode('ascii'),
             ]
 
         sorted_tags = sorted(tags.items(),
@@ -1328,7 +1328,7 @@ def describe(repo):
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return 'g{}'.format(r[r.head()].id.decode('utf-8')[:7])
+            return 'g{}'.format(r[r.head()].id.decode('ascii')[:7])
 
         # We're now 0 commits from the top
         commit_count = 0
@@ -1340,7 +1340,7 @@ def describe(repo):
         walker = r.get_walker()
         for entry in walker:
             # Check if tag
-            commit_id = entry.commit.id.decode('utf-8')
+            commit_id = entry.commit.id.decode('ascii')
             for tag in sorted_tags:
                 tag_name = tag[0]
                 tag_commit = tag[1][1]
@@ -1351,9 +1351,9 @@ def describe(repo):
                         return '{}-{}-g{}'.format(
                                 tag_name,
                                 commit_count,
-                                latest_commit.id.decode('utf-8')[:7])
+                                latest_commit.id.decode('ascii')[:7])
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return 'g{}'.format(latest_commit.id.decode('utf-8')[:7])
+        return 'g{}'.format(latest_commit.id.decode('ascii')[:7])

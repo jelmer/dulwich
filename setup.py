@@ -14,7 +14,7 @@ from distutils.core import Distribution
 import os
 import sys
 
-dulwich_version_string = '0.19.5'
+dulwich_version_string = '0.19.6'
 
 include_dirs = []
 # Windows MSVC support

@@ -1,3 +1,17 @@
+0.19.5	2018-08-08
+
+ IMPROVEMENTS
+
+  * Add ``porcelain.describe``. (Sylvia van Os)
+
+ BUG FIXES
+
+  * Fix regression in ``dulwich.porcelain.clone`` that prevented cloning
+    of remote repositories. (Jelmer Vernooĳ, #639)
+
+  * Don't leave around empty parent directories for removed refs.
+    (Damien Tournoud, #640)
+
 0.19.4	2018-06-24
 
  IMPROVEMENTS

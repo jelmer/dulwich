@@ -772,18 +772,41 @@ class DiskRefsContainer(RefsContainer):
                     orig_ref = self.get_packed_refs().get(name, ZERO_SHA)
                 if orig_ref != old_ref:
                     return False
-            # may only be packed
+
+            # remove the reference file itself
             try:
                 os.remove(filename)
             except OSError as e:
-                if e.errno != errno.ENOENT:
+                if e.errno != errno.ENOENT:  # may only be packed
                     raise
+
             self._remove_packed_ref(name)
             self._log(name, old_ref, None, committer=committer,
                       timestamp=timestamp, timezone=timezone, message=message)
         finally:
             # never write, we just wanted the lock
             f.abort()
+
+        # outside of the lock, clean-up any parent directory that might now
+        # be empty. this ensures that re-creating a reference of the same
+        # name of what was previously a directory works as expected
+        parent = name
+        while True:
+            try:
+                parent, _ = parent.rsplit(b'/', 1)
+            except ValueError:
+                break
+
+            parent_filename = self.refpath(parent)
+            try:
+                os.rmdir(parent_filename)
+            except OSError as e:
+                # this can be caused by the parent directory being
+                # removed by another process, being not empty, etc.
+                # in any case, this is non fatal because we already
+                # removed the reference, just ignore it
+                break
+
         return True
 
 

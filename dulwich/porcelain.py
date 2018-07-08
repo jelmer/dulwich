@@ -30,6 +30,7 @@ Currently implemented:
  * commit
  * commit-tree
  * daemon
+ * describe
  * diff-tree
  * fetch
  * init
@@ -61,6 +62,7 @@ from contextlib import (
     contextmanager,
 )
 from io import BytesIO
+import datetime
 import os
 import posixpath
 import stat
@@ -306,11 +308,8 @@ def clone(source, target=None, bare=False, checkout=None,
     if checkout and bare:
         raise ValueError("checkout and bare are incompatible")
 
-    config = StackedConfig.default()
-    client, host_path = get_transport_and_path(source, config=config, **kwargs)
-
     if target is None:
-        target = host_path.split("/")[-1]
+        target = source.split("/")[-1]
 
     if not os.path.exists(target):
         os.mkdir(target)
@@ -322,7 +321,7 @@ def clone(source, target=None, bare=False, checkout=None,
 
     reflog_message = b'clone: from ' + source.encode('utf-8')
     try:
-        fetch_result = fetch(r, host_path, origin, message=reflog_message)
+        fetch_result = fetch(r, source, origin, message=reflog_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -1289,3 +1288,72 @@ def ls_files(repo):
     """List all files in an index."""
     with open_repo_closing(repo) as r:
         return sorted(r.open_index())
+
+
+def describe(repo):
+    """Describe the repository version.
+
+    :param projdir: git repository root
+    :returns: a string description of the current git revision
+
+    Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
+    """
+    # Get the repository
+    with open_repo_closing(repo) as r:
+        # Get a list of all tags
+        refs = r.get_refs()
+        tags = {}
+        for key, value in refs.items():
+            key = key.decode()
+            obj = r.get_object(value)
+            if u'tags' not in key:
+                continue
+
+            _, tag = key.rsplit(u'/', 1)
+
+            try:
+                commit = obj.object
+            except AttributeError:
+                continue
+            else:
+                commit = r.get_object(commit[1])
+            tags[tag] = [
+                datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
+                commit.id.decode('ascii'),
+            ]
+
+        sorted_tags = sorted(tags.items(),
+                             key=lambda tag: tag[1][0],
+                             reverse=True)
+
+        # If there are no tags, return the current commit
+        if len(sorted_tags) == 0:
+            return 'g{}'.format(r[r.head()].id.decode('ascii')[:7])
+
+        # We're now 0 commits from the top
+        commit_count = 0
+
+        # Get the latest commit
+        latest_commit = r[r.head()]
+
+        # Walk through all commits
+        walker = r.get_walker()
+        for entry in walker:
+            # Check if tag
+            commit_id = entry.commit.id.decode('ascii')
+            for tag in sorted_tags:
+                tag_name = tag[0]
+                tag_commit = tag[1][1]
+                if commit_id == tag_commit:
+                    if commit_count == 0:
+                        return tag_name
+                    else:
+                        return '{}-{}-g{}'.format(
+                                tag_name,
+                                commit_count,
+                                latest_commit.id.decode('ascii')[:7])
+
+            commit_count += 1
+
+        # Return plain commit if no parent tag can be found
+        return 'g{}'.format(latest_commit.id.decode('ascii')[:7])

@@ -174,16 +174,25 @@ def open_repo_closing(path_or_repo):
 
 
 def path_to_tree_path(repopath, path):
-    """Convert a path to a path usable in e.g. an index.
+    """Convert a path to a path usable in an index, e.g. bytes and relative to
+    the repository root.
 
-    :param repo: Repository
-    :param path: A path
+    :param repopath: Repository path, absolute or relative to the cwd
+    :param path: A path, absolute or relative to the cwd
     :return: A path formatted for use in e.g. an index
     """
-    os.path.relpath(path, repopath)
-    if os.path.sep != '/':
-        path = path.replace(os.path.sep, '/')
-    return path.encode(sys.getfilesystemencoding())
+    if not isinstance(path, bytes):
+        path = path.encode(sys.getfilesystemencoding())
+    if not isinstance(repopath, bytes):
+        repopath = repopath.encode(sys.getfilesystemencoding())
+    if os.path.isabs(path) and not os.path.isabs(repopath):
+        repopath = os.path.abspath(repopath)
+    elif os.path.isabs(repopath) and not os.path.isabs(path):
+        path = os.path.abspath(path)
+    treepath = os.path.relpath(path, repopath)
+    if treepath.startswith(b'..'):
+        raise ValueError('Path not in repo')
+    return treepath
 
 
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
@@ -1188,10 +1197,10 @@ def check_ignore(repo, paths, no_index=False):
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         for path in paths:
-            if os.path.isabs(path):
-                path = os.path.relpath(path, r.path)
             if not no_index and path_to_tree_path(r.path, path) in index:
                 continue
+            if os.path.isabs(path):
+                path = os.path.relpath(path, r.path)
             if ignore_manager.is_ignored(path):
                 yield path
 

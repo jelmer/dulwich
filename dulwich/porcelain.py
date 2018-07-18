@@ -185,10 +185,6 @@ def path_to_tree_path(repopath, path):
         path = path.encode(sys.getfilesystemencoding())
     if not isinstance(repopath, bytes):
         repopath = repopath.encode(sys.getfilesystemencoding())
-    if os.path.isabs(path) and not os.path.isabs(repopath):
-        repopath = os.path.abspath(repopath)
-    elif os.path.isabs(repopath) and not os.path.isabs(path):
-        path = os.path.abspath(path)
     treepath = os.path.relpath(path, repopath)
     if treepath.startswith(b'..'):
         raise ValueError('Path not in repo')

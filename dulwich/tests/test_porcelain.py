@@ -827,7 +827,7 @@ class StatusTests(PorcelainTestCase):
             results.staged)
         self.assertEqual([], results.unstaged)
 
-    def test_status(self):
+    def test_status_base(self):
         """Integration test for `status` functionality."""
 
         # Commit a dummy file then modify it
@@ -858,6 +858,41 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(results.staged['add'][0],
                          filename_add.encode('ascii'))
         self.assertEqual(results.unstaged, [b'foo'])
+
+    def test_status_all(self):
+        del_path = os.path.join(self.repo.path, 'foo')
+        mod_path = os.path.join(self.repo.path, 'bar')
+        add_path = os.path.join(self.repo.path, 'baz')
+        us_path = os.path.join(self.repo.path, 'blye')
+        ut_path = os.path.join(self.repo.path, 'blyat')
+        with open(del_path, 'w') as f:
+            f.write('origstuff')
+        with open(mod_path, 'w') as f:
+            f.write('origstuff')
+        with open(us_path, 'w') as f:
+            f.write('origstuff')
+        porcelain.add(repo=self.repo.path, paths=[del_path, mod_path, us_path])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+        porcelain.remove(self.repo.path, [del_path])
+        with open(add_path, 'w') as f:
+            f.write('origstuff')
+        with open(mod_path, 'w') as f:
+            f.write('more_origstuff')
+        with open(us_path, 'w') as f:
+            f.write('more_origstuff')
+        porcelain.add(repo=self.repo.path, paths=[add_path, mod_path])
+        with open(us_path, 'w') as f:
+            f.write('\norigstuff')
+        with open(ut_path, 'w') as f:
+            f.write('origstuff')
+        results = porcelain.status(self.repo.path)
+        self.assertDictEqual(
+            {'add': [b'baz'], 'delete': [b'foo'], 'modify': [b'bar']},
+            results.staged)
+        self.assertListEqual(results.unstaged, [b'blye'])
+        self.assertListEqual(results.untracked, ['blyat'])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""
@@ -1283,27 +1318,48 @@ class CheckIgnoreTests(PorcelainTestCase):
 
     def test_check_ignored(self):
         with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
-            f.write("foo")
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
-            f.write("BAR")
-        with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
-            f.write("BAR")
+            f.write('foo')
+        foo_path = os.path.join(self.repo.path, 'foo')
+        with open(foo_path, 'w') as f:
+            f.write('BAR')
+        bar_path = os.path.join(self.repo.path, 'bar')
+        with open(bar_path, 'w') as f:
+            f.write('BAR')
         self.assertEqual(
             ['foo'],
-            list(porcelain.check_ignore(self.repo, ['foo'])))
-        self.assertEqual([], list(porcelain.check_ignore(self.repo, ['bar'])))
+            list(porcelain.check_ignore(self.repo, [foo_path])))
+        self.assertEqual(
+            [], list(porcelain.check_ignore(self.repo, [bar_path])))
 
-    def test_check_added(self):
-        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
-            f.write("BAR")
+    def test_check_added_abs(self):
+        path = os.path.join(self.repo.path, 'foo')
+        with open(path, 'w') as f:
+            f.write('BAR')
         self.repo.stage(['foo'])
         with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
-            f.write("foo\n")
+            f.write('foo\n')
         self.assertEqual(
-            [], list(porcelain.check_ignore(self.repo, ['foo'])))
+            [], list(porcelain.check_ignore(self.repo, [path])))
         self.assertEqual(
             ['foo'],
-            list(porcelain.check_ignore(self.repo, ['foo'], no_index=True)))
+            list(porcelain.check_ignore(self.repo, [path], no_index=True)))
+
+    def test_check_added_rel(self):
+        with open(os.path.join(self.repo.path, 'foo'), 'w') as f:
+            f.write('BAR')
+        self.repo.stage(['foo'])
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write('foo\n')
+        cwd = os.getcwd()
+        os.mkdir(os.path.join(self.repo.path, 'bar'))
+        os.chdir(os.path.join(self.repo.path, 'bar'))
+        try:
+            self.assertEqual(
+                list(porcelain.check_ignore(self.repo, ['../foo'])), [])
+            self.assertEqual(['../foo'], list(
+               porcelain.check_ignore(self.repo, ['../foo'], no_index=True)))
+        finally:
+            os.chdir(cwd)
 
 
 class UpdateHeadTests(PorcelainTestCase):
@@ -1431,3 +1487,42 @@ class DescribeTests(PorcelainTestCase):
         self.assertEqual(
                 'tryme-1-g{}'.format(sha[:7].decode('ascii')),
                 porcelain.describe(self.repo.path))
+
+
+class HelperTests(PorcelainTestCase):
+    def test_path_to_tree_path_base(self):
+        self.assertEqual(
+            b'bar', porcelain.path_to_tree_path('/home/foo', '/home/foo/bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', 'bar'))
+        cwd = os.getcwd()
+        self.assertEqual(
+            b'bar', porcelain.path_to_tree_path('.', os.path.join(cwd, 'bar')))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path(cwd, 'bar'))
+
+    def test_path_to_tree_path_syntax(self):
+        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', './bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', b'./bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', b'./bar'))
+
+    def test_path_to_tree_path_error(self):
+        with self.assertRaises(ValueError):
+            porcelain.path_to_tree_path('/home/foo/', '/home/bar/baz')
+
+    def test_path_to_tree_path_rel(self):
+        cwd = os.getcwd()
+        os.mkdir(os.path.join(self.repo.path, 'foo'))
+        os.mkdir(os.path.join(self.repo.path, 'foo/bar'))
+        try:
+            os.chdir(os.path.join(self.repo.path, 'foo/bar'))
+            self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
+                '..', 'baz'))
+            self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
+                os.path.join(os.getcwd(), '..'),
+                os.path.join(os.getcwd(), 'baz')))
+            self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
+                '..', os.path.join(os.getcwd(), 'baz')))
+            self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
+                os.path.join(os.getcwd(), '..'), 'baz'))
+        finally:
+            os.chdir(cwd)

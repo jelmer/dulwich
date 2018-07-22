@@ -326,7 +326,8 @@ def clone(source, target=None, bare=False, checkout=None,
 
     reflog_message = b'clone: from ' + source.encode('utf-8')
     try:
-        fetch_result = fetch(r, source, origin, message=reflog_message)
+        fetch_result = fetch(
+            r, source, origin, errstream=errstream, message=reflog_message)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)

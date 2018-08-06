@@ -23,9 +23,11 @@ matrix:
     - python: 3.3
       env: TEST_REQUIRE=fastimport
     - python: 3.7
+      env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
     - python: 3.8-dev
+      env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
       

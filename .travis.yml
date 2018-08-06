@@ -22,6 +22,13 @@ matrix:
       env: TEST_REQUIRE=fastimport
     - python: 3.3
       env: TEST_REQUIRE=fastimport
+    - python: 3.7
+      dist: xenial
+      sudo: true
+    - python: 3.8-dev
+      dist: xenial
+      sudo: true
+      
 
 install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE

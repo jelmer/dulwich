@@ -54,10 +54,8 @@ except ImportError:
     from urllib.parse import unquote as urlunquote
 
 try:
-    import urllib2
     import urlparse
 except ImportError:
-    import urllib.request as urllib2
     import urllib.parse as urlparse
 
 import dulwich
@@ -1353,7 +1351,6 @@ class HttpGitClient(GitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
-        auth, host = urllib2.splituser(parsedurl.netloc)
         password = parsedurl.password
         if password is not None:
             password = urlunquote(password)
@@ -1361,7 +1358,7 @@ class HttpGitClient(GitClient):
         if username is not None:
             username = urlunquote(username)
         # TODO(jelmer): This also strips the username
-        parsedurl = parsedurl._replace(netloc=host)
+        parsedurl = parsedurl._replace(netloc=parsedurl.hostname)
         return cls(urlparse.urlunparse(parsedurl),
                    password=password, username=username, **kwargs)
 

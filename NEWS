@@ -1,5 +1,10 @@
 0.19.6	UNRELEASED
 
+ BUG FIXES
+
+  * Fix support for custom transport arguments in ``dulwich.porcelain.clone``.
+    (Semyon Slepov)
+
 0.19.5	2018-08-08
 
  IMPROVEMENTS

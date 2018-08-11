@@ -590,6 +590,10 @@ def read_submodule_head(path):
     """
     from dulwich.errors import NotGitRepository
     from dulwich.repo import Repo
+    # Repo currently expects a "str", so decode if necessary.
+    # TODO(jelmer): Perhaps move this into Repo() ?
+    if not isinstance(path, str):
+        path = path.decode(sys.getfilesystemencoding())
     try:
         repo = Repo(path)
     except NotGitRepository:
@@ -690,12 +694,13 @@ def index_entry_from_path(path, object_store=None):
         save new blobs in
     :return: An index entry
     """
+    assert isinstance(path, bytes)
     try:
         st = os.lstat(path)
         blob = blob_from_path_and_stat(path, st)
     except EnvironmentError as e:
         if e.errno == errno.EISDIR:
-            if os.path.exists(os.path.join(path, '.git')):
+            if os.path.exists(os.path.join(path, b'.git')):
                 head = read_submodule_head(path)
                 if head is None:
                     return None

@@ -1,4 +1,4 @@
-0.19.6	UNRELEASED
+0.19.6	2018-08-11
 
  BUG FIXES
 
@@ -12,7 +12,7 @@
   * Support paths as bytestrings in various places in ``dulwich.index``
     (Jelmer Vernooĳ)
 
-0.19.5	2018-08-08
+0.19.5	2018-07-08
 
  IMPROVEMENTS
 

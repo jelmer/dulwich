@@ -5,6 +5,13 @@
   * Fix support for custom transport arguments in ``dulwich.porcelain.clone``.
     (Semyon Slepov)
 
+  * Fix compatibility with Python 3.8 (Jelmer Vernooĳ, Daniel M. Capella)
+
+  * Fix some corner cases in ``path_to_tree_path``. (Romain Keramitas)
+
+  * Support paths as bytestrings in various places in ``dulwich.index``
+    (Jelmer Vernooĳ)
+
 0.19.5	2018-08-08
 
  IMPROVEMENTS

@@ -1,4 +1,4 @@
-dulwich (0.19.6-1) UNRELEASED; urgency=medium
+dulwich (0.19.6-1) unstable; urgency=medium
 
   * Migrate to pybuild.
   * New upstream release.

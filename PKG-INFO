@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.19.5
+Version: 0.19.6
 Summary: [![Build Status](https://travis-ci.org/dulwich/dulwich.png?branch=master)](https://travis-ci.org/dulwich/dulwich)
 [![Windows Build status](https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true)](https://ci.appveyor.com/project/jelmer/dulwich/branch/master)
 

@@ -79,12 +79,6 @@ class ArchiveTests(PorcelainTestCase):
         self.addCleanup(tf.close)
         self.assertEqual([], tf.getnames())
 
-    def test_simple_outstream_errstream_autofallback(self):
-        c1, c2, c3 = build_commit_graph(
-                self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
-        self.repo.refs[b"refs/heads/master"] = c3.id
-        porcelain.archive(self.repo.path, b"refs/heads/master")
-
 
 class UpdateServerInfoTests(PorcelainTestCase):
 
@@ -226,6 +220,20 @@ class CloneTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
         errstream = BytesIO()
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=True, errstream=errstream)
+        r.close()
+
+    def test_no_head_no_checkout_outstream_errstream_autofallback(self):
+        f1_1 = make_object(Blob, data=b'f1')
+        commit_spec = [[1]]
+        trees = {1: [(b'f1', f1_1), (b'f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        errstream = porcelain.NoneStream
         r = porcelain.clone(
             self.repo.path, target_path, checkout=True, errstream=errstream)
         r.close()

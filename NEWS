@@ -1,5 +1,10 @@
 0.19.7	UNRELEASED
 
+ BUG FIXES
+
+  * Don't write to stdout and stderr when they are not available
+    (such as is the case for pythonw). (Sylvia van Os, #652)
+
 0.19.6	2018-08-11
 
  BUG FIXES

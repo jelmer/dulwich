@@ -1490,6 +1490,7 @@ class DescribeTests(PorcelainTestCase):
 
 
 class HelperTests(PorcelainTestCase):
+
     def test_path_to_tree_path_base(self):
         self.assertEqual(
             b'bar', porcelain.path_to_tree_path('/home/foo', '/home/foo/bar'))

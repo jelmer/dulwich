@@ -188,6 +188,8 @@ def path_to_tree_path(repopath, path):
     treepath = os.path.relpath(path, repopath)
     if treepath.startswith(b'..'):
         raise ValueError('Path not in repo')
+    if os.path.sep != '/':
+        treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
     return treepath
 
 

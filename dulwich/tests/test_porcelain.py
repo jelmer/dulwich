@@ -224,6 +224,20 @@ class CloneTests(PorcelainTestCase):
             self.repo.path, target_path, checkout=True, errstream=errstream)
         r.close()
 
+    def test_no_head_no_checkout_outstream_errstream_autofallback(self):
+        f1_1 = make_object(Blob, data=b'f1')
+        commit_spec = [[1]]
+        trees = {1: [(b'f1', f1_1), (b'f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        errstream = porcelain.NoneStream()
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=True, errstream=errstream)
+        r.close()
+
 
 class InitTests(TestCase):
 

@@ -61,7 +61,7 @@ from contextlib import (
     closing,
     contextmanager,
 )
-from io import BytesIO
+from io import BytesIO, RawIOBase
 import datetime
 import os
 import posixpath
@@ -139,8 +139,27 @@ from dulwich.server import (
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
-default_bytes_out_stream = getattr(sys.stdout, 'buffer', sys.stdout)
-default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
+class NoneStream(RawIOBase):
+    """Fallback if stdout or stderr are unavailable, does nothing."""
+    def read(self, size=-1):
+        return None
+
+    def readall(self):
+        return None
+
+    def readinto(self, b):
+        return None
+
+    def write(self, b):
+        return None
+
+
+default_bytes_out_stream = getattr(
+        sys.stdout, 'buffer', sys.stdout
+    ) or NoneStream()
+default_bytes_err_stream = getattr(
+        sys.stderr, 'buffer', sys.stderr
+    ) or NoneStream()
 
 
 DEFAULT_ENCODING = 'utf-8'

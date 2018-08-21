@@ -79,6 +79,12 @@ class ArchiveTests(PorcelainTestCase):
         self.addCleanup(tf.close)
         self.assertEqual([], tf.getnames())
 
+    def test_simple_outstream_errstream_autofallback(self):
+        c1, c2, c3 = build_commit_graph(
+                self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        porcelain.archive(self.repo.path, b"refs/heads/master")
+
 
 class UpdateServerInfoTests(PorcelainTestCase):
 

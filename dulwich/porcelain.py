@@ -141,25 +141,25 @@ GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
-    def read(size=-1):
+    def read(self, size=-1):
         return None
 
-    def readall():
+    def readall(self):
         return None
 
-    def readinto(b):
+    def readinto(self, b):
         return None
 
-    def write(b):
+    def write(self, b):
         return None
 
 
 default_bytes_out_stream = getattr(
         sys.stdout, 'buffer', sys.stdout
-    ) or NoneStream
+    ) or NoneStream()
 default_bytes_err_stream = getattr(
         sys.stderr, 'buffer', sys.stderr
-    ) or NoneStream
+    ) or NoneStream()
 
 
 DEFAULT_ENCODING = 'utf-8'

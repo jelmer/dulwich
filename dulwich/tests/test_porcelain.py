@@ -233,7 +233,7 @@ class CloneTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/master"] = c1.id
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
-        errstream = porcelain.NoneStream
+        errstream = porcelain.NoneStream()
         r = porcelain.clone(
             self.repo.path, target_path, checkout=True, errstream=errstream)
         r.close()

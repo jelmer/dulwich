@@ -549,6 +549,28 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual('user', c._username)
         self.assertEqual('passwd', c._password)
 
+    def test_http_auth_with_username(self):
+        url = 'https://github.com/jelmer/dulwich'
+
+        c, path = get_transport_and_path(
+                url, username='user2', password='blah')
+
+        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('/jelmer/dulwich', path)
+        self.assertEqual('user2', c._username)
+        self.assertEqual('blah', c._password)
+
+    def test_http_auth_with_username_and_in_url(self):
+        url = 'https://user:passwd@github.com/jelmer/dulwich'
+
+        c, path = get_transport_and_path(
+                url, username='user2', password='blah')
+
+        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('/jelmer/dulwich', path)
+        self.assertEqual('user', c._username)
+        self.assertEqual('passwd', c._password)
+
     def test_http_no_auth(self):
         url = 'https://github.com/jelmer/dulwich'
 

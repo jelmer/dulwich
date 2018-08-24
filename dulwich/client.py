@@ -1353,14 +1353,13 @@ class HttpGitClient(GitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         password = parsedurl.password
         if password is not None:
-            password = urlunquote(password)
+            kwargs['password'] = urlunquote(password)
         username = parsedurl.username
         if username is not None:
-            username = urlunquote(username)
+            kwargs['username'] = urlunquote(username)
         # TODO(jelmer): This also strips the username
         parsedurl = parsedurl._replace(netloc=parsedurl.hostname)
-        return cls(urlparse.urlunparse(parsedurl),
-                   password=password, username=username, **kwargs)
+        return cls(urlparse.urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (

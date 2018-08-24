@@ -1329,7 +1329,6 @@ class HttpGitClient(GitClient):
         self._username = username
         self._password = password
         self.dumb = dumb
-        self.headers = {}
 
         if pool_manager is None:
             self.pool_manager = default_urllib3_manager(config)

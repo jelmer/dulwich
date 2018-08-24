@@ -6,7 +6,6 @@ python:
   - 2.7
   - 3.4
   - 3.5
-  - 3.5-dev
   - 3.6
   - 3.6-dev
   - pypy3.3-5.2-alpha1
@@ -30,7 +29,6 @@ matrix:
       env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
-      
 
 install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE

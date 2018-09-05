@@ -500,6 +500,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             data = self.rfile.read(nbytes)
         else:
             data = None
+            env['CONTENT_LENGTH'] = '0'
         # throw away additional data [see bug #427345]
         while select.select([self.rfile._sock], [], [], 0)[0]:
             if not self.rfile._sock.recv(1):

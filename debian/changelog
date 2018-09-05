@@ -1,4 +1,4 @@
-dulwich (0.19.6-2) UNRELEASED; urgency=medium
+dulwich (0.19.6-2) unstable; urgency=medium
 
   * Add patch 02_newer_git, fixing compatibility with newer versions of
     git. Closes: #907954

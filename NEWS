@@ -5,6 +5,9 @@
   * Don't write to stdout and stderr when they are not available
     (such as is the case for pythonw). (Sylvia van Os, #652)
 
+  * Fix compatibility with newer versions of git, which expect CONTENT_LENGTH
+    to be set to 0 for empty body requests. (Jelmer Vernooĳ, #657)
+
 0.19.6	2018-08-11
 
  BUG FIXES

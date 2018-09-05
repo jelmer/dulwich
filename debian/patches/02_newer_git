@@ -1,0 +1,18 @@
+Description: Fix compatibility with newer versions of git, which expect CONTENT_LENGTH to be set to 0 for empty body requests.
+Origin: commit, revision id: git-v1:76ea02025eb4651913f9cf21454562d572ef4f3d
+Author: Jelmer Vernooĳ <jelmer@jelmer.uk>
+Last-Update: 2018-09-05
+X-Bzr-Revision-Id: git-v1:76ea02025eb4651913f9cf21454562d572ef4f3d
+
+=== modified file 'dulwich/tests/compat/test_client.py'
+--- old/dulwich/tests/compat/test_client.py	2018-06-15 22:19:41 +0000
++++ new/dulwich/tests/compat/test_client.py	2018-09-05 20:17:23 +0000
+@@ -500,6 +500,7 @@
+             data = self.rfile.read(nbytes)
+         else:
+             data = None
++            env['CONTENT_LENGTH'] = '0'
+         # throw away additional data [see bug #427345]
+         while select.select([self.rfile._sock], [], [], 0)[0]:
+             if not self.rfile._sock.recv(1):
+

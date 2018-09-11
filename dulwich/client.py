@@ -103,7 +103,17 @@ from dulwich.pack import (
     )
 from dulwich.refs import (
     read_info_refs,
+    ANNOTATED_TAG_SUFFIX,
     )
+
+
+class InvalidWants(Exception):
+    """Invalid wants."""
+
+    def __init__(self, wants):
+        Exception.__init__(
+            self,
+            "requested wants not in server provided refs: %r" % wants)
 
 
 def _fileno_can_read(fileno):
@@ -611,6 +621,19 @@ class GitClient(object):
                 if data == b"":
                     break
                 pack_data(data)
+
+
+def check_wants(wants, refs):
+    """Check that a set of wants is valid.
+
+    :param wants: Set of object SHAs to fetch
+    :param refs: Refs dictionary to check against
+    """
+    missing = set(wants) - {
+            v for (k, v) in refs.items()
+            if not k.endswith(ANNOTATED_TAG_SUFFIX)}
+    if missing:
+        raise InvalidWants(missing)
 
 
 class TraditionalGitClient(GitClient):

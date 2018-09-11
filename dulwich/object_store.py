@@ -65,6 +65,7 @@ from dulwich.pack import (
     PackIndexer,
     PackStreamCopier,
     )
+from dulwich.refs import ANNOTATED_TAG_SUFFIX
 
 INFODIR = 'info'
 PACKDIR = 'pack'
@@ -75,7 +76,8 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.items()
-                if sha not in self and not ref.endswith(b"^{}") and
+                if sha not in self and
+                not ref.endswith(ANNOTATED_TAG_SUFFIX) and
                 not sha == ZERO_SHA]
 
     def iter_shas(self, shas):

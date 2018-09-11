@@ -42,6 +42,7 @@ from dulwich import (
     client,
     )
 from dulwich.client import (
+    InvalidWants,
     LocalGitClient,
     TraditionalGitClient,
     TCPGitClient,
@@ -53,6 +54,7 @@ from dulwich.client import (
     SubprocessSSHVendor,
     PLinkSSHVendor,
     UpdateRefsError,
+    check_wants,
     default_urllib3_manager,
     get_transport_and_path,
     get_transport_and_path_from_url,
@@ -1178,3 +1180,21 @@ class RsyncUrlTests(TestCase):
 
     def test_path(self):
         self.assertRaises(ValueError, parse_rsync_url, '/path')
+
+
+class CheckWantsTests(TestCase):
+
+    def test_fine(self):
+        check_wants(['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+                    {'refs/heads/blah': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+
+    def test_missing(self):
+        self.assertRaises(InvalidWants, check_wants,
+                ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+                {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+
+    def test_annotated(self):
+        self.assertRaises(InvalidWants, check_wants,
+                ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+                {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
+                 'refs/heads/blah^{}': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})

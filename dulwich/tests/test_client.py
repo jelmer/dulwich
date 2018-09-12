@@ -192,6 +192,19 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
+    def test_fetch_pack_sha_not_in_ref(self):
+        self.rin.write(
+            b'008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD\x00multi_ack '
+            b'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
+            b'include-tag\n'
+            b'0000')
+        self.rin.seek(0)
+        self.assertRaises(InvalidWants, self.client.fetch_pack,
+                b'bla',
+                lambda heads: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
+                None, None,
+                None)
+
     def test_send_pack_no_sideband64k_with_update_ref_error(self):
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data
@@ -218,7 +231,7 @@ class GitClientTests(TestCase):
         commit.encoding = b'UTF-8'
         commit.message = b'test message'
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {b'refs/foo/bar': commit.id, }
 
         def generate_pack_data(have, want, ofs_delta=False):
@@ -226,7 +239,7 @@ class GitClientTests(TestCase):
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, "blah",
-                          determine_wants, generate_pack_data)
+                          update_refs, generate_pack_data)
 
     def test_send_pack_none(self):
         self.rin.write(
@@ -236,7 +249,7 @@ class GitClientTests(TestCase):
             b'0000')
         self.rin.seek(0)
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {
                 b'refs/heads/master':
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
@@ -245,7 +258,7 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):
@@ -258,13 +271,13 @@ class GitClientTests(TestCase):
             b'0000')
         self.rin.seek(0)
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -283,13 +296,13 @@ class GitClientTests(TestCase):
             b'0000')
         self.rin.seek(0)
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', determine_wants, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -308,7 +321,7 @@ class GitClientTests(TestCase):
             b'0000')
         self.rin.seek(0)
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {
                 b'refs/heads/blah12':
                 b'310ca9477129b8586fa2afc779c1f57cf64bba6c',
@@ -321,7 +334,7 @@ class GitClientTests(TestCase):
 
         f = BytesIO()
         write_pack_objects(f, {})
-        self.client.send_pack('/', determine_wants, generate_pack_data)
+        self.client.send_pack('/', update_refs, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f0000000000000000000000000000000000000000 '
@@ -352,7 +365,7 @@ class GitClientTests(TestCase):
         commit.encoding = b'UTF-8'
         commit.message = b'test message'
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {
                 b'refs/heads/blah12': commit.id,
                 b'refs/heads/master':
@@ -364,7 +377,7 @@ class GitClientTests(TestCase):
 
         f = BytesIO()
         write_pack_data(f, *generate_pack_data(None, None))
-        self.client.send_pack(b'/', determine_wants, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, generate_pack_data)
         self.assertIn(
             self.rout.getvalue(),
             [b'007f0000000000000000000000000000000000000000 ' + commit.id +
@@ -386,7 +399,7 @@ class GitClientTests(TestCase):
                 self.rin.write(("%04x" % (len(pkt)+4)).encode('ascii') + pkt)
         self.rin.seek(0)
 
-        def determine_wants(refs):
+        def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
         def generate_pack_data(have, want, ofs_delta=False):
@@ -394,7 +407,7 @@ class GitClientTests(TestCase):
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, b"/",
-                          determine_wants, generate_pack_data)
+                          update_refs, generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
 

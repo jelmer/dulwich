@@ -8,6 +8,10 @@
   * Fix compatibility with newer versions of git, which expect CONTENT_LENGTH
     to be set to 0 for empty body requests. (Jelmer Vernooĳ, #657)
 
+  * Raise an exception client-side when a caller tries to request
+    SHAs that are not directly referenced the servers' refs.
+    (Jelmer Vernooĳ)
+
 0.19.6	2018-08-11
 
  BUG FIXES

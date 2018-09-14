@@ -1435,10 +1435,7 @@ class HttpGitClient(GitClient):
         # `BytesIO`, if we can guarantee that the entire response is consumed
         # before issuing the next to still allow for connection reuse from the
         # pool.
-        if resp.getheader("Content-Encoding") == "gzip":
-            read = gzip.GzipFile(fileobj=BytesIO(resp.data)).read
-        else:
-            read = BytesIO(resp.data).read
+        read = BytesIO(resp.data).read
 
         resp.content_type = resp.getheader("Content-Type")
         resp.redirect_location = resp.get_redirect_location()

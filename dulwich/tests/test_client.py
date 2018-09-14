@@ -199,7 +199,8 @@ class GitClientTests(TestCase):
             b'include-tag\n'
             b'0000')
         self.rin.seek(0)
-        self.assertRaises(InvalidWants, self.client.fetch_pack,
+        self.assertRaises(
+                InvalidWants, self.client.fetch_pack,
                 b'bla',
                 lambda heads: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
                 None, None,
@@ -1198,16 +1199,19 @@ class RsyncUrlTests(TestCase):
 class CheckWantsTests(TestCase):
 
     def test_fine(self):
-        check_wants(['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-                    {'refs/heads/blah': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+        check_wants(
+            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {'refs/heads/blah': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
 
     def test_missing(self):
-        self.assertRaises(InvalidWants, check_wants,
-                ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-                {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+        self.assertRaises(
+            InvalidWants, check_wants,
+            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
 
     def test_annotated(self):
-        self.assertRaises(InvalidWants, check_wants,
-                ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-                {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
-                 'refs/heads/blah^{}': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+        self.assertRaises(
+            InvalidWants, check_wants,
+            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
+             'refs/heads/blah^{}': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})

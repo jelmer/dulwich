@@ -40,7 +40,6 @@ Known capabilities that are not supported:
 
 from contextlib import closing
 from io import BytesIO, BufferedReader
-import gzip
 import select
 import socket
 import subprocess

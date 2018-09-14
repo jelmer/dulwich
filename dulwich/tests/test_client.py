@@ -1214,4 +1214,5 @@ class CheckWantsTests(TestCase):
             InvalidWants, check_wants,
             [b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
             {b'refs/heads/blah': b'3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
-             b'refs/heads/blah^{}': b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+             b'refs/heads/blah^{}':
+                b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})

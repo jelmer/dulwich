@@ -1200,18 +1200,18 @@ class CheckWantsTests(TestCase):
 
     def test_fine(self):
         check_wants(
-            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-            {'refs/heads/blah': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+            [b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {b'refs/heads/blah': b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
 
     def test_missing(self):
         self.assertRaises(
             InvalidWants, check_wants,
-            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-            {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+            [b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {b'refs/heads/blah': b'3f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
 
     def test_annotated(self):
         self.assertRaises(
             InvalidWants, check_wants,
-            ['2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
-            {'refs/heads/blah': '3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
-             'refs/heads/blah^{}': '2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+            [b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'],
+            {b'refs/heads/blah': b'3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
+             b'refs/heads/blah^{}': b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})

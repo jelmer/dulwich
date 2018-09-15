@@ -1,3 +1,9 @@
+dulwich (0.19.6-3) UNRELEASED; urgency=medium
+
+  * Add debian/upstream/metadata.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 16 Sep 2018 00:25:19 +0100
+
 dulwich (0.19.6-2) unstable; urgency=medium
 
   * Add patch 02_newer_git, fixing compatibility with newer versions of

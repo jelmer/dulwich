@@ -83,15 +83,42 @@ if has_setuptools:
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
 
+with open('README.md', 'r') as f:
+    description = f.read()
 
 setup(name='dulwich',
+      author="Jelmer Vernooij",
+      author_email="jelmer@jelmer.uk",
+      url="https://www.dulwich.io/",
+      description=description,
+      summary="Python Git Library",
       version=dulwich_version_string,
       license='Apachev2 or later or GPLv2',
+      project_urls={
+          "Bug Tracker": "https://github.com/dulwich/dulwich/issues",
+          "Repository": "https://www.dulwich.io/code/",
+          "GitHub": "https://github.com/dulwich/dulwich",
+      },
+      keywords="git vcs",
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
                 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       ext_modules=ext_modules,
       distclass=DulwichDistribution,
+      classifiers=[
+          'Development Status :: 4 - Beta',
+          'License :: OSI Approved :: Apache Software License',
+          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3.3',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: Implementation :: CPython',
+          'Programming Language :: Python :: Implementation :: PyPy',
+          'Operating System :: POSIX',
+          'Operating System :: Microsoft :: Windows',
+          'Topic :: Software Development :: Version Control',
+      ],
       **setup_kwargs
       )

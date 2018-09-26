@@ -871,6 +871,10 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual([], r[commit_sha].parents)
         self.assertEqual(old_refs, r.get_refs())
 
+    def test_remote_url(self):
+        r = Repo.init('.')
+        self.assertEqual(r.url(), any(['https://github.com/dulwich/dulwich', 'git@github.com:dulwich/dulwich.git']))
+
     def test_commit_dangling_commit_with_parents(self):
         r = self._repo
 

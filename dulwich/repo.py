@@ -1066,6 +1066,10 @@ class Repo(BaseRepo):
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element)
 
+    def url(self):
+        config = self.get_config()
+        return config.get((b'remote', b'origin'), 'url')
+
     def get_config(self):
         """Retrieve the config object.
 

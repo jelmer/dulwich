@@ -643,6 +643,7 @@ def remote_error_from_stderr(stderr):
     for l in stderr.readlines():
         if l.startswith(b'ERROR: '):
             return GitProtocolError(l[len(b'ERROR: '):].decode('utf-8', 'replace'))
+        return GitProtocolError(l.decode('utf-8', 'replace'))
     return HangupException()
 
 

@@ -380,7 +380,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.SubprocessGitClient(stderr=subprocess.PIPE)
+        return client.SubprocessGitClient()
 
     def _build_path(self, path):
         return self.gitroot + path

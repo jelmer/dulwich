@@ -65,6 +65,7 @@ from dulwich.errors import (
     UpdateRefsError,
     )
 from dulwich.protocol import (
+    HangupException,
     _RBUFSIZE,
     agent_string,
     capability_agent,
@@ -635,6 +636,16 @@ def check_wants(wants, refs):
         raise InvalidWants(missing)
 
 
+def remote_error_from_stderr(stderr):
+    """Return an appropriate exception based on stderr output. """
+    if stderr is None:
+        return HangupException()
+    for l in stderr.readlines():
+        if l.startswith(b'ERROR: '):
+            return GitProtocolError(l[len(b'ERROR: '):].decode('utf-8', 'replace'))
+    return HangupException()
+
+
 class TraditionalGitClient(GitClient):
     """Traditional Git client."""
 
@@ -676,9 +687,12 @@ class TraditionalGitClient(GitClient):
         :return: new_refs dictionary containing the changes that were made
             {refname: new_ref}, including deleted refs.
         """
-        proto, unused_can_read = self._connect(b'receive-pack', path)
+        proto, unused_can_read, stderr = self._connect(b'receive-pack', path)
         with proto:
-            old_refs, server_capabilities = read_pkt_refs(proto)
+            try:
+                old_refs, server_capabilities = read_pkt_refs(proto)
+            except HangupException:
+                raise remote_error_from_stderr(stderr)
             negotiated_capabilities = \
                 self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
@@ -747,9 +761,12 @@ class TraditionalGitClient(GitClient):
         :param progress: Callback for progress reports (strings)
         :return: FetchPackResult object
         """
-        proto, can_read = self._connect(b'upload-pack', path)
+        proto, can_read, stderr = self._connect(b'upload-pack', path)
         with proto:
-            refs, server_capabilities = read_pkt_refs(proto)
+            try:
+                refs, server_capabilities = read_pkt_refs(proto)
+            except HangupException:
+                raise remote_error_from_stderr(stderr)
             negotiated_capabilities, symrefs, agent = (
                     self._negotiate_upload_pack_capabilities(
                             server_capabilities))
@@ -779,15 +796,18 @@ class TraditionalGitClient(GitClient):
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
         # stock `git ls-remote` uses upload-pack
-        proto, _ = self._connect(b'upload-pack', path)
+        proto, _, stderr = self._connect(b'upload-pack', path)
         with proto:
-            refs, _ = read_pkt_refs(proto)
+            try:
+                refs, _ = read_pkt_refs(proto)
+            except HangupException:
+                raise remote_error_from_stderr(stderr)
             proto.write_pkt_line(None)
             return refs
 
     def archive(self, path, committish, write_data, progress=None,
                 write_error=None, format=None, subdirs=None, prefix=None):
-        proto, can_read = self._connect(b'upload-archive', path)
+        proto, can_read, stderr = self._connect(b'upload-archive', path)
         with proto:
             if format is not None:
                 proto.write_pkt_line(b"argument --format=" + format)
@@ -798,7 +818,10 @@ class TraditionalGitClient(GitClient):
             if prefix is not None:
                 proto.write_pkt_line(b"argument --prefix=" + prefix)
             proto.write_pkt_line(None)
-            pkt = proto.read_pkt_line()
+            try:
+                pkt = proto.read_pkt_line()
+            except HangupException:
+                raise remote_error_from_stderr(stderr)
             if pkt == b"NACK\n":
                 return
             elif pkt == b"ACK\n":
@@ -874,7 +897,7 @@ class TCPGitClient(TraditionalGitClient):
         # TODO(jelmer): Alternative to ascii?
         proto.send_cmd(
             b'git-' + cmd, path, b'host=' + self._host.encode('ascii'))
-        return proto, lambda: _fileno_can_read(s)
+        return proto, lambda: _fileno_can_read(s), None
 
 
 class SubprocessWrapper(object):
@@ -887,6 +910,10 @@ class SubprocessWrapper(object):
         else:
             self.read = BufferedReader(proc.stdout).read
         self.write = proc.stdin.write
+
+    @property
+    def stderr(self):
+        return self.proc.stderr
 
     def can_read(self):
         if sys.platform == 'win32':
@@ -922,14 +949,6 @@ def find_git_command():
 class SubprocessGitClient(TraditionalGitClient):
     """Git client that talks to a server using a subprocess."""
 
-    def __init__(self, **kwargs):
-        self._connection = None
-        self._stderr = None
-        self._stderr = kwargs.get('stderr')
-        if 'stderr' in kwargs:
-            del kwargs['stderr']
-        super(SubprocessGitClient, self).__init__(**kwargs)
-
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
         return cls(**kwargs)
@@ -944,12 +963,12 @@ class SubprocessGitClient(TraditionalGitClient):
         if self.git_command is None:
             git_command = find_git_command()
         argv = git_command + [service.decode('ascii'), path]
-        p = SubprocessWrapper(
-            subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
+        p = subprocess.Popen(argv, bufsize=0, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
-                             stderr=self._stderr))
-        return Protocol(p.read, p.write, p.close,
-                        report_activity=self._report_activity), p.can_read
+                             stderr=subprocess.PIPE)
+        pw = SubprocessWrapper(p)
+        return Protocol(pw.read, pw.write, pw.close,
+                        report_activity=self._report_activity), pw.can_read, p.stderr
 
 
 class LocalGitClient(GitClient):
@@ -1151,7 +1170,8 @@ class SubprocessSSHVendor(SSHVendor):
 
         proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
 
@@ -1187,7 +1207,8 @@ class PLinkSSHVendor(SSHVendor):
 
         proc = subprocess.Popen(args + [command], bufsize=0,
                                 stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
         return SubprocessWrapper(proc)
 
 
@@ -1259,7 +1280,7 @@ class SSHGitClient(TraditionalGitClient):
             **kwargs)
         return (Protocol(con.read, con.write, con.close,
                          report_activity=self._report_activity),
-                con.can_read)
+                con.can_read, getattr(con, 'stderr', None))
 
 
 def default_user_agent_string():

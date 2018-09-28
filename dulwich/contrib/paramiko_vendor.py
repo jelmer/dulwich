@@ -32,11 +32,9 @@ This implementation is experimental and does not have any tests.
 
 import paramiko
 import paramiko.client
-import threading
 
 
 class _ParamikoWrapper(object):
-    STDERR_READ_N = 2048  # 2k
 
     def __init__(self, client, channel):
         self.client = client

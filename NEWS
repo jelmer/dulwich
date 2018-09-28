@@ -12,6 +12,9 @@
     SHAs that are not directly referenced the servers' refs.
     (Jelmer Vernooĳ)
 
+  * Raise more informative errors when unable to connect to repository
+    over SSH or subprocess. (Jelmer Vernooĳ)
+
 0.19.6	2018-08-11
 
  BUG FIXES

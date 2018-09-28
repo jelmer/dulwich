@@ -100,7 +100,7 @@ class DummyClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self)
 
     def _connect(self, service, path):
-        return Protocol(self.read, self.write), self.can_read
+        return Protocol(self.read, self.write), self.can_read, None
 
 
 class DummyPopen():

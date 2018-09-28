@@ -642,7 +642,8 @@ def remote_error_from_stderr(stderr):
         return HangupException()
     for l in stderr.readlines():
         if l.startswith(b'ERROR: '):
-            return GitProtocolError(l[len(b'ERROR: '):].decode('utf-8', 'replace'))
+            return GitProtocolError(
+                l[len(b'ERROR: '):].decode('utf-8', 'replace'))
         return GitProtocolError(l.decode('utf-8', 'replace'))
     return HangupException()
 
@@ -968,8 +969,9 @@ class SubprocessGitClient(TraditionalGitClient):
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         pw = SubprocessWrapper(p)
-        return Protocol(pw.read, pw.write, pw.close,
-                        report_activity=self._report_activity), pw.can_read, p.stderr
+        return (Protocol(pw.read, pw.write, pw.close,
+                         report_activity=self._report_activity),
+                pw.can_read, p.stderr)
 
 
 class LocalGitClient(GitClient):

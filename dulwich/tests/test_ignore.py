@@ -106,10 +106,10 @@ class ReadIgnorePatterns(TestCase):
 
 # and an empty line:
 
-\#not a comment
+\\#not a comment
 !negative
 with trailing whitespace 
-with escaped trailing whitespace\ 
+with escaped trailing whitespace\\ 
 """)  # noqa: W291
         self.assertEqual(list(read_ignore_patterns(f)), [
             b'\\#not a comment',

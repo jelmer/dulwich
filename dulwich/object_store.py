@@ -1317,3 +1317,14 @@ class OverlayObjectStore(BaseObjectStore):
                 return True
         else:
             return False
+
+
+def read_packs_file(f):
+    """Yield the packs listed in a packs file."""
+    for line in f.read().splitlines():
+        if not line:
+            continue
+        (kind, name) = line.split(b" ", 1)
+        if kind != b"P":
+            continue
+        yield name.decode(sys.getfilesystemencoding())

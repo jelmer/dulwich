@@ -725,8 +725,8 @@ class RenameDetectionTest(DiffTestCase):
     def test_content_rename_one_to_one(self):
         b11 = make_object(Blob, data=b'a\nb\nc\nd\n')
         b12 = make_object(Blob, data=b'a\nb\nc\ne\n')
-        b21 = make_object(Blob, data=b'e\nf\ng\n\h')
-        b22 = make_object(Blob, data=b'e\nf\ng\n\i')
+        b21 = make_object(Blob, data=b'e\nf\ng\n\nh')
+        b22 = make_object(Blob, data=b'e\nf\ng\n\ni')
         tree1 = self.commit_tree([(b'a', b11), (b'b', b21)])
         tree2 = self.commit_tree([(b'c', b12), (b'd', b22)])
         self.assertEqual(

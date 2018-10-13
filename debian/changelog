@@ -2,6 +2,7 @@ dulwich (0.19.6-3) UNRELEASED; urgency=medium
 
   * Add debian/upstream/metadata.
   * Install example scripts.
+  * Don't build pypy package on hppa, powerpcspe.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 16 Sep 2018 00:25:19 +0100
 

@@ -1,9 +1,9 @@
-dulwich (0.19.6-3) UNRELEASED; urgency=medium
+dulwich (0.19.6-3) unstable; urgency=medium
 
   * Add debian/upstream/metadata.
   * Install example scripts.
   * Don't build pypy package on hppa, powerpcspe.
-  * Don't run against C git on ia64 (unavailable).
+  * Don't run tests against C git on ia64 (unavailable).
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 16 Sep 2018 00:25:19 +0100
 

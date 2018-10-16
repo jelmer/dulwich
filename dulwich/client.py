@@ -829,7 +829,8 @@ class TraditionalGitClient(GitClient):
             elif pkt == b"ACK\n":
                 pass
             elif pkt.startswith(b"ERR "):
-                raise GitProtocolError(pkt[4:].rstrip(b"\n").decode('utf-8', 'replace'))
+                raise GitProtocolError(
+                        pkt[4:].rstrip(b"\n").decode('utf-8', 'replace'))
             else:
                 raise AssertionError("invalid response %r" % pkt)
             ret = proto.read_pkt_line()

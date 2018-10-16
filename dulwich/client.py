@@ -206,7 +206,7 @@ def read_pkt_refs(proto):
     for pkt in proto.read_pkt_seq():
         (sha, ref) = pkt.rstrip(b'\n').split(None, 1)
         if sha == b'ERR':
-            raise GitProtocolError(ref)
+            raise GitProtocolError(ref.decode('utf-8', 'replace'))
         if server_capabilities is None:
             (ref, server_capabilities) = extract_capabilities(ref)
         refs[ref] = sha
@@ -829,7 +829,7 @@ class TraditionalGitClient(GitClient):
             elif pkt == b"ACK\n":
                 pass
             elif pkt.startswith(b"ERR "):
-                raise GitProtocolError(pkt[4:].rstrip(b"\n"))
+                raise GitProtocolError(pkt[4:].rstrip(b"\n").decode('utf-8', 'replace'))
             else:
                 raise AssertionError("invalid response %r" % pkt)
             ret = proto.read_pkt_line()
@@ -876,7 +876,8 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error as err:
+            except socket.error as e:
+                err = e
                 if s is not None:
                     s.close()
                 s = None

@@ -15,6 +15,9 @@
   * Raise more informative errors when unable to connect to repository
     over SSH or subprocess. (Jelmer Vernooĳ)
 
+  * Handle commit identity fields with multiple ">" characters.
+    (Nicolas Dandrimont)
+
 0.19.6	2018-08-11
 
  BUG FIXES

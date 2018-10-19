@@ -1112,7 +1112,7 @@ def parse_time_entry(value):
     :return: Tuple of (author, time, (timezone, timezone_neg_utc))
     """
     try:
-        sep = value.index(b'> ')
+        sep = value.rindex(b'> ')
     except ValueError:
         return (value, None, (None, False))
     try:

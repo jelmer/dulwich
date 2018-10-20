@@ -1401,6 +1401,8 @@ def get_object_by_path(repo, path, committish=None):
     with open_repo_closing(repo) as r:
         commit = parse_commit(repo, committish)
         base_tree = commit.tree
+        if not isinstance(path, bytes):
+            path = path.encode(commit.encoding or DEFAULT_ENCODING)
         (mode, sha) = tree_lookup_path(
             r.object_store.__getitem__,
             base_tree, path)

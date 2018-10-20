@@ -684,7 +684,7 @@ class BaseRepo(object):
             try:
                 encoding = config.get(('i18n', ), 'commitEncoding')
             except KeyError:
-                pass # No dice
+                pass  # No dice
         if encoding is not None:
             c.encoding = encoding
         if message is None:

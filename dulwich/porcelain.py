@@ -1385,3 +1385,23 @@ def describe(repo):
 
         # Return plain commit if no parent tag can be found
         return 'g{}'.format(latest_commit.id.decode('ascii')[:7])
+
+
+def get_object_by_path(repo, path, committish=None):
+    """Get an object by path.
+
+    :param repo: A path to the repository
+    :param path: Path to look up
+    :param committish: Commit to look up path in
+    :return: A `ShaFile` object
+    """
+    if committish is None:
+        committish = "HEAD"
+    # Get the repository
+    with open_repo_closing(repo) as r:
+        commit = parse_commit(repo, committish)
+        base_tree = commit.tree
+        (mode, sha) = tree_lookup_path(
+            r.object_store.__getitem__,
+            base_tree, path)
+        return r[sha]

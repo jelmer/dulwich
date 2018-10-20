@@ -748,7 +748,7 @@ class BuildRepoRootTests(TestCase):
             encoding=b"iso8859-1")
         self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
-    def test_commit_encoding(self):
+    def test_commit_encoding_from_config(self):
         r = self._repo
         c = r.get_config()
         c.set(('i18n',), 'commitEncoding', 'iso8859-1')

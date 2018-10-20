@@ -23,6 +23,9 @@
   * ``dulwich.porcelain.get_object_by_path`` method for easily
     accessing a path in another tree. (Jelmer Vernooĳ)
 
+  * Support the ``i18n.commitEncoding`` setting in config.
+    (Jelmer Vernooĳ)
+
 0.19.6	2018-08-11
 
  BUG FIXES

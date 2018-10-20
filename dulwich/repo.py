@@ -565,12 +565,11 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self):
+    def _get_user_identity(self, config):
         """Determine the identity to use for new commits.
         """
         user = os.environ.get("GIT_COMMITTER_NAME")
         email = os.environ.get("GIT_COMMITTER_EMAIL")
-        config = self.get_config_stack()
         if user is None:
             try:
                 user = config.get(("user", ), "name")
@@ -652,11 +651,12 @@ class BaseRepo(object):
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
+        config = self.get_config_stack()
         if merge_heads is None:
             # FIXME: Read merge heads from .git/MERGE_HEADS
             merge_heads = []
         if committer is None:
-            committer = self._get_user_identity()
+            committer = self._get_user_identity(config)
         check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
@@ -680,6 +680,11 @@ class BaseRepo(object):
         if author_timezone is None:
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
+        if encoding is None:
+            try:
+                encoding = config.get(('i18n', ), 'commitEncoding')
+            except KeyError:
+                pass # No dice
         if encoding is not None:
             c.encoding = encoding
         if message is None:
@@ -816,7 +821,8 @@ class Repo(BaseRepo):
             if e.errno != errno.EEXIST:
                 raise
         if committer is None:
-            committer = self._get_user_identity()
+            config = self.get_config_stack()
+            committer = self._get_user_identity(config)
         check_user_identity(committer)
         if timestamp is None:
             timestamp = int(time.time())

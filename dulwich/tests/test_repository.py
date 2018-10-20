@@ -748,6 +748,19 @@ class BuildRepoRootTests(TestCase):
             encoding=b"iso8859-1")
         self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
+    def test_commit_encoding(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(('i18n',), 'commitEncoding', 'iso8859-1')
+        c.write_to_path()
+        commit_sha = r.do_commit(
+            b'commit with strange character \xee',
+            committer=b'Test Committer <test@nodomain.com>',
+            author=b'Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
+        self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
+
     def test_commit_config_identity(self):
         # commit falls back to the users' identity if it wasn't specified
         r = self._repo

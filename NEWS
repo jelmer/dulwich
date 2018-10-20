@@ -18,6 +18,11 @@
   * Handle commit identity fields with multiple ">" characters.
     (Nicolas Dandrimont)
 
+ IMPROVEMENTS
+
+  * ``dulwich.porcelain.get_object_by_path`` method for easily
+    accessing a path in another tree. (Jelmer Vernooĳ)
+
 0.19.6	2018-08-11
 
  BUG FIXES

@@ -1541,3 +1541,24 @@ class HelperTests(PorcelainTestCase):
                 os.path.join(os.getcwd(), '..'), 'baz'))
         finally:
             os.chdir(cwd)
+
+
+class GetObjectBypathTests(PorcelainTestCase):
+
+    def test_simple(self):
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write("BAR")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+                self.repo.path, message=b"Some message",
+                author=b"Joe <joe@example.com>",
+                committer=b"Bob <bob@example.com>")
+        self.assertEqual(
+            b"BAR",
+            porcelain.get_object_by_path(self.repo, 'foo').data)
+
+    def test_missing(self):
+        self.assertRaises(
+            KeyError,
+            porcelain.get_object_by_path, self.repo, 'foo')

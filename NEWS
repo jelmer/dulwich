@@ -1,5 +1,10 @@
 0.19.7	UNRELEASED
 
+ IMPROVEMENTS
+
+  * Support ``depth`` argument to ``GitClient.fetch_pack`` and support
+    fetching and updating shallow metadata. (Jelmer Vernooĳ, #240)
+
  BUG FIXES
 
   * Don't write to stdout and stderr when they are not available

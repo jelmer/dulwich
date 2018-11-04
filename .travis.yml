@@ -8,7 +8,6 @@ python:
   - 3.5
   - 3.6
   - 3.6-dev
-  - pypy3.3-5.2-alpha1
   - pypy3.5
 
 env:
@@ -18,8 +17,6 @@ env:
 matrix:
   include:
     - python: pypy
-      env: TEST_REQUIRE=fastimport
-    - python: 3.3
       env: TEST_REQUIRE=fastimport
     - python: 3.7
       env: TEST_REQUIRE=fastimport

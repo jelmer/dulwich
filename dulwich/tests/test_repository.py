@@ -672,12 +672,15 @@ class BuildRepoRootTests(TestCase):
     def test_update_shallow(self):
         self._repo.update_shallow(None, None)  # no op
         self.assertEquals(set(), self._repo.get_shallow())
-        self._repo.update_shallow([b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
-                                  None)
-        self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
-                         self._repo.get_shallow())
-        self._repo.update_shallow([b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
-                                  [b'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
+        self._repo.update_shallow(
+                [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
+                None)
+        self.assertEqual(
+                {b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
+                self._repo.get_shallow())
+        self._repo.update_shallow(
+                [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
+                [b'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
         self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
                          self._repo.get_shallow())
 

@@ -468,6 +468,14 @@ class BaseRepo(object):
         """
         return set()
 
+    def update_shallow(self, new_shallow, new_unshallow):
+        """Update the list of shallow objects.
+
+        :param new_shallow: Newly shallow objects
+        :param new_unshallow: Newly no longer shallow objects
+        """
+        raise NotImplementedError(self.update_shallow)
+
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 
@@ -934,6 +942,16 @@ class Repo(BaseRepo):
             return set()
         with f:
             return set(l.strip() for l in f)
+
+    def update_shallow(self, new_shallow, new_unshallow):
+        shallow = self.get_shallow()
+        if new_shallow:
+            shallow.update(new_shallow)
+        if new_unshallow:
+            shallow.difference_update(new_unshallow)
+        self._put_named_file(
+            'shallow',
+            b''.join([sha + b'\n' for sha in shallow]))
 
     def index_path(self):
         """Return path to the index file."""

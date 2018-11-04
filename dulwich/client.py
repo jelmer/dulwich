@@ -385,7 +385,7 @@ class GitClient(object):
         return result
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None):
+                   progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         :param path: Remote path to fetch from
@@ -395,6 +395,7 @@ class GitClient(object):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :param depth: Shallow fetch depth
         :return: FetchPackResult object
         """
         raise NotImplementedError(self.fetch_pack)
@@ -571,6 +572,13 @@ class GitClient(object):
                              b' '.join(capabilities) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
+        if getattr(graph_walker, 'shallow', None):
+            if not CAPABILITY_SHALLOW in capabilities:
+                raise GitProtocolError(
+                    "server does not support shallow capability required for "
+                    "shallow")
+            for obj_id in graph_walker.shallow:
+                proto.write_pkt_line(COMMAND_SHALLOW + b' ' + shallow + b'\n')
         if depth not in (0, None):
             if not CAPABILITY_SHALLOW in capabilities:
                 raise GitProtocolError(
@@ -763,7 +771,7 @@ class TraditionalGitClient(GitClient):
             return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   depth=None, progress=None):
+                   progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         :param path: Remote path to fetch from
@@ -772,8 +780,8 @@ class TraditionalGitClient(GitClient):
             list of shas to fetch.
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
-        :param depth: Depth for request
         :param progress: Callback for progress reports (strings)
+        :param depth: Shallow fetch depth
         :return: FetchPackResult object
         """
         proto, can_read, stderr = self._connect(b'upload-pack', path)
@@ -1071,7 +1079,8 @@ class LocalGitClient(GitClient):
 
         return new_refs
 
-    def fetch(self, path, target, determine_wants=None, progress=None):
+    def fetch(self, path, target, determine_wants=None, progress=None,
+              depth=None):
         """Fetch into a target repository.
 
         :param path: Path to fetch from (as bytestring)
@@ -1080,16 +1089,17 @@ class LocalGitClient(GitClient):
             to fetch. Receives dictionary of name->sha, should return
             list of shas to fetch. Defaults to all shas.
         :param progress: Optional progress function
+        :param depth: Shallow fetch depth
         :return: FetchPackResult object
         """
         with self._open_repo(path) as r:
             refs = r.fetch(target, determine_wants=determine_wants,
-                           progress=progress)
+                           progress=progress, depth=depth)
             return FetchPackResult(refs, r.refs.get_symrefs(),
                                    agent_string())
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None):
+                   progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         :param path: Remote path to fetch from
@@ -1099,11 +1109,12 @@ class LocalGitClient(GitClient):
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :param depth: Shallow fetch depth
         :return: FetchPackResult object
         """
         with self._open_repo(path) as r:
             objects_iter = r.fetch_objects(
-                determine_wants, graph_walker, progress)
+                determine_wants, graph_walker, progress=progress, depth=depth)
             symrefs = r.refs.get_symrefs()
             agent = agent_string()
 
@@ -1588,7 +1599,7 @@ class HttpGitClient(GitClient):
             resp.close()
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   depth=None, progress=None):
+                   progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch

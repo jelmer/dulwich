@@ -593,12 +593,12 @@ class GitClient(object):
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
         if depth not in (0, None) or getattr(graph_walker, 'shallow', None):
-            if not CAPABILITY_SHALLOW in capabilities:
+            if CAPABILITY_SHALLOW not in capabilities:
                 raise GitProtocolError(
                     "server does not support shallow capability required for "
                     "depth")
-            for obj_id in graph_walker.shallow:
-                proto.write_pkt_line(COMMAND_SHALLOW + b' ' + shallow + b'\n')
+            for sha in graph_walker.shallow:
+                proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha + b'\n')
             proto.write_pkt_line(b'%s %d\n' % (COMMAND_DEEPEN, depth))
             proto.write_pkt_line(None)
             if can_read is not None:
@@ -838,7 +838,8 @@ class TraditionalGitClient(GitClient):
             self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
+            return FetchPackResult(
+                    refs, symrefs, agent, new_shallow, new_unshallow)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
@@ -1656,11 +1657,13 @@ class HttpGitClient(GitClient):
         try:
             resp_proto = Protocol(read, None)
             if new_shallow is None and new_unshallow is None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(resp_proto)
+                (new_shallow, new_unshallow) = _read_shallow_updates(
+                        resp_proto)
             self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
+            return FetchPackResult(
+                    refs, symrefs, agent, new_shallow, new_unshallow)
         finally:
             resp.close()
 

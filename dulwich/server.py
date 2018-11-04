@@ -927,7 +927,7 @@ class ReceivePackHandler(PackHandler):
                         self.repo.refs.set_if_equals(ref, oldsha, sha)
                     except all_exceptions:
                         ref_status = b'failed to write'
-            except KeyError as e:
+            except KeyError:
                 ref_status = b'bad ref'
             status.append((ref, ref_status))
 

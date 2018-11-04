@@ -309,7 +309,7 @@ def init(path=".", bare=False):
 
 def clone(source, target=None, bare=False, checkout=None,
           errstream=default_bytes_err_stream, outstream=None,
-          origin=b"origin", **kwargs):
+          origin=b"origin", depth=None, **kwargs):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -319,6 +319,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
     :param origin: Name of remote from the repository used to clone
+    :param depth: Depth to fetch at
     :return: The new repository
     """
     # TODO(jelmer): This code overlaps quite a bit with Repo.clone
@@ -349,7 +350,7 @@ def clone(source, target=None, bare=False, checkout=None,
     try:
         fetch_result = fetch(
             r, source, origin, errstream=errstream, message=reflog_message,
-            **kwargs)
+            depth=depth, **kwargs)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -1086,7 +1087,7 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
-          errstream=default_bytes_err_stream, message=None, **kwargs):
+          errstream=default_bytes_err_stream, message=None, depth=None, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1095,6 +1096,7 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     :param message: Reflog message (defaults to b"fetch: from <remote_name>")
+    :param depth: Depth to fetch at
     :return: Dictionary with refs on the remote
     """
     if message is None:
@@ -1102,7 +1104,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs)
-        fetch_result = client.fetch(path, r, progress=errstream.write)
+        fetch_result = client.fetch(path, r, progress=errstream.write,
+                                    depth=depth)
         stripped_refs = strip_peeled_refs(fetch_result.refs)
         branches = {
             n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()

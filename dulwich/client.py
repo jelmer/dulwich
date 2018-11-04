@@ -286,6 +286,20 @@ class FetchPackResult(object):
                 self.__class__.__name__, self.refs, self.symrefs, self.agent)
 
 
+def _read_shallow_updates(proto):
+    new_shallow = set()
+    new_unshallow = set()
+    for pkt in proto.read_pkt_seq():
+        cmd, sha = pkt.split(b' ', 1)
+        if cmd == COMMAND_SHALLOW:
+            new_shallow.add(sha.strip())
+        elif cmd == COMMAND_UNSHALLOW:
+            new_unshallow.add(sha.strip())
+        else:
+            raise GitProtocolError('unknown command %s' % pkt)
+    return (new_shallow, new_unshallow)
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
@@ -587,23 +601,17 @@ class GitClient(object):
                 proto.write_pkt_line(COMMAND_SHALLOW + b' ' + shallow + b'\n')
             proto.write_pkt_line(b'%s %d\n' % (COMMAND_DEEPEN, depth))
             proto.write_pkt_line(None)
-            new_shallow = set()
-            new_unshallow = set()
-            for pkt in proto.read_pkt_seq():
-                cmd, sha = pkt.split(b' ', 1)
-                if cmd == COMMAND_SHALLOW:
-                    new_shallow.add(sha.strip())
-                elif cmd == COMMAND_UNSHALLOW:
-                    new_unshallow.add(sha.strip())
-                else:
-                    raise GitProtocolError('unknown command %s' % pkt)
+            if can_read is not None:
+                (new_shallow, new_unshallow) = _read_shallow_updates(proto)
+            else:
+                new_shallow = new_unshallow = None
         else:
-            new_shallow = new_unshallow = None
+            new_shallow = new_unshallow = set()
             proto.write_pkt_line(None)
         have = next(graph_walker)
         while have:
             proto.write_pkt_line(COMMAND_HAVE + b' ' + have + b'\n')
-            if can_read():
+            if can_read is not None and can_read():
                 pkt = proto.read_pkt_line()
                 parts = pkt.rstrip(b'\n').split(b' ')
                 if parts[0] == b'ACK':
@@ -1640,17 +1648,19 @@ class HttpGitClient(GitClient):
         check_wants(wants, refs)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
-        self._handle_upload_pack_head(
+        (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
-                lambda: False, depth=depth)
+                can_read=None, depth=depth)
         resp, read = self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:
             resp_proto = Protocol(read, None)
+            if new_shallow is None and new_unshallow is None:
+                (new_shallow, new_unshallow) = _read_shallow_updates(resp_proto)
             self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs, agent)
+            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
         finally:
             resp.close()
 

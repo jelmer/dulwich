@@ -85,6 +85,8 @@ from dulwich.protocol import (
     KNOWN_RECEIVE_CAPABILITIES,
     KNOWN_UPLOAD_CAPABILITIES,
     COMMAND_DEEPEN,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_WANT,
@@ -235,10 +237,13 @@ class FetchPackResult(object):
             'setdefault', 'update', 'values', 'viewitems', 'viewkeys',
             'viewvalues']
 
-    def __init__(self, refs, symrefs, agent):
+    def __init__(self, refs, symrefs, agent, new_shallow=None,
+                 new_unshallow=None):
         self.refs = refs
         self.symrefs = symrefs
         self.agent = agent
+        self.new_shallow = new_shallow
+        self.new_unshallow = new_unshallow
 
     def _warn_deprecated(self):
         import warnings
@@ -382,6 +387,7 @@ class GitClient(object):
             raise
         else:
             commit()
+        target.update_shallow(result.new_shallow, result.new_unshallow)
         return result
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
@@ -572,20 +578,28 @@ class GitClient(object):
                              b' '.join(capabilities) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
-        if getattr(graph_walker, 'shallow', None):
-            if not CAPABILITY_SHALLOW in capabilities:
-                raise GitProtocolError(
-                    "server does not support shallow capability required for "
-                    "shallow")
-            for obj_id in graph_walker.shallow:
-                proto.write_pkt_line(COMMAND_SHALLOW + b' ' + shallow + b'\n')
-        if depth not in (0, None):
+        if depth not in (0, None) or getattr(graph_walker, 'shallow', None):
             if not CAPABILITY_SHALLOW in capabilities:
                 raise GitProtocolError(
                     "server does not support shallow capability required for "
                     "depth")
+            for obj_id in graph_walker.shallow:
+                proto.write_pkt_line(COMMAND_SHALLOW + b' ' + shallow + b'\n')
             proto.write_pkt_line(b'%s %d\n' % (COMMAND_DEEPEN, depth))
-        proto.write_pkt_line(None)
+            proto.write_pkt_line(None)
+            new_shallow = set()
+            new_unshallow = set()
+            for pkt in proto.read_pkt_seq():
+                cmd, sha = pkt.split(b' ', 1)
+                if cmd == COMMAND_SHALLOW:
+                    new_shallow.add(sha.strip())
+                elif cmd == COMMAND_UNSHALLOW:
+                    new_unshallow.add(sha.strip())
+                else:
+                    raise GitProtocolError('unknown command %s' % pkt)
+        else:
+            new_shallow = new_unshallow = None
+            proto.write_pkt_line(None)
         have = next(graph_walker)
         while have:
             proto.write_pkt_line(COMMAND_HAVE + b' ' + have + b'\n')
@@ -604,6 +618,7 @@ class GitClient(object):
                             parts[2])
             have = next(graph_walker)
         proto.write_pkt_line(COMMAND_DONE + b'\n')
+        return (new_shallow, new_unshallow)
 
     def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
                                  pack_data, progress=None, rbufsize=_RBUFSIZE):
@@ -809,13 +824,13 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 return FetchPackResult(refs, symrefs, agent)
             check_wants(wants, refs)
-            self._handle_upload_pack_head(
+            (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read,
                 depth=depth)
             self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
-            return FetchPackResult(refs, symrefs, agent)
+            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""

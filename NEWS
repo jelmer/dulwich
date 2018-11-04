@@ -1,5 +1,11 @@
 0.19.7	UNRELEASED
 
+ CHANGES
+
+  * Drop support for Python 3 < 3.4. This is because
+    pkg_resources (which get used by setuptools and mock)
+    no longer supports 3.3 and earlier. (Jelmer Vernooĳ)
+
  IMPROVEMENTS
 
   * Support ``depth`` argument to ``GitClient.fetch_pack`` and support

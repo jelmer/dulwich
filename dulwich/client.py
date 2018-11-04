@@ -77,12 +77,14 @@ from dulwich.protocol import (
     CAPABILITY_OFS_DELTA,
     CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
     CAPABILITY_SYMREF,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_THIN_PACK,
     CAPABILITIES_REF,
     KNOWN_RECEIVE_CAPABILITIES,
     KNOWN_UPLOAD_CAPABILITIES,
+    COMMAND_DEEPEN,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_WANT,
@@ -136,7 +138,8 @@ def _win32_peek_avail(handle):
 
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
 UPLOAD_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
-                        CAPABILITY_MULTI_ACK_DETAILED] + COMMON_CAPABILITIES)
+                        CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_SHALLOW]
+                       + COMMON_CAPABILITIES)
 RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
 
 
@@ -341,7 +344,8 @@ class GitClient(object):
         """
         raise NotImplementedError(self.send_pack)
 
-    def fetch(self, path, target, determine_wants=None, progress=None):
+    def fetch(self, path, target, determine_wants=None, progress=None,
+              depth=None):
         """Fetch into a target repository.
 
         :param path: Path to fetch from (as bytestring)
@@ -350,6 +354,7 @@ class GitClient(object):
             to fetch. Receives dictionary of name->sha, should return
             list of shas to fetch. Defaults to all shas.
         :param progress: Optional progress function
+        :param depth: Depth to fetch at
         :return: Dictionary with all remote refs (not just those fetched)
         """
         if determine_wants is None:
@@ -371,7 +376,7 @@ class GitClient(object):
         try:
             result = self.fetch_pack(
                 path, determine_wants, target.get_graph_walker(), f.write,
-                progress)
+                progress=progress, depth=depth)
         except BaseException:
             abort()
             raise
@@ -550,7 +555,7 @@ class GitClient(object):
         return (negotiated_capabilities, symrefs, agent)
 
     def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
-                                 wants, can_read):
+                                 wants, can_read, depth):
         """Handle the head of a 'git-upload-pack' request.
 
         :param proto: Protocol object to read from
@@ -559,12 +564,19 @@ class GitClient(object):
         :param wants: List of commits to fetch
         :param can_read: function that returns a boolean that indicates
             whether there is extra graph data to read on proto
+        :param depth: Depth for request
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
         proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' +
                              b' '.join(capabilities) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
+        if depth not in (0, None):
+            if not CAPABILITY_SHALLOW in capabilities:
+                raise GitProtocolError(
+                    "server does not support shallow capability required for "
+                    "depth")
+            proto.write_pkt_line(b'%s %d\n' % (COMMAND_DEEPEN, depth))
         proto.write_pkt_line(None)
         have = next(graph_walker)
         while have:
@@ -751,7 +763,7 @@ class TraditionalGitClient(GitClient):
             return new_refs
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None):
+                   depth=None, progress=None):
         """Retrieve a pack from a git smart server.
 
         :param path: Remote path to fetch from
@@ -760,6 +772,7 @@ class TraditionalGitClient(GitClient):
             list of shas to fetch.
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
+        :param depth: Depth for request
         :param progress: Callback for progress reports (strings)
         :return: FetchPackResult object
         """
@@ -789,7 +802,8 @@ class TraditionalGitClient(GitClient):
                 return FetchPackResult(refs, symrefs, agent)
             check_wants(wants, refs)
             self._handle_upload_pack_head(
-                proto, negotiated_capabilities, graph_walker, wants, can_read)
+                proto, negotiated_capabilities, graph_walker, wants, can_read,
+                depth=depth)
             self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
@@ -1574,13 +1588,14 @@ class HttpGitClient(GitClient):
             resp.close()
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None):
+                   depth=None, progress=None):
         """Retrieve a pack from a git smart server.
 
         :param determine_wants: Callback that returns list of commits to fetch
         :param graph_walker: Object with next() and ack().
         :param pack_data: Callback called for each bit of data in the pack
         :param progress: Callback for progress reports (strings)
+        :param depth: Depth for request
         :return: FetchPackResult object
         """
         url = self._get_url(path)
@@ -1601,7 +1616,7 @@ class HttpGitClient(GitClient):
         req_proto = Protocol(None, req_data.write)
         self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
-                lambda: False)
+                lambda: False, depth=depth)
         resp, read = self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:

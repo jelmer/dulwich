@@ -134,7 +134,7 @@ class GitClientTests(TestCase):
         agent_cap = (
             'agent=dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')
         self.assertEqual(set([b'multi_ack', b'side-band-64k', b'ofs-delta',
-                              b'thin-pack', b'multi_ack_detailed',
+                              b'thin-pack', b'multi_ack_detailed', b'shallow',
                               agent_cap]),
                          set(self.client._fetch_capabilities))
         self.assertEqual(set([b'ofs-delta', b'report-status', b'side-band-64k',

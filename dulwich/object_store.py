@@ -194,7 +194,8 @@ class BaseObjectStore(object):
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None,
-                             get_parents=lambda commit: commit.parents):
+                             get_parents=lambda commit: commit.parents,
+                             depth=None):
         """Find the missing objects required for a set of revisions.
 
         :param haves: Iterable over SHAs already in common.
@@ -1165,7 +1166,7 @@ class ObjectStoreGraphWalker(object):
     :ivar get_parents: Function to retrieve parents in the local repo
     """
 
-    def __init__(self, local_heads, get_parents):
+    def __init__(self, local_heads, get_parents, shallow=None):
         """Create a new instance.
 
         :param local_heads: Heads to start search with
@@ -1174,6 +1175,9 @@ class ObjectStoreGraphWalker(object):
         self.heads = set(local_heads)
         self.get_parents = get_parents
         self.parents = {}
+        if shallow is None:
+            shallow = set()
+        self.shallow = shallow
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""

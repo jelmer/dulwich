@@ -599,7 +599,8 @@ class GitClient(object):
                     "depth")
             for sha in graph_walker.shallow:
                 proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha + b'\n')
-            proto.write_pkt_line(b'%s %d\n' % (COMMAND_DEEPEN, depth))
+            proto.write_pkt_line(COMMAND_DEEPEN + b' ' +
+                                 str(depth).encode('ascii') + b'\n')
             proto.write_pkt_line(None)
             if can_read is not None:
                 (new_shallow, new_unshallow) = _read_shallow_updates(proto)

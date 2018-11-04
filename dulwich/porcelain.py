@@ -1087,7 +1087,8 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
-          errstream=default_bytes_err_stream, message=None, depth=None, **kwargs):
+          errstream=default_bytes_err_stream, message=None, depth=None,
+          **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository

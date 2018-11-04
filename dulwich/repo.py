@@ -259,24 +259,26 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.open_index)
 
-    def fetch(self, target, determine_wants=None, progress=None):
+    def fetch(self, target, determine_wants=None, progress=None, depth=None):
         """Fetch objects into another repository.
 
         :param target: The target repository
         :param determine_wants: Optional function to determine what refs to
             fetch.
         :param progress: Optional progress function
+        :param depth: Optional shallow fetch depth
         :return: The local refs
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         count, pack_data = self.fetch_pack_data(
-                determine_wants, target.get_graph_walker(), progress)
+                determine_wants, target.get_graph_walker(), progress=progress,
+                depth=depth)
         target.object_store.add_pack_data(count, pack_data, progress)
         return self.get_refs()
 
     def fetch_pack_data(self, determine_wants, graph_walker, progress,
-                        get_tagged=None):
+                        get_tagged=None, depth=None):
         """Fetch the pack data required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads
@@ -288,15 +290,16 @@ class BaseRepo(object):
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
+        :param depth: Shallow fetch depth
         :return: count and iterator over pack data
         """
         # TODO(jelmer): Fetch pack data directly, don't create objects first.
         objects = self.fetch_objects(determine_wants, graph_walker, progress,
-                                     get_tagged)
+                                     get_tagged, depth=depth)
         return pack_objects_to_data(objects)
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
-                      get_tagged=None):
+                      get_tagged=None, depth=None):
         """Fetch the missing objects required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads
@@ -308,8 +311,12 @@ class BaseRepo(object):
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
+        :param depth: Shallow fetch depth
         :return: iterator over objects, with __len__ implemented
         """
+        if depth not in (None, 0):
+            raise NotImplementedError("depth not supported yet")
+
         wants = determine_wants(self.get_refs())
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
@@ -361,7 +368,8 @@ class BaseRepo(object):
         """
         if heads is None:
             heads = self.refs.as_dict(b'refs/heads').values()
-        return ObjectStoreGraphWalker(heads, self.get_parents)
+        return ObjectStoreGraphWalker(
+            heads, self.get_parents, shallow=self.get_shallow())
 
     def get_refs(self):
         """Get dictionary with all refs.

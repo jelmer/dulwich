@@ -800,7 +800,7 @@ class DiskRefsContainer(RefsContainer):
             parent_filename = self.refpath(parent)
             try:
                 os.rmdir(parent_filename)
-            except OSError as e:
+            except OSError:
                 # this can be caused by the parent directory being
                 # removed by another process, being not empty, etc.
                 # in any case, this is non fatal because we already

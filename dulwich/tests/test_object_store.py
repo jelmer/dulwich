@@ -47,6 +47,7 @@ from dulwich.object_store import (
     OverlayObjectStore,
     ObjectStoreGraphWalker,
     commit_tree_changes,
+    read_packs_file,
     tree_lookup_path,
     )
 from dulwich.pack import (
@@ -645,3 +646,10 @@ class CommitTreeChangesTests(TestCase):
         self.assertEqual(set(new_tree), {b'a', b'ad', b'c'})
         ad_tree = self.store[new_tree[b'ad'][1]]
         self.assertEqual(set(ad_tree), {b'b', b'c'})
+
+
+class TestReadPacksFile(TestCase):
+
+    def test_read_packs(self):
+        self.assertEqual(["pack-1.pack"], list(read_packs_file(BytesIO(b"""P pack-1.pack
+"""))))

@@ -370,12 +370,10 @@ class UploadPackHandler(PackHandler):
                 self._done_received):
             return
 
-        self.progress(b"dul-daemon says what\n")
         self.progress(
                 ("counting objects: %d, done.\n" % len(objects_iter)).encode(
                     'ascii'))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress(b"how was that, then?\n")
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -929,7 +927,7 @@ class ReceivePackHandler(PackHandler):
                         self.repo.refs.set_if_equals(ref, oldsha, sha)
                     except all_exceptions:
                         ref_status = b'failed to write'
-            except KeyError as e:
+            except KeyError:
                 ref_status = b'bad ref'
             status.append((ref, ref_status))
 

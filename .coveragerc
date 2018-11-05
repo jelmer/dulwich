@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = dulwich
+
+[report]
+exclude_lines =
+    raise NotImplementedError

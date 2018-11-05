@@ -1,3 +1,9 @@
+dulwich (0.19.6-4) UNRELEASED; urgency=medium
+
+  * Run wrap-and-sort.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 05 Nov 2018 19:12:20 +0000
+
 dulwich (0.19.6-3) unstable; urgency=medium
 
   * Add debian/upstream/metadata.

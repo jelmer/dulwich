@@ -3,6 +3,7 @@ dulwich (0.19.7-1) UNRELEASED; urgency=medium
   * Run wrap-and-sort.
   * New upstream release.
    + Drop patch 02_newer_git: applied upstream.
+  * Bump standards version to 4.2.1
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 05 Nov 2018 19:27:07 +0000
 

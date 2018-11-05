@@ -224,6 +224,20 @@ class CloneTests(PorcelainTestCase):
             self.repo.path, target_path, checkout=True, errstream=errstream)
         r.close()
 
+    def test_no_head_no_checkout_outstream_errstream_autofallback(self):
+        f1_1 = make_object(Blob, data=b'f1')
+        commit_spec = [[1]]
+        trees = {1: [(b'f1', f1_1), (b'f2', f1_1)]}
+
+        (c1, ) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        errstream = porcelain.NoneStream()
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=True, errstream=errstream)
+        r.close()
+
 
 class InitTests(TestCase):
 
@@ -1490,6 +1504,7 @@ class DescribeTests(PorcelainTestCase):
 
 
 class HelperTests(PorcelainTestCase):
+
     def test_path_to_tree_path_base(self):
         self.assertEqual(
             b'bar', porcelain.path_to_tree_path('/home/foo', '/home/foo/bar'))
@@ -1526,3 +1541,24 @@ class HelperTests(PorcelainTestCase):
                 os.path.join(os.getcwd(), '..'), 'baz'))
         finally:
             os.chdir(cwd)
+
+
+class GetObjectBypathTests(PorcelainTestCase):
+
+    def test_simple(self):
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write("BAR")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+                self.repo.path, message=b"Some message",
+                author=b"Joe <joe@example.com>",
+                committer=b"Bob <bob@example.com>")
+        self.assertEqual(
+            b"BAR",
+            porcelain.get_object_by_path(self.repo, 'foo').data)
+
+    def test_missing(self):
+        self.assertRaises(
+            KeyError,
+            porcelain.get_object_by_path, self.repo, 'foo')

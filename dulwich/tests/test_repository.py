@@ -662,10 +662,25 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual([], r[commit_sha].parents)
         self._root_commit = commit_sha
 
-    def test_shallow(self):
+    def test_get_shallow(self):
         self.assertEqual(set(), self._repo.get_shallow())
         with open(os.path.join(self._repo.path, '.git', 'shallow'), 'wb') as f:
             f.write(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097\n')
+        self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
+                         self._repo.get_shallow())
+
+    def test_update_shallow(self):
+        self._repo.update_shallow(None, None)  # no op
+        self.assertEquals(set(), self._repo.get_shallow())
+        self._repo.update_shallow(
+                [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
+                None)
+        self.assertEqual(
+                {b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
+                self._repo.get_shallow())
+        self._repo.update_shallow(
+                [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
+                [b'f9e39b120c68182a4ba35349f832d0e4e61f485c'])
         self.assertEqual({b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'},
                          self._repo.get_shallow())
 
@@ -746,6 +761,19 @@ class BuildRepoRootTests(TestCase):
             commit_timestamp=12395, commit_timezone=0,
             author_timestamp=12395, author_timezone=0,
             encoding=b"iso8859-1")
+        self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
+
+    def test_commit_encoding_from_config(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(('i18n',), 'commitEncoding', 'iso8859-1')
+        c.write_to_path()
+        commit_sha = r.do_commit(
+            b'commit with strange character \xee',
+            committer=b'Test Committer <test@nodomain.com>',
+            author=b'Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
         self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
     def test_commit_config_identity(self):

@@ -223,8 +223,13 @@ class cmd_init(Command):
 class cmd_clone(Command):
 
     def run(self, args):
-        opts, args = getopt(args, "", ["bare"])
-        opts = dict(opts)
+        parser = optparse.OptionParser()
+        parser.add_option("--bare", dest="bare",
+                          help="Whether to create a bare repository.",
+                          action="store_true")
+        parser.add_option("--depth", dest="depth",
+                          type=int, help="Depth at which to fetch")
+        options, args = parser.parse_args(args)
 
         if args == []:
             print("usage: dulwich clone host:path [PATH]")
@@ -236,7 +241,7 @@ class cmd_clone(Command):
         else:
             target = None
 
-        porcelain.clone(source, target, bare=("--bare" in opts))
+        porcelain.clone(source, target, bare=options.bare, depth=options.depth)
 
 
 class cmd_commit(Command):

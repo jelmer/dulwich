@@ -96,7 +96,7 @@ def translate(pat):
     if not pat.endswith(b'/'):
         res += b'/?'
 
-    return res + b'\Z'
+    return res + b'\\Z'
 
 
 def read_ignore_patterns(f):

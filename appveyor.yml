@@ -10,15 +10,6 @@ environment:
       PYTHON_VERSION: "2.7.x"
       PYTHON_ARCH: "64"
 
-    - PYTHON: "C:\\Python33"
-      PYTHON_VERSION: "3.3.x"
-      PYTHON_ARCH: "32"
-
-    - PYTHON: "C:\\Python33-x64"
-      PYTHON_VERSION: "3.3.x"
-      PYTHON_ARCH: "64"
-      DISTUTILS_USE_SDK: "1"
-
     - PYTHON: "C:\\Python34"
       PYTHON_VERSION: "3.4.x"
       PYTHON_ARCH: "32"
@@ -84,6 +75,7 @@ build_script:
 
 test_script:
   - "build.cmd %PYTHON%\\python.exe setup.py test"
+  - "build.cmd %PYTHON%\\pythonw.exe setup.py test"
 
 after_test:
   - "build.cmd %PYTHON%\\python.exe setup.py bdist_wheel"

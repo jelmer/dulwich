@@ -506,6 +506,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(expected_refs, self._repo.get_refs())
 
     def test_cyrillic(self):
+        if sys.platform == 'win32':
+            raise SkipTest(
+                    "filesystem encoding doesn't support arbitrary bytes")
         # reported in https://github.com/dulwich/dulwich/issues/608
         name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
         encoded_ref = b'refs/heads/' + name

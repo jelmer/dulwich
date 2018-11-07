@@ -1,5 +1,8 @@
 0.19.8	UNRELEASED
 
+ * Fix encoding when reading README file in setup.py.
+   (egor <egor@sourced.tech>, #668)
+
 0.19.7	2018-11-05
 
  CHANGES

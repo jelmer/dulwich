@@ -1,3 +1,9 @@
+dulwich (0.19.8-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 07 Nov 2018 01:52:52 +0000
+
 dulwich (0.19.7-1) unstable; urgency=medium
 
   * Run wrap-and-sort.

@@ -11,10 +11,11 @@ except ImportError:
 else:
     has_setuptools = True
 from distutils.core import Distribution
+import io
 import os
 import sys
 
-dulwich_version_string = '0.19.7'
+dulwich_version_string = '0.19.8'
 
 include_dirs = []
 # Windows MSVC support
@@ -83,7 +84,8 @@ if has_setuptools:
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
 
-with open('README.md', 'r') as f:
+with io.open(os.path.join(os.path.dirname(__file__), "README.md"),
+             encoding="utf-8") as f:
     description = f.read()
 
 setup(name='dulwich',

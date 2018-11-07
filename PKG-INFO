@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.19.7
+Version: 0.19.8
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -102,7 +102,7 @@ Description: [![Build Status](https://travis-ci.org/dulwich/dulwich.png?branch=m
         Supported versions of Python
         ----------------------------
         
-        At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.3, 3.4, 3.5, 3.6 and Pypy.
+        At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5, 3.6 and Pypy.
         
 Keywords: git vcs
 Platform: UNKNOWN

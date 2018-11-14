@@ -673,6 +673,14 @@ class TestGetTransportAndPathFromUrl(TestCase):
         url = 'https://github.com/jelmer/dulwich'
         c, path = get_transport_and_path_from_url(url)
         self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertEqual('https://github.com', c.get_url(b'/'))
+        self.assertEqual('/jelmer/dulwich', path)
+
+    def test_http_port(self):
+        url = 'https://github.com:9090/jelmer/dulwich'
+        c, path = get_transport_and_path_from_url(url)
+        self.assertEqual('https://github.com:9090', c.get_url(b'/'))
+        self.assertTrue(isinstance(c, HttpGitClient))
         self.assertEqual('/jelmer/dulwich', path)
 
     def test_file(self):

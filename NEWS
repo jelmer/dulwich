@@ -3,6 +3,9 @@
  * Fix encoding when reading README file in setup.py.
    (egor <egor@sourced.tech>, #668)
 
+ * Preserve port and username in parsed HTTP URLs.
+   (Jelmer Vernooĳ)
+
 0.19.7	2018-11-05
 
  CHANGES

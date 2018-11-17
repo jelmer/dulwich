@@ -493,8 +493,7 @@ class RenameDetectionTest(DiffTestCase):
 
     def _do_test_count_blocks(self, count_blocks):
         blob = make_object(Blob, data=b'a\nb\na\n')
-        self.assertEqual({hash(b'a\n'): 4, hash(b'b\n'): 2},
-                         count_blocks(blob))
+        self.assertBlockCountEqual({b'a\n': 4, b'b\n': 2}, count_blocks(blob))
 
     test_count_blocks = functest_builder(_do_test_count_blocks,
                                          _count_blocks_py)
@@ -503,17 +502,21 @@ class RenameDetectionTest(DiffTestCase):
 
     def _do_test_count_blocks_no_newline(self, count_blocks):
         blob = make_object(Blob, data=b'a\na')
-        self.assertEqual({hash(b'a\n'): 2, hash(b'a'): 1}, _count_blocks(blob))
+        self.assertBlockCountEqual({b'a\n': 2, b'a': 1}, _count_blocks(blob))
 
     test_count_blocks_no_newline = functest_builder(
         _do_test_count_blocks_no_newline, _count_blocks_py)
     test_count_blocks_no_newline_extension = ext_functest_builder(
         _do_test_count_blocks_no_newline, _count_blocks)
 
+    def assertBlockCountEqual(self, expected, got):
+        self.assertEqual(
+            {(hash(l) & 0xffffffff): c for (l, c) in expected.items()},
+            {(h & 0xffffffff): c for (h, c) in got.items()})
+
     def _do_test_count_blocks_chunks(self, count_blocks):
         blob = ShaFile.from_raw_chunks(Blob.type_num, [b'a\nb', b'\na\n'])
-        self.assertEqual({hash(b'a\n'): 4, hash(b'b\n'): 2},
-                         _count_blocks(blob))
+        self.assertBlockCountEqual({b'a\n': 4, b'b\n': 2}, _count_blocks(blob))
 
     test_count_blocks_chunks = functest_builder(_do_test_count_blocks_chunks,
                                                 _count_blocks_py)
@@ -524,9 +527,12 @@ class RenameDetectionTest(DiffTestCase):
         a = b'a' * 64
         data = a + b'xxx\ny\n' + a + b'zzz\n'
         blob = make_object(Blob, data=data)
-        self.assertEqual({hash(b'a' * 64): 128, hash(b'xxx\n'): 4,
-                          hash(b'y\n'): 2, hash(b'zzz\n'): 4},
-                         _count_blocks(blob))
+        self.assertBlockCountEqual(
+            {b'a' * 64: 128,
+             b'xxx\n': 4,
+             b'y\n': 2,
+             b'zzz\n': 4},
+            _count_blocks(blob))
 
     test_count_blocks_long_lines = functest_builder(
         _do_test_count_blocks_long_lines, _count_blocks_py)

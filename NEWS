@@ -1,16 +1,20 @@
-0.19.9	2018-11-06
+0.19.9	UNRELEASED
+
+ BUG FIXES
 
  * Avoid fetching ghosts in ``Repo.fetch``.
    (Jelmer Vernooĳ)
 
- * Fix encoding when reading README file in setup.py.
-   (egor <egor@sourced.tech>, #668)
-
  * Preserve port and username in parsed HTTP URLs.
    (Jelmer Vernooĳ)
 
- * Add basic server side implementation of ``git-upload-archivw``.
+ * Add basic server side implementation of ``git-upload-archive``.
    (Jelmer Vernooĳ)
+
+0.19.8	2018-11-06
+
+ * Fix encoding when reading README file in setup.py.
+   (egor <egor@sourced.tech>, #668)
 
 0.19.7	2018-11-05
 

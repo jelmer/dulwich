@@ -1,5 +1,8 @@
 0.19.9	2018-11-06
 
+ * Avoid fetching ghosts in ``Repo.fetch``.
+   (Jelmer Vernooĳ)
+
  * Fix encoding when reading README file in setup.py.
    (egor <egor@sourced.tech>, #668)
 

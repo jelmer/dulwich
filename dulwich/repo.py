@@ -73,6 +73,7 @@ from dulwich.hooks import (
     )
 
 from dulwich.refs import (  # noqa: F401
+    ANNOTATED_TAG_SUFFIX,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -317,7 +318,22 @@ class BaseRepo(object):
         if depth not in (None, 0):
             raise NotImplementedError("depth not supported yet")
 
-        wants = determine_wants(self.get_refs())
+        refs = {}
+        for ref, sha in self.get_refs().items():
+            try:
+                obj = self.object_store[sha]
+            except KeyError:
+                warnings.warn(
+                    'ref %s points at non-present sha %s' % (
+                        ref.decode('utf-8', 'replace'), sha.decode('ascii')),
+                    UserWarning)
+                continue
+            else:
+                if isinstance(obj, Tag):
+                    refs[ref + ANNOTATED_TAG_SUFFIX] = obj.object[1]
+                refs[ref] = sha
+
+        wants = determine_wants(refs)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 

@@ -46,6 +46,7 @@ import collections
 import os
 import socket
 import sys
+import time
 import zlib
 
 try:
@@ -53,6 +54,7 @@ try:
 except ImportError:
     import socketserver as SocketServer
 
+from dulwich.archive import tar_stream
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
@@ -1003,19 +1005,48 @@ class ReceivePackHandler(PackHandler):
 
 class UploadArchiveHandler(Handler):
 
-    def __init__(self, backend, proto, http_req=None):
+    def __init__(self, backend, args, proto, http_req=None):
         super(UploadArchiveHandler, self).__init__(backend, proto, http_req)
+        self.repo = backend.open_repository(args[0])
 
     def handle(self):
-        # TODO(jelmer)
-        raise NotImplementedError(self.handle)
+        def write(x):
+            return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+        arguments = []
+        for pkt in self.proto.read_pkt_seq():
+            (key, value) = pkt.split(b' ', 1)
+            if key != b'argument':
+                raise GitProtocolError('unknown command %s' % key)
+            arguments.append(value.rstrip(b'\n'))
+        prefix = b''
+        format = 'tar'
+        i = 0
+        store = self.repo.object_store
+        while i < len(arguments):
+            argument = arguments[i]
+            if argument == b'--prefix':
+                i += 1
+                prefix = arguments[i]
+            elif argument == b'--format':
+                i += 1
+                format = arguments[i].decode('ascii')
+            else:
+                commit_sha = self.repo.refs[argument]
+                tree = store[store[commit_sha].tree]
+            i += 1
+        self.proto.write_pkt_line(b'ACK\n')
+        self.proto.write_pkt_line(None)
+        for chunk in tar_stream(
+                store, tree, mtime=time.time(), prefix=prefix, format=format):
+            write(chunk)
+        self.proto.write_pkt_line(None)
 
 
 # Default handler classes for git services.
 DEFAULT_HANDLERS = {
   b'git-upload-pack': UploadPackHandler,
   b'git-receive-pack': ReceivePackHandler,
-  # b'git-upload-archive': UploadArchiveHandler,
+  b'git-upload-archive': UploadArchiveHandler,
 }
 
 

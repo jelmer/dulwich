@@ -1,6 +1,6 @@
 === modified file 'dulwich/tests/compat/test_client.py'
 --- old/dulwich/tests/compat/test_client.py	2018-11-05 19:27:24 +0000
-+++ new/dulwich/tests/compat/test_client.py	2018-11-05 19:33:10 +0000
++++ new/dulwich/tests/compat/test_client.py	2018-11-17 19:32:09 +0000
 @@ -544,6 +544,8 @@
      min_git_version = (1, 7, 0, 2)
  
@@ -12,8 +12,8 @@
          self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
 
 === modified file 'dulwich/tests/test_client.py'
---- old/dulwich/tests/test_client.py	2018-11-05 19:27:24 +0000
-+++ new/dulwich/tests/test_client.py	2018-11-05 19:33:35 +0000
+--- old/dulwich/tests/test_client.py	2018-11-17 19:26:16 +0000
++++ new/dulwich/tests/test_client.py	2018-11-17 19:32:27 +0000
 @@ -35,7 +35,8 @@
  except ImportError:
      import urllib.parse as urlparse
@@ -86,7 +86,17 @@
          url = 'https://github.com/jelmer/dulwich'
          c, path = get_transport_and_path_from_url(url)
          self.assertTrue(isinstance(c, HttpGitClient))
-@@ -901,6 +923,11 @@
+@@ -677,6 +699,9 @@
+         self.assertEqual('/jelmer/dulwich', path)
+ 
+     def test_http_port(self):
++        if '__pypy__' in sys.modules:
++            self.skipTest('urllib3 not available for pypy in debian')
++
+         url = 'https://github.com:9090/jelmer/dulwich'
+         c, path = get_transport_and_path_from_url(url)
+         self.assertEqual('https://github.com:9090', c.get_url(b'/'))
+@@ -909,6 +934,11 @@
  
  class HttpGitClientTests(TestCase):
  
@@ -98,7 +108,7 @@
      @staticmethod
      def b64encode(s):
          """Python 2/3 compatible Base64 encoder. Returns string."""
-@@ -999,12 +1026,18 @@
+@@ -1007,12 +1037,18 @@
  
  class DefaultUrllib3ManagerTest(TestCase):
  

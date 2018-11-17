@@ -266,6 +266,33 @@ class RepositoryRootTests(TestCase):
                 r.get_walker(b'2a72d929692c41d8554c07f6301757ba18a65d91')],
             [b'2a72d929692c41d8554c07f6301757ba18a65d91'])
 
+    def test_fetch(self):
+        r = self.open_repo('a.git')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = Repo.init(tmp_dir)
+        r.fetch(t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a', t)
+        self.assertIn(b'b0931cadc54336e78a1d980420e3268903b57a50', t)
+
+    def test_fetch_ignores_missing_refs(self):
+        r = self.open_repo('a.git')
+        missing = b'1234566789123456789123567891234657373833'
+        r.refs[b'refs/heads/blah'] = missing
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = Repo.init(tmp_dir)
+        r.fetch(t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097', t)
+        self.assertIn(b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a', t)
+        self.assertIn(b'b0931cadc54336e78a1d980420e3268903b57a50', t)
+        self.assertNotIn(missing, t)
+
     def test_clone(self):
         r = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()

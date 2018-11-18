@@ -3,7 +3,6 @@ PYFLAKES = pyflakes
 PEP8 = pep8
 FLAKE8 ?= flake8
 SETUP = $(PYTHON) setup.py
-PYDOCTOR ?= pydoctor
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
 COVERAGE = python3-coverage
@@ -12,14 +11,10 @@ DESTDIR=/
 
 all: build
 
-doc:: pydoctor
 doc:: sphinx
 
 sphinx::
 	$(MAKE) -C docs html
-
-pydoctor::
-	$(PYDOCTOR) --make-html -c dulwich.cfg
 
 build::
 	$(SETUP) build

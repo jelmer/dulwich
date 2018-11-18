@@ -1,10 +1,10 @@
 include NEWS
 include AUTHORS
-include README.md
-include README.swift.md
+include README.rst
+include README.swift.rst
 include Makefile
 include COPYING
-include CONTRIBUTING.md
+include CONTRIBUTING.rst
 include TODO
 include setup.cfg
 include dulwich/stdint.h

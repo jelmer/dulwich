@@ -18,7 +18,7 @@ Configuration file
 
 We need to provide some configuration values in order to let Dulwich
 talk and authenticate against Swift. The following config file must
-be used as template:
+be used as template::
 
     [swift]
     # Authentication URL (Keystone or Swift)
@@ -54,7 +54,7 @@ How to start unittest
 ---------------------
 
 There is no need to have a Swift cluster running to run the unitests.
-Just run the following command in the Dulwich source directory:
+Just run the following command in the Dulwich source directory::
 
     $ PYTHONPATH=. python -m dulwich.contrib.test_swift
 
@@ -63,7 +63,7 @@ How to start functional tests
 
 We provide some basic tests to perform smoke tests against a real Swift
 cluster. To run those functional tests you need a properly configured
-configuration file. The tests can be run as follow:
+configuration file. The tests can be run as follow::
 
     $ DULWICH_SWIFT_CFG=/etc/swift-dul.conf PYTHONPATH=. python -m dulwich.contrib.test_swift_smoke
 
@@ -71,14 +71,14 @@ How to install
 --------------
 
 Install the Dulwich library via the setup.py. The dependencies will be
-automatically retrieved from pypi:
+automatically retrieved from pypi::
 
     $ python ./setup.py install
 
 How to run the server
 ---------------------
 
-Start the server using the following command:
+Start the server using the following command::
 
     $ python -m dulwich.contrib.swift daemon -c /etc/swift-dul.conf -l 127.0.0.1
 
@@ -92,7 +92,7 @@ How to use
 
 Once you have validated that the functional tests is working as expected and
 the server is running we can init a bare repository. Run this
-command with the name of the repository to create:
+command with the name of the repository to create::
 
     $ python -m dulwich.contrib.swift init -c /etc/swift-dul.conf edeploy
 
@@ -100,11 +100,11 @@ The repository name will be the container that will contain all the Git
 objects for the repository. Then standard c Git client can be used to
 perform operations against this repository.
 
-As an example we can clone the previously empty bare repository:
+As an example we can clone the previously empty bare repository::
 
     $ git clone git://localhost/edeploy
 
-Then push an existing project in it:
+Then push an existing project in it::
 
     $ git clone https://github.com/enovance/edeploy.git edeployclone
     $ cd edeployclone

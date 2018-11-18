@@ -84,7 +84,7 @@ if has_setuptools:
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
 
-with io.open(os.path.join(os.path.dirname(__file__), "README.md"),
+with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
              encoding="utf-8") as f:
     description = f.read()
 

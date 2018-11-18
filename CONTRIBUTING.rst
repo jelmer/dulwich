@@ -23,7 +23,8 @@ Running the tests
 To run the testsuite, you should be able to simply run "make check". This
 will run the tests using unittest.
 
- $ make check
+::
+   $ make check
 
 Tox configuration is also present as well as a Travis configuration file.
 

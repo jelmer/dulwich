@@ -6,7 +6,7 @@ This is the Dulwich project.
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
-**Main website**: [www.dulwich.io](https://www.dulwich.io/)
+**Main website**: <https://www.dulwich.io/>
 
 **License**: Apache License, version 2 or GNU General Public License, version 2 or later.
 
@@ -29,7 +29,7 @@ or if you are installing from pip::
     $ pip install dulwich --global-option="--pure"
 
 Note that you can also specify --global-option in a
-[requirements.txt](https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers)
+`requirements.txt <https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers>`_
 file, e.g. like this::
 
     dulwich --global-option=--pure
@@ -40,7 +40,7 @@ Getting started
 Dulwich comes with both a lower-level API and higher-level plumbing ("porcelain").
 
 For example, to use the lower level API to access the commit message of the
-last commit:
+last commit::
 
     >>> from dulwich.repo import Repo
     >>> r = Repo('.')
@@ -52,7 +52,7 @@ last commit:
     >>> c.message
     'Add note about encoding.\n'
 
-And to print it using porcelain:
+And to print it using porcelain::
 
     >>> from dulwich import porcelain
     >>> porcelain.log('.', max_entries=1)
@@ -67,26 +67,26 @@ Further documentation
 ---------------------
 
 The dulwich documentation can be found in docs/ and
-[on the web](https://www.dulwich.io/docs/).
+`on the web <https://www.dulwich.io/docs/>`_.
 
 The API reference can be generated using pydoctor, by running "make pydoctor",
-or [on the web](https://www.dulwich.io/apidocs).
+or `on the web <https://www.dulwich.io/apidocs>`_.
 
 Help
 ----
 
-There is a *#dulwich* IRC channel on the [Freenode](https://www.freenode.net/), and
-[dulwich-announce](https://groups.google.com/forum/#!forum/dulwich-announce)
-and [dulwich-discuss](https://groups.google.com/forum/#!forum/dulwich-discuss)
+There is a *#dulwich* IRC channel on the `Freenode <https://www.freenode.net/>`_, and
+`dulwich-announce <https://groups.google.com/forum/#!forum/dulwich-announce>`_
+and `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
 mailing lists.
 
 Contributing
 ------------
 
-For a full list of contributors, see the git logs or [AUTHORS](AUTHORS).
+For a full list of contributors, see the git logs or `AUTHORS <AUTHORS>`_.
 
-If you'd like to contribute to Dulwich, see the [CONTRIBUTING](CONTRIBUTING.md)
-file and [list of open issues](https://github.com/dulwich/dulwich/issues).
+If you'd like to contribute to Dulwich, see the `CONTRIBUTING <CONTRIBUTING.rst>`_
+file and `list of open issues <https://github.com/dulwich/dulwich/issues>`_.
 
 Supported versions of Python
 ----------------------------

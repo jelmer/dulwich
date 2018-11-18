@@ -12,7 +12,6 @@ Overview
 Documentation
 =============
 
-
 .. toctree::
     :maxdepth: 2
 
@@ -20,6 +19,8 @@ Documentation
     protocol
 
     tutorial/index
+
+    api/index
 
 
 Changelog

@@ -26,7 +26,12 @@ dulwich = __import__('dulwich')
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx',
+    'sphinx_epytext',
+    ]
 try:
     import rst2pdf
     if rst2pdf.version >= '0.16':
@@ -51,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dulwich'
-copyright = u'2011, Jelmer Vernooij'
+copyright = u'2011-2018 Jelmer Vernooĳ'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

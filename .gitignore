@@ -21,3 +21,4 @@ dulwich.egg-info/
 .idea/
 .coverage
 htmlcov/
+docs/api/*.txt

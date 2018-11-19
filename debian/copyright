@@ -1,4 +1,4 @@
-Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: dulwich
 Upstream-Contact: Jelmer Vernooĳ <jelmer@jelmer.uk>
 Source: https://www.dulwich.io/

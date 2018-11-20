@@ -1,4 +1,4 @@
-dulwich (0.19.9-2) UNRELEASED; urgency=medium
+dulwich (0.19.9-2) unstable; urgency=medium
 
   * Stop attempting to build pypy package mips64el, ppc64 and sparc64 -
     where pypy is not available.
@@ -6,7 +6,7 @@ dulwich (0.19.9-2) UNRELEASED; urgency=medium
     dulwich.tests.test_porcelain.PushTests.test_simple, which is subject
     to a race condition. Closes: #913037
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 19 Nov 2018 19:53:42 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 20 Nov 2018 04:09:22 +0000
 
 dulwich (0.19.9-1) unstable; urgency=medium
 

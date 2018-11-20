@@ -1,6 +1,8 @@
 dulwich (0.19.9-2) UNRELEASED; urgency=medium
 
   * Use secure copyright file specification URI.
+  * Stop attempting to build pypy package mips64el, ppc64 and sparc64 -
+    where pypy is not available.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 19 Nov 2018 19:53:42 +0000
 

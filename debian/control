@@ -7,7 +7,7 @@ Homepage: https://www.dulwich.io/
 Build-Depends: debhelper (>= 11),
                dh-python,
                git (>= 1:1.7.0.4-2) [!alpha !ppc64 !sparc64 !x32 !ia64],
-               pypy-dev [!hurd-any !m68k !sh4 !x32 !hppa !powerpcspe],
+               pypy-dev [alpha amd64 arm64 armel armhf i386 mips mips64el powerpc ppc64 ppc64el s390x sparc64]
                python-all-dbg (>= 2.6.6-3),
                python-all-dev (>= 2.6.6-3),
                python-certifi,
@@ -45,7 +45,7 @@ Description: Python Git library
  This package contains the module built for Python version 2.x.
 
 Package: pypy-dulwich
-Architecture: kfreebsd-any alpha amd64 arm64 armel armhf i386 mips mips64el mipsel powerpc ppc64 ppc64el s390x sparc64
+Architecture: alpha amd64 arm64 armel armhf i386 mips mips64el mipsel powerpc ppc64 ppc64el s390x sparc64
 Provides: ${pypy:Provides}
 Depends: ${misc:Depends}, ${pypy:Depends}, ${shlibs:Depends}
 Recommends: pypy-fastimport

@@ -1,0 +1,16 @@
+include: https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
+
+build:
+    extends: .build-unstable
+
+reprotest:
+    extends: .test-reprotest
+
+lintian:
+    extends: .test-lintian
+
+autopkgtest:
+    extends: .test-autopkgtest
+
+piuparts:
+    extends: .test-piuparts

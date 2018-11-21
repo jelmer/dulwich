@@ -1,3 +1,9 @@
+dulwich (0.19.9-3) UNRELEASED; urgency=medium
+
+  * Add CI/CD configuration for Salsa.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 21 Nov 2018 01:12:02 +0000
+
 dulwich (0.19.9-2) unstable; urgency=medium
 
   * Stop attempting to build pypy package mips64el, ppc64 and sparc64 -

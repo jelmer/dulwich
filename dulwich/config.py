@@ -31,11 +31,18 @@ import os
 import sys
 
 from collections import (
-    Iterable,
     OrderedDict,
-    MutableMapping,
     )
-
+try:
+    from collections.abc import (
+        Iterable,
+        MutableMapping,
+        )
+except ImportError:  # python < 3.7
+    from collections import (
+        Iterable,
+        MutableMapping,
+        )
 
 from dulwich.file import GitFile
 

@@ -331,7 +331,8 @@ class UploadPackHandler(PackHandler):
                 # all relevant tags.
                 # TODO: fix behavior when missing
                 return {}
-        # TODO(jelmer): Integrate this with the refs logic in Repo.fetch_objects
+        # TODO(jelmer): Integrate this with the refs logic in
+        # Repo.fetch_objects
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)

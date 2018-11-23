@@ -331,6 +331,7 @@ class UploadPackHandler(PackHandler):
                 # all relevant tags.
                 # TODO: fix behavior when missing
                 return {}
+        # TODO(jelmer): Integrate this with the refs logic in Repo.fetch_objects
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
@@ -551,6 +552,13 @@ class _ProtocolGraphWalker(object):
         values = set(heads.values())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.items())):
+                try:
+                    peeled_sha = self.get_peeled(ref)
+                except KeyError:
+                    # Skip refs that are inaccessible
+                    # TODO(jelmer): Integrate with Repo.fetch_objects refs
+                    # logic.
+                    continue
                 line = sha + b' ' + ref
                 if not i:
                     line += (b'\x00' +
@@ -558,7 +566,6 @@ class _ProtocolGraphWalker(object):
                                  self.handler.capabilities() +
                                  symref_capabilities(symrefs.items())))
                 self.proto.write_pkt_line(line + b'\n')
-                peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
                         peeled_sha + b' ' + ref + ANNOTATED_TAG_SUFFIX + b'\n')

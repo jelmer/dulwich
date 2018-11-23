@@ -1,3 +1,9 @@
+dulwich (0.19.9-2~bpo9+1) stretch-backports; urgency=medium
+
+  * Rebuild for stretch-backports.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 23 Nov 2018 20:10:47 +0000
+
 dulwich (0.19.9-2) unstable; urgency=medium
 
   * Stop attempting to build pypy package mips64el, ppc64 and sparc64 -

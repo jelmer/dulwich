@@ -1411,3 +1411,13 @@ def get_object_by_path(repo, path, committish=None):
             r.object_store.__getitem__,
             base_tree, path)
         return r[sha]
+
+
+def write_tree(repo):
+    """Write a tree object from the index.
+
+    :param repo: Repository for which to write tree
+    :return: tree id for the tree that was written
+    """
+    with open_repo_closing(repo) as r:
+        return r.open_index().commit(r.object_store)

@@ -388,6 +388,14 @@ class cmd_web_daemon(Command):
                              port=options.port)
 
 
+class cmd_write_tree(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        sys.stdout.write('%s\n' % porcelain.write_tree('.'))
+
+
 class cmd_receive_pack(Command):
 
     def run(self, args):
@@ -689,6 +697,7 @@ commands = {
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "web-daemon": cmd_web_daemon,
+    "write-tree": cmd_write_tree,
     }
 
 if len(sys.argv) < 2:

@@ -1,5 +1,10 @@
 0.19.10	UNRELEASED
 
+ IMPROVEMENTS
+
+ * Add `dulwich.porcelain.write_tree`.
+  (Jelmer Vernooĳ)
+
 0.19.9	2018-11-17
 
  BUG FIXES

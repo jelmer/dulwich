@@ -3,7 +3,10 @@
  IMPROVEMENTS
 
  * Add `dulwich.porcelain.write_tree`.
-  (Jelmer Vernooĳ)
+   (Jelmer Vernooĳ)
+
+ * Support reading ``MERGE_HEADS`` in ``Repo.do_commit``.
+   (Jelmer Vernooĳ)
 
 0.19.9	2018-11-17
 

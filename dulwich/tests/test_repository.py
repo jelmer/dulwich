@@ -754,6 +754,27 @@ class BuildRepoRootTests(TestCase):
         self.assertTrue(stat.S_ISLNK(b_mode))
         self.assertEqual(b'a', r[b_id].data)
 
+    def test_commit_merge_heads(self):
+        r = self._repo
+        with open('a', 'w') as f:
+            f.write('merged text')
+        with open('.git/MERGE_HEADS', 'w') as f:
+            f.write('c27a2d21dd136312d7fa9e8baabb82561a1727d0')
+        r.stage(['a'])
+        commit_sha = r.do_commit(
+            b'deleted a',
+            committer=b'Test Committer <test@nodomain.com>',
+            author=b'Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
+        self.assertEqual([
+            self._root_commit,
+            b'c27a2d21dd136312d7fa9e8baabb82561a1727d0'],
+            r[commit_sha].parents)
+        self.assertEqual([], list(r.open_index()))
+        tree = r[r[commit_sha].tree]
+        self.assertEqual([], list(tree.iteritems()))
+
     def test_commit_deleted(self):
         r = self._repo
         os.remove(os.path.join(r.path, 'a'))

@@ -8,6 +8,10 @@
  * Support reading ``MERGE_HEADS`` in ``Repo.do_commit``.
    (Jelmer Vernooĳ)
 
+ * Import from ``collections.abc`` rather than ``collections`` where
+   applicable. Required for 3.8 compatibility.
+   (Jelmer Vernooĳ)
+
 0.19.9	2018-11-17
 
  BUG FIXES

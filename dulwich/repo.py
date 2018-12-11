@@ -866,11 +866,6 @@ class Repo(BaseRepo):
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
 
-        # Line ending convert filters
-        # TODO: Set them based on configuration
-        self.read_filter = None
-        self.write_filter = None
-
     def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
                       timezone, message):
         from .reflog import format_reflog_line
@@ -1273,7 +1268,7 @@ class Repo(BaseRepo):
         """
         # TODO Parse the git attributes files
         git_attributes = {}
-        return BlobNormalizer(self.get_config_stack(), git_attributes, self.read_filter, self.write_filter)
+        return BlobNormalizer(self.get_config_stack(), git_attributes)
 
 
 class MemoryRepo(BaseRepo):

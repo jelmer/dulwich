@@ -152,6 +152,24 @@ def convert_lf_to_crlf(text_hunk):
     return intermediary.replace(LF, CRLF)
 
 
+def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
+    """ Returns the correct checkout filter based on the passed arguments
+    """
+    # TODO this function should process the git_attributes for the path and if
+    # the text attribute is not defined, fallback on the
+    # get_checkout_filter_autocrlf function with the autocrlf value
+    return get_checkout_filter_autocrlf(core_autocrlf)
+
+
+def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
+    """ Returns the correct checkin filter based on the passed arguments
+    """
+    # TODO this function should process the git_attributes for the path and if
+    # the text attribute is not defined, fallback on the
+    # get_checkin_filter_autocrlf function with the autocrlf value
+    return get_checkin_filter_autocrlf(core_autocrlf)
+
+
 def get_checkout_filter_autocrlf(core_autocrlf):
     """ Returns the correct checkout filter base on autocrlf value
 
@@ -188,13 +206,27 @@ class BlobNormalizer(object):
     on configuration, gitattributes, path and operation (checkin or checkout)
     """
 
-    def __init__(self, config_stack, gitattributes, read_filter, write_filter):
+    def __init__(self, config_stack, gitattributes):
         self.config_stack = config_stack
         self.gitattributes = gitattributes
 
-        # TODO compute them based on passed values
-        self.fallback_read_filter = read_filter
-        self.fallback_write_filter = write_filter
+        # Compute which filters we needs based on parameters
+        try:
+            core_eol = config_stack.get("core", "eol")
+        except KeyError:
+            core_eol = "native"
+
+        try:
+            core_autocrlf = config_stack.get("core", "autocrlf").lower()
+        except KeyError:
+            core_autocrlf = False
+
+        self.fallback_read_filter = get_checkout_filter(
+            core_eol, core_autocrlf, self.gitattributes
+        )
+        self.fallback_write_filter = get_checkin_filter(
+            core_eol, core_autocrlf, self.gitattributes
+        )
 
     def checkin_normalize(self, blob, tree_path):
         """ Normalize a blob during a checkin operation

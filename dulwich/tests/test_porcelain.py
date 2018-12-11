@@ -33,7 +33,6 @@ import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
-from dulwich.line_ending import convert_crlf_to_lf
 from dulwich.objects import (
     Blob,
     Tag,
@@ -949,7 +948,9 @@ class StatusTests(PorcelainTestCase):
             f.write(b'line1\r\nline2')
 
         # TODO: It should be set automatically by looking at the configuration
-        self.repo.write_filter = convert_crlf_to_lf
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", True)
+        c.write_to_path()
 
         results = porcelain.status(self.repo)
         self.assertDictEqual(

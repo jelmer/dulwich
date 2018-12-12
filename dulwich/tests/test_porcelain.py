@@ -341,6 +341,26 @@ class AddTests(PorcelainTestCase):
             paths=["../foo"])
         self.assertEqual([], list(self.repo.open_index()))
 
+    def test_add_file_clrf_conversion(self):
+        # Set the right configuration to the repo
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Add a file with CRLF line-ending
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'wb') as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(self.repo.path, paths=[fullpath])
+
+        # The line-endings should have been converted to LF
+        index = self.repo.open_index()
+        self.assertIn(b"foo", index)
+
+        entry = index[b"foo"]
+        blob = self.repo[entry.sha]
+        self.assertEqual(blob.data, b"line1\nline2")
+
 
 class RemoveTests(PorcelainTestCase):
 

@@ -1022,6 +1022,7 @@ class Repo(BaseRepo):
             _fs_to_tree_path,
             )
         index = self.open_index()
+        blob_normalizer = self.get_blob_normalizer()
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
                 fs_path = fs_path.encode(sys.getfilesystemencoding())
@@ -1042,6 +1043,7 @@ class Repo(BaseRepo):
             else:
                 if not stat.S_ISDIR(st.st_mode):
                     blob = blob_from_path_and_stat(full_path, st)
+                    blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self.object_store.add_object(blob)
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
                 else:

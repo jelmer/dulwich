@@ -486,6 +486,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
 
+    def test_read_loose_ref(self):
+        self._refs[b'refs/heads/foo'] = (
+            b'df6800012397fb85c56e7418dd4eb9405dee075c'
+        )
+
+        self.assertEqual(None, self._refs.read_ref(b'refs/heads/foo/bar'))
+
     def test_non_ascii(self):
         try:
             encoded_ref = u'refs/tags/schön'.encode(

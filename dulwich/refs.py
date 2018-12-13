@@ -617,7 +617,7 @@ class DiskRefsContainer(RefsContainer):
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
         except IOError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR):
+            if e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):
                 return None
             raise
 

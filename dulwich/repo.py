@@ -663,7 +663,7 @@ class BaseRepo(object):
         if f is None:
             return []
         with f:
-            return f.splitlines()
+            return [l.strip() for l in f.readlines() if l.strip()]
 
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,

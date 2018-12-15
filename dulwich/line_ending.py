@@ -126,6 +126,8 @@ Sources:
 - https://adaptivepatchwork.com/2012/03/01/mind-the-end-of-your-line/
 """
 
+from dulwich.objects import Blob
+
 CRLF = b"\r\n"
 LF = b"\n"
 
@@ -179,3 +181,27 @@ def get_checkin_filter_autocrlf(core_autocrlf):
 
     # Checking filter should never be `convert_lf_to_crlf`
     return None
+
+
+def normalize_blob(blob, conversion, binary_detection):
+    """ Takes a blob as input returns either the original blob if
+    binary_detection is True and the blob content looks like binary, else
+    return a new blob with converted data
+    """
+    # Read the original blob
+    data = blob.data
+
+    # If we need to detect if a file is binary and the file is detected as
+    # binary, do not apply the conversion function and return the original
+    # chunked text
+    if binary_detection is True:
+        if is_binary(data):
+            return blob
+
+    # Now apply the conversion
+    converted_data = conversion(data)
+
+    new_blob = Blob()
+    new_blob.data = converted_data
+
+    return new_blob

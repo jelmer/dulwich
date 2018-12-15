@@ -700,7 +700,7 @@ class BuildRepoRootTests(TestCase):
 
     def test_update_shallow(self):
         self._repo.update_shallow(None, None)  # no op
-        self.assertEquals(set(), self._repo.get_shallow())
+        self.assertEqual(set(), self._repo.get_shallow())
         self._repo.update_shallow(
                 [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
                 None)
@@ -754,12 +754,22 @@ class BuildRepoRootTests(TestCase):
         self.assertTrue(stat.S_ISLNK(b_mode))
         self.assertEqual(b'a', r[b_id].data)
 
-    def test_commit_merge_heads(self):
-        r = self._repo
-        with open('a', 'w') as f:
+    def test_commit_merge_heads_file(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        r = Repo.init(tmp_dir)
+        with open(os.path.join(r.path, 'a'), 'w') as f:
+            f.write('initial text')
+        c1 = r.do_commit(
+            b'initial commit',
+            committer=b'Test Committer <test@nodomain.com>',
+            author=b'Test Author <test@nodomain.com>',
+            commit_timestamp=12395, commit_timezone=0,
+            author_timestamp=12395, author_timezone=0)
+        with open(os.path.join(r.path, 'a'), 'w') as f:
             f.write('merged text')
-        with open('.git/MERGE_HEADS', 'w') as f:
-            f.write('c27a2d21dd136312d7fa9e8baabb82561a1727d0')
+        with open(os.path.join(r.path, '.git', 'MERGE_HEADS'), 'w') as f:
+            f.write('c27a2d21dd136312d7fa9e8baabb82561a1727d0\n')
         r.stage(['a'])
         commit_sha = r.do_commit(
             b'deleted a',
@@ -768,12 +778,9 @@ class BuildRepoRootTests(TestCase):
             commit_timestamp=12395, commit_timezone=0,
             author_timestamp=12395, author_timezone=0)
         self.assertEqual([
-            self._root_commit,
+            c1,
             b'c27a2d21dd136312d7fa9e8baabb82561a1727d0'],
             r[commit_sha].parents)
-        self.assertEqual([], list(r.open_index()))
-        tree = r[r[commit_sha].tree]
-        self.assertEqual([], list(tree.iteritems()))
 
     def test_commit_deleted(self):
         r = self._repo

@@ -12,6 +12,11 @@
    applicable. Required for 3.8 compatibility.
    (Jelmer Vernooĳ)
 
+ BUG FIXES
+
+ *  Handle invalid ref that pretends to be a sub-folder under a valid ref.
+    (KS Chan)
+
 0.19.9	2018-11-17
 
  BUG FIXES

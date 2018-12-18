@@ -58,6 +58,7 @@ class PorcelainTestCase(TestCase):
     def setUp(self):
         super(PorcelainTestCase, self).setUp()
         self.test_dir = tempfile.mkdtemp()
+        os.mkdir(self.test_dir)
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo = Repo.init(os.path.join(self.test_dir, 'repo'), mkdir=True)
         self.addCleanup(self.repo.close)
@@ -340,6 +341,38 @@ class AddTests(PorcelainTestCase):
             porcelain.add, self.repo,
             paths=["../foo"])
         self.assertEqual([], list(self.repo.open_index()))
+
+    def test_add_all_base(self):
+        os.mkdir(os.path.join(self.repo.path, 'foo'))
+        with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
+            f.write("\n")
+        with open(os.path.join(self.repo.path, 'foo', 'blie'), 'w') as f:
+            f.write("\n")
+
+        cwd = os.getcwd()
+        try:
+            os.chdir(os.path.join(self.repo.path, 'foo'))
+            porcelain.add(repo=self.repo.path, all=True)
+            porcelain.commit(repo=self.repo.path, message=b'test',
+                             author=b'test <email>',
+                             committer=b'test <email>')
+        finally:
+            os.chdir(cwd)
+
+    def test_add_all_and_paths(self):
+        os.mkdir(os.path.join(self.repo.path, 'foo'))
+        with open(os.path.join(self.repo.path, 'blah'), 'w') as f:
+            f.write("\n")
+        with open(os.path.join(self.repo.path, 'foo', 'blie'), 'w') as f:
+            f.write("\n")
+
+        porcelain.add(repo=self.repo.path, all=True,
+                      paths=[os.path.join(self.repo.path, 'blah')])
+        porcelain.commit(repo=self.repo.path, message=b'test',
+                         author=b'test <email>',
+                         committer=b'test <email>')
+        index = self.repo.open_index()
+        self.assertEqual(sorted(index), [b'blah', b'foo/blie'])
 
 
 class RemoveTests(PorcelainTestCase):

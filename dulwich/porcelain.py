@@ -377,24 +377,40 @@ def clone(source, target=None, bare=False, checkout=None,
     return r
 
 
-def add(repo=".", paths=None):
+def add(repo=".", paths=None, all=False):
     """Add files to the staging area.
 
     :param repo: Repository for the files
-    :param paths: Paths to add.  No value passed stages all modified files.
+    :param paths: Paths to stage, stages all modified files in the CWD if None.
+    :param all: To stage everything in the repository, supersedes paths.
     :return: Tuple with set of added files and ignored files
     """
     ignored = set()
     with open_repo_closing(repo) as r:
         ignore_manager = IgnoreFilterManager.from_repo(r)
-        if not paths:
-            paths = list(
+        if all:
+            index = r.open_index()
+            paths = list(get_untracked_paths(r.path, r.path, r.open_index()))
+            paths += [
+                path.decode(sys.getfilesystemencoding())
+                for path in list(get_unstaged_changes(index, r.path))]
+        elif not paths:
+            index = r.open_index()
+            paths = [
+                os.path.join(r.path, path.decode(sys.getfilesystemencoding()))
+                for path in list(get_unstaged_changes(index, os.getcwd()))]
+            # deleted files should not be staged
+            paths = [path for path in paths if os.path.exists(path)]
+            paths += list(
                 get_untracked_paths(os.getcwd(), r.path, r.open_index()))
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            relpath = os.path.relpath(p, r.path)
+            if all:
+                relpath = p
+            else:
+                relpath = os.path.relpath(p, r.path)
             if relpath.startswith('..' + os.path.sep):
                 raise ValueError('path %r is not in repo' % relpath)
             # FIXME: Support patterns, directories.

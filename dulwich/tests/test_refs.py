@@ -340,6 +340,27 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          f.read()[:40])
         f.close()
 
+        self.assertRaises(
+            OSError, self._refs.__setitem__,
+            b'refs/some/ref/sub', b'42d06bd4b77fed026b154d16493e5deab78f02ec')
+
+    def test_setitem_packed(self):
+        # It's allowed to set a new ref on a packed ref, the new ref will be placed outside on refs/
+        self._refs[b'refs/heads/packed'] = (
+            b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'
+        )
+        f = open(os.path.join(self._refs.path, b'refs', b'heads', b'packed'),
+                 'rb')
+        self.assertEqual(b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
+                         f.read()[:40])
+        f.close()
+
+        self._refs._packed_refs[b'refs/some/packed'] = b'42d06bd4b77fed026b154d16493e5deab78f02ec'
+        self.assertRaises(
+            OSError, self._refs.__setitem__,
+            b'refs/some/packed/sub',
+            b'42d06bd4b77fed026b154d16493e5deab78f02ec')
+
     def test_setitem_symbolic(self):
         ones = b'1' * 40
         self._refs[b'HEAD'] = ones

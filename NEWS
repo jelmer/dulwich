@@ -12,6 +12,9 @@
    applicable. Required for 3.8 compatibility.
    (Jelmer Vernooĳ)
 
+ * Support plain strings as refspec arguments to
+   ``dulwich.porcelain.push``. (Jelmer Vernooĳ)
+
  BUG FIXES
 
  *  Handle invalid ref that pretends to be a sub-folder under a valid ref.

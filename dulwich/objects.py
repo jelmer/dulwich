@@ -520,27 +520,31 @@ class ShaFile(object):
         return "<%s %s>" % (self.__class__.__name__, self.id)
 
     def __ne__(self, other):
+        """Check whether this object does not match the other."""
         return not isinstance(other, ShaFile) or self.id != other.id
 
     def __eq__(self, other):
         """Return True if the SHAs of the two objects match.
-
-        It doesn't make sense to talk about an order on ShaFiles, so we don't
-        override the rich comparison methods (__le__, etc.).
         """
         return isinstance(other, ShaFile) and self.id == other.id
 
     def __lt__(self, other):
+        """Return whether SHA of this object is less than the other.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return self.id < other.id
 
     def __le__(self, other):
+        """Check whether SHA of this object is less than or equal to the other.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return self.id <= other.id
 
     def __cmp__(self, other):
+        """Compare the SHA of this object with that of the other object.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return cmp(self.id, other.id)  # noqa: F821

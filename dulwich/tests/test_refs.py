@@ -345,17 +345,23 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b'refs/some/ref/sub', b'42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_setitem_packed(self):
-        # It's allowed to set a new ref on a packed ref, the new ref will be placed outside on refs/
+        with open(os.path.join(self._refs.path, 'packed-refs'), 'w') as f:
+            f.write('# pack-refs with: peeled fully-peeled sorted \n')
+            f.write(
+                '42d06bd4b77fed026b154d16493e5deab78f02ec refs/some/packed\n')
+
+        # It's allowed to set a new ref on a packed ref, the new ref will be
+        # placed outside on refs/
         self._refs[b'refs/heads/packed'] = (
             b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'
         )
-        f = open(os.path.join(self._refs.path, b'refs', b'heads', b'packed'),
-                 'rb')
-        self.assertEqual(b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
-                         f.read()[:40])
-        f.close()
+        packed_ref_path = os.path.join(
+            self._refs.path, b'refs', b'heads', b'packed')
+        with open(packed_ref_path, 'rb') as f:
+            self.assertEqual(
+                b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
+                f.read()[:40])
 
-        self._refs._packed_refs[b'refs/some/packed'] = b'42d06bd4b77fed026b154d16493e5deab78f02ec'
         self.assertRaises(
             OSError, self._refs.__setitem__,
             b'refs/some/packed/sub',

@@ -345,7 +345,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b'refs/some/ref/sub', b'42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_setitem_packed(self):
-        with open(os.path.join(self._refs.path, 'packed-refs'), 'w') as f:
+        with open(os.path.join(self._refs.path, b'packed-refs'), 'w') as f:
             f.write('# pack-refs with: peeled fully-peeled sorted \n')
             f.write(
                 '42d06bd4b77fed026b154d16493e5deab78f02ec refs/heads/packed\n')

@@ -335,10 +335,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_setitem(self):
         RefsContainerTests.test_setitem(self)
-        f = open(os.path.join(self._refs.path, b'refs', b'some', b'ref'), 'rb')
-        self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
-                         f.read()[:40])
-        f.close()
+        path = os.path.join(self._refs.path, b'refs', b'some', b'ref')
+        with open(path, 'rb') as f:
+            self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
+                             f.read()[:40])
 
         self.assertRaises(
             OSError, self._refs.__setitem__,
@@ -348,7 +348,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         with open(os.path.join(self._refs.path, 'packed-refs'), 'w') as f:
             f.write('# pack-refs with: peeled fully-peeled sorted \n')
             f.write(
-                '42d06bd4b77fed026b154d16493e5deab78f02ec refs/some/packed\n')
+                '42d06bd4b77fed026b154d16493e5deab78f02ec refs/heads/packed\n')
 
         # It's allowed to set a new ref on a packed ref, the new ref will be
         # placed outside on refs/
@@ -364,7 +364,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         self.assertRaises(
             OSError, self._refs.__setitem__,
-            b'refs/some/packed/sub',
+            b'refs/heads/packed/sub',
             b'42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_setitem_symbolic(self):

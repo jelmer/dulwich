@@ -62,6 +62,7 @@ class LineEndingConversion(TestCase):
 
 
 class GetLineEndingAutocrlfFilters(TestCase):
+
     def test_get_checkin_filter_autocrlf_default(self):
         checkin_filter = get_checkin_filter_autocrlf(b"false")
 

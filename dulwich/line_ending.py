@@ -127,6 +127,7 @@ Sources:
 """
 
 from dulwich.objects import Blob
+from dulwich.patch import is_binary
 
 CRLF = b"\r\n"
 LF = b"\n"

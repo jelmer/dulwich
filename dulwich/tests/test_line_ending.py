@@ -134,6 +134,23 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [normalized_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), normalized_sha)
 
+    def test_normalize_to_lf_binary(self):
+        base_content = b"line1\r\nline2\0"
+        base_sha = "b44504193b765f7cd79673812de8afb55b372ab2"
+
+        base_blob = Blob()
+        base_blob.set_raw_string(base_content)
+
+        self.assertEqual(base_blob.as_raw_chunks(), [base_content])
+        self.assertEqual(base_blob.sha().hexdigest(), base_sha)
+
+        filtered_blob = normalize_blob(
+            base_blob, convert_crlf_to_lf, binary_detection=True
+        )
+
+        self.assertEqual(filtered_blob.as_raw_chunks(), [base_content])
+        self.assertEqual(filtered_blob.sha().hexdigest(), base_sha)
+
     def test_normalize_to_crlf_no_op(self):
         base_content = b"line1\r\nline2"
         base_sha = "3a1bd7a52799fe5cf6411f1d35f4c10bacb1db96"
@@ -170,3 +187,20 @@ class NormalizeBlobTestCase(TestCase):
 
         self.assertEqual(filtered_blob.as_raw_chunks(), [normalized_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), normalized_sha)
+
+    def test_normalize_to_crlf_binary(self):
+        base_content = b"line1\r\nline2\0"
+        base_sha = "b44504193b765f7cd79673812de8afb55b372ab2"
+
+        base_blob = Blob()
+        base_blob.set_raw_string(base_content)
+
+        self.assertEqual(base_blob.as_raw_chunks(), [base_content])
+        self.assertEqual(base_blob.sha().hexdigest(), base_sha)
+
+        filtered_blob = normalize_blob(
+            base_blob, convert_lf_to_crlf, binary_detection=True
+        )
+
+        self.assertEqual(filtered_blob.as_raw_chunks(), [base_content])
+        self.assertEqual(filtered_blob.sha().hexdigest(), base_sha)

@@ -604,7 +604,7 @@ def read_submodule_head(path):
         return None
 
 
-def get_unstaged_changes(index, root_path):
+def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     """Walk through an index and check for differences against working tree.
 
     :param index: index to check
@@ -618,7 +618,12 @@ def get_unstaged_changes(index, root_path):
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
         try:
-            blob = blob_from_path_and_stat(full_path, os.lstat(full_path))
+            blob = blob_from_path_and_stat(
+                full_path, os.lstat(full_path)
+            )
+
+            if filter_blob_callback is not None:
+                blob = filter_blob_callback(blob, tree_path)
         except OSError as e:
             if e.errno != errno.ENOENT:
                 raise

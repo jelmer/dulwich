@@ -72,6 +72,8 @@ from dulwich.hooks import (
     CommitMsgShellHook,
     )
 
+from dulwich.line_ending import BlobNormalizer
+
 from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
     check_ref_format,
@@ -864,6 +866,11 @@ class Repo(BaseRepo):
         self.hooks['commit-msg'] = CommitMsgShellHook(self.controldir())
         self.hooks['post-commit'] = PostCommitShellHook(self.controldir())
 
+        # Line ending convert filters
+        # TODO: Set them based on configuration
+        self.read_filter = None
+        self.write_filter = None
+
     def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
                       timezone, message):
         from .reflog import format_reflog_line
@@ -1260,6 +1267,13 @@ class Repo(BaseRepo):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def get_blob_normalizer(self):
+        """ Return a BlobNormalizer object
+        """
+        # TODO Parse the git attributes files
+        git_attributes = {}
+        return BlobNormalizer(self.get_config_stack(), git_attributes, self.read_filter, self.write_filter)
 
 
 class MemoryRepo(BaseRepo):

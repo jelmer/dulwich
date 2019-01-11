@@ -183,6 +183,40 @@ def get_checkin_filter_autocrlf(core_autocrlf):
     return None
 
 
+class BlobNormalizer(object):
+    """ An object to store computation result of which filter to apply based
+    on configuration, gitattributes, path and operation (checkin or checkout)
+    """
+
+    def __init__(self, config_stack, gitattributes, read_filter, write_filter):
+        self.config_stack = config_stack
+        self.gitattributes = gitattributes
+
+        # TODO compute them based on passed values
+        self.fallback_read_filter = read_filter
+        self.fallback_write_filter = write_filter
+
+    def checkin_normalize(self, blob, tree_path):
+        """ Normalize a blob during a checkin operation
+        """
+        if self.fallback_write_filter is not None:
+            return normalize_blob(
+                blob, self.fallback_write_filter, binary_detection=False
+            )
+
+        return blob
+
+    def checkout_normalize(self, blob, tree_path):
+        """ Normalize a blob during a checkout operation
+        """
+        if self.fallback_read_filter is not None:
+            return normalize_blob(
+                blob, self.fallback_read_filter, binary_detection=False
+            )
+
+        return blob
+
+
 def normalize_blob(blob, conversion, binary_detection):
     """ Takes a blob as input returns either the original blob if
     binary_detection is True and the blob content looks like binary, else

@@ -33,6 +33,7 @@ import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
+from dulwich.line_ending import convert_crlf_to_lf
 from dulwich.objects import (
     Blob,
     Tag,
@@ -907,6 +908,55 @@ class StatusTests(PorcelainTestCase):
             results.staged)
         self.assertListEqual(results.unstaged, [b'blye'])
         self.assertListEqual(results.untracked, ['blyat'])
+
+    def test_status_crlf_mismatch(self):
+        # First make a commit as if the file has been added on a Linux system
+        # or with core.autocrlf=True
+        file_path = os.path.join(self.repo.path, 'crlf')
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\nline2')
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+
+        # Then update the file as if it was created by CGit on a Windows
+        # system with core.autocrlf=true
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\r\nline2')
+
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [b'crlf'])
+        self.assertListEqual(results.untracked, [])
+
+    def test_status_crlf_convert(self):
+        # First make a commit as if the file has been added on a Linux system
+        # or with core.autocrlf=True
+        file_path = os.path.join(self.repo.path, 'crlf')
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\nline2')
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+
+        # Then update the file as if it was created by CGit on a Windows
+        # system with core.autocrlf=true
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\r\nline2')
+
+        # TODO: It should be set automatically by looking at the configuration
+        self.repo.write_filter = convert_crlf_to_lf
+
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [])
+        self.assertListEqual(results.untracked, [])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""

@@ -204,6 +204,9 @@ class BlobReadTests(TestCase):
         self.assertEqual(
                 t.message,
                 b'This is a signed tag\n'
+                )
+        self.assertEqual(
+                t.signature,
                 b'-----BEGIN PGP SIGNATURE-----\n'
                 b'Version: GnuPG v1.4.9 (GNU/Linux)\n'
                 b'\n'

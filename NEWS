@@ -15,6 +15,9 @@
  * Support plain strings as refspec arguments to
    ``dulwich.porcelain.push``. (Jelmer Vernooĳ)
 
+ * Add support for creating signed tags.
+   (Jelmer Vernooĳ, #542)
+
  BUG FIXES
 
  *  Handle invalid ref that pretends to be a sub-folder under a valid ref.

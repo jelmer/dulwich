@@ -617,7 +617,7 @@ class DiskRefsContainer(RefsContainer):
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
         except IOError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR):
+            if e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):
                 return None
             raise
 
@@ -687,6 +687,16 @@ class DiskRefsContainer(RefsContainer):
         except (KeyError, IndexError):
             realname = name
         filename = self.refpath(realname)
+
+        # make sure none of the ancestor folders is in packed refs
+        probe_ref = os.path.dirname(realname)
+        packed_refs = self.get_packed_refs()
+        while probe_ref:
+            if packed_refs.get(probe_ref, None) is not None:
+                raise OSError(errno.ENOTDIR,
+                              'Not a directory: {}'.format(filename))
+            probe_ref = os.path.dirname(probe_ref)
+
         ensure_dir_exists(os.path.dirname(filename))
         with GitFile(filename, 'wb') as f:
             if old_ref is not None:

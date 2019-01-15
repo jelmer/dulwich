@@ -15,7 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.19.9'
+dulwich_version_string = '0.19.10'
 
 include_dirs = []
 # Windows MSVC support
@@ -77,14 +77,14 @@ setup_kwargs = {}
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.21'],
+        'https': ['urllib3[secure]>=1.23'],
         }
-    setup_kwargs['install_requires'] = ['urllib3>=1.21', 'certifi']
+    setup_kwargs['install_requires'] = ['urllib3>=1.23', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
 
-with io.open(os.path.join(os.path.dirname(__file__), "README.md"),
+with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
              encoding="utf-8") as f:
     description = f.read()
 

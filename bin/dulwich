@@ -311,11 +311,13 @@ class cmd_rev_list(Command):
 class cmd_tag(Command):
 
     def run(self, args):
-        opts, args = getopt(args, '', [])
-        if len(args) < 2:
-            print('Usage: dulwich tag NAME')
-            sys.exit(1)
-        porcelain.tag('.', args[0])
+        parser = optparse.OptionParser()
+        parser.add_option("-a", "--annotated", help="Create an annotated tag.", action="store_true")
+        parser.add_option("-s", "--sign", help="Sign the annotated tag.", action="store_true")
+        options, args = parser.parse_args(args)
+        porcelain.tag_create(
+            '.', args[0], annotated=options.annotated,
+            sign=options.sign)
 
 
 class cmd_repack(Command):
@@ -386,6 +388,14 @@ class cmd_web_daemon(Command):
         from dulwich import porcelain
         porcelain.web_daemon(gitdir, address=options.listen_address,
                              port=options.port)
+
+
+class cmd_write_tree(Command):
+
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        sys.stdout.write('%s\n' % porcelain.write_tree('.'))
 
 
 class cmd_receive_pack(Command):
@@ -689,6 +699,7 @@ commands = {
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "web-daemon": cmd_web_daemon,
+    "write-tree": cmd_write_tree,
     }
 
 if len(sys.argv) < 2:

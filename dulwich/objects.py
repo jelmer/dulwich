@@ -67,6 +67,8 @@ S_IFGITLINK = 0o160000
 
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
+BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
+
 
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
@@ -520,27 +522,31 @@ class ShaFile(object):
         return "<%s %s>" % (self.__class__.__name__, self.id)
 
     def __ne__(self, other):
+        """Check whether this object does not match the other."""
         return not isinstance(other, ShaFile) or self.id != other.id
 
     def __eq__(self, other):
         """Return True if the SHAs of the two objects match.
-
-        It doesn't make sense to talk about an order on ShaFiles, so we don't
-        override the rich comparison methods (__le__, etc.).
         """
         return isinstance(other, ShaFile) and self.id == other.id
 
     def __lt__(self, other):
+        """Return whether SHA of this object is less than the other.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return self.id < other.id
 
     def __le__(self, other):
+        """Check whether SHA of this object is less than or equal to the other.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return self.id <= other.id
 
     def __cmp__(self, other):
+        """Compare the SHA of this object with that of the other object.
+        """
         if not isinstance(other, ShaFile):
             raise TypeError
         return cmp(self.id, other.id)  # noqa: F821
@@ -687,7 +693,7 @@ class Tag(ShaFile):
 
     __slots__ = ('_tag_timezone_neg_utc', '_name', '_object_sha',
                  '_object_class', '_tag_time', '_tag_timezone',
-                 '_tagger', '_message')
+                 '_tagger', '_message', '_signature')
 
     def __init__(self):
         super(Tag, self).__init__()
@@ -695,6 +701,7 @@ class Tag(ShaFile):
         self._tag_time = None
         self._tag_timezone = None
         self._tag_timezone_neg_utc = False
+        self._signature = None
 
     @classmethod
     def from_path(cls, filename):
@@ -753,6 +760,8 @@ class Tag(ShaFile):
         if self._message is not None:
             chunks.append(b'\n')  # To close headers
             chunks.append(self._message)
+        if self._signature is not None:
+            chunks.append(self._signature)
         return chunks
 
     def _deserialize(self, chunks):
@@ -777,7 +786,18 @@ class Tag(ShaFile):
                  (self._tag_timezone,
                   self._tag_timezone_neg_utc)) = parse_time_entry(value)
             elif field is None:
-                self._message = value
+                if value is None:
+                    self._message = None
+                    self._signature = None
+                else:
+                    try:
+                        sig_idx = value.index(BEGIN_PGP_SIGNATURE)
+                    except ValueError:
+                        self._message = value
+                        self._signature = None
+                    else:
+                        self._message = value[:sig_idx]
+                        self._signature = value[sig_idx:]
             else:
                 raise ObjectFormatException("Unknown field %s" % field)
 
@@ -806,7 +826,10 @@ class Tag(ShaFile):
             "tag_timezone",
             "The timezone that tag_time is in.")
     message = serializable_property(
-            "message", "The message attached to this tag")
+            "message", "the message attached to this tag")
+
+    signature = serializable_property(
+            "signature", "Optional detached GPG signature")
 
 
 class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):

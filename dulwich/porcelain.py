@@ -681,7 +681,8 @@ def tag(*args, **kwargs):
 
 def tag_create(
         repo, tag, author=None, message=None, annotated=False,
-        objectish="HEAD", tag_time=None, tag_timezone=None):
+        objectish="HEAD", tag_time=None, tag_timezone=None,
+        sign=False):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
@@ -692,6 +693,7 @@ def tag_create(
     :param objectish: object the tag should point at, defaults to HEAD
     :param tag_time: Optional time for annotated tag
     :param tag_timezone: Optional timezone for annotated tag
+    :param sign: GPG Sign the tag
     """
 
     with open_repo_closing(repo) as r:
@@ -702,7 +704,7 @@ def tag_create(
             tag_obj = Tag()
             if author is None:
                 # TODO(jelmer): Don't use repo private method.
-                author = r._get_user_identity()
+                author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
             tag_obj.message = message
             tag_obj.name = tag
@@ -716,6 +718,10 @@ def tag_create(
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone)
             tag_obj.tag_timezone = tag_timezone
+            if sign:
+                import gpg
+                with gpg.Context(armor=True) as c:
+                    tag_obj.signature, result = c.sign(tag_obj.as_raw_string())
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:
@@ -1411,3 +1417,13 @@ def get_object_by_path(repo, path, committish=None):
             r.object_store.__getitem__,
             base_tree, path)
         return r[sha]
+
+
+def write_tree(repo):
+    """Write a tree object from the index.
+
+    :param repo: Repository for which to write tree
+    :return: tree id for the tree that was written
+    """
+    with open_repo_closing(repo) as r:
+        return r.open_index().commit(r.object_store)

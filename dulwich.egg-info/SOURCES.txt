@@ -4,13 +4,13 @@
 .testr.conf
 .travis.yml
 AUTHORS
-CONTRIBUTING.md
+CONTRIBUTING.rst
 COPYING
 MANIFEST.in
 Makefile
 NEWS
-README.md
-README.swift.md
+README.rst
+README.swift.rst
 TODO
 appveyor.yml
 build.cmd
@@ -31,6 +31,7 @@ docs/index.txt
 docs/make.bat
 docs/performance.txt
 docs/protocol.txt
+docs/api/index.txt
 docs/tutorial/.gitignore
 docs/tutorial/Makefile
 docs/tutorial/conclusion.txt
@@ -58,6 +59,7 @@ dulwich/greenthreads.py
 dulwich/hooks.py
 dulwich/ignore.py
 dulwich/index.py
+dulwich/line_ending.py
 dulwich/log_utils.py
 dulwich/lru_cache.py
 dulwich/mailmap.py
@@ -78,8 +80,6 @@ dulwich/walk.py
 dulwich/web.py
 dulwich.egg-info/PKG-INFO
 dulwich.egg-info/SOURCES.txt
-dulwich.egg-info/SOURCES.txt.~1~
-dulwich.egg-info/SOURCES.txt.~2~
 dulwich.egg-info/dependency_links.txt
 dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
@@ -104,6 +104,7 @@ dulwich/tests/test_greenthreads.py
 dulwich/tests/test_hooks.py
 dulwich/tests/test_ignore.py
 dulwich/tests/test_index.py
+dulwich/tests/test_line_ending.py
 dulwich/tests/test_lru_cache.py
 dulwich/tests/test_mailmap.py
 dulwich/tests/test_missing_obj_finder.py

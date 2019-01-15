@@ -252,6 +252,10 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self._put_named_file)
 
+    def _del_named_file(self, path):
+        """Delete a file in the contrl directory with the given name."""
+        raise NotImplementedError(self._del_named_file)
+
     def open_index(self):
         """Open the index for this repository.
 
@@ -654,6 +658,13 @@ class BaseRepo(object):
         for sha in to_remove:
             del self._graftpoints[sha]
 
+    def _read_heads(self, name):
+        f = self.get_named_file(name)
+        if f is None:
+            return []
+        with f:
+            return [l.strip() for l in f.readlines() if l.strip()]
+
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
@@ -696,8 +707,7 @@ class BaseRepo(object):
 
         config = self.get_config_stack()
         if merge_heads is None:
-            # FIXME: Read merge heads from .git/MERGE_HEADS
-            merge_heads = []
+            merge_heads = self._read_heads('MERGE_HEADS')
         if committer is None:
             committer = self._get_user_identity(config)
         check_user_identity(committer)
@@ -767,6 +777,8 @@ class BaseRepo(object):
                 # Fail if the atomic compare-and-swap failed, leaving the
                 # commit and all its objects as garbage.
                 raise CommitError("%s changed during commit" % (ref,))
+
+        self._del_named_file('MERGE_HEADS')
 
         try:
             self.hooks['post-commit'].execute()
@@ -938,6 +950,14 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
+
+    def _del_named_file(self, path):
+        try:
+            os.unlink(os.path.join(self.controldir(), path))
+        except (IOError, OSError) as e:
+            if e.errno == errno.ENOENT:
+                return
+            raise
 
     def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
@@ -1282,6 +1302,12 @@ class MemoryRepo(BaseRepo):
         :param contents: A string to write to the file.
         """
         self._named_files[path] = contents
+
+    def _del_named_file(self, path):
+        try:
+            del self._named_files[path]
+        except KeyError:
+            pass
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.

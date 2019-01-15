@@ -7,11 +7,10 @@ dulwich - Python implementation of Git
 Overview
 ========
 
-.. include:: ../README.md
+.. include:: ../README.rst
 
 Documentation
 =============
-
 
 .. toctree::
     :maxdepth: 2
@@ -20,6 +19,8 @@ Documentation
     protocol
 
     tutorial/index
+
+    api/index
 
 
 Changelog

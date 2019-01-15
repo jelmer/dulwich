@@ -65,6 +65,7 @@ from dulwich.pack import (
     PackIndexer,
     PackStreamCopier,
     )
+from dulwich.refs import ANNOTATED_TAG_SUFFIX
 
 INFODIR = 'info'
 PACKDIR = 'pack'
@@ -75,7 +76,8 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs):
         return [sha for (ref, sha) in refs.items()
-                if sha not in self and not ref.endswith(b"^{}") and
+                if sha not in self and
+                not ref.endswith(ANNOTATED_TAG_SUFFIX) and
                 not sha == ZERO_SHA]
 
     def iter_shas(self, shas):
@@ -192,7 +194,8 @@ class BaseObjectStore(object):
 
     def find_missing_objects(self, haves, wants, progress=None,
                              get_tagged=None,
-                             get_parents=lambda commit: commit.parents):
+                             get_parents=lambda commit: commit.parents,
+                             depth=None):
         """Find the missing objects required for a set of revisions.
 
         :param haves: Iterable over SHAs already in common.
@@ -1163,7 +1166,7 @@ class ObjectStoreGraphWalker(object):
     :ivar get_parents: Function to retrieve parents in the local repo
     """
 
-    def __init__(self, local_heads, get_parents):
+    def __init__(self, local_heads, get_parents, shallow=None):
         """Create a new instance.
 
         :param local_heads: Heads to start search with
@@ -1172,6 +1175,9 @@ class ObjectStoreGraphWalker(object):
         self.heads = set(local_heads)
         self.get_parents = get_parents
         self.parents = {}
+        if shallow is None:
+            shallow = set()
+        self.shallow = shallow
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
@@ -1315,3 +1321,14 @@ class OverlayObjectStore(BaseObjectStore):
                 return True
         else:
             return False
+
+
+def read_packs_file(f):
+    """Yield the packs listed in a packs file."""
+    for line in f.read().splitlines():
+        if not line:
+            continue
+        (kind, name) = line.split(b" ", 1)
+        if kind != b"P":
+            continue
+        yield name.decode(sys.getfilesystemencoding())

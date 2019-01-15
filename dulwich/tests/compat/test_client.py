@@ -210,6 +210,18 @@ class DulwichClientTestBase(object):
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
+    def test_fetch_pack_depth(self):
+        c = self._client()
+        with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
+            result = c.fetch(self._build_path('/server_new.export'), dest,
+                             depth=1)
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertEqual(
+                    dest.get_shallow(),
+                    set([b'35e0b59e187dd72a0af294aedffc213eaa4d03ff',
+                         b'514dc6d3fbfe77361bcaef320c4d21b72bc10be9']))
+
     def test_repeat(self):
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, 'dest')) as dest:
@@ -380,7 +392,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.SubprocessGitClient(stderr=subprocess.PIPE)
+        return client.SubprocessGitClient()
 
     def _build_path(self, path):
         return self.gitroot + path
@@ -500,6 +512,7 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             data = self.rfile.read(nbytes)
         else:
             data = None
+            env['CONTENT_LENGTH'] = '0'
         # throw away additional data [see bug #427345]
         while select.select([self.rfile._sock], [], [], 0)[0]:
             if not self.rfile._sock.recv(1):

@@ -73,6 +73,7 @@ from dulwich.hooks import (
     )
 
 from dulwich.refs import (  # noqa: F401
+    ANNOTATED_TAG_SUFFIX,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -251,6 +252,10 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self._put_named_file)
 
+    def _del_named_file(self, path):
+        """Delete a file in the contrl directory with the given name."""
+        raise NotImplementedError(self._del_named_file)
+
     def open_index(self):
         """Open the index for this repository.
 
@@ -259,24 +264,26 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.open_index)
 
-    def fetch(self, target, determine_wants=None, progress=None):
+    def fetch(self, target, determine_wants=None, progress=None, depth=None):
         """Fetch objects into another repository.
 
         :param target: The target repository
         :param determine_wants: Optional function to determine what refs to
             fetch.
         :param progress: Optional progress function
+        :param depth: Optional shallow fetch depth
         :return: The local refs
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         count, pack_data = self.fetch_pack_data(
-                determine_wants, target.get_graph_walker(), progress)
+                determine_wants, target.get_graph_walker(), progress=progress,
+                depth=depth)
         target.object_store.add_pack_data(count, pack_data, progress)
         return self.get_refs()
 
     def fetch_pack_data(self, determine_wants, graph_walker, progress,
-                        get_tagged=None):
+                        get_tagged=None, depth=None):
         """Fetch the pack data required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads
@@ -288,15 +295,16 @@ class BaseRepo(object):
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
+        :param depth: Shallow fetch depth
         :return: count and iterator over pack data
         """
         # TODO(jelmer): Fetch pack data directly, don't create objects first.
         objects = self.fetch_objects(determine_wants, graph_walker, progress,
-                                     get_tagged)
+                                     get_tagged, depth=depth)
         return pack_objects_to_data(objects)
 
     def fetch_objects(self, determine_wants, graph_walker, progress,
-                      get_tagged=None):
+                      get_tagged=None, depth=None):
         """Fetch the missing objects required for a set of revisions.
 
         :param determine_wants: Function that takes a dictionary with heads
@@ -308,9 +316,28 @@ class BaseRepo(object):
             updated progress strings.
         :param get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
+        :param depth: Shallow fetch depth
         :return: iterator over objects, with __len__ implemented
         """
-        wants = determine_wants(self.get_refs())
+        if depth not in (None, 0):
+            raise NotImplementedError("depth not supported yet")
+
+        refs = {}
+        for ref, sha in self.get_refs().items():
+            try:
+                obj = self.object_store[sha]
+            except KeyError:
+                warnings.warn(
+                    'ref %s points at non-present sha %s' % (
+                        ref.decode('utf-8', 'replace'), sha.decode('ascii')),
+                    UserWarning)
+                continue
+            else:
+                if isinstance(obj, Tag):
+                    refs[ref + ANNOTATED_TAG_SUFFIX] = obj.object[1]
+                refs[ref] = sha
+
+        wants = determine_wants(refs)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
@@ -361,7 +388,8 @@ class BaseRepo(object):
         """
         if heads is None:
             heads = self.refs.as_dict(b'refs/heads').values()
-        return ObjectStoreGraphWalker(heads, self.get_parents)
+        return ObjectStoreGraphWalker(
+            heads, self.get_parents, shallow=self.get_shallow())
 
     def get_refs(self):
         """Get dictionary with all refs.
@@ -458,7 +486,26 @@ class BaseRepo(object):
 
         :return: Set of shallow commits.
         """
-        return set()
+        f = self.get_named_file('shallow')
+        if f is None:
+            return set()
+        with f:
+            return set(l.strip() for l in f)
+
+    def update_shallow(self, new_shallow, new_unshallow):
+        """Update the list of shallow objects.
+
+        :param new_shallow: Newly shallow objects
+        :param new_unshallow: Newly no longer shallow objects
+        """
+        shallow = self.get_shallow()
+        if new_shallow:
+            shallow.update(new_shallow)
+        if new_unshallow:
+            shallow.difference_update(new_unshallow)
+        self._put_named_file(
+            'shallow',
+            b''.join([sha + b'\n' for sha in shallow]))
 
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
@@ -565,12 +612,11 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self):
+    def _get_user_identity(self, config):
         """Determine the identity to use for new commits.
         """
         user = os.environ.get("GIT_COMMITTER_NAME")
         email = os.environ.get("GIT_COMMITTER_EMAIL")
-        config = self.get_config_stack()
         if user is None:
             try:
                 user = config.get(("user", ), "name")
@@ -612,6 +658,13 @@ class BaseRepo(object):
         for sha in to_remove:
             del self._graftpoints[sha]
 
+    def _read_heads(self, name):
+        f = self.get_named_file(name)
+        if f is None:
+            return []
+        with f:
+            return [l.strip() for l in f.readlines() if l.strip()]
+
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
@@ -652,11 +705,11 @@ class BaseRepo(object):
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
+        config = self.get_config_stack()
         if merge_heads is None:
-            # FIXME: Read merge heads from .git/MERGE_HEADS
-            merge_heads = []
+            merge_heads = self._read_heads('MERGE_HEADS')
         if committer is None:
-            committer = self._get_user_identity()
+            committer = self._get_user_identity(config)
         check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
@@ -680,6 +733,11 @@ class BaseRepo(object):
         if author_timezone is None:
             author_timezone = commit_timezone
         c.author_timezone = author_timezone
+        if encoding is None:
+            try:
+                encoding = config.get(('i18n', ), 'commitEncoding')
+            except KeyError:
+                pass  # No dice
         if encoding is not None:
             c.encoding = encoding
         if message is None:
@@ -719,6 +777,8 @@ class BaseRepo(object):
                 # Fail if the atomic compare-and-swap failed, leaving the
                 # commit and all its objects as garbage.
                 raise CommitError("%s changed during commit" % (ref,))
+
+        self._del_named_file('MERGE_HEADS')
 
         try:
             self.hooks['post-commit'].execute()
@@ -816,7 +876,8 @@ class Repo(BaseRepo):
             if e.errno != errno.EEXIST:
                 raise
         if committer is None:
-            committer = self._get_user_identity()
+            config = self.get_config_stack()
+            committer = self._get_user_identity(config)
         check_user_identity(committer)
         if timestamp is None:
             timestamp = int(time.time())
@@ -890,6 +951,14 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
             f.write(contents)
 
+    def _del_named_file(self, path):
+        try:
+            os.unlink(os.path.join(self.controldir(), path))
+        except (IOError, OSError) as e:
+            if e.errno == errno.ENOENT:
+                return
+            raise
+
     def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
 
@@ -913,13 +982,6 @@ class Repo(BaseRepo):
             if e.errno == errno.ENOENT:
                 return None
             raise
-
-    def get_shallow(self):
-        f = self.get_named_file('shallow')
-        if f is None:
-            return set()
-        with f:
-            return set(l.strip() for l in f)
 
     def index_path(self):
         """Return path to the index file."""
@@ -1240,6 +1302,12 @@ class MemoryRepo(BaseRepo):
         :param contents: A string to write to the file.
         """
         self._named_files[path] = contents
+
+    def _del_named_file(self, path):
+        try:
+            del self._named_files[path]
+        except KeyError:
+            pass
 
     def get_named_file(self, path):
         """Get a file from the control dir with a specific name.

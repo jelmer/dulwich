@@ -204,6 +204,9 @@ class BlobReadTests(TestCase):
         self.assertEqual(
                 t.message,
                 b'This is a signed tag\n'
+                )
+        self.assertEqual(
+                t.signature,
                 b'-----BEGIN PGP SIGNATURE-----\n'
                 b'Version: GnuPG v1.4.9 (GNU/Linux)\n'
                 b'\n'
@@ -672,6 +675,27 @@ class CommitParseTests(ShaFileCheckTests):
         for commit in [commit0, commit1]:
             with self.assertRaises(ObjectFormatException):
                 commit.check()
+
+    def test_mangled_author_line(self):
+        """Mangled author line should successfully parse"""
+        author_line = (
+            b'Karl MacMillan <kmacmill@redhat.com> <"Karl MacMillan '
+            b'<kmacmill@redhat.com>"> 1197475547 -0500'
+        )
+        expected_identity = (
+            b'Karl MacMillan <kmacmill@redhat.com> <"Karl MacMillan '
+            b'<kmacmill@redhat.com>">'
+        )
+        commit = Commit.from_string(
+            self.make_commit_text(author=author_line)
+        )
+
+        # The commit parses properly
+        self.assertEqual(commit.author, expected_identity)
+
+        # But the check fails because the author identity is bogus
+        with self.assertRaises(ObjectFormatException):
+            commit.check()
 
     def test_parse_gpgsig(self):
         c = Commit.from_string(b"""tree aaff74984cccd156a469afa7d9ab10e4777beb24

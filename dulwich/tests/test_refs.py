@@ -335,10 +335,37 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_setitem(self):
         RefsContainerTests.test_setitem(self)
-        f = open(os.path.join(self._refs.path, b'refs', b'some', b'ref'), 'rb')
-        self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
-                         f.read()[:40])
-        f.close()
+        path = os.path.join(self._refs.path, b'refs', b'some', b'ref')
+        with open(path, 'rb') as f:
+            self.assertEqual(b'42d06bd4b77fed026b154d16493e5deab78f02ec',
+                             f.read()[:40])
+
+        self.assertRaises(
+            OSError, self._refs.__setitem__,
+            b'refs/some/ref/sub', b'42d06bd4b77fed026b154d16493e5deab78f02ec')
+
+    def test_setitem_packed(self):
+        with open(os.path.join(self._refs.path, b'packed-refs'), 'w') as f:
+            f.write('# pack-refs with: peeled fully-peeled sorted \n')
+            f.write(
+                '42d06bd4b77fed026b154d16493e5deab78f02ec refs/heads/packed\n')
+
+        # It's allowed to set a new ref on a packed ref, the new ref will be
+        # placed outside on refs/
+        self._refs[b'refs/heads/packed'] = (
+            b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8'
+        )
+        packed_ref_path = os.path.join(
+            self._refs.path, b'refs', b'heads', b'packed')
+        with open(packed_ref_path, 'rb') as f:
+            self.assertEqual(
+                b'3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8',
+                f.read()[:40])
+
+        self.assertRaises(
+            OSError, self._refs.__setitem__,
+            b'refs/heads/packed/sub',
+            b'42d06bd4b77fed026b154d16493e5deab78f02ec')
 
     def test_setitem_symbolic(self):
         ones = b'1' * 40
@@ -486,6 +513,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
                          self._refs.read_ref(b'refs/heads/packed'))
         self.assertEqual(None, self._refs.read_ref(b'nonexistant'))
 
+    def test_read_loose_ref(self):
+        self._refs[b'refs/heads/foo'] = (
+            b'df6800012397fb85c56e7418dd4eb9405dee075c'
+        )
+
+        self.assertEqual(None, self._refs.read_ref(b'refs/heads/foo/bar'))
+
     def test_non_ascii(self):
         try:
             encoded_ref = u'refs/tags/schön'.encode(
@@ -506,6 +540,9 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(expected_refs, self._repo.get_refs())
 
     def test_cyrillic(self):
+        if sys.platform == 'win32':
+            raise SkipTest(
+                    "filesystem encoding doesn't support arbitrary bytes")
         # reported in https://github.com/dulwich/dulwich/issues/608
         name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
         encoded_ref = b'refs/heads/' + name

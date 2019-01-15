@@ -61,7 +61,7 @@ from contextlib import (
     closing,
     contextmanager,
 )
-from io import BytesIO
+from io import BytesIO, RawIOBase
 import datetime
 import os
 import posixpath
@@ -139,8 +139,27 @@ from dulwich.server import (
 GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
 
 
-default_bytes_out_stream = getattr(sys.stdout, 'buffer', sys.stdout)
-default_bytes_err_stream = getattr(sys.stderr, 'buffer', sys.stderr)
+class NoneStream(RawIOBase):
+    """Fallback if stdout or stderr are unavailable, does nothing."""
+    def read(self, size=-1):
+        return None
+
+    def readall(self):
+        return None
+
+    def readinto(self, b):
+        return None
+
+    def write(self, b):
+        return None
+
+
+default_bytes_out_stream = getattr(
+        sys.stdout, 'buffer', sys.stdout
+    ) or NoneStream()
+default_bytes_err_stream = getattr(
+        sys.stderr, 'buffer', sys.stderr
+    ) or NoneStream()
 
 
 DEFAULT_ENCODING = 'utf-8'
@@ -188,6 +207,8 @@ def path_to_tree_path(repopath, path):
     treepath = os.path.relpath(path, repopath)
     if treepath.startswith(b'..'):
         raise ValueError('Path not in repo')
+    if os.path.sep != '/':
+        treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
     return treepath
 
 
@@ -288,7 +309,7 @@ def init(path=".", bare=False):
 
 def clone(source, target=None, bare=False, checkout=None,
           errstream=default_bytes_err_stream, outstream=None,
-          origin=b"origin", **kwargs):
+          origin=b"origin", depth=None, **kwargs):
     """Clone a local or remote git repository.
 
     :param source: Path or URL for source repository
@@ -298,6 +319,7 @@ def clone(source, target=None, bare=False, checkout=None,
     :param errstream: Optional stream to write progress to
     :param outstream: Optional stream to write progress to (deprecated)
     :param origin: Name of remote from the repository used to clone
+    :param depth: Depth to fetch at
     :return: The new repository
     """
     # TODO(jelmer): This code overlaps quite a bit with Repo.clone
@@ -328,7 +350,7 @@ def clone(source, target=None, bare=False, checkout=None,
     try:
         fetch_result = fetch(
             r, source, origin, errstream=errstream, message=reflog_message,
-            **kwargs)
+            depth=depth, **kwargs)
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
@@ -659,7 +681,8 @@ def tag(*args, **kwargs):
 
 def tag_create(
         repo, tag, author=None, message=None, annotated=False,
-        objectish="HEAD", tag_time=None, tag_timezone=None):
+        objectish="HEAD", tag_time=None, tag_timezone=None,
+        sign=False):
     """Creates a tag in git via dulwich calls:
 
     :param repo: Path to repository
@@ -670,6 +693,7 @@ def tag_create(
     :param objectish: object the tag should point at, defaults to HEAD
     :param tag_time: Optional time for annotated tag
     :param tag_timezone: Optional timezone for annotated tag
+    :param sign: GPG Sign the tag
     """
 
     with open_repo_closing(repo) as r:
@@ -680,7 +704,7 @@ def tag_create(
             tag_obj = Tag()
             if author is None:
                 # TODO(jelmer): Don't use repo private method.
-                author = r._get_user_identity()
+                author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
             tag_obj.message = message
             tag_obj.name = tag
@@ -694,6 +718,10 @@ def tag_create(
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone)
             tag_obj.tag_timezone = tag_timezone
+            if sign:
+                import gpg
+                with gpg.Context(armor=True) as c:
+                    tag_obj.signature, result = c.sign(tag_obj.as_raw_string())
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:
@@ -1065,7 +1093,8 @@ def branch_list(repo):
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
-          errstream=default_bytes_err_stream, message=None, **kwargs):
+          errstream=default_bytes_err_stream, message=None, depth=None,
+          **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1074,6 +1103,7 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param outstream: Output stream (defaults to stdout)
     :param errstream: Error stream (defaults to stderr)
     :param message: Reflog message (defaults to b"fetch: from <remote_name>")
+    :param depth: Depth to fetch at
     :return: Dictionary with refs on the remote
     """
     if message is None:
@@ -1081,7 +1111,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     with open_repo_closing(repo) as r:
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs)
-        fetch_result = client.fetch(path, r, progress=errstream.write)
+        fetch_result = client.fetch(path, r, progress=errstream.write,
+                                    depth=depth)
         stripped_refs = strip_peeled_refs(fetch_result.refs)
         branches = {
             n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
@@ -1364,3 +1395,35 @@ def describe(repo):
 
         # Return plain commit if no parent tag can be found
         return 'g{}'.format(latest_commit.id.decode('ascii')[:7])
+
+
+def get_object_by_path(repo, path, committish=None):
+    """Get an object by path.
+
+    :param repo: A path to the repository
+    :param path: Path to look up
+    :param committish: Commit to look up path in
+    :return: A `ShaFile` object
+    """
+    if committish is None:
+        committish = "HEAD"
+    # Get the repository
+    with open_repo_closing(repo) as r:
+        commit = parse_commit(repo, committish)
+        base_tree = commit.tree
+        if not isinstance(path, bytes):
+            path = path.encode(commit.encoding or DEFAULT_ENCODING)
+        (mode, sha) = tree_lookup_path(
+            r.object_store.__getitem__,
+            base_tree, path)
+        return r[sha]
+
+
+def write_tree(repo):
+    """Write a tree object from the index.
+
+    :param repo: Repository for which to write tree
+    :return: tree id for the tree that was written
+    """
+    with open_repo_closing(repo) as r:
+        return r.open_index().commit(r.object_store)

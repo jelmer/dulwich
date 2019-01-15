@@ -11,10 +11,11 @@ except ImportError:
 else:
     has_setuptools = True
 from distutils.core import Distribution
+import io
 import os
 import sys
 
-dulwich_version_string = '0.19.6'
+dulwich_version_string = '0.19.10'
 
 include_dirs = []
 # Windows MSVC support
@@ -76,22 +77,49 @@ setup_kwargs = {}
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.21'],
+        'https': ['urllib3[secure]>=1.23'],
         }
-    setup_kwargs['install_requires'] = ['urllib3>=1.21', 'certifi']
+    setup_kwargs['install_requires'] = ['urllib3>=1.23', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
 
+with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
+             encoding="utf-8") as f:
+    description = f.read()
 
 setup(name='dulwich',
+      author="Jelmer Vernooij",
+      author_email="jelmer@jelmer.uk",
+      url="https://www.dulwich.io/",
+      long_description=description,
+      description="Python Git Library",
       version=dulwich_version_string,
       license='Apachev2 or later or GPLv2',
+      project_urls={
+          "Bug Tracker": "https://github.com/dulwich/dulwich/issues",
+          "Repository": "https://www.dulwich.io/code/",
+          "GitHub": "https://github.com/dulwich/dulwich",
+      },
+      keywords="git vcs",
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
                 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
       scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
       ext_modules=ext_modules,
       distclass=DulwichDistribution,
+      classifiers=[
+          'Development Status :: 4 - Beta',
+          'License :: OSI Approved :: Apache Software License',
+          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: Implementation :: CPython',
+          'Programming Language :: Python :: Implementation :: PyPy',
+          'Operating System :: POSIX',
+          'Operating System :: Microsoft :: Windows',
+          'Topic :: Software Development :: Version Control',
+      ],
       **setup_kwargs
       )

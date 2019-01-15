@@ -46,6 +46,7 @@ import collections
 import os
 import socket
 import sys
+import time
 import zlib
 
 try:
@@ -53,6 +54,7 @@ try:
 except ImportError:
     import socketserver as SocketServer
 
+from dulwich.archive import tar_stream
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
@@ -329,6 +331,8 @@ class UploadPackHandler(PackHandler):
                 # all relevant tags.
                 # TODO: fix behavior when missing
                 return {}
+        # TODO(jelmer): Integrate this with the refs logic in
+        # Repo.fetch_objects
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
@@ -370,12 +374,10 @@ class UploadPackHandler(PackHandler):
                 self._done_received):
             return
 
-        self.progress(b"dul-daemon says what\n")
         self.progress(
                 ("counting objects: %d, done.\n" % len(objects_iter)).encode(
                     'ascii'))
         write_pack_objects(ProtocolFile(None, write), objects_iter)
-        self.progress(b"how was that, then?\n")
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -551,6 +553,13 @@ class _ProtocolGraphWalker(object):
         values = set(heads.values())
         if self.advertise_refs or not self.http_req:
             for i, (ref, sha) in enumerate(sorted(heads.items())):
+                try:
+                    peeled_sha = self.get_peeled(ref)
+                except KeyError:
+                    # Skip refs that are inaccessible
+                    # TODO(jelmer): Integrate with Repo.fetch_objects refs
+                    # logic.
+                    continue
                 line = sha + b' ' + ref
                 if not i:
                     line += (b'\x00' +
@@ -558,7 +567,6 @@ class _ProtocolGraphWalker(object):
                                  self.handler.capabilities() +
                                  symref_capabilities(symrefs.items())))
                 self.proto.write_pkt_line(line + b'\n')
-                peeled_sha = self.get_peeled(ref)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
                         peeled_sha + b' ' + ref + ANNOTATED_TAG_SUFFIX + b'\n')
@@ -929,7 +937,7 @@ class ReceivePackHandler(PackHandler):
                         self.repo.refs.set_if_equals(ref, oldsha, sha)
                     except all_exceptions:
                         ref_status = b'failed to write'
-            except KeyError as e:
+            except KeyError:
                 ref_status = b'bad ref'
             status.append((ref, ref_status))
 
@@ -1005,19 +1013,48 @@ class ReceivePackHandler(PackHandler):
 
 class UploadArchiveHandler(Handler):
 
-    def __init__(self, backend, proto, http_req=None):
+    def __init__(self, backend, args, proto, http_req=None):
         super(UploadArchiveHandler, self).__init__(backend, proto, http_req)
+        self.repo = backend.open_repository(args[0])
 
     def handle(self):
-        # TODO(jelmer)
-        raise NotImplementedError(self.handle)
+        def write(x):
+            return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+        arguments = []
+        for pkt in self.proto.read_pkt_seq():
+            (key, value) = pkt.split(b' ', 1)
+            if key != b'argument':
+                raise GitProtocolError('unknown command %s' % key)
+            arguments.append(value.rstrip(b'\n'))
+        prefix = b''
+        format = 'tar'
+        i = 0
+        store = self.repo.object_store
+        while i < len(arguments):
+            argument = arguments[i]
+            if argument == b'--prefix':
+                i += 1
+                prefix = arguments[i]
+            elif argument == b'--format':
+                i += 1
+                format = arguments[i].decode('ascii')
+            else:
+                commit_sha = self.repo.refs[argument]
+                tree = store[store[commit_sha].tree]
+            i += 1
+        self.proto.write_pkt_line(b'ACK\n')
+        self.proto.write_pkt_line(None)
+        for chunk in tar_stream(
+                store, tree, mtime=time.time(), prefix=prefix, format=format):
+            write(chunk)
+        self.proto.write_pkt_line(None)
 
 
 # Default handler classes for git services.
 DEFAULT_HANDLERS = {
   b'git-upload-pack': UploadPackHandler,
   b'git-receive-pack': ReceivePackHandler,
-  # b'git-upload-archive': UploadArchiveHandler,
+  b'git-upload-archive': UploadArchiveHandler,
 }
 
 

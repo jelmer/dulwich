@@ -174,6 +174,11 @@ class ParseReftupleTests(TestCase):
         self.assertEqual((b"refs/heads/foo", None, False),
                          parse_reftuple(r, r, b"refs/heads/foo:"))
 
+    def test_default_with_string(self):
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
+                         parse_reftuple(r, r, "foo"))
+
 
 class ParseReftuplesTests(TestCase):
 

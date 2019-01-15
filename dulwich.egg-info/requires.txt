@@ -1,8 +1,8 @@
 certifi
-urllib3>=1.21
+urllib3>=1.23
 
 [fastimport]
 fastimport
 
 [https]
-urllib3[secure]>=1.21
+urllib3[secure]>=1.23

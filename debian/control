@@ -32,6 +32,7 @@ Depends: python-certifi,
          ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
 Recommends: python-fastimport
+Suggests: python-gpg
 Description: Python Git library
  Dulwich is a Python implementation of the file formats and protocols
  used by the Git version control system. It can currently read from and write
@@ -70,6 +71,7 @@ Depends: python3-certifi,
          ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.2)
 Recommends: python3-fastimport
+Suggests: python3-gpg
 Description: Python Git library - Python3 module
  Dulwich is a Python implementation of the file formats and protocols
  used by the Git version control system. It can currently read from and write

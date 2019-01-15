@@ -1,5 +1,6 @@
 dulwich (0.19.10-1) UNRELEASED; urgency=medium
 
+  * Suggest python{,3}-gpg, for tag signing support.
   * Add CI/CD configuration for Salsa.
   * New upstream release.
 

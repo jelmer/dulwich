@@ -129,7 +129,7 @@ class Config(object):
     def get_boolean(self, section, name, default=None):
         """Retrieve a configuration setting as boolean.
 
-        :param section: Tuple with section name and optional subsection namee
+        :param section: Tuple with section name and optional subsection name
         :param name: Name of the setting, including section and possible
             subsection.
         :return: Contents of the setting

@@ -1,8 +1,9 @@
-dulwich (0.19.9-3) UNRELEASED; urgency=medium
+dulwich (0.19.10-1) UNRELEASED; urgency=medium
 
   * Add CI/CD configuration for Salsa.
+  * New upstream release.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 21 Nov 2018 01:12:02 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 15 Jan 2019 02:44:02 +0000
 
 dulwich (0.19.9-2) unstable; urgency=medium
 

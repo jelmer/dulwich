@@ -341,6 +341,26 @@ class AddTests(PorcelainTestCase):
             paths=["../foo"])
         self.assertEqual([], list(self.repo.open_index()))
 
+    def test_add_file_clrf_conversion(self):
+        # Set the right configuration to the repo
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Add a file with CRLF line-ending
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'wb') as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(self.repo.path, paths=[fullpath])
+
+        # The line-endings should have been converted to LF
+        index = self.repo.open_index()
+        self.assertIn(b"foo", index)
+
+        entry = index[b"foo"]
+        blob = self.repo[entry.sha]
+        self.assertEqual(blob.data, b"line1\nline2")
+
 
 class RemoveTests(PorcelainTestCase):
 
@@ -907,6 +927,57 @@ class StatusTests(PorcelainTestCase):
             results.staged)
         self.assertListEqual(results.unstaged, [b'blye'])
         self.assertListEqual(results.untracked, ['blyat'])
+
+    def test_status_crlf_mismatch(self):
+        # First make a commit as if the file has been added on a Linux system
+        # or with core.autocrlf=True
+        file_path = os.path.join(self.repo.path, 'crlf')
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\nline2')
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+
+        # Then update the file as if it was created by CGit on a Windows
+        # system with core.autocrlf=true
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\r\nline2')
+
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [b'crlf'])
+        self.assertListEqual(results.untracked, [])
+
+    def test_status_crlf_convert(self):
+        # First make a commit as if the file has been added on a Linux system
+        # or with core.autocrlf=True
+        file_path = os.path.join(self.repo.path, 'crlf')
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\nline2')
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(repo=self.repo.path, message=b'test status',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+
+        # Then update the file as if it was created by CGit on a Windows
+        # system with core.autocrlf=true
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\r\nline2')
+
+        # TODO: It should be set automatically by looking at the configuration
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", True)
+        c.write_to_path()
+
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [])
+        self.assertListEqual(results.untracked, [])
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""

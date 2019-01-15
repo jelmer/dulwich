@@ -882,7 +882,11 @@ def status(repo=".", ignored=False):
         tracked_changes = get_tree_changes(r)
         # 2. Get status of unstaged
         index = r.open_index()
-        unstaged_changes = list(get_unstaged_changes(index, r.path))
+        normalizer = r.get_blob_normalizer()
+        filter_callback = normalizer.checkin_normalize
+        unstaged_changes = list(
+            get_unstaged_changes(index, r.path, filter_callback)
+        )
         ignore_manager = IgnoreFilterManager.from_repo(r)
         untracked_paths = get_untracked_paths(r.path, r.path, index)
         if ignored:

@@ -225,7 +225,7 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
     if committish is None:
         committish = "HEAD"
     with open_repo_closing(repo) as repo_obj:
-        c = repo_obj[committish]
+        c = parse_commit(repo_obj, committish)
         for chunk in tar_stream(
                 repo_obj.object_store, repo_obj.object_store[c.tree],
                 c.commit_time):

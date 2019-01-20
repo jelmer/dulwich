@@ -1413,7 +1413,7 @@ def get_object_by_path(repo, path, committish=None):
         committish = "HEAD"
     # Get the repository
     with open_repo_closing(repo) as r:
-        commit = parse_commit(repo, committish)
+        commit = parse_commit(r, committish)
         base_tree = commit.tree
         if not isinstance(path, bytes):
             path = path.encode(commit.encoding or DEFAULT_ENCODING)

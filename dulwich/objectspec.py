@@ -162,6 +162,29 @@ def parse_commit_range(repo, committishs):
     return iter([parse_commit(repo, committishs)])
 
 
+class AmbiguousShortId(Exception):
+    """The short id is ambiguous."""
+
+    def __init__(self, prefix, options):
+        self.prefix = prefix
+        self.options = options
+
+
+def scan_for_short_id(object_store, prefix):
+    """Scan an object store for a short id."""
+    # TODO(jelmer): This could short-circuit looking for objects
+    # starting with a certain prefix.
+    ret = []
+    for object_id in object_store:
+        if object_id.startswith(prefix):
+            ret.append(object_store[object_id])
+    if not ret:
+        raise KeyError(prefix)
+    if len(ret) == 1:
+        return ret[0]
+    raise AmbiguousShortId(prefix, ret)
+
+
 def parse_commit(repo, committish):
     """Parse a string referring to a single commit.
 
@@ -180,6 +203,16 @@ def parse_commit(repo, committish):
         return repo[parse_ref(repo, committish)]
     except KeyError:
         pass
+    if len(committish) >= 4 and len(committish) < 40:
+        try:
+            int(committish, 16)
+        except ValueError:
+            pass
+        else:
+            try:
+                return scan_for_short_id(repo.object_store, committish)
+            except KeyError:
+                pass
     raise KeyError(committish)
 
 

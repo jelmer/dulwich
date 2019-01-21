@@ -78,6 +78,7 @@ if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.23'],
+        'pgp': ['gpg'],
         }
     setup_kwargs['install_requires'] = ['urllib3>=1.23', 'certifi']
     setup_kwargs['include_package_data'] = True

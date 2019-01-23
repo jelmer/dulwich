@@ -1517,7 +1517,8 @@ class HttpGitClient(GitClient):
         read = BytesIO(resp.data).read
 
         resp.content_type = resp.getheader("Content-Type")
-        resp.redirect_location = resp.get_redirect_location()
+        resp_url = resp.geturl()
+        resp.redirect_location = resp_url if resp_url != url else ''
 
         return resp, read
 

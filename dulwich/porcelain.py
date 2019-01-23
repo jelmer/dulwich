@@ -1098,7 +1098,7 @@ def branch_list(repo):
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           errstream=default_bytes_err_stream, message=None, depth=None,
-          **kwargs):
+          prune=False, prune_tags=False, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1108,6 +1108,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param errstream: Error stream (defaults to stderr)
     :param message: Reflog message (defaults to b"fetch: from <remote_name>")
     :param depth: Depth to fetch at
+    :param prune: Prune remote removed refs
+    :param prune_tags: Prune reomte removed tags
     :return: Dictionary with refs on the remote
     """
     if message is None:
@@ -1122,12 +1124,15 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
             n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
             if n.startswith(b'refs/heads/')}
         r.refs.import_refs(
-            b'refs/remotes/' + remote_name, branches, message=message)
+            b'refs/remotes/' + remote_name, branches, message=message,
+            prune=prune)
         tags = {
             n[len(b'refs/tags/'):]: v for (n, v) in stripped_refs.items()
             if n.startswith(b'refs/tags/') and
             not n.endswith(ANNOTATED_TAG_SUFFIX)}
-        r.refs.import_refs(b'refs/tags', tags, message=message)
+        r.refs.import_refs(
+            b'refs/tags', tags, message=message,
+            prune=prune_tags)
     return fetch_result.refs
 
 

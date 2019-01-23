@@ -1270,7 +1270,9 @@ class Repo(BaseRepo):
         """
         # TODO Parse the git attributes files
         git_attributes = {}
-        return BlobNormalizer(self.get_config_stack(), git_attributes)
+        return BlobNormalizer(
+            self.get_config_stack(), git_attributes
+        )
 
 
 class MemoryRepo(BaseRepo):

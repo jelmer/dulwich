@@ -234,7 +234,7 @@ class BlobNormalizer(object):
         """
         if self.fallback_write_filter is not None:
             return normalize_blob(
-                blob, self.fallback_write_filter, binary_detection=False
+                blob, self.fallback_write_filter, binary_detection=True
             )
 
         return blob
@@ -244,7 +244,7 @@ class BlobNormalizer(object):
         """
         if self.fallback_read_filter is not None:
             return normalize_blob(
-                blob, self.fallback_read_filter, binary_detection=False
+                blob, self.fallback_read_filter, binary_detection=True
             )
 
         return blob

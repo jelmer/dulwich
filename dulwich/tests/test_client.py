@@ -984,6 +984,86 @@ class HttpGitClientTests(TestCase):
         expected_basic_auth = 'Basic %s' % str(b64_credentials)
         self.assertEqual(basic_auth, expected_basic_auth)
 
+    def test_url_redirect_location(self):
+
+        from urllib3.response import HTTPResponse
+
+        test_data = {
+            'https://gitlab.com/inkscape/inkscape/': {
+                'redirect_url': 'https://gitlab.com/inkscape/inkscape.git/',
+                'refs_data': (b'001e# service=git-upload-pack\n00000032'
+                              b'fb2bebf4919a011f0fd7cec085443d0031228e76 '
+                              b'HEAD\n0000')
+            },
+            'https://github.com/jelmer/dulwich/': {
+                'redirect_url': 'https://github.com/jelmer/dulwich/',
+                'refs_data': (b'001e# service=git-upload-pack\n00000032'
+                              b'3ff25e09724aa4d86ea5bca7d5dd0399a3c8bfcf '
+                              b'HEAD\n0000')
+            }
+        }
+
+        tail = 'info/refs?service=git-upload-pack'
+
+        # we need to mock urllib3.PoolManager as this test will fail
+        # otherwise without an active internet connection
+        class PoolManagerMock():
+
+            def __init__(self):
+                self.headers = {}
+
+            def request(self, method, url, fields=None, headers=None,
+                        redirect=True):
+                base_url = url[:-len(tail)]
+                redirect_base_url = test_data[base_url]['redirect_url']
+                redirect_url = redirect_base_url + tail
+                headers = {
+                    'Content-Type':
+                    'application/x-git-upload-pack-advertisement'
+                }
+                body = test_data[base_url]['refs_data']
+                # urllib3 handles automatic redirection by default
+                status = 200
+                request_url = redirect_url
+                # simulate urllib3 behavior when redirect parameter is False
+                if redirect is False:
+                    request_url = url
+                    if redirect_base_url != base_url:
+                        body = ''
+                        headers['location'] = redirect_url
+                        status = 301
+                return HTTPResponse(body=body,
+                                    headers=headers,
+                                    request_method=method,
+                                    request_url=request_url,
+                                    status=status)
+
+        pool_manager = PoolManagerMock()
+
+        for base_url in test_data.keys():
+            # instantiate HttpGitClient with mocked pool manager
+            c = HttpGitClient(base_url, pool_manager=pool_manager,
+                              config=None)
+            # call method that detects url redirection
+            _, _, processed_url = c._discover_references(b'git-upload-pack',
+                                                         base_url)
+
+            # send the same request as the method above without redirection
+            resp = c.pool_manager.request('GET', base_url + tail,
+                                          redirect=False)
+
+            # check expected behavior of urllib3
+            redirect_location = resp.get_redirect_location()
+            if resp.status == 200:
+                self.assertFalse(redirect_location)
+
+            if redirect_location:
+                # check that url redirection has been correctly detected
+                self.assertEqual(processed_url, redirect_location[:-len(tail)])
+            else:
+                # check also the no redirection case
+                self.assertEqual(processed_url, base_url)
+
 
 class TCPGitClientTests(TestCase):
 

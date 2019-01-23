@@ -4,6 +4,9 @@
 
  * Add support for short ids in parse_commit. (Jelmer Vernooĳ)
 
+ * Add support for ``prune`` and ``prune_tags`` arguments
+   to ``porcelain.fetch``. (Jelmer Vernooĳ, #681)
+
 0.19.10	2018-01-15
 
  IMPROVEMENTS

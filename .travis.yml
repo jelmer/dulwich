@@ -1,6 +1,12 @@
 language: python
 sudo: false
 cache: pip
+addons:
+  apt:
+    update: true
+    packages:
+    - libgpgme-dev
+
 
 python:
   - 2.7

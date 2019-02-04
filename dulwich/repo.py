@@ -120,6 +120,15 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
+def _get_default_identity():
+    import getpass
+    import socket
+    user = getpass.getuser().encode(sys.getdefaultencoding())
+    email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
+             .encode(sys.getdefaultencoding()))
+    return (user, email)
+
+
 def check_user_identity(identity):
     """Verify that a user identity is formatted correctly.
 
@@ -629,14 +638,11 @@ class BaseRepo(object):
                 email = config.get(("user", ), "email")
             except KeyError:
                 email = None
+        default_user, default_email = _get_default_identity()
         if user is None:
-            import getpass
-            user = getpass.getuser().encode(sys.getdefaultencoding())
+            user = default_user
         if email is None:
-            import getpass
-            import socket
-            email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
-                     .encode(sys.getdefaultencoding()))
+            email = default_email
         return (user + b" <" + email + b">")
 
     def _add_graftpoints(self, updated_graftpoints):

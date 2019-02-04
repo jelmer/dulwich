@@ -448,6 +448,8 @@ class PackBasedObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
+        if name == ZERO_SHA:
+            raise KeyError(name)
         if len(name) == 40:
             sha = hex_to_sha(name)
             hexsha = name

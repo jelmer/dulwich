@@ -130,7 +130,7 @@ def _get_default_identity():
         fullname = None
     else:
         try:
-            fullname = pwd.getpwnam(username).pw_gecos.split(',')[0]
+            fullname = pwd.getpwnam(username).pw_gecos.split(',')[0].decode('utf-8')
         except KeyError:
             fullname = None
     if not fullname:

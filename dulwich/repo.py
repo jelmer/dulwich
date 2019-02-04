@@ -135,8 +135,10 @@ def _get_default_identity():
             fullname = None
     if not fullname:
         fullname = username.encode(sys.getdefaultencoding())
-    email = ("{}@{}".format(username, socket.gethostname())
-             .encode(sys.getdefaultencoding()))
+    email = os.environ.get('EMAIL')
+    if email is None:
+        email = ("{}@{}".format(username, socket.gethostname())
+                 .encode(sys.getdefaultencoding()))
     return (fullname, email)
 
 
@@ -634,11 +636,15 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self, config):
+    def _get_user_identity(self, config, kind=None):
         """Determine the identity to use for new commits.
         """
-        user = os.environ.get("GIT_COMMITTER_NAME")
-        email = os.environ.get("GIT_COMMITTER_EMAIL")
+        if kind:
+            user = os.environ.get("GIT_" + kind + "_NAME")
+            email = os.environ.get("GIT_" + kind + "_EMAIL")
+        else:
+            user = None
+            email = None
         if user is None:
             try:
                 user = config.get(("user", ), "name")
@@ -728,7 +734,7 @@ class BaseRepo(object):
         if merge_heads is None:
             merge_heads = self._read_heads('MERGE_HEADS')
         if committer is None:
-            committer = self._get_user_identity(config)
+            committer = self._get_user_identity(config, kind='COMMITTER')
         check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
@@ -740,9 +746,7 @@ class BaseRepo(object):
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
-            # FIXME: Support GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL environment
-            # variables
-            author = committer
+            author = self._get_user_identity(config, kind='AUTHOR')
         c.author = author
         check_user_identity(author)
         if author_timestamp is None:

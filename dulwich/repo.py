@@ -134,12 +134,42 @@ def _get_default_identity():
         except KeyError:
             fullname = None
     if not fullname:
-        fullname = username.encode(sys.getdefaultencoding())
+        fullname = username
     email = os.environ.get('EMAIL')
     if email is None:
-        email = ("{}@{}".format(username, socket.gethostname())
-                 .encode(sys.getdefaultencoding()))
+        email = "{}@{}".format(username, socket.gethostname())
     return (fullname, email)
+
+
+def get_user_identity(config, kind=None):
+    """Determine the identity to use for new commits.
+    """
+    if kind:
+        user = os.environ.get("GIT_" + kind + "_NAME")
+        if user is not None:
+            user = user.encode('utf-8')
+        email = os.environ.get("GIT_" + kind + "_EMAIL")
+        if email is not None:
+            email = email.encode('utf-8')
+    else:
+        user = None
+        email = None
+    if user is None:
+        try:
+            user = config.get(("user", ), "name")
+        except KeyError:
+            user = None
+    if email is None:
+        try:
+            email = config.get(("user", ), "email")
+        except KeyError:
+            email = None
+    default_user, default_email = _get_default_identity()
+    if user is None:
+        user = default_user.encode('utf-8')
+    if email is None:
+        email = default_email.encode('utf-8')
+    return (user + b" <" + email + b">")
 
 
 def check_user_identity(identity):
@@ -639,28 +669,8 @@ class BaseRepo(object):
     def _get_user_identity(self, config, kind=None):
         """Determine the identity to use for new commits.
         """
-        if kind:
-            user = os.environ.get("GIT_" + kind + "_NAME")
-            email = os.environ.get("GIT_" + kind + "_EMAIL")
-        else:
-            user = None
-            email = None
-        if user is None:
-            try:
-                user = config.get(("user", ), "name")
-            except KeyError:
-                user = None
-        if email is None:
-            try:
-                email = config.get(("user", ), "email")
-            except KeyError:
-                email = None
-        default_user, default_email = _get_default_identity()
-        if user is None:
-            user = default_user
-        if email is None:
-            email = default_email
-        return (user + b" <" + email + b">")
+        # TODO(jelmer): Deprecate this function in favor of get_user_identity
+        return get_user_identity(config)
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
@@ -734,7 +744,7 @@ class BaseRepo(object):
         if merge_heads is None:
             merge_heads = self._read_heads('MERGE_HEADS')
         if committer is None:
-            committer = self._get_user_identity(config, kind='COMMITTER')
+            committer = get_user_identity(config, kind='COMMITTER')
         check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
@@ -746,7 +756,7 @@ class BaseRepo(object):
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
-            author = self._get_user_identity(config, kind='AUTHOR')
+            author = get_user_identity(config, kind='AUTHOR')
         c.author = author
         check_user_identity(author)
         if author_timestamp is None:

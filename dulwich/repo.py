@@ -123,10 +123,21 @@ class InvalidUserIdentity(Exception):
 def _get_default_identity():
     import getpass
     import socket
-    user = getpass.getuser().encode(sys.getdefaultencoding())
-    email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
+    username = getpass.getuser()
+    try:
+        import pwd
+    except ImportError:
+        fullname = None
+    else:
+        try:
+            fullname = pwd.getpwnam(username).pw_gecos.split(',')[0]
+        except KeyError:
+            fullname = None
+    if not fullname:
+        fullname = username.encode(sys.getdefaultencoding())
+    email = ("{}@{}".format(username, socket.gethostname())
              .encode(sys.getdefaultencoding()))
-    return (user, email)
+    return (fullname, email)
 
 
 def check_user_identity(identity):

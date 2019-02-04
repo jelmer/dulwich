@@ -2,6 +2,9 @@
 
  IMPROVEMENTS
 
+ * Use fullname from gecos field, if available.
+   (Jelmer Vernooĳ)
+
  * Add support for short ids in parse_commit. (Jelmer Vernooĳ)
 
  * Add support for ``prune`` and ``prune_tags`` arguments

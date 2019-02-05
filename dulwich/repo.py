@@ -617,8 +617,8 @@ class BaseRepo(object):
     def _get_user_identity(self, config):
         """Determine the identity to use for new commits.
         """
-        user = os.environ.get("GIT_COMMITTER_NAME")
-        email = os.environ.get("GIT_COMMITTER_EMAIL")
+        user = os.environ.get("GIT_COMMITTER_NAME").encode(sys.getdefaultencoding())
+        email = os.environ.get("GIT_COMMITTER_EMAIL").encode(sys.getdefaultencoding())
         if user is None:
             try:
                 user = config.get(("user", ), "name")

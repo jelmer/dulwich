@@ -24,12 +24,10 @@
 
 from io import BytesIO
 import errno
-from itertools import chain
 import os
 import stat
 import sys
 import tempfile
-import time
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -55,6 +53,7 @@ from dulwich.pack import (
     Pack,
     PackData,
     PackInflater,
+    PackFileDisappeared,
     iter_sha1,
     pack_objects_to_data,
     write_pack_header,
@@ -310,8 +309,11 @@ class PackBasedObjectStore(BaseObjectStore):
         This does not check alternates.
         """
         for pack in self.packs:
-            if sha in pack:
-                return True
+            try:
+                if sha in pack:
+                    return True
+            except PackFileDisappeared:
+                pass
         return False
 
     def __contains__(self, sha):
@@ -326,11 +328,7 @@ class PackBasedObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def _pack_cache_stale(self):
-        """Check whether the pack cache is stale."""
-        raise NotImplementedError(self._pack_cache_stale)
-
-    def _add_known_pack(self, base_name, pack):
+    def _add_cached_pack(self, base_name, pack):
         """Add a newly appeared pack to the cache by path.
 
         """
@@ -340,23 +338,27 @@ class PackBasedObjectStore(BaseObjectStore):
             if prev_pack:
                 prev_pack.close()
 
-    def _flush_pack_cache(self):
+    def _clear_cached_packs(self):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
             (name, pack) = pack_cache.popitem()
             pack.close()
 
+    def _iter_cached_packs(self):
+        return self._pack_cache.values()
+
+    def _update_pack_cache(self):
+        raise NotImplementedError(self._update_pack_cache)
+
     def close(self):
-        self._flush_pack_cache()
+        self._clear_cached_packs()
 
     @property
     def packs(self):
         """List with pack objects."""
-        if self._pack_cache is None or self._pack_cache_stale():
-            self._update_pack_cache()
-
-        return self._pack_cache.values()
+        return (
+            list(self._iter_cached_packs()) + list(self._update_pack_cache()))
 
     def _iter_alternate_objects(self):
         """Iterate over the SHAs of all the objects in alternate stores."""
@@ -403,7 +405,7 @@ class PackBasedObjectStore(BaseObjectStore):
         old_packs = {p.name(): p for p in self.packs}
         for name, pack in old_packs.items():
             objects.update((obj, None) for obj in pack.iterobjects())
-        self._flush_pack_cache()
+        self._clear_cached_packs()
 
         # The name of the consolidated pack might match the name of a
         # pre-existing pack. Take care not to remove the newly created
@@ -421,9 +423,17 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
-        iterables = (list(self.packs) + [self._iter_loose_objects()] +
-                     [self._iter_alternate_objects()])
-        return chain(*iterables)
+        self._update_pack_cache()
+        for pack in self._iter_cached_packs():
+            try:
+                for sha in pack:
+                    yield sha
+            except PackFileDisappeared:
+                pass
+        for sha in self._iter_loose_objects():
+            yield sha
+        for sha in self._iter_alternate_objects():
+            yield sha
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose.
@@ -438,6 +448,8 @@ class PackBasedObjectStore(BaseObjectStore):
         :param name: sha for the object.
         :return: tuple with numeric type and object contents.
         """
+        if name == ZERO_SHA:
+            raise KeyError(name)
         if len(name) == 40:
             sha = hex_to_sha(name)
             hexsha = name
@@ -446,16 +458,23 @@ class PackBasedObjectStore(BaseObjectStore):
             hexsha = None
         else:
             raise AssertionError("Invalid object name %r" % name)
-        for pack in self.packs:
+        for pack in self._iter_cached_packs():
             try:
                 return pack.get_raw(sha)
-            except KeyError:
+            except (KeyError, PackFileDisappeared):
                 pass
         if hexsha is None:
             hexsha = sha_to_hex(name)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()
+        # Maybe something else has added a pack with the object
+        # in the mean time?
+        for pack in self._update_pack_cache():
+            try:
+                return pack.get_raw(sha)
+            except KeyError:
+                pass
         for alternate in self.alternates:
             try:
                 return alternate.get_raw(hexsha)
@@ -486,8 +505,6 @@ class DiskObjectStore(PackBasedObjectStore):
         super(DiskObjectStore, self).__init__()
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
-        self._pack_cache_time = 0
-        self._pack_cache = {}
         self._alternates = None
 
     def __repr__(self):
@@ -545,16 +562,14 @@ class DiskObjectStore(PackBasedObjectStore):
         self.alternates.append(DiskObjectStore(path))
 
     def _update_pack_cache(self):
+        """Read and iterate over new pack files and cache them."""
         try:
             pack_dir_contents = os.listdir(self.pack_dir)
         except OSError as e:
             if e.errno == errno.ENOENT:
-                self._pack_cache_time = 0
                 self.close()
-                return
+                return []
             raise
-        self._pack_cache_time = max(
-                os.stat(self.pack_dir).st_mtime, time.time())
         pack_files = set()
         for name in pack_dir_contents:
             if name.startswith("pack-") and name.endswith(".pack"):
@@ -566,20 +581,16 @@ class DiskObjectStore(PackBasedObjectStore):
                     pack_files.add(pack_name)
 
         # Open newly appeared pack files
+        new_packs = []
         for f in pack_files:
             if f not in self._pack_cache:
-                self._pack_cache[f] = Pack(os.path.join(self.pack_dir, f))
+                pack = Pack(os.path.join(self.pack_dir, f))
+                new_packs.append(pack)
+                self._pack_cache[f] = pack
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
             self._pack_cache.pop(f).close()
-
-    def _pack_cache_stale(self):
-        try:
-            return os.stat(self.pack_dir).st_mtime >= self._pack_cache_time
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                return True
-            raise
+        return new_packs
 
     def _get_shafile_path(self, sha):
         # Check from object dir
@@ -676,7 +687,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Add the pack to the store and return it.
         final_pack = Pack(pack_base_name)
         final_pack.check_length_and_checksum()
-        self._add_known_pack(pack_base_name, final_pack)
+        self._add_cached_pack(pack_base_name, final_pack)
         return final_pack
 
     def add_thin_pack(self, read_all, read_some):
@@ -714,12 +725,9 @@ class DiskObjectStore(PackBasedObjectStore):
             basename = self._get_pack_basepath(entries)
             with GitFile(basename+".idx", "wb") as f:
                 write_pack_index_v2(f, entries, p.get_stored_checksum())
-        if self._pack_cache is None or self._pack_cache_stale():
-            self._update_pack_cache()
-        try:
-            return self._pack_cache[basename]
-        except KeyError:
-            pass
+        for pack in self.packs:
+            if pack._basename == basename:
+                return pack
         target_pack = basename + '.pack'
         if sys.platform == 'win32':
             # Windows might have the target pack file lingering. Attempt
@@ -731,7 +739,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     raise
         os.rename(path, target_pack)
         final_pack = Pack(basename)
-        self._add_known_pack(basename, final_pack)
+        self._add_cached_pack(basename, final_pack)
         return final_pack
 
     def add_pack(self):
@@ -967,6 +975,8 @@ class ObjectStoreIterator(ObjectIterator):
 
         :param needle: SHA1 of the object to check for
         """
+        if needle == ZERO_SHA:
+            return False
         return needle in self.store
 
     def __getitem__(self, key):

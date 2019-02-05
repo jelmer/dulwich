@@ -863,6 +863,33 @@ class BuildRepoRootTests(TestCase):
             b"Jelmer <jelmer@apache.org>",
             r[commit_sha].committer)
 
+    def overrideEnv(self, name, value):
+        def restore():
+            if oldval is not None:
+                os.environ[name] = oldval
+            else:
+                del os.environ[name]
+        oldval = os.environ.get(name)
+        os.environ[name] = value
+        self.addCleanup(restore)
+
+    def test_commit_config_identity_from_env(self):
+        # commit falls back to the users' identity if it wasn't specified
+        self.overrideEnv('GIT_COMMITTER_NAME', 'joe')
+        self.overrideEnv('GIT_COMMITTER_EMAIL', 'joe@example.com')
+        r = self._repo
+        c = r.get_config()
+        c.set((b"user", ), b"name", b"Jelmer")
+        c.set((b"user", ), b"email", b"jelmer@apache.org")
+        c.write_to_path()
+        commit_sha = r.do_commit(b'message')
+        self.assertEqual(
+            b"Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEqual(
+            b"joe <joe@example.com>",
+            r[commit_sha].committer)
+
     def test_commit_fail_ref(self):
         r = self._repo
 

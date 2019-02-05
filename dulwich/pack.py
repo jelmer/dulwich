@@ -111,6 +111,12 @@ def take_msb_bytes(read, crc32=None):
     return ret, crc32
 
 
+class PackFileDisappeared(Exception):
+
+    def __init__(self, obj):
+        self.obj = obj
+
+
 class UnpackedObject(object):
     """Class encapsulating an object unpacked from a pack file.
 
@@ -391,7 +397,13 @@ class PackIndex(object):
         """
         if len(sha) == 40:
             sha = hex_to_sha(sha)
-        return self._object_index(sha)
+        try:
+            return self._object_index(sha)
+        except ValueError:
+            closed = getattr(self._contents, 'closed', None)
+            if closed in (None, True):
+                raise PackFileDisappeared(self)
+            raise
 
     def object_sha1(self, index):
         """Return the SHA1 corresponding to the index in the pack file.

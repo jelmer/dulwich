@@ -617,8 +617,8 @@ class BaseRepo(object):
     def _get_user_identity(self, config):
         """Determine the identity to use for new commits.
         """
-        user = os.environ.get("GIT_COMMITTER_NAME").encode(sys.getdefaultencoding())
-        email = os.environ.get("GIT_COMMITTER_EMAIL").encode(sys.getdefaultencoding())
+        user = os.environ.get("GIT_COMMITTER_NAME")
+        email = os.environ.get("GIT_COMMITTER_EMAIL")
         if user is None:
             try:
                 user = config.get(("user", ), "name")
@@ -631,13 +631,12 @@ class BaseRepo(object):
                 email = None
         if user is None:
             import getpass
-            user = getpass.getuser().encode(sys.getdefaultencoding())
+            user = getpass.getuser()
         if email is None:
             import getpass
             import socket
             email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
-                     .encode(sys.getdefaultencoding()))
-        return (user + b" <" + email + b">")
+        return (user.encode(sys.getdefaultencoding()) + b" <" + email.encode(sys.getdefaultencoding()) + b">")
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints

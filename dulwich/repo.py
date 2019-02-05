@@ -619,6 +619,10 @@ class BaseRepo(object):
         """
         user = os.environ.get("GIT_COMMITTER_NAME")
         email = os.environ.get("GIT_COMMITTER_EMAIL")
+        if user:
+            user = user.encode(sys.getdefaultencoding())
+        if email:
+            email = email.encode(sys.getdefaultencoding())
         if user is None:
             try:
                 user = config.get(("user", ), "name")

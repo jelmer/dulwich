@@ -120,6 +120,60 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
+def _get_default_identity():
+    import getpass
+    import socket
+    username = getpass.getuser()
+    try:
+        import pwd
+    except ImportError:
+        fullname = None
+    else:
+        try:
+            gecos = pwd.getpwnam(username).pw_gecos
+        except KeyError:
+            fullname = None
+        else:
+            fullname = gecos.split(',')[0].decode('utf-8')
+    if not fullname:
+        fullname = username
+    email = os.environ.get('EMAIL')
+    if email is None:
+        email = "{}@{}".format(username, socket.gethostname())
+    return (fullname, email)
+
+
+def get_user_identity(config, kind=None):
+    """Determine the identity to use for new commits.
+    """
+    if kind:
+        user = os.environ.get("GIT_" + kind + "_NAME")
+        if user is not None:
+            user = user.encode('utf-8')
+        email = os.environ.get("GIT_" + kind + "_EMAIL")
+        if email is not None:
+            email = email.encode('utf-8')
+    else:
+        user = None
+        email = None
+    if user is None:
+        try:
+            user = config.get(("user", ), "name")
+        except KeyError:
+            user = None
+    if email is None:
+        try:
+            email = config.get(("user", ), "email")
+        except KeyError:
+            email = None
+    default_user, default_email = _get_default_identity()
+    if user is None:
+        user = default_user.encode('utf-8')
+    if email is None:
+        email = default_email.encode('utf-8')
+    return (user + b" <" + email + b">")
+
+
 def check_user_identity(identity):
     """Verify that a user identity is formatted correctly.
 
@@ -614,34 +668,11 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self, config):
+    def _get_user_identity(self, config, kind=None):
         """Determine the identity to use for new commits.
         """
-        user = os.environ.get("GIT_COMMITTER_NAME")
-        email = os.environ.get("GIT_COMMITTER_EMAIL")
-        if user:
-            user = user.encode(sys.getdefaultencoding())
-        if email:
-            email = email.encode(sys.getdefaultencoding())
-        if user is None:
-            try:
-                user = config.get(("user", ), "name")
-            except KeyError:
-                user = None
-        if email is None:
-            try:
-                email = config.get(("user", ), "email")
-            except KeyError:
-                email = None
-        if user is None:
-            import getpass
-            user = getpass.getuser().encode(sys.getdefaultencoding())
-        if email is None:
-            import getpass
-            import socket
-            email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
-                     .encode(sys.getdefaultencoding()))
-        return (user + b" <" + email + b">")
+        # TODO(jelmer): Deprecate this function in favor of get_user_identity
+        return get_user_identity(config)
 
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
@@ -715,7 +746,7 @@ class BaseRepo(object):
         if merge_heads is None:
             merge_heads = self._read_heads('MERGE_HEADS')
         if committer is None:
-            committer = self._get_user_identity(config)
+            committer = get_user_identity(config, kind='COMMITTER')
         check_user_identity(committer)
         c.committer = committer
         if commit_timestamp is None:
@@ -727,9 +758,7 @@ class BaseRepo(object):
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
-            # FIXME: Support GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL environment
-            # variables
-            author = committer
+            author = get_user_identity(config, kind='AUTHOR')
         c.author = author
         check_user_identity(author)
         if author_timestamp is None:

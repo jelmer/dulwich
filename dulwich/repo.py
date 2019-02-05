@@ -640,7 +640,7 @@ class BaseRepo(object):
             import getpass
             import socket
             email = ("{}@{}".format(getpass.getuser(), socket.gethostname())
-                    .encode(sys.getdefaultencoding()))
+                     .encode(sys.getdefaultencoding()))
             
         return (user + b" <" + email + b">")
 

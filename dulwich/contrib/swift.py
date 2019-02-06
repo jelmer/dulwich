@@ -650,16 +650,16 @@ class SwiftObjectStore(PackBasedObjectStore):
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
         self._alternates = None
 
-    @property
-    def packs(self):
-        """List with pack objects."""
-        if not self._pack_cache:
-            self._update_pack_cache()
-        return self._pack_cache.values()
-
     def _update_pack_cache(self):
-        for pack in self._load_packs():
-            self._pack_cache[pack._basename] = pack
+        objects = self.scon.get_container_objects()
+        pack_files = [o['name'].replace(".pack", "")
+                      for o in objects if o['name'].endswith(".pack")]
+        ret = []
+        for basename in pack_files:
+            pack = SwiftPack(basename, scon=self.scon)
+            self._pack_cache[basename] = pack
+            ret.append(pack)
+        return ret
 
     def _iter_loose_objects(self):
         """Loose objects are not supported by this repository
@@ -679,16 +679,6 @@ class SwiftObjectStore(PackBasedObjectStore):
     def find_missing_objects(self, *args, **kwargs):
         kwargs['concurrency'] = self.scon.concurrency
         return PackInfoMissingObjectFinder(self, *args, **kwargs)
-
-    def _load_packs(self):
-        """Load all packs from Swift
-
-        :return: a list of `SwiftPack` instances
-        """
-        objects = self.scon.get_container_objects()
-        pack_files = [o['name'].replace(".pack", "")
-                      for o in objects if o['name'].endswith(".pack")]
-        return [SwiftPack(pack, scon=self.scon) for pack in pack_files]
 
     def pack_info_get(self, sha):
         for pack in self.packs:
@@ -745,7 +735,7 @@ class SwiftObjectStore(PackBasedObjectStore):
                 index.close()
                 final_pack = SwiftPack(basename, scon=self.scon)
                 final_pack.check_length_and_checksum()
-                self._add_known_pack(basename, final_pack)
+                self._add_cached_pack(basename, final_pack)
                 return final_pack
             else:
                 return None
@@ -838,7 +828,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         # Add the pack to the store and return it.
         final_pack = SwiftPack(pack_base_name, scon=self.scon)
         final_pack.check_length_and_checksum()
-        self._add_known_pack(pack_base_name, final_pack)
+        self._add_cached_pack(pack_base_name, final_pack)
         return final_pack
 
 

@@ -286,7 +286,7 @@ class TestSwiftObjectStore(TestCase):
                  'fakerepo/objects/pack/pack-'+'2'*40+'.info': ''}
         fsc = FakeSwiftConnector('fakerepo', conf=self.conf, store=store)
         sos = swift.SwiftObjectStore(fsc)
-        packs = sos._load_packs()
+        packs = sos.packs
         self.assertEqual(len(packs), 2)
         for pack in packs:
             self.assertTrue(isinstance(pack, swift.SwiftPack))

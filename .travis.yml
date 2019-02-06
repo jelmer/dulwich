@@ -1,11 +1,6 @@
 language: python
 sudo: false
 cache: pip
-addons:
-  apt:
-    update: true
-    packages:
-    - libgpgme-dev
 
 
 python:
@@ -35,7 +30,7 @@ matrix:
     #  sudo: true
 
 install:
-  - travis_retry pip install -U pip coverage codecov flake8 gpg $TEST_REQUIRE
+  - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
 
 script:
   # Test without c extensions

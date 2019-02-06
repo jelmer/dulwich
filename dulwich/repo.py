@@ -134,7 +134,7 @@ def _get_default_identity():
         except KeyError:
             fullname = None
         else:
-            fullname = gecos.split(',')[0].decode('utf-8')
+            fullname = gecos.split(',')[0]
     if not fullname:
         fullname = username
     email = os.environ.get('EMAIL')

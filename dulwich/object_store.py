@@ -405,7 +405,6 @@ class PackBasedObjectStore(BaseObjectStore):
         old_packs = {p.name(): p for p in self.packs}
         for name, pack in old_packs.items():
             objects.update((obj, None) for obj in pack.iterobjects())
-        self._clear_cached_packs()
 
         # The name of the consolidated pack might match the name of a
         # pre-existing pack. Take care not to remove the newly created
@@ -618,6 +617,10 @@ class DiskObjectStore(PackBasedObjectStore):
     def _remove_pack(self, pack):
         os.remove(pack.data.path)
         os.remove(pack.index.path)
+        try:
+            del self._pack_cache[os.path.basename(pack._basename)]
+        except KeyError:
+            pass
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)

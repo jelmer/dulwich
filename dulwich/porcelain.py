@@ -225,7 +225,7 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
     if committish is None:
         committish = "HEAD"
     with open_repo_closing(repo) as repo_obj:
-        c = repo_obj[committish]
+        c = parse_commit(repo_obj, committish)
         for chunk in tar_stream(
                 repo_obj.object_store, repo_obj.object_store[c.tree],
                 c.commit_time):
@@ -882,7 +882,11 @@ def status(repo=".", ignored=False):
         tracked_changes = get_tree_changes(r)
         # 2. Get status of unstaged
         index = r.open_index()
-        unstaged_changes = list(get_unstaged_changes(index, r.path))
+        normalizer = r.get_blob_normalizer()
+        filter_callback = normalizer.checkin_normalize
+        unstaged_changes = list(
+            get_unstaged_changes(index, r.path, filter_callback)
+        )
         ignore_manager = IgnoreFilterManager.from_repo(r)
         untracked_paths = get_untracked_paths(r.path, r.path, index)
         if ignored:
@@ -1094,7 +1098,7 @@ def branch_list(repo):
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           errstream=default_bytes_err_stream, message=None, depth=None,
-          **kwargs):
+          prune=False, prune_tags=False, **kwargs):
     """Fetch objects from a remote server.
 
     :param repo: Path to the repository
@@ -1104,6 +1108,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
     :param errstream: Error stream (defaults to stderr)
     :param message: Reflog message (defaults to b"fetch: from <remote_name>")
     :param depth: Depth to fetch at
+    :param prune: Prune remote removed refs
+    :param prune_tags: Prune reomte removed tags
     :return: Dictionary with refs on the remote
     """
     if message is None:
@@ -1118,12 +1124,15 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
             n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
             if n.startswith(b'refs/heads/')}
         r.refs.import_refs(
-            b'refs/remotes/' + remote_name, branches, message=message)
+            b'refs/remotes/' + remote_name, branches, message=message,
+            prune=prune)
         tags = {
             n[len(b'refs/tags/'):]: v for (n, v) in stripped_refs.items()
             if n.startswith(b'refs/tags/') and
             not n.endswith(ANNOTATED_TAG_SUFFIX)}
-        r.refs.import_refs(b'refs/tags', tags, message=message)
+        r.refs.import_refs(
+            b'refs/tags', tags, message=message,
+            prune=prune_tags)
     return fetch_result.refs
 
 
@@ -1409,7 +1418,7 @@ def get_object_by_path(repo, path, committish=None):
         committish = "HEAD"
     # Get the repository
     with open_repo_closing(repo) as r:
-        commit = parse_commit(repo, committish)
+        commit = parse_commit(r, committish)
         base_tree = commit.tree
         if not isinstance(path, bytes):
             path = path.encode(commit.encoding or DEFAULT_ENCODING)

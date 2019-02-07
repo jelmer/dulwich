@@ -6,3 +6,6 @@ fastimport
 
 [https]
 urllib3[secure]>=1.23
+
+[pgp]
+gpg

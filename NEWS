@@ -1,3 +1,23 @@
+0.19.11	2019-02-07
+
+ IMPROVEMENTS
+
+ * Use fullname from gecos field, if available.
+   (Jelmer Vernooĳ)
+
+ * Support ``GIT_AUTHOR_NAME`` / ``GIT_AUTHOR_EMAIL``.
+   (Jelmer Vernooĳ)
+
+ * Add support for short ids in parse_commit. (Jelmer Vernooĳ)
+
+ * Add support for ``prune`` and ``prune_tags`` arguments
+   to ``porcelain.fetch``. (Jelmer Vernooĳ, #681)
+
+ BUG FIXES
+
+  * Fix handling of race conditions when new packs appear.
+    (Jelmer Vernooĳ)
+
 0.19.10	2018-01-15
 
  IMPROVEMENTS

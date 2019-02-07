@@ -1,6 +1,7 @@
 dulwich (0.19.11-1) UNRELEASED; urgency=medium
 
   * New upstream version.
+  * Add patch 03_default_identity.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 07 Feb 2019 03:13:59 +0000
 

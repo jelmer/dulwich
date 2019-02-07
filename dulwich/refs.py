@@ -138,10 +138,21 @@ class RefsContainer(object):
         return None
 
     def import_refs(self, base, other, committer=None, timestamp=None,
-                    timezone=None, message=None):
+                    timezone=None, message=None, prune=False):
+        if prune:
+            to_delete = set(self.subkeys(base))
+        else:
+            to_delete = set()
         for name, value in other.items():
             self.set_if_equals(b'/'.join((base, name)), None, value,
                                message=message)
+            if to_delete:
+                try:
+                    to_delete.remove(name)
+                except KeyError:
+                    pass
+        for ref in to_delete:
+            self.remove_if_equals(b'/'.join((base, ref)), None)
 
     def allkeys(self):
         """All refs present in this container."""

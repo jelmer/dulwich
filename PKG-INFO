@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.19.10
+Version: 0.19.11
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -124,3 +124,4 @@ Classifier: Operating System :: Microsoft :: Windows
 Classifier: Topic :: Software Development :: Version Control
 Provides-Extra: fastimport
 Provides-Extra: https
+Provides-Extra: pgp

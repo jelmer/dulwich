@@ -1,3 +1,9 @@
+dulwich (0.19.11-2) UNRELEASED; urgency=medium
+
+  * Re-export upstream signing key without extra signatures.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 09 Feb 2019 07:36:34 +0000
+
 dulwich (0.19.11-1) unstable; urgency=medium
 
   * New upstream version.

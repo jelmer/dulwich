@@ -604,6 +604,32 @@ def read_submodule_head(path):
         return None
 
 
+def has_directory_changed(error, tree_path, entry):
+    """ When handling an error trying to create a blob from a path, call this
+    function. It will check if the path is a directory. If it's a directory
+    and a submodule, check the submodule head to see if it's has changed. If
+    not, consider the file as changed as Git tracked a file and not a
+    directory.
+
+    Return true if the given path should be considered as changed and False
+    otherwise or if the path is not a directory.
+    """
+    if error.errno != errno.EISDIR:
+        return False
+
+    # This is actually a directory
+    if os.path.exists(os.path.join(tree_path, b'.git')):
+        # Submodule
+        head = read_submodule_head(tree_path)
+        if entry.sha != head:
+            return True
+    else:
+        # The file was changed to a directory, so consider it removed.
+        return True
+
+    return False
+
+
 def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     """Walk through an index and check for differences against working tree.
 
@@ -625,23 +651,21 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
         except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
-            # The file was removed, so we assume that counts as
-            # different from whatever file used to exist.
-            yield tree_path
-        except IOError as e:
-            if e.errno != errno.EISDIR:
-                raise
-            # This is actually a directory
-            if os.path.exists(os.path.join(tree_path, '.git')):
-                # Submodule
-                head = read_submodule_head(tree_path)
-                if entry.sha != head:
-                    yield tree_path
-            else:
-                # The file was changed to a directory, so consider it removed.
+            directory_changed = has_directory_changed(e, tree_path, entry)
+            if directory_changed:
                 yield tree_path
+            else:
+                if e.errno != errno.ENOENT:
+                    raise
+                # The file was removed, so we assume that counts as
+                # different from whatever file used to exist.
+                yield tree_path
+        except IOError as e:
+            directory_changed = has_directory_changed(e, tree_path, entry)
+            if directory_changed:
+                yield tree_path
+            else:
+                raise
         else:
             if blob.id != entry.sha:
                 yield tree_path

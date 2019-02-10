@@ -615,12 +615,13 @@ class DiskObjectStore(PackBasedObjectStore):
         os.remove(self._get_shafile_path(sha))
 
     def _remove_pack(self, pack):
-        os.remove(pack.data.path)
-        os.remove(pack.index.path)
         try:
             del self._pack_cache[os.path.basename(pack._basename)]
         except KeyError:
             pass
+        pack.close()
+        os.remove(pack.data.path)
+        os.remove(pack.index.path)
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)

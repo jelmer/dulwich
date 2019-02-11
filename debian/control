@@ -30,7 +30,7 @@ Depends: python-certifi,
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
-Breaks: bzr-git (<< 0.6.2)
+Breaks: bzr-git (<< 0.6.13+bzr1650), python-breezy (<< 3.0.0~bzr7268)
 Recommends: python-fastimport
 Suggests: python-gpg
 Description: Python Git library
@@ -69,7 +69,7 @@ Depends: python3-certifi,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Breaks: bzr-git (<< 0.6.2)
+Breaks: python3-breezy (<< 3.0.0~bzr7268)
 Recommends: python3-fastimport
 Suggests: python3-gpg
 Description: Python Git library - Python3 module

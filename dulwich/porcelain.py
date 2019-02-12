@@ -408,6 +408,35 @@ def add(repo=".", paths=None):
     return (relpaths, ignored)
 
 
+def clean(repo="."):
+    """Remove any untracked files from the current directory recursively
+
+    Equivalent to git clean -fd.
+
+    :param repo: Repository where the files may be tracked
+    """
+    with open_repo_closing(repo) as r:
+        index = r.open_index()
+        ignore_manager = IgnoreFilterManager.from_repo(r)
+        
+        paths_in_wd = walk_working_dir_paths(os.getcwd(), r.path)
+        # Reverse file visit order, so that files and subdirectories are removed before
+        # containing directory
+        for ap, is_dir in reversed(list(paths_in_wd)):
+            if is_dir:
+                # All subdirectories and files have been removed if untracked,
+                # so dir contains no tracked files iff it is empty.
+                is_empty = len(os.listdir(ap)) == 0
+                if is_empty:
+                    os.rmdir(ap)
+            else:
+                ip = path_to_tree_path(r.path, ap)
+                is_tracked = ip in index
+                is_ignored = ignore_manager.is_ignored(ip)
+                if not is_tracked and not is_ignored:
+                    os.remove(ap)
+         
+        
 def remove(repo=".", paths=None, cached=False):
     """Remove files from the staging area.
 
@@ -900,14 +929,12 @@ def status(repo=".", ignored=False):
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def get_untracked_paths(frompath, basepath, index):
-    """Get untracked paths.
+def walk_working_dir_paths(frompath, basepath):
+    """Get path, is_dir for files in working dir from frompath
 
-    ;param frompath: Path to walk
+    :param frompath: Path to begin walk
     :param basepath: Path to compare to
-    :param index: Index to check against
     """
-    # If nothing is specified, add all non-ignored files.
     for dirpath, dirnames, filenames in os.walk(frompath):
         # Skip .git and below.
         if '.git' in dirnames:
@@ -918,8 +945,25 @@ def get_untracked_paths(frompath, basepath, index):
             filenames.remove('.git')
             if dirpath != basepath:
                 continue
+
+        if dirpath != frompath:
+            yield dirpath, True
+
         for filename in filenames:
-            ap = os.path.join(dirpath, filename)
+            filepath = os.path.join(dirpath, filename)
+            yield filepath, False
+
+     
+        
+def get_untracked_paths(frompath, basepath, index):
+    """Get untracked paths.
+
+    ;param frompath: Path to walk
+    :param basepath: Path to compare to
+    :param index: Index to check against
+    """
+    for ap, is_dir in walk_working_dir_paths(frompath, basepath):
+        if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
                 yield os.path.relpath(ap, frompath)

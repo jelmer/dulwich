@@ -1,10 +1,10 @@
-dulwich (0.19.11-2) UNRELEASED; urgency=medium
+dulwich (0.19.11-2) unstable; urgency=medium
 
   * Re-export upstream signing key without extra signatures.
   * Add Breaks: for older versions of breezy/bzr-git since they use
     Dulwich' private packs API, which has changed.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 09 Feb 2019 07:36:34 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 12 Feb 2019 01:33:14 +0000
 
 dulwich (0.19.11-1) unstable; urgency=medium
 

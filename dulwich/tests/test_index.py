@@ -694,6 +694,7 @@ class GetUnstagedChangesTests(TestCase):
 
             self.assertEqual(list(changes), [b'foo1'])
 
+    @skipIf(not can_symlink(), 'Requires symlink support')
     def test_get_unstaged_changes_removed_replaced_by_link(self):
         """Unit test for get_unstaged_changes."""
 

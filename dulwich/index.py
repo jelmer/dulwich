@@ -605,7 +605,9 @@ def read_submodule_head(path):
 
 
 def has_directory_changed(error, tree_path, entry):
-    """ When handling an error trying to create a blob from a path, call this
+    """ check if a directory has changed after getting an error
+
+    When handling an error trying to create a blob from a path, call this
     function. It will check if the path is a directory. If it's a directory
     and a submodule, check the submodule head to see if it's has changed. If
     not, consider the file as changed as Git tracked a file and not a

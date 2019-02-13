@@ -652,22 +652,17 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
-        except OSError as e:
+        except (OSError, IOError) as e:
             directory_changed = has_directory_changed(e, tree_path, entry)
             if directory_changed:
                 yield tree_path
             else:
-                if e.errno != errno.ENOENT:
+                if e.errno == errno.ENOENT:
+                    # The file was removed, so we assume that counts as
+                    # different from whatever file used to exist.
+                    yield tree_path
+                else:
                     raise
-                # The file was removed, so we assume that counts as
-                # different from whatever file used to exist.
-                yield tree_path
-        except IOError as e:
-            directory_changed = has_directory_changed(e, tree_path, entry)
-            if directory_changed:
-                yield tree_path
-            else:
-                raise
         else:
             if blob.id != entry.sha:
                 yield tree_path

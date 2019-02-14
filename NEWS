@@ -1,5 +1,10 @@
 0.19.12	UNRELEASED
 
+ BUG FIXES
+
+ * Update directory detection for `get_unstaged_changes` for Python 3.
+   (Boris Feld, #684)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

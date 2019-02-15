@@ -1203,7 +1203,7 @@ class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
     def run_command(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
+                    password=None, key_filename=None, ssh_config_filename=None):
 
         if password is not None:
             raise NotImplementedError(
@@ -1216,6 +1216,9 @@ class SubprocessSSHVendor(SSHVendor):
 
         if key_filename:
             args.extend(['-i', str(key_filename)])
+
+        if ssh_config_filename:
+            args.extend(['-F', str(ssh_config_filename)])
 
         if username:
             host = '%s@%s' % (username, host)
@@ -1283,12 +1286,13 @@ get_ssh_vendor = SubprocessSSHVendor
 class SSHGitClient(TraditionalGitClient):
 
     def __init__(self, host, port=None, username=None, vendor=None,
-                 config=None, password=None, key_filename=None, **kwargs):
+                 config=None, password=None, key_filename=None, ssh_config_filename=None, **kwargs):
         self.host = host
         self.port = port
         self.username = username
         self.password = password
         self.key_filename = key_filename
+        self.ssh_config_filename = ssh_config_filename
         super(SSHGitClient, self).__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
@@ -1330,6 +1334,8 @@ class SSHGitClient(TraditionalGitClient):
             kwargs['password'] = self.password
         if self.key_filename is not None:
             kwargs['key_filename'] = self.key_filename
+        if self.ssh_config_filename is not None:
+            kwargs['ssh_config_filename'] = self.ssh_config_filename
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username,
             **kwargs)

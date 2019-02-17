@@ -25,6 +25,8 @@ try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+import errno
+import itertools
 import os
 import shutil
 import tarfile
@@ -52,6 +54,32 @@ from dulwich.tests.utils import (
     make_object,
     )
 
+
+def create_dir_in_wd(repo, dir_path):
+    abs_path = os.path.join(repo.path, dir_path)
+    try:
+        os.makedirs(abs_path)
+    except OSError as err:
+        if not err.errno == errno.EEXIST:
+            raise err
+
+def write_file_in_wd(repo, file_path, contents='\n'):
+    parent_dir = os.path.dirname(file_path)
+    create_dir_in_wd(repo, parent_dir)
+
+    abs_path = os.path.join(repo.path, file_path)
+    with open(abs_path, 'w') as f:
+        f.write(contents)
+
+def flat_walk_dir(dir_to_walk):
+    for dirpath, _, filenames in os.walk(dir_to_walk):
+        rel_dirpath = os.path.relpath(dirpath, dir_to_walk)
+        if not dirpath == dir_to_walk:
+            yield rel_dirpath
+        for filename in filenames:
+            rel_filepath = os.path.join(rel_dirpath, filename)
+            yield rel_filepath
+        
 
 class PorcelainTestCase(TestCase):
 
@@ -114,6 +142,67 @@ class CommitTests(PorcelainTestCase):
                 committer="Bob <bob@example.com>")
         self.assertTrue(isinstance(sha, bytes))
         self.assertEqual(len(sha), 40)
+
+
+class CleanTests(PorcelainTestCase):
+    def setUp(self):
+        super(CleanTests, self).setUp()
+        self.orig_path = os.getcwd()
+        os.chdir(self.repo.path)
+
+    def tearDown(self):
+        super(CleanTests, self).tearDown()
+        os.chdir(self.orig_path)
+
+    def test_simple(self):  
+        tracked_files = {
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+        }
+
+        ignored_files = {
+            'ignored_file'
+        }
+
+        untracked_files = {
+            'untracked_file'
+            'tracked_dir/untracked_dir/untracked_file',
+            'untracked_dir/untracked_dir/untracked_file',
+        }
+
+
+        all_files = tracked_files | ignored_files | untracked_files
+
+        for file_path in all_files:
+            write_file_in_wd(self.repo, file_path)
+        write_file_in_wd(self.repo, '.gitignore', '\n'.join(ignored_files))
+        create_dir_in_wd(self.repo, 'empty_dir')
+
+        porcelain.add(repo=self.repo.path, paths=list(tracked_files))
+        porcelain.commit(repo=self.repo.path, message="init commit")
+
+        controldir = self.repo._controldir
+        controldir_before = set(flat_walk_dir(controldir))
+
+        porcelain.clean(repo=self.repo.path)
+
+        controldir_after = set(flat_walk_dir(controldir))
+        
+        # ignored files should not be removed on clean
+        expected_files = tracked_files | ignored_files
+        expected_dirs = {os.path.dirname(f) for f in expected_files} - {''}
+        expected_paths = expected_files | expected_dirs
+        
+        control_dir_rel = os.path.relpath(controldir, self.repo.path)
+        found_paths = {
+            os.path.relpath(p, self.repo.path) 
+            for p in flat_walk_dir(self.repo.path) 
+            if not p.startswith(control_dir_rel)}
+        
+
+        self.assertEqual(controldir_after, controldir_before)
+        self.assertEqual(found_paths, expected_paths)
 
 
 class CloneTests(PorcelainTestCase):

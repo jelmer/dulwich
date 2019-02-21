@@ -409,9 +409,9 @@ def add(repo=".", paths=None):
 
 
 def is_subdir(subdir, parentdir):
-    """Check whether `subdir` is `parentdir` or a subdir of `parentdir`
+    """Check whether subdir is parentdir or a subdir of parentdir
 
-        If `parentdir` or `subdir` is a relative path, it will be disamgibuated
+        If parentdir or subdir is a relative path, it will be disamgibuated
         relative to the pwd.
     """
     parentdir_abs = os.path.realpath(parentdir)
@@ -419,10 +419,11 @@ def is_subdir(subdir, parentdir):
     return subdir_abs.startswith(parentdir_abs)
     
 
+# TODO: option to remove ignored files also, in line with `git clean -fdx`
 def clean(repo=".", target_dir=None):
     """Remove any untracked files from the target directory recursively
 
-    Equivalent to running git clean -fd in `target_dir`.
+    Equivalent to running `git clean -fd` in target_dir.
 
     :param repo: Repository where the files may be tracked
     :param target_dir: Directory to clean - defaults to current directory if None

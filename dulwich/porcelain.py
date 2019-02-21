@@ -408,18 +408,32 @@ def add(repo=".", paths=None):
     return (relpaths, ignored)
 
 
+def is_subdir(subdir, parentdir):
+    """Check whether `subdir` is `parentdir` or a subdir of `parentdir`
+
+        If `parentdir` or `subdir` is a relative path, it will be disamgibuated
+        relative to the pwd.
+    """
+    parentdir_abs = os.path.realpath(parentdir)
+    subdir_abs = os.path.realpath(subdir)
+    return subdir_abs.startswith(parentdir_abs)
+    
+
 def clean(repo=".", target_dir=None):
     """Remove any untracked files from the target directory recursively
 
-    Equivalent to running git clean -fd in target_dir.
+    Equivalent to running git clean -fd in `target_dir`.
 
     :param repo: Repository where the files may be tracked
     :param target_dir: Directory to clean - defaults to current directory if None
     """
-    with open_repo_closing(repo) as r:
-        if target_dir is None:
-            target_dir = os.getcwd()
-         
+    if target_dir is None:
+        target_dir = os.getcwd()
+    
+    if not is_subdir(target_dir, repo):
+        raise ValueError("target_dir must be in the repo's working dir")
+
+    with open_repo_closing(repo) as r:        
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         

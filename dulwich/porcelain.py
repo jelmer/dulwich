@@ -408,18 +408,22 @@ def add(repo=".", paths=None):
     return (relpaths, ignored)
 
 
-def clean(repo="."):
-    """Remove any untracked files from the current directory recursively
+def clean(repo=".", target_dir=None):
+    """Remove any untracked files from the target directory recursively
 
-    Equivalent to git clean -fd.
+    Equivalent to running git clean -fd in target_dir.
 
     :param repo: Repository where the files may be tracked
+    :param target_dir: Directory to clean - defaults to current directory if None
     """
     with open_repo_closing(repo) as r:
+        if target_dir is None:
+            target_dir = os.getcwd()
+         
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         
-        paths_in_wd = walk_working_dir_paths(os.getcwd(), r.path)
+        paths_in_wd = walk_working_dir_paths(target_dir, r.path)
         # Reverse file visit order, so that files and subdirectories are removed before
         # containing directory
         for ap, is_dir in reversed(list(paths_in_wd)):
@@ -952,6 +956,7 @@ def walk_working_dir_paths(frompath, basepath):
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
             yield filepath, False
+
 
      
         

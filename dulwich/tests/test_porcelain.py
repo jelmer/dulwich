@@ -77,8 +77,10 @@ def flat_walk_dir(dir_to_walk):
         if not dirpath == dir_to_walk:
             yield rel_dirpath
         for filename in filenames:
-            rel_filepath = os.path.join(rel_dirpath, filename)
-            yield rel_filepath
+            if dirpath == dir_to_walk:
+                yield filename
+            else:
+                yield os.path.join(rel_dirpath, filename)
         
 
 class PorcelainTestCase(TestCase):
@@ -145,65 +147,109 @@ class CommitTests(PorcelainTestCase):
 
 
 class CleanTests(PorcelainTestCase):
-    def setUp(self):
-        super(CleanTests, self).setUp()
-        self.orig_path = os.getcwd()
-        os.chdir(self.repo.path)
+    def path_in_wd(self, name):
+        """Get path of file in wd
+        """
+        return os.path.join(self.repo.path, name)
 
-    def tearDown(self):
-        super(CleanTests, self).tearDown()
-        os.chdir(self.orig_path)
+    def put_files(self, tracked, ignored, untracked, empty_dirs):
+        """Put the described files in the wd
+        """
+        all_files = tracked | ignored | untracked
+        for file_path in all_files:
+            write_file_in_wd(self.repo, file_path)
 
-    def test_simple(self):  
-        tracked_files = {
+        write_file_in_wd(self.repo, '.gitignore', '\n'.join(ignored))
+
+        for dir_path in empty_dirs:
+            create_dir_in_wd(self.repo, 'empty_dir')
+
+        files_to_add = [self.path_in_wd(f) for f in tracked]
+        porcelain.add(repo=self.repo.path, paths=files_to_add)
+        porcelain.commit(repo=self.repo.path, message="init commit")
+
+    def clean(self, target_dir):
+        """Clean the target_dir and assert control dir unchanged
+        """
+        controldir = self.repo._controldir
+        
+        controldir_before = set(flat_walk_dir(controldir))
+        porcelain.clean(repo=self.repo.path, target_dir=target_dir)
+        controldir_after = set(flat_walk_dir(controldir))
+
+        self.assertEqual(controldir_after, controldir_before)
+
+
+    def ls_wd(self):
+        """Get paths of all files and dirs in the wd
+        """
+        control_dir = self.repo._controldir
+        control_dir_rel = os.path.relpath(control_dir, self.repo.path)
+        return {
+            p for p in flat_walk_dir(self.repo.path) 
+            if not p.split(os.sep)[0] == '.git'}
+
+
+    def assert_wd(self, expected_paths):
+        """Assert paths of files and dirs in wd are same as expected_paths
+        """
+        found_paths = self.ls_wd()
+        self.assertEqual(found_paths, expected_paths)
+
+
+    def test_from_root(self): 
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+        
+        self.clean(self.repo.path)
+        
+        self.assert_wd({
             'tracked_file',
             'tracked_dir/tracked_file',
             '.gitignore',
-        }
+            'ignored_file',
+            'tracked_dir'})
 
-        ignored_files = {
-            'ignored_file'
-        }
+    def test_from_subdir(self):
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+        
+        target_dir = self.path_in_wd('untracked_dir')
+        self.clean(target_dir)
 
-        untracked_files = {
-            'untracked_file'
+        self.assert_wd({
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+            'ignored_file',
+            'untracked_file',
             'tracked_dir/untracked_dir/untracked_file',
-            'untracked_dir/untracked_dir/untracked_file',
-        }
-
-
-        all_files = tracked_files | ignored_files | untracked_files
-
-        for file_path in all_files:
-            write_file_in_wd(self.repo, file_path)
-        write_file_in_wd(self.repo, '.gitignore', '\n'.join(ignored_files))
-        create_dir_in_wd(self.repo, 'empty_dir')
-
-        porcelain.add(repo=self.repo.path, paths=list(tracked_files))
-        porcelain.commit(repo=self.repo.path, message="init commit")
-
-        controldir = self.repo._controldir
-        controldir_before = set(flat_walk_dir(controldir))
-
-        porcelain.clean(repo=self.repo.path)
-
-        controldir_after = set(flat_walk_dir(controldir))
-        
-        # ignored files should not be removed on clean
-        expected_files = tracked_files | ignored_files
-        expected_dirs = {os.path.dirname(f) for f in expected_files} - {''}
-        expected_paths = expected_files | expected_dirs
-        
-        control_dir_rel = os.path.relpath(controldir, self.repo.path)
-        found_paths = {
-            os.path.relpath(p, self.repo.path) 
-            for p in flat_walk_dir(self.repo.path) 
-            if not p.startswith(control_dir_rel)}
-        
-
-        self.assertEqual(controldir_after, controldir_before)
-        self.assertEqual(found_paths, expected_paths)
-
+            'empty_dir',
+            'untracked_dir',
+            'tracked_dir',
+            'tracked_dir/untracked_dir'})
 
 class CloneTests(PorcelainTestCase):
 

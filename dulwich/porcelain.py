@@ -414,8 +414,8 @@ def _is_subdir(subdir, parentdir):
         If parentdir or subdir is a relative path, it will be disamgibuated
         relative to the pwd.
     """
-    parentdir_abs = os.path.realpath(parentdir)
-    subdir_abs = os.path.realpath(subdir)
+    parentdir_abs = os.path.realpath(parentdir) + os.path.sep
+    subdir_abs = os.path.realpath(subdir) + os.path.sep
     return subdir_abs.startswith(parentdir_abs)
 
 

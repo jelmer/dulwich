@@ -26,7 +26,6 @@ try:
 except ImportError:
     from io import StringIO
 import errno
-import itertools
 import os
 import shutil
 import tarfile
@@ -63,6 +62,7 @@ def create_dir_in_wd(repo, dir_path):
         if not err.errno == errno.EEXIST:
             raise err
 
+
 def write_file_in_wd(repo, file_path, contents='\n'):
     parent_dir = os.path.dirname(file_path)
     create_dir_in_wd(repo, parent_dir)
@@ -70,6 +70,7 @@ def write_file_in_wd(repo, file_path, contents='\n'):
     abs_path = os.path.join(repo.path, file_path)
     with open(abs_path, 'w') as f:
         f.write(contents)
+
 
 def flat_walk_dir(dir_to_walk):
     for dirpath, _, filenames in os.walk(dir_to_walk):
@@ -81,7 +82,7 @@ def flat_walk_dir(dir_to_walk):
                 yield filename
             else:
                 yield os.path.join(rel_dirpath, filename)
-        
+
 
 class PorcelainTestCase(TestCase):
 
@@ -172,32 +173,24 @@ class CleanTests(PorcelainTestCase):
         """Clean the target_dir and assert control dir unchanged
         """
         controldir = self.repo._controldir
-        
+
         controldir_before = set(flat_walk_dir(controldir))
         porcelain.clean(repo=self.repo.path, target_dir=target_dir)
         controldir_after = set(flat_walk_dir(controldir))
 
         self.assertEqual(controldir_after, controldir_before)
 
-
-    def ls_wd(self):
-        """Get paths of all files and dirs in the wd
-        """
-        control_dir = self.repo._controldir
-        control_dir_rel = os.path.relpath(control_dir, self.repo.path)
-        return {
-            p for p in flat_walk_dir(self.repo.path) 
-            if not p.split(os.sep)[0] == '.git'}
-
-
     def assert_wd(self, expected_paths):
         """Assert paths of files and dirs in wd are same as expected_paths
         """
-        found_paths = self.ls_wd()
+        control_dir = self.repo._controldir
+        control_dir_rel = os.path.relpath(control_dir, self.repo.path)
+        found_paths = {
+            p for p in flat_walk_dir(self.repo.path)
+            if not p.split(os.sep)[0] == control_dir_rel}
         self.assertEqual(found_paths, expected_paths)
 
-
-    def test_from_root(self): 
+    def test_from_root(self):
         self.put_files(
             tracked={
                 'tracked_file',
@@ -211,9 +204,9 @@ class CleanTests(PorcelainTestCase):
                 'untracked_dir/untracked_dir/untracked_file'},
             empty_dirs={
                 'empty_dir'})
-        
+
         self.clean(self.repo.path)
-        
+
         self.assert_wd({
             'tracked_file',
             'tracked_dir/tracked_file',
@@ -235,7 +228,7 @@ class CleanTests(PorcelainTestCase):
                 'untracked_dir/untracked_dir/untracked_file'},
             empty_dirs={
                 'empty_dir'})
-        
+
         target_dir = self.path_in_wd('untracked_dir')
         self.clean(target_dir)
 
@@ -250,6 +243,7 @@ class CleanTests(PorcelainTestCase):
             'untracked_dir',
             'tracked_dir',
             'tracked_dir/untracked_dir'})
+
 
 class CloneTests(PorcelainTestCase):
 

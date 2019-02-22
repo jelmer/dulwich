@@ -408,7 +408,7 @@ def add(repo=".", paths=None):
     return (relpaths, ignored)
 
 
-def is_subdir(subdir, parentdir):
+def _is_subdir(subdir, parentdir):
     """Check whether subdir is parentdir or a subdir of parentdir
 
         If parentdir or subdir is a relative path, it will be disamgibuated
@@ -417,7 +417,7 @@ def is_subdir(subdir, parentdir):
     parentdir_abs = os.path.realpath(parentdir)
     subdir_abs = os.path.realpath(subdir)
     return subdir_abs.startswith(parentdir_abs)
-    
+
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
 def clean(repo=".", target_dir=None):
@@ -426,21 +426,21 @@ def clean(repo=".", target_dir=None):
     Equivalent to running `git clean -fd` in target_dir.
 
     :param repo: Repository where the files may be tracked
-    :param target_dir: Directory to clean - defaults to current directory if None
+    :param target_dir: Directory to clean - current directory if None
     """
     if target_dir is None:
         target_dir = os.getcwd()
-    
-    if not is_subdir(target_dir, repo):
+
+    if not _is_subdir(target_dir, repo):
         raise ValueError("target_dir must be in the repo's working dir")
 
-    with open_repo_closing(repo) as r:        
+    with open_repo_closing(repo) as r:
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
-        
-        paths_in_wd = walk_working_dir_paths(target_dir, r.path)
-        # Reverse file visit order, so that files and subdirectories are removed before
-        # containing directory
+
+        paths_in_wd = _walk_working_dir_paths(target_dir, r.path)
+        # Reverse file visit order, so that files and subdirectories are
+        # removed before containing directory
         for ap, is_dir in reversed(list(paths_in_wd)):
             if is_dir:
                 # All subdirectories and files have been removed if untracked,
@@ -454,8 +454,8 @@ def clean(repo=".", target_dir=None):
                 is_ignored = ignore_manager.is_ignored(ip)
                 if not is_tracked and not is_ignored:
                     os.remove(ap)
-         
-        
+
+
 def remove(repo=".", paths=None, cached=False):
     """Remove files from the staging area.
 
@@ -948,7 +948,7 @@ def status(repo=".", ignored=False):
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def walk_working_dir_paths(frompath, basepath):
+def _walk_working_dir_paths(frompath, basepath):
     """Get path, is_dir for files in working dir from frompath
 
     :param frompath: Path to begin walk
@@ -973,8 +973,6 @@ def walk_working_dir_paths(frompath, basepath):
             yield filepath, False
 
 
-     
-        
 def get_untracked_paths(frompath, basepath, index):
     """Get untracked paths.
 
@@ -982,7 +980,7 @@ def get_untracked_paths(frompath, basepath, index):
     :param basepath: Path to compare to
     :param index: Index to check against
     """
-    for ap, is_dir in walk_working_dir_paths(frompath, basepath):
+    for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:

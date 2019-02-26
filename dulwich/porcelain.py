@@ -451,7 +451,10 @@ def clean(repo=".", target_dir=None):
             else:
                 ip = path_to_tree_path(r.path, ap)
                 is_tracked = ip in index
-                is_ignored = ignore_manager.is_ignored(ip)
+
+                rp = os.path.relpath(ap, r.path)
+                is_ignored = ignore_manager.is_ignored(rp)
+
                 if not is_tracked and not is_ignored:
                     os.remove(ap)
 

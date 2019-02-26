@@ -185,10 +185,15 @@ class CleanTests(PorcelainTestCase):
         """
         control_dir = self.repo._controldir
         control_dir_rel = os.path.relpath(control_dir, self.repo.path)
+
+        # normalize paths to simplify comparison across platforms
+        from os.path import normpath
         found_paths = {
-            p for p in flat_walk_dir(self.repo.path)
+            normpath(p)
+            for p in flat_walk_dir(self.repo.path)
             if not p.split(os.sep)[0] == control_dir_rel}
-        self.assertEqual(found_paths, expected_paths)
+        norm_expected_paths = {normpath(p) for p in expected_paths}
+        self.assertEqual(found_paths, norm_expected_paths)
 
     def test_from_root(self):
         self.put_files(

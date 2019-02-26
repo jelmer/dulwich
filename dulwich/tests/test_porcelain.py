@@ -54,24 +54,6 @@ from dulwich.tests.utils import (
     )
 
 
-def create_dir_in_wd(repo, dir_path):
-    abs_path = os.path.join(repo.path, dir_path)
-    try:
-        os.makedirs(abs_path)
-    except OSError as err:
-        if not err.errno == errno.EEXIST:
-            raise err
-
-
-def write_file_in_wd(repo, file_path, contents='\n'):
-    parent_dir = os.path.dirname(file_path)
-    create_dir_in_wd(repo, parent_dir)
-
-    abs_path = os.path.join(repo.path, file_path)
-    with open(abs_path, 'w') as f:
-        f.write(contents)
-
-
 def flat_walk_dir(dir_to_walk):
     for dirpath, _, filenames in os.walk(dir_to_walk):
         rel_dirpath = os.path.relpath(dirpath, dir_to_walk)
@@ -158,14 +140,25 @@ class CleanTests(PorcelainTestCase):
         """
         all_files = tracked | ignored | untracked
         for file_path in all_files:
-            write_file_in_wd(self.repo, file_path)
+            abs_path = self.path_in_wd(file_path)
+            # File may need to be written in a dir that doesn't exist yet, so
+            # create the parent dir(s) as necessary
+            parent_dir = os.path.dirname(abs_path)
+            try:
+                os.makedirs(parent_dir)
+            except OSError as err:
+                if not err.errno == errno.EEXIST:
+                    raise err
+            with open(abs_path, 'w') as f:
+                f.write('')
 
-        write_file_in_wd(self.repo, '.gitignore', '\n'.join(ignored))
+        with open(self.path_in_wd('.gitignore'), 'w') as f:
+            f.writelines(ignored)
 
         for dir_path in empty_dirs:
-            create_dir_in_wd(self.repo, 'empty_dir')
+            os.mkdir(self.path_in_wd('empty_dir'))
 
-        files_to_add = [self.path_in_wd(f) for f in tracked]
+        files_to_add = [self.path_in_wd(t) for t in tracked]
         porcelain.add(repo=self.repo.path, paths=files_to_add)
         porcelain.commit(repo=self.repo.path, message="init commit")
 

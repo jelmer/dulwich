@@ -5,6 +5,8 @@
  * Update directory detection for `get_unstaged_changes` for Python 3.
    (Boris Feld, #684)
 
+ * Add a basic ``porcelain.clean``. (Lane Barlow, #398)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

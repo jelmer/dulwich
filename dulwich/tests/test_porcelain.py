@@ -25,6 +25,7 @@ try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+import errno
 import os
 import shutil
 import tarfile
@@ -51,6 +52,18 @@ from dulwich.tests.utils import (
     make_commit,
     make_object,
     )
+
+
+def flat_walk_dir(dir_to_walk):
+    for dirpath, _, filenames in os.walk(dir_to_walk):
+        rel_dirpath = os.path.relpath(dirpath, dir_to_walk)
+        if not dirpath == dir_to_walk:
+            yield rel_dirpath
+        for filename in filenames:
+            if dirpath == dir_to_walk:
+                yield filename
+            else:
+                yield os.path.join(rel_dirpath, filename)
 
 
 class PorcelainTestCase(TestCase):
@@ -114,6 +127,120 @@ class CommitTests(PorcelainTestCase):
                 committer="Bob <bob@example.com>")
         self.assertTrue(isinstance(sha, bytes))
         self.assertEqual(len(sha), 40)
+
+
+class CleanTests(PorcelainTestCase):
+    def path_in_wd(self, name):
+        """Get path of file in wd
+        """
+        return os.path.join(self.repo.path, name)
+
+    def put_files(self, tracked, ignored, untracked, empty_dirs):
+        """Put the described files in the wd
+        """
+        all_files = tracked | ignored | untracked
+        for file_path in all_files:
+            abs_path = self.path_in_wd(file_path)
+            # File may need to be written in a dir that doesn't exist yet, so
+            # create the parent dir(s) as necessary
+            parent_dir = os.path.dirname(abs_path)
+            try:
+                os.makedirs(parent_dir)
+            except OSError as err:
+                if not err.errno == errno.EEXIST:
+                    raise err
+            with open(abs_path, 'w') as f:
+                f.write('')
+
+        with open(self.path_in_wd('.gitignore'), 'w') as f:
+            f.writelines(ignored)
+
+        for dir_path in empty_dirs:
+            os.mkdir(self.path_in_wd('empty_dir'))
+
+        files_to_add = [self.path_in_wd(t) for t in tracked]
+        porcelain.add(repo=self.repo.path, paths=files_to_add)
+        porcelain.commit(repo=self.repo.path, message="init commit")
+
+    def clean(self, target_dir):
+        """Clean the target_dir and assert control dir unchanged
+        """
+        controldir = self.repo._controldir
+
+        controldir_before = set(flat_walk_dir(controldir))
+        porcelain.clean(repo=self.repo.path, target_dir=target_dir)
+        controldir_after = set(flat_walk_dir(controldir))
+
+        self.assertEqual(controldir_after, controldir_before)
+
+    def assert_wd(self, expected_paths):
+        """Assert paths of files and dirs in wd are same as expected_paths
+        """
+        control_dir = self.repo._controldir
+        control_dir_rel = os.path.relpath(control_dir, self.repo.path)
+
+        # normalize paths to simplify comparison across platforms
+        from os.path import normpath
+        found_paths = {
+            normpath(p)
+            for p in flat_walk_dir(self.repo.path)
+            if not p.split(os.sep)[0] == control_dir_rel}
+        norm_expected_paths = {normpath(p) for p in expected_paths}
+        self.assertEqual(found_paths, norm_expected_paths)
+
+    def test_from_root(self):
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+
+        self.clean(self.repo.path)
+
+        self.assert_wd({
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+            'ignored_file',
+            'tracked_dir'})
+
+    def test_from_subdir(self):
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+
+        target_dir = self.path_in_wd('untracked_dir')
+        self.clean(target_dir)
+
+        self.assert_wd({
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+            'ignored_file',
+            'untracked_file',
+            'tracked_dir/untracked_dir/untracked_file',
+            'empty_dir',
+            'untracked_dir',
+            'tracked_dir',
+            'tracked_dir/untracked_dir'})
 
 
 class CloneTests(PorcelainTestCase):

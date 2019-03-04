@@ -431,10 +431,10 @@ def clean(repo=".", target_dir=None):
     if target_dir is None:
         target_dir = os.getcwd()
 
-    if not _is_subdir(target_dir, repo):
-        raise ValueError("target_dir must be in the repo's working dir")
-
     with open_repo_closing(repo) as r:
+        if not _is_subdir(target_dir, r.path):
+            raise ValueError("target_dir must be in the repo's working dir")
+
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
 

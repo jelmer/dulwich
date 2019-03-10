@@ -13,12 +13,12 @@ Build-Depends: debhelper (>= 11),
                python-certifi,
                python-fastimport (>= 0.9.0~bzr293),
                python-unittest2,
-               python-urllib3,
+               python-urllib3 (>= 1.24.1),
                python3-all-dbg,
                python3-all-dev,
                python3-certifi,
                python3-fastimport,
-               python3-urllib3
+               python3-urllib3 (>= 1.24.1)
 Standards-Version: 4.2.1
 Vcs-Git: https://salsa.debian.org/python-team/modules/dulwich.git
 Vcs-Browser: https://salsa.debian.org/python-team/modules/dulwich
@@ -26,7 +26,7 @@ Vcs-Browser: https://salsa.debian.org/python-team/modules/dulwich
 Package: python-dulwich
 Architecture: any
 Depends: python-certifi,
-         python-urllib3,
+         python-urllib3 (>= 1.24.1),
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
@@ -65,7 +65,7 @@ Description: Python Git library - pypy module
 Package: python3-dulwich
 Architecture: any
 Depends: python3-certifi,
-         python3-urllib3,
+         python3-urllib3 (>= 1.24.1),
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}

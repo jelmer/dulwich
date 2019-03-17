@@ -547,7 +547,10 @@ def print_tag(tag, decode, outstream=sys.stdout):
     :param outstream: A stream to write to
     """
     outstream.write("Tagger: " + decode(tag.tagger) + "\n")
-    outstream.write("Date:   " + decode(tag.tag_time) + "\n")
+    time_tuple = time.gmtime(tag.tag_time + tag.tag_timezone)
+    time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
+    timezone_str = format_timezone(tag.tag_timezone).decode('ascii')
+    outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(tag.message) + "\n")
     outstream.write("\n")

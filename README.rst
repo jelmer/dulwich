@@ -71,11 +71,8 @@ And to print it using porcelain::
 Further documentation
 ---------------------
 
-The dulwich documentation can be found in docs/ and
-`on the web <https://www.dulwich.io/docs/>`_.
-
-The API reference can be generated using pydoctor, by running "make pydoctor",
-or `on the web <https://www.dulwich.io/apidocs>`_.
+The dulwich documentation can be found in docs/ and built by running ``make
+doc``. It can also be found `on the web <https://www.dulwich.io/docs/>`_.
 
 Help
 ----

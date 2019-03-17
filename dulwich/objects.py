@@ -259,7 +259,10 @@ class ShaFile(object):
             start = len(header)
         header = header[:end]
         type_name, size = header.split(b' ', 1)
-        size = int(size)  # sanity check
+        try:
+            int(size)  # sanity check
+        except ValueError as e:
+            raise ObjectFormatException("Object size not an integer: %s" % e)
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)

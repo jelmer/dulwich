@@ -48,6 +48,7 @@ from dulwich.client import (
     TCPGitClient,
     SSHGitClient,
     HttpGitClient,
+    FetchPackResult,
     ReportStatusParser,
     SendPackError,
     StrangeHostname,
@@ -1304,3 +1305,17 @@ class CheckWantsTests(TestCase):
             {b'refs/heads/blah': b'3f3dc7a53fb752a6961d3a56683df46d4d3bf262',
              b'refs/heads/blah^{}':
                 b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'})
+
+
+class FetchPackResultTests(TestCase):
+
+    def test_eq(self):
+        self.assertEqual(
+            FetchPackResult(
+                 {b'refs/heads/master':
+                  b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'}, {},
+                 b'user/agent'),
+            FetchPackResult(
+                {b'refs/heads/master':
+                 b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'}, {},
+                b'user/agent'))

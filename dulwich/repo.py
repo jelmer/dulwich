@@ -1359,7 +1359,7 @@ class MemoryRepo(BaseRepo):
         except KeyError:
             pass
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to

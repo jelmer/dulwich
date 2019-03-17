@@ -774,7 +774,8 @@ def tag_create(
             if sign:
                 import gpg
                 with gpg.Context(armor=True) as c:
-                    tag_obj.signature, result = c.sign(tag_obj.as_raw_string())
+                    tag_obj.signature, unused_result = c.sign(
+                        tag_obj.as_raw_string())
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:

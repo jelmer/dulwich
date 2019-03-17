@@ -21,8 +21,6 @@
 """General implementation of walking commits and their contents."""
 
 
-from collections import defaultdict
-
 import collections
 import heapq
 from itertools import chain
@@ -394,7 +392,7 @@ def _topo_reorder(entries, get_parents=lambda commit: commit.parents):
     """
     todo = collections.deque()
     pending = {}
-    num_children = defaultdict(int)
+    num_children = collections.defaultdict(int)
     for entry in entries:
         todo.append(entry)
         for p in get_parents(entry.commit):

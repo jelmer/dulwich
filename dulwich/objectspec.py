@@ -74,8 +74,7 @@ def parse_ref(container, refspec):
     for ref in possible_refs:
         if ref in container:
             return ref
-    else:
-        raise KeyError(refspec)
+    raise KeyError(refspec)
 
 
 def parse_reftuple(lh_container, rh_container, refspec):

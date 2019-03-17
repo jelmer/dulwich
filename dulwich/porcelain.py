@@ -609,7 +609,7 @@ def show_tag(repo, tag, decode, outstream=sys.stdout):
     :param outstream: Stream to write to
     """
     print_tag(tag, decode, outstream)
-    show_object(repo, repo[tag.object[1]], outstream)
+    show_object(repo, repo[tag.object[1]], decode, outstream)
 
 
 def show_object(repo, obj, decode, outstream):

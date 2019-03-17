@@ -1319,22 +1319,19 @@ class OverlayObjectStore(BaseObjectStore):
                 return b.get_raw(sha_id)
             except KeyError:
                 pass
-        else:
-            raise KeyError(sha_id)
+        raise KeyError(sha_id)
 
     def contains_packed(self, sha):
         for b in self.bases:
             if b.contains_packed(sha):
                 return True
-        else:
-            return False
+        return False
 
     def contains_loose(self, sha):
         for b in self.bases:
             if b.contains_loose(sha):
                 return True
-        else:
-            return False
+        return False
 
 
 def read_packs_file(f):

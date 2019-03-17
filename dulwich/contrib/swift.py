@@ -199,11 +199,8 @@ def swift_load_pack_index(scon, filename):
     :param filename: Path to the index file objectise
     :return: a `PackIndexer` instance
     """
-    f = scon.get_object(filename)
-    try:
+    with scon.get_object(filename) as f:
         return load_pack_index_file(filename, f)
-    finally:
-        f.close()
 
 
 def pack_info_create(pack_data, pack_index):
@@ -935,10 +932,9 @@ class SwiftRepo(BaseRepo):
         :param filename: the path to the object to put on Swift
         :param contents: the content as bytestring
         """
-        f = BytesIO()
-        f.write(contents)
-        self.scon.put_object(filename, f)
-        f.close()
+        with BytesIO() as f:
+            f.write(contents)
+            self.scon.put_object(filename, f)
 
     @classmethod
     def init_bare(cls, scon, conf):
@@ -992,7 +988,6 @@ def cmd_daemon(args):
         sys.exit(1)
     import gevent.monkey
     gevent.monkey.patch_socket()
-    from dulwich.contrib.swift import load_conf
     from dulwich import log_utils
     logger = log_utils.getLogger(__name__)
     conf = load_conf(options.swift_config)

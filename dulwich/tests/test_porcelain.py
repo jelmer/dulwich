@@ -573,7 +573,7 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
 Test message.
 
 diff --git /dev/null b/somename
-new mode 100644
+new file mode 100644
 index 0000000..ea5c7bf 100644
 --- /dev/null
 +++ b/somename
@@ -610,7 +610,7 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
 Test message.
 
 diff --git /dev/null b/somename
-new mode 100644
+new file mode 100644
 index 0000000..ea5c7bf 100644
 --- /dev/null
 +++ b/somename

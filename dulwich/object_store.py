@@ -997,9 +997,14 @@ class ObjectStoreIterator(ObjectIterator):
         return len(list(self.itershas()))
 
     def empty(self):
-        iter = self.itershas()
+        import warnings
+        warnings.warn('Use bool() instead.', DeprecationWarning)
+        return self._empty()
+
+    def _empty(self):
+        it = self.itershas()
         try:
-            iter()
+            next(it)
         except StopIteration:
             return True
         else:
@@ -1007,7 +1012,7 @@ class ObjectStoreIterator(ObjectIterator):
 
     def __bool__(self):
         """Indicate whether this object has contents."""
-        return not self.empty()
+        return not self._empty()
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):

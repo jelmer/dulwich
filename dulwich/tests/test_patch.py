@@ -278,7 +278,7 @@ class DiffTests(TestCase):
         self.assertEqual([
              b'diff --git a/bar.txt b/bar.txt',
              b'new file mode 644',
-             b'index 0000000..a116b51 644',
+             b'index 0000000..a116b51',
              b'--- /dev/null',
              b'+++ b/bar.txt',
              b'@@ -0,0 +1,2 @@',
@@ -324,7 +324,7 @@ class DiffTests(TestCase):
         self.assertEqual([
             b'diff --git a/added.txt b/added.txt',
             b'new file mode 644',
-            b'index 0000000..76d4bb8 644',
+            b'index 0000000..76d4bb8',
             b'--- /dev/null',
             b'+++ b/added.txt',
             b'@@ -0,0 +1 @@',
@@ -396,7 +396,7 @@ class DiffTests(TestCase):
         self.assertEqual([
              b'diff --git a/bar.txt b/bar.txt',
              b'new file mode 644',
-             b'index 0000000..a116b51 644',
+             b'index 0000000..a116b51',
              b'--- /dev/null',
              b'+++ b/bar.txt',
              b'@@ -0,0 +1,2 @@',
@@ -494,7 +494,7 @@ class DiffTests(TestCase):
         self.assertEqual([
             b'diff --git a/bar.png b/bar.png',
             b'new file mode 644',
-            b'index 0000000..06364b7 644',
+            b'index 0000000..06364b7',
             b'Binary files /dev/null and b/bar.png differ'
             ], f.getvalue().splitlines())
 

@@ -276,7 +276,7 @@ class DiffTests(TestCase):
             f, (None, None, None),
             (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")))
         self.assertEqual([
-             b'diff --git /dev/null b/bar.txt',
+             b'diff --git a/bar.txt b/bar.txt',
              b'new file mode 644',
              b'index 0000000..a116b51 644',
              b'--- /dev/null',
@@ -292,7 +292,7 @@ class DiffTests(TestCase):
             f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
             (None, None, None))
         self.assertEqual([
-            b'diff --git a/bar.txt /dev/null',
+            b'diff --git a/bar.txt b/bar.txt',
             b'deleted file mode 644',
             b'index a116b51..0000000',
             b'--- a/bar.txt',
@@ -322,7 +322,7 @@ class DiffTests(TestCase):
             tree1, tree2, added, removed, changed1, changed2, unchanged]])
         write_tree_diff(f, store, tree1.id, tree2.id)
         self.assertEqual([
-            b'diff --git /dev/null b/added.txt',
+            b'diff --git a/added.txt b/added.txt',
             b'new file mode 644',
             b'index 0000000..76d4bb8 644',
             b'--- /dev/null',
@@ -337,7 +337,7 @@ class DiffTests(TestCase):
             b' unchanged',
             b'-removed',
             b'+added',
-            b'diff --git a/removed.txt /dev/null',
+            b'diff --git a/removed.txt b/removed.txt',
             b'deleted file mode 644',
             b'index 2c3f0b3..0000000',
             b'--- a/removed.txt',
@@ -394,7 +394,7 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (None, None, None),
                                     (b"bar.txt", 0o644, b2.id))
         self.assertEqual([
-             b'diff --git /dev/null b/bar.txt',
+             b'diff --git a/bar.txt b/bar.txt',
              b'new file mode 644',
              b'index 0000000..a116b51 644',
              b'--- /dev/null',
@@ -412,7 +412,7 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b"bar.txt", 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
-            b'diff --git a/bar.txt /dev/null',
+            b'diff --git a/bar.txt b/bar.txt',
             b'deleted file mode 644',
             b'index a116b51..0000000',
             b'--- a/bar.txt',
@@ -492,7 +492,7 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (None, None, None),
                                     (b'bar.png', 0o644, b2.id))
         self.assertEqual([
-            b'diff --git /dev/null b/bar.png',
+            b'diff --git a/bar.png b/bar.png',
             b'new file mode 644',
             b'index 0000000..06364b7 644',
             b'Binary files /dev/null and b/bar.png differ'
@@ -510,7 +510,7 @@ class DiffTests(TestCase):
         write_object_diff(f, store, (b'foo.png', 0o644, b1.id),
                                     (None, None, None))
         self.assertEqual([
-            b'diff --git a/foo.png /dev/null',
+            b'diff --git a/foo.png b/foo.png',
             b'deleted file mode 644',
             b'index f73e47d..0000000',
             b'Binary files a/foo.png and /dev/null differ'

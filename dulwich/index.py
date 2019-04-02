@@ -643,17 +643,18 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
         try:
-            blob = blob_from_path_and_stat(
-                full_path, os.lstat(full_path)
-            )
+            st = os.lstat(full_path)
+            if stat.S_ISDIR(st.st_mode):
+                if _has_directory_changed(tree_path, entry):
+                    yield tree_path
+                continue
+
+            blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
         except EnvironmentError as e:
-            if e.errno == errno.EISDIR:
-                if _has_directory_changed(tree_path, entry):
-                    yield tree_path
-            elif e.errno == errno.ENOENT:
+            if e.errno == errno.ENOENT:
                 # The file was removed, so we assume that counts as
                 # different from whatever file used to exist.
                 yield tree_path
@@ -714,28 +715,23 @@ def index_entry_from_path(path, object_store=None):
     :param path: Path to create an index entry for
     :param object_store: Optional object store to
         save new blobs in
-    :return: An index entry
+    :return: An index entry; None for directories
     """
     assert isinstance(path, bytes)
-    try:
-        st = os.lstat(path)
-        blob = blob_from_path_and_stat(path, st)
-    except EnvironmentError as e:
-        if e.errno == errno.EISDIR:
-            if os.path.exists(os.path.join(path, b'.git')):
-                head = read_submodule_head(path)
-                if head is None:
-                    return None
-                return index_entry_from_stat(
-                    st, head, 0, mode=S_IFGITLINK)
-            else:
-                raise
-        else:
-            raise
-    else:
-        if object_store is not None:
-            object_store.add_object(blob)
-        return index_entry_from_stat(st, blob.id, 0)
+    st = os.lstat(path)
+    if stat.S_ISDIR(st.st_mode):
+        if os.path.exists(os.path.join(path, b'.git')):
+            head = read_submodule_head(path)
+            if head is None:
+                return None
+            return index_entry_from_stat(
+                st, head, 0, mode=S_IFGITLINK)
+        return None
+
+    blob = blob_from_path_and_stat(path, st)
+    if object_store is not None:
+        object_store.add_object(blob)
+    return index_entry_from_stat(st, blob.id, 0)
 
 
 def iter_fresh_entries(paths, root_path, object_store=None):

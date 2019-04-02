@@ -28,15 +28,13 @@ from dulwich import porcelain
 from dulwich.repo import (
     Repo,
     )
-from dulwich.tests import (
-    TestCase,
-    )
 from dulwich.tests.compat.utils import (
+    CompatTestCase,
     run_git_or_fail,
     )
 
 
-class CompatPatchTestCase(TestCase):
+class CompatPatchTestCase(CompatTestCase):
 
     def setUp(self):
         super(CompatPatchTestCase, self).setUp()

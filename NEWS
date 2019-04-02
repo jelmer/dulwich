@@ -7,6 +7,9 @@
 
  * Add a basic ``porcelain.clean``. (Lane Barlow, #398)
 
+ * Fix output format of ``porcelain.diff`` to match that of
+   C Git. (Boris Feld)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

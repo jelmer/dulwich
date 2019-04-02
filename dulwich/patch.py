@@ -185,8 +185,8 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file
-    old_path = patch_filename(old_path, b"a")
-    new_path = patch_filename(new_path, b"b")
+    patched_old_path = patch_filename(old_path, b"a")
+    patched_new_path = patch_filename(new_path, b"b")
 
     def content(mode, hexsha):
         if hexsha is None:
@@ -207,11 +207,17 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     new_content = content(new_mode, new_id)
     if not diff_binary and (
             is_binary(old_content.data) or is_binary(new_content.data)):
-        f.write(b"Binary files " + old_path + b" and " + new_path +
-                b" differ\n")
+        binary_diff = (
+            b"Binary files "
+            + patched_old_path
+            + b" and "
+            + patched_new_path
+            + b" differ\n"
+        )
+        f.write(binary_diff)
     else:
         f.writelines(unified_diff(lines(old_content), lines(new_content),
-                     old_path, new_path))
+                     patched_old_path, patched_new_path))
 
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
@@ -225,16 +231,23 @@ def gen_diff_header(paths, modes, shas):
     (old_path, new_path) = paths
     (old_mode, new_mode) = modes
     (old_sha, new_sha) = shas
+    if old_path is None and new_path is not None:
+        old_path = new_path
+    if new_path is None and old_path is not None:
+        new_path = old_path
+    old_path = patch_filename(old_path, b"a")
+    new_path = patch_filename(new_path, b"b")
     yield b"diff --git " + old_path + b" " + new_path + b"\n"
+
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                yield ("old mode %o\n" % old_mode).encode('ascii')
-            yield ("new mode %o\n" % new_mode).encode('ascii')
+                yield ("old file mode %o\n" % old_mode).encode('ascii')
+            yield ("new file mode %o\n" % new_mode).encode('ascii')
         else:
-            yield ("deleted mode %o\n" % old_mode).encode('ascii')
+            yield ("deleted file mode %o\n" % old_mode).encode('ascii')
     yield b"index " + shortid(old_sha) + b".." + shortid(new_sha)
-    if new_mode is not None:
+    if new_mode is not None and old_mode is not None:
         yield (" %o" % new_mode).encode('ascii')
     yield b"\n"
 
@@ -251,8 +264,8 @@ def write_blob_diff(f, old_file, new_file):
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file
-    old_path = patch_filename(old_path, b"a")
-    new_path = patch_filename(new_path, b"b")
+    patched_old_path = patch_filename(old_path, b"a")
+    patched_new_path = patch_filename(new_path, b"b")
 
     def lines(blob):
         if blob is not None:
@@ -265,7 +278,7 @@ def write_blob_diff(f, old_file, new_file):
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(unified_diff(old_contents, new_contents,
-                 old_path, new_path))
+                 patched_old_path, patched_new_path))
 
 
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):

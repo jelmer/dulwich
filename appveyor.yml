@@ -91,10 +91,3 @@ after_test:
 
 artifacts:
   - path: dist\*
-
-on_success:
-  - ps: >-
-      $cmtid = git rev-parse HEAD
-      if (git describe --exact-match $cmtid) {
-        twine upload -u PYPI_USER -p PYPI_PSWD dist/*
-      }

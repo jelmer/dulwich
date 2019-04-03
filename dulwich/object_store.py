@@ -727,8 +727,10 @@ class DiskObjectStore(PackBasedObjectStore):
         with PackData(path) as p:
             entries = p.sorted_entries()
             basename = self._get_pack_basepath(entries)
-            with GitFile(basename+".idx", "wb") as f:
-                write_pack_index_v2(f, entries, p.get_stored_checksum())
+            index_name = basename + ".idx"
+            if not os.path.exists(index_name):
+                with GitFile(index_name, "wb") as f:
+                    write_pack_index_v2(f, entries, p.get_stored_checksum())
         for pack in self.packs:
             if pack._basename == basename:
                 return pack

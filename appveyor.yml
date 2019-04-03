@@ -1,5 +1,10 @@
 environment:
 
+  PYPI_USER: "dulwich-bot"
+  PYPI_PSWD:
+    # See https://www.appveyor.com/docs/build-configuration/#secure-variables
+    secure: e7DTu4CwOCARfN/mwA8lXQ==
+
   matrix:
 
     - PYTHON: "C:\\Python27"
@@ -86,3 +91,10 @@ after_test:
 
 artifacts:
   - path: dist\*
+
+on_success:
+  - ps: >-
+      $cmtid = git rev-parse HEAD
+      if (git describe --exact-match $cmtid) {
+        twine upload -u PYPI_USER -p PYPI_PSWD dist/*
+      }

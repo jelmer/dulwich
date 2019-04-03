@@ -1374,7 +1374,7 @@ def default_urllib3_manager(config, **override_kwargs):
             ssl_verify = True
 
         try:
-            ca_certs = config.get_boolean(b"http", b"sslCAInfo")
+            ca_certs = config.get(b"http", b"sslCAInfo")
         except KeyError:
             ca_certs = None
 

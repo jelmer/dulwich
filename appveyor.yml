@@ -1,9 +1,7 @@
 environment:
 
-  PYPI_USER: "dulwich-bot"
-  PYPI_PSWD:
-    # See https://www.appveyor.com/docs/build-configuration/#secure-variables
-    secure: e7DTu4CwOCARfN/mwA8lXQ==
+  TWINE_USER: "dulwich-bot"
+  # TWINE_PASSWORD is set in appveyor settings
 
   matrix:
 
@@ -93,8 +91,10 @@ artifacts:
   - path: dist\*
 
 on_success:
-  - ps: >-
-      $cmtid = git rev-parse HEAD
-      if (git describe --exact-match $cmtid) {
-        twine upload -u PYPI_USER -p PYPI_PSWD dist/*
-      }
+  - >
+    IF "%APPVEYOR_REPO_TAG%" == "true"
+    (
+    python -m pip install twine
+    &&
+    python -m twine upload dist/*.whl
+    )

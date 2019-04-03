@@ -65,6 +65,7 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo/foo.c", b"/*.c"),
     (b"foo/bar/", b"/bar/"),
     (b"foo/bar/", b"foo/bar/*"),
+    (b"foo/bar", b"foo?bar")
 ]
 
 

@@ -38,7 +38,7 @@ def _translate_segment(segment):
         if c == b'*':
             res += b'[^/]*'
         elif c == b'?':
-            res += b'.'
+            res += b'[^/]'
         elif c == b'[':
             j = i
             if j < n and segment[j:j+1] == b'!':

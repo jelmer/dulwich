@@ -192,7 +192,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         if hexsha is None:
             return Blob.from_string(b'')
         elif S_ISGITLINK(mode):
-            return Blob.from_string(b"Submodule commit " + hexsha + b"\n")
+            return Blob.from_string(b"Subproject commit " + hexsha + b"\n")
         else:
             return store[hexsha]
 

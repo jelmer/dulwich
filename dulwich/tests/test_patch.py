@@ -363,8 +363,8 @@ class DiffTests(TestCase):
             b'--- a/asubmodule',
             b'+++ b/asubmodule',
             b'@@ -1 +1 @@',
-            b'-Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
-            b'+Submodule commit cc975646af69f279396d4d5e1379ac6af80ee637',
+            b'-Subproject commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            b'+Subproject commit cc975646af69f279396d4d5e1379ac6af80ee637',
             ], f.getvalue().splitlines())
 
     def test_object_diff_blob(self):
@@ -535,5 +535,5 @@ class DiffTests(TestCase):
             b'@@ -1,2 +1 @@',
             b'-new',
             b'-same',
-            b'+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
+            b'+Subproject commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
             ], f.getvalue().splitlines())

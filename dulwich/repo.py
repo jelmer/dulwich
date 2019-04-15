@@ -1297,8 +1297,15 @@ class Repo(BaseRepo):
                     except KeyError:
                         pass
                 else:
+                    # Check if the file is already in the index
+                    try:
+                        index[tree_path]
+                        new_file = False
+                    except KeyError:
+                        new_file = True
+
                     blob = blob_from_path_and_stat(full_path, st)
-                    blob = blob_normalizer.checkin_normalize(blob, fs_path)
+                    blob = blob_normalizer.checkin_normalize(blob, fs_path, new_file)
                     self.object_store.add_object(blob)
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
         index.write()

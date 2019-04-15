@@ -31,6 +31,9 @@ The normalization is a two-fold process that happens at two moments:
   when doing a `git add` call. We call this process the write filter in this
   module.
 
+The normalization only happens when the resulting file does not exists yet.
+For the write filter, they are files that are shown as added in status.
+
 One thing to know is that Git does line-ending normalization only on text
 files. How does Git know that a file is text? We can either mark a file as a
 text file, a binary file or ask Git to automatically decides. Git has an
@@ -229,9 +232,14 @@ class BlobNormalizer(object):
             core_eol, core_autocrlf, self.gitattributes
         )
 
-    def checkin_normalize(self, blob, tree_path):
+    def checkin_normalize(self, blob, tree_path, new_file):
         """ Normalize a blob during a checkin operation
         """
+        if not new_file:
+            # Line-ending normalization only happens for new files, aka files
+            # not already commited
+            return blob
+
         if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
@@ -239,9 +247,14 @@ class BlobNormalizer(object):
 
         return blob
 
-    def checkout_normalize(self, blob, tree_path):
+    def checkout_normalize(self, blob, tree_path, new_file):
         """ Normalize a blob during a checkout operation
         """
+        if not new_file:
+            # Line-ending normalization only happens for new files, aka files
+            # not already commited
+            return blob
+
         if self.fallback_read_filter is not None:
             return normalize_blob(
                 blob, self.fallback_read_filter, binary_detection=True

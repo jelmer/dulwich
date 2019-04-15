@@ -1179,7 +1179,7 @@ class StatusTests(PorcelainTestCase):
         self.assertListEqual(results.unstaged, [b'crlf'])
         self.assertListEqual(results.untracked, [])
 
-    def test_status_crlf_convert(self):
+    def test_status_crlf_no_convert(self):
         # First make a commit as if the file has been added on a Linux system
         # or with core.autocrlf=True
         file_path = os.path.join(self.repo.path, 'crlf')
@@ -1200,9 +1200,50 @@ class StatusTests(PorcelainTestCase):
         c.set("core", "autocrlf", True)
         c.write_to_path()
 
+        # The file should be seen as modified as the line-ending conversion
+        # will NOT be applied since the file is already in the store and in
+        # the staging area
         results = porcelain.status(self.repo)
         self.assertDictEqual(
             {'add': [], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [b"crlf"])
+        self.assertListEqual(results.untracked, [])
+
+    def test_status_crlf_convert(self):
+        # With an emty repo
+        file_path = os.path.join(self.repo.path, 'crlf')
+        repo = Repo(self.repo_path)
+
+        # TODO: It should be set automatically by looking at the configuration
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", True)
+        c.write_to_path()
+
+        # Write the file as it would be on Windows
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\r\nline2')
+
+        # Stage the file, the conversion should happens as the file is new
+        repo.stage([b"crlf"])
+
+        # So far, the file should be seen only as added
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [b"crlf"], 'delete': [], 'modify': []},
+            results.staged)
+        self.assertListEqual(results.unstaged, [])
+        self.assertListEqual(results.untracked, [])
+
+        # Then update the file line-ending to Unix line endings
+        with open(file_path, 'wb') as f:
+            f.write(b'line1\nline2')
+
+        # It should match the blob in staging area, so the file shouldn't be
+        # shown as unstaged
+        results = porcelain.status(self.repo)
+        self.assertDictEqual(
+            {'add': [b"crlf"], 'delete': [], 'modify': []},
             results.staged)
         self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])

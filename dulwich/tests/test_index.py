@@ -645,7 +645,7 @@ class GetUnstagedChangesTests(TestCase):
             # modify access and modify time of path
             os.utime(foo1_fullpath, (0, 0))
 
-            changes = get_unstaged_changes(repo.open_index(), repo_dir)
+            changes = get_unstaged_changes(repo.open_index(), repo)
 
             self.assertEqual(list(changes), [b'foo1'])
 
@@ -667,7 +667,7 @@ class GetUnstagedChangesTests(TestCase):
 
             os.unlink(foo1_fullpath)
 
-            changes = get_unstaged_changes(repo.open_index(), repo_dir)
+            changes = get_unstaged_changes(repo.open_index(), repo)
 
             self.assertEqual(list(changes), [b'foo1'])
 
@@ -690,7 +690,7 @@ class GetUnstagedChangesTests(TestCase):
             os.remove(foo1_fullpath)
             os.mkdir(foo1_fullpath)
 
-            changes = get_unstaged_changes(repo.open_index(), repo_dir)
+            changes = get_unstaged_changes(repo.open_index(), repo)
 
             self.assertEqual(list(changes), [b'foo1'])
 
@@ -714,7 +714,7 @@ class GetUnstagedChangesTests(TestCase):
             os.remove(foo1_fullpath)
             os.symlink(os.path.dirname(foo1_fullpath), foo1_fullpath)
 
-            changes = get_unstaged_changes(repo.open_index(), repo_dir)
+            changes = get_unstaged_changes(repo.open_index(), repo)
 
             self.assertEqual(list(changes), [b'foo1'])
 

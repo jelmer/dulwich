@@ -942,7 +942,7 @@ def status(repo=".", ignored=False):
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
         unstaged_changes = list(
-            get_unstaged_changes(index, r.path, filter_callback)
+            get_unstaged_changes(index, r, filter_callback)
         )
         ignore_manager = IgnoreFilterManager.from_repo(r)
         untracked_paths = get_untracked_paths(r.path, r.path, index)

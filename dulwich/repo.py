@@ -1051,16 +1051,6 @@ class Repo(BaseRepo):
 
         root_path_bytes = self.path.encode(sys.getfilesystemencoding())
 
-        head_tree = None
-        lookup_obj = self.object_store.__getitem__
-
-        try:
-            head_tree = self[self[b"HEAD"].tree]
-        except KeyError:
-            # In case we don't have a HEAD refs, the line-ending filters will
-            # be executed
-            pass
-
         if not isinstance(fs_paths, list):
             fs_paths = [fs_paths]
         from dulwich.index import (
@@ -1091,16 +1081,12 @@ class Repo(BaseRepo):
                 if not stat.S_ISDIR(st.st_mode):
                     blob = blob_from_path_and_stat(full_path, st)
 
-                    if not head_tree:
+                    # Check if the file is already in the index
+                    try:
+                        index[tree_path]
+                        new_file = False
+                    except KeyError:
                         new_file = True
-                    else:
-                        try:
-                            head_tree.lookup_path(lookup_obj, tree_path)
-                            new_file = False
-                        except KeyError:
-                            # Line-ending conversion is done only for files
-                            # not in store yet
-                            new_file = True
 
                     blob = blob_normalizer.checkin_normalize(blob, fs_path,
                                                              new_file)

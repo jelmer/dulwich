@@ -1211,11 +1211,10 @@ class StatusTests(PorcelainTestCase):
         self.assertListEqual(results.untracked, [])
 
     def test_status_crlf_convert(self):
-        # With an emty repo
+        # With an empty repo
         file_path = os.path.join(self.repo.path, 'crlf')
         repo = Repo(self.repo_path)
 
-        # TODO: It should be set automatically by looking at the configuration
         c = self.repo.get_config()
         c.set("core", "autocrlf", True)
         c.write_to_path()

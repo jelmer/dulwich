@@ -232,8 +232,10 @@ class BlobNormalizer(object):
             core_eol, core_autocrlf, self.gitattributes
         )
 
-    def checkin_normalize(self, blob, tree_path, new_file):
+    def checkin_normalize(self, blob, tree_path, new_file=True):
         """ Normalize a blob during a checkin operation
+
+        new_file is set to True by default for backward-compatibility
         """
         if not new_file:
             # Line-ending normalization only happens for new files, aka files
@@ -247,8 +249,10 @@ class BlobNormalizer(object):
 
         return blob
 
-    def checkout_normalize(self, blob, tree_path, new_file):
+    def checkout_normalize(self, blob, tree_path, new_file=True):
         """ Normalize a blob during a checkout operation
+
+        new_file is set to True by default for backward-compatibility
         """
         if not new_file:
             # Line-ending normalization only happens for new files, aka files

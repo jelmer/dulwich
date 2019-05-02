@@ -286,7 +286,7 @@ class DumbHandlersTestCase(WebTestCase):
 
         mat = re.search('info/refs', '/foo/info/refs')
         self.assertEqual(
-            ['No git repository was found at /foo'],
+            [b'No git repository was found at /foo'],
             list(get_info_refs(self._req, backend, mat)))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
         self.assertContentTypeEquals('text/plain')

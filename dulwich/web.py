@@ -47,6 +47,7 @@ from dulwich.protocol import (
     ReceivableProtocol,
     )
 from dulwich.repo import (
+    NotGitRepository,
     Repo,
     )
 from dulwich.server import (
@@ -173,6 +174,11 @@ def get_idx_file(req, backend, mat):
 def get_info_refs(req, backend, mat):
     params = parse_qs(req.environ['QUERY_STRING'])
     service = params.get('service', [None])[0]
+    try:
+        repo = get_repo(backend, mat)
+    except NotGitRepository as e:
+        yield req.not_found(str(e))
+        return
     if service and not req.dumb:
         handler_cls = req.handlers.get(service.encode('ascii'), None)
         if handler_cls is None:
@@ -194,7 +200,6 @@ def get_info_refs(req, backend, mat):
         req.nocache()
         req.respond(HTTP_OK, 'text/plain')
         logger.info('Emulating dumb info/refs')
-        repo = get_repo(backend, mat)
         for text in generate_info_refs(repo):
             yield text
 
@@ -236,9 +241,16 @@ def handle_service_request(req, backend, mat):
     if handler_cls is None:
         yield req.forbidden('Unsupported service')
         return
+    try:
+        get_repo(backend, mat)
+    except NotGitRepository as e:
+        yield req.not_found(str(e))
+        return
     req.nocache()
     write = req.respond(HTTP_OK, 'application/x-%s-result' % service)
     proto = ReceivableProtocol(req.environ['wsgi.input'].read, write)
+    # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
+    # reopen.
     handler = handler_cls(backend, [url_prefix(mat)], proto, http_req=req)
     handler.handle()
 

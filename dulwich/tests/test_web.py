@@ -277,6 +277,20 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertContentTypeEquals('text/plain')
         self.assertFalse(self._req.cached)
 
+    def test_get_info_refs_not_found(self):
+        self._environ['QUERY_STRING'] = ''
+
+        objects = []
+        refs = {}
+        backend = _test_backend(objects, refs=refs)
+
+        mat = re.search('info/refs', '/foo/info/refs')
+        self.assertEqual(
+            ['No git repository was found at /foo'],
+            list(get_info_refs(self._req, backend, mat)))
+        self.assertEqual(HTTP_NOT_FOUND, self._status)
+        self.assertContentTypeEquals('text/plain')
+
     def test_get_info_packs(self):
         class TestPackData(object):
 
@@ -341,8 +355,12 @@ class SmartHandlersTestCase(WebTestCase):
         if content_length is not None:
             self._environ['CONTENT_LENGTH'] = content_length
         mat = re.search('.*', '/git-upload-pack')
+
+        class Backend(object):
+            def open_repository(self, path):
+                return None
         handler_output = b''.join(
-          handle_service_request(self._req, 'backend', mat))
+          handle_service_request(self._req, Backend(), mat))
         write_output = self._output.getvalue()
         # Ensure all output was written via the write callback.
         self.assertEqual(b'', handler_output)
@@ -363,7 +381,13 @@ class SmartHandlersTestCase(WebTestCase):
 
     def test_get_info_refs_unknown(self):
         self._environ['QUERY_STRING'] = 'service=git-evil-handler'
-        content = list(get_info_refs(self._req, b'backend', None))
+
+        class Backend(object):
+            def open_repository(self, url):
+                return None
+
+        mat = re.search('.*', '/git-evil-pack')
+        content = list(get_info_refs(self._req, Backend(), mat))
         self.assertFalse(b'git-evil-handler' in b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
@@ -372,8 +396,13 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ['wsgi.input'] = BytesIO(b'foo')
         self._environ['QUERY_STRING'] = 'service=git-upload-pack'
 
+        class Backend(object):
+
+            def open_repository(self, url):
+                return None
+
         mat = re.search('.*', '/git-upload-pack')
-        handler_output = b''.join(get_info_refs(self._req, b'backend', mat))
+        handler_output = b''.join(get_info_refs(self._req, Backend(), mat))
         write_output = self._output.getvalue()
         self.assertEqual((b'001e# service=git-upload-pack\n'
                           b'0000'

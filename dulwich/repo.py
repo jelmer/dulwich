@@ -447,7 +447,9 @@ class BaseRepo(object):
         :return: A graph walker object
         """
         if heads is None:
-            heads = self.refs.as_dict(b'refs/heads').values()
+            heads = [
+                sha for sha in self.refs.as_dict(b'refs/heads').values()
+                if sha in self.object_store]
         return ObjectStoreGraphWalker(
             heads, self.get_parents, shallow=self.get_shallow())
 

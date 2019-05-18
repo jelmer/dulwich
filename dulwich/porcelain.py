@@ -930,7 +930,7 @@ def status(repo=".", ignored=False):
     :param repo: Path to repository or repository object
     :param ignored: Whether to include ignored files in `untracked`
     :return: GitStatus tuple,
-        staged -  dict with lists for each type of staged paths (diff index/HEAD)
+        staged -  dict with lists of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
     """

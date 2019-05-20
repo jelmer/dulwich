@@ -47,3 +47,18 @@ script:
 after_success:
   - python -m coverage combine
   - codecov
+
+deploy:
+  provider: pypi
+  user: dulwich-bot
+  password:
+    secure: e7DTu4CwOCARfN/mwA8lXQ==
+  skip_cleanup: true
+  skip_existing: true
+  file_glob: true
+  file:
+    - dist/dulwich*.whl
+    - dist/dulwich*.tar.gz
+  on:
+    tags: true
+    repo: dulwich/dulwich

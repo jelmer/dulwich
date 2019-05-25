@@ -1,7 +1,7 @@
 environment:
 
-  PYPI_USER: "dulwich-bot"
-  PYPI_PSWD:
+  TWINE_USERNAME: "dulwich-bot"
+  TWINE_PASSWORD:
     # See https://www.appveyor.com/docs/build-configuration/#secure-variables
     secure: e7DTu4CwOCARfN/mwA8lXQ==
 
@@ -88,6 +88,10 @@ after_test:
   # - "python setup.py bdist_wininst"
   - "build.cmd %PYTHON%\\python.exe setup.py bdist_msi"
   - ps: "ls dist"
+
+deploy_script:
+  - if "%APPVEYOR_REPO_TAG%"=="true" pip install twine
+  - if "%APPVEYOR_REPO_TAG%"=="true" twine upload dist\dulwich-*.whl
 
 artifacts:
   - path: dist\*

@@ -52,7 +52,7 @@ deploy:
   provider: pypi
   user: dulwich-bot
   password:
-    secure: e7DTu4CwOCARfN/mwA8lXQ==
+    secure: Q8DDDojBugQWzXvmmEQiU90UkVPk+OYoFZwv1H9LYpQ4u5CfwQNWpf8qXYhlGMdr/gzWaSWsqLvgWLpzfkvqS4Vyk2bO9mr+dSskfD8uwc82LiiL9CNd/NY03CjH9RaFgVMD/+exMjY/yCtlyH1jL4kjgOyNnC+x4B37CliZHcE=
   skip_cleanup: true
   skip_existing: true
   file_glob: true

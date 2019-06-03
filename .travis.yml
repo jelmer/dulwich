@@ -14,6 +14,7 @@ env:
   - PYTHONHASHSEED=random
     TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
     PURE=false
+    PIP=pip
 
 matrix:
   include:
@@ -27,6 +28,9 @@ matrix:
       env: PURE=true
     - python: 2.7
       env: PURE=true
+    - os: osx
+      language: generic
+      env: PIP=pip2
     # flakes checker fails on python 3.8-dev:
     #- python: 3.8-dev
     #  env: TEST_REQUIRE=fastimport
@@ -34,17 +38,22 @@ matrix:
     #  sudo: true
 
 install:
-  - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
+  - travis_retry $PIP install -U pip coverage codecov flake8 $TEST_REQUIRE
 
 script:
+  - $PIP install cibuildwheel
   - if [ $PURE = false ]; then python setup.py build_ext -i; fi
   - python -m coverage run -p -m unittest dulwich.tests.test_suite
 
   # Style
   - make style
 
-  - if [ $PURE = true ]; then SETUP_ARGS=--pure; fi
-  - python setup.py $SETUP_ARGS bdist_wheel
+  - |
+    if [ $PURE = true ]; then
+      python setup.py --pure bdist_wheel
+    else
+      cibuildwheel --output-dir dist
+    fi
 
 after_success:
   - python -m coverage combine

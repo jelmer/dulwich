@@ -49,6 +49,7 @@ script:
   - make style
 
   - |
+    rm -rf build
     if [ $PURE = true ]; then
       python setup.py --pure bdist_wheel
     else

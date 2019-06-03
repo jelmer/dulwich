@@ -13,6 +13,7 @@ python:
 env:
   - PYTHONHASHSEED=random
     TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+    PURE=false
 
 matrix:
   include:
@@ -22,6 +23,10 @@ matrix:
       env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
+    - python: 3.6
+      env: PURE=true
+    - python: 2.7
+      env: PURE=true
     # flakes checker fails on python 3.8-dev:
     #- python: 3.8-dev
     #  env: TEST_REQUIRE=fastimport
@@ -32,17 +37,14 @@ install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
 
 script:
-  # Test without c extensions
-  - python -m coverage run -p -m unittest dulwich.tests.test_suite
-
-  # Test with c extensions
-  - python setup.py build_ext -i
+  - if [ $PURE = false ]; then python setup.py build_ext -i; fi
   - python -m coverage run -p -m unittest dulwich.tests.test_suite
 
   # Style
   - make style
 
-  - python setup.py bdist_wheel
+  - if [ $PURE = true ]; then SETUP_ARGS=--pure; fi
+  - python setup.py $SETUP_ARGS bdist_wheel
 
 after_success:
   - python -m coverage combine

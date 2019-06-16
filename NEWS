@@ -12,6 +12,9 @@
 
  * Return a 404 not found error when repository is not found.
 
+ * Mark ``.git`` directories as hidden on Windows.
+   (Martin Packman, #585)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

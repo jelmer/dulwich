@@ -243,6 +243,28 @@ def serialize_graftpoints(graftpoints):
     return b'\n'.join(graft_lines)
 
 
+def _set_filesystem_hidden(path):
+    """Mark path as to be hidden if supported by platform and filesystem.
+
+    On win32 uses SetFileAttributesW api:
+    <https://docs.microsoft.com/windows/desktop/api/fileapi/nf-fileapi-setfileattributesw>
+    """
+    if sys.platform == 'win32':
+        import ctypes
+        from ctypes.wintypes import BOOL, DWORD, LPCWSTR
+
+        FILE_ATTRIBUTE_HIDDEN = 2
+        SetFileAttributesW = ctypes.WINFUNCTYPE(BOOL, LPCWSTR, DWORD)(
+            ("SetFileAttributesW", ctypes.windll.kernel32))
+
+        if isinstance(path, bytes):
+            path = path.decode(sys.getfilesystemencoding())
+        if not SetFileAttributesW(path, FILE_ATTRIBUTE_HIDDEN):
+            pass  # Could raise or log `ctypes.WinError()` here
+
+    # Could implement other platform specific filesytem hiding here
+
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -1234,6 +1256,7 @@ class Repo(BaseRepo):
             os.mkdir(path)
         controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
+        _set_filesystem_hidden(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)
 

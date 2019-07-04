@@ -158,6 +158,9 @@ class RefsContainer(object):
         """All refs present in this container."""
         raise NotImplementedError(self.allkeys)
 
+    def __iter__(self):
+        return iter(self.allkeys())
+
     def keys(self, base=None):
         """Refs present in this container.
 

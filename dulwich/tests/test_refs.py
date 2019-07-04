@@ -185,6 +185,11 @@ class RefsContainerTests(object):
         self.assertEqual([b'refs-0.1', b'refs-0.2'],
                          sorted(self._refs.keys(b'refs/tags')))
 
+    def test_iter(self):
+        actual_keys = set(self._refs.keys())
+        self.assertEqual(set(self._refs), actual_keys)
+        self.assertEqual(set(_TEST_REFS.keys()), actual_keys)
+
     def test_as_dict(self):
         # refs/heads/loop does not show up even if it exists
         expected_refs = dict(_TEST_REFS)

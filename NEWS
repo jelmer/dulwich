@@ -15,6 +15,9 @@
  * Mark ``.git`` directories as hidden on Windows.
    (Martin Packman, #585)
 
+ * Implement ``RefsContainer.__iter__``
+   (Jelmer Vernooĳ, #717)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

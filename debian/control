@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: https://www.dulwich.io/
-Build-Depends: debhelper (>= 11),
+Build-Depends: debhelper-compat (= 11),
                dh-python,
                git (>= 1:1.7.0.4-2) [!alpha !ppc64 !sparc64 !x32 !ia64],
                pypy-dev [alpha amd64 arm64 armel armhf i386 mips powerpc ppc64el s390x],

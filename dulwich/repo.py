@@ -994,7 +994,10 @@ class Repo(BaseRepo):
             f.write('')
 
         st1 = os.lstat(fname)
-        os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        try:
+            os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        except PermissionError:
+            return False
         st2 = os.lstat(fname)
 
         os.unlink(fname)

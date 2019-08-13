@@ -8,6 +8,9 @@ dulwich (0.19.12-1) UNRELEASED; urgency=medium
   [ Ondřej Nový ]
   * Use debhelper-compat instead of debian/compat.
 
+  [ Jelmer Vernooĳ ]
+  * Bump debhelper from old 11 to 12.
+
  -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 13 Aug 2019 19:44:44 +0000
 
 dulwich (0.19.11-2) unstable; urgency=medium

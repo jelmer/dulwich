@@ -604,6 +604,31 @@ def read_submodule_head(path):
         return None
 
 
+def _has_directory_changed(tree_path, entry):
+    """Check if a directory has changed after getting an error.
+
+    When handling an error trying to create a blob from a path, call this
+    function. It will check if the path is a directory. If it's a directory
+    and a submodule, check the submodule head to see if it's has changed. If
+    not, consider the file as changed as Git tracked a file and not a
+    directory.
+
+    Return true if the given path should be considered as changed and False
+    otherwise or if the path is not a directory.
+    """
+    # This is actually a directory
+    if os.path.exists(os.path.join(tree_path, b'.git')):
+        # Submodule
+        head = read_submodule_head(tree_path)
+        if entry.sha != head:
+            return True
+    else:
+        # The file was changed to a directory, so consider it removed.
+        return True
+
+    return False
+
+
 def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     """Walk through an index and check for differences against working tree.
 
@@ -618,30 +643,23 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
         try:
-            blob = blob_from_path_and_stat(
-                full_path, os.lstat(full_path)
-            )
+            st = os.lstat(full_path)
+            if stat.S_ISDIR(st.st_mode):
+                if _has_directory_changed(tree_path, entry):
+                    yield tree_path
+                continue
+
+            blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
-            # The file was removed, so we assume that counts as
-            # different from whatever file used to exist.
-            yield tree_path
-        except IOError as e:
-            if e.errno != errno.EISDIR:
-                raise
-            # This is actually a directory
-            if os.path.exists(os.path.join(tree_path, '.git')):
-                # Submodule
-                head = read_submodule_head(tree_path)
-                if entry.sha != head:
-                    yield tree_path
-            else:
-                # The file was changed to a directory, so consider it removed.
+        except EnvironmentError as e:
+            if e.errno == errno.ENOENT:
+                # The file was removed, so we assume that counts as
+                # different from whatever file used to exist.
                 yield tree_path
+            else:
+                raise
         else:
             if blob.id != entry.sha:
                 yield tree_path
@@ -697,28 +715,23 @@ def index_entry_from_path(path, object_store=None):
     :param path: Path to create an index entry for
     :param object_store: Optional object store to
         save new blobs in
-    :return: An index entry
+    :return: An index entry; None for directories
     """
     assert isinstance(path, bytes)
-    try:
-        st = os.lstat(path)
-        blob = blob_from_path_and_stat(path, st)
-    except EnvironmentError as e:
-        if e.errno == errno.EISDIR:
-            if os.path.exists(os.path.join(path, b'.git')):
-                head = read_submodule_head(path)
-                if head is None:
-                    return None
-                return index_entry_from_stat(
-                    st, head, 0, mode=S_IFGITLINK)
-            else:
-                raise
-        else:
-            raise
-    else:
-        if object_store is not None:
-            object_store.add_object(blob)
-        return index_entry_from_stat(st, blob.id, 0)
+    st = os.lstat(path)
+    if stat.S_ISDIR(st.st_mode):
+        if os.path.exists(os.path.join(path, b'.git')):
+            head = read_submodule_head(path)
+            if head is None:
+                return None
+            return index_entry_from_stat(
+                st, head, 0, mode=S_IFGITLINK)
+        return None
+
+    blob = blob_from_path_and_stat(path, st)
+    if object_store is not None:
+        object_store.add_object(blob)
+    return index_entry_from_stat(st, blob.id, 0)
 
 
 def iter_fresh_entries(paths, root_path, object_store=None):

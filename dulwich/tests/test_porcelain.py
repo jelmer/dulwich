@@ -25,6 +25,7 @@ try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+import errno
 import os
 import shutil
 import tarfile
@@ -51,6 +52,21 @@ from dulwich.tests.utils import (
     make_commit,
     make_object,
     )
+from dulwich.tests.compat.utils import (
+    run_git_or_fail,
+    )
+
+
+def flat_walk_dir(dir_to_walk):
+    for dirpath, _, filenames in os.walk(dir_to_walk):
+        rel_dirpath = os.path.relpath(dirpath, dir_to_walk)
+        if not dirpath == dir_to_walk:
+            yield rel_dirpath
+        for filename in filenames:
+            if dirpath == dir_to_walk:
+                yield filename
+            else:
+                yield os.path.join(rel_dirpath, filename)
 
 
 class PorcelainTestCase(TestCase):
@@ -59,7 +75,8 @@ class PorcelainTestCase(TestCase):
         super(PorcelainTestCase, self).setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
-        self.repo = Repo.init(os.path.join(self.test_dir, 'repo'), mkdir=True)
+        self.repo_path = os.path.join(self.test_dir, 'repo')
+        self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
 
@@ -114,6 +131,105 @@ class CommitTests(PorcelainTestCase):
                 committer="Bob <bob@example.com>")
         self.assertTrue(isinstance(sha, bytes))
         self.assertEqual(len(sha), 40)
+
+
+class CleanTests(PorcelainTestCase):
+
+    def put_files(self, tracked, ignored, untracked, empty_dirs):
+        """Put the described files in the wd
+        """
+        all_files = tracked | ignored | untracked
+        for file_path in all_files:
+            abs_path = os.path.join(self.repo.path, file_path)
+            # File may need to be written in a dir that doesn't exist yet, so
+            # create the parent dir(s) as necessary
+            parent_dir = os.path.dirname(abs_path)
+            try:
+                os.makedirs(parent_dir)
+            except OSError as err:
+                if not err.errno == errno.EEXIST:
+                    raise err
+            with open(abs_path, 'w') as f:
+                f.write('')
+
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.writelines(ignored)
+
+        for dir_path in empty_dirs:
+            os.mkdir(os.path.join(self.repo.path, 'empty_dir'))
+
+        files_to_add = [os.path.join(self.repo.path, t) for t in tracked]
+        porcelain.add(repo=self.repo.path, paths=files_to_add)
+        porcelain.commit(repo=self.repo.path, message="init commit")
+
+    def assert_wd(self, expected_paths):
+        """Assert paths of files and dirs in wd are same as expected_paths
+        """
+        control_dir_rel = os.path.relpath(
+            self.repo._controldir, self.repo.path)
+
+        # normalize paths to simplify comparison across platforms
+        found_paths = {
+            os.path.normpath(p)
+            for p in flat_walk_dir(self.repo.path)
+            if not p.split(os.sep)[0] == control_dir_rel}
+        norm_expected_paths = {os.path.normpath(p) for p in expected_paths}
+        self.assertEqual(found_paths, norm_expected_paths)
+
+    def test_from_root(self):
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+
+        porcelain.clean(repo=self.repo.path, target_dir=self.repo.path)
+
+        self.assert_wd({
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+            'ignored_file',
+            'tracked_dir'})
+
+    def test_from_subdir(self):
+        self.put_files(
+            tracked={
+                'tracked_file',
+                'tracked_dir/tracked_file',
+                '.gitignore'},
+            ignored={
+                'ignored_file'},
+            untracked={
+                'untracked_file',
+                'tracked_dir/untracked_dir/untracked_file',
+                'untracked_dir/untracked_dir/untracked_file'},
+            empty_dirs={
+                'empty_dir'})
+
+        porcelain.clean(
+            repo=self.repo,
+            target_dir=os.path.join(self.repo.path, 'untracked_dir'))
+
+        self.assert_wd({
+            'tracked_file',
+            'tracked_dir/tracked_file',
+            '.gitignore',
+            'ignored_file',
+            'untracked_file',
+            'tracked_dir/untracked_dir/untracked_file',
+            'empty_dir',
+            'untracked_dir',
+            'tracked_dir',
+            'tracked_dir/untracked_dir'})
 
 
 class CloneTests(PorcelainTestCase):
@@ -456,9 +572,46 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
 
 Test message.
 
-diff --git /dev/null b/somename
-new mode 100644
-index 0000000..ea5c7bf 100644
+diff --git a/somename b/somename
+new file mode 100644
+index 0000000..ea5c7bf
+--- /dev/null
++++ b/somename
+@@ -0,0 +1 @@
++The Foo
+""")
+
+    def test_tag(self):
+        a = Blob.from_string(b"The Foo\n")
+        ta = Tree()
+        ta.add(b"somename", 0o100644, a.id)
+        ca = make_commit(tree=ta.id)
+        self.repo.object_store.add_objects([(a, None), (ta, None), (ca, None)])
+        porcelain.tag_create(
+            self.repo.path, b"tryme", b'foo <foo@bar.com>', b'bar',
+            annotated=True, objectish=ca.id, tag_time=1552854211,
+            tag_timezone=0)
+        outstream = StringIO()
+        porcelain.show(self.repo, objects=[b'refs/tags/tryme'],
+                       outstream=outstream)
+        self.maxDiff = None
+        self.assertMultiLineEqual(outstream.getvalue(), """\
+Tagger: foo <foo@bar.com>
+Date:   Sun Mar 17 2019 20:23:31 +0000
+
+bar
+
+--------------------------------------------------
+commit: 344da06c1bb85901270b3e8875c988a027ec087d
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Test message.
+
+diff --git a/somename b/somename
+new file mode 100644
+index 0000000..ea5c7bf
 --- /dev/null
 +++ b/somename
 @@ -0,0 +1 @@
@@ -552,6 +705,81 @@ class DiffTreeTests(PorcelainTestCase):
         porcelain.diff_tree(self.repo.path, c2.tree, c3.tree,
                             outstream=outstream)
         self.assertEqual(outstream.getvalue(), b"")
+
+    def test_diff_apply(self):
+        # Prepare the repository
+
+        # Create some files and commit them
+        file_list = ["to_exists", "to_modify", "to_delete"]
+        for file in file_list:
+            file_path = os.path.join(self.repo_path, file)
+
+            # Touch the files
+            with open(file_path, "w"):
+                pass
+
+        self.repo.stage(file_list)
+
+        first_commit = self.repo.do_commit(b"The first commit")
+
+        # Make a copy of the repository so we can apply the diff later
+        copy_path = os.path.join(self.test_dir, "copy")
+        shutil.copytree(self.repo_path, copy_path)
+
+        # Do some changes
+        with open(os.path.join(self.repo_path, "to_modify"), "w") as f:
+            f.write("Modified!")
+
+        os.remove(os.path.join(self.repo_path, "to_delete"))
+
+        with open(os.path.join(self.repo_path, "to_add"), "w"):
+            pass
+
+        self.repo.stage(["to_modify", "to_delete", "to_add"])
+
+        second_commit = self.repo.do_commit(b"The second commit")
+
+        # Get the patch
+        first_tree = self.repo[first_commit].tree
+        second_tree = self.repo[second_commit].tree
+
+        outstream = BytesIO()
+        porcelain.diff_tree(self.repo.path, first_tree, second_tree,
+                            outstream=outstream)
+
+        # Save it on disk
+        patch_path = os.path.join(self.test_dir, "patch.patch")
+        with open(patch_path, "wb") as patch:
+            patch.write(outstream.getvalue())
+
+        # And try to apply it to the copy directory
+        git_command = ["-C", copy_path, "apply", patch_path]
+        run_git_or_fail(git_command)
+
+        # And now check that the files contents are exactly the same between
+        # the two repositories
+        original_files = set(os.listdir(self.repo_path))
+        new_files = set(os.listdir(copy_path))
+
+        # Check that we have the exact same files in both repositories
+        assert original_files == new_files
+
+        for file in original_files:
+            if file == ".git":
+                continue
+
+            original_file_path = os.path.join(self.repo_path, file)
+            copy_file_path = os.path.join(copy_path, file)
+
+            assert os.path.isfile(copy_file_path)
+
+            with open(original_file_path, "rb") as original_file:
+                original_content = original_file.read()
+
+            with open(copy_file_path, "rb") as copy_file:
+                copy_content = copy_file.read()
+
+            assert original_content == copy_content
 
 
 class CommitTreeTests(PorcelainTestCase):

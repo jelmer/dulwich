@@ -168,9 +168,13 @@ def get_user_identity(config, kind=None):
             email = None
     default_user, default_email = _get_default_identity()
     if user is None:
-        user = default_user.encode('utf-8')
+        user = default_user
+        if not isinstance(user, bytes):
+            user = user.encode('utf-8')
     if email is None:
-        email = default_email.encode('utf-8')
+        email = default_email
+        if not isinstance(email, bytes):
+            email = email.encode('utf-8')
     return (user + b" <" + email + b">")
 
 
@@ -237,6 +241,28 @@ def serialize_graftpoints(graftpoints):
         else:
             graft_lines.append(commit)
     return b'\n'.join(graft_lines)
+
+
+def _set_filesystem_hidden(path):
+    """Mark path as to be hidden if supported by platform and filesystem.
+
+    On win32 uses SetFileAttributesW api:
+    <https://docs.microsoft.com/windows/desktop/api/fileapi/nf-fileapi-setfileattributesw>
+    """
+    if sys.platform == 'win32':
+        import ctypes
+        from ctypes.wintypes import BOOL, DWORD, LPCWSTR
+
+        FILE_ATTRIBUTE_HIDDEN = 2
+        SetFileAttributesW = ctypes.WINFUNCTYPE(BOOL, LPCWSTR, DWORD)(
+            ("SetFileAttributesW", ctypes.windll.kernel32))
+
+        if isinstance(path, bytes):
+            path = path.decode(sys.getfilesystemencoding())
+        if not SetFileAttributesW(path, FILE_ATTRIBUTE_HIDDEN):
+            pass  # Could raise or log `ctypes.WinError()` here
+
+    # Could implement other platform specific filesytem hiding here
 
 
 class BaseRepo(object):
@@ -443,7 +469,9 @@ class BaseRepo(object):
         :return: A graph walker object
         """
         if heads is None:
-            heads = self.refs.as_dict(b'refs/heads').values()
+            heads = [
+                sha for sha in self.refs.as_dict(b'refs/heads').values()
+                if sha in self.object_store]
         return ObjectStoreGraphWalker(
             heads, self.get_parents, shallow=self.get_shallow())
 
@@ -966,7 +994,10 @@ class Repo(BaseRepo):
             f.write('')
 
         st1 = os.lstat(fname)
-        os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        try:
+            os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
+        except PermissionError:
+            return False
         st2 = os.lstat(fname)
 
         os.unlink(fname)
@@ -1228,6 +1259,7 @@ class Repo(BaseRepo):
             os.mkdir(path)
         controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
+        _set_filesystem_hidden(controldir)
         cls._init_maybe_bare(controldir, False)
         return cls(path)
 
@@ -1355,7 +1387,7 @@ class MemoryRepo(BaseRepo):
         except KeyError:
             pass
 
-    def get_named_file(self, path):
+    def get_named_file(self, path, basedir=None):
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to

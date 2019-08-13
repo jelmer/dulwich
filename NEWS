@@ -1,3 +1,26 @@
+0.19.12	2019-08-13
+
+ BUG FIXES
+
+ * Update directory detection for `get_unstaged_changes` for Python 3.
+   (Boris Feld, #684)
+
+ * Add a basic ``porcelain.clean``. (Lane Barlow, #398)
+
+ * Fix output format of ``porcelain.diff`` to match that of
+   C Git. (Boris Feld)
+
+ * Return a 404 not found error when repository is not found.
+
+ * Mark ``.git`` directories as hidden on Windows.
+   (Martin Packman, #585)
+
+ * Implement ``RefsContainer.__iter__``
+   (Jelmer Vernooĳ, #717)
+
+ * Don't trust modes if they can't be modified after a file has been created.
+   (Jelmer Vernooĳ, #719)
+
 0.19.11	2019-02-07
 
  IMPROVEMENTS

@@ -1,5 +1,10 @@
 environment:
 
+  TWINE_USERNAME: "dulwich-bot"
+  TWINE_PASSWORD:
+    # See https://www.appveyor.com/docs/build-configuration/#secure-variables
+    secure: e7DTu4CwOCARfN/mwA8lXQ==
+
   matrix:
 
     - PYTHON: "C:\\Python27"
@@ -9,15 +14,6 @@ environment:
     - PYTHON: "C:\\Python27-x64"
       PYTHON_VERSION: "2.7.x"
       PYTHON_ARCH: "64"
-
-    - PYTHON: "C:\\Python34"
-      PYTHON_VERSION: "3.4.x"
-      PYTHON_ARCH: "32"
-
-    - PYTHON: "C:\\Python34-x64"
-      PYTHON_VERSION: "3.4.x"
-      PYTHON_ARCH: "64"
-      DISTUTILS_USE_SDK: "1"
 
     - PYTHON: "C:\\Python35"
       PYTHON_VERSION: "3.5.x"
@@ -83,6 +79,10 @@ after_test:
   # - "python setup.py bdist_wininst"
   - "build.cmd %PYTHON%\\python.exe setup.py bdist_msi"
   - ps: "ls dist"
+
+deploy_script:
+  - if "%APPVEYOR_REPO_TAG%"=="true" pip install twine
+  - if "%APPVEYOR_REPO_TAG%"=="true" twine upload dist\dulwich-*.whl
 
 artifacts:
   - path: dist\*

@@ -615,12 +615,13 @@ class DiskObjectStore(PackBasedObjectStore):
         os.remove(self._get_shafile_path(sha))
 
     def _remove_pack(self, pack):
-        os.remove(pack.data.path)
-        os.remove(pack.index.path)
         try:
             del self._pack_cache[os.path.basename(pack._basename)]
         except KeyError:
             pass
+        pack.close()
+        os.remove(pack.data.path)
+        os.remove(pack.index.path)
 
     def _get_pack_basepath(self, entries):
         suffix = iter_sha1(entry[0] for entry in entries)
@@ -726,8 +727,10 @@ class DiskObjectStore(PackBasedObjectStore):
         with PackData(path) as p:
             entries = p.sorted_entries()
             basename = self._get_pack_basepath(entries)
-            with GitFile(basename+".idx", "wb") as f:
-                write_pack_index_v2(f, entries, p.get_stored_checksum())
+            index_name = basename + ".idx"
+            if not os.path.exists(index_name):
+                with GitFile(index_name, "wb") as f:
+                    write_pack_index_v2(f, entries, p.get_stored_checksum())
         for pack in self.packs:
             if pack._basename == basename:
                 return pack
@@ -996,9 +999,14 @@ class ObjectStoreIterator(ObjectIterator):
         return len(list(self.itershas()))
 
     def empty(self):
-        iter = self.itershas()
+        import warnings
+        warnings.warn('Use bool() instead.', DeprecationWarning)
+        return self._empty()
+
+    def _empty(self):
+        it = self.itershas()
         try:
-            iter()
+            next(it)
         except StopIteration:
             return True
         else:
@@ -1006,7 +1014,7 @@ class ObjectStoreIterator(ObjectIterator):
 
     def __bool__(self):
         """Indicate whether this object has contents."""
-        return not self.empty()
+        return not self._empty()
 
 
 def tree_lookup_path(lookup_obj, root_sha, path):
@@ -1318,22 +1326,19 @@ class OverlayObjectStore(BaseObjectStore):
                 return b.get_raw(sha_id)
             except KeyError:
                 pass
-        else:
-            raise KeyError(sha_id)
+        raise KeyError(sha_id)
 
     def contains_packed(self, sha):
         for b in self.bases:
             if b.contains_packed(sha):
                 return True
-        else:
-            return False
+        return False
 
     def contains_loose(self, sha):
         for b in self.bases:
             if b.contains_loose(sha):
                 return True
-        else:
-            return False
+        return False
 
 
 def read_packs_file(f):

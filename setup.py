@@ -15,7 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.19.11'
+dulwich_version_string = '0.19.12'
 
 include_dirs = []
 # Windows MSVC support
@@ -77,10 +77,10 @@ setup_kwargs = {}
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.23'],
+        'https': ['urllib3[secure]>=1.24.1'],
         'pgp': ['gpg'],
         }
-    setup_kwargs['install_requires'] = ['urllib3>=1.23', 'certifi']
+    setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require

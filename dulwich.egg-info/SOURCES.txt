@@ -128,6 +128,7 @@ dulwich/tests/compat/__init__.py
 dulwich/tests/compat/server_utils.py
 dulwich/tests/compat/test_client.py
 dulwich/tests/compat/test_pack.py
+dulwich/tests/compat/test_patch.py
 dulwich/tests/compat/test_repository.py
 dulwich/tests/compat/test_server.py
 dulwich/tests/compat/test_utils.py

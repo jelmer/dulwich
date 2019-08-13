@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.19.11
+Version: 0.19.12
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -82,11 +82,8 @@ Description: .. image:: https://travis-ci.org/dulwich/dulwich.png?branch=master
         Further documentation
         ---------------------
         
-        The dulwich documentation can be found in docs/ and
-        `on the web <https://www.dulwich.io/docs/>`_.
-        
-        The API reference can be generated using pydoctor, by running "make pydoctor",
-        or `on the web <https://www.dulwich.io/apidocs>`_.
+        The dulwich documentation can be found in docs/ and built by running ``make
+        doc``. It can also be found `on the web <https://www.dulwich.io/docs/>`_.
         
         Help
         ----
@@ -107,7 +104,8 @@ Description: .. image:: https://travis-ci.org/dulwich/dulwich.png?branch=master
         Supported versions of Python
         ----------------------------
         
-        At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5, 3.6 and Pypy.
+        At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5, 3.6,
+        3.7 and Pypy.
         
 Keywords: git vcs
 Platform: UNKNOWN

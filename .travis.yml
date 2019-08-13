@@ -8,12 +8,12 @@ python:
   - 3.4
   - 3.5
   - 3.6
-  - 3.6-dev
   - pypy3.5
 
 env:
   - PYTHONHASHSEED=random
     TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+    PURE=false
 
 matrix:
   include:
@@ -23,6 +23,10 @@ matrix:
       env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
+    - python: 3.6
+      env: PURE=true
+    - python: 2.7
+      env: PURE=true
     # flakes checker fails on python 3.8-dev:
     #- python: 3.8-dev
     #  env: TEST_REQUIRE=fastimport
@@ -33,16 +37,30 @@ install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
 
 script:
-  # Test without c extensions
-  - python -m coverage run -p -m unittest dulwich.tests.test_suite
-
-  # Test with c extensions
-  - python setup.py build_ext -i
+  - if [ $PURE = false ]; then python setup.py build_ext -i; fi
   - python -m coverage run -p -m unittest dulwich.tests.test_suite
 
   # Style
   - make style
 
+  - if [ $PURE = true ]; then SETUP_ARGS=--pure; fi
+  - python setup.py $SETUP_ARGS bdist_wheel
+
 after_success:
   - python -m coverage combine
   - codecov
+
+deploy:
+  provider: pypi
+  user: dulwich-bot
+  password:
+    secure: Q8DDDojBugQWzXvmmEQiU90UkVPk+OYoFZwv1H9LYpQ4u5CfwQNWpf8qXYhlGMdr/gzWaSWsqLvgWLpzfkvqS4Vyk2bO9mr+dSskfD8uwc82LiiL9CNd/NY03CjH9RaFgVMD/+exMjY/yCtlyH1jL4kjgOyNnC+x4B37CliZHcE=
+  skip_cleanup: true
+  skip_existing: true
+  file_glob: true
+  file:
+    - dist/dulwich*.whl
+    - dist/dulwich*.tar.gz
+  on:
+    tags: true
+    repo: dulwich/dulwich

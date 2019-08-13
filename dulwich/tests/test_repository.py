@@ -266,6 +266,49 @@ class RepositoryRootTests(TestCase):
                 r.get_walker(b'2a72d929692c41d8554c07f6301757ba18a65d91')],
             [b'2a72d929692c41d8554c07f6301757ba18a65d91'])
 
+    def assertFilesystemHidden(self, path):
+        if sys.platform != 'win32':
+            return
+        import ctypes
+        from ctypes.wintypes import DWORD, LPCWSTR
+        GetFileAttributesW = ctypes.WINFUNCTYPE(DWORD, LPCWSTR)(
+            ('GetFileAttributesW', ctypes.windll.kernel32))
+        self.assertTrue(2 & GetFileAttributesW(path))
+
+    def test_init_existing(self):
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        t = Repo.init(tmp_dir)
+        self.addCleanup(t.close)
+        self.assertEqual(os.listdir(tmp_dir), ['.git'])
+        self.assertFilesystemHidden(os.path.join(tmp_dir, '.git'))
+
+    def test_init_mkdir(self):
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_dir = os.path.join(tmp_dir, 'a-repo')
+
+        t = Repo.init(repo_dir, mkdir=True)
+        self.addCleanup(t.close)
+        self.assertEqual(os.listdir(repo_dir), ['.git'])
+        self.assertFilesystemHidden(os.path.join(repo_dir, '.git'))
+
+    def test_init_mkdir_unicode(self):
+        repo_name = u'\xa7'
+        try:
+            repo_name.encode(sys.getfilesystemencoding())
+        except UnicodeEncodeError:
+            self.skipTest('filesystem lacks unicode support')
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_dir = os.path.join(tmp_dir, repo_name)
+
+        t = Repo.init(repo_dir, mkdir=True)
+        self.addCleanup(t.close)
+        self.assertEqual(os.listdir(repo_dir), ['.git'])
+        self.assertFilesystemHidden(os.path.join(repo_dir, '.git'))
+
+    @skipIf(sys.platform == 'win32', 'fails on Windows')
     def test_fetch(self):
         r = self.open_repo('a.git')
         tmp_dir = self.mkdtemp()
@@ -279,6 +322,7 @@ class RepositoryRootTests(TestCase):
         self.assertIn(b'28237f4dc30d0d462658d6b937b08a0f0b6ef55a', t)
         self.assertIn(b'b0931cadc54336e78a1d980420e3268903b57a50', t)
 
+    @skipIf(sys.platform == 'win32', 'fails on Windows')
     def test_fetch_ignores_missing_refs(self):
         r = self.open_repo('a.git')
         missing = b'1234566789123456789123567891234657373833'

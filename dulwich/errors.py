@@ -121,24 +121,21 @@ class GitProtocolError(Exception):
 class SendPackError(GitProtocolError):
     """An error occurred during send_pack."""
 
-    def __init__(self, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
-
 
 class UpdateRefsError(GitProtocolError):
     """The server reported errors updating refs."""
 
     def __init__(self, *args, **kwargs):
         self.ref_status = kwargs.pop('ref_status')
-        Exception.__init__(self, *args, **kwargs)
+        super(UpdateRefsError, self).__init__(*args, **kwargs)
 
 
 class HangupException(GitProtocolError):
     """Hangup exception."""
 
     def __init__(self):
-        Exception.__init__(
-            self, "The remote server unexpectedly closed the connection.")
+        super(HangupException, self).__init__(
+            "The remote server unexpectedly closed the connection.")
 
 
 class UnexpectedCommandError(GitProtocolError):
@@ -149,7 +146,8 @@ class UnexpectedCommandError(GitProtocolError):
             command = 'flush-pkt'
         else:
             command = 'command %s' % command
-        GitProtocolError.__init__(self, 'Protocol got unexpected %s' % command)
+        super(UnexpectedCommandError, self).__init__(
+            'Protocol got unexpected %s' % command)
 
 
 class FileFormatException(Exception):
@@ -165,10 +163,7 @@ class ObjectFormatException(FileFormatException):
 
 
 class EmptyFileException(FileFormatException):
-    """Indicates an empty file instead of the object's disk
-       representation.
-
-    """
+    """An unexpectedly empty file was encountered."""
 
 
 class NoIndexPresent(Exception):

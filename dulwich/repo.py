@@ -996,8 +996,10 @@ class Repo(BaseRepo):
         st1 = os.lstat(fname)
         try:
             os.chmod(fname, st1.st_mode ^ stat.S_IXUSR)
-        except PermissionError:
-            return False
+        except EnvironmentError as e:
+            if e.errno == errno.EPERM:
+                return False
+            raise
         st2 = os.lstat(fname)
 
         os.unlink(fname)

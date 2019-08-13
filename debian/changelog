@@ -3,14 +3,12 @@ dulwich (0.19.12-1) UNRELEASED; urgency=medium
   [ Jelmer Vernooĳ ]
   * Depend on at least urllib3 >= 1.24.1, as older versions lack
     HTTPResponse.geturl().
+  * New upstream release.
 
   [ Ondřej Nový ]
   * Use debhelper-compat instead of debian/compat.
 
-  [ Jelmer Vernooĳ ]
-  * New upstream release.
-
- -- Jelmer Vernooĳ <bla>  Tue, 13 Aug 2019 19:44:44 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 13 Aug 2019 19:44:44 +0000
 
 dulwich (0.19.11-2) unstable; urgency=medium
 

@@ -762,7 +762,7 @@ class DiffTreeTests(PorcelainTestCase):
         new_files = set(os.listdir(copy_path))
 
         # Check that we have the exact same files in both repositories
-        assert original_files == new_files
+        self.assertEqual(original_files, new_files)
 
         for file in original_files:
             if file == ".git":
@@ -771,7 +771,7 @@ class DiffTreeTests(PorcelainTestCase):
             original_file_path = os.path.join(self.repo_path, file)
             copy_file_path = os.path.join(copy_path, file)
 
-            assert os.path.isfile(copy_file_path)
+            self.assertTrue(os.path.isfile(copy_file_path))
 
             with open(original_file_path, "rb") as original_file:
                 original_content = original_file.read()
@@ -779,7 +779,7 @@ class DiffTreeTests(PorcelainTestCase):
             with open(copy_file_path, "rb") as copy_file:
                 copy_content = copy_file.read()
 
-            assert original_content == copy_content
+            self.assertEqual(original_content, copy_content)
 
 
 class CommitTreeTests(PorcelainTestCase):

@@ -52,9 +52,6 @@ from dulwich.tests.utils import (
     make_commit,
     make_object,
     )
-from dulwich.tests.compat.utils import (
-    run_git_or_fail,
-    )
 
 
 def flat_walk_dir(dir_to_walk):
@@ -705,81 +702,6 @@ class DiffTreeTests(PorcelainTestCase):
         porcelain.diff_tree(self.repo.path, c2.tree, c3.tree,
                             outstream=outstream)
         self.assertEqual(outstream.getvalue(), b"")
-
-    def test_diff_apply(self):
-        # Prepare the repository
-
-        # Create some files and commit them
-        file_list = ["to_exists", "to_modify", "to_delete"]
-        for file in file_list:
-            file_path = os.path.join(self.repo_path, file)
-
-            # Touch the files
-            with open(file_path, "w"):
-                pass
-
-        self.repo.stage(file_list)
-
-        first_commit = self.repo.do_commit(b"The first commit")
-
-        # Make a copy of the repository so we can apply the diff later
-        copy_path = os.path.join(self.test_dir, "copy")
-        shutil.copytree(self.repo_path, copy_path)
-
-        # Do some changes
-        with open(os.path.join(self.repo_path, "to_modify"), "w") as f:
-            f.write("Modified!")
-
-        os.remove(os.path.join(self.repo_path, "to_delete"))
-
-        with open(os.path.join(self.repo_path, "to_add"), "w"):
-            pass
-
-        self.repo.stage(["to_modify", "to_delete", "to_add"])
-
-        second_commit = self.repo.do_commit(b"The second commit")
-
-        # Get the patch
-        first_tree = self.repo[first_commit].tree
-        second_tree = self.repo[second_commit].tree
-
-        outstream = BytesIO()
-        porcelain.diff_tree(self.repo.path, first_tree, second_tree,
-                            outstream=outstream)
-
-        # Save it on disk
-        patch_path = os.path.join(self.test_dir, "patch.patch")
-        with open(patch_path, "wb") as patch:
-            patch.write(outstream.getvalue())
-
-        # And try to apply it to the copy directory
-        git_command = ["-C", copy_path, "apply", patch_path]
-        run_git_or_fail(git_command)
-
-        # And now check that the files contents are exactly the same between
-        # the two repositories
-        original_files = set(os.listdir(self.repo_path))
-        new_files = set(os.listdir(copy_path))
-
-        # Check that we have the exact same files in both repositories
-        self.assertEqual(original_files, new_files)
-
-        for file in original_files:
-            if file == ".git":
-                continue
-
-            original_file_path = os.path.join(self.repo_path, file)
-            copy_file_path = os.path.join(copy_path, file)
-
-            self.assertTrue(os.path.isfile(copy_file_path))
-
-            with open(original_file_path, "rb") as original_file:
-                original_content = original_file.read()
-
-            with open(copy_file_path, "rb") as copy_file:
-                copy_content = copy_file.read()
-
-            self.assertEqual(original_content, copy_content)
 
 
 class CommitTreeTests(PorcelainTestCase):

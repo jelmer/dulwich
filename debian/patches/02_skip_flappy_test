@@ -1,7 +1,9 @@
 === modified file 'dulwich/tests/test_porcelain.py'
---- old/dulwich/tests/test_porcelain.py	2018-11-05 19:27:24 +0000
-+++ new/dulwich/tests/test_porcelain.py	2018-11-20 04:03:18 +0000
-@@ -693,6 +693,9 @@
+Index: dulwich/dulwich/tests/test_porcelain.py
+===================================================================
+--- dulwich.orig/dulwich/tests/test_porcelain.py
++++ dulwich/dulwich/tests/test_porcelain.py
+@@ -941,6 +941,9 @@ class PushTests(PorcelainTestCase):
          clone the remote, commit a file to the clone, then push the changes
          back to the remote.
          """
@@ -11,4 +13,3 @@
          outstream = BytesIO()
          errstream = BytesIO()
  
-

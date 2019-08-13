@@ -1,7 +1,9 @@
 === modified file 'dulwich/tests/compat/test_client.py'
---- old/dulwich/tests/compat/test_client.py	2018-11-05 19:27:24 +0000
-+++ new/dulwich/tests/compat/test_client.py	2018-11-17 19:32:09 +0000
-@@ -544,6 +544,8 @@
+Index: dulwich/dulwich/tests/compat/test_client.py
+===================================================================
+--- dulwich.orig/dulwich/tests/compat/test_client.py
++++ dulwich/dulwich/tests/compat/test_client.py
+@@ -544,6 +544,8 @@ class DulwichHttpClientTest(CompatTestCa
      min_git_version = (1, 7, 0, 2)
  
      def setUp(self):
@@ -10,11 +12,11 @@
          CompatTestCase.setUp(self)
          DulwichClientTestBase.setUp(self)
          self._httpd = HTTPGitServer(("localhost", 0), self.gitroot)
-
-=== modified file 'dulwich/tests/test_client.py'
---- old/dulwich/tests/test_client.py	2018-11-17 19:26:16 +0000
-+++ new/dulwich/tests/test_client.py	2018-11-17 19:32:27 +0000
-@@ -35,7 +35,8 @@
+Index: dulwich/dulwich/tests/test_client.py
+===================================================================
+--- dulwich.orig/dulwich/tests/test_client.py
++++ dulwich/dulwich/tests/test_client.py
+@@ -35,7 +35,8 @@ try:
  except ImportError:
      import urllib.parse as urlparse
  
@@ -24,7 +26,7 @@
  
  import dulwich
  from dulwich import (
-@@ -550,12 +551,20 @@
+@@ -551,12 +552,20 @@ class TestGetTransportAndPath(TestCase):
          self.assertTrue(isinstance(c, SSHGitClient))
  
      def test_http(self):
@@ -45,7 +47,7 @@
          url = 'https://user:passwd@github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(url)
-@@ -566,6 +575,9 @@
+@@ -567,6 +576,9 @@ class TestGetTransportAndPath(TestCase):
          self.assertEqual('passwd', c._password)
  
      def test_http_auth_with_username(self):
@@ -55,7 +57,7 @@
          url = 'https://github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(
-@@ -577,6 +589,9 @@
+@@ -578,6 +590,9 @@ class TestGetTransportAndPath(TestCase):
          self.assertEqual('blah', c._password)
  
      def test_http_auth_with_username_and_in_url(self):
@@ -65,7 +67,7 @@
          url = 'https://user:passwd@github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(
-@@ -588,6 +603,10 @@
+@@ -589,6 +604,10 @@ class TestGetTransportAndPath(TestCase):
          self.assertEqual('passwd', c._password)
  
      def test_http_no_auth(self):
@@ -76,7 +78,7 @@
          url = 'https://github.com/jelmer/dulwich'
  
          c, path = get_transport_and_path(url)
-@@ -670,6 +689,9 @@
+@@ -671,6 +690,9 @@ class TestGetTransportAndPathFromUrl(Tes
              'prospero://bar/baz')
  
      def test_http(self):
@@ -86,7 +88,7 @@
          url = 'https://github.com/jelmer/dulwich'
          c, path = get_transport_and_path_from_url(url)
          self.assertTrue(isinstance(c, HttpGitClient))
-@@ -677,6 +699,9 @@
+@@ -678,6 +700,9 @@ class TestGetTransportAndPathFromUrl(Tes
          self.assertEqual('/jelmer/dulwich', path)
  
      def test_http_port(self):
@@ -96,7 +98,7 @@
          url = 'https://github.com:9090/jelmer/dulwich'
          c, path = get_transport_and_path_from_url(url)
          self.assertEqual('https://github.com:9090', c.get_url(b'/'))
-@@ -909,6 +934,11 @@
+@@ -910,6 +935,11 @@ class LocalGitClientTests(TestCase):
  
  class HttpGitClientTests(TestCase):
  
@@ -108,7 +110,7 @@
      @staticmethod
      def b64encode(s):
          """Python 2/3 compatible Base64 encoder. Returns string."""
-@@ -1007,12 +1037,18 @@
+@@ -1088,12 +1118,18 @@ class TCPGitClientTests(TestCase):
  
  class DefaultUrllib3ManagerTest(TestCase):
  
@@ -127,4 +129,3 @@
          manager = default_urllib3_manager(config=ConfigDict())
          self.assertNotIsInstance(manager, urllib3.ProxyManager)
  
-

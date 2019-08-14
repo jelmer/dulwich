@@ -1,14 +1,5 @@
-language: python
 sudo: false
 cache: pip
-
-
-python:
-  - 2.7
-  - 3.4
-  - 3.5
-  - 3.6
-  - pypy3.5
 
 env:
   - PYTHONHASHSEED=random
@@ -17,22 +8,35 @@ env:
 
 matrix:
   include:
+    - python: 2.7
+      language: python
+    - python: 3.4
+      language: python
+    - python: 3.5
+      language: python
+    - python: 3.6
+      language: python
+    - python: pypy3.5
+      language: python
     - python: pypy
+      language: python
       env: TEST_REQUIRE=fastimport
     - python: 3.7
       env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
+      language: python
     - python: 3.6
       env: PURE=true
+      language: python
     - python: 2.7
       env: PURE=true
+      language: python
     # flakes checker fails on python 3.8-dev:
     #- python: 3.8-dev
     #  env: TEST_REQUIRE=fastimport
     #  dist: xenial
     #  sudo: true
-  include:
     - sudo: required
       services:
         - docker

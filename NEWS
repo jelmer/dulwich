@@ -1,3 +1,13 @@
+0.19.13	2019-08-19
+
+ BUG FIXES
+
+ * Avoid ``PermissionError``, since it is Python3-specific.
+  (Jelmer Vernooĳ)
+
+ * Fix regression that added a dependency on C git for the
+   test suite. (Jelmer Vernooĳ, #720)
+
 0.19.12	2019-08-13
 
  BUG FIXES

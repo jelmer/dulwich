@@ -882,7 +882,7 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
         c = r.get_config()
         c.set((b"user", ), b"name", b"Jelmer")
-        c.set((b"user", ), b"email", b"jelmer@apache.org")
+        c.set((b"user", ), b"email", b"<jelmer@apache.org>")
         c.write_to_path()
         commit_sha = r.do_commit(b'message')
         self.assertEqual(

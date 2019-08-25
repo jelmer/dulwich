@@ -1,3 +1,7 @@
+0.19.14	UNRELEASED
+
+ * Strip superfluous <> around email. (monnerat)
+
 0.19.13	2019-08-19
 
  BUG FIXES

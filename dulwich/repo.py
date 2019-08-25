@@ -112,6 +112,7 @@ BASE_DIRECTORIES = [
 
 DEFAULT_REF = b'refs/heads/master'
 
+
 class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'"""
 

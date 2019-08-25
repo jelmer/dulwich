@@ -113,8 +113,7 @@ BASE_DIRECTORIES = [
 
 DEFAULT_REF = b'refs/heads/master'
 
-quoted_email_re = re.compile(b"^\s*<\s*(.*)\s*>\s*$")
-
+quoted_email_re = re.compile(br"^\s*<\s*(.*)\s*>\s*$")
 
 
 class InvalidUserIdentity(Exception):

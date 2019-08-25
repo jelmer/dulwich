@@ -34,7 +34,6 @@ import os
 import sys
 import stat
 import time
-import re
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -113,9 +112,6 @@ BASE_DIRECTORIES = [
 
 DEFAULT_REF = b'refs/heads/master'
 
-quoted_email_re = re.compile(br"^\s*<\s*(.*)\s*>\s*$")
-
-
 class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'"""
 
@@ -178,9 +174,8 @@ def get_user_identity(config, kind=None):
         email = default_email
         if not isinstance(email, bytes):
             email = email.encode('utf-8')
-    m = quoted_email_re.match(email)
-    if m:
-        email = m.group(1)
+    if email.startswith(b'<') and email.endswith(b'>'):
+        email = email[1:-1]
     return (user + b" <" + email + b">")
 
 

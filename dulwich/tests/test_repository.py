@@ -882,6 +882,22 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
         c = r.get_config()
         c.set((b"user", ), b"name", b"Jelmer")
+        c.set((b"user", ), b"email", b"jelmer@apache.org")
+        c.write_to_path()
+        commit_sha = r.do_commit(b'message')
+        self.assertEqual(
+            b"Jelmer <jelmer@apache.org>",
+            r[commit_sha].author)
+        self.assertEqual(
+            b"Jelmer <jelmer@apache.org>",
+            r[commit_sha].committer)
+
+    def test_commit_config_identity_strips_than(self):
+        # commit falls back to the users' identity if it wasn't specified,
+        # and strips superfluous <>
+        r = self._repo
+        c = r.get_config()
+        c.set((b"user", ), b"name", b"Jelmer")
         c.set((b"user", ), b"email", b"<jelmer@apache.org>")
         c.write_to_path()
         commit_sha = r.do_commit(b'message')

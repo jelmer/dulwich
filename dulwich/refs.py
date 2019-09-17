@@ -717,8 +717,7 @@ class DiskRefsContainer(RefsContainer):
                 # read again while holding the lock
                 orig_ref = self.read_loose_ref(realname)
                 if orig_ref is None:
-                    orig_ref = self.get_packed_refs().get(
-                            realname, ZERO_SHA)
+                    orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
             except (OSError, IOError):
                 f.abort()
                 raise

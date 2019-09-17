@@ -720,12 +720,12 @@ class DiskRefsContainer(RefsContainer):
                     if orig_ref is None:
                         orig_ref = self.get_packed_refs().get(
                                 realname, ZERO_SHA)
-                    if orig_ref != old_ref:
-                        f.abort()
-                        return False
                 except (OSError, IOError):
                     f.abort()
                     raise
+                if orig_ref != old_ref:
+                    f.abort()
+                    return False
             try:
                 f.write(new_ref + b'\n')
             except (OSError, IOError):

@@ -721,6 +721,9 @@ class DiskRefsContainer(RefsContainer):
             except (OSError, IOError):
                 f.abort()
                 raise
+            if new_ref == orig_ref:
+                f.abort()
+                return False
             if old_ref is not None:
                 if orig_ref != old_ref:
                     f.abort()

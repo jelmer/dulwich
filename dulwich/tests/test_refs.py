@@ -224,6 +224,10 @@ class RefsContainerTests(object):
             b'HEAD', b'42d06bd4b77fed026b154d16493e5deab78f02ec', nines))
         self.assertEqual(nines, self._refs[b'HEAD'])
 
+        # Setting the ref again is a no-op, but will return True.
+        self.assertTrue(self._refs.set_if_equals(b'HEAD', nines, nines))
+        self.assertEqual(nines, self._refs[b'HEAD'])
+
         self.assertTrue(self._refs.set_if_equals(b'refs/heads/master', None,
                                                  nines))
         self.assertEqual(nines, self._refs[b'refs/heads/master'])

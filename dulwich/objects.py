@@ -25,6 +25,7 @@ import binascii
 from io import BytesIO
 from collections import namedtuple
 import os
+import os.path
 import posixpath
 import stat
 import sys
@@ -1072,7 +1073,7 @@ class Tree(ShaFile):
         :param path: Path to lookup
         :return: A tuple of (mode, SHA) of the resulting path.
         """
-        parts = path.split(b'/')
+        parts = path.split(str.encode(os.path.sep))
         sha = self.id
         mode = None
         for p in parts:

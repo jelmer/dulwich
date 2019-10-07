@@ -25,6 +25,7 @@
 from io import BytesIO
 import errno
 import os
+import os.path
 import stat
 import sys
 import tempfile
@@ -1265,7 +1266,7 @@ def commit_tree_changes(object_store, tree, changes):
     nested_changes = {}
     for (path, new_mode, new_sha) in changes:
         try:
-            (dirname, subpath) = path.split(b'/', 1)
+            (dirname, subpath) = path.split(str.encode(os.path.sep), 1)
         except ValueError:
             if new_sha is None:
                 del tree[path]

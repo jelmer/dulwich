@@ -23,6 +23,7 @@
 import collections
 import errno
 import os
+import os.path
 import stat
 import struct
 import sys
@@ -496,7 +497,7 @@ def validate_path_element_ntfs(element):
 
 def validate_path(path, element_validator=validate_path_element_default):
     """Default path validator that just checks for .git/."""
-    parts = path.split(b"/")
+    parts = path.split(str.encode(os.path.sep))
     for p in parts:
         if not element_validator(p):
             return False

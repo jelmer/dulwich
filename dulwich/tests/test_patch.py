@@ -32,6 +32,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     )
 from dulwich.patch import (
+    get_summary,
     git_am_patch_split,
     write_blob_diff,
     write_commit_patch,
@@ -537,3 +538,15 @@ class DiffTests(TestCase):
             b'-same',
             b'+Submodule commit 06d0bdd9e2e20377b3180e4986b14c8549b393e4',
             ], f.getvalue().splitlines())
+
+
+class GetSummaryTests(TestCase):
+
+    def test_simple(self):
+        c = Commit()
+        c.committer = c.author = b"Jelmer <jelmer@samba.org>"
+        c.commit_time = c.author_time = 1271350201
+        c.commit_timezone = c.author_timezone = 0
+        c.message = b"This is the first line\nAnd this is the second line.\n"
+        c.tree = Tree().id
+        self.assertEqual('This-is-the-first-line', get_summary(c))

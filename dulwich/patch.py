@@ -83,7 +83,7 @@ def get_summary(commit):
     :param commit: Commit
     :return: Summary string
     """
-    return commit.message.splitlines()[0].replace(" ", "-")
+    return commit.message.decode(errors='replace').splitlines()[0].replace(" ", "-")
 
 
 #  Unified Diff

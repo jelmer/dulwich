@@ -832,7 +832,6 @@ class TraditionalGitClient(GitClient):
             if not wants:
                 proto.write_pkt_line(None)
                 return FetchPackResult(refs, symrefs, agent)
-            check_wants(wants, refs)
             (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read,
                 depth=depth)
@@ -1652,7 +1651,6 @@ class HttpGitClient(GitClient):
             return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        check_wants(wants, refs)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (new_shallow, new_unshallow) = self._handle_upload_pack_head(

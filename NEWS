@@ -2,6 +2,9 @@
 
  * Strip superfluous <> around email. (monnerat)
 
+ * Stop checking for ref validity client-side. Users can
+   still call check_wants manually. (Jelmer Vernooĳ)
+
 0.19.13	2019-08-19
 
  BUG FIXES

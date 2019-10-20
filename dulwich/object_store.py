@@ -456,7 +456,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError("Invalid object name %r" % name)
+            raise AssertionError("Invalid object name %r" % (name, ))
         for pack in self._iter_cached_packs():
             try:
                 return pack.get_raw(sha)

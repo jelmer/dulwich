@@ -193,20 +193,6 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
-    def test_fetch_pack_sha_not_in_ref(self):
-        self.rin.write(
-            b'008855dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7 HEAD\x00multi_ack '
-            b'thin-pack side-band side-band-64k ofs-delta shallow no-progress '
-            b'include-tag\n'
-            b'0000')
-        self.rin.seek(0)
-        self.assertRaises(
-                InvalidWants, self.client.fetch_pack,
-                b'bla',
-                lambda heads: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
-                None, None,
-                None)
-
     def test_send_pack_no_sideband64k_with_update_ref_error(self):
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data

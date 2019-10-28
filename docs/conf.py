@@ -30,7 +30,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.ifconfig',
     'sphinx.ext.intersphinx',
-    'sphinx_epytext',
+    'sphinx.ext.napoleon',
     ]
 try:
     import rst2pdf
@@ -56,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dulwich'
-copyright = u'2011-2018 Jelmer Vernooĳ'
+copyright = u'2011-2019 Jelmer Vernooĳ'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

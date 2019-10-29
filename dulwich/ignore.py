@@ -102,8 +102,9 @@ def translate(pat):
 def read_ignore_patterns(f):
     """Read a git ignore file.
 
-    :param f: File-like object to read from
-    :return: List of patterns
+    Args:
+      f: File-like object to read from
+    Returns: List of patterns
     """
 
     for line in f:
@@ -128,10 +129,12 @@ def read_ignore_patterns(f):
 def match_pattern(path, pattern, ignorecase=False):
     """Match a gitignore-style pattern against a path.
 
-    :param path: Path to match
-    :param pattern: Pattern to match
-    :param ignorecase: Whether to do case-sensitive matching
-    :return: bool indicating whether the pattern matched
+    Args:
+      path: Path to match
+      pattern: Pattern to match
+      ignorecase: Whether to do case-sensitive matching
+    Returns:
+      bool indicating whether the pattern matched
     """
     return Pattern(pattern, ignorecase).match(path)
 
@@ -172,8 +175,9 @@ class Pattern(object):
     def match(self, path):
         """Try to match a path against this ignore pattern.
 
-        :param path: Path to match (relative to ignore location)
-        :return: boolean
+        Args:
+          path: Path to match (relative to ignore location)
+        Returns: boolean
         """
         return bool(self._re.match(path))
 

@@ -75,12 +75,14 @@ def tar_stream(store, tree, mtime, prefix=b'', format=''):
     pieces (bytestrings). To obtain the complete .tar.gz binary file, simply
     concatenate these chunks.
 
-    :param store: Object store to retrieve objects from
-    :param tree: Tree object for the tree root
-    :param mtime: UNIX timestamp that is assigned as the modification time for
+    Args:
+      store: Object store to retrieve objects from
+      tree: Tree object for the tree root
+      mtime: UNIX timestamp that is assigned as the modification time for
         all files, and the gzip header modification time if format='gz'
-    :param format: Optional compression format for tarball
-    :return: Bytestrings
+      format: Optional compression format for tarball
+    Returns:
+      Bytestrings
     """
     buf = BytesIO()
     with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:

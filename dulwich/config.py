@@ -119,21 +119,27 @@ class Config(object):
     def get(self, section, name):
         """Retrieve the contents of a configuration setting.
 
-        :param section: Tuple with section name and optional subsection namee
-        :param subsection: Subsection name
-        :return: Contents of the setting
-        :raise KeyError: if the value is not set
+        Args:
+          section: Tuple with section name and optional subsection namee
+          subsection: Subsection name
+        Returns:
+          Contents of the setting
+        Raises:
+          KeyError: if the value is not set
         """
         raise NotImplementedError(self.get)
 
     def get_boolean(self, section, name, default=None):
         """Retrieve a configuration setting as boolean.
 
-        :param section: Tuple with section name and optional subsection name
-        :param name: Name of the setting, including section and possible
+        Args:
+          section: Tuple with section name and optional subsection name
+          name: Name of the setting, including section and possible
             subsection.
-        :return: Contents of the setting
-        :raise KeyError: if the value is not set
+        Returns:
+          Contents of the setting
+        Raises:
+          KeyError: if the value is not set
         """
         try:
             value = self.get(section, name)
@@ -148,18 +154,21 @@ class Config(object):
     def set(self, section, name, value):
         """Set a configuration value.
 
-        :param section: Tuple with section name and optional subsection namee
-        :param name: Name of the configuration value, including section
+        Args:
+          section: Tuple with section name and optional subsection namee
+          name: Name of the configuration value, including section
             and optional subsection
-        :param: Value of the setting
+           value: value of the setting
         """
         raise NotImplementedError(self.set)
 
     def iteritems(self, section):
         """Iterate over the configuration pairs for a specific section.
 
-        :param section: Tuple with section name and optional subsection namee
-        :return: Iterator over (name, value) pairs
+        Args:
+          section: Tuple with section name and optional subsection namee
+        Returns:
+          Iterator over (name, value) pairs
         """
         raise NotImplementedError(self.iteritems)
 
@@ -173,8 +182,10 @@ class Config(object):
     def has_section(self, name):
         """Check if a specified section exists.
 
-        :param name: Name of section to check for
-        :return: boolean indicating whether the section exists
+        Args:
+          name: Name of section to check for
+        Returns:
+          boolean indicating whether the section exists
         """
         return (name in self.itersections())
 
@@ -538,8 +549,10 @@ class StackedConfig(Config):
 def parse_submodules(config):
     """Parse a gitmodules GitConfig file, returning submodules.
 
-   :param config: A `ConfigFile`
-   :return: list of tuples (submodule path, url, name),
+   Args:
+     config: A `ConfigFile`
+   Returns:
+     list of tuples (submodule path, url, name),
        where name is quoted part of the section's name.
     """
     for section in config.keys():

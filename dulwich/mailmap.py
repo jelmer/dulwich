@@ -37,8 +37,9 @@ def parse_identity(text):
 def read_mailmap(f):
     """Read a mailmap.
 
-    :param f: File-like object to read from
-    :return: Iterator over
+    Args:
+      f: File-like object to read from
+    Returns: Iterator over
         ((canonical_name, canonical_email), (from_name, from_email)) tuples
     """
     for line in f:
@@ -72,8 +73,9 @@ class Mailmap(object):
         Any of the fields can be None, but at least one of them needs to be
         set.
 
-        :param canonical_identity: The canonical identity (tuple)
-        :param from_identity: The from identity (tuple)
+        Args:
+          canonical_identity: The canonical identity (tuple)
+          from_identity: The from identity (tuple)
         """
         if from_identity is None:
             from_name, from_email = None, None

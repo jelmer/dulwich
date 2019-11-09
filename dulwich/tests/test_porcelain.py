@@ -1795,3 +1795,9 @@ class WriteTreeTests(PorcelainTestCase):
         self.assertEqual(
             b'd2092c8a9f311f0311083bf8d177f2ca0ab5b241',
             porcelain.write_tree(self.repo))
+
+
+class ActiveBranchTests(PorcelainTestCase):
+
+    def test_simple(self):
+        self.assertEqual(b'master', porcelain.active_branch(self.repo))

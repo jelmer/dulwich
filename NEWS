@@ -8,6 +8,9 @@
  * Switch over to Google-style docstrings.
    (Jelmer Vernooĳ)
 
+ * Add a ``dulwich.porcelain.active_branch`` function.
+   (Jelmer Vernooĳ)
+
 0.19.13	2019-08-19
 
  BUG FIXES

@@ -123,6 +123,7 @@ from dulwich.protocol import (
     )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
     strip_peeled_refs,
 )
 from dulwich.repo import (BaseRepo, Repo)
@@ -1113,7 +1114,7 @@ def receive_pack(path=".", inf=None, outf=None):
 def _make_branch_ref(name):
     if getattr(name, 'encode', None):
         name = name.encode(DEFAULT_ENCODING)
-    return b"refs/heads/" + name
+    return LOCAL_BRANCH_PREFIX + name
 
 
 def _make_tag_ref(name):
@@ -1164,7 +1165,25 @@ def branch_list(repo):
     :param repo: Path to the repository
     """
     with open_repo_closing(repo) as r:
-        return r.refs.keys(base=b"refs/heads/")
+        return r.refs.keys(base=LOCAL_BRANCH_PREFIX)
+
+
+def active_branch(repo):
+    """Return the active branch in the repository, if any.
+
+    Args:
+      repo: Repository to open
+    Returns:
+      branch name
+    Raises:
+      KeyError: if the repository does not have a working tree
+      IndexError: if HEAD is floating
+    """
+    with open_repo_closing(repo) as r:
+        active_ref = r.refs.follow(b'HEAD')[0][1]
+        if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
+            raise ValueError(active_ref)
+        return active_ref[len(LOCAL_BRANCH_PREFIX):]
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
@@ -1192,8 +1211,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
                                     depth=depth)
         stripped_refs = strip_peeled_refs(fetch_result.refs)
         branches = {
-            n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
-            if n.startswith(b'refs/heads/')}
+            n[len(LOCAL_BRANCH_PREFIX):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(LOCAL_BRANCH_PREFIX)}
         r.refs.import_refs(
             b'refs/remotes/' + remote_name, branches, message=message,
             prune=prune)

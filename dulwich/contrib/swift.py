@@ -167,8 +167,9 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
 def load_conf(path=None, file=None):
     """Load configuration in global var CONF
 
-    :param path: The path to the configuration file
-    :param file: If provided read instead the file like object
+    Args:
+      path: The path to the configuration file
+      file: If provided read instead the file like object
     """
     conf = ConfigParser()
     if file:
@@ -195,9 +196,10 @@ def load_conf(path=None, file=None):
 def swift_load_pack_index(scon, filename):
     """Read a pack index file from Swift
 
-    :param scon: a `SwiftConnector` instance
-    :param filename: Path to the index file objectise
-    :return: a `PackIndexer` instance
+    Args:
+      scon: a `SwiftConnector` instance
+      filename: Path to the index file objectise
+    Returns: a `PackIndexer` instance
     """
     with scon.get_object(filename) as f:
         return load_pack_index_file(filename, f)
@@ -248,8 +250,9 @@ class SwiftConnector(object):
     def __init__(self, root, conf):
         """ Initialize a SwiftConnector
 
-        :param root: The swift container that will act as Git bare repository
-        :param conf: A ConfigParser Object
+        Args:
+          root: The swift container that will act as Git bare repository
+          conf: A ConfigParser Object
         """
         self.conf = conf
         self.auth_ver = self.conf.get("swift", "auth_ver")
@@ -394,9 +397,10 @@ class SwiftConnector(object):
     def get_object_stat(self, name):
         """Retrieve object stat
 
-        :param name: The object name
-        :return: A dict that describe the object
-                 or None if object does not exist
+        Args:
+          name: The object name
+        Returns:
+          A dict that describe the object or None if object does not exist
         """
         path = self.base_path + '/' + name
         ret = self.httpclient.request('HEAD', path)
@@ -413,9 +417,11 @@ class SwiftConnector(object):
     def put_object(self, name, content):
         """Put an object
 
-        :param name: The object name
-        :param content: A file object
-        :raise: `SwiftException` if unable to create
+        Args:
+          name: The object name
+          content: A file object
+        Raises:
+          SwiftException: if unable to create
         """
         content.seek(0)
         data = content.read()
@@ -442,11 +448,12 @@ class SwiftConnector(object):
     def get_object(self, name, range=None):
         """Retrieve an object
 
-        :param name: The object name
-        :param range: A string range like "0-10" to
-                      retrieve specified bytes in object content
-        :return: A file like instance
-                 or bytestring if range is specified
+        Args:
+          name: The object name
+          range: A string range like "0-10" to
+                 retrieve specified bytes in object content
+        Returns:
+          A file like instance or bytestring if range is specified
         """
         headers = {}
         if range:
@@ -467,8 +474,10 @@ class SwiftConnector(object):
     def del_object(self, name):
         """Delete an object
 
-        :param name: The object name
-        :raise: `SwiftException` if unable to delete
+        Args:
+          name: The object name
+        Raises:
+          SwiftException: if unable to delete
         """
         path = self.base_path + '/' + name
         ret = self.httpclient.request('DELETE', path)
@@ -502,9 +511,10 @@ class SwiftPackReader(object):
     def __init__(self, scon, filename, pack_length):
         """Initialize a SwiftPackReader
 
-        :param scon: a `SwiftConnector` instance
-        :param filename: the pack filename
-        :param pack_length: The size of the pack object
+        Args:
+          scon: a `SwiftConnector` instance
+          filename: the pack filename
+          pack_length: The size of the pack object
         """
         self.scon = scon
         self.filename = filename
@@ -525,8 +535,10 @@ class SwiftPackReader(object):
     def read(self, length):
         """Read a specified amount of Bytes form the pack object
 
-        :param length: amount of bytes to read
-        :return: bytestring
+        Args:
+          length: amount of bytes to read
+        Returns:
+          a bytestring
         """
         end = self.offset+length
         if self.base_offset + end > self.pack_length:
@@ -544,7 +556,8 @@ class SwiftPackReader(object):
     def seek(self, offset):
         """Seek to a specified offset
 
-        :param offset: the offset to seek to
+        Args:
+          offset: the offset to seek to
         """
         self.base_offset = offset
         self._read()
@@ -568,8 +581,9 @@ class SwiftPackData(PackData):
     def __init__(self, scon, filename):
         """ Initialize a SwiftPackReader
 
-        :param scon: a `SwiftConnector` instance
-        :param filename: the pack filename
+        Args:
+          scon: a `SwiftConnector` instance
+          filename: the pack filename
         """
         self.scon = scon
         self._filename = filename
@@ -639,7 +653,8 @@ class SwiftObjectStore(PackBasedObjectStore):
     def __init__(self, scon):
         """Open a Swift object store.
 
-        :param scon: A `SwiftConnector` instance
+        Args:
+          scon: A `SwiftConnector` instance
         """
         super(SwiftObjectStore, self).__init__()
         self.scon = scon
@@ -901,8 +916,9 @@ class SwiftRepo(BaseRepo):
         `SwiftInfoRefsContainer`. The root attribute is the Swift
         container that contain the Git bare repository.
 
-        :param root: The container which contains the bare repo
-        :param conf: A ConfigParser object
+        Args:
+          root: The container which contains the bare repo
+          conf: A ConfigParser object
         """
         self.root = root.lstrip('/')
         self.conf = conf
@@ -929,8 +945,9 @@ class SwiftRepo(BaseRepo):
     def _put_named_file(self, filename, contents):
         """Put an object in a Swift container
 
-        :param filename: the path to the object to put on Swift
-        :param contents: the content as bytestring
+        Args:
+          filename: the path to the object to put on Swift
+          contents: the content as bytestring
         """
         with BytesIO() as f:
             f.write(contents)
@@ -940,9 +957,11 @@ class SwiftRepo(BaseRepo):
     def init_bare(cls, scon, conf):
         """Create a new bare repository.
 
-        :param scon: a `SwiftConnector` instance
-        :param conf: a ConfigParser object
-        :return: a `SwiftRepo` instance
+        Args:
+          scon: a `SwiftConnector` instance
+          conf: a ConfigParser object
+        Returns:
+          a `SwiftRepo` instance
         """
         scon.create_root()
         for obj in [posixpath.join(OBJECTDIR, PACKDIR),

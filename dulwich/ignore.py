@@ -197,8 +197,10 @@ class IgnoreFilter(object):
     def find_matching(self, path):
         """Yield all matching patterns for path.
 
-        :param path: Path to match
-        :return: Iterator over  iterators
+        Args:
+          path: Path to match
+        Returns:
+          Iterator over  iterators
         """
         if not isinstance(path, bytes):
             path = path.encode(sys.getfilesystemencoding())
@@ -242,9 +244,11 @@ class IgnoreFilterStack(object):
     def is_ignored(self, path):
         """Check whether a path is explicitly included or excluded in ignores.
 
-        :param path: Path to check
-        :return: None if the file is not mentioned, True if it is included,
-            False if it is explicitly excluded.
+        Args:
+          path: Path to check
+        Returns:
+          None if the file is not mentioned, True if it is included,
+          False if it is explicitly excluded.
         """
         status = None
         for filter in self._filters:
@@ -257,8 +261,10 @@ class IgnoreFilterStack(object):
 def default_user_ignore_filter_path(config):
     """Return default user ignore filter path.
 
-    :param config: A Config object
-    :return: Path to a global ignore file
+    Args:
+      config: A Config object
+    Returns:
+      Path to a global ignore file
     """
     try:
         return config.get((b'core', ), b'excludesFile')
@@ -305,8 +311,10 @@ class IgnoreFilterManager(object):
 
         Stops after the first ignore file with matches.
 
-        :param path: Path to check
-        :return: Iterator over Pattern instances
+        Args:
+          path: Path to check
+        Returns:
+          Iterator over Pattern instances
         """
         if os.path.isabs(path):
             raise ValueError('%s is an absolute path' % path)
@@ -333,9 +341,11 @@ class IgnoreFilterManager(object):
     def is_ignored(self, path):
         """Check whether a path is explicitly included or excluded in ignores.
 
-        :param path: Path to check
-        :return: None if the file is not mentioned, True if it is included,
-            False if it is explicitly excluded.
+        Args:
+          path: Path to check
+        Returns:
+          None if the file is not mentioned, True if it is included,
+          False if it is explicitly excluded.
         """
         matches = list(self.find_matching(path))
         if matches:
@@ -346,8 +356,10 @@ class IgnoreFilterManager(object):
     def from_repo(cls, repo):
         """Create a IgnoreFilterManager from a repository.
 
-        :param repo: Repository object
-        :return: A `IgnoreFilterManager` object
+        Args:
+          repo: Repository object
+        Returns:
+          A `IgnoreFilterManager` object
         """
         global_filters = []
         for p in [

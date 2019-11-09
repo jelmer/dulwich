@@ -56,8 +56,10 @@ FLAG_EXTENDED = 0x4000
 def pathsplit(path):
     """Split a /-delimited path into a directory part and a basename.
 
-    :param path: The path to split.
-    :return: Tuple with directory name and basename
+    Args:
+      path: The path to split.
+    Returns:
+      Tuple with directory name and basename
     """
     try:
         (dirname, basename) = path.rsplit(b"/", 1)
@@ -77,8 +79,10 @@ def pathjoin(*args):
 def read_cache_time(f):
     """Read a cache time.
 
-    :param f: File-like object to read from
-    :return: Tuple with seconds and nanoseconds
+    Args:
+      f: File-like object to read from
+    Returns:
+      Tuple with seconds and nanoseconds
     """
     return struct.unpack(">LL", f.read(8))
 
@@ -86,8 +90,9 @@ def read_cache_time(f):
 def write_cache_time(f, t):
     """Write a cache time.
 
-    :param f: File-like object to write to
-    :param t: Time to write (as int, float or tuple with secs and nsecs)
+    Args:
+      f: File-like object to write to
+      t: Time to write (as int, float or tuple with secs and nsecs)
     """
     if isinstance(t, int):
         t = (t, 0)
@@ -102,8 +107,10 @@ def write_cache_time(f, t):
 def read_cache_entry(f):
     """Read an entry from a cache file.
 
-    :param f: File-like object to read from
-    :return: tuple with: device, inode, mode, uid, gid, size, sha, flags
+    Args:
+      f: File-like object to read from
+    Returns:
+      tuple with: device, inode, mode, uid, gid, size, sha, flags
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
@@ -121,8 +128,9 @@ def read_cache_entry(f):
 def write_cache_entry(f, entry):
     """Write an index entry to a file.
 
-    :param f: File object
-    :param entry: Entry to write, tuple with:
+    Args:
+      f: File object
+      entry: Entry to write, tuple with:
         (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
     """
     beginoffset = f.tell()
@@ -152,7 +160,8 @@ def read_index(f):
 def read_index_dict(f):
     """Read an index file and return it as a dictionary.
 
-    :param f: File object to read from
+    Args:
+      f: File object to read from
     """
     ret = {}
     for x in read_index(f):

@@ -59,8 +59,10 @@ PATTERN = r'[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)'
 def get_recent_tags(projdir=PROJDIR):
     """Get list of tags in order from newest to oldest and their datetimes.
 
-    :param projdir: path to ``.git``
-    :returns: list of tags sorted by commit time from newest to oldest
+    Args:
+      projdir: path to ``.git``
+    Returns:
+      list of tags sorted by commit time from newest to oldest
 
     Each tag in the list contains the tag name, commit time, commit id, author
     and any tag meta. If a tag isn't annotated, then its tag meta is ``None``.
@@ -115,10 +117,12 @@ def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
     version. *EG*: "Release-0.2.1-rc.1" will be come "0.2.1-rc.1". If no match
     is found, then the most recent tag is return without modification.
 
-    :param projdir: path to ``.git``
-    :param pattern: regular expression pattern with group that matches version
-    :param logger: a Python logging instance to capture exception
-    :returns: tag matching first group in regular expression pattern
+    Args:
+      projdir: path to ``.git``
+      pattern: regular expression pattern with group that matches version
+      logger: a Python logging instance to capture exception
+    Returns:
+      tag matching first group in regular expression pattern
     """
     tags = get_recent_tags(projdir)
     try:

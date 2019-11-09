@@ -140,9 +140,10 @@ class LRUCache(object):
         Also, if the entry is ever removed from the cache, call
         cleanup(key, value).
 
-        :param key: The key to store it under
-        :param value: The object to store
-        :param cleanup: None or a function taking (key, value) to indicate
+        Args:
+          key: The key to store it under
+          value: The object to store
+          cleanup: None or a function taking (key, value) to indicate
                         'value' should be cleaned up.
         """
         if key is _null_key:
@@ -179,7 +180,7 @@ class LRUCache(object):
         request them later. This is simply meant as a peak into the current
         state.
 
-        :return: An unordered list of keys that are currently cached.
+        Returns: An unordered list of keys that are currently cached.
         """
         return self._cache.keys()
 
@@ -288,11 +289,12 @@ class LRUSizeCache(LRUCache):
                  compute_size=None):
         """Create a new LRUSizeCache.
 
-        :param max_size: The max number of bytes to store before we start
+        Args:
+          max_size: The max number of bytes to store before we start
             clearing out entries.
-        :param after_cleanup_size: After cleaning up, shrink everything to this
+          after_cleanup_size: After cleaning up, shrink everything to this
             size.
-        :param compute_size: A function to compute the size of the values. We
+          compute_size: A function to compute the size of the values. We
             use a function here, so that you can pass 'len' if you are just
             using simple strings, or a more complex function if you are using
             something like a list of strings, or even a custom object.
@@ -312,9 +314,10 @@ class LRUSizeCache(LRUCache):
         Also, if the entry is ever removed from the cache, call
         cleanup(key, value).
 
-        :param key: The key to store it under
-        :param value: The object to store
-        :param cleanup: None or a function taking (key, value) to indicate
+        Args:
+          key: The key to store it under
+          value: The object to store
+          cleanup: None or a function taking (key, value) to indicate
                         'value' should be cleaned up.
         """
         if key is _null_key:

@@ -136,8 +136,9 @@ LF = b"\n"
 def convert_crlf_to_lf(text_hunk):
     """Convert CRLF in text hunk into LF
 
-    :param text_hunk: A bytes string representing a text hunk
-    :return: The text hunk with the same type, with CRLF replaced into LF
+    Args:
+      text_hunk: A bytes string representing a text hunk
+    Returns: The text hunk with the same type, with CRLF replaced into LF
     """
     return text_hunk.replace(CRLF, LF)
 
@@ -145,8 +146,9 @@ def convert_crlf_to_lf(text_hunk):
 def convert_lf_to_crlf(text_hunk):
     """Convert LF in text hunk into CRLF
 
-    :param text_hunk: A bytes string representing a text hunk
-    :return: The text hunk with the same type, with LF replaced into CRLF
+    Args:
+      text_hunk: A bytes string representing a text hunk
+    Returns: The text hunk with the same type, with LF replaced into CRLF
     """
     # TODO find a more efficient way of doing it
     intermediary = text_hunk.replace(CRLF, LF)
@@ -174,9 +176,10 @@ def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
 def get_checkout_filter_autocrlf(core_autocrlf):
     """ Returns the correct checkout filter base on autocrlf value
 
-    :param core_autocrlf: The bytes configuration value of core.autocrlf.
+    Args:
+      core_autocrlf: The bytes configuration value of core.autocrlf.
         Valid values are: b'true', b'false' or b'input'.
-    :return: Either None if no filter has to be applied or a function
+    Returns: Either None if no filter has to be applied or a function
         accepting a single argument, a binary text hunk
     """
 
@@ -189,9 +192,10 @@ def get_checkout_filter_autocrlf(core_autocrlf):
 def get_checkin_filter_autocrlf(core_autocrlf):
     """ Returns the correct checkin filter base on autocrlf value
 
-    :param core_autocrlf: The bytes configuration value of core.autocrlf.
+    Args:
+      core_autocrlf: The bytes configuration value of core.autocrlf.
         Valid values are: b'true', b'false' or b'input'.
-    :return: Either None if no filter has to be applied or a function
+    Returns: Either None if no filter has to be applied or a function
         accepting a single argument, a binary text hunk
     """
 

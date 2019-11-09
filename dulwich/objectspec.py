@@ -30,10 +30,12 @@ def to_bytes(text):
 def parse_object(repo, objectish):
     """Parse a string referring to an object.
 
-    :param repo: A `Repo` object
-    :param objectish: A string referring to an object
-    :return: A git object
-    :raise KeyError: If the object can not be found
+    Args:
+      repo: A `Repo` object
+      objectish: A string referring to an object
+    Returns: A git object
+    Raises:
+      KeyError: If the object can not be found
     """
     objectish = to_bytes(objectish)
     return repo[objectish]
@@ -42,10 +44,12 @@ def parse_object(repo, objectish):
 def parse_tree(repo, treeish):
     """Parse a string referring to a tree.
 
-    :param repo: A `Repo` object
-    :param treeish: A string referring to a tree
-    :return: A git object
-    :raise KeyError: If the object can not be found
+    Args:
+      repo: A `Repo` object
+      treeish: A string referring to a tree
+    Returns: A git object
+    Raises:
+      KeyError: If the object can not be found
     """
     treeish = to_bytes(treeish)
     o = repo[treeish]
@@ -57,10 +61,12 @@ def parse_tree(repo, treeish):
 def parse_ref(container, refspec):
     """Parse a string referring to a reference.
 
-    :param container: A RefsContainer object
-    :param refspec: A string referring to a ref
-    :return: A ref
-    :raise KeyError: If the ref can not be found
+    Args:
+      container: A RefsContainer object
+      refspec: A string referring to a ref
+    Returns: A ref
+    Raises:
+      KeyError: If the ref can not be found
     """
     refspec = to_bytes(refspec)
     possible_refs = [
@@ -80,11 +86,13 @@ def parse_ref(container, refspec):
 def parse_reftuple(lh_container, rh_container, refspec):
     """Parse a reftuple spec.
 
-    :param lh_container: A RefsContainer object
-    :param hh_container: A RefsContainer object
-    :param refspec: A string
-    :return: A tuple with left and right ref
-    :raise KeyError: If one of the refs can not be found
+    Args:
+      lh_container: A RefsContainer object
+      hh_container: A RefsContainer object
+      refspec: A string
+    Returns: A tuple with left and right ref
+    Raises:
+      KeyError: If one of the refs can not be found
     """
     refspec = to_bytes(refspec)
     if refspec.startswith(b"+"):
@@ -115,11 +123,13 @@ def parse_reftuple(lh_container, rh_container, refspec):
 def parse_reftuples(lh_container, rh_container, refspecs):
     """Parse a list of reftuple specs to a list of reftuples.
 
-    :param lh_container: A RefsContainer object
-    :param hh_container: A RefsContainer object
-    :param refspecs: A list of refspecs or a string
-    :return: A list of refs
-    :raise KeyError: If one of the refs can not be found
+    Args:
+      lh_container: A RefsContainer object
+      hh_container: A RefsContainer object
+      refspecs: A list of refspecs or a string
+    Returns: A list of refs
+    Raises:
+      KeyError: If one of the refs can not be found
     """
     if not isinstance(refspecs, list):
         refspecs = [refspecs]
@@ -133,10 +143,12 @@ def parse_reftuples(lh_container, rh_container, refspecs):
 def parse_refs(container, refspecs):
     """Parse a list of refspecs to a list of refs.
 
-    :param container: A RefsContainer object
-    :param refspecs: A list of refspecs or a string
-    :return: A list of refs
-    :raise KeyError: If one of the refs can not be found
+    Args:
+      container: A RefsContainer object
+      refspecs: A list of refspecs or a string
+    Returns: A list of refs
+    Raises:
+      KeyError: If one of the refs can not be found
     """
     # TODO: Support * in refspecs
     if not isinstance(refspecs, list):
@@ -150,11 +162,13 @@ def parse_refs(container, refspecs):
 def parse_commit_range(repo, committishs):
     """Parse a string referring to a range of commits.
 
-    :param repo: A `Repo` object
-    :param committishs: A string referring to a range of commits.
-    :return: An iterator over `Commit` objects
-    :raise KeyError: When the reference commits can not be found
-    :raise ValueError: If the range can not be parsed
+    Args:
+      repo: A `Repo` object
+      committishs: A string referring to a range of commits.
+    Returns: An iterator over `Commit` objects
+    Raises:
+      KeyError: When the reference commits can not be found
+      ValueError: If the range can not be parsed
     """
     committishs = to_bytes(committishs)
     # TODO(jelmer): Support more than a single commit..
@@ -187,11 +201,13 @@ def scan_for_short_id(object_store, prefix):
 def parse_commit(repo, committish):
     """Parse a string referring to a single commit.
 
-    :param repo: A` Repo` object
-    :param commitish: A string referring to a single commit.
-    :return: A Commit object
-    :raise KeyError: When the reference commits can not be found
-    :raise ValueError: If the range can not be parsed
+    Args:
+      repo: A` Repo` object
+      commitish: A string referring to a single commit.
+    Returns: A Commit object
+    Raises:
+      KeyError: When the reference commits can not be found
+      ValueError: If the range can not be parsed
     """
     committish = to_bytes(committish)
     try:

@@ -1191,16 +1191,18 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           prune=False, prune_tags=False, **kwargs):
     """Fetch objects from a remote server.
 
-    :param repo: Path to the repository
-    :param remote_location: String identifying a remote server
-    :param remote_name: Name for remote server
-    :param outstream: Output stream (defaults to stdout)
-    :param errstream: Error stream (defaults to stderr)
-    :param message: Reflog message (defaults to b"fetch: from <remote_name>")
-    :param depth: Depth to fetch at
-    :param prune: Prune remote removed refs
-    :param prune_tags: Prune reomte removed tags
-    :return: Dictionary with refs on the remote
+    Args:
+      repo: Path to the repository
+      remote_location: String identifying a remote server
+      remote_name: Name for remote server
+      outstream: Output stream (defaults to stdout)
+      errstream: Error stream (defaults to stderr)
+      message: Reflog message (defaults to b"fetch: from <remote_name>")
+      depth: Depth to fetch at
+      prune: Prune remote removed refs
+      prune_tags: Prune reomte removed tags
+    Returns:
+      Dictionary with refs on the remote
     """
     if message is None:
         message = b'fetch: from ' + remote_location.encode("utf-8")
@@ -1229,9 +1231,11 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
 def ls_remote(remote, config=None, **kwargs):
     """List the refs in a remote.
 
-    :param remote: Remote repository location
-    :param config: Configuration to use
-    :return: Dictionary with remote refs
+    Args:
+      remote: Remote repository location
+      config: Configuration to use
+    Returns:
+      Dictionary with remote refs
     """
     if config is None:
         config = StackedConfig.default()

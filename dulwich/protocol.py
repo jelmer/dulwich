@@ -144,8 +144,9 @@ class ProtocolFile(object):
 def pkt_line(data):
     """Wrap data in a pkt-line.
 
-    :param data: The data to wrap, as a str or None.
-    :return: The data prefixed with its length in pkt-line format; if data was
+    Args:
+      data: The data to wrap, as a str or None.
+    Returns: The data prefixed with its length in pkt-line format; if data was
         None, returns the flush-pkt ('0000').
     """
     if data is None:
@@ -187,7 +188,7 @@ class Protocol(object):
 
         This method may read from the readahead buffer; see unread_pkt_line.
 
-        :return: The next string from the stream, without the length prefix, or
+        Returns: The next string from the stream, without the length prefix, or
             None for a flush-pkt ('0000').
         """
         if self._readahead is None:
@@ -223,7 +224,7 @@ class Protocol(object):
         Note that this refers to the actual stream EOF and not just a
         flush-pkt.
 
-        :return: True if the stream is at EOF, False otherwise.
+        Returns: True if the stream is at EOF, False otherwise.
         """
         try:
             next_line = self.read_pkt_line()
@@ -238,8 +239,10 @@ class Protocol(object):
         This method can be used to unread a single pkt-line into a fixed
         readahead buffer.
 
-        :param data: The data to unread, without the length prefix.
-        :raise ValueError: If more than one pkt-line is unread.
+        Args:
+          data: The data to unread, without the length prefix.
+        Raises:
+          ValueError: If more than one pkt-line is unread.
         """
         if self._readahead is not None:
             raise ValueError('Attempted to unread multiple pkt-lines.')
@@ -248,7 +251,7 @@ class Protocol(object):
     def read_pkt_seq(self):
         """Read a sequence of pkt-lines from the remote git process.
 
-        :return: Yields each line of data up to but not including the next
+        Returns: Yields each line of data up to but not including the next
             flush-pkt.
         """
         pkt = self.read_pkt_line()
@@ -259,7 +262,8 @@ class Protocol(object):
     def write_pkt_line(self, line):
         """Sends a pkt-line to the remote git process.
 
-        :param line: A string containing the data to send, without the length
+        Args:
+          line: A string containing the data to send, without the length
             prefix.
         """
         try:
@@ -294,8 +298,9 @@ class Protocol(object):
     def write_sideband(self, channel, blob):
         """Write multiplexed data to the sideband.
 
-        :param channel: An int specifying the channel to write to.
-        :param blob: A blob of data (as a string) to send on this channel.
+        Args:
+          channel: An int specifying the channel to write to.
+          blob: A blob of data (as a string) to send on this channel.
         """
         # a pktline can be a max of 65520. a sideband line can therefore be
         # 65520-5 = 65515
@@ -309,8 +314,9 @@ class Protocol(object):
 
         Only used for the TCP git protocol (git://).
 
-        :param cmd: The remote service to access.
-        :param args: List of arguments to send to remove service.
+        Args:
+          cmd: The remote service to access.
+          args: List of arguments to send to remove service.
         """
         self.write_pkt_line(cmd + b" " + b"".join([(a + b"\0") for a in args]))
 
@@ -319,7 +325,7 @@ class Protocol(object):
 
         Only used for the TCP git protocol (git://).
 
-        :return: A tuple of (command, [list of arguments]).
+        Returns: A tuple of (command, [list of arguments]).
         """
         line = self.read_pkt_line()
         splice_at = line.find(b" ")
@@ -439,8 +445,9 @@ class ReceivableProtocol(Protocol):
 def extract_capabilities(text):
     """Extract a capabilities list from a string, if present.
 
-    :param text: String to extract from
-    :return: Tuple with text with capabilities removed and list of capabilities
+    Args:
+      text: String to extract from
+    Returns: Tuple with text with capabilities removed and list of capabilities
     """
     if b"\0" not in text:
         return text, []
@@ -456,8 +463,9 @@ def extract_want_line_capabilities(text):
 
         want obj-id cap1 cap2 ...
 
-    :param text: Want line to extract from
-    :return: Tuple with text with capabilities removed and list of capabilities
+    Args:
+      text: Want line to extract from
+    Returns: Tuple with text with capabilities removed and list of capabilities
     """
     split_text = text.rstrip().split(b" ")
     if len(split_text) < 3:
@@ -485,8 +493,9 @@ class BufferedPktLineWriter(object):
     def __init__(self, write, bufsize=65515):
         """Initialize the BufferedPktLineWriter.
 
-        :param write: A write callback for the underlying writer.
-        :param bufsize: The internal buffer size, including length prefixes.
+        Args:
+          write: A write callback for the underlying writer.
+          bufsize: The internal buffer size, including length prefixes.
         """
         self._write = write
         self._bufsize = bufsize

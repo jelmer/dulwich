@@ -213,7 +213,7 @@ class IgnoreFilter(object):
 
         For directories, include a trailing slash.
 
-        :return: status is None if file is not mentioned, True if it is
+        Returns: status is None if file is not mentioned, True if it is
             included, False if it is explicitly excluded.
         """
         status = None

@@ -62,11 +62,12 @@ static void free_objects(PyObject **objs, Py_ssize_t n)
 /**
  * Get the entries of a tree, prepending the given path.
  *
- * :param path: The path to prepend, without trailing slashes.
- * :param path_len: The length of path.
- * :param tree: The Tree object to iterate.
- * :param n: Set to the length of result.
- * :return: A (C) array of PyObject pointers to TreeEntry objects for each path
+ * Args:
+ *   path: The path to prepend, without trailing slashes.
+ *   path_len: The length of path.
+ *   tree: The Tree object to iterate.
+ *   n: Set to the length of result.
+ * Returns: A (C) array of PyObject pointers to TreeEntry objects for each path
  *     in tree.
  */
 static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,

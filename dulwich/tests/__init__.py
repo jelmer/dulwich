@@ -64,8 +64,9 @@ class BlackboxTestCase(TestCase):
     def bin_path(self, name):
         """Determine the full path of a binary.
 
-        :param name: Name of the script
-        :return: Full path
+        Args:
+          name: Name of the script
+        Returns: Full path
         """
         for d in self.bin_directories:
             p = os.path.join(d, name)
@@ -77,8 +78,9 @@ class BlackboxTestCase(TestCase):
     def run_command(self, name, args):
         """Run a Dulwich command.
 
-        :param name: Name of the command, as it exists in bin/
-        :param args: Arguments to the command
+        Args:
+          name: Name of the command, as it exists in bin/
+          args: Arguments to the command
         """
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(sys.path)

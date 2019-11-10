@@ -356,7 +356,7 @@ class SwiftConnector(object):
     def test_root_exists(self):
         """Check that Swift container exist
 
-        :return: True if exist or None it not
+        Returns: True if exist or None it not
         """
         ret = self.httpclient.request('HEAD', self.base_path)
         if ret.status_code == 404:
@@ -369,7 +369,8 @@ class SwiftConnector(object):
     def create_root(self):
         """Create the Swift container
 
-        :raise: `SwiftException` if unable to create
+        Raises:
+          SwiftException: if unable to create
         """
         if not self.test_root_exists():
             ret = self.httpclient.request('PUT', self.base_path)
@@ -380,7 +381,7 @@ class SwiftConnector(object):
     def get_container_objects(self):
         """Retrieve objects list in a container
 
-        :return: A list of dict that describe objects
+        Returns: A list of dict that describe objects
                  or None if container does not exist
         """
         qs = '?format=json'
@@ -488,7 +489,8 @@ class SwiftConnector(object):
     def del_root(self):
         """Delete the root container by removing container content
 
-        :raise: `SwiftException` if unable to delete
+        Raises:
+          SwiftException: if unable to delete
         """
         for obj in self.get_container_objects():
             self.del_object(obj['name'])
@@ -566,7 +568,7 @@ class SwiftPackReader(object):
     def read_checksum(self):
         """Read the checksum from the pack
 
-        :return: the checksum bytestring
+        Returns: the checksum bytestring
         """
         return self.scon.get_object(self.filename, range="-20")
 
@@ -681,7 +683,7 @@ class SwiftObjectStore(PackBasedObjectStore):
     def iter_shas(self, finder):
         """An iterator over pack's ObjectStore.
 
-        :return: a `ObjectStoreIterator` or `GreenThreadsObjectStoreIterator`
+        Returns: a `ObjectStoreIterator` or `GreenThreadsObjectStoreIterator`
                  instance if gevent is enabled
         """
         shas = iter(finder.next, None)
@@ -725,7 +727,7 @@ class SwiftObjectStore(PackBasedObjectStore):
     def add_pack(self):
         """Add a new pack to this object store.
 
-        :return: Fileobject to write to and a commit function to
+        Returns: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
         f = BytesIO()
@@ -938,7 +940,7 @@ class SwiftRepo(BaseRepo):
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
 
-        :return: True if permissions can be trusted, False otherwise.
+        Returns: True if permissions can be trusted, False otherwise.
         """
         return False
 

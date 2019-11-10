@@ -89,8 +89,9 @@ def date_time_string(timestamp=None):
 def url_prefix(mat):
     """Extract the URL prefix from a regex match.
 
-    :param mat: A regex match object.
-    :returns: The URL prefix, defined as the text before the match in the
+    Args:
+      mat: A regex match object.
+    Returns: The URL prefix, defined as the text before the match in the
         original string. Normalized to start with one leading slash and end
         with zero.
     """
@@ -105,10 +106,11 @@ def get_repo(backend, mat):
 def send_file(req, f, content_type):
     """Send a file-like object to the request output.
 
-    :param req: The HTTPGitRequest object to send output to.
-    :param f: An open file-like object to send; will be closed.
-    :param content_type: The MIME type for the file.
-    :return: Iterator over the contents of the file, as chunks.
+    Args:
+      req: The HTTPGitRequest object to send output to.
+      f: An open file-like object to send; will be closed.
+      content_type: The MIME type for the file.
+    Returns: Iterator over the contents of the file, as chunks.
     """
     if f is None:
         yield req.not_found('File not found')

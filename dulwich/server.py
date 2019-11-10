@@ -127,9 +127,11 @@ class Backend(object):
     def open_repository(self, path):
         """Open the repository at a path.
 
-        :param path: Path to the repository
-        :raise NotGitRepository: no git repository was found at path
-        :return: Instance of BackendRepo
+        Args:
+          path: Path to the repository
+        Raises:
+          NotGitRepository: no git repository was found at path
+        Returns: Instance of BackendRepo
         """
         raise NotImplementedError(self.open_repository)
 
@@ -148,15 +150,16 @@ class BackendRepo(object):
         """
         Get all the refs in the repository
 
-        :return: dict of name -> sha
+        Returns: dict of name -> sha
         """
         raise NotImplementedError
 
     def get_peeled(self, name):
         """Return the cached peeled value of a ref, if available.
 
-        :param name: Name of the ref to peel
-        :return: The peeled value of the ref. If the ref is known not point to
+        Args:
+          name: Name of the ref to peel
+        Returns: The peeled value of the ref. If the ref is known not point to
             a tag, this will be the SHA the ref refers to. If no cached
             information about a tag is available, this method may return None,
             but it should attempt to peel the tag if possible.
@@ -168,8 +171,9 @@ class BackendRepo(object):
         """
         Yield the objects required for a list of commits.
 
-        :param progress: is a callback to send progress messages to the client
-        :param get_tagged: Function that returns a dict of pointed-to sha ->
+        Args:
+          progress: is a callback to send progress messages to the client
+          get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
         """
         raise NotImplementedError
@@ -312,11 +316,12 @@ class UploadPackHandler(PackHandler):
     def get_tagged(self, refs=None, repo=None):
         """Get a dict of peeled values of tags to their original tag shas.
 
-        :param refs: dict of refname -> sha of possible tags; defaults to all
+        Args:
+          refs: dict of refname -> sha of possible tags; defaults to all
             of the backend's refs.
-        :param repo: optional Repo instance for getting peeled refs; defaults
+          repo: optional Repo instance for getting peeled refs; defaults
             to the backend's repo, if available
-        :return: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
+        Returns: dict of peeled_sha -> tag_sha, where tag_sha is the sha of a
             tag whose peeled value is peeled_sha.
         """
         if not self.has_capability(CAPABILITY_INCLUDE_TAG):
@@ -385,18 +390,20 @@ class UploadPackHandler(PackHandler):
 def _split_proto_line(line, allowed):
     """Split a line read from the wire.
 
-    :param line: The line read from the wire.
-    :param allowed: An iterable of command names that should be allowed.
+    Args:
+      line: The line read from the wire.
+      allowed: An iterable of command names that should be allowed.
         Command names not listed below as possible return values will be
         ignored.  If None, any commands from the possible return values are
         allowed.
-    :return: a tuple having one of the following forms:
+    Returns: a tuple having one of the following forms:
         ('want', obj_id)
         ('have', obj_id)
         ('done', None)
         (None, None)  (for a flush-pkt)
 
-    :raise UnexpectedCommandError: if the line cannot be parsed into one of the
+    Raises:
+      UnexpectedCommandError: if the line cannot be parsed into one of the
         allowed return values.
     """
     if not line:
@@ -422,11 +429,12 @@ def _split_proto_line(line, allowed):
 def _find_shallow(store, heads, depth):
     """Find shallow commits according to a given depth.
 
-    :param store: An ObjectStore for looking up objects.
-    :param heads: Iterable of head SHAs to start walking from.
-    :param depth: The depth of ancestors to include. A depth of one includes
+    Args:
+      store: An ObjectStore for looking up objects.
+      heads: Iterable of head SHAs to start walking from.
+      depth: The depth of ancestors to include. A depth of one includes
         only the heads themselves.
-    :return: A tuple of (shallow, not_shallow), sets of SHAs that should be
+    Returns: A tuple of (shallow, not_shallow), sets of SHAs that should be
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
     """
@@ -484,10 +492,11 @@ def _want_satisfied(store, haves, want, earliest):
 def _all_wants_satisfied(store, haves, wants):
     """Check whether all the current wants are satisfied by a set of haves.
 
-    :param store: Object store to retrieve objects from
-    :param haves: A set of commits we know the client has.
-    :param wants: A set of commits the client wants
-    :note: Wants are specified with set_wants rather than passed in since
+    Args:
+      store: Object store to retrieve objects from
+      haves: A set of commits we know the client has.
+      wants: A set of commits the client wants
+    Note: Wants are specified with set_wants rather than passed in since
         in the current interface they are determined outside this class.
     """
     haves = set(haves)
@@ -546,8 +555,9 @@ class _ProtocolGraphWalker(object):
         walking the graph. Additionally, later code depends on this method
         consuming everything up to the first 'have' line.
 
-        :param heads: a dict of refname->SHA1 to advertise
-        :return: a list of SHA1s requested by the client
+        Args:
+          heads: a dict of refname->SHA1 to advertise
+        Returns: a list of SHA1s requested by the client
         """
         symrefs = self.get_symrefs()
         values = set(heads.values())
@@ -638,9 +648,11 @@ class _ProtocolGraphWalker(object):
     def read_proto_line(self, allowed):
         """Read a line from the wire.
 
-        :param allowed: An iterable of command names that should be allowed.
-        :return: A tuple of (command, value); see _split_proto_line.
-        :raise UnexpectedCommandError: If an error occurred reading the line.
+        Args:
+          allowed: An iterable of command names that should be allowed.
+        Returns: A tuple of (command, value); see _split_proto_line.
+        Raises:
+          UnexpectedCommandError: If an error occurred reading the line.
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
@@ -691,8 +703,9 @@ class _ProtocolGraphWalker(object):
     def all_wants_satisfied(self, haves):
         """Check whether all the current wants are satisfied by a set of haves.
 
-        :param haves: A set of commits we know the client has.
-        :note: Wants are specified with set_wants rather than passed in since
+        Args:
+          haves: A set of commits we know the client has.
+        Note: Wants are specified with set_wants rather than passed in since
             in the current interface they are determined outside this class.
         """
         return _all_wants_satisfied(self.store, haves, self._wants)
@@ -1133,12 +1146,13 @@ def serve_command(handler_cls, argv=sys.argv, backend=None, inf=sys.stdin,
     This is mostly useful for the implementation of commands used by e.g.
     git+ssh.
 
-    :param handler_cls: `Handler` class to use for the request
-    :param argv: execv-style command-line arguments. Defaults to sys.argv.
-    :param backend: `Backend` to use
-    :param inf: File-like object to read from, defaults to standard input.
-    :param outf: File-like object to write to, defaults to standard output.
-    :return: Exit code for use with sys.exit. 0 on success, 1 on failure.
+    Args:
+      handler_cls: `Handler` class to use for the request
+      argv: execv-style command-line arguments. Defaults to sys.argv.
+      backend: `Backend` to use
+      inf: File-like object to read from, defaults to standard input.
+      outf: File-like object to write to, defaults to standard output.
+    Returns: Exit code for use with sys.exit. 0 on success, 1 on failure.
     """
     if backend is None:
         backend = FileSystemBackend()

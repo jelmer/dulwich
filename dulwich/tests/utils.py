@@ -67,11 +67,12 @@ def open_repo(name, temp_dir=None):
     accidentally or intentionally modifying those repos in place. Use
     tear_down_repo to delete any temp files created.
 
-    :param name: The name of the repository, relative to
+    Args:
+      name: The name of the repository, relative to
         dulwich/tests/data/repos
-    :param temp_dir: temporary directory to initialize to. If not provided, a
+      temp_dir: temporary directory to initialize to. If not provided, a
         temporary directory will be created.
-    :returns: An initialized Repo object that lives in a temporary directory.
+    Returns: An initialized Repo object that lives in a temporary directory.
     """
     if temp_dir is None:
         temp_dir = tempfile.mkdtemp()
@@ -95,8 +96,9 @@ def make_object(cls, **attrs):
     reassignment, which is not otherwise possible with objects having
     __slots__.
 
-    :param attrs: dict of attributes to set on the new object.
-    :return: A newly initialized object of type cls.
+    Args:
+      attrs: dict of attributes to set on the new object.
+    Returns: A newly initialized object of type cls.
     """
 
     class TestObject(cls):
@@ -123,8 +125,9 @@ def make_object(cls, **attrs):
 def make_commit(**attrs):
     """Make a Commit object with a default set of members.
 
-    :param attrs: dict of attributes to overwrite from the default values.
-    :return: A newly initialized Commit object.
+    Args:
+      attrs: dict of attributes to overwrite from the default values.
+    Returns: A newly initialized Commit object.
     """
     default_time = 1262304000  # 2010-01-01 00:00:00
     all_attrs = {'author': b'Test Author <test@nodomain.com>',
@@ -143,9 +146,10 @@ def make_commit(**attrs):
 def make_tag(target, **attrs):
     """Make a Tag object with a default set of values.
 
-    :param target: object to be tagged (Commit, Blob, Tree, etc)
-    :param attrs: dict of attributes to overwrite from the default values.
-    :return: A newly initialized Tag object.
+    Args:
+      target: object to be tagged (Commit, Blob, Tree, etc)
+      attrs: dict of attributes to overwrite from the default values.
+    Returns: A newly initialized Tag object.
     """
     target_id = target.id
     target_type = object_class(target.type_name)
@@ -186,9 +190,10 @@ def ext_functest_builder(method, func):
         test_foo = functest_builder(_do_some_test, foo_py)
         test_foo_extension = ext_functest_builder(_do_some_test, _foo_c)
 
-    :param method: The method to run. It must must two parameters, self and the
+    Args:
+      method: The method to run. It must must two parameters, self and the
         function implementation to test.
-    :param func: The function implementation to pass to method.
+      func: The function implementation to pass to method.
     """
 
     def do_test(self):
@@ -202,8 +207,9 @@ def ext_functest_builder(method, func):
 def build_pack(f, objects_spec, store=None):
     """Write test pack data from a concise spec.
 
-    :param f: A file-like object to write the pack to.
-    :param objects_spec: A list of (type_num, obj). For non-delta types, obj
+    Args:
+      f: A file-like object to write the pack to.
+      objects_spec: A list of (type_num, obj). For non-delta types, obj
         is the string of that object's data.
         For delta types, obj is a tuple of (base, data), where:
 
@@ -213,8 +219,8 @@ def build_pack(f, objects_spec, store=None):
         * data is a string of the full, non-deltified data for that object.
 
         Note that offsets/refs and deltas are computed within this function.
-    :param store: An optional ObjectStore for looking up external refs.
-    :return: A list of tuples in the order specified by objects_spec:
+      store: An optional ObjectStore for looking up external refs.
+    Returns: A list of tuples in the order specified by objects_spec:
         (offset, type num, data, sha, CRC32)
     """
     sf = SHA1Writer(f)
@@ -285,21 +291,23 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
     If not otherwise specified, commits will refer to the empty tree and have
     commit times increasing in the same order as the commit spec.
 
-    :param object_store: An ObjectStore to commit objects to.
-    :param commit_spec: An iterable of iterables of ints defining the commit
+    Args:
+      object_store: An ObjectStore to commit objects to.
+      commit_spec: An iterable of iterables of ints defining the commit
         graph. Each entry defines one commit, and entries must be in
         topological order. The first element of each entry is a commit number,
         and the remaining elements are its parents. The commit numbers are only
         meaningful for the call to make_commits; since real commit objects are
         created, they will get created with real, opaque SHAs.
-    :param trees: An optional dict of commit number -> tree spec for building
+      trees: An optional dict of commit number -> tree spec for building
         trees for commits. The tree spec is an iterable of (path, blob, mode)
         or (path, blob) entries; if mode is omitted, it defaults to the normal
         file mode (0100644).
-    :param attrs: A dict of commit number -> (dict of attribute -> value) for
+      attrs: A dict of commit number -> (dict of attribute -> value) for
         assigning additional values to the commits.
-    :return: The list of commit objects created.
-    :raise ValueError: If an undefined commit identifier is listed as a parent.
+    Returns: The list of commit objects created.
+    Raises:
+      ValueError: If an undefined commit identifier is listed as a parent.
     """
     if trees is None:
         trees = {}

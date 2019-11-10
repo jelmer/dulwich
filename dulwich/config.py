@@ -175,7 +175,7 @@ class Config(object):
     def itersections(self):
         """Iterate over the sections.
 
-        :return: Iterator over section tuples
+        Returns: Iterator over section tuples
         """
         raise NotImplementedError(self.itersections)
 

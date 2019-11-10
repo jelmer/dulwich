@@ -38,12 +38,13 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
                        message):
     """Generate a single reflog line.
 
-    :param old_sha: Old Commit SHA
-    :param new_sha: New Commit SHA
-    :param committer: Committer name and e-mail
-    :param timestamp: Timestamp
-    :param timezone: Timezone
-    :param message: Message
+    Args:
+      old_sha: Old Commit SHA
+      new_sha: New Commit SHA
+      committer: Committer name and e-mail
+      timestamp: Timestamp
+      timezone: Timezone
+      message: Message
     """
     if old_sha is None:
         old_sha = ZERO_SHA
@@ -55,8 +56,9 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
 def parse_reflog_line(line):
     """Parse a reflog line.
 
-    :param line: Line to parse
-    :return: Tuple of (old_sha, new_sha, committer, timestamp, timezone,
+    Args:
+      line: Line to parse
+    Returns: Tuple of (old_sha, new_sha, committer, timestamp, timezone,
         message)
     """
     (begin, message) = line.split(b'\t', 1)
@@ -69,8 +71,9 @@ def parse_reflog_line(line):
 def read_reflog(f):
     """Read reflog.
 
-    :param f: File-like object
-    :returns: Iterator over Entry objects
+    Args:
+      f: File-like object
+    Returns: Iterator over Entry objects
     """
     for l in f:
         yield parse_reflog_line(l)

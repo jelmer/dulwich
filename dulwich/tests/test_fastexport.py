@@ -213,8 +213,9 @@ M 100644 :1 a
     def make_file_commit(self, file_cmds):
         """Create a trivial commit with the specified file commands.
 
-        :param file_cmds: File commands to run.
-        :return: The created commit object
+        Args:
+          file_cmds: File commands to run.
+        Returns: The created commit object
         """
         from fastimport import commands
         cmd = commands.CommitCommand(

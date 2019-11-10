@@ -48,9 +48,10 @@ _REPOS_DATA_DIR = os.path.abspath(os.path.join(
 def git_version(git_path=_DEFAULT_GIT):
     """Attempt to determine the version of git currently installed.
 
-    :param git_path: Path to the git executable; defaults to the version in
+    Args:
+      git_path: Path to the git executable; defaults to the version in
         the system path.
-    :return: A tuple of ints of the form (major, minor, point, sub-point), or
+    Returns: A tuple of ints of the form (major, minor, point, sub-point), or
         None if no git installation was found.
     """
     try:
@@ -77,12 +78,14 @@ def git_version(git_path=_DEFAULT_GIT):
 def require_git_version(required_version, git_path=_DEFAULT_GIT):
     """Require git version >= version, or skip the calling test.
 
-    :param required_version: A tuple of ints of the form (major, minor, point,
+    Args:
+      required_version: A tuple of ints of the form (major, minor, point,
         sub-point); ommitted components default to 0.
-    :param git_path: Path to the git executable; defaults to the version in
+      git_path: Path to the git executable; defaults to the version in
         the system path.
-    :raise ValueError: if the required version tuple has too many parts.
-    :raise SkipTest: if no suitable git version was found at the given path.
+    Raises:
+      ValueError: if the required version tuple has too many parts.
+      SkipTest: if no suitable git version was found at the given path.
     """
     found_version = git_version(git_path=git_path)
     if found_version is None:
@@ -112,15 +115,17 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
     Input is piped from the input parameter and output is sent to the standard
     streams, unless capture_stdout is set.
 
-    :param args: A list of args to the git command.
-    :param git_path: Path to to the git executable.
-    :param input: Input data to be sent to stdin.
-    :param capture_stdout: Whether to capture and return stdout.
-    :param popen_kwargs: Additional kwargs for subprocess.Popen;
+    Args:
+      args: A list of args to the git command.
+      git_path: Path to to the git executable.
+      input: Input data to be sent to stdin.
+      capture_stdout: Whether to capture and return stdout.
+      popen_kwargs: Additional kwargs for subprocess.Popen;
         stdin/stdout args are ignored.
-    :return: A tuple of (returncode, stdout contents). If capture_stdout is
+    Returns: A tuple of (returncode, stdout contents). If capture_stdout is
         False, None will be returned as stdout contents.
-    :raise OSError: if the git executable was not found.
+    Raises:
+      OSError: if the git executable was not found.
     """
 
     env = popen_kwargs.pop('env', {})
@@ -155,9 +160,10 @@ def import_repo_to_dir(name):
     These are used rather than binary repos for compat tests because they are
     more compact and human-editable, and we already depend on git.
 
-    :param name: The name of the repository export file, relative to
+    Args:
+      name: The name of the repository export file, relative to
         dulwich/tests/data/repos.
-    :returns: The path to the imported repository.
+    Returns: The path to the imported repository.
     """
     temp_dir = tempfile.mkdtemp()
     export_path = os.path.join(_REPOS_DATA_DIR, name)
@@ -175,11 +181,12 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
 
     Defaults to checking 10 times with a delay of 0.1 sec between tries.
 
-    :param limit: Number of attempts before deciding no daemon is running.
-    :param delay: Delay between connection attempts.
-    :param timeout: Socket timeout for connection attempts.
-    :param port: Port on which we expect the daemon to appear.
-    :returns: A boolean, true if a daemon is running on the specified port,
+    Args:
+      limit: Number of attempts before deciding no daemon is running.
+      delay: Delay between connection attempts.
+      timeout: Socket timeout for connection attempts.
+      port: Port on which we expect the daemon to appear.
+    Returns: A boolean, true if a daemon is running on the specified port,
         false if not.
     """
     for _ in range(limit):
@@ -231,9 +238,10 @@ class CompatTestCase(TestCase):
     def import_repo(self, name):
         """Import a repo from a fast-export file in a temporary directory.
 
-        :param name: The name of the repository export file, relative to
+        Args:
+          name: The name of the repository export file, relative to
             dulwich/tests/data/repos.
-        :returns: An initialized Repo object that lives in a temporary
+        Returns: An initialized Repo object that lives in a temporary
             directory.
         """
         path = import_repo_to_dir(name)

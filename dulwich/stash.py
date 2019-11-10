@@ -72,9 +72,10 @@ class Stash(object):
     def push(self, committer=None, author=None, message=None):
         """Create a new stash.
 
-        :param committer: Optional committer name to use
-        :param author: Optional author name to use
-        :param message: Optional commit message
+        Args:
+          committer: Optional committer name to use
+          author: Optional author name to use
+          message: Optional commit message
         """
         # First, create the index commit.
         commit_kwargs = {}

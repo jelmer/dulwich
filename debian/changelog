@@ -1,6 +1,7 @@
 dulwich (0.19.13-2) UNRELEASED; urgency=medium
 
   * Remove obsolete fields Name, Contact from debian/upstream/metadata.
+  * Re-export upstream signing key without extra signatures.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sun, 25 Aug 2019 15:28:29 +0000
 

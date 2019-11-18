@@ -18,6 +18,7 @@
  * License, Version 2.0.
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <sys/stat.h>
 

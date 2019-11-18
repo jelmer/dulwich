@@ -18,6 +18,7 @@
  * License, Version 2.0.
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -61,7 +62,7 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 {
 	char *text, *start, *end;
-	int len, strict;
+	Py_ssize_t len; int strict;
 	size_t namelen;
 	PyObject *ret, *item, *name, *sha, *py_strict = NULL;
 	static char *kwlist[] = {"text", "strict", NULL};

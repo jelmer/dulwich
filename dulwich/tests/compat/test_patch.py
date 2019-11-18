@@ -100,7 +100,7 @@ class CompatPatchTestCase(CompatTestCase):
         new_files = set(os.listdir(copy_path))
 
         # Check that we have the exact same files in both repositories
-        self.assertEquals(original_files, new_files)
+        self.assertEqual(original_files, new_files)
 
         for file in original_files:
             if file == ".git":
@@ -117,4 +117,4 @@ class CompatPatchTestCase(CompatTestCase):
             with open(copy_file_path, "rb") as copy_file:
                 copy_content = copy_file.read()
 
-            self.assertEquals(original_content, copy_content)
+            self.assertEqual(original_content, copy_content)

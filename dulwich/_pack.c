@@ -18,6 +18,7 @@
  * License, Version 2.0.
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdint.h>
 
@@ -205,7 +206,7 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 {
 	PyObject *unpack_name;
 	char *sha;
-	int sha_len;
+	Py_ssize_t sha_len;
 	int start, end;
 #if PY_MAJOR_VERSION >= 3
 	if (!PyArg_ParseTuple(args, "iiy#O", &start, &end,
@@ -227,7 +228,7 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 
 	while (start <= end) {
 		PyObject *file_sha;
-		int i = (start + end)/2;
+		Py_ssize_t i = (start + end)/2;
 		int cmp;
 		file_sha = PyObject_CallFunction(unpack_name, "i", i);
 		if (file_sha == NULL) {

@@ -11,6 +11,8 @@
  * Add a ``dulwich.porcelain.active_branch`` function.
    (Jelmer Vernooĳ)
 
+ * Cleanup new directory if clone fails. (Jelmer Vernooĳ, #733)
+
 0.19.13	2019-08-19
 
  BUG FIXES

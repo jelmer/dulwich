@@ -351,6 +351,12 @@ class CloneTests(PorcelainTestCase):
             self.repo.path, target_path, checkout=True, errstream=errstream)
         r.close()
 
+    def test_source_broken(self):
+        target_path = tempfile.mkdtemp()
+        self.assertRaises(
+            Exception, porcelain.clone, '/nonexistant/repo', target_path)
+        self.assertFalse(os.path.exists(target_path))
+
 
 class InitTests(TestCase):
 

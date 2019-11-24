@@ -65,6 +65,7 @@ from io import BytesIO, RawIOBase
 import datetime
 import os
 import posixpath
+import shutil
 import stat
 import sys
 import time
@@ -382,6 +383,7 @@ def clone(source, target=None, bare=False, checkout=None,
             errstream.write(b'Checking out ' + head.id + b'\n')
             r.reset_index(head.tree)
     except BaseException:
+        shutil.rmtree(target)
         r.close()
         raise
 

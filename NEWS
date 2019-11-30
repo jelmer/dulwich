@@ -13,6 +13,8 @@
 
  * Cleanup new directory if clone fails. (Jelmer Vernooĳ, #733)
 
+ * Expand "~" in global exclude path. (Jelmer Vernooĳ)
+
 0.19.13	2019-08-19
 
  BUG FIXES

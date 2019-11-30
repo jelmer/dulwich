@@ -1,0 +1,40 @@
+Porcelain
+=========
+
+The ``porcelain`` is the higher level interface, built on top of the lower
+level implementation covered in previous chapters of this tutorial. The
+``dulwich.porcelain`` module in Dulwich is aimed to closely resemble
+the Git command-line API that you are familiar with.
+
+Basic concepts
+--------------
+The porcelain operations are implemented as top-level functions in the
+``dulwich.porcelain`` module. Most arguments can either be strings or
+more complex Dulwich objects; e.g. a repository argument will either take
+a string with a path to the repository or an instance of a ``Repo`` object.
+
+Initializing a new repository
+-----------------------------
+
+  >>> from dulwich import porcelain
+
+  >>> repo = porcelain.init("myrepo")
+
+Clone a repository
+------------------
+
+  >>> porcelain.clone("git://github.com/jelmer/dulwich", "dulwich-clone")
+
+Commit changes
+--------------
+
+  >>> r = porcelain.init("testrepo")
+  >>> open("testrepo/testfile", "w").write("data")
+  >>> porcelain.add(r, "testfile")
+  >>> porcelain.commit(r, b"A sample commit")
+
+Push changes
+------------
+
+  >>> tr = porcelain.init("targetrepo")
+  >>> r = porcelain.push("testrepo", "targetrepo", "master")

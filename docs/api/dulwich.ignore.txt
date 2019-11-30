@@ -1,0 +1,7 @@
+dulwich.ignore module
+=====================
+
+.. automodule:: dulwich.ignore
+   :members:
+   :undoc-members:
+   :show-inheritance:

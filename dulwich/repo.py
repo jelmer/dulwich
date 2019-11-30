@@ -175,14 +175,18 @@ def get_user_identity(config, kind=None):
         email = default_email
         if not isinstance(email, bytes):
             email = email.encode('utf-8')
+    if email.startswith(b'<') and email.endswith(b'>'):
+        email = email[1:-1]
     return (user + b" <" + email + b">")
 
 
 def check_user_identity(identity):
     """Verify that a user identity is formatted correctly.
 
-    :param identity: User identity bytestring
-    :raise InvalidUserIdentity: Raised when identity is invalid
+    Args:
+      identity: User identity bytestring
+    Raises:
+      InvalidUserIdentity: Raised when identity is invalid
     """
     try:
         fst, snd = identity.split(b' <', 1)
@@ -195,7 +199,8 @@ def check_user_identity(identity):
 def parse_graftpoints(graftpoints):
     """Convert a list of graftpoints into a dict
 
-    :param graftpoints: Iterator of graftpoint lines
+    Args:
+      graftpoints: Iterator of graftpoint lines
 
     Each line is formatted as:
         <commit sha1> <parent sha1> [<parent sha1>]*
@@ -280,8 +285,9 @@ class BaseRepo(object):
         This shouldn't be called directly, but rather through one of the
         base classes, such as MemoryRepo or Repo.
 
-        :param object_store: Object store to use
-        :param refs: Refs container to use
+        Args:
+          object_store: Object store to use
+          refs: Refs container to use
         """
         self.object_store = object_store
         self.refs = refs
@@ -292,7 +298,7 @@ class BaseRepo(object):
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
 
-        :return: True if permissions can be trusted, False otherwise.
+        Returns: True if permissions can be trusted, False otherwise.
         """
         raise NotImplementedError(self._determine_file_mode)
 
@@ -321,16 +327,18 @@ class BaseRepo(object):
         the control dir in a disk-based Repo, the object returned need not be
         pointing to a file in that location.
 
-        :param path: The path to the file, relative to the control dir.
-        :return: An open file object, or None if the file does not exist.
+        Args:
+          path: The path to the file, relative to the control dir.
+        Returns: An open file object, or None if the file does not exist.
         """
         raise NotImplementedError(self.get_named_file)
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
-        :param path: The path to the file, relative to the control dir.
-        :param contents: A string to write to the file.
+        Args:
+          path: The path to the file, relative to the control dir.
+          contents: A string to write to the file.
         """
         raise NotImplementedError(self._put_named_file)
 
@@ -341,20 +349,22 @@ class BaseRepo(object):
     def open_index(self):
         """Open the index for this repository.
 
-        :raise NoIndexPresent: If no index is present
-        :return: The matching `Index`
+        Raises:
+          NoIndexPresent: If no index is present
+        Returns: The matching `Index`
         """
         raise NotImplementedError(self.open_index)
 
     def fetch(self, target, determine_wants=None, progress=None, depth=None):
         """Fetch objects into another repository.
 
-        :param target: The target repository
-        :param determine_wants: Optional function to determine what refs to
+        Args:
+          target: The target repository
+          determine_wants: Optional function to determine what refs to
             fetch.
-        :param progress: Optional progress function
-        :param depth: Optional shallow fetch depth
-        :return: The local refs
+          progress: Optional progress function
+          depth: Optional shallow fetch depth
+        Returns: The local refs
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -368,17 +378,18 @@ class BaseRepo(object):
                         get_tagged=None, depth=None):
         """Fetch the pack data required for a set of revisions.
 
-        :param determine_wants: Function that takes a dictionary with heads
+        Args:
+          determine_wants: Function that takes a dictionary with heads
             and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions
+          graph_walker: Object that can iterate over the list of revisions
             to fetch and has an "ack" method that will be called to acknowledge
             that a revision is present.
-        :param progress: Simple progress function that will be called with
+          progress: Simple progress function that will be called with
             updated progress strings.
-        :param get_tagged: Function that returns a dict of pointed-to sha ->
+          get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
-        :param depth: Shallow fetch depth
-        :return: count and iterator over pack data
+          depth: Shallow fetch depth
+        Returns: count and iterator over pack data
         """
         # TODO(jelmer): Fetch pack data directly, don't create objects first.
         objects = self.fetch_objects(determine_wants, graph_walker, progress,
@@ -389,17 +400,18 @@ class BaseRepo(object):
                       get_tagged=None, depth=None):
         """Fetch the missing objects required for a set of revisions.
 
-        :param determine_wants: Function that takes a dictionary with heads
+        Args:
+          determine_wants: Function that takes a dictionary with heads
             and returns the list of heads to fetch.
-        :param graph_walker: Object that can iterate over the list of revisions
+          graph_walker: Object that can iterate over the list of revisions
             to fetch and has an "ack" method that will be called to acknowledge
             that a revision is present.
-        :param progress: Simple progress function that will be called with
+          progress: Simple progress function that will be called with
             updated progress strings.
-        :param get_tagged: Function that returns a dict of pointed-to sha ->
+          get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
-        :param depth: Shallow fetch depth
-        :return: iterator over objects, with __len__ implemented
+          depth: Shallow fetch depth
+        Returns: iterator over objects, with __len__ implemented
         """
         if depth not in (None, 0):
             raise NotImplementedError("depth not supported yet")
@@ -465,8 +477,9 @@ class BaseRepo(object):
         A graph walker is used by a remote repository (or proxy)
         to find out which objects are present in this repository.
 
-        :param heads: Repository heads to use (optional)
-        :return: A graph walker object
+        Args:
+          heads: Repository heads to use (optional)
+        Returns: A graph walker object
         """
         if heads is None:
             heads = [
@@ -478,7 +491,7 @@ class BaseRepo(object):
     def get_refs(self):
         """Get dictionary with all refs.
 
-        :return: A ``dict`` mapping ref names to SHA1s
+        Returns: A ``dict`` mapping ref names to SHA1s
         """
         return self.refs.as_dict()
 
@@ -506,9 +519,11 @@ class BaseRepo(object):
     def get_object(self, sha):
         """Retrieve the object with the specified SHA.
 
-        :param sha: SHA to retrieve
-        :return: A ShaFile object
-        :raise KeyError: when the object can not be found
+        Args:
+          sha: SHA to retrieve
+        Returns: A ShaFile object
+        Raises:
+          KeyError: when the object can not be found
         """
         return self.object_store[sha]
 
@@ -518,9 +533,10 @@ class BaseRepo(object):
         If the specific commit is a graftpoint, the graft parents
         will be returned instead.
 
-        :param sha: SHA of the commit for which to retrieve the parents
-        :param commit: Optional commit matching the sha
-        :return: List of parents
+        Args:
+          sha: SHA of the commit for which to retrieve the parents
+          commit: Optional commit matching the sha
+        Returns: List of parents
         """
 
         try:
@@ -533,14 +549,14 @@ class BaseRepo(object):
     def get_config(self):
         """Retrieve the config object.
 
-        :return: `ConfigFile` object for the ``.git/config`` file.
+        Returns: `ConfigFile` object for the ``.git/config`` file.
         """
         raise NotImplementedError(self.get_config)
 
     def get_description(self):
         """Retrieve the description for this repository.
 
-        :return: String with the description of the repository
+        Returns: String with the description of the repository
             as set by the user.
         """
         raise NotImplementedError(self.get_description)
@@ -548,7 +564,8 @@ class BaseRepo(object):
     def set_description(self, description):
         """Set the description for this repository.
 
-        :param description: Text to set as description for this repository.
+        Args:
+          description: Text to set as description for this repository.
         """
         raise NotImplementedError(self.set_description)
 
@@ -559,7 +576,7 @@ class BaseRepo(object):
         itself (.git/config) and the global configuration, which usually
         lives in ~/.gitconfig.
 
-        :return: `Config` instance for this repository
+        Returns: `Config` instance for this repository
         """
         from dulwich.config import StackedConfig
         backends = [self.get_config()] + StackedConfig.default_backends()
@@ -568,7 +585,7 @@ class BaseRepo(object):
     def get_shallow(self):
         """Get the set of shallow commits.
 
-        :return: Set of shallow commits.
+        Returns: Set of shallow commits.
         """
         f = self.get_named_file('shallow')
         if f is None:
@@ -579,8 +596,9 @@ class BaseRepo(object):
     def update_shallow(self, new_shallow, new_unshallow):
         """Update the list of shallow objects.
 
-        :param new_shallow: Newly shallow objects
-        :param new_unshallow: Newly no longer shallow objects
+        Args:
+          new_shallow: Newly shallow objects
+          new_unshallow: Newly no longer shallow objects
         """
         shallow = self.get_shallow()
         if new_shallow:
@@ -594,8 +612,9 @@ class BaseRepo(object):
     def get_peeled(self, ref):
         """Get the peeled value of a ref.
 
-        :param ref: The refname to peel.
-        :return: The fully-peeled SHA1 of a tag object, after peeling all
+        Args:
+          ref: The refname to peel.
+        Returns: The fully-peeled SHA1 of a tag object, after peeling all
             intermediate tags; if the original ref does not point to a tag,
             this will equal the original SHA1.
         """
@@ -607,27 +626,28 @@ class BaseRepo(object):
     def get_walker(self, include=None, *args, **kwargs):
         """Obtain a walker for this repository.
 
-        :param include: Iterable of SHAs of commits to include along with their
+        Args:
+          include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
-        :param exclude: Iterable of SHAs of commits to exclude along with their
+          exclude: Iterable of SHAs of commits to exclude along with their
             ancestors, overriding includes.
-        :param order: ORDER_* constant specifying the order of results.
+          order: ORDER_* constant specifying the order of results.
             Anything other than ORDER_DATE may result in O(n) memory usage.
-        :param reverse: If True, reverse the order of output, requiring O(n)
+          reverse: If True, reverse the order of output, requiring O(n)
             memory.
-        :param max_entries: The maximum number of entries to yield, or None for
+          max_entries: The maximum number of entries to yield, or None for
             no limit.
-        :param paths: Iterable of file or subtree paths to show entries for.
-        :param rename_detector: diff.RenameDetector object for detecting
+          paths: Iterable of file or subtree paths to show entries for.
+          rename_detector: diff.RenameDetector object for detecting
             renames.
-        :param follow: If True, follow path across renames/copies. Forces a
+          follow: If True, follow path across renames/copies. Forces a
             default rename_detector.
-        :param since: Timestamp to list commits after.
-        :param until: Timestamp to list commits before.
-        :param queue_cls: A class to use for a queue of commits, supporting the
+          since: Timestamp to list commits after.
+          until: Timestamp to list commits before.
+          queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
-        :return: A `Walker` object
+        Returns: A `Walker` object
         """
         from dulwich.walk import Walker
         if include is None:
@@ -643,9 +663,11 @@ class BaseRepo(object):
     def __getitem__(self, name):
         """Retrieve a Git object by SHA1 or ref.
 
-        :param name: A Git object SHA1 or a ref name
-        :return: A `ShaFile` object, such as a Commit or Blob
-        :raise KeyError: when the specified ref or object does not exist
+        Args:
+          name: A Git object SHA1 or a ref name
+        Returns: A `ShaFile` object, such as a Commit or Blob
+        Raises:
+          KeyError: when the specified ref or object does not exist
         """
         if not isinstance(name, bytes):
             raise TypeError("'name' must be bytestring, not %.80s" %
@@ -663,7 +685,8 @@ class BaseRepo(object):
     def __contains__(self, name):
         """Check if a specific Git object or ref is present.
 
-        :param name: Git object SHA1 or ref name
+        Args:
+          name: Git object SHA1 or ref name
         """
         if len(name) in (20, 40):
             return name in self.object_store or name in self.refs
@@ -673,8 +696,9 @@ class BaseRepo(object):
     def __setitem__(self, name, value):
         """Set a ref.
 
-        :param name: ref name
-        :param value: Ref value - either a ShaFile object, or a hex sha
+        Args:
+          name: ref name
+          value: Ref value - either a ShaFile object, or a hex sha
         """
         if name.startswith(b"refs/") or name == b'HEAD':
             if isinstance(value, ShaFile):
@@ -689,7 +713,8 @@ class BaseRepo(object):
     def __delitem__(self, name):
         """Remove a ref.
 
-        :param name: Name of the ref to remove
+        Args:
+          name: Name of the ref to remove
         """
         if name.startswith(b"refs/") or name == b"HEAD":
             del self.refs[name]
@@ -705,7 +730,8 @@ class BaseRepo(object):
     def _add_graftpoints(self, updated_graftpoints):
         """Add or modify graftpoints
 
-        :param updated_graftpoints: Dict of commit shas to list of parent shas
+        Args:
+          updated_graftpoints: Dict of commit shas to list of parent shas
         """
 
         # Simple validation
@@ -718,7 +744,8 @@ class BaseRepo(object):
     def _remove_graftpoints(self, to_remove=[]):
         """Remove graftpoints
 
-        :param to_remove: List of commit shas
+        Args:
+          to_remove: List of commit shas
         """
         for sha in to_remove:
             del self._graftpoints[sha]
@@ -737,21 +764,22 @@ class BaseRepo(object):
                   ref=b'HEAD', merge_heads=None):
         """Create a new commit.
 
-        :param message: Commit message
-        :param committer: Committer fullname
-        :param author: Author fullname (defaults to committer)
-        :param commit_timestamp: Commit timestamp (defaults to now)
-        :param commit_timezone: Commit timestamp timezone (defaults to GMT)
-        :param author_timestamp: Author timestamp (defaults to commit
+        Args:
+          message: Commit message
+          committer: Committer fullname
+          author: Author fullname (defaults to committer)
+          commit_timestamp: Commit timestamp (defaults to now)
+          commit_timezone: Commit timestamp timezone (defaults to GMT)
+          author_timestamp: Author timestamp (defaults to commit
             timestamp)
-        :param author_timezone: Author timestamp timezone
+          author_timezone: Author timestamp timezone
             (defaults to commit timestamp timezone)
-        :param tree: SHA1 of the tree root to use (if not specified the
+          tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
-        :param encoding: Encoding
-        :param ref: Optional ref to commit to (defaults to current branch)
-        :param merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
-        :return: New commit SHA1
+          encoding: Encoding
+          ref: Optional ref to commit to (defaults to current branch)
+          merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
+        Returns: New commit SHA1
         """
         import time
         c = Commit()
@@ -858,8 +886,9 @@ def read_gitfile(f):
 
     The first line of the file should start with "gitdir: "
 
-    :param f: File-like object to read from
-    :return: A path
+    Args:
+      f: File-like object to read from
+    Returns: A path
     """
     cs = f.read()
     if not cs.startswith("gitdir: "):
@@ -957,7 +986,8 @@ class Repo(BaseRepo):
         Return a Repo object for the first parent directory that looks like a
         Git repository.
 
-        :param start: The directory to start discovery from (defaults to '.')
+        Args:
+          start: The directory to start discovery from (defaults to '.')
         """
         remaining = True
         path = os.path.abspath(start)
@@ -987,7 +1017,7 @@ class Repo(BaseRepo):
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
 
-        :return: True if permissions can be trusted, False otherwise.
+        Returns: True if permissions can be trusted, False otherwise.
         """
         fname = os.path.join(self.path, '.probe-permissions')
         with open(fname, 'w') as f:
@@ -1012,8 +1042,9 @@ class Repo(BaseRepo):
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
-        :param path: The path to the file, relative to the control dir.
-        :param contents: A string to write to the file.
+        Args:
+          path: The path to the file, relative to the control dir.
+          contents: A string to write to the file.
         """
         path = path.lstrip(os.path.sep)
         with GitFile(os.path.join(self.controldir(), path), 'wb') as f:
@@ -1034,10 +1065,11 @@ class Repo(BaseRepo):
         the control dir in a disk-based Repo, the object returned need not be
         pointing to a file in that location.
 
-        :param path: The path to the file, relative to the control dir.
-        :param basedir: Optional argument that specifies an alternative to the
+        Args:
+          path: The path to the file, relative to the control dir.
+          basedir: Optional argument that specifies an alternative to the
             control dir.
-        :return: An open file object, or None if the file does not exist.
+        Returns: An open file object, or None if the file does not exist.
         """
         # TODO(dborowitz): sanitize filenames, since this is used directly by
         # the dumb web serving code.
@@ -1058,8 +1090,9 @@ class Repo(BaseRepo):
     def open_index(self):
         """Open the index for this repository.
 
-        :raise NoIndexPresent: If no index is present
-        :return: The matching `Index`
+        Raises:
+          NoIndexPresent: If no index is present
+        Returns: The matching `Index`
         """
         from dulwich.index import Index
         if not self.has_index():
@@ -1075,7 +1108,8 @@ class Repo(BaseRepo):
     def stage(self, fs_paths):
         """Stage a set of paths.
 
-        :param fs_paths: List of paths, relative to the repository path
+        Args:
+          fs_paths: List of paths, relative to the repository path
         """
 
         root_path_bytes = self.path.encode(sys.getfilesystemencoding())
@@ -1123,12 +1157,13 @@ class Repo(BaseRepo):
               origin=b"origin", checkout=None):
         """Clone this repository.
 
-        :param target_path: Target path
-        :param mkdir: Create the target directory
-        :param bare: Whether to create a bare repository
-        :param origin: Base name for refs in target repository
+        Args:
+          target_path: Target path
+          mkdir: Create the target directory
+          bare: Whether to create a bare repository
+          origin: Base name for refs in target repository
             cloned from this repository
-        :return: Created repository as `Repo`
+        Returns: Created repository as `Repo`
         """
         if not bare:
             target = self.init(target_path, mkdir=mkdir)
@@ -1177,7 +1212,8 @@ class Repo(BaseRepo):
     def reset_index(self, tree=None):
         """Reset the index back to a specific tree.
 
-        :param tree: Tree SHA to reset to, None for current HEAD tree.
+        Args:
+          tree: Tree SHA to reset to, None for current HEAD tree.
         """
         from dulwich.index import (
             build_index_from_tree,
@@ -1201,7 +1237,7 @@ class Repo(BaseRepo):
     def get_config(self):
         """Retrieve the config object.
 
-        :return: `ConfigFile` object for the ``.git/config`` file.
+        Returns: `ConfigFile` object for the ``.git/config`` file.
         """
         from dulwich.config import ConfigFile
         path = os.path.join(self._controldir, 'config')
@@ -1217,7 +1253,7 @@ class Repo(BaseRepo):
     def get_description(self):
         """Retrieve the description of this repository.
 
-        :return: A string describing the repository or None.
+        Returns: A string describing the repository or None.
         """
         path = os.path.join(self._controldir, 'description')
         try:
@@ -1234,7 +1270,8 @@ class Repo(BaseRepo):
     def set_description(self, description):
         """Set the description for this repository.
 
-        :param description: Text to set as description for this repository.
+        Args:
+          description: Text to set as description for this repository.
         """
 
         self._put_named_file('description', description)
@@ -1253,9 +1290,10 @@ class Repo(BaseRepo):
     def init(cls, path, mkdir=False):
         """Create a new repository.
 
-        :param path: Path in which to create the repository
-        :param mkdir: Whether to create the directory
-        :return: `Repo` instance
+        Args:
+          path: Path in which to create the repository
+          mkdir: Whether to create the directory
+        Returns: `Repo` instance
         """
         if mkdir:
             os.mkdir(path)
@@ -1270,11 +1308,12 @@ class Repo(BaseRepo):
                                     mkdir=False):
         """Create a new working directory linked to a repository.
 
-        :param path: Path in which to create the working tree.
-        :param main_repo: Main repository to reference
-        :param identifier: Worktree identifier
-        :param mkdir: Whether to create the directory
-        :return: `Repo` instance
+        Args:
+          path: Path in which to create the working tree.
+          main_repo: Main repository to reference
+          identifier: Worktree identifier
+          mkdir: Whether to create the directory
+        Returns: `Repo` instance
         """
         if mkdir:
             os.mkdir(path)
@@ -1313,8 +1352,9 @@ class Repo(BaseRepo):
 
         ``path`` should already exist and be an empty directory.
 
-        :param path: Path to create bare repository in
-        :return: a `Repo` instance
+        Args:
+          path: Path to create bare repository in
+        Returns: a `Repo` instance
         """
         if mkdir:
             os.mkdir(path)
@@ -1371,15 +1411,16 @@ class MemoryRepo(BaseRepo):
     def _determine_file_mode(self):
         """Probe the file-system to determine whether permissions can be trusted.
 
-        :return: True if permissions can be trusted, False otherwise.
+        Returns: True if permissions can be trusted, False otherwise.
         """
         return sys.platform != 'win32'
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
 
-        :param path: The path to the file, relative to the control dir.
-        :param contents: A string to write to the file.
+        Args:
+          path: The path to the file, relative to the control dir.
+          contents: A string to write to the file.
         """
         self._named_files[path] = contents
 
@@ -1396,8 +1437,9 @@ class MemoryRepo(BaseRepo):
         the control dir in a disk-baked Repo, the object returned need not be
         pointing to a file in that location.
 
-        :param path: The path to the file, relative to the control dir.
-        :return: An open file object, or None if the file does not exist.
+        Args:
+          path: The path to the file, relative to the control dir.
+        Returns: An open file object, or None if the file does not exist.
         """
         contents = self._named_files.get(path, None)
         if contents is None:
@@ -1407,14 +1449,15 @@ class MemoryRepo(BaseRepo):
     def open_index(self):
         """Fail to open index for this repo, since it is bare.
 
-        :raise NoIndexPresent: Raised when no index is present
+        Raises:
+          NoIndexPresent: Raised when no index is present
         """
         raise NoIndexPresent()
 
     def get_config(self):
         """Retrieve the config object.
 
-        :return: `ConfigFile` object.
+        Returns: `ConfigFile` object.
         """
         return self._config
 
@@ -1422,9 +1465,10 @@ class MemoryRepo(BaseRepo):
     def init_bare(cls, objects, refs):
         """Create a new bare repository in memory.
 
-        :param objects: Objects for the new repository,
+        Args:
+          objects: Objects for the new repository,
             as iterable
-        :param refs: Refs as dictionary, mapping names
+          refs: Refs as dictionary, mapping names
             to object SHA1s
         """
         ret = cls()

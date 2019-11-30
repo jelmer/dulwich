@@ -69,9 +69,9 @@ def _fancy_rename(oldname, newname):
 def GitFile(filename, mode='rb', bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
 
-    :return: a builtin file object or a _GitFile object
+    Returns: a builtin file object or a _GitFile object
 
-    :note: See _GitFile for a description of the file locking protocol.
+    Note: See _GitFile for a description of the file locking protocol.
 
     Only read-only and write-only (binary) modes are supported; r+, w+, and a
     are not.  To read and write from the same file, you can take advantage of
@@ -106,7 +106,7 @@ class _GitFile(object):
     directory, and the lockfile will be renamed to overwrite the original file
     on close.
 
-    :note: You *must* call close() or abort() on a _GitFile for the lock to be
+    Note: You *must* call close() or abort() on a _GitFile for the lock to be
         released. Typically this will happen in a finally block.
     """
 
@@ -157,11 +157,12 @@ class _GitFile(object):
     def close(self):
         """Close this file, saving the lockfile over the original.
 
-        :note: If this method fails, it will attempt to delete the lockfile.
+        Note: If this method fails, it will attempt to delete the lockfile.
             However, it is not guaranteed to do so (e.g. if a filesystem
             becomes suddenly read-only), which will prevent future writes to
             this file until the lockfile is removed manually.
-        :raises OSError: if the original file could not be overwritten. The
+        Raises:
+          OSError: if the original file could not be overwritten. The
             lock file is still closed, so further attempts to write to the same
             file object will raise ValueError.
         """

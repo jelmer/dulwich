@@ -1,0 +1,7 @@
+dulwich.tests.test\_refs module
+===============================
+
+.. automodule:: dulwich.tests.test_refs
+   :members:
+   :undoc-members:
+   :show-inheritance:

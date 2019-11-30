@@ -1,0 +1,7 @@
+dulwich.client module
+=====================
+
+.. automodule:: dulwich.client
+   :members:
+   :undoc-members:
+   :show-inheritance:

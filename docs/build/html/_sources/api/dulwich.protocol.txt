@@ -1,0 +1,7 @@
+dulwich.protocol module
+=======================
+
+.. automodule:: dulwich.protocol
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -41,9 +41,11 @@ def write_commit_patch(f, commit, contents, progress, version=None,
                        encoding=None):
     """Write a individual file patch.
 
-    :param commit: Commit object
-    :param progress: Tuple with current patch number and total.
-    :return: tuple with filename and contents
+    Args:
+      commit: Commit object
+      progress: Tuple with current patch number and total.
+    Returns:
+      tuple with filename and contents
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
     if isinstance(contents, str):
@@ -80,10 +82,12 @@ def write_commit_patch(f, commit, contents, progress, version=None,
 def get_summary(commit):
     """Determine the summary line for use in a filename.
 
-    :param commit: Commit
-    :return: Summary string
+    Args:
+      commit: Commit
+    Returns: Summary string
     """
-    return commit.message.splitlines()[0].replace(" ", "-")
+    decoded = commit.message.decode(errors='replace')
+    return decoded.splitlines()[0].replace(" ", "-")
 
 
 #  Unified Diff
@@ -152,7 +156,8 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
 def is_binary(content):
     """See if the first few bytes contain any null characters.
 
-    :param content: Bytestring to check for binary content
+    Args:
+      content: Bytestring to check for binary content
     """
     return b'\0' in content[:FIRST_FEW_BYTES]
 
@@ -174,14 +179,15 @@ def patch_filename(p, root):
 def write_object_diff(f, store, old_file, new_file, diff_binary=False):
     """Write the diff for an object.
 
-    :param f: File-like object to write to
-    :param store: Store to retrieve objects from, if necessary
-    :param old_file: (path, mode, hexsha) tuple
-    :param new_file: (path, mode, hexsha) tuple
-    :param diff_binary: Whether to diff files even if they
+    Args:
+      f: File-like object to write to
+      store: Store to retrieve objects from, if necessary
+      old_file: (path, mode, hexsha) tuple
+      new_file: (path, mode, hexsha) tuple
+      diff_binary: Whether to diff files even if they
         are considered binary files by is_binary().
 
-    :note: the tuple elements should be None for nonexistant files
+    Note: the tuple elements should be None for nonexistant files
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file
@@ -224,9 +230,10 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
 def gen_diff_header(paths, modes, shas):
     """Write a blob diff header.
 
-    :param paths: Tuple with old and new path
-    :param modes: Tuple with old and new modes
-    :param shas: Tuple with old and new shas
+    Args:
+      paths: Tuple with old and new path
+      modes: Tuple with old and new modes
+      shas: Tuple with old and new shas
     """
     (old_path, new_path) = paths
     (old_mode, new_mode) = modes
@@ -256,11 +263,12 @@ def gen_diff_header(paths, modes, shas):
 def write_blob_diff(f, old_file, new_file):
     """Write blob diff.
 
-    :param f: File-like object to write to
-    :param old_file: (path, mode, hexsha) tuple (None if nonexisting)
-    :param new_file: (path, mode, hexsha) tuple (None if nonexisting)
+    Args:
+      f: File-like object to write to
+      old_file: (path, mode, hexsha) tuple (None if nonexisting)
+      new_file: (path, mode, hexsha) tuple (None if nonexisting)
 
-    :note: The use of write_object_diff is recommended over this function.
+    Note: The use of write_object_diff is recommended over this function.
     """
     (old_path, old_mode, old_blob) = old_file
     (new_path, new_mode, new_blob) = new_file
@@ -284,10 +292,11 @@ def write_blob_diff(f, old_file, new_file):
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """Write tree diff.
 
-    :param f: File-like object to write to.
-    :param old_tree: Old tree id
-    :param new_tree: New tree id
-    :param diff_binary: Whether to diff files even if they
+    Args:
+      f: File-like object to write to.
+      old_tree: Old tree id
+      new_tree: New tree id
+      diff_binary: Whether to diff files even if they
         are considered binary files by is_binary().
     """
     changes = store.tree_changes(old_tree, new_tree)
@@ -299,9 +308,10 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
 def git_am_patch_split(f, encoding=None):
     """Parse a git-am-style patch and split it up into bits.
 
-    :param f: File-like object to parse
-    :param encoding: Encoding to use when creating Git objects
-    :return: Tuple with commit object, diff contents and git version
+    Args:
+      f: File-like object to parse
+      encoding: Encoding to use when creating Git objects
+    Returns: Tuple with commit object, diff contents and git version
     """
     encoding = encoding or getattr(f, "encoding", "ascii")
     encoding = encoding or "ascii"
@@ -319,9 +329,10 @@ def git_am_patch_split(f, encoding=None):
 def parse_patch_message(msg, encoding=None):
     """Extract a Commit object and patch from an e-mail message.
 
-    :param msg: An email message (email.message.Message)
-    :param encoding: Encoding to use to encode Git commits
-    :return: Tuple with commit object, diff contents and git version
+    Args:
+      msg: An email message (email.message.Message)
+      encoding: Encoding to use to encode Git commits
+    Returns: Tuple with commit object, diff contents and git version
     """
     c = Commit()
     c.author = msg["from"].encode(encoding)

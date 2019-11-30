@@ -23,15 +23,18 @@ matrix:
       env: TEST_REQUIRE=fastimport
       dist: xenial
       sudo: true
+    - python: 3.8
+      env: TEST_REQUIRE=fastimport
+      dist: xenial
+      sudo: true
+    - python: 3.8
+      env: TEST_REQUIRE=fastimport
+      dist: xenial
+      sudo: true
     - python: 3.6
       env: PURE=true
     - python: 2.7
       env: PURE=true
-    # flakes checker fails on python 3.8-dev:
-    #- python: 3.8-dev
-    #  env: TEST_REQUIRE=fastimport
-    #  dist: xenial
-    #  sudo: true
 
 install:
   - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE

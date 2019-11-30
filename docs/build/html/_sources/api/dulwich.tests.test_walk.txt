@@ -1,0 +1,7 @@
+dulwich.tests.test\_walk module
+===============================
+
+.. automodule:: dulwich.tests.test_walk
+   :members:
+   :undoc-members:
+   :show-inheritance:

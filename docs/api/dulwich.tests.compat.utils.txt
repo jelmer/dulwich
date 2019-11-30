@@ -1,0 +1,7 @@
+dulwich.tests.compat.utils module
+=================================
+
+.. automodule:: dulwich.tests.compat.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:

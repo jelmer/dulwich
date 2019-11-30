@@ -1,0 +1,7 @@
+dulwich.tests.test\_hooks module
+================================
+
+.. automodule:: dulwich.tests.test_hooks
+   :members:
+   :undoc-members:
+   :show-inheritance:

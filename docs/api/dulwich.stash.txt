@@ -1,0 +1,7 @@
+dulwich.stash module
+====================
+
+.. automodule:: dulwich.stash
+   :members:
+   :undoc-members:
+   :show-inheritance:

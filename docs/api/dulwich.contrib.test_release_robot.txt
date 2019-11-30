@@ -1,0 +1,7 @@
+dulwich.contrib.test\_release\_robot module
+===========================================
+
+.. automodule:: dulwich.contrib.test_release_robot
+   :members:
+   :undoc-members:
+   :show-inheritance:

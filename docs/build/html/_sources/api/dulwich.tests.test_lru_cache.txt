@@ -1,0 +1,7 @@
+dulwich.tests.test\_lru\_cache module
+=====================================
+
+.. automodule:: dulwich.tests.test_lru_cache
+   :members:
+   :undoc-members:
+   :show-inheritance:

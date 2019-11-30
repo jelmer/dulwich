@@ -121,12 +121,14 @@ class InvalidWants(Exception):
 
 
 def _fileno_can_read(fileno):
-    """Check if a file descriptor is readable."""
+    """Check if a file descriptor is readable.
+    """
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 
 def _win32_peek_avail(handle):
-    """Wrapper around PeekNamedPipe to check how many bytes are available."""
+    """Wrapper around PeekNamedPipe to check how many bytes are available.
+    """
     from ctypes import byref, wintypes, windll
     c_avail = wintypes.DWORD()
     c_message = wintypes.DWORD()
@@ -146,8 +148,7 @@ RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
 
 
 class ReportStatusParser(object):
-    """Handle status as reported by servers with 'report-status' capability.
-    """
+    """Handle status as reported by servers with 'report-status' capability."""
 
     def __init__(self):
         self._done = False
@@ -158,8 +159,9 @@ class ReportStatusParser(object):
     def check(self):
         """Check if there were any errors and, if so, raise exceptions.
 
-        :raise SendPackError: Raised when the server could not unpack
-        :raise UpdateRefsError: Raised when refs could not be updated
+        Raises:
+          SendPackError: Raised when the server could not unpack
+          UpdateRefsError: Raised when refs could not be updated
         """
         if self._pack_status not in (b'unpack ok', None):
             raise SendPackError(self._pack_status)
@@ -187,8 +189,9 @@ class ReportStatusParser(object):
     def handle_packet(self, pkt):
         """Handle a packet.
 
-        :raise GitProtocolError: Raised when packets are received after a
-            flush packet.
+        Raises:
+          GitProtocolError: Raised when packets are received after a flush
+          packet.
         """
         if self._done:
             raise GitProtocolError("received more data after status report")
@@ -226,9 +229,10 @@ def read_pkt_refs(proto):
 class FetchPackResult(object):
     """Result of a fetch-pack operation.
 
-    :var refs: Dictionary with all remote refs
-    :var symrefs: Dictionary with remote symrefs
-    :var agent: User agent string
+    Attributes:
+      refs: Dictionary with all remote refs
+      symrefs: Dictionary with remote symrefs
+      agent: User agent string
     """
 
     _FORWARDED_ATTRS = [
@@ -304,15 +308,14 @@ def _read_shallow_updates(proto):
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
 class GitClient(object):
-    """Git smart server client.
-
-    """
+    """Git smart server client."""
 
     def __init__(self, thin_packs=True, report_activity=None, quiet=False):
         """Create a new GitClient instance.
 
-        :param thin_packs: Whether or not thin packs should be retrieved
-        :param report_activity: Optional callback for reporting transport
+        Args:
+          thin_packs: Whether or not thin packs should be retrieved
+          report_activity: Optional callback for reporting transport
             activity.
         """
         self._report_activity = report_activity
@@ -329,8 +332,12 @@ class GitClient(object):
     def get_url(self, path):
         """Retrieves full url to given path.
 
-        :param path: Repository path (as string)
-        :return: Url to path (as string)
+        Args:
+          path: Repository path (as string)
+
+        Returns:
+          Url to path (as string)
+
         """
         raise NotImplementedError(self.get_url)
 
@@ -338,8 +345,11 @@ class GitClient(object):
     def from_parsedurl(cls, parsedurl, **kwargs):
         """Create an instance of this client from a urlparse.parsed object.
 
-        :param parsedurl: Result of urlparse.urlparse()
-        :return: A `GitClient` object
+        Args:
+          parsedurl: Result of urlparse.urlparse()
+
+        Returns:
+          A `GitClient` object
         """
         raise NotImplementedError(cls.from_parsedurl)
 
@@ -347,19 +357,24 @@ class GitClient(object):
                   progress=None):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path (as bytestring)
-        :param update_refs: Function to determine changes to remote refs.
-            Receive dict with existing remote refs, returns dict with
+        Args:
+          path: Repository path (as bytestring)
+          update_refs: Function to determine changes to remote refs. Receive
+            dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_data: Function that can return a tuple
+          generate_pack_data: Function that can return a tuple
             with number of objects and list of pack data to include
-        :param progress: Optional progress function
+          progress: Optional progress function
 
-        :raises SendPackError: if server rejects the pack data
-        :raises UpdateRefsError: if the server supports report-status
-                                 and rejects ref updates
-        :return: new_refs dictionary containing the changes that were made
+        Returns:
+          new_refs dictionary containing the changes that were made
             {refname: new_ref}, including deleted refs.
+
+        Raises:
+          SendPackError: if server rejects the pack data
+          UpdateRefsError: if the server supports report-status
+                         and rejects ref updates
+
         """
         raise NotImplementedError(self.send_pack)
 
@@ -367,14 +382,18 @@ class GitClient(object):
               depth=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from (as bytestring)
-        :param target: Target repository to fetch into
-        :param determine_wants: Optional function to determine what refs
-            to fetch. Receives dictionary of name->sha, should return
+        Args:
+          path: Path to fetch from (as bytestring)
+          target: Target repository to fetch into
+          determine_wants: Optional function to determine what refs to fetch.
+            Receives dictionary of name->sha, should return
             list of shas to fetch. Defaults to all shas.
-        :param progress: Optional progress function
-        :param depth: Depth to fetch at
-        :return: Dictionary with all remote refs (not just those fetched)
+          progress: Optional progress function
+          depth: Depth to fetch at
+
+        Returns:
+          Dictionary with all remote refs (not just those fetched)
+
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
@@ -408,22 +427,30 @@ class GitClient(object):
                    progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
-        :param path: Remote path to fetch from
-        :param determine_wants: Function determine what refs
-            to fetch. Receives dictionary of name->sha, should return
-            list of shas to fetch.
-        :param graph_walker: Object with next() and ack().
-        :param pack_data: Callback called for each bit of data in the pack
-        :param progress: Callback for progress reports (strings)
-        :param depth: Shallow fetch depth
-        :return: FetchPackResult object
+        Args:
+          path: Remote path to fetch from
+          determine_wants: Function determine what refs
+        to fetch. Receives dictionary of name->sha, should return
+        list of shas to fetch.
+          graph_walker: Object with next() and ack().
+          pack_data: Callback called for each bit of data in the pack
+          progress: Callback for progress reports (strings)
+          depth: Shallow fetch depth
+
+        Returns:
+          FetchPackResult object
+
         """
         raise NotImplementedError(self.fetch_pack)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server.
 
-        :param path: Path to the repo to fetch from. (as bytestring)
+        Args:
+          path: Path to the repo to fetch from. (as bytestring)
+
+        Returns:
+
         """
         raise NotImplementedError(self.get_refs)
 
@@ -469,8 +496,9 @@ class GitClient(object):
 
         This requires the side-band-64k capability.
 
-        :param proto: Protocol object to read from
-        :param channel_callbacks: Dictionary mapping channels to packet
+        Args:
+          proto: Protocol object to read from
+          channel_callbacks: Dictionary mapping channels to packet
             handlers to use. None for a callback discards channel data.
         """
         for pkt in proto.read_pkt_seq():
@@ -488,11 +516,15 @@ class GitClient(object):
                                   new_refs):
         """Handle the head of a 'git-receive-pack' request.
 
-        :param proto: Protocol object to read from
-        :param capabilities: List of negotiated capabilities
-        :param old_refs: Old refs, as received from the server
-        :param new_refs: Refs to change
-        :return: (have, want) tuple
+        Args:
+          proto: Protocol object to read from
+          capabilities: List of negotiated capabilities
+          old_refs: Old refs, as received from the server
+          new_refs: Refs to change
+
+        Returns:
+          have, want) tuple
+
         """
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
@@ -536,9 +568,13 @@ class GitClient(object):
     def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
 
-        :param proto: Protocol object to read from
-        :param capabilities: List of negotiated capabilities
-        :param progress: Optional progress reporting function
+        Args:
+          proto: Protocol object to read from
+          capabilities: List of negotiated capabilities
+          progress: Optional progress reporting function
+
+        Returns:
+
         """
         if CAPABILITY_SIDE_BAND_64K in capabilities:
             if progress is None:
@@ -579,13 +615,17 @@ class GitClient(object):
                                  wants, can_read, depth):
         """Handle the head of a 'git-upload-pack' request.
 
-        :param proto: Protocol object to read from
-        :param capabilities: List of negotiated capabilities
-        :param graph_walker: GraphWalker instance to call .ack() on
-        :param wants: List of commits to fetch
-        :param can_read: function that returns a boolean that indicates
-            whether there is extra graph data to read on proto
-        :param depth: Depth for request
+        Args:
+          proto: Protocol object to read from
+          capabilities: List of negotiated capabilities
+          graph_walker: GraphWalker instance to call .ack() on
+          wants: List of commits to fetch
+          can_read: function that returns a boolean that indicates
+        whether there is extra graph data to read on proto
+          depth: Depth for request
+
+        Returns:
+
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
         proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' +
@@ -633,12 +673,16 @@ class GitClient(object):
                                  pack_data, progress=None, rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
-        :param proto: Protocol object to read from
-        :param capabilities: List of negotiated capabilities
-        :param graph_walker: GraphWalker instance to call .ack() on
-        :param pack_data: Function to call with pack data
-        :param progress: Optional progress reporting function
-        :param rbufsize: Read buffer size
+        Args:
+          proto: Protocol object to read from
+          capabilities: List of negotiated capabilities
+          graph_walker: GraphWalker instance to call .ack() on
+          pack_data: Function to call with pack data
+          progress: Optional progress reporting function
+          rbufsize: Read buffer size
+
+        Returns:
+
         """
         pkt = proto.read_pkt_line()
         while pkt:
@@ -670,8 +714,12 @@ class GitClient(object):
 def check_wants(wants, refs):
     """Check that a set of wants is valid.
 
-    :param wants: Set of object SHAs to fetch
-    :param refs: Refs dictionary to check against
+    Args:
+      wants: Set of object SHAs to fetch
+      refs: Refs dictionary to check against
+
+    Returns:
+
     """
     missing = set(wants) - {
             v for (k, v) in refs.items()
@@ -681,7 +729,6 @@ def check_wants(wants, refs):
 
 
 def remote_error_from_stderr(stderr):
-    """Return an appropriate exception based on stderr output. """
     if stderr is None:
         return HangupException()
     for l in stderr.readlines():
@@ -710,8 +757,9 @@ class TraditionalGitClient(GitClient):
         for use and a can_read function which may be used to see if
         reads would block.
 
-        :param cmd: The git service name to which we should connect.
-        :param path: The path we should pass to the service. (as bytestirng)
+        Args:
+          cmd: The git service name to which we should connect.
+          path: The path we should pass to the service. (as bytestirng)
         """
         raise NotImplementedError()
 
@@ -719,19 +767,24 @@ class TraditionalGitClient(GitClient):
                   progress=None):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path (as bytestring)
-        :param update_refs: Function to determine changes to remote refs.
-            Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_data: Function that can return a tuple with
-            number of objects and pack data to upload.
-        :param progress: Optional callback called with progress updates
+        Args:
+          path: Repository path (as bytestring)
+          update_refs: Function to determine changes to remote refs.
+        Receive dict with existing remote refs, returns dict with
+        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          generate_pack_data: Function that can return a tuple with
+        number of objects and pack data to upload.
+          progress: Optional callback called with progress updates
 
-        :raises SendPackError: if server rejects the pack data
-        :raises UpdateRefsError: if the server supports report-status
-                                 and rejects ref updates
-        :return: new_refs dictionary containing the changes that were made
-            {refname: new_ref}, including deleted refs.
+        Returns:
+          new_refs dictionary containing the changes that were made
+          {refname: new_ref}, including deleted refs.
+
+        Raises:
+          SendPackError: if server rejects the pack data
+          UpdateRefsError: if the server supports report-status
+                         and rejects ref updates
+
         """
         proto, unused_can_read, stderr = self._connect(b'receive-pack', path)
         with proto:
@@ -798,15 +851,19 @@ class TraditionalGitClient(GitClient):
                    progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
-        :param path: Remote path to fetch from
-        :param determine_wants: Function determine what refs
-            to fetch. Receives dictionary of name->sha, should return
-            list of shas to fetch.
-        :param graph_walker: Object with next() and ack().
-        :param pack_data: Callback called for each bit of data in the pack
-        :param progress: Callback for progress reports (strings)
-        :param depth: Shallow fetch depth
-        :return: FetchPackResult object
+        Args:
+          path: Remote path to fetch from
+          determine_wants: Function determine what refs
+        to fetch. Receives dictionary of name->sha, should return
+        list of shas to fetch.
+          graph_walker: Object with next() and ack().
+          pack_data: Callback called for each bit of data in the pack
+          progress: Callback for progress reports (strings)
+          depth: Shallow fetch depth
+
+        Returns:
+          FetchPackResult object
+
         """
         proto, can_read, stderr = self._connect(b'upload-pack', path)
         with proto:
@@ -832,7 +889,6 @@ class TraditionalGitClient(GitClient):
             if not wants:
                 proto.write_pkt_line(None)
                 return FetchPackResult(refs, symrefs, agent)
-            check_wants(wants, refs)
             (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read,
                 depth=depth)
@@ -843,7 +899,8 @@ class TraditionalGitClient(GitClient):
                     refs, symrefs, agent, new_shallow, new_unshallow)
 
     def get_refs(self, path):
-        """Retrieve the current refs from a git smart server."""
+        """Retrieve the current refs from a git smart server.
+        """
         # stock `git ls-remote` uses upload-pack
         proto, _, stderr = self._connect(b'upload-pack', path)
         with proto:
@@ -983,8 +1040,7 @@ class SubprocessWrapper(object):
 
 
 def find_git_command():
-    """Find command to run for system Git (usually C Git).
-    """
+    """Find command to run for system Git (usually C Git)."""
     if sys.platform == 'win32':  # support .exe, .bat and .cmd
         try:  # to avoid overhead
             import win32api
@@ -1029,8 +1085,9 @@ class LocalGitClient(GitClient):
     def __init__(self, thin_packs=True, report_activity=None, config=None):
         """Create a new LocalGitClient instance.
 
-        :param thin_packs: Whether or not thin packs should be retrieved
-        :param report_activity: Optional callback for reporting transport
+        Args:
+          thin_packs: Whether or not thin packs should be retrieved
+          report_activity: Optional callback for reporting transport
             activity.
         """
         self._report_activity = report_activity
@@ -1054,19 +1111,24 @@ class LocalGitClient(GitClient):
                   progress=None):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path (as bytestring)
-        :param update_refs: Function to determine changes to remote refs.
-            Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_data: Function that can return a tuple
-            with number of items and pack data to upload.
-        :param progress: Optional progress function
+        Args:
+          path: Repository path (as bytestring)
+          update_refs: Function to determine changes to remote refs.
+        Receive dict with existing remote refs, returns dict with
+        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          generate_pack_data: Function that can return a tuple
+        with number of items and pack data to upload.
+          progress: Optional progress function
 
-        :raises SendPackError: if server rejects the pack data
-        :raises UpdateRefsError: if the server supports report-status
-                                 and rejects ref updates
-        :return: new_refs dictionary containing the changes that were made
-            {refname: new_ref}, including deleted refs.
+        Returns:
+          new_refs dictionary containing the changes that were made
+          {refname: new_ref}, including deleted refs.
+
+        Raises:
+          SendPackError: if server rejects the pack data
+          UpdateRefsError: if the server supports report-status
+                         and rejects ref updates
+
         """
         if not progress:
             def progress(x):
@@ -1108,14 +1170,18 @@ class LocalGitClient(GitClient):
               depth=None):
         """Fetch into a target repository.
 
-        :param path: Path to fetch from (as bytestring)
-        :param target: Target repository to fetch into
-        :param determine_wants: Optional function determine what refs
-            to fetch. Receives dictionary of name->sha, should return
-            list of shas to fetch. Defaults to all shas.
-        :param progress: Optional progress function
-        :param depth: Shallow fetch depth
-        :return: FetchPackResult object
+        Args:
+          path: Path to fetch from (as bytestring)
+          target: Target repository to fetch into
+          determine_wants: Optional function determine what refs
+        to fetch. Receives dictionary of name->sha, should return
+        list of shas to fetch. Defaults to all shas.
+          progress: Optional progress function
+          depth: Shallow fetch depth
+
+        Returns:
+          FetchPackResult object
+
         """
         with self._open_repo(path) as r:
             refs = r.fetch(target, determine_wants=determine_wants,
@@ -1127,15 +1193,19 @@ class LocalGitClient(GitClient):
                    progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
-        :param path: Remote path to fetch from
-        :param determine_wants: Function determine what refs
-            to fetch. Receives dictionary of name->sha, should return
-            list of shas to fetch.
-        :param graph_walker: Object with next() and ack().
-        :param pack_data: Callback called for each bit of data in the pack
-        :param progress: Callback for progress reports (strings)
-        :param depth: Shallow fetch depth
-        :return: FetchPackResult object
+        Args:
+          path: Remote path to fetch from
+          determine_wants: Function determine what refs
+        to fetch. Receives dictionary of name->sha, should return
+        list of shas to fetch.
+          graph_walker: Object with next() and ack().
+          pack_data: Callback called for each bit of data in the pack
+          progress: Callback for progress reports (strings)
+          depth: Shallow fetch depth
+
+        Returns:
+          FetchPackResult object
+
         """
         with self._open_repo(path) as r:
             objects_iter = r.fetch_objects(
@@ -1152,7 +1222,8 @@ class LocalGitClient(GitClient):
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):
-        """Retrieve the current refs from a git smart server."""
+        """Retrieve the current refs from a git smart server.
+        """
 
         with self._open_repo(path) as target:
             return target.get_refs()
@@ -1182,12 +1253,16 @@ class SSHVendor(object):
         Run a command remotely and return a file-like object for interaction
         with the remote command.
 
-        :param host: Host name
-        :param command: Command to run (as argv array)
-        :param username: Optional ame of user to log in as
-        :param port: Optional SSH port to use
-        :param password: Optional ssh password for login or private key
-        :param key_filename: Optional path to private keyfile
+        Args:
+          host: Host name
+          command: Command to run (as argv array)
+          username: Optional ame of user to log in as
+          port: Optional SSH port to use
+          password: Optional ssh password for login or private key
+          key_filename: Optional path to private keyfile
+
+        Returns:
+
         """
         raise NotImplementedError(self.run_command)
 
@@ -1349,10 +1424,14 @@ def default_urllib3_manager(config, **override_kwargs):
 
     Honour detected proxy configurations.
 
-    :param config: `dulwich.config.ConfigDict` instance with Git configuration.
-    :param kwargs: Additional arguments for urllib3.ProxyManager
-    :return: `urllib3.ProxyManager` instance for proxy configurations,
-        `urllib3.PoolManager` otherwise.
+    Args:
+      config: dulwich.config.ConfigDict` instance with Git configuration.
+      kwargs: Additional arguments for urllib3.ProxyManager
+
+    Returns:
+      urllib3.ProxyManager` instance for proxy configurations,
+      `urllib3.PoolManager` otherwise.
+
     """
     proxy_server = user_agent = None
     ca_certs = ssl_verify = None
@@ -1479,14 +1558,18 @@ class HttpGitClient(GitClient):
                       allow_compression=False):
         """Perform HTTP request.
 
-        :param url: Request URL.
-        :param headers: Optional custom headers to override defaults.
-        :param data: Request data.
-        :param allow_compression: Allow GZipped communication.
-        :return: Tuple (`response`, `read`), where response is an `urllib3`
-            response object with additional `content_type` and
-            `redirect_location` properties, and `read` is a consumable read
-            method for the response data.
+        Args:
+          url: Request URL.
+          headers: Optional custom headers to override defaults.
+          data: Request data.
+          allow_compression: Allow GZipped communication.
+
+        Returns:
+          Tuple (`response`, `read`), where response is an `urllib3`
+          response object with additional `content_type` and
+          `redirect_location` properties, and `read` is a consumable read
+          method for the response data.
+
         """
         req_headers = self.pool_manager.headers.copy()
         if headers is not None:
@@ -1577,19 +1660,24 @@ class HttpGitClient(GitClient):
                   progress=None):
         """Upload a pack to a remote repository.
 
-        :param path: Repository path (as bytestring)
-        :param update_refs: Function to determine changes to remote refs.
-            Receive dict with existing remote refs, returns dict with
-            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        :param generate_pack_data: Function that can return a tuple
-            with number of elements and pack data to upload.
-        :param progress: Optional progress function
+        Args:
+          path: Repository path (as bytestring)
+          update_refs: Function to determine changes to remote refs.
+        Receive dict with existing remote refs, returns dict with
+        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          generate_pack_data: Function that can return a tuple
+        with number of elements and pack data to upload.
+          progress: Optional progress function
 
-        :raises SendPackError: if server rejects the pack data
-        :raises UpdateRefsError: if the server supports report-status
-                                 and rejects ref updates
-        :return: new_refs dictionary containing the changes that were made
-            {refname: new_ref}, including deleted refs.
+        Returns:
+          new_refs dictionary containing the changes that were made
+          {refname: new_ref}, including deleted refs.
+
+        Raises:
+          SendPackError: if server rejects the pack data
+          UpdateRefsError: if the server supports report-status
+                         and rejects ref updates
+
         """
         url = self._get_url(path)
         old_refs, server_capabilities, url = self._discover_references(
@@ -1632,12 +1720,17 @@ class HttpGitClient(GitClient):
                    progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
-        :param determine_wants: Callback that returns list of commits to fetch
-        :param graph_walker: Object with next() and ack().
-        :param pack_data: Callback called for each bit of data in the pack
-        :param progress: Callback for progress reports (strings)
-        :param depth: Depth for request
-        :return: FetchPackResult object
+        Args:
+          path: Path to fetch from
+          determine_wants: Callback that returns list of commits to fetch
+          graph_walker: Object with next() and ack().
+          pack_data: Callback called for each bit of data in the pack
+          progress: Callback for progress reports (strings)
+          depth: Depth for request
+
+        Returns:
+          FetchPackResult object
+
         """
         url = self._get_url(path)
         refs, server_capabilities, url = self._discover_references(
@@ -1652,7 +1745,6 @@ class HttpGitClient(GitClient):
             return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
             raise NotImplementedError(self.send_pack)
-        check_wants(wants, refs)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (new_shallow, new_unshallow) = self._handle_upload_pack_head(
@@ -1674,7 +1766,8 @@ class HttpGitClient(GitClient):
             resp.close()
 
     def get_refs(self, path):
-        """Retrieve the current refs from a git smart server."""
+        """Retrieve the current refs from a git smart server.
+        """
         url = self._get_url(path)
         refs, _, _ = self._discover_references(
             b"git-upload-pack", url)
@@ -1684,12 +1777,16 @@ class HttpGitClient(GitClient):
 def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
-    :param url: URL to open (a unicode string)
-    :param config: Optional config object
-    :param thin_packs: Whether or not thin packs should be retrieved
-    :param report_activity: Optional callback for reporting transport
+    Args:
+      url: URL to open (a unicode string)
+      config: Optional config object
+      thin_packs: Whether or not thin packs should be retrieved
+      report_activity: Optional callback for reporting transport
         activity.
-    :return: Tuple with client instance and relative path.
+
+    Returns:
+      Tuple with client instance and relative path.
+
     """
     parsed = urlparse.urlparse(url)
     if parsed.scheme == 'git':
@@ -1708,7 +1805,8 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
 
 
 def parse_rsync_url(location):
-    """Parse a rsync-style URL."""
+    """Parse a rsync-style URL.
+    """
     if ':' in location and '@' not in location:
         # SSH with no user@, zero or one leading slash.
         (host, path) = location.split(':', 1)
@@ -1729,12 +1827,16 @@ def parse_rsync_url(location):
 def get_transport_and_path(location, **kwargs):
     """Obtain a git client from a URL.
 
-    :param location: URL or path (a string)
-    :param config: Optional config object
-    :param thin_packs: Whether or not thin packs should be retrieved
-    :param report_activity: Optional callback for reporting transport
+    Args:
+      location: URL or path (a string)
+      config: Optional config object
+      thin_packs: Whether or not thin packs should be retrieved
+      report_activity: Optional callback for reporting transport
         activity.
-    :return: Tuple with client instance and relative path.
+
+    Returns:
+      Tuple with client instance and relative path.
+
     """
     # First, try to parse it as a URL
     try:

@@ -1,0 +1,7 @@
+dulwich.contrib.swift module
+============================
+
+.. automodule:: dulwich.contrib.swift
+   :members:
+   :undoc-members:
+   :show-inheritance:

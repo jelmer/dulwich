@@ -1,0 +1,65 @@
+.. _protocol:
+
+===================
+Git Server Protocol
+===================
+
+Transport
+=========
+
+The Git protocol operates over pipes or TCP/IP. When a client connects over
+TCP/IP, it sends a header that tells the server which program to run and what
+parameters to use. When invoked over SSH, git will run a program with the
+parameters as command line arguments.
+
+Protocols
+=========
+
+Basics
+------
+
+Git communicates with a server by piping data between a local program and a
+remote program.
+
+A common way of sending a unit of information is a pkt_line. This is a 4 byte
+size as human encoded hex (i.e. totally underusing the 4 bytes...) that tells
+you the size of the payload, followed by the payload. The size includes the 4
+bytes used by the size itself.
+
+    0009ABCD\n
+
+Git can also multiplex data using the sideband. As well as 4 bytes size, there
+would be a 1 byte channel number. This is in binary, so ``1`` will be ``\x01``.
+
+Typically Git will piggyback a list of capabilities on the first pkt_line it
+sends. It will also look for capabilities in the first pkt_like it receives.
+Git will degrade as much as possible when encountering a server or client with
+differing capabilities.
+
+git-upload-pack
+---------------
+
+git-upload pack is used by git-ls-remote, git-clone, git-fetch and git-pull.
+And i'm sure others. Typically a client will connect a local git-fetch-pack to
+a remote git-upload-pack.
+
+Capabilities for this protocol include multi_ack, thin-pack, ofs-delta,
+sideband and sideband-64k A thin pack can reference objects not in the current
+pack.
+
+The server tells the client what refs it has. The client states which of those
+SHA1's it would like. It then starts to report which SHA1's it has. The server
+ACKs these allowing the client to work out when to stop sending SHA1's. This
+saves a lot of transfer because the client can make decisions like "well if it
+has this SHA, then it has all its parents so I don't need to care about those".
+When the client stops sending shas, the server can work out an optimal pack and
+then send it to the client.
+
+git-receive-pack
+----------------
+
+git-receive-pack is used by git push. Typically a client connects a local
+git-send-pack to a remote git-receive-pack.
+
+Capabilities include report-status and delete-ref.
+

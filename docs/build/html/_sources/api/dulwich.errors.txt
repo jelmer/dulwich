@@ -1,0 +1,7 @@
+dulwich.errors module
+=====================
+
+.. automodule:: dulwich.errors
+   :members:
+   :undoc-members:
+   :show-inheritance:

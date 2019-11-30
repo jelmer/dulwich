@@ -1,0 +1,7 @@
+dulwich.tests.test\_mailmap module
+==================================
+
+.. automodule:: dulwich.tests.test_mailmap
+   :members:
+   :undoc-members:
+   :show-inheritance:

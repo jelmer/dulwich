@@ -1,3 +1,20 @@
+0.19.14	2019-11-30
+
+ * Strip superfluous <> around email. (monnerat)
+
+ * Stop checking for ref validity client-side. Users can
+   still call check_wants manually. (Jelmer Vernooĳ)
+
+ * Switch over to Google-style docstrings.
+   (Jelmer Vernooĳ)
+
+ * Add a ``dulwich.porcelain.active_branch`` function.
+   (Jelmer Vernooĳ)
+
+ * Cleanup new directory if clone fails. (Jelmer Vernooĳ, #733)
+
+ * Expand "~" in global exclude path. (Jelmer Vernooĳ)
+
 0.19.13	2019-08-19
 
  BUG FIXES
@@ -7,6 +24,9 @@
 
  * Fix regression that added a dependency on C git for the
    test suite. (Jelmer Vernooĳ, #720)
+
+ * Fix compatibility with Python 3.8 - mostly deprecation warnings.
+   (Jelmer Vernooĳ)
 
 0.19.12	2019-08-13
 

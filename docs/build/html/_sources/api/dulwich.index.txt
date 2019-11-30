@@ -1,0 +1,7 @@
+dulwich.index module
+====================
+
+.. automodule:: dulwich.index
+   :members:
+   :undoc-members:
+   :show-inheritance:

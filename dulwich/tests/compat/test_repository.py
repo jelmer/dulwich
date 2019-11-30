@@ -133,10 +133,11 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
     def create_new_worktree(self, repo_dir, branch):
         """Create a new worktree using git-worktree.
 
-        :param repo_dir: The directory of the main working tree.
-        :param branch: The branch or commit to checkout in the new worktree.
+        Args:
+          repo_dir: The directory of the main working tree.
+          branch: The branch or commit to checkout in the new worktree.
 
-        :returns: The path to the new working tree.
+        Returns: The path to the new working tree.
         """
         temp_dir = tempfile.mkdtemp()
         run_git_or_fail(['worktree', 'add', temp_dir, branch],

@@ -1,0 +1,7 @@
+dulwich.mailmap module
+======================
+
+.. automodule:: dulwich.mailmap
+   :members:
+   :undoc-members:
+   :show-inheritance:

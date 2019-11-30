@@ -1,0 +1,7 @@
+dulwich.greenthreads module
+===========================
+
+.. automodule:: dulwich.greenthreads
+   :members:
+   :undoc-members:
+   :show-inheritance:

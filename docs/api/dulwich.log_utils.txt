@@ -1,0 +1,7 @@
+dulwich.log\_utils module
+=========================
+
+.. automodule:: dulwich.log_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:

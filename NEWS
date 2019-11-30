@@ -1,4 +1,4 @@
-0.19.14	UNRELEASED
+0.19.14	2019-11-30
 
  * Strip superfluous <> around email. (monnerat)
 

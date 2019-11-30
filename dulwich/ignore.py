@@ -271,9 +271,7 @@ def default_user_ignore_filter_path(config):
     except KeyError:
         pass
 
-    xdg_config_home = os.environ.get(
-        "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
-    )
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "~/.config/")
     return os.path.join(xdg_config_home, 'git', 'ignore')
 
 
@@ -366,7 +364,8 @@ class IgnoreFilterManager(object):
                 os.path.join(repo.controldir(), 'info', 'exclude'),
                 default_user_ignore_filter_path(repo.get_config_stack())]:
             try:
-                global_filters.append(IgnoreFilter.from_path(p))
+                global_filters.append(
+                    IgnoreFilter.from_path(os.path.expanduser(p)))
             except IOError:
                 pass
         config = repo.get_config_stack()

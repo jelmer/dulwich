@@ -102,8 +102,9 @@ def translate(pat):
 def read_ignore_patterns(f):
     """Read a git ignore file.
 
-    :param f: File-like object to read from
-    :return: List of patterns
+    Args:
+      f: File-like object to read from
+    Returns: List of patterns
     """
 
     for line in f:
@@ -128,10 +129,12 @@ def read_ignore_patterns(f):
 def match_pattern(path, pattern, ignorecase=False):
     """Match a gitignore-style pattern against a path.
 
-    :param path: Path to match
-    :param pattern: Pattern to match
-    :param ignorecase: Whether to do case-sensitive matching
-    :return: bool indicating whether the pattern matched
+    Args:
+      path: Path to match
+      pattern: Pattern to match
+      ignorecase: Whether to do case-sensitive matching
+    Returns:
+      bool indicating whether the pattern matched
     """
     return Pattern(pattern, ignorecase).match(path)
 
@@ -172,8 +175,9 @@ class Pattern(object):
     def match(self, path):
         """Try to match a path against this ignore pattern.
 
-        :param path: Path to match (relative to ignore location)
-        :return: boolean
+        Args:
+          path: Path to match (relative to ignore location)
+        Returns: boolean
         """
         return bool(self._re.match(path))
 
@@ -193,8 +197,10 @@ class IgnoreFilter(object):
     def find_matching(self, path):
         """Yield all matching patterns for path.
 
-        :param path: Path to match
-        :return: Iterator over  iterators
+        Args:
+          path: Path to match
+        Returns:
+          Iterator over  iterators
         """
         if not isinstance(path, bytes):
             path = path.encode(sys.getfilesystemencoding())
@@ -207,7 +213,7 @@ class IgnoreFilter(object):
 
         For directories, include a trailing slash.
 
-        :return: status is None if file is not mentioned, True if it is
+        Returns: status is None if file is not mentioned, True if it is
             included, False if it is explicitly excluded.
         """
         status = None
@@ -238,9 +244,11 @@ class IgnoreFilterStack(object):
     def is_ignored(self, path):
         """Check whether a path is explicitly included or excluded in ignores.
 
-        :param path: Path to check
-        :return: None if the file is not mentioned, True if it is included,
-            False if it is explicitly excluded.
+        Args:
+          path: Path to check
+        Returns:
+          None if the file is not mentioned, True if it is included,
+          False if it is explicitly excluded.
         """
         status = None
         for filter in self._filters:
@@ -253,17 +261,17 @@ class IgnoreFilterStack(object):
 def default_user_ignore_filter_path(config):
     """Return default user ignore filter path.
 
-    :param config: A Config object
-    :return: Path to a global ignore file
+    Args:
+      config: A Config object
+    Returns:
+      Path to a global ignore file
     """
     try:
         return config.get((b'core', ), b'excludesFile')
     except KeyError:
         pass
 
-    xdg_config_home = os.environ.get(
-        "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
-    )
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "~/.config/")
     return os.path.join(xdg_config_home, 'git', 'ignore')
 
 
@@ -301,8 +309,10 @@ class IgnoreFilterManager(object):
 
         Stops after the first ignore file with matches.
 
-        :param path: Path to check
-        :return: Iterator over Pattern instances
+        Args:
+          path: Path to check
+        Returns:
+          Iterator over Pattern instances
         """
         if os.path.isabs(path):
             raise ValueError('%s is an absolute path' % path)
@@ -329,9 +339,11 @@ class IgnoreFilterManager(object):
     def is_ignored(self, path):
         """Check whether a path is explicitly included or excluded in ignores.
 
-        :param path: Path to check
-        :return: None if the file is not mentioned, True if it is included,
-            False if it is explicitly excluded.
+        Args:
+          path: Path to check
+        Returns:
+          None if the file is not mentioned, True if it is included,
+          False if it is explicitly excluded.
         """
         matches = list(self.find_matching(path))
         if matches:
@@ -342,15 +354,18 @@ class IgnoreFilterManager(object):
     def from_repo(cls, repo):
         """Create a IgnoreFilterManager from a repository.
 
-        :param repo: Repository object
-        :return: A `IgnoreFilterManager` object
+        Args:
+          repo: Repository object
+        Returns:
+          A `IgnoreFilterManager` object
         """
         global_filters = []
         for p in [
                 os.path.join(repo.controldir(), 'info', 'exclude'),
                 default_user_ignore_filter_path(repo.get_config_stack())]:
             try:
-                global_filters.append(IgnoreFilter.from_path(p))
+                global_filters.append(
+                    IgnoreFilter.from_path(os.path.expanduser(p)))
             except IOError:
                 pass
         config = repo.get_config_stack()

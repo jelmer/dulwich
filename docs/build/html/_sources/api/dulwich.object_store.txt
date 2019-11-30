@@ -1,0 +1,7 @@
+dulwich.object\_store module
+============================
+
+.. automodule:: dulwich.object_store
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -36,9 +36,12 @@ class Hook(object):
     def execute(self, *args):
         """Execute the hook with the given args
 
-        :param args: argument list to hook
-        :raise HookError: hook execution failure
-        :return: a hook may return a useful value
+        Args:
+          args: argument list to hook
+        Raises:
+          HookError: hook execution failure
+        Returns:
+          a hook may return a useful value
         """
         raise NotImplementedError(self.execute)
 
@@ -56,18 +59,19 @@ class ShellHook(Hook):
                  cwd=None):
         """Setup shell hook definition
 
-        :param name: name of hook for error messages
-        :param path: absolute path to executable file
-        :param numparam: number of requirements parameters
-        :param pre_exec_callback: closure for setup before execution
+        Args:
+          name: name of hook for error messages
+          path: absolute path to executable file
+          numparam: number of requirements parameters
+          pre_exec_callback: closure for setup before execution
             Defaults to None. Takes in the variable argument list from the
             execute functions and returns a modified argument list for the
             shell hook.
-        :param post_exec_callback: closure for cleanup after execution
+          post_exec_callback: closure for cleanup after execution
             Defaults to None. Takes in a boolean for hook success and the
             modified argument list and returns the final hook return value
             if applicable
-        :param cwd: working directory to switch to when executing the hook
+          cwd: working directory to switch to when executing the hook
         """
         self.name = name
         self.filepath = path
@@ -129,8 +133,10 @@ class PostCommitShellHook(ShellHook):
 class CommitMsgShellHook(ShellHook):
     """commit-msg shell hook
 
-    :param args[0]: commit message
-    :return: new commit message or None
+    Args:
+      args[0]: commit message
+    Returns:
+      new commit message or None
     """
 
     def __init__(self, controldir):

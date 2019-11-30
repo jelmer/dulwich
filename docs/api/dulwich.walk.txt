@@ -1,0 +1,7 @@
+dulwich.walk module
+===================
+
+.. automodule:: dulwich.walk
+   :members:
+   :undoc-members:
+   :show-inheritance:

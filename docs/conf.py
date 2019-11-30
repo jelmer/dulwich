@@ -30,15 +30,8 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.ifconfig',
     'sphinx.ext.intersphinx',
-    'sphinx_epytext',
+    'sphinx.ext.napoleon',
     ]
-try:
-    import rst2pdf
-    if rst2pdf.version >= '0.16':
-        extensions.append('rst2pdf.pdfbuilder')
-except ImportError:
-    print("[NOTE] In order to build PDF you need rst2pdf with version >=0.16")
-
 
 autoclass_content = "both"
 
@@ -56,7 +49,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dulwich'
-copyright = u'2011-2018 Jelmer Vernooĳ'
+copyright = u'2011-2019 Jelmer Vernooĳ'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -213,11 +206,3 @@ latex_documents = [
 
 # If false, no module index is generated.
 # latex_use_modindex = True
-
-pdf_documents = [
-    ('index', u'dulwich', u'Documentation for dulwich',
-        u'Jelmer Vernooij'),
-]
-pdf_stylesheets = ['sphinx', 'kerning', 'a4']
-pdf_break_level = 2
-pdf_inline_footnotes = True

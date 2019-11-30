@@ -65,6 +65,7 @@ from io import BytesIO, RawIOBase
 import datetime
 import os
 import posixpath
+import shutil
 import stat
 import sys
 import time
@@ -123,6 +124,7 @@ from dulwich.protocol import (
     )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
     strip_peeled_refs,
 )
 from dulwich.repo import (BaseRepo, Repo)
@@ -198,9 +200,10 @@ def path_to_tree_path(repopath, path):
     """Convert a path to a path usable in an index, e.g. bytes and relative to
     the repository root.
 
-    :param repopath: Repository path, absolute or relative to the cwd
-    :param path: A path, absolute or relative to the cwd
-    :return: A path formatted for use in e.g. an index
+    Args:
+      repopath: Repository path, absolute or relative to the cwd
+      path: A path, absolute or relative to the cwd
+    Returns: A path formatted for use in e.g. an index
     """
     if not isinstance(path, bytes):
         path = path.encode(sys.getfilesystemencoding())
@@ -218,10 +221,11 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
             errstream=default_bytes_err_stream):
     """Create an archive.
 
-    :param repo: Path of repository for which to generate an archive.
-    :param committish: Commit SHA1 or ref to use
-    :param outstream: Output stream (defaults to stdout)
-    :param errstream: Error stream (defaults to stderr)
+    Args:
+      repo: Path of repository for which to generate an archive.
+      committish: Commit SHA1 or ref to use
+      outstream: Output stream (defaults to stdout)
+      errstream: Error stream (defaults to stderr)
     """
 
     if committish is None:
@@ -237,7 +241,8 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
 def update_server_info(repo="."):
     """Update server info files for a repository.
 
-    :param repo: path to the repository
+    Args:
+      repo: path to the repository
     """
     with open_repo_closing(repo) as r:
         server_update_server_info(r)
@@ -246,9 +251,10 @@ def update_server_info(repo="."):
 def symbolic_ref(repo, ref_name, force=False):
     """Set git symbolic ref into HEAD.
 
-    :param repo: path to the repository
-    :param ref_name: short name of the new ref
-    :param force: force settings without checking if it exists in refs/heads
+    Args:
+      repo: path to the repository
+      ref_name: short name of the new ref
+      force: force settings without checking if it exists in refs/heads
     """
     with open_repo_closing(repo) as repo_obj:
         ref_path = _make_branch_ref(ref_name)
@@ -260,11 +266,12 @@ def symbolic_ref(repo, ref_name, force=False):
 def commit(repo=".", message=None, author=None, committer=None, encoding=None):
     """Create a new commit.
 
-    :param repo: Path to repository
-    :param message: Optional commit message
-    :param author: Optional author name and email
-    :param committer: Optional committer name and email
-    :return: SHA1 of the new commit
+    Args:
+      repo: Path to repository
+      message: Optional commit message
+      author: Optional author name and email
+      committer: Optional committer name and email
+    Returns: SHA1 of the new commit
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
@@ -283,10 +290,11 @@ def commit(repo=".", message=None, author=None, committer=None, encoding=None):
 def commit_tree(repo, tree, message=None, author=None, committer=None):
     """Create a new commit object.
 
-    :param repo: Path to repository
-    :param tree: An existing tree object
-    :param author: Optional author name and email
-    :param committer: Optional committer name and email
+    Args:
+      repo: Path to repository
+      tree: An existing tree object
+      author: Optional author name and email
+      committer: Optional committer name and email
     """
     with open_repo_closing(repo) as r:
         return r.do_commit(
@@ -296,9 +304,10 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
 def init(path=".", bare=False):
     """Create a new git repository.
 
-    :param path: Path to repository.
-    :param bare: Whether to create a bare repository.
-    :return: A Repo instance
+    Args:
+      path: Path to repository.
+      bare: Whether to create a bare repository.
+    Returns: A Repo instance
     """
     if not os.path.exists(path):
         os.mkdir(path)
@@ -314,15 +323,16 @@ def clone(source, target=None, bare=False, checkout=None,
           origin=b"origin", depth=None, **kwargs):
     """Clone a local or remote git repository.
 
-    :param source: Path or URL for source repository
-    :param target: Path to target repository (optional)
-    :param bare: Whether or not to create a bare repository
-    :param checkout: Whether or not to check-out HEAD after cloning
-    :param errstream: Optional stream to write progress to
-    :param outstream: Optional stream to write progress to (deprecated)
-    :param origin: Name of remote from the repository used to clone
-    :param depth: Depth to fetch at
-    :return: The new repository
+    Args:
+      source: Path or URL for source repository
+      target: Path to target repository (optional)
+      bare: Whether or not to create a bare repository
+      checkout: Whether or not to check-out HEAD after cloning
+      errstream: Optional stream to write progress to
+      outstream: Optional stream to write progress to (deprecated)
+      origin: Name of remote from the repository used to clone
+      depth: Depth to fetch at
+    Returns: The new repository
     """
     # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
@@ -373,6 +383,7 @@ def clone(source, target=None, bare=False, checkout=None,
             errstream.write(b'Checking out ' + head.id + b'\n')
             r.reset_index(head.tree)
     except BaseException:
+        shutil.rmtree(target)
         r.close()
         raise
 
@@ -382,9 +393,10 @@ def clone(source, target=None, bare=False, checkout=None,
 def add(repo=".", paths=None):
     """Add files to the staging area.
 
-    :param repo: Repository for the files
-    :param paths: Paths to add.  No value passed stages all modified files.
-    :return: Tuple with set of added files and ignored files
+    Args:
+      repo: Repository for the files
+      paths: Paths to add.  No value passed stages all modified files.
+    Returns: Tuple with set of added files and ignored files
     """
     ignored = set()
     with open_repo_closing(repo) as r:
@@ -425,8 +437,9 @@ def clean(repo=".", target_dir=None):
 
     Equivalent to running `git clean -fd` in target_dir.
 
-    :param repo: Repository where the files may be tracked
-    :param target_dir: Directory to clean - current directory if None
+    Args:
+      repo: Repository where the files may be tracked
+      target_dir: Directory to clean - current directory if None
     """
     if target_dir is None:
         target_dir = os.getcwd()
@@ -462,8 +475,9 @@ def clean(repo=".", target_dir=None):
 def remove(repo=".", paths=None, cached=False):
     """Remove files from the staging area.
 
-    :param repo: Repository for the files
-    :param paths: Paths to remove
+    Args:
+      repo: Repository for the files
+      paths: Paths to remove
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
@@ -517,8 +531,9 @@ def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
 def print_commit(commit, decode, outstream=sys.stdout):
     """Write a human-readable commit log entry.
 
-    :param commit: A `Commit` object
-    :param outstream: A stream file to write to
+    Args:
+      commit: A `Commit` object
+      outstream: A stream file to write to
     """
     outstream.write("-" * 50 + "\n")
     outstream.write("commit: " + commit.id.decode('ascii') + "\n")
@@ -542,9 +557,10 @@ def print_commit(commit, decode, outstream=sys.stdout):
 def print_tag(tag, decode, outstream=sys.stdout):
     """Write a human-readable tag.
 
-    :param tag: A `Tag` object
-    :param decode: Function for decoding bytes to unicode string
-    :param outstream: A stream to write to
+    Args:
+      tag: A `Tag` object
+      decode: Function for decoding bytes to unicode string
+      outstream: A stream to write to
     """
     outstream.write("Tagger: " + decode(tag.tagger) + "\n")
     time_tuple = time.gmtime(tag.tag_time + tag.tag_timezone)
@@ -559,10 +575,11 @@ def print_tag(tag, decode, outstream=sys.stdout):
 def show_blob(repo, blob, decode, outstream=sys.stdout):
     """Write a blob to a stream.
 
-    :param repo: A `Repo` object
-    :param blob: A `Blob` object
-    :param decode: Function for decoding bytes to unicode string
-    :param outstream: A stream file to write to
+    Args:
+      repo: A `Repo` object
+      blob: A `Blob` object
+      decode: Function for decoding bytes to unicode string
+      outstream: A stream file to write to
     """
     outstream.write(decode(blob.data))
 
@@ -570,10 +587,11 @@ def show_blob(repo, blob, decode, outstream=sys.stdout):
 def show_commit(repo, commit, decode, outstream=sys.stdout):
     """Show a commit to a stream.
 
-    :param repo: A `Repo` object
-    :param commit: A `Commit` object
-    :param decode: Function for decoding bytes to unicode string
-    :param outstream: Stream to write to
+    Args:
+      repo: A `Repo` object
+      commit: A `Commit` object
+      decode: Function for decoding bytes to unicode string
+      outstream: Stream to write to
     """
     print_commit(commit, decode=decode, outstream=outstream)
     if commit.parents:
@@ -594,10 +612,11 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
 def show_tree(repo, tree, decode, outstream=sys.stdout):
     """Print a tree to a stream.
 
-    :param repo: A `Repo` object
-    :param tree: A `Tree` object
-    :param decode: Function for decoding bytes to unicode string
-    :param outstream: Stream to write to
+    Args:
+      repo: A `Repo` object
+      tree: A `Tree` object
+      decode: Function for decoding bytes to unicode string
+      outstream: Stream to write to
     """
     for n in tree:
         outstream.write(decode(n) + "\n")
@@ -606,10 +625,11 @@ def show_tree(repo, tree, decode, outstream=sys.stdout):
 def show_tag(repo, tag, decode, outstream=sys.stdout):
     """Print a tag to a stream.
 
-    :param repo: A `Repo` object
-    :param tag: A `Tag` object
-    :param decode: Function for decoding bytes to unicode string
-    :param outstream: Stream to write to
+    Args:
+      repo: A `Repo` object
+      tag: A `Tag` object
+      decode: Function for decoding bytes to unicode string
+      outstream: Stream to write to
     """
     print_tag(tag, decode, outstream)
     show_object(repo, repo[tag.object[1]], decode, outstream)
@@ -658,12 +678,13 @@ def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
         reverse=False, name_status=False):
     """Write commit logs.
 
-    :param repo: Path to repository
-    :param paths: Optional set of specific paths to print entries for
-    :param outstream: Stream to write log output to
-    :param reverse: Reverse order in which entries are printed
-    :param name_status: Print name status
-    :param max_entries: Optional maximum number of entries to display
+    Args:
+      repo: Path to repository
+      paths: Optional set of specific paths to print entries for
+      outstream: Stream to write log output to
+      reverse: Reverse order in which entries are printed
+      name_status: Print name status
+      max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
         walker = r.get_walker(
@@ -682,10 +703,11 @@ def show(repo=".", objects=None, outstream=sys.stdout,
          default_encoding=DEFAULT_ENCODING):
     """Print the changes in a commit.
 
-    :param repo: Path to repository
-    :param objects: Objects to show (defaults to [HEAD])
-    :param outstream: Stream to write to
-    :param default_encoding: Default encoding to use if none is set in the
+    Args:
+      repo: Path to repository
+      objects: Objects to show (defaults to [HEAD])
+      outstream: Stream to write to
+      default_encoding: Default encoding to use if none is set in the
         commit
     """
     if objects is None:
@@ -707,10 +729,11 @@ def show(repo=".", objects=None, outstream=sys.stdout,
 def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
     """Compares the content and mode of blobs found via two tree objects.
 
-    :param repo: Path to repository
-    :param old_tree: Id of old tree
-    :param new_tree: Id of new tree
-    :param outstream: Stream to write to
+    Args:
+      repo: Path to repository
+      old_tree: Id of old tree
+      new_tree: Id of new tree
+      outstream: Stream to write to
     """
     with open_repo_closing(repo) as r:
         write_tree_diff(outstream, r.object_store, old_tree, new_tree)
@@ -719,9 +742,10 @@ def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
 def rev_list(repo, commits, outstream=sys.stdout):
     """Lists commit objects in reverse chronological order.
 
-    :param repo: Path to repository
-    :param commits: Commits over which to iterate
-    :param outstream: Stream to write to
+    Args:
+      repo: Path to repository
+      commits: Commits over which to iterate
+      outstream: Stream to write to
     """
     with open_repo_closing(repo) as r:
         for entry in r.get_walker(include=[r[c].id for c in commits]):
@@ -741,15 +765,16 @@ def tag_create(
         sign=False):
     """Creates a tag in git via dulwich calls:
 
-    :param repo: Path to repository
-    :param tag: tag string
-    :param author: tag author (optional, if annotated is set)
-    :param message: tag message (optional)
-    :param annotated: whether to create an annotated tag
-    :param objectish: object the tag should point at, defaults to HEAD
-    :param tag_time: Optional time for annotated tag
-    :param tag_timezone: Optional timezone for annotated tag
-    :param sign: GPG Sign the tag
+    Args:
+      repo: Path to repository
+      tag: tag string
+      author: tag author (optional, if annotated is set)
+      message: tag message (optional)
+      annotated: whether to create an annotated tag
+      objectish: object the tag should point at, defaults to HEAD
+      tag_time: Optional time for annotated tag
+      tag_timezone: Optional timezone for annotated tag
+      sign: GPG Sign the tag
     """
 
     with open_repo_closing(repo) as r:
@@ -797,8 +822,9 @@ def list_tags(*args, **kwargs):
 def tag_list(repo, outstream=sys.stdout):
     """List all tags.
 
-    :param repo: Path to repository
-    :param outstream: Stream to write tags to
+    Args:
+      repo: Path to repository
+      outstream: Stream to write tags to
     """
     with open_repo_closing(repo) as r:
         tags = sorted(r.refs.as_dict(b"refs/tags"))
@@ -808,8 +834,9 @@ def tag_list(repo, outstream=sys.stdout):
 def tag_delete(repo, name):
     """Remove a tag.
 
-    :param repo: Path to repository
-    :param name: Name of tag to remove
+    Args:
+      repo: Path to repository
+      name: Name of tag to remove
     """
     with open_repo_closing(repo) as r:
         if isinstance(name, bytes):
@@ -825,9 +852,10 @@ def tag_delete(repo, name):
 def reset(repo, mode, treeish="HEAD"):
     """Reset current HEAD to the specified state.
 
-    :param repo: Path to repository
-    :param mode: Mode ("hard", "soft", "mixed")
-    :param treeish: Treeish to reset to
+    Args:
+      repo: Path to repository
+      mode: Mode ("hard", "soft", "mixed")
+      treeish: Treeish to reset to
     """
 
     if mode != "hard":
@@ -843,11 +871,12 @@ def push(repo, remote_location, refspecs,
          errstream=default_bytes_err_stream, **kwargs):
     """Remote push with dulwich via dulwich.client
 
-    :param repo: Path to repository
-    :param remote_location: Location of the remote
-    :param refspecs: Refs to push to remote
-    :param outstream: A stream file to write output
-    :param errstream: A stream file to write errors
+    Args:
+      repo: Path to repository
+      remote_location: Location of the remote
+      refspecs: Refs to push to remote
+      outstream: A stream file to write output
+      errstream: A stream file to write errors
     """
 
     # Open the repo
@@ -890,11 +919,12 @@ def pull(repo, remote_location=None, refspecs=None,
          errstream=default_bytes_err_stream, **kwargs):
     """Pull from remote via dulwich.client
 
-    :param repo: Path to repository
-    :param remote_location: Location of the remote
-    :param refspec: refspecs to fetch
-    :param outstream: A stream file to write to output
-    :param errstream: A stream file to write to errors
+    Args:
+      repo: Path to repository
+      remote_location: Location of the remote
+      refspec: refspecs to fetch
+      outstream: A stream file to write to output
+      errstream: A stream file to write to errors
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -927,9 +957,10 @@ def pull(repo, remote_location=None, refspecs=None,
 def status(repo=".", ignored=False):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
-    :param repo: Path to repository or repository object
-    :param ignored: Whether to include ignored files in `untracked`
-    :return: GitStatus tuple,
+    Args:
+      repo: Path to repository or repository object
+      ignored: Whether to include ignored files in `untracked`
+    Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
         untracked - list of untracked, un-ignored & non-.git paths
@@ -958,8 +989,9 @@ def status(repo=".", ignored=False):
 def _walk_working_dir_paths(frompath, basepath):
     """Get path, is_dir for files in working dir from frompath
 
-    :param frompath: Path to begin walk
-    :param basepath: Path to compare to
+    Args:
+      frompath: Path to begin walk
+      basepath: Path to compare to
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
         # Skip .git and below.
@@ -983,9 +1015,10 @@ def _walk_working_dir_paths(frompath, basepath):
 def get_untracked_paths(frompath, basepath, index):
     """Get untracked paths.
 
+    Args:
     ;param frompath: Path to walk
-    :param basepath: Path to compare to
-    :param index: Index to check against
+      basepath: Path to compare to
+      index: Index to check against
     """
     for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
         if not is_dir:
@@ -997,8 +1030,9 @@ def get_untracked_paths(frompath, basepath, index):
 def get_tree_changes(repo):
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
-    :param repo: repo path or object
-    :return: dict with lists for each type of change
+    Args:
+      repo: repo path or object
+    Returns: dict with lists for each type of change
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
@@ -1031,9 +1065,10 @@ def get_tree_changes(repo):
 def daemon(path=".", address=None, port=None):
     """Run a daemon serving Git requests over TCP/IP.
 
-    :param path: Path to the directory to serve.
-    :param address: Optional address to listen on (defaults to ::)
-    :param port: Optional port to listen on (defaults to TCP_GIT_PORT)
+    Args:
+      path: Path to the directory to serve.
+      address: Optional address to listen on (defaults to ::)
+      port: Optional port to listen on (defaults to TCP_GIT_PORT)
     """
     # TODO(jelmer): Support git-daemon-export-ok and --export-all.
     backend = FileSystemBackend(path)
@@ -1044,9 +1079,10 @@ def daemon(path=".", address=None, port=None):
 def web_daemon(path=".", address=None, port=None):
     """Run a daemon serving Git requests over HTTP.
 
-    :param path: Path to the directory to serve
-    :param address: Optional address to listen on (defaults to ::)
-    :param port: Optional port to listen on (defaults to 80)
+    Args:
+      path: Path to the directory to serve
+      address: Optional address to listen on (defaults to ::)
+      port: Optional port to listen on (defaults to 80)
     """
     from dulwich.web import (
         make_wsgi_chain,
@@ -1065,9 +1101,10 @@ def web_daemon(path=".", address=None, port=None):
 def upload_pack(path=".", inf=None, outf=None):
     """Upload a pack file after negotiating its contents using smart protocol.
 
-    :param path: Path to the repository
-    :param inf: Input stream to communicate with client
-    :param outf: Output stream to communicate with client
+    Args:
+      path: Path to the repository
+      inf: Input stream to communicate with client
+      outf: Output stream to communicate with client
     """
     if outf is None:
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
@@ -1089,9 +1126,10 @@ def upload_pack(path=".", inf=None, outf=None):
 def receive_pack(path=".", inf=None, outf=None):
     """Receive a pack file after negotiating its contents using smart protocol.
 
-    :param path: Path to the repository
-    :param inf: Input stream to communicate with client
-    :param outf: Output stream to communicate with client
+    Args:
+      path: Path to the repository
+      inf: Input stream to communicate with client
+      outf: Output stream to communicate with client
     """
     if outf is None:
         outf = getattr(sys.stdout, 'buffer', sys.stdout)
@@ -1113,7 +1151,7 @@ def receive_pack(path=".", inf=None, outf=None):
 def _make_branch_ref(name):
     if getattr(name, 'encode', None):
         name = name.encode(DEFAULT_ENCODING)
-    return b"refs/heads/" + name
+    return LOCAL_BRANCH_PREFIX + name
 
 
 def _make_tag_ref(name):
@@ -1125,8 +1163,9 @@ def _make_tag_ref(name):
 def branch_delete(repo, name):
     """Delete a branch.
 
-    :param repo: Path to the repository
-    :param name: Name of the branch
+    Args:
+      repo: Path to the repository
+      name: Name of the branch
     """
     with open_repo_closing(repo) as r:
         if isinstance(name, list):
@@ -1140,10 +1179,11 @@ def branch_delete(repo, name):
 def branch_create(repo, name, objectish=None, force=False):
     """Create a branch.
 
-    :param repo: Path to the repository
-    :param name: Name of the new branch
-    :param objectish: Target object to point new branch at (defaults to HEAD)
-    :param force: Force creation of branch, even if it already exists
+    Args:
+      repo: Path to the repository
+      name: Name of the new branch
+      objectish: Target object to point new branch at (defaults to HEAD)
+      force: Force creation of branch, even if it already exists
     """
     with open_repo_closing(repo) as r:
         if objectish is None:
@@ -1161,10 +1201,29 @@ def branch_create(repo, name, objectish=None, force=False):
 def branch_list(repo):
     """List all branches.
 
-    :param repo: Path to the repository
+    Args:
+      repo: Path to the repository
     """
     with open_repo_closing(repo) as r:
-        return r.refs.keys(base=b"refs/heads/")
+        return r.refs.keys(base=LOCAL_BRANCH_PREFIX)
+
+
+def active_branch(repo):
+    """Return the active branch in the repository, if any.
+
+    Args:
+      repo: Repository to open
+    Returns:
+      branch name
+    Raises:
+      KeyError: if the repository does not have a working tree
+      IndexError: if HEAD is floating
+    """
+    with open_repo_closing(repo) as r:
+        active_ref = r.refs.follow(b'HEAD')[0][1]
+        if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
+            raise ValueError(active_ref)
+        return active_ref[len(LOCAL_BRANCH_PREFIX):]
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
@@ -1172,16 +1231,18 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           prune=False, prune_tags=False, **kwargs):
     """Fetch objects from a remote server.
 
-    :param repo: Path to the repository
-    :param remote_location: String identifying a remote server
-    :param remote_name: Name for remote server
-    :param outstream: Output stream (defaults to stdout)
-    :param errstream: Error stream (defaults to stderr)
-    :param message: Reflog message (defaults to b"fetch: from <remote_name>")
-    :param depth: Depth to fetch at
-    :param prune: Prune remote removed refs
-    :param prune_tags: Prune reomte removed tags
-    :return: Dictionary with refs on the remote
+    Args:
+      repo: Path to the repository
+      remote_location: String identifying a remote server
+      remote_name: Name for remote server
+      outstream: Output stream (defaults to stdout)
+      errstream: Error stream (defaults to stderr)
+      message: Reflog message (defaults to b"fetch: from <remote_name>")
+      depth: Depth to fetch at
+      prune: Prune remote removed refs
+      prune_tags: Prune reomte removed tags
+    Returns:
+      Dictionary with refs on the remote
     """
     if message is None:
         message = b'fetch: from ' + remote_location.encode("utf-8")
@@ -1192,8 +1253,8 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
                                     depth=depth)
         stripped_refs = strip_peeled_refs(fetch_result.refs)
         branches = {
-            n[len(b'refs/heads/'):]: v for (n, v) in stripped_refs.items()
-            if n.startswith(b'refs/heads/')}
+            n[len(LOCAL_BRANCH_PREFIX):]: v for (n, v) in stripped_refs.items()
+            if n.startswith(LOCAL_BRANCH_PREFIX)}
         r.refs.import_refs(
             b'refs/remotes/' + remote_name, branches, message=message,
             prune=prune)
@@ -1210,9 +1271,11 @@ def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
 def ls_remote(remote, config=None, **kwargs):
     """List the refs in a remote.
 
-    :param remote: Remote repository location
-    :param config: Configuration to use
-    :return: Dictionary with remote refs
+    Args:
+      remote: Remote repository location
+      config: Configuration to use
+    Returns:
+      Dictionary with remote refs
     """
     if config is None:
         config = StackedConfig.default()
@@ -1225,7 +1288,8 @@ def repack(repo):
 
     Currently this only packs loose objects.
 
-    :param repo: Path to the repository
+    Args:
+      repo: Path to the repository
     """
     with open_repo_closing(repo) as r:
         r.object_store.pack_loose_objects()
@@ -1234,10 +1298,11 @@ def repack(repo):
 def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
     """Pack objects into a file.
 
-    :param repo: Path to the repository
-    :param object_ids: List of object ids to write
-    :param packf: File-like object to write to
-    :param idxf: File-like object to write to (can be None)
+    Args:
+      repo: Path to the repository
+      object_ids: List of object ids to write
+      packf: File-like object to write to
+      idxf: File-like object to write to (can be None)
     """
     with open_repo_closing(repo) as r:
         entries, data_sum = write_pack_objects(
@@ -1253,11 +1318,12 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
             name_only=False):
     """List contents of a tree.
 
-    :param repo: Path to the repository
-    :param tree_ish: Tree id to list
-    :param outstream: Output stream (defaults to stdout)
-    :param recursive: Whether to recursively list files
-    :param name_only: Only print item name
+    Args:
+      repo: Path to the repository
+      tree_ish: Tree id to list
+      outstream: Output stream (defaults to stdout)
+      recursive: Whether to recursively list files
+      name_only: Only print item name
     """
     def list_tree(store, treeid, base):
         for (name, mode, sha) in store[treeid].iteritems():
@@ -1277,9 +1343,10 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
 def remote_add(repo, name, url):
     """Add a remote.
 
-    :param repo: Path to the repository
-    :param name: Remote name
-    :param url: Remote URL
+    Args:
+      repo: Path to the repository
+      name: Remote name
+      url: Remote URL
     """
     if not isinstance(name, bytes):
         name = name.encode(DEFAULT_ENCODING)
@@ -1297,10 +1364,11 @@ def remote_add(repo, name, url):
 def check_ignore(repo, paths, no_index=False):
     """Debug gitignore files.
 
-    :param repo: Path to the repository
-    :param paths: List of paths to check for
-    :param no_index: Don't check index
-    :return: List of ignored files
+    Args:
+      repo: Path to the repository
+      paths: List of paths to check for
+      no_index: Don't check index
+    Returns: List of ignored files
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
@@ -1319,10 +1387,11 @@ def update_head(repo, target, detached=False, new_branch=None):
 
     Note that this does not actually update the working tree.
 
-    :param repo: Path to the repository
-    :param detach: Create a detached head
-    :param target: Branch or committish to switch to
-    :param new_branch: New branch to create
+    Args:
+      repo: Path to the repository
+      detach: Create a detached head
+      target: Branch or committish to switch to
+      new_branch: New branch to create
     """
     with open_repo_closing(repo) as r:
         if new_branch is not None:
@@ -1344,9 +1413,10 @@ def update_head(repo, target, detached=False, new_branch=None):
 def check_mailmap(repo, contact):
     """Check canonical name and email of contact.
 
-    :param repo: Path to the repository
-    :param contact: Contact name and/or email
-    :return: Canonical contact data
+    Args:
+      repo: Path to the repository
+      contact: Contact name and/or email
+    Returns: Canonical contact data
     """
     with open_repo_closing(repo) as r:
         from dulwich.mailmap import Mailmap
@@ -1363,8 +1433,9 @@ def check_mailmap(repo, contact):
 def fsck(repo):
     """Check a repository.
 
-    :param repo: A path to the repository
-    :return: Iterator over errors/warnings
+    Args:
+      repo: A path to the repository
+    Returns: Iterator over errors/warnings
     """
     with open_repo_closing(repo) as r:
         # TODO(jelmer): check pack files
@@ -1411,8 +1482,9 @@ def ls_files(repo):
 def describe(repo):
     """Describe the repository version.
 
-    :param projdir: git repository root
-    :returns: a string description of the current git revision
+    Args:
+      projdir: git repository root
+    Returns: a string description of the current git revision
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
     """
@@ -1480,10 +1552,11 @@ def describe(repo):
 def get_object_by_path(repo, path, committish=None):
     """Get an object by path.
 
-    :param repo: A path to the repository
-    :param path: Path to look up
-    :param committish: Commit to look up path in
-    :return: A `ShaFile` object
+    Args:
+      repo: A path to the repository
+      path: Path to look up
+      committish: Commit to look up path in
+    Returns: A `ShaFile` object
     """
     if committish is None:
         committish = "HEAD"
@@ -1502,8 +1575,9 @@ def get_object_by_path(repo, path, committish=None):
 def write_tree(repo):
     """Write a tree object from the index.
 
-    :param repo: Repository for which to write tree
-    :return: tree id for the tree that was written
+    Args:
+      repo: Repository for which to write tree
+    Returns: tree id for the tree that was written
     """
     with open_repo_closing(repo) as r:
         return r.open_index().commit(r.object_store)

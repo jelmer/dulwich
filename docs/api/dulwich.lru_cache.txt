@@ -1,0 +1,7 @@
+dulwich.lru\_cache module
+=========================
+
+.. automodule:: dulwich.lru_cache
+   :members:
+   :undoc-members:
+   :show-inheritance:

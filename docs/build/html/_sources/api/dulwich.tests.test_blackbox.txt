@@ -1,0 +1,7 @@
+dulwich.tests.test\_blackbox module
+===================================
+
+.. automodule:: dulwich.tests.test_blackbox
+   :members:
+   :undoc-members:
+   :show-inheritance:

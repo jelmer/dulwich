@@ -1,0 +1,50 @@
+dulwich package
+===============
+
+.. automodule:: dulwich
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Subpackages
+-----------
+
+.. toctree::
+
+   dulwich.contrib
+   dulwich.tests
+
+Submodules
+----------
+
+.. toctree::
+
+   dulwich.archive
+   dulwich.client
+   dulwich.config
+   dulwich.diff_tree
+   dulwich.errors
+   dulwich.fastexport
+   dulwich.file
+   dulwich.greenthreads
+   dulwich.hooks
+   dulwich.ignore
+   dulwich.index
+   dulwich.line_ending
+   dulwich.log_utils
+   dulwich.lru_cache
+   dulwich.mailmap
+   dulwich.object_store
+   dulwich.objects
+   dulwich.objectspec
+   dulwich.pack
+   dulwich.patch
+   dulwich.porcelain
+   dulwich.protocol
+   dulwich.reflog
+   dulwich.refs
+   dulwich.repo
+   dulwich.server
+   dulwich.stash
+   dulwich.walk
+   dulwich.web

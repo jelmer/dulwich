@@ -1,0 +1,84 @@
+.. _tutorial-remote:
+
+Most of the tests in this file require a Dulwich server, so let's start one:
+
+    >>> from dulwich.repo import Repo
+    >>> from dulwich.server import DictBackend, TCPGitServer
+    >>> import threading
+    >>> repo = Repo.init("remote", mkdir=True)
+    >>> cid = repo.do_commit(b"message", committer=b"Jelmer <jelmer@samba.org>")
+    >>> backend = DictBackend({b'/': repo})
+    >>> dul_server = TCPGitServer(backend, b'localhost', 0)
+    >>> threading.Thread(target=dul_server.serve).start()
+    >>> server_address, server_port=dul_server.socket.getsockname()
+
+Remote repositories
+===================
+
+The interface for remote Git repositories is different from that
+for local repositories.
+
+The Git smart server protocol provides three basic operations:
+
+ * upload-pack - provides a pack with objects requested by the client
+ * receive-pack - imports a pack with objects provided by the client
+ * upload-archive - provides a tarball with the contents of a specific revision
+
+The smart server protocol can be accessed over either plain TCP (git://),
+SSH (git+ssh://) or tunneled over HTTP (http://).
+
+Dulwich provides support for accessing remote repositories in
+``dulwich.client``. To create a new client, you can construct
+one manually::
+
+   >>> from dulwich.client import TCPGitClient
+   >>> client = TCPGitClient(server_address, server_port)
+
+Retrieving raw pack files
+-------------------------
+
+The client object can then be used to retrieve a pack. The ``fetch_pack``
+method takes a ``determine_wants`` callback argument, which allows the
+client to determine which objects it wants to end up with::
+
+   >>> def determine_wants(refs):
+   ...    # retrieve all objects
+   ...    return refs.values()
+
+Another required object is a "graph walker", which is used to determine
+which objects that the client already has should not be sent again
+by the server. Here in the tutorial we'll just use a dummy graph walker
+which claims that the client doesn't have any objects::
+
+   >>> class DummyGraphWalker(object):
+   ...     def ack(self, sha): pass
+   ...     def next(self): pass
+   ...     def __next__(self): pass
+
+With the ``determine_wants`` function in place, we can now fetch a pack,
+which we will write to a ``BytesIO`` object::
+
+   >>> from io import BytesIO
+   >>> f = BytesIO()
+   >>> result = client.fetch_pack(b"/", determine_wants,
+   ...    DummyGraphWalker(), pack_data=f.write)
+
+``f`` will now contain a full pack file::
+
+   >>> print(f.getvalue()[:4].decode('ascii'))
+   PACK
+
+Fetching objects into a local repository
+----------------------------------------
+
+It is also possible to fetch from a remote repository into a local repository,
+in which case Dulwich takes care of providing the right graph walker, and
+importing the received pack file into the local repository::
+
+   >>> from dulwich.repo import Repo
+   >>> local = Repo.init("local", mkdir=True)
+   >>> remote_refs = client.fetch(b"/", local)
+
+Let's shut down the server now that all tests have been run::
+
+   >>> dul_server.shutdown()

@@ -1,0 +1,7 @@
+dulwich.tests.test\_protocol module
+===================================
+
+.. automodule:: dulwich.tests.test_protocol
+   :members:
+   :undoc-members:
+   :show-inheritance:

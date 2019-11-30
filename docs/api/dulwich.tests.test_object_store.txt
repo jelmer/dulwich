@@ -1,0 +1,7 @@
+dulwich.tests.test\_object\_store module
+========================================
+
+.. automodule:: dulwich.tests.test_object_store
+   :members:
+   :undoc-members:
+   :show-inheritance:

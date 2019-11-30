@@ -1,0 +1,7 @@
+dulwich.tests.test\_reflog module
+=================================
+
+.. automodule:: dulwich.tests.test_reflog
+   :members:
+   :undoc-members:
+   :show-inheritance:

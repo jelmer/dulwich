@@ -1,0 +1,19 @@
+dulwich.contrib package
+=======================
+
+.. automodule:: dulwich.contrib
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Submodules
+----------
+
+.. toctree::
+
+   dulwich.contrib.paramiko_vendor
+   dulwich.contrib.release_robot
+   dulwich.contrib.swift
+   dulwich.contrib.test_release_robot
+   dulwich.contrib.test_swift
+   dulwich.contrib.test_swift_smoke

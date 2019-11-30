@@ -73,8 +73,9 @@ BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
-    :param m: Mode to check
-    :return: a ``boolean``
+    Args:
+      m: Mode to check
+    Returns: a ``boolean``
     """
     return (stat.S_IFMT(m) == S_IFGITLINK)
 
@@ -162,8 +163,9 @@ def serializable_property(name, docstring=None):
 def object_class(type):
     """Get the object class corresponding to the given type.
 
-    :param type: Either a type name string or a numeric type.
-    :return: The ShaFile subclass corresponding to the given type, or None if
+    Args:
+      type: Either a type name string or a numeric type.
+    Returns: The ShaFile subclass corresponding to the given type, or None if
         type is not a valid type name/number.
     """
     return _TYPE_MAP.get(type, None)
@@ -172,9 +174,11 @@ def object_class(type):
 def check_hexsha(hex, error_msg):
     """Check if a string is a valid hex sha string.
 
-    :param hex: Hex string to check
-    :param error_msg: Error message to use in exception
-    :raise ObjectFormatException: Raised when the string is not valid
+    Args:
+      hex: Hex string to check
+      error_msg: Error message to use in exception
+    Raises:
+      ObjectFormatException: Raised when the string is not valid
     """
     if not valid_hexsha(hex):
         raise ObjectFormatException("%s %s" % (error_msg, hex))
@@ -185,8 +189,9 @@ def check_identity(identity, error_msg):
 
     This will raise an exception if the identity is not valid.
 
-    :param identity: Identity string
-    :param error_msg: Error message to use in exception
+    Args:
+      identity: Identity string
+      error_msg: Error message to use in exception
     """
     email_start = identity.find(b'<')
     email_end = identity.find(b'>')
@@ -202,7 +207,8 @@ def check_time(time_seconds):
 
     This will raise an exception if the time is not valid.
 
-    :param time_info: author/committer/tagger info
+    Args:
+      time_info: author/committer/tagger info
 
     """
     # Prevent overflow error
@@ -279,7 +285,7 @@ class ShaFile(object):
     def as_legacy_object_chunks(self):
         """Return chunks representing the object in the experimental format.
 
-        :return: List of strings
+        Returns: List of strings
         """
         compobj = zlib.compressobj()
         yield compobj.compress(self._header())
@@ -295,7 +301,7 @@ class ShaFile(object):
     def as_raw_chunks(self):
         """Return chunks with serialization of the object.
 
-        :return: List of strings, not necessarily one per line
+        Returns: List of strings, not necessarily one per line
         """
         if self._needs_serialization:
             self._sha = None
@@ -306,7 +312,7 @@ class ShaFile(object):
     def as_raw_string(self):
         """Return raw string with serialization of the object.
 
-        :return: String object
+        Returns: String object
         """
         return b''.join(self.as_raw_chunks())
 
@@ -417,9 +423,10 @@ class ShaFile(object):
     def from_raw_string(type_num, string, sha=None):
         """Creates an object of the indicated type from the raw string given.
 
-        :param type_num: The numeric type of the object.
-        :param string: The raw uncompressed contents.
-        :param sha: Optional known sha for the object
+        Args:
+          type_num: The numeric type of the object.
+          string: The raw uncompressed contents.
+          sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
         obj.set_raw_string(string, sha)
@@ -429,9 +436,10 @@ class ShaFile(object):
     def from_raw_chunks(type_num, chunks, sha=None):
         """Creates an object of the indicated type from the raw chunks given.
 
-        :param type_num: The numeric type of the object.
-        :param chunks: An iterable of the raw uncompressed contents.
-        :param sha: Optional known sha for the object
+        Args:
+          type_num: The numeric type of the object.
+          chunks: An iterable of the raw uncompressed contents.
+          sha: Optional known sha for the object
         """
         obj = object_class(type_num)()
         obj.set_raw_chunks(chunks, sha)
@@ -447,9 +455,11 @@ class ShaFile(object):
     def _check_has_member(self, member, error_msg):
         """Check that the object has a given member variable.
 
-        :param member: the member variable to check for
-        :param error_msg: the message for an error if the member is missing
-        :raise ObjectFormatException: with the given error_msg if member is
+        Args:
+          member: the member variable to check for
+          error_msg: the message for an error if the member is missing
+        Raises:
+          ObjectFormatException: with the given error_msg if member is
             missing or is None
         """
         if getattr(self, member, None) is None:
@@ -458,8 +468,9 @@ class ShaFile(object):
     def check(self):
         """Check this object for internal consistency.
 
-        :raise ObjectFormatException: if the object is malformed in some way
-        :raise ChecksumMismatch: if the object was created with a SHA that does
+        Raises:
+          ObjectFormatException: if the object is malformed in some way
+          ChecksumMismatch: if the object was created with a SHA that does
             not match its contents
         """
         # TODO: if we find that error-checking during object parsing is a
@@ -603,7 +614,8 @@ class Blob(ShaFile):
     def check(self):
         """Check this object for internal consistency.
 
-        :raise ObjectFormatException: if the object is malformed in some way
+        Raises:
+          ObjectFormatException: if the object is malformed in some way
         """
         super(Blob, self).check()
 
@@ -638,8 +650,9 @@ class Blob(ShaFile):
 def _parse_message(chunks):
     """Parse a message with a list of fields and a body.
 
-    :param chunks: the raw chunks of the tag or commit object.
-    :return: iterator of tuples of (field, value), one per header line, in the
+    Args:
+      chunks: the raw chunks of the tag or commit object.
+    Returns: iterator of tuples of (field, value), one per header line, in the
         order read from the text, possibly including duplicates. Includes a
         field named None for the freeform tag/commit text.
     """
@@ -716,7 +729,8 @@ class Tag(ShaFile):
     def check(self):
         """Check this object for internal consistency.
 
-        :raise ObjectFormatException: if the object is malformed in some way
+        Raises:
+          ObjectFormatException: if the object is malformed in some way
         """
         super(Tag, self).check()
         self._check_has_member("_object_sha", "missing object sha")
@@ -807,7 +821,7 @@ class Tag(ShaFile):
     def _get_object(self):
         """Get the object pointed to by this tag.
 
-        :return: tuple of (object class, sha).
+        Returns: tuple of (object class, sha).
         """
         return (self._object_class, self._object_sha)
 
@@ -848,9 +862,11 @@ class TreeEntry(namedtuple('TreeEntry', ['path', 'mode', 'sha'])):
 def parse_tree(text, strict=False):
     """Parse a tree text.
 
-    :param text: Serialized text to parse
-    :return: iterator of tuples of (name, mode, sha)
-    :raise ObjectFormatException: if the object was malformed in some way
+    Args:
+      text: Serialized text to parse
+    Returns: iterator of tuples of (name, mode, sha)
+    Raises:
+      ObjectFormatException: if the object was malformed in some way
     """
     count = 0
     length = len(text)
@@ -876,8 +892,9 @@ def parse_tree(text, strict=False):
 def serialize_tree(items):
     """Serialize the items in a tree to a text.
 
-    :param items: Sorted iterable over (name, mode, sha) tuples
-    :return: Serialized tree text as chunks
+    Args:
+      items: Sorted iterable over (name, mode, sha) tuples
+    Returns: Serialized tree text as chunks
     """
     for name, mode, hexsha in items:
         yield (("%04o" % mode).encode('ascii') + b' ' + name +
@@ -887,11 +904,12 @@ def serialize_tree(items):
 def sorted_tree_items(entries, name_order):
     """Iterate over a tree entries dictionary.
 
-    :param name_order: If True, iterate entries in order of their name. If
+    Args:
+      name_order: If True, iterate entries in order of their name. If
         False, iterate entries in tree order, that is, treat subtree entries as
         having '/' appended.
-    :param entries: Dictionary mapping names to (mode, sha) tuples
-    :return: Iterator over (name, mode, hexsha)
+      entries: Dictionary mapping names to (mode, sha) tuples
+    Returns: Iterator over (name, mode, hexsha)
     """
     key_func = name_order and key_entry_name_order or key_entry
     for name, entry in sorted(entries.items(), key=key_func):
@@ -906,7 +924,8 @@ def sorted_tree_items(entries, name_order):
 def key_entry(entry):
     """Sort key for tree entry.
 
-    :param entry: (name, value) tuplee
+    Args:
+      entry: (name, value) tuplee
     """
     (name, value) = entry
     if stat.S_ISDIR(value[0]):
@@ -922,10 +941,11 @@ def key_entry_name_order(entry):
 def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8"):
     """Pretty format tree entry.
 
-    :param name: Name of the directory entry
-    :param mode: Mode of entry
-    :param hexsha: Hexsha of the referenced object
-    :return: string describing the tree entry
+    Args:
+      name: Name of the directory entry
+      mode: Mode of entry
+      hexsha: Hexsha of the referenced object
+    Returns: string describing the tree entry
     """
     if mode & stat.S_IFDIR:
         kind = "tree"
@@ -964,8 +984,9 @@ class Tree(ShaFile):
     def __setitem__(self, name, value):
         """Set a tree entry by name.
 
-        :param name: The name of the entry, as a string.
-        :param value: A tuple of (mode, hexsha), where mode is the mode of the
+        Args:
+          name: The name of the entry, as a string.
+          value: A tuple of (mode, hexsha), where mode is the mode of the
             entry as an integral type and hexsha is the hex SHA of the entry as
             a string.
         """
@@ -986,10 +1007,11 @@ class Tree(ShaFile):
     def add(self, name, mode, hexsha):
         """Add an entry to the tree.
 
-        :param mode: The mode of the entry as an integral type. Not all
+        Args:
+          mode: The mode of the entry as an integral type. Not all
             possible modes are supported by git; see check() for details.
-        :param name: The name of the entry, as a string.
-        :param hexsha: The hex SHA of the entry as a string.
+          name: The name of the entry, as a string.
+          hexsha: The hex SHA of the entry as a string.
         """
         if isinstance(name, int) and isinstance(mode, bytes):
             (name, mode) = (mode, name)
@@ -1002,16 +1024,17 @@ class Tree(ShaFile):
     def iteritems(self, name_order=False):
         """Iterate over entries.
 
-        :param name_order: If True, iterate in name order instead of tree
+        Args:
+          name_order: If True, iterate in name order instead of tree
             order.
-        :return: Iterator over (name, mode, sha) tuples
+        Returns: Iterator over (name, mode, sha) tuples
         """
         return sorted_tree_items(self._entries, name_order)
 
     def items(self):
         """Return the sorted entries in this tree.
 
-        :return: List with (name, mode, sha) tuples
+        Returns: List with (name, mode, sha) tuples
         """
         return list(self.iteritems())
 
@@ -1029,7 +1052,8 @@ class Tree(ShaFile):
     def check(self):
         """Check this object for internal consistency.
 
-        :raise ObjectFormatException: if the object is malformed in some way
+        Raises:
+          ObjectFormatException: if the object is malformed in some way
         """
         super(Tree, self).check()
         last = None
@@ -1068,9 +1092,10 @@ class Tree(ShaFile):
     def lookup_path(self, lookup_obj, path):
         """Look up an object in a Git tree.
 
-        :param lookup_obj: Callback for retrieving object by SHA1
-        :param path: Path to lookup
-        :return: A tuple of (mode, SHA) of the resulting path.
+        Args:
+          lookup_obj: Callback for retrieving object by SHA1
+          path: Path to lookup
+        Returns: A tuple of (mode, SHA) of the resulting path.
         """
         parts = path.split(b'/')
         sha = self.id
@@ -1088,8 +1113,9 @@ class Tree(ShaFile):
 def parse_timezone(text):
     """Parse a timezone text fragment (e.g. '+0100').
 
-    :param text: Text to parse.
-    :return: Tuple with timezone as seconds difference to UTC
+    Args:
+      text: Text to parse.
+    Returns: Tuple with timezone as seconds difference to UTC
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
@@ -1114,8 +1140,9 @@ def parse_timezone(text):
 def format_timezone(offset, unnecessary_negative_timezone=False):
     """Format a timezone for Git serialization.
 
-    :param offset: Timezone offset as seconds difference to UTC
-    :param unnecessary_negative_timezone: Whether to use a minus sign for
+    Args:
+      offset: Timezone offset as seconds difference to UTC
+      unnecessary_negative_timezone: Whether to use a minus sign for
         UTC or positive timezones (-0000 and --700 rather than +0000 / +0700).
     """
     if offset % 60 != 0:
@@ -1132,10 +1159,12 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
 def parse_time_entry(value):
     """Parse time entry behavior
 
-    :param value: Bytes representing a git commit/tag line
-    :raise: ObjectFormatException in case of parsing error (malformed
-            field date)
-    :return: Tuple of (author, time, (timezone, timezone_neg_utc))
+    Args:
+      value: Bytes representing a git commit/tag line
+    Raises:
+      ObjectFormatException in case of parsing error (malformed
+      field date)
+    Returns: Tuple of (author, time, (timezone, timezone_neg_utc))
     """
     try:
         sep = value.rindex(b'> ')
@@ -1155,8 +1184,9 @@ def parse_time_entry(value):
 def parse_commit(chunks):
     """Parse a commit object from chunks.
 
-    :param chunks: Chunks to parse
-    :return: Tuple of (tree, parents, author_info, commit_info,
+    Args:
+      chunks: Chunks to parse
+    Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
     parents = []
@@ -1234,7 +1264,8 @@ class Commit(ShaFile):
     def check(self):
         """Check this object for internal consistency.
 
-        :raise ObjectFormatException: if the object is malformed in some way
+        Raises:
+          ObjectFormatException: if the object is malformed in some way
         """
         super(Commit, self).check()
         self._check_has_member("_tree", "missing tree")

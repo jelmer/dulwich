@@ -1,0 +1,7 @@
+dulwich.tests.test\_index module
+================================
+
+.. automodule:: dulwich.tests.test_index
+   :members:
+   :undoc-members:
+   :show-inheritance:

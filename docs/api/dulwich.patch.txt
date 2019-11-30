@@ -1,0 +1,7 @@
+dulwich.patch module
+====================
+
+.. automodule:: dulwich.patch
+   :members:
+   :undoc-members:
+   :show-inheritance:

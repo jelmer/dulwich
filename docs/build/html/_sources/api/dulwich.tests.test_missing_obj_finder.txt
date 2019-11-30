@@ -1,0 +1,7 @@
+dulwich.tests.test\_missing\_obj\_finder module
+===============================================
+
+.. automodule:: dulwich.tests.test_missing_obj_finder
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,4 +1,4 @@
-dulwich (0.19.14-1) UNRELEASED; urgency=medium
+dulwich (0.19.14-1) unstable; urgency=medium
 
   [ Debian Janitor ]
   * Remove obsolete fields Name, Contact from debian/upstream/metadata.
@@ -9,7 +9,7 @@ dulwich (0.19.14-1) UNRELEASED; urgency=medium
    + Fixes handling of ~ in global gitignore. Closes: #933192
   * Drop build-dependency on python-fastimport.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 30 Nov 2019 18:29:08 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 30 Nov 2019 18:34:47 +0000
 
 dulwich (0.19.13-1) unstable; urgency=medium
 

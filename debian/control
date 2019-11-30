@@ -11,7 +11,6 @@ Build-Depends: debhelper-compat (= 12),
                python-all-dbg (>= 2.6.6-3),
                python-all-dev (>= 2.6.6-3),
                python-certifi,
-               python-fastimport (>= 0.9.0~bzr293),
                python-unittest2,
                python-urllib3 (>= 1.24.1),
                python3-all-dbg,
@@ -31,7 +30,6 @@ Depends: python-certifi,
          ${python:Depends},
          ${shlibs:Depends}
 Breaks: bzr-git (<< 0.6.13+bzr1650), python-breezy (<< 3.0.0~bzr7268)
-Recommends: python-fastimport
 Suggests: python-gpg
 Description: Python Git library
  Dulwich is a Python implementation of the file formats and protocols

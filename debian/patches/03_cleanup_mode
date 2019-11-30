@@ -1,0 +1,57 @@
+=== modified file 'dulwich/index.py'
+--- old/dulwich/index.py	2019-11-09 03:25:15 +0000
++++ new/dulwich/index.py	2019-12-15 13:30:23 +0000
+@@ -207,7 +207,8 @@
+     elif S_ISGITLINK(mode):
+         return S_IFGITLINK
+     ret = stat.S_IFREG | 0o644
+-    ret |= (mode & 0o111)
++    if mode & 0o100:
++        ret |= 0o111
+     return ret
+ 
+ 
+@@ -326,7 +327,7 @@
+         """
+         def lookup_entry(path):
+             entry = self[path]
+-            return entry.sha, entry.mode
++            return entry.sha, cleanup_mode(entry.mode)
+         for (name, mode, sha) in changes_from_tree(
+                 self._byname.keys(), lookup_entry, object_store, tree,
+                 want_unchanged=want_unchanged):
+
+=== modified file 'dulwich/tests/test_index.py'
+--- old/dulwich/tests/test_index.py	2019-02-14 01:21:20 +0000
++++ new/dulwich/tests/test_index.py	2019-12-15 13:30:23 +0000
+@@ -229,20 +229,24 @@
+ 
+ class CleanupModeTests(TestCase):
+ 
++    def assertModeEqual(self, expected, got):
++        self.assertEqual(expected, got, '%o != %o' % (expected, got))
++
+     def test_file(self):
+-        self.assertEqual(0o100644, cleanup_mode(0o100000))
++        self.assertModeEqual(0o100644, cleanup_mode(0o100000))
+ 
+     def test_executable(self):
+-        self.assertEqual(0o100755, cleanup_mode(0o100711))
++        self.assertModeEqual(0o100755, cleanup_mode(0o100711))
++        self.assertModeEqual(0o100755, cleanup_mode(0o100700))
+ 
+     def test_symlink(self):
+-        self.assertEqual(0o120000, cleanup_mode(0o120711))
++        self.assertModeEqual(0o120000, cleanup_mode(0o120711))
+ 
+     def test_dir(self):
+-        self.assertEqual(0o040000, cleanup_mode(0o40531))
++        self.assertModeEqual(0o040000, cleanup_mode(0o40531))
+ 
+     def test_submodule(self):
+-        self.assertEqual(0o160000, cleanup_mode(0o160744))
++        self.assertModeEqual(0o160000, cleanup_mode(0o160744))
+ 
+ 
+ class WriteCacheTimeTests(TestCase):
+

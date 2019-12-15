@@ -1,9 +1,9 @@
-dulwich (0.19.14-2) UNRELEASED; urgency=medium
+dulwich (0.19.14-2) unstable; urgency=medium
 
   * Cherry-pick upstream change for cleaning up file modes when
     comparing trees. Closes: #946740
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 15 Dec 2019 13:38:35 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 15 Dec 2019 13:39:48 +0000
 
 dulwich (0.19.14-1) unstable; urgency=medium
 

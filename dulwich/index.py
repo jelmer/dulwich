@@ -207,7 +207,8 @@ def cleanup_mode(mode):
     elif S_ISGITLINK(mode):
         return S_IFGITLINK
     ret = stat.S_IFREG | 0o644
-    ret |= (mode & 0o111)
+    if mode & 0o100:
+        ret |= 0o111
     return ret
 
 
@@ -326,7 +327,7 @@ class Index(object):
         """
         def lookup_entry(path):
             entry = self[path]
-            return entry.sha, entry.mode
+            return entry.sha, cleanup_mode(entry.mode)
         for (name, mode, sha) in changes_from_tree(
                 self._byname.keys(), lookup_entry, object_store, tree,
                 want_unchanged=want_unchanged):

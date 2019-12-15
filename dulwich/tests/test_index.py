@@ -229,20 +229,24 @@ class CommitTreeTests(TestCase):
 
 class CleanupModeTests(TestCase):
 
+    def assertModeEqual(self, expected, got):
+        self.assertEqual(expected, got, '%o != %o' % (expected, got))
+
     def test_file(self):
-        self.assertEqual(0o100644, cleanup_mode(0o100000))
+        self.assertModeEqual(0o100644, cleanup_mode(0o100000))
 
     def test_executable(self):
-        self.assertEqual(0o100755, cleanup_mode(0o100711))
+        self.assertModeEqual(0o100755, cleanup_mode(0o100711))
+        self.assertModeEqual(0o100755, cleanup_mode(0o100700))
 
     def test_symlink(self):
-        self.assertEqual(0o120000, cleanup_mode(0o120711))
+        self.assertModeEqual(0o120000, cleanup_mode(0o120711))
 
     def test_dir(self):
-        self.assertEqual(0o040000, cleanup_mode(0o40531))
+        self.assertModeEqual(0o040000, cleanup_mode(0o40531))
 
     def test_submodule(self):
-        self.assertEqual(0o160000, cleanup_mode(0o160744))
+        self.assertModeEqual(0o160000, cleanup_mode(0o160744))
 
 
 class WriteCacheTimeTests(TestCase):

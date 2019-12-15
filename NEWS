@@ -1,5 +1,8 @@
 0.19.15	UNRELEASED
 
+ * Properly handle files that are just executable for the
+   current user. (Jelmer Vernooĳ, #734)
+
 0.19.14	2019-11-30
 
  * Strip superfluous <> around email. (monnerat)

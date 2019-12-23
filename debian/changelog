@@ -1,9 +1,9 @@
-dulwich (0.19.14-3) UNRELEASED; urgency=medium
+dulwich (0.19.14-3) unstable; urgency=medium
 
   * Team upload.
   * Drop python2 support; Closes: #936454
 
- -- Sandro Tosi <morph@debian.org>  Mon, 23 Dec 2019 17:51:45 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 23 Dec 2019 17:54:20 -0500
 
 dulwich (0.19.14-2) unstable; urgency=medium
 

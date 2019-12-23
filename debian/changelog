@@ -1,3 +1,10 @@
+dulwich (0.19.14-3) UNRELEASED; urgency=medium
+
+  * Team upload.
+  * Drop python2 support; Closes: #936454
+
+ -- Sandro Tosi <morph@debian.org>  Mon, 23 Dec 2019 17:51:45 -0500
+
 dulwich (0.19.14-2) unstable; urgency=medium
 
   * Cherry-pick upstream change for cleaning up file modes when

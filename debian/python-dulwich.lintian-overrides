@@ -1,2 +1,0 @@
-python-dulwich binary: package-contains-vcs-control-file
-python-dulwich binary: executable-not-elf-or-script usr/lib/python2.7/dist-packages/dulwich/tests/data/commits/0d/89f20333fbb1d2f3a94da77f4981373d8f4310

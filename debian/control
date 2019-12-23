@@ -8,11 +8,6 @@ Build-Depends: debhelper-compat (= 12),
                dh-python,
                git (>= 1:1.7.0.4-2) [!alpha !ppc64 !sparc64 !x32 !ia64],
                pypy-dev [alpha amd64 arm64 armel armhf i386 mips powerpc ppc64el s390x],
-               python-all-dbg (>= 2.6.6-3),
-               python-all-dev (>= 2.6.6-3),
-               python-certifi,
-               python-unittest2,
-               python-urllib3 (>= 1.24.1),
                python3-all-dbg,
                python3-all-dev,
                python3-certifi,
@@ -21,27 +16,6 @@ Build-Depends: debhelper-compat (= 12),
 Standards-Version: 4.2.1
 Vcs-Git: https://salsa.debian.org/python-team/modules/dulwich.git
 Vcs-Browser: https://salsa.debian.org/python-team/modules/dulwich
-
-Package: python-dulwich
-Architecture: any
-Depends: python-certifi,
-         python-urllib3 (>= 1.24.1),
-         ${misc:Depends},
-         ${python:Depends},
-         ${shlibs:Depends}
-Breaks: bzr-git (<< 0.6.13+bzr1650), python-breezy (<< 3.0.0~bzr7268)
-Suggests: python-gpg
-Description: Python Git library
- Dulwich is a Python implementation of the file formats and protocols
- used by the Git version control system. It can currently read from and write
- to existing Git repositories and implements the protocol for pushing and
- receiving packs from remote servers.
- .
- All functionality is available in pure Python, but for improved performance
- replacements of some modules written in C are also available. This package
- includes the high performance versions.
- .
- This package contains the module built for Python version 2.x.
 
 Package: pypy-dulwich
 Architecture: alpha amd64 arm64 armel armhf i386 mips mipsel powerpc ppc64el s390x

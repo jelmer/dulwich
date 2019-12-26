@@ -1,3 +1,4 @@
 01_no_urllib3_pypy
 02_skip_flappy_test
 03_cleanup_mode
+04_s390x

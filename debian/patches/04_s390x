@@ -1,0 +1,29 @@
+From: Stefano Rivera <stefanor@debian.org>
+Date: Thu, 26 Dec 2019 09:50:33 +0200
+Subject: A missed Py_ssize_t conversion for PY_SSIZE_T_CLEAN
+
+Missed in 8f73bc51e2620820fa1d3aa2c109a3aa3fbe5bc8
+
+This was causing misbehaviour on s390x (multiple test failures).
+
+Bug-Debian: https://bugs.debian.org/946854
+Bug-Upstream: https://github.com/dulwich/dulwich/issues/735
+Forwarded: https://github.com/dulwich/dulwich/pull/736
+---
+ dulwich/_diff_tree.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/dulwich/_diff_tree.c b/dulwich/_diff_tree.c
+index 3481ddd..068b4f6 100644
+--- a/dulwich/_diff_tree.c
++++ b/dulwich/_diff_tree.c
+@@ -198,8 +198,7 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
+ {
+ 	PyObject *tree1, *tree2, **entries1 = NULL, **entries2 = NULL;
+ 	PyObject *e1, *e2, *pair, *result = NULL;
+-	Py_ssize_t n1 = 0, n2 = 0, i1 = 0, i2 = 0;
+-	int path_len;
++	Py_ssize_t n1 = 0, n2 = 0, i1 = 0, i2 = 0, path_len;
+ 	char *path_str;
+ 	int cmp;
+ 

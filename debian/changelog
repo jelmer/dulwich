@@ -1,8 +1,9 @@
-dulwich (0.19.14-4) UNRELEASED; urgency=medium
+dulwich (0.19.14-4) unstable; urgency=medium
 
+  * Team upload.
   * Patch 04_s390x: Fix FTBFS on s390x. Closes: #946854
 
- -- Stefano Rivera <stefanor@debian.org>  Thu, 26 Dec 2019 09:57:22 +0200
+ -- Stefano Rivera <stefanor@debian.org>  Thu, 26 Dec 2019 10:10:53 +0200
 
 dulwich (0.19.14-3) unstable; urgency=medium
 

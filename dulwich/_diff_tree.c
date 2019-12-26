@@ -198,8 +198,7 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 {
 	PyObject *tree1, *tree2, **entries1 = NULL, **entries2 = NULL;
 	PyObject *e1, *e2, *pair, *result = NULL;
-	Py_ssize_t n1 = 0, n2 = 0, i1 = 0, i2 = 0;
-	int path_len;
+	Py_ssize_t n1 = 0, n2 = 0, i1 = 0, i2 = 0, path_len;
 	char *path_str;
 	int cmp;
 

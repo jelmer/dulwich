@@ -1770,7 +1770,7 @@ class HelperTests(PorcelainTestCase):
             os.chdir(cwd)
 
 
-class GetObjectBypathTests(PorcelainTestCase):
+class GetObjectByPathTests(PorcelainTestCase):
 
     def test_simple(self):
         fullpath = os.path.join(self.repo.path, 'foo')
@@ -1784,6 +1784,26 @@ class GetObjectBypathTests(PorcelainTestCase):
         self.assertEqual(
             b"BAR",
             porcelain.get_object_by_path(self.repo, 'foo').data)
+        self.assertEqual(
+            b"BAR",
+            porcelain.get_object_by_path(self.repo, b'foo').data)
+
+    def test_encoding(self):
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write("BAR")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+                self.repo.path, message=b"Some message",
+                author=b"Joe <joe@example.com>",
+                committer=b"Bob <bob@example.com>",
+                encoding=b"utf-8")
+        self.assertEqual(
+            b"BAR",
+            porcelain.get_object_by_path(self.repo, 'foo').data)
+        self.assertEqual(
+            b"BAR",
+            porcelain.get_object_by_path(self.repo, b'foo').data)
 
     def test_missing(self):
         self.assertRaises(

@@ -3,6 +3,10 @@
  * Properly handle files that are just executable for the
    current user. (Jelmer Vernooĳ, #734)
 
+ * Fix handling of stored encoding in
+   ``dulwich.porcelain.get_object_by_path`` on Python 3.
+   (Jelmer Vernooĳ)
+
 0.19.14	2019-11-30
 
  * Strip superfluous <> around email. (monnerat)

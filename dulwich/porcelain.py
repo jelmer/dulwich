@@ -523,9 +523,19 @@ rm = remove
 
 
 def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
-    if commit.encoding is not None:
-        return contents.decode(commit.encoding, "replace")
-    return contents.decode(default_encoding, "replace")
+    if commit.encoding:
+        encoding = commit.encoding.decode('ascii')
+    else:
+        encoding = default_encoding
+    return contents.decode(encoding, "replace")
+
+
+def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
+    if commit.encoding:
+        encoding = commit.encoding.decode('ascii')
+    else:
+        encoding = default_encoding
+    return contents.encode(encoding)
 
 
 def print_commit(commit, decode, outstream=sys.stdout):
@@ -604,9 +614,7 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
         diffstream,
         repo.object_store, base_tree, commit.tree)
     diffstream.seek(0)
-    outstream.write(
-        diffstream.getvalue().decode(
-                commit.encoding or DEFAULT_ENCODING, 'replace'))
+    outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
 def show_tree(repo, tree, decode, outstream=sys.stdout):
@@ -1565,7 +1573,7 @@ def get_object_by_path(repo, path, committish=None):
         commit = parse_commit(r, committish)
         base_tree = commit.tree
         if not isinstance(path, bytes):
-            path = path.encode(commit.encoding or DEFAULT_ENCODING)
+            path = commit_encode(commit, path)
         (mode, sha) = tree_lookup_path(
             r.object_store.__getitem__,
             base_tree, path)

@@ -1502,10 +1502,11 @@ def default_urllib3_manager(config, **override_kwargs):
 class HttpGitClient(GitClient):
 
     def __init__(self, base_url, dumb=None, pool_manager=None, config=None,
-                 username=None, password=None, **kwargs):
+                 username=None, password=None, password_mgr=None, **kwargs):
         self._base_url = base_url.rstrip("/") + "/"
         self._username = username
         self._password = password
+        self._password_mgr = password_mgr
         self.dumb = dumb
 
         if pool_manager is None:
@@ -1514,12 +1515,7 @@ class HttpGitClient(GitClient):
             self.pool_manager = pool_manager
 
         if username is not None:
-            # No escaping needed: ":" is not allowed in username:
-            # https://tools.ietf.org/html/rfc2617#section-2
-            credentials = "%s:%s" % (username, password)
-            import urllib3.util
-            basic_auth = urllib3.util.make_headers(basic_auth=credentials)
-            self.pool_manager.headers.update(basic_auth)
+            self._update_auth()
 
         GitClient.__init__(self, **kwargs)
 
@@ -1554,8 +1550,16 @@ class HttpGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
 
+    def _update_auth(self):
+        # No escaping needed: ":" is not allowed in username:
+        # https://tools.ietf.org/html/rfc2617#section-2
+        credentials = "%s:%s" % (self._username, self._password)
+        import urllib3.util
+        basic_auth = urllib3.util.make_headers(basic_auth=credentials)
+        self.pool_manager.headers.update(basic_auth)
+
     def _http_request(self, url, headers=None, data=None,
-                      allow_compression=False):
+                      allow_compression=False, try_again=True):
         """Perform HTTP request.
 
         Args:
@@ -1588,6 +1592,31 @@ class HttpGitClient(GitClient):
 
         if resp.status == 404:
             raise NotGitRepository()
+        if resp.status == 401 and try_again and self._password_mgr is not None:
+            # Support people using brest practices by sending an auth failure
+            # first, and only then sending credentials
+
+            import urllib3.util
+            current_url = urllib3.util.parse_url(resp.geturl())
+            # Create the http origin for the password manager
+            safe_origin = str(urllib3.util.Url(scheme=current_url.scheme,
+                                           host=current_url.host,
+                                           port=current_url.port).url)
+            # Extract the realm (if it exists)
+            realm = None
+            try:
+                realm = resp.headers["WWW-Authenticawte"]
+                if realm is not None:
+                    realm = realm[13:-1] # Basic realm=".."
+            except KeyError:
+                pass
+
+            self._username, self._password = \
+                self._password_mgr.find_user_password(realm, safe_origin)
+
+            self._update_auth()
+            return self._http_request(url, headers, data, allow_compression,
+                                      try_again=False)
         elif resp.status != 200:
             raise GitProtocolError("unexpected http resp %d for %s" %
                                    (resp.status, url))

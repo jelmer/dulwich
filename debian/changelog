@@ -1,3 +1,9 @@
+dulwich (0.19.15-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 26 Jan 2020 19:40:58 +0000
+
 dulwich (0.19.14-4) unstable; urgency=medium
 
   * Team upload.

@@ -1,7 +1,0 @@
-dulwich.tests.test\_stash module
-================================
-
-.. automodule:: dulwich.tests.test_stash
-   :members:
-   :undoc-members:
-   :show-inheritance:

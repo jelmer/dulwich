@@ -1,7 +1,0 @@
-dulwich.tests.compat.test\_server module
-========================================
-
-.. automodule:: dulwich.tests.compat.test_server
-   :members:
-   :undoc-members:
-   :show-inheritance:

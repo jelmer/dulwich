@@ -1,7 +1,0 @@
-dulwich.tests.test\_greenthreads module
-=======================================
-
-.. automodule:: dulwich.tests.test_greenthreads
-   :members:
-   :undoc-members:
-   :show-inheritance:

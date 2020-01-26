@@ -1,7 +1,0 @@
-dulwich.tests.test\_file module
-===============================
-
-.. automodule:: dulwich.tests.test_file
-   :members:
-   :undoc-members:
-   :show-inheritance:

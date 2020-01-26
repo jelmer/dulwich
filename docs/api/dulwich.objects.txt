@@ -1,7 +1,0 @@
-dulwich.objects module
-======================
-
-.. automodule:: dulwich.objects
-   :members:
-   :undoc-members:
-   :show-inheritance:

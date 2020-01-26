@@ -1,7 +1,0 @@
-dulwich.tests.utils module
-==========================
-
-.. automodule:: dulwich.tests.utils
-   :members:
-   :undoc-members:
-   :show-inheritance:

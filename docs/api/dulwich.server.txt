@@ -1,7 +1,0 @@
-dulwich.server module
-=====================
-
-.. automodule:: dulwich.server
-   :members:
-   :undoc-members:
-   :show-inheritance:

@@ -1,7 +1,0 @@
-dulwich.contrib.test\_swift\_smoke module
-=========================================
-
-.. automodule:: dulwich.contrib.test_swift_smoke
-   :members:
-   :undoc-members:
-   :show-inheritance:

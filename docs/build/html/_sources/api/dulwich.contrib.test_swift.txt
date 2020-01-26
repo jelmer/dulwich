@@ -1,7 +1,0 @@
-dulwich.contrib.test\_swift module
-==================================
-
-.. automodule:: dulwich.contrib.test_swift
-   :members:
-   :undoc-members:
-   :show-inheritance:

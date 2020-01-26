@@ -1,7 +1,0 @@
-dulwich.tests.compat.test\_repository module
-============================================
-
-.. automodule:: dulwich.tests.compat.test_repository
-   :members:
-   :undoc-members:
-   :show-inheritance:

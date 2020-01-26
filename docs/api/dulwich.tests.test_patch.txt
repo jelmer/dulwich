@@ -1,7 +1,0 @@
-dulwich.tests.test\_patch module
-================================
-
-.. automodule:: dulwich.tests.test_patch
-   :members:
-   :undoc-members:
-   :show-inheritance:

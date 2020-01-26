@@ -1,7 +1,0 @@
-dulwich.tests.test\_archive module
-==================================
-
-.. automodule:: dulwich.tests.test_archive
-   :members:
-   :undoc-members:
-   :show-inheritance:

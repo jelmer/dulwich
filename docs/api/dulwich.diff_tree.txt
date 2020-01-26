@@ -1,7 +1,0 @@
-dulwich.diff\_tree module
-=========================
-
-.. automodule:: dulwich.diff_tree
-   :members:
-   :undoc-members:
-   :show-inheritance:

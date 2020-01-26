@@ -1,7 +1,0 @@
-dulwich.tests.test\_ignore module
-=================================
-
-.. automodule:: dulwich.tests.test_ignore
-   :members:
-   :undoc-members:
-   :show-inheritance:

@@ -1,7 +1,0 @@
-dulwich.repo module
-===================
-
-.. automodule:: dulwich.repo
-   :members:
-   :undoc-members:
-   :show-inheritance:

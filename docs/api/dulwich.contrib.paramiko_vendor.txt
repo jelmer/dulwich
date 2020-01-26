@@ -1,7 +1,0 @@
-dulwich.contrib.paramiko\_vendor module
-=======================================
-
-.. automodule:: dulwich.contrib.paramiko_vendor
-   :members:
-   :undoc-members:
-   :show-inheritance:

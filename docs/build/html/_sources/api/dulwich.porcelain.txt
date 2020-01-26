@@ -1,7 +1,0 @@
-dulwich.porcelain module
-========================
-
-.. automodule:: dulwich.porcelain
-   :members:
-   :undoc-members:
-   :show-inheritance:

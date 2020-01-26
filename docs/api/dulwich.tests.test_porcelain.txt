@@ -1,7 +1,0 @@
-dulwich.tests.test\_porcelain module
-====================================
-
-.. automodule:: dulwich.tests.test_porcelain
-   :members:
-   :undoc-members:
-   :show-inheritance:

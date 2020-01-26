@@ -1,7 +1,0 @@
-dulwich.fastexport module
-=========================
-
-.. automodule:: dulwich.fastexport
-   :members:
-   :undoc-members:
-   :show-inheritance:

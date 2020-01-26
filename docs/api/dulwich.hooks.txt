@@ -1,7 +1,0 @@
-dulwich.hooks module
-====================
-
-.. automodule:: dulwich.hooks
-   :members:
-   :undoc-members:
-   :show-inheritance:

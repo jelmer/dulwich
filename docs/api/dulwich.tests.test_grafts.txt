@@ -1,7 +1,0 @@
-dulwich.tests.test\_grafts module
-=================================
-
-.. automodule:: dulwich.tests.test_grafts
-   :members:
-   :undoc-members:
-   :show-inheritance:

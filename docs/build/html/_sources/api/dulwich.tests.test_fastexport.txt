@@ -1,7 +1,0 @@
-dulwich.tests.test\_fastexport module
-=====================================
-
-.. automodule:: dulwich.tests.test_fastexport
-   :members:
-   :undoc-members:
-   :show-inheritance:

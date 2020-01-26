@@ -160,7 +160,8 @@ class BaseObjectStore(object):
             return commit()
 
     def tree_changes(self, source, target, want_unchanged=False,
-                     include_trees=False, change_type_same=False):
+                     include_trees=False, change_type_same=False,
+                     rename_detector=None):
         """Find the differences between the contents of two trees
 
         Args:
@@ -176,7 +177,8 @@ class BaseObjectStore(object):
         for change in tree_changes(self, source, target,
                                    want_unchanged=want_unchanged,
                                    include_trees=include_trees,
-                                   change_type_same=change_type_same):
+                                   change_type_same=change_type_same,
+                                   rename_detector=rename_detector):
             yield ((change.old.path, change.new.path),
                    (change.old.mode, change.new.mode),
                    (change.old.sha, change.new.sha))

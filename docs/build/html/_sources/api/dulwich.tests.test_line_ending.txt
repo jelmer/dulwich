@@ -1,7 +1,0 @@
-dulwich.tests.test\_line\_ending module
-=======================================
-
-.. automodule:: dulwich.tests.test_line_ending
-   :members:
-   :undoc-members:
-   :show-inheritance:

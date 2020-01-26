@@ -1,7 +1,0 @@
-dulwich.line\_ending module
-===========================
-
-.. automodule:: dulwich.line_ending
-   :members:
-   :undoc-members:
-   :show-inheritance:

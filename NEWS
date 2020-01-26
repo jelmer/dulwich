@@ -1,4 +1,4 @@
-0.19.15	UNRELEASED
+0.19.15	2020-01-26
 
  * Properly handle files that are just executable for the
    current user. (Jelmer Vernooĳ, #734)

@@ -182,13 +182,11 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
       Iterator over TreeChange instances for each change between the
         source and target tree.
     """
-    if include_trees and rename_detector is not None:
-        raise NotImplementedError(
-            'rename_detector and include_trees are mutually exclusive')
     if (rename_detector is not None and tree1_id is not None and
             tree2_id is not None):
         for change in rename_detector.changes_with_renames(
-                tree1_id, tree2_id, want_unchanged=want_unchanged):
+                tree1_id, tree2_id, want_unchanged=want_unchanged,
+                include_trees=include_trees):
             yield change
         return
 
@@ -457,7 +455,8 @@ class RenameDetector(object):
     def _collect_changes(self, tree1_id, tree2_id):
         want_unchanged = self._find_copies_harder or self._want_unchanged
         for change in tree_changes(self._store, tree1_id, tree2_id,
-                                   want_unchanged=want_unchanged):
+                                   want_unchanged=want_unchanged,
+                                   include_trees=self._include_trees):
             self._add_change(change)
 
     def _prune(self, add_paths, delete_paths):
@@ -599,10 +598,12 @@ class RenameDetector(object):
         self._deletes = [
             d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
-    def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False):
+    def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False,
+                             include_trees=False):
         """Iterate TreeChanges between two tree SHAs, with rename detection."""
         self._reset()
         self._want_unchanged = want_unchanged
+        self._include_trees = include_trees
         self._collect_changes(tree1_id, tree2_id)
         self._find_exact_renames()
         self._find_content_rename_candidates()

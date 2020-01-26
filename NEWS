@@ -7,6 +7,10 @@
    ``dulwich.porcelain.get_object_by_path`` on Python 3.
    (Jelmer Vernooĳ)
 
+ * Support the include_trees and rename_detector arguments
+   at the same time when diffing trees.
+   (Jelmer Vernooĳ)
+
 0.19.14	2019-11-30
 
  * Strip superfluous <> around email. (monnerat)

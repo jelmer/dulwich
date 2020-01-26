@@ -1,10 +1,10 @@
-dulwich (0.19.15-1) UNRELEASED; urgency=medium
+dulwich (0.19.15-1) unstable; urgency=medium
 
   * New upstream release.
   * Drop patch 03_cleanup_mode: applied upstream.
   * Drop patch 04_s390x: applied upstream.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 26 Jan 2020 19:40:58 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sun, 26 Jan 2020 19:43:54 +0000
 
 dulwich (0.19.14-4) unstable; urgency=medium
 

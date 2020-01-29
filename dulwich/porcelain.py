@@ -916,10 +916,13 @@ def push(repo, remote_location, refspecs,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
-        except (UpdateRefsError, SendPackError) as e:
+        except UpdateRefsError as e:
             errstream.write(b"Push to " + remote_location_bytes +
                             b" failed -> " + e.message.encode(err_encoding) +
                             b"\n")
+        except SendPackError as e:
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" failed -> " + e.args[0] + b"\n")
 
 
 def pull(repo, remote_location=None, refspecs=None,

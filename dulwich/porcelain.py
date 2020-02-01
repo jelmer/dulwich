@@ -940,9 +940,12 @@ def pull(repo, remote_location=None, refspecs=None,
     # Open the repo
     with open_repo_closing(repo) as r:
         if remote_location is None:
-            # TODO(jelmer): Lookup 'remote' for current branch in config
-            raise NotImplementedError(
-                "looking up remote from branch config not supported yet")
+            section = (b'remote', b'origin')
+            config = r.get_config()
+            if config.has_section(section):
+                url = config.get(section, 'url')
+                remote_location = url.decode()
+
         if refspecs is None:
             refspecs = [b"HEAD"]
         selected_refs = []

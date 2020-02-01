@@ -1007,6 +1007,18 @@ class PullTests(PorcelainTestCase):
         with Repo(self.target_path) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
 
+    def test_no_remote_location(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Pull changes into the cloned repo
+        porcelain.pull(self.target_path, refspecs=b'refs/heads/master',
+                       outstream=outstream, errstream=errstream)
+
+        # Check the target repo for pushed changes
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
+
 
 class StatusTests(PorcelainTestCase):
 

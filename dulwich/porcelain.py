@@ -940,6 +940,8 @@ def pull(repo, remote_location=None, refspecs=None,
     # Open the repo
     with open_repo_closing(repo) as r:
         if remote_location is None:
+            # TODO(jelmer): Retrieve remote to use from config rather than
+            # using default.
             section = (b'remote', b'origin')
             config = r.get_config()
             if config.has_section(section):

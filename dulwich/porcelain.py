@@ -940,10 +940,10 @@ def pull(repo, remote_location=None, refspecs=None,
     # Open the repo
     with open_repo_closing(repo) as r:
         if remote_location is None:
-            # TODO(jelmer): Retrieve remote to use from config rather than
-            # using default.
-            section = (b'remote', b'origin')
             config = r.get_config()
+            remote_name = get_branch_remote(r.path)
+            section = (b'remote', remote_name)
+
             if config.has_section(section):
                 url = config.get(section, 'url')
                 remote_location = url.decode()
@@ -1240,6 +1240,26 @@ def active_branch(repo):
         if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
             raise ValueError(active_ref)
         return active_ref[len(LOCAL_BRANCH_PREFIX):]
+
+
+def get_branch_remote(repo):
+    """Return the active branch's remote name, if any.
+
+    Args:
+      repo: Repository to open
+    Returns:
+      remote name
+    Raises:
+      KeyError: if the repository does not have a working tree
+    """
+    with open_repo_closing(repo) as r:
+        branch_name = active_branch(r.path)
+        config = r.get_config()
+        try:
+            remote_name = config.get((b'branch', branch_name), 'remote')
+        except KeyError:
+            remote_name = b'origin'
+    return remote_name
 
 
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,

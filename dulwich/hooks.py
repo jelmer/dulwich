@@ -171,6 +171,10 @@ class PostReceiveShellHook(ShellHook):
         ShellHook.__init__(self, 'post-receive', filepath, 0)
 
     def execute(self, client_refs):
+        # do nothing if the script doesn't exist
+        if not os.path.exists(self.filepath):
+            return 0
+
         try:
             env = os.environ.copy()
             env['GIT_DIR'] = self.controldir
@@ -185,10 +189,10 @@ class PostReceiveShellHook(ShellHook):
 
             # client_refs is a list of (oldsha, newsha, ref)
             in_data = '\n'.join([' '.join(ref) for ref in client_refs])
-            
+
             self.out_data, self.err_data = p.communicate(in_data)
             return p.returncode
-        except OSError:  # no file. silent failure.
+        except OSError as err:
             self.out_data = None
-            self.err_data = None
-            return 0
+            self.err_data = repr(err)
+            return 256

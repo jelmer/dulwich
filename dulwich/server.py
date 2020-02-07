@@ -59,6 +59,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    HookError,
     NotGitRepository,
     UnexpectedCommandError,
     ObjectFormatException,
@@ -1020,11 +1021,12 @@ class ReceivePackHandler(PackHandler):
 
         hook = self.repo.hooks.get('post-receive', None)
         if hook:
-            hook.execute(client_refs)
-            if hook.out_data:
-                self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, hook.out_data)
-            if hook.err_data:
-                self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, hook.err_data)
+            try:
+                out_data = hook.execute(client_refs)
+                if out_data:
+                    self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, out_data)
+            except HookError as err:
+                self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, repr(err))
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

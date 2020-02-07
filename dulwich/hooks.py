@@ -173,7 +173,7 @@ class PostReceiveShellHook(ShellHook):
     def execute(self, client_refs):
         # do nothing if the script doesn't exist
         if not os.path.exists(self.filepath):
-            return 0
+            return None
 
         try:
             env = os.environ.copy()
@@ -190,9 +190,10 @@ class PostReceiveShellHook(ShellHook):
             # client_refs is a list of (oldsha, newsha, ref)
             in_data = '\n'.join([' '.join(ref) for ref in client_refs])
 
-            self.out_data, self.err_data = p.communicate(in_data)
-            return p.returncode
+            out_data, err_data = p.communicate(in_data)
+
+            if (p.returncode != 0) or err_data:
+                raise HookError("post-receive exit code: %d\nstdout:\n%s\nstderr:\n%s" % (p.returncode, out_data, err_data))
+            return out_data
         except OSError as err:
-            self.out_data = None
-            self.err_data = repr(err)
-            return 256
+            raise HookError(repr(err))

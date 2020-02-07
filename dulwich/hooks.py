@@ -193,7 +193,10 @@ class PostReceiveShellHook(ShellHook):
             out_data, err_data = p.communicate(in_data)
 
             if (p.returncode != 0) or err_data:
-                raise HookError("post-receive exit code: %d\nstdout:\n%s\nstderr:\n%s" % (p.returncode, out_data, err_data))
+                err_fmt = "post-receive exit code: %d\n" \
+                    + "stdout:\n%s\nstderr:\n%s"
+                err_msg = err_fmt % (p.returncode, out_data, err_data)
+                raise HookError(err_msg)
             return out_data
         except OSError as err:
             raise HookError(repr(err))

@@ -161,6 +161,7 @@ class CommitMsgShellHook(ShellHook):
         ShellHook.__init__(self, 'commit-msg', filepath, 1,
                            prepare_msg, clean_msg, controldir)
 
+
 class PostReceiveShellHook(ShellHook):
     """post-receive shell hook"""
 
@@ -169,10 +170,11 @@ class PostReceiveShellHook(ShellHook):
         filepath = os.path.join(controldir, 'hooks', 'post-receive')
         ShellHook.__init__(self, 'post-receive', filepath, 0)
 
-    def execute(self, stdin):
+    def execute(self, client_refs):
         try:
             env = os.environ.copy()
             env['GIT_DIR'] = self.controldir
+
             p = subprocess.Popen(
                 self.filepath,
                 stdin=subprocess.PIPE,
@@ -180,8 +182,13 @@ class PostReceiveShellHook(ShellHook):
                 stderr=subprocess.PIPE,
                 env=env
             )
-            self.stdout, self.stderr = p.communicate(stdin)
+
+            # client_refs is a list of (oldsha, newsha, ref)
+            in_data = '\n'.join([' '.join(ref) for ref in client_refs])
+            
+            self.out_data, self.err_data = p.communicate(in_data)
             return p.returncode
         except OSError:  # no file. silent failure.
-            self.stdout = None
+            self.out_data = None
+            self.err_data = None
             return 0

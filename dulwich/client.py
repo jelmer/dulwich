@@ -551,7 +551,7 @@ class GitClient(object):
                 else:
                     proto.write_pkt_line(
                         old_sha1 + b' ' + new_sha1 + b' ' + refname + b'\0' +
-                        b' '.join(capabilities))
+                        b' '.join(sorted(capabilities)))
                     sent_capabilities = True
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
@@ -631,7 +631,7 @@ class GitClient(object):
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
         proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' +
-                             b' '.join(capabilities) + b'\n')
+                             b' '.join(sorted(capabilities)) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
         if depth not in (0, None) or getattr(graph_walker, 'shallow', None):

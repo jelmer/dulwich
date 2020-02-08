@@ -59,6 +59,7 @@ from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    HookError,
     NotGitRepository,
     UnexpectedCommandError,
     ObjectFormatException,
@@ -981,6 +982,17 @@ class ReceivePackHandler(PackHandler):
         write(None)
         flush()
 
+    def _on_post_receive(self, client_refs):
+        hook = self.repo.hooks.get('post-receive', None)
+        if not hook:
+            return
+        try:
+            output = hook.execute(client_refs)
+            if output:
+                self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, output)
+        except HookError as err:
+            self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, repr(err))
+
     def handle(self):
         if self.advertise_refs or not self.http_req:
             refs = sorted(self.repo.get_refs().items())
@@ -1017,6 +1029,8 @@ class ReceivePackHandler(PackHandler):
 
         # backend can now deal with this refs and read a pack using self.read
         status = self._apply_pack(client_refs)
+
+        self._on_post_receive(client_refs)
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

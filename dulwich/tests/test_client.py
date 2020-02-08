@@ -138,9 +138,11 @@ class GitClientTests(TestCase):
                               b'thin-pack', b'multi_ack_detailed', b'shallow',
                               agent_cap]),
                          set(self.client._fetch_capabilities))
-        self.assertEqual(set([b'ofs-delta', b'report-status', b'side-band-64k',
-                              agent_cap]),
-                         set(self.client._send_capabilities))
+        self.assertEqual(
+            set(
+            [b'delete-refs', b'ofs-delta', b'report-status', b'side-band-64k',
+                agent_cap]),
+            set(self.client._send_capabilities))
 
     def test_archive_ack(self):
         self.rin.write(
@@ -266,14 +268,11 @@ class GitClientTests(TestCase):
             return 0, []
 
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00report-status ofs-delta0000',
-             b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00ofs-delta report-status0000'])
+            b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'0000000000000000000000000000000000000000 '
+            b'refs/heads/master\x00delete-refs ofs-delta report-status0000')
 
     def test_send_pack_delete_only(self):
         self.rin.write(
@@ -291,14 +290,11 @@ class GitClientTests(TestCase):
             return 0, []
 
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00report-status ofs-delta0000',
-             b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00ofs-delta report-status0000'])
+            b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'0000000000000000000000000000000000000000 '
+            b'refs/heads/master\x00delete-refs ofs-delta report-status0000')
 
     def test_send_pack_new_ref_only(self):
         self.rin.write(
@@ -323,16 +319,12 @@ class GitClientTests(TestCase):
         f = BytesIO()
         write_pack_objects(f, {})
         self.client.send_pack('/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f0000000000000000000000000000000000000000 '
-             b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'refs/heads/blah12\x00report-status ofs-delta0000' +
-             f.getvalue(),
-             b'007f0000000000000000000000000000000000000000 '
-             b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'refs/heads/blah12\x00ofs-delta report-status0000' +
-             f.getvalue()])
+            b'008b0000000000000000000000000000000000000000 '
+            b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'refs/heads/blah12\x00delete-refs ofs-delta report-status0000' +
+            f.getvalue())
 
     def test_send_pack_new_ref(self):
         self.rin.write(
@@ -366,14 +358,11 @@ class GitClientTests(TestCase):
         f = BytesIO()
         write_pack_data(f, *generate_pack_data(None, None))
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00report-status ofs-delta0000' +
-             f.getvalue(),
-             b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00ofs-delta report-status0000' +
-             f.getvalue()])
+            b'008b0000000000000000000000000000000000000000 ' + commit.id +
+            b' refs/heads/blah12\x00delete-refs ofs-delta report-status0000' +
+            f.getvalue())
 
     def test_send_pack_no_deleteref_delete_only(self):
         pkts = [b'310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'

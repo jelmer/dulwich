@@ -188,13 +188,13 @@ class PostReceiveShellHook(ShellHook):
             )
 
             # client_refs is a list of (oldsha, newsha, ref)
-            in_data = '\n'.join([' '.join(ref) for ref in client_refs])
+            in_data = b'\n'.join([b' '.join(ref) for ref in client_refs])
 
             out_data, err_data = p.communicate(in_data)
 
             if (p.returncode != 0) or err_data:
-                err_fmt = "post-receive exit code: %d\n" \
-                    + "stdout:\n%s\nstderr:\n%s"
+                err_fmt = b"post-receive exit code: %d\n" \
+                    + b"stdout:\n%s\nstderr:\n%s"
                 err_msg = err_fmt % (p.returncode, out_data, err_data)
                 raise HookError(err_msg)
             return out_data

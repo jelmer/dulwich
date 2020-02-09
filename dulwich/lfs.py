@@ -18,6 +18,7 @@
 # License, Version 2.0.
 #
 
+import errno
 import hashlib
 import os
 import tempfile
@@ -51,8 +52,10 @@ class LFSStore(object):
         """Open an object by sha."""
         try:
             return open(self._sha_path(sha), 'rb')
-        except FileNotFoundError:
-            raise KeyError(sha)
+        except (OSError, IOError) as e:
+            if e.errno == errno.ENOENT:
+                raise KeyError(sha)
+            raise
 
     def write_object(self, chunks):
         """Write an object.

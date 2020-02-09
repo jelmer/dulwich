@@ -139,9 +139,8 @@ class GitClientTests(TestCase):
                               agent_cap]),
                          set(self.client._fetch_capabilities))
         self.assertEqual(
-            set(
-            [b'delete-refs', b'ofs-delta', b'report-status', b'side-band-64k',
-                agent_cap]),
+            set([b'delete-refs', b'ofs-delta', b'report-status',
+                 b'side-band-64k', agent_cap]),
             set(self.client._send_capabilities))
 
     def test_archive_ack(self):

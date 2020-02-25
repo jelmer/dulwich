@@ -38,6 +38,7 @@ Known capabilities that are not supported:
  * include-tag
 """
 
+import asyncio
 from contextlib import closing
 from io import BytesIO, BufferedReader
 import select
@@ -355,6 +356,30 @@ class GitClient(object):
         """
         raise NotImplementedError(cls.from_parsedurl)
 
+    async def send_pack_async(
+            self, path, update_refs, generate_pack_data, progress=None):
+        """Upload a pack to a remote repository.
+
+        Args:
+          path: Repository path (as bytestring)
+          update_refs: Function to determine changes to remote refs. Receive
+            dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          generate_pack_data: Function that can return a tuple
+            with number of objects and list of pack data to include
+          progress: Optional progress function
+
+        Returns:
+          new_refs dictionary containing the changes that were made
+            {refname: new_ref}, including deleted refs.
+
+        Raises:
+          SendPackError: if server rejects the pack data
+          UpdateRefsError: if the server supports report-status
+                         and rejects ref updates
+        """
+        raise NotImplementedError(self.send_pack_async)
+
     def send_pack(self, path, update_refs, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
@@ -376,9 +401,10 @@ class GitClient(object):
           SendPackError: if server rejects the pack data
           UpdateRefsError: if the server supports report-status
                          and rejects ref updates
-
         """
-        raise NotImplementedError(self.send_pack)
+        return asyncio.run(self.send_pack_async(
+            path, update_refs=update_refs,
+            generate_pack_data=generate_pack_data, progress=progress))
 
     def fetch(self, path, target, determine_wants=None, progress=None,
               depth=None):
@@ -443,7 +469,29 @@ class GitClient(object):
           FetchPackResult object
 
         """
-        raise NotImplementedError(self.fetch_pack)
+        return asyncio.run(self.fetch_pack_async(
+            path, determine_wants=determine_wants, graph_walker=graph_walker,
+            pack_data=pack_data, progress=progress, depth=depth))
+
+    async def fetch_pack_async(self, path, determine_wants, graph_walker,
+                               pack_data, progress=None, depth=None):
+        """Retrieve a pack from a git smart server.
+
+        Args:
+          path: Remote path to fetch from
+          determine_wants: Function determine what refs
+        to fetch. Receives dictionary of name->sha, should return
+        list of shas to fetch.
+          graph_walker: Object with next() and ack().
+          pack_data: Callback called for each bit of data in the pack
+          progress: Callback for progress reports (strings)
+          depth: Shallow fetch depth
+
+        Returns:
+          FetchPackResult object
+
+        """
+        raise NotImplementedError(self.fetch_pack_async)
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server.
@@ -765,8 +813,8 @@ class TraditionalGitClient(GitClient):
         """
         raise NotImplementedError()
 
-    def send_pack(self, path, update_refs, generate_pack_data,
-                  progress=None):
+    async def send_pack_async(self, path, update_refs, generate_pack_data,
+                              progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -849,8 +897,8 @@ class TraditionalGitClient(GitClient):
                 proto, negotiated_capabilities, progress)
             return new_refs
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None, depth=None):
+    async def fetch_pack_async(self, path, determine_wants, graph_walker,
+                               pack_data, progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1188,8 +1236,8 @@ class LocalGitClient(GitClient):
             return FetchPackResult(refs, r.refs.get_symrefs(),
                                    agent_string())
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None, depth=None):
+    async def fetch_pack_async(self, path, determine_wants, graph_walker,
+                               pack_data, progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1715,8 +1763,8 @@ class HttpGitClient(GitClient):
         finally:
             resp.close()
 
-    def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
-                   progress=None, depth=None):
+    async def fetch_pack_async(self, path, determine_wants, graph_walker,
+                               pack_data, progress=None, depth=None):
         """Retrieve a pack from a git smart server.
 
         Args:

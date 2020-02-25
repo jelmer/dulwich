@@ -565,7 +565,7 @@ class GitClient(object):
                 refname for refname in ref_status if refname not in ok]) +
                 b' failed to update', ref_status=ref_status)
 
-    def _read_side_band64k_data(self, proto, channel_callbacks):
+    async def _read_side_band64k_data(self, proto, channel_callbacks):
         """Read per-channel data.
 
         This requires the side-band-64k capability.
@@ -639,7 +639,8 @@ class GitClient(object):
         # TODO(jelmer): warn about unknown capabilities
         return negotiated_capabilities
 
-    def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
+    async def _handle_receive_pack_tail(
+            self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
 
         Args:
@@ -658,7 +659,7 @@ class GitClient(object):
             if CAPABILITY_REPORT_STATUS in capabilities:
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet).parse
-            self._read_side_band64k_data(proto, channel_callbacks)
+            await self._read_side_band64k_data(proto, channel_callbacks)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
                 for pkt in proto.read_pkt_seq():
@@ -743,8 +744,9 @@ class GitClient(object):
         proto.write_pkt_line(COMMAND_DONE + b'\n')
         return (new_shallow, new_unshallow)
 
-    def _handle_upload_pack_tail(self, proto, capabilities, graph_walker,
-                                 pack_data, progress=None, rbufsize=_RBUFSIZE):
+    async def _handle_upload_pack_tail(
+            self, proto, capabilities, graph_walker, pack_data, progress=None,
+            rbufsize=_RBUFSIZE):
         """Handle the tail of a 'git-upload-pack' request.
 
         Args:
@@ -773,7 +775,7 @@ class GitClient(object):
 
                 def progress(x):
                     pass
-            self._read_side_band64k_data(proto, {
+            await self._read_side_band64k_data(proto, {
                 SIDE_BAND_CHANNEL_DATA: pack_data,
                 SIDE_BAND_CHANNEL_PROGRESS: progress}
             )
@@ -918,7 +920,7 @@ class TraditionalGitClient(GitClient):
             if dowrite:
                 write_pack_data(proto.write_file(), pack_data_count, pack_data)
 
-            self._handle_receive_pack_tail(
+            await self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress)
             return new_refs
 
@@ -968,7 +970,7 @@ class TraditionalGitClient(GitClient):
             (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read,
                 depth=depth)
-            self._handle_upload_pack_tail(
+            await self._handle_upload_pack_tail(
                 proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
             return FetchPackResult(
@@ -1017,7 +1019,7 @@ class TraditionalGitClient(GitClient):
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
-            self._read_side_band64k_data(proto, {
+            await self._read_side_band64k_data(proto, {
                 SIDE_BAND_CHANNEL_DATA: write_data,
                 SIDE_BAND_CHANNEL_PROGRESS: progress,
                 SIDE_BAND_CHANNEL_FATAL: write_error})
@@ -1730,8 +1732,8 @@ class HttpGitClient(GitClient):
                                    % resp.content_type)
         return resp, read
 
-    def send_pack(self, path, update_refs, generate_pack_data,
-                  progress=None):
+    async def send_pack_async(self, path, update_refs, generate_pack_data,
+                              progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -1784,7 +1786,7 @@ class HttpGitClient(GitClient):
                                          data=req_data.getvalue())
         try:
             resp_proto = Protocol(read, None)
-            self._handle_receive_pack_tail(
+            await self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
             return new_refs
         finally:
@@ -1831,7 +1833,7 @@ class HttpGitClient(GitClient):
             if new_shallow is None and new_unshallow is None:
                 (new_shallow, new_unshallow) = _read_shallow_updates(
                         resp_proto)
-            self._handle_upload_pack_tail(
+            await self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,
                 progress)
             return FetchPackResult(

@@ -156,14 +156,10 @@ class NoneStream(RawIOBase):
         return None
 
 
-if sys.version_info[0] == 2:
-    default_bytes_out_stream = sys.stdout or NoneStream()
-    default_bytes_err_stream = sys.stderr or NoneStream()
-else:
-    default_bytes_out_stream = (
-        getattr(sys.stdout, 'buffer', None) or NoneStream())
-    default_bytes_err_stream = (
-        getattr(sys.stderr, 'buffer', None) or NoneStream())
+default_bytes_out_stream = (
+    getattr(sys.stdout, 'buffer', None) or NoneStream())
+default_bytes_err_stream = (
+    getattr(sys.stderr, 'buffer', None) or NoneStream())
 
 
 DEFAULT_ENCODING = 'utf-8'

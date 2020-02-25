@@ -1,4 +1,6 @@
-0.19.16	UNRELEASED
+0.20.0	UNRELEASED
+
+ * Drop support for Python 2. (Jelmer Vernooĳ)
 
 0.19.15	2020-01-26
 

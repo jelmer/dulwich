@@ -82,11 +82,6 @@ class ShellHook(Hook):
 
         self.cwd = cwd
 
-        if sys.version_info[0] == 2 and sys.platform == 'win32':
-            # Python 2 on windows does not support unicode file paths
-            # http://bugs.python.org/issue1759845
-            self.filepath = self.filepath.encode(sys.getfilesystemencoding())
-
     def execute(self, *args):
         """Execute the hook with given args"""
 

@@ -316,14 +316,9 @@ class ShaFile(object):
         """
         return b''.join(self.as_raw_chunks())
 
-    if sys.version_info[0] >= 3:
-        def __bytes__(self):
-            """Return raw string serialization of this object."""
-            return self.as_raw_string()
-    else:
-        def __str__(self):
-            """Return raw string serialization of this object."""
-            return self.as_raw_string()
+    def __bytes__(self):
+        """Return raw string serialization of this object."""
+        return self.as_raw_string()
 
     def __hash__(self):
         """Return unique hash for this object."""

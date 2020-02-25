@@ -502,7 +502,31 @@ class GitClient(object):
         Returns:
 
         """
-        raise NotImplementedError(self.get_refs)
+        return asyncio.run(self.get_refs_async(path))
+
+    async def get_refs_async(self, path):
+        """Retrieve the current refs from a git smart server.
+
+        Args:
+          path: Path to the repo to fetch from. (as bytestring)
+
+        Returns:
+
+        """
+        raise NotImplementedError(self.get_refs_async)
+
+    def archive(self, path, committish, write_data, progress=None,
+                write_error=None, format=None, subdirs=None,
+                prefix=None):
+        return asyncio.run(self.archive_async(
+            path, committish, write_data=write_data,
+            progress=progress, write_error=write_error, format=format,
+            subdirs=subdirs, prefix=prefix))
+
+    async def archive_async(self, path, committish, write_data, progress=None,
+                            write_error=None, format=None, subdirs=None,
+                            prefix=None):
+        raise NotImplementedError(self.archive_async)
 
     def _parse_status_report(self, proto):
         unpack = proto.read_pkt_line().strip()
@@ -948,7 +972,7 @@ class TraditionalGitClient(GitClient):
             return FetchPackResult(
                     refs, symrefs, agent, new_shallow, new_unshallow)
 
-    def get_refs(self, path):
+    async def get_refs_async(self, path):
         """Retrieve the current refs from a git smart server.
         """
         # stock `git ls-remote` uses upload-pack
@@ -961,8 +985,9 @@ class TraditionalGitClient(GitClient):
             proto.write_pkt_line(None)
             return refs
 
-    def archive(self, path, committish, write_data, progress=None,
-                write_error=None, format=None, subdirs=None, prefix=None):
+    async def archive_async(self, path, committish, write_data, progress=None,
+                            write_error=None, format=None, subdirs=None,
+                            prefix=None):
         proto, can_read, stderr = self._connect(b'upload-archive', path)
         with proto:
             if format is not None:
@@ -1154,8 +1179,8 @@ class LocalGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return closing(Repo(path))
 
-    def send_pack(self, path, update_refs, generate_pack_data,
-                  progress=None):
+    async def send_pack_async(self, path, update_refs, generate_pack_data,
+                              progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -1268,7 +1293,7 @@ class LocalGitClient(GitClient):
             write_pack_objects(protocol, objects_iter)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
-    def get_refs(self, path):
+    async def get_refs_async(self, path):
         """Retrieve the current refs from a git smart server.
         """
 
@@ -1812,7 +1837,7 @@ class HttpGitClient(GitClient):
         finally:
             resp.close()
 
-    def get_refs(self, path):
+    async def get_refs_async(self, path):
         """Retrieve the current refs from a git smart server.
         """
         url = self._get_url(path)

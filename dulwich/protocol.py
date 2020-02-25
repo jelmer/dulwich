@@ -339,6 +339,187 @@ class Protocol(object):
         return cmd, args[:-1].split(b"\0")
 
 
+class AsyncProtocol(object):
+    """Async variant of Protocol.
+
+    Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
+    consists of the length of the line as a 4-byte hex string, followed by the
+    payload data. The length includes the 4-byte header. The special line
+    '0000' indicates the end of a section of input and is called a 'flush-pkt'.
+
+    For details on the pkt-line format, see the cgit distribution:
+        Documentation/technical/protocol-common.txt
+    """
+
+    def __init__(self, read, write, close=None, report_activity=None):
+        self.read = read
+        self.write = write
+        self._close = close
+        self.report_activity = report_activity
+        self._readahead = None
+
+    def close(self):
+        if self._close:
+            self._close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def read_pkt_line(self):
+        """Reads a pkt-line from the remote git process.
+
+        This method may read from the readahead buffer; see unread_pkt_line.
+
+        Returns: The next string from the stream, without the length prefix, or
+            None for a flush-pkt ('0000').
+        """
+        if self._readahead is None:
+            read = self.read
+        else:
+            read = self._readahead.read
+            self._readahead = None
+
+        try:
+            sizestr = read(4)
+            if not sizestr:
+                raise HangupException()
+            size = int(sizestr, 16)
+            if size == 0:
+                if self.report_activity:
+                    self.report_activity(4, 'read')
+                return None
+            if self.report_activity:
+                self.report_activity(size, 'read')
+            pkt_contents = read(size-4)
+        except socket.error as e:
+            raise GitProtocolError(e)
+        else:
+            if len(pkt_contents) + 4 != size:
+                raise GitProtocolError(
+                    'Length of pkt read %04x does not match length prefix %04x'
+                    % (len(pkt_contents) + 4, size))
+            return pkt_contents
+
+    async def eof(self):
+        """Test whether the protocol stream has reached EOF.
+
+        Note that this refers to the actual stream EOF and not just a
+        flush-pkt.
+
+        Returns: True if the stream is at EOF, False otherwise.
+        """
+        try:
+            next_line = self.read_pkt_line()
+        except HangupException:
+            return True
+        self.unread_pkt_line(next_line)
+        return False
+
+    def unread_pkt_line(self, data):
+        """Unread a single line of data into the readahead buffer.
+
+        This method can be used to unread a single pkt-line into a fixed
+        readahead buffer.
+
+        Args:
+          data: The data to unread, without the length prefix.
+        Raises:
+          ValueError: If more than one pkt-line is unread.
+        """
+        if self._readahead is not None:
+            raise ValueError('Attempted to unread multiple pkt-lines.')
+        self._readahead = BytesIO(pkt_line(data))
+
+    async def read_pkt_seq(self):
+        """Read a sequence of pkt-lines from the remote git process.
+
+        Returns: Yields each line of data up to but not including the next
+            flush-pkt.
+        """
+        pkt = self.read_pkt_line()
+        while pkt:
+            yield pkt
+            pkt = self.read_pkt_line()
+
+    def write_pkt_line(self, line):
+        """Sends a pkt-line to the remote git process.
+
+        Args:
+          line: A string containing the data to send, without the length
+            prefix.
+        """
+        try:
+            line = pkt_line(line)
+            self.write(line)
+            if self.report_activity:
+                self.report_activity(len(line), 'write')
+        except socket.error as e:
+            raise GitProtocolError(e)
+
+    def write_file(self):
+        """Return a writable file-like object for this protocol."""
+
+        class ProtocolFile(object):
+
+            def __init__(self, proto):
+                self._proto = proto
+                self._offset = 0
+
+            def write(self, data):
+                self._proto.write(data)
+                self._offset += len(data)
+
+            def tell(self):
+                return self._offset
+
+            def close(self):
+                pass
+
+        return ProtocolFile(self)
+
+    def write_sideband(self, channel, blob):
+        """Write multiplexed data to the sideband.
+
+        Args:
+          channel: An int specifying the channel to write to.
+          blob: A blob of data (as a string) to send on this channel.
+        """
+        # a pktline can be a max of 65520. a sideband line can therefore be
+        # 65520-5 = 65515
+        # WTF: Why have the len in ASCII, but the channel in binary.
+        while blob:
+            self.write_pkt_line(bytes(bytearray([channel])) + blob[:65515])
+            blob = blob[65515:]
+
+    def send_cmd(self, cmd, *args):
+        """Send a command and some arguments to a git server.
+
+        Only used for the TCP git protocol (git://).
+
+        Args:
+          cmd: The remote service to access.
+          args: List of arguments to send to remove service.
+        """
+        self.write_pkt_line(cmd + b" " + b"".join([(a + b"\0") for a in args]))
+
+    def read_cmd(self):
+        """Read a command and some arguments from the git client
+
+        Only used for the TCP git protocol (git://).
+
+        Returns: A tuple of (command, [list of arguments]).
+        """
+        line = self.read_pkt_line()
+        splice_at = line.find(b" ")
+        cmd, args = line[:splice_at], line[splice_at+1:]
+        assert args[-1:] == b"\x00"
+        return cmd, args[:-1].split(b"\0")
+
+
+
 _RBUFSIZE = 8192  # Default read buffer size.
 
 

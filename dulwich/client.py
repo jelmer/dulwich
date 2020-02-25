@@ -95,7 +95,7 @@ from dulwich.protocol import (
     SIDE_BAND_CHANNEL_PROGRESS,
     SIDE_BAND_CHANNEL_FATAL,
     PktLineParser,
-    Protocol,
+    AsyncProtocol,
     ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
@@ -210,11 +210,11 @@ class ReportStatusParser(object):
                 self._ref_status_ok = False
 
 
-def read_pkt_refs(proto):
+async def read_pkt_refs(proto):
     server_capabilities = None
     refs = {}
     # Receive refs from server
-    for pkt in proto.read_pkt_seq():
+    async for pkt in proto.read_pkt_seq():
         (sha, ref) = pkt.rstrip(b'\n').split(None, 1)
         if sha == b'ERR':
             raise GitProtocolError(ref.decode('utf-8', 'replace'))
@@ -293,10 +293,10 @@ class FetchPackResult(object):
                 self.__class__.__name__, self.refs, self.symrefs, self.agent)
 
 
-def _read_shallow_updates(proto):
+async def _read_shallow_updates(proto):
     new_shallow = set()
     new_unshallow = set()
-    for pkt in proto.read_pkt_seq():
+    async for pkt in proto.read_pkt_seq():
         cmd, sha = pkt.split(b' ', 1)
         if cmd == COMMAND_SHALLOW:
             new_shallow.add(sha.strip())
@@ -575,7 +575,7 @@ class GitClient(object):
           channel_callbacks: Dictionary mapping channels to packet
             handlers to use. None for a callback discards channel data.
         """
-        for pkt in proto.read_pkt_seq():
+        async for pkt in proto.read_pkt_seq():
             channel = ord(pkt[:1])
             pkt = pkt[1:]
             try:
@@ -662,7 +662,7 @@ class GitClient(object):
             await self._read_side_band64k_data(proto, channel_callbacks)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
-                for pkt in proto.read_pkt_seq():
+                async for pkt in proto.read_pkt_seq():
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
             self._report_status_parser.check()
@@ -719,7 +719,7 @@ class GitClient(object):
                                  str(depth).encode('ascii') + b'\n')
             proto.write_pkt_line(None)
             if can_read is not None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(proto)
+                (new_shallow, new_unshallow) = await _read_shallow_updates(proto)
             else:
                 new_shallow = new_unshallow = None
         else:
@@ -867,7 +867,7 @@ class TraditionalGitClient(GitClient):
             b'receive-pack', path)
         with proto:
             try:
-                old_refs, server_capabilities = read_pkt_refs(proto)
+                old_refs, server_capabilities = await read_pkt_refs(proto)
             except HangupException:
                 raise remote_error_from_stderr(stderr)
             negotiated_capabilities = \
@@ -947,7 +947,7 @@ class TraditionalGitClient(GitClient):
             b'upload-pack', path)
         with proto:
             try:
-                refs, server_capabilities = read_pkt_refs(proto)
+                refs, server_capabilities = await read_pkt_refs(proto)
             except HangupException:
                 raise remote_error_from_stderr(stderr)
             negotiated_capabilities, symrefs, agent = (
@@ -984,7 +984,7 @@ class TraditionalGitClient(GitClient):
         proto, _, stderr = await self._connect(b'upload-pack', path)
         with proto:
             try:
-                refs, _ = read_pkt_refs(proto)
+                refs, _ = await read_pkt_refs(proto)
             except HangupException:
                 raise remote_error_from_stderr(stderr)
             proto.write_pkt_line(None)
@@ -1078,8 +1078,9 @@ class TCPGitClient(TraditionalGitClient):
             wfile.close()
             s.close()
 
-        proto = Protocol(rfile.read, wfile.write, close,
-                         report_activity=self._report_activity)
+        proto = AsyncProtocol(
+            rfile.read, wfile.write, close,
+            report_activity=self._report_activity)
         if path.startswith(b"/~"):
             path = path[1:]
         # TODO(jelmer): Alternative to ascii?
@@ -1151,9 +1152,9 @@ class SubprocessGitClient(TraditionalGitClient):
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         pw = SubprocessWrapper(p)
-        return (Protocol(pw.read, pw.write, pw.close,
-                         report_activity=self._report_activity),
-                pw.can_read, p.stderr)
+        return (AsyncProtocol(
+            pw.read, pw.write, pw.close,
+            report_activity=self._report_activity), pw.can_read, p.stderr)
 
 
 class LocalGitClient(GitClient):
@@ -1476,9 +1477,11 @@ class SSHGitClient(TraditionalGitClient):
         con = await self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username,
             **kwargs)
-        return (Protocol(con.read, con.write, con.close,
-                         report_activity=self._report_activity),
-                con.can_read, getattr(con, 'stderr', None))
+        return (
+            AsyncProtocol(
+                con.read, con.write, con.close,
+                report_activity=self._report_activity),
+            con.can_read, getattr(con, 'stderr', None))
 
 
 def default_user_agent_string():
@@ -1693,17 +1696,17 @@ class HttpGitClient(GitClient):
         try:
             self.dumb = not resp.content_type.startswith("application/x-git-")
             if not self.dumb:
-                proto = Protocol(read, None)
+                proto = AsyncProtocol(read, None)
                 # The first line should mention the service
                 try:
-                    [pkt] = list(proto.read_pkt_seq())
+                    [pkt] = [pkt async for pkt in proto.read_pkt_seq()]
                 except ValueError:
                     raise GitProtocolError(
                         "unexpected number of packets received")
                 if pkt.rstrip(b'\n') != (b'# service=' + service):
                     raise GitProtocolError(
                         "unexpected first line %r from smart server" % pkt)
-                return read_pkt_refs(proto) + (base_url, )
+                return await read_pkt_refs(proto) + (base_url, )
             else:
                 return read_info_refs(resp), set(), base_url
         finally:
@@ -1764,7 +1767,7 @@ class HttpGitClient(GitClient):
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
-        req_proto = Protocol(None, req_data.write)
+        req_proto = AsyncProtocol(None, req_data.write)
         (have, want) = await self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
@@ -1777,7 +1780,7 @@ class HttpGitClient(GitClient):
         resp, read = await self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())
         try:
-            resp_proto = Protocol(read, None)
+            resp_proto = AsyncProtocol(read, None)
             await self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
             return new_refs
@@ -1814,16 +1817,16 @@ class HttpGitClient(GitClient):
         if self.dumb:
             raise NotImplementedError(self.send_pack)
         req_data = BytesIO()
-        req_proto = Protocol(None, req_data.write)
+        req_proto = AsyncProtocol(None, req_data.write)
         (new_shallow, new_unshallow) = await self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
                 can_read=None, depth=depth)
         resp, read = await self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:
-            resp_proto = Protocol(read, None)
+            resp_proto = AsyncProtocol(read, None)
             if new_shallow is None and new_unshallow is None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(
+                (new_shallow, new_unshallow) = await _read_shallow_updates(
                         resp_proto)
             await self._handle_upload_pack_tail(
                 resp_proto, negotiated_capabilities, graph_walker, pack_data,

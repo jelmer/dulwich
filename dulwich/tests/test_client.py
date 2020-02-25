@@ -70,7 +70,7 @@ from dulwich.tests import (
     )
 from dulwich.protocol import (
     TCP_GIT_PORT,
-    Protocol,
+    AsyncProtocol,
     )
 from dulwich.pack import (
     pack_objects_to_data,
@@ -102,7 +102,7 @@ class DummyClient(TraditionalGitClient):
         TraditionalGitClient.__init__(self)
 
     async def _connect(self, service, path):
-        return Protocol(self.read, self.write), self.can_read, None
+        return AsyncProtocol(self.read, self.write), self.can_read, None
 
 
 class DummyPopen():

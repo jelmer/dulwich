@@ -822,7 +822,7 @@ class TraditionalGitClient(GitClient):
         self._remote_path_encoding = path_encoding
         super(TraditionalGitClient, self).__init__(**kwargs)
 
-    def _connect(self, cmd, path):
+    async def _connect(self, cmd, path):
         """Create a connection to the server.
 
         This method is abstract - concrete implementations should
@@ -860,7 +860,8 @@ class TraditionalGitClient(GitClient):
                          and rejects ref updates
 
         """
-        proto, unused_can_read, stderr = self._connect(b'receive-pack', path)
+        proto, unused_can_read, stderr = await self._connect(
+            b'receive-pack', path)
         with proto:
             try:
                 old_refs, server_capabilities = read_pkt_refs(proto)
@@ -939,7 +940,8 @@ class TraditionalGitClient(GitClient):
           FetchPackResult object
 
         """
-        proto, can_read, stderr = self._connect(b'upload-pack', path)
+        proto, can_read, stderr = await self._connect(
+            b'upload-pack', path)
         with proto:
             try:
                 refs, server_capabilities = read_pkt_refs(proto)
@@ -976,7 +978,7 @@ class TraditionalGitClient(GitClient):
         """Retrieve the current refs from a git smart server.
         """
         # stock `git ls-remote` uses upload-pack
-        proto, _, stderr = self._connect(b'upload-pack', path)
+        proto, _, stderr = await self._connect(b'upload-pack', path)
         with proto:
             try:
                 refs, _ = read_pkt_refs(proto)
@@ -988,7 +990,7 @@ class TraditionalGitClient(GitClient):
     async def archive_async(self, path, committish, write_data, progress=None,
                             write_error=None, format=None, subdirs=None,
                             prefix=None):
-        proto, can_read, stderr = self._connect(b'upload-archive', path)
+        proto, can_read, stderr = await self._connect(b'upload-archive', path)
         with proto:
             if format is not None:
                 proto.write_pkt_line(b"argument --format=" + format)
@@ -1041,7 +1043,7 @@ class TCPGitClient(TraditionalGitClient):
             netloc += ":%d" % self._port
         return urlparse.urlunsplit(("git", netloc, path, '', ''))
 
-    def _connect(self, cmd, path):
+    async def _connect(self, cmd, path):
         if not isinstance(cmd, bytes):
             raise TypeError(cmd)
         if not isinstance(path, bytes):
@@ -1134,7 +1136,7 @@ class SubprocessGitClient(TraditionalGitClient):
 
     git_command = None
 
-    def _connect(self, service, path):
+    async def _connect(self, service, path):
         if not isinstance(service, bytes):
             raise TypeError(service)
         if isinstance(path, bytes):
@@ -1463,7 +1465,7 @@ class SSHGitClient(TraditionalGitClient):
         assert isinstance(cmd, bytes)
         return cmd
 
-    def _connect(self, cmd, path):
+    async def _connect(self, cmd, path):
         if not isinstance(cmd, bytes):
             raise TypeError(cmd)
         if isinstance(path, bytes):

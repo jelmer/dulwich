@@ -18,6 +18,7 @@
 # License, Version 2.0.
 #
 
+import asyncio
 from io import BytesIO
 import base64
 import sys
@@ -100,7 +101,7 @@ class DummyClient(TraditionalGitClient):
         self.write = write
         TraditionalGitClient.__init__(self)
 
-    def _connect(self, service, path):
+    async def _connect(self, service, path):
         return Protocol(self.read, self.write), self.can_read, None
 
 
@@ -746,12 +747,12 @@ class SSHGitClientTests(TestCase):
         client.username = b"username"
         client.port = 1337
 
-        client._connect(b"command", b"/path/to/repo")
+        asyncio.run(client._connect(b"command", b"/path/to/repo"))
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
         self.assertEqual("git-command '/path/to/repo'", server.command)
 
-        client._connect(b"relative-command", b"/~/path/to/repo")
+        asyncio.run(client._connect(b"relative-command", b"/~/path/to/repo"))
         self.assertEqual("git-relative-command '~/path/to/repo'",
                          server.command)
 

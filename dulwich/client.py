@@ -586,7 +586,7 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
-    def _handle_receive_pack_head(self, proto, capabilities, old_refs,
+    async def _handle_receive_pack_head(self, proto, capabilities, old_refs,
                                   new_refs):
         """Handle the head of a 'git-receive-pack' request.
 
@@ -686,8 +686,9 @@ class GitClient(object):
             self._fetch_capabilities & server_capabilities)
         return (negotiated_capabilities, symrefs, agent)
 
-    def _handle_upload_pack_head(self, proto, capabilities, graph_walker,
-                                 wants, can_read, depth):
+    async def _handle_upload_pack_head(
+            self, proto, capabilities, graph_walker,
+            wants, can_read, depth):
         """Handle the head of a 'git-upload-pack' request.
 
         Args:
@@ -904,7 +905,7 @@ class TraditionalGitClient(GitClient):
                     report_status_parser.check()
                 return old_refs
 
-            (have, want) = self._handle_receive_pack_head(
+            (have, want) = await self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
             if (not want and
                     set(new_refs.items()).issubset(set(old_refs.items()))):
@@ -967,7 +968,7 @@ class TraditionalGitClient(GitClient):
             if not wants:
                 proto.write_pkt_line(None)
                 return FetchPackResult(refs, symrefs, agent)
-            (new_shallow, new_unshallow) = self._handle_upload_pack_head(
+            (new_shallow, new_unshallow) = await self._handle_upload_pack_head(
                 proto, negotiated_capabilities, graph_walker, wants, can_read,
                 depth=depth)
             await self._handle_upload_pack_tail(
@@ -1312,18 +1313,9 @@ default_local_git_client_cls = LocalGitClient
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
-        # This function was deprecated in 0.9.1
-        import warnings
-        warnings.warn(
-            "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
-            DeprecationWarning)
-        return self.run_command(host, command, username=username, port=port,
-                                password=password, key_filename=key_filename)
-
-    def run_command(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
+    async def run_command(
+            self, host, command, username=None, port=None,
+            password=None, key_filename=None):
         """Connect to an SSH server.
 
         Run a command remotely and return a file-like object for interaction
@@ -1353,8 +1345,8 @@ class StrangeHostname(Exception):
 class SubprocessSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'ssh' command."""
 
-    def run_command(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
+    async def run_command(self, host, command, username=None, port=None,
+                          password=None, key_filename=None):
 
         if password is not None:
             raise NotImplementedError(
@@ -1384,8 +1376,8 @@ class SubprocessSSHVendor(SSHVendor):
 class PLinkSSHVendor(SSHVendor):
     """SSH vendor that shells out to the local 'plink' command."""
 
-    def run_command(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
+    async def run_command(self, host, command, username=None, port=None,
+                          password=None, key_filename=None):
 
         if sys.platform == 'win32':
             args = ['plink.exe', '-ssh']
@@ -1481,7 +1473,7 @@ class SSHGitClient(TraditionalGitClient):
             kwargs['password'] = self.password
         if self.key_filename is not None:
             kwargs['key_filename'] = self.key_filename
-        con = self.ssh_vendor.run_command(
+        con = await self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username,
             **kwargs)
         return (Protocol(con.read, con.write, con.close,
@@ -1773,7 +1765,7 @@ class HttpGitClient(GitClient):
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
-        (have, want) = self._handle_receive_pack_head(
+        (have, want) = await self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
@@ -1823,7 +1815,7 @@ class HttpGitClient(GitClient):
             raise NotImplementedError(self.send_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
-        (new_shallow, new_unshallow) = self._handle_upload_pack_head(
+        (new_shallow, new_unshallow) = await self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
                 can_read=None, depth=depth)
         resp, read = await self._smart_request(

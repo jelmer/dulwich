@@ -351,7 +351,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 class TestSSHVendor(object):
 
     @staticmethod
-    def run_command(host, command, username=None, port=None,
+    async def run_command(host, command, username=None, port=None,
                     password=None, key_filename=None):
         cmd, path = command.split(' ')
         cmd = cmd.split('-', 1)

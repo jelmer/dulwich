@@ -675,8 +675,8 @@ class TestSSHVendor(object):
         self.password = None
         self.key_filename = None
 
-    def run_command(self, host, command, username=None, port=None,
-                    password=None, key_filename=None):
+    async def run_command(self, host, command, username=None, port=None,
+                          password=None, key_filename=None):
         self.host = host
         self.command = command
         self.username = username
@@ -1114,29 +1114,32 @@ class SubprocessSSHVendorTests(TestCase):
 
     def test_run_command_dashes(self):
         vendor = SubprocessSSHVendor()
-        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
-                          'git-clone-url')
+        self.assertRaises(
+            StrangeHostname, asyncio.run,
+            vendor.run_command('--weird-host', 'git-clone-url'))
 
     def test_run_command_password(self):
         vendor = SubprocessSSHVendor()
-        self.assertRaises(NotImplementedError, vendor.run_command, 'host',
-                          'git-clone-url', password='12345')
+        self.assertRaises(
+            NotImplementedError, asyncio.run,
+            vendor.run_command('host', 'git-clone-url', password='12345'))
 
     def test_run_command_password_and_privkey(self):
         vendor = SubprocessSSHVendor()
-        self.assertRaises(NotImplementedError, vendor.run_command,
-                          'host', 'git-clone-url',
-                          password='12345', key_filename='/tmp/id_rsa')
+        self.assertRaises(
+            NotImplementedError, asyncio.run, vendor.run_command(
+                  'host', 'git-clone-url',
+                  password='12345', key_filename='/tmp/id_rsa'))
 
     def test_run_command_with_port_username_and_privkey(self):
         expected = ['ssh', '-x', '-p', '2200',
                     '-i', '/tmp/id_rsa', 'user@host', 'git-clone-url']
 
         vendor = SubprocessSSHVendor()
-        command = vendor.run_command(
+        command = asyncio.run(vendor.run_command(
             'host', 'git-clone-url',
             username='user', port='2200',
-            key_filename='/tmp/id_rsa')
+            key_filename='/tmp/id_rsa'))
 
         args = command.proc.args
 
@@ -1155,8 +1158,9 @@ class PLinkSSHVendorTests(TestCase):
 
     def test_run_command_dashes(self):
         vendor = PLinkSSHVendor()
-        self.assertRaises(StrangeHostname, vendor.run_command, '--weird-host',
-                          'git-clone-url')
+        self.assertRaises(
+            StrangeHostname, asyncio.run,
+            vendor.run_command('--weird-host', 'git-clone-url'))
 
     def test_run_command_password_and_privkey(self):
         vendor = PLinkSSHVendor()
@@ -1166,9 +1170,9 @@ class PLinkSSHVendorTests(TestCase):
         warnings_list, restore_warnings = setup_warning_catcher()
         self.addCleanup(restore_warnings)
 
-        command = vendor.run_command(
+        command = asyncio.run(vendor.run_command(
                 'host', 'git-clone-url', password='12345',
-                key_filename='/tmp/id_rsa')
+                key_filename='/tmp/id_rsa'))
 
         expected_warning = UserWarning(
             'Invoking PLink with a password exposes the password in the '
@@ -1207,7 +1211,8 @@ class PLinkSSHVendorTests(TestCase):
         warnings_list, restore_warnings = setup_warning_catcher()
         self.addCleanup(restore_warnings)
 
-        command = vendor.run_command('host', 'git-clone-url', password='12345')
+        command = asyncio.run(
+            vendor.run_command('host', 'git-clone-url', password='12345'))
 
         expected_warning = UserWarning(
             'Invoking PLink with a password exposes the password in the '
@@ -1236,10 +1241,10 @@ class PLinkSSHVendorTests(TestCase):
             'user@host', 'git-clone-url']
 
         vendor = PLinkSSHVendor()
-        command = vendor.run_command(
+        command = asyncio.run(vendor.run_command(
             'host', 'git-clone-url',
             username='user', port='2200',
-            key_filename='/tmp/id_rsa')
+            key_filename='/tmp/id_rsa'))
 
         args = command.proc.args
 

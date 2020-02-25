@@ -77,10 +77,11 @@ class ParamikoSSHVendor(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
-    def run_command(self, host, command,
-                    username=None, port=None,
-                    password=None, pkey=None,
-                    key_filename=None, **kwargs):
+    async def run_command(
+            self, host, command,
+            username=None, port=None,
+            password=None, pkey=None,
+            key_filename=None, **kwargs):
 
         client = paramiko.SSHClient()
 

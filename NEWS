@@ -2,6 +2,14 @@
 
  * Drop support for Python 2. (Jelmer Vernooĳ)
 
+ * Various client functions are now implemented as asyncio functions:
+   (Jelmer Vernooĳ)
+
+ * SSHVendor.run_command is now async. (Jelmer Vernooĳ)
+
+ * SSHVendor.connect_ssh has been removed (it was deprecated in version 0.9.1).
+   (Jelmer Vernooĳ)
+
 0.19.15	2020-01-26
 
  * Properly handle files that are just executable for the

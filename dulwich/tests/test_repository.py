@@ -1090,7 +1090,7 @@ class BuildRepoRootTests(TestCase):
         r.stage(['c'])
         self.assertEqual([b'a'], list(r.open_index()))
 
-    @skipIf(sys.platform == 'win32' and sys.version_info[:2] >= (3, 6),
+    @skipIf(sys.platform == 'win32',
             'tries to implicitly decode as utf8')
     def test_commit_no_encode_decode(self):
         r = self._repo

@@ -1,3 +1,7 @@
+0.20.0	UNRELEASED
+
+ * Drop support for Python 2. (Jelmer Vernooĳ)
+
 0.19.17	UNRELEASED
 
  * Don't break when encountering block devices.

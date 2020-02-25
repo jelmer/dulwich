@@ -15,13 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.19.17'
-
-include_dirs = []
-# Windows MSVC support
-if sys.platform == 'win32' and sys.version_info[:2] < (3, 6):
-    # Include dulwich/ for fallback stdint.h
-    include_dirs.append('dulwich')
+dulwich_version_string = '0.20.0'
 
 
 class DulwichDistribution(Distribution):
@@ -64,12 +58,9 @@ if '__pypy__' not in sys.modules and not sys.platform == 'win32':
 
 
 ext_modules = [
-    Extension('dulwich._objects', ['dulwich/_objects.c'],
-              include_dirs=include_dirs),
-    Extension('dulwich._pack', ['dulwich/_pack.c'],
-              include_dirs=include_dirs),
-    Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
-              include_dirs=include_dirs),
+    Extension('dulwich._objects', ['dulwich/_objects.c']),
+    Extension('dulwich._pack', ['dulwich/_pack.c']),
+    Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
 setup_kwargs = {}
@@ -112,7 +103,6 @@ setup(name='dulwich',
       classifiers=[
           'Development Status :: 4 - Beta',
           'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3.4',
           'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',

@@ -52,9 +52,6 @@ from dulwich.objects import (
     )
 from dulwich.pack import (
     REF_DELTA,
-    write_pack_index_v2,
-    PackData,
-    load_pack_index_file,
     )
 
 try:
@@ -81,8 +78,6 @@ except ImportError:
 
 skipmsg = "Required libraries are not installed (%r)" % missing_libs
 
-skipIfPY3 = skipIf(sys.version_info[0] == 3,
-                   "SWIFT module not yet ported to python3.")
 
 if not missing_libs:
     from dulwich.contrib import swift
@@ -260,128 +255,6 @@ class FakeSwiftConnector(object):
 
 
 @skipIf(missing_libs, skipmsg)
-@skipIfPY3
-class TestSwiftObjectStore(TestCase):
-
-    def setUp(self):
-        super(TestSwiftObjectStore, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file %
-                                                  def_config_file))
-        self.fsc = FakeSwiftConnector('fakerepo', conf=self.conf)
-
-    def _put_pack(self, sos, commit_amount=1, marker='Default'):
-        odata = create_commits(length=commit_amount, marker=marker)
-        data = [(d.type_num, d.as_raw_string()) for d in odata]
-        f = BytesIO()
-        build_pack(f, data, store=sos)
-        sos.add_thin_pack(f.read, None)
-        return odata
-
-    def test_load_packs(self):
-        store = {'fakerepo/objects/pack/pack-'+'1'*40+'.idx': '',
-                 'fakerepo/objects/pack/pack-'+'1'*40+'.pack': '',
-                 'fakerepo/objects/pack/pack-'+'1'*40+'.info': '',
-                 'fakerepo/objects/pack/pack-'+'2'*40+'.idx': '',
-                 'fakerepo/objects/pack/pack-'+'2'*40+'.pack': '',
-                 'fakerepo/objects/pack/pack-'+'2'*40+'.info': ''}
-        fsc = FakeSwiftConnector('fakerepo', conf=self.conf, store=store)
-        sos = swift.SwiftObjectStore(fsc)
-        packs = sos.packs
-        self.assertEqual(len(packs), 2)
-        for pack in packs:
-            self.assertTrue(isinstance(pack, swift.SwiftPack))
-
-    def test_add_thin_pack(self):
-        sos = swift.SwiftObjectStore(self.fsc)
-        self._put_pack(sos, 1, 'Default')
-        self.assertEqual(len(self.fsc.store), 3)
-
-    def test_find_missing_objects(self):
-        commit_amount = 3
-        sos = swift.SwiftObjectStore(self.fsc)
-        odata = self._put_pack(sos, commit_amount, 'Default')
-        head = odata[-1].id
-        i = sos.iter_shas(sos.find_missing_objects([],
-                                                   [head, ],
-                                                   progress=None,
-                                                   get_tagged=None))
-        self.assertEqual(len(i), commit_amount * 3)
-        shas = [d.id for d in odata]
-        for sha, path in i:
-            self.assertIn(sha.id, shas)
-
-    def test_find_missing_objects_with_tag(self):
-        commit_amount = 3
-        sos = swift.SwiftObjectStore(self.fsc)
-        odata = self._put_pack(sos, commit_amount, 'Default')
-        head = odata[-1].id
-        peeled_sha = dict([(sha.object[1], sha.id)
-                           for sha in odata if isinstance(sha, Tag)])
-
-        def get_tagged():
-            return peeled_sha
-        i = sos.iter_shas(sos.find_missing_objects([],
-                                                   [head, ],
-                                                   progress=None,
-                                                   get_tagged=get_tagged))
-        self.assertEqual(len(i), commit_amount * 4)
-        shas = [d.id for d in odata]
-        for sha, path in i:
-            self.assertIn(sha.id, shas)
-
-    def test_find_missing_objects_with_common(self):
-        commit_amount = 3
-        sos = swift.SwiftObjectStore(self.fsc)
-        odata = self._put_pack(sos, commit_amount, 'Default')
-        head = odata[-1].id
-        have = odata[7].id
-        i = sos.iter_shas(sos.find_missing_objects([have, ],
-                                                   [head, ],
-                                                   progress=None,
-                                                   get_tagged=None))
-        self.assertEqual(len(i), 3)
-
-    def test_find_missing_objects_multiple_packs(self):
-        sos = swift.SwiftObjectStore(self.fsc)
-        commit_amount_a = 3
-        odataa = self._put_pack(sos, commit_amount_a, 'Default1')
-        heada = odataa[-1].id
-        commit_amount_b = 2
-        odatab = self._put_pack(sos, commit_amount_b, 'Default2')
-        headb = odatab[-1].id
-        i = sos.iter_shas(sos.find_missing_objects([],
-                                                   [heada, headb],
-                                                   progress=None,
-                                                   get_tagged=None))
-        self.assertEqual(len(self.fsc.store), 6)
-        self.assertEqual(len(i),
-                         commit_amount_a * 3 +
-                         commit_amount_b * 3)
-        shas = [d.id for d in odataa]
-        shas.extend([d.id for d in odatab])
-        for sha, path in i:
-            self.assertIn(sha.id, shas)
-
-    def test_add_thin_pack_ext_ref(self):
-        sos = swift.SwiftObjectStore(self.fsc)
-        odata = self._put_pack(sos, 1, 'Default1')
-        ref_blob_content = odata[0].as_raw_string()
-        ref_blob_id = odata[0].id
-        new_blob = Blob.from_string(ref_blob_content.replace('blob',
-                                                             'yummy blob'))
-        blob, tree, tag, cmt = \
-            create_commit([], marker='Default2', blob=new_blob)
-        data = [(REF_DELTA, (ref_blob_id, blob.as_raw_string())),
-                (tree.type_num, tree.as_raw_string()),
-                (cmt.type_num, cmt.as_raw_string()),
-                (tag.type_num, tag.as_raw_string())]
-        f = BytesIO()
-        build_pack(f, data, store=sos)
-        sos.add_thin_pack(f.read, None)
-        self.assertEqual(len(self.fsc.store), 6)
-
-
-@skipIf(missing_libs, skipmsg)
 class TestSwiftRepo(TestCase):
 
     def setUp(self):
@@ -430,51 +303,6 @@ class TestSwiftRepo(TestCase):
         self.assertIn('fakeroot/objects/pack', fsc.store)
         self.assertIn('fakeroot/info/refs', fsc.store)
         self.assertIn('fakeroot/description', fsc.store)
-
-
-@skipIf(missing_libs, skipmsg)
-@skipIfPY3
-class TestPackInfoLoadDump(TestCase):
-
-    def setUp(self):
-        super(TestPackInfoLoadDump, self).setUp()
-        conf = swift.load_conf(file=StringIO(config_file %
-                                             def_config_file))
-        sos = swift.SwiftObjectStore(
-            FakeSwiftConnector('fakerepo', conf=conf))
-        commit_amount = 10
-        self.commits = create_commits(length=commit_amount, marker="m")
-        data = [(d.type_num, d.as_raw_string()) for d in self.commits]
-        f = BytesIO()
-        fi = BytesIO()
-        expected = build_pack(f, data, store=sos)
-        entries = [(sha, ofs, checksum) for
-                   ofs, _, _, sha, checksum in expected]
-        self.pack_data = PackData.from_file(file=f, size=None)
-        write_pack_index_v2(
-            fi, entries, self.pack_data.calculate_checksum())
-        fi.seek(0)
-        self.pack_index = load_pack_index_file('', fi)
-
-#    def test_pack_info_perf(self):
-#        dump_time = []
-#        load_time = []
-#        for i in range(0, 100):
-#            start = time()
-#            dumps = swift.pack_info_create(self.pack_data, self.pack_index)
-#            dump_time.append(time() - start)
-#        for i in range(0, 100):
-#            start = time()
-#            pack_infos = swift.load_pack_info('', file=BytesIO(dumps))
-#            load_time.append(time() - start)
-#        print sum(dump_time) / float(len(dump_time))
-#        print sum(load_time) / float(len(load_time))
-
-    def test_pack_info(self):
-        dumps = swift.pack_info_create(self.pack_data, self.pack_index)
-        pack_infos = swift.load_pack_info('', file=BytesIO(dumps))
-        for obj in self.commits:
-            self.assertIn(obj.id, pack_infos)
 
 
 @skipIf(missing_libs, skipmsg)

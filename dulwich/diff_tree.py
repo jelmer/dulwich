@@ -315,8 +315,7 @@ def _count_blocks(obj):
     block_getvalue = block.getvalue
 
     for c in chain(*obj.as_raw_chunks()):
-        if sys.version_info[0] == 3:
-            c = c.to_bytes(1, 'big')
+        c = c.to_bytes(1, 'big')
         block_write(c)
         n += 1
         if c == b'\n' or n == _BLOCK_SIZE:

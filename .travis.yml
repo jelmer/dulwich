@@ -4,10 +4,10 @@ cache: pip
 
 
 python:
-  - 2.7
-  - 3.4
   - 3.5
   - 3.6
+  - 3.7
+  - 3.8
   - pypy3.5
 
 env:
@@ -32,8 +32,6 @@ matrix:
       dist: xenial
       sudo: true
     - python: 3.6
-      env: PURE=true
-    - python: 2.7
       env: PURE=true
 
 install:

@@ -32,10 +32,6 @@ from dulwich.objects import (
     Tag,
     ZERO_SHA,
     )
-from fastimport import __version__ as fastimport_version
-if (fastimport_version <= (0, 9, 5) and
-        sys.version_info[0] == 3 and sys.version_info[1] < 5):
-    raise ImportError("Older versions of fastimport don't support python3<3.5")
 from fastimport import (  # noqa: E402
     commands,
     errors as fastimport_errors,

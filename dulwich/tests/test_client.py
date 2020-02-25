@@ -1021,8 +1021,8 @@ class HttpGitClientTests(TestCase):
             c = HttpGitClient(base_url, pool_manager=pool_manager,
                               config=None)
             # call method that detects url redirection
-            _, _, processed_url = c._discover_references(b'git-upload-pack',
-                                                         base_url)
+            _, _, processed_url = asyncio.run(
+                c._discover_references(b'git-upload-pack', base_url))
 
             # send the same request as the method above without redirection
             resp = c.pool_manager.request('GET', base_url + tail,

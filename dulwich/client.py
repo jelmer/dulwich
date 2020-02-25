@@ -1681,7 +1681,7 @@ class HttpGitClient(GitClient):
 
         return resp, read
 
-    def _discover_references(self, service, base_url):
+    async def _discover_references(self, service, base_url):
         assert base_url[-1] == "/"
         tail = "info/refs"
         headers = {"Accept": "*/*"}
@@ -1717,7 +1717,7 @@ class HttpGitClient(GitClient):
         finally:
             resp.close()
 
-    def _smart_request(self, service, url, data):
+    async def _smart_request(self, service, url, data):
         assert url[-1] == "/"
         url = urlparse.urljoin(url, service)
         result_content_type = "application/x-%s-result" % service
@@ -1756,7 +1756,7 @@ class HttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        old_refs, server_capabilities, url = self._discover_references(
+        old_refs, server_capabilities, url = await self._discover_references(
             b"git-receive-pack", url)
         negotiated_capabilities = self._negotiate_receive_pack_capabilities(
                 server_capabilities)
@@ -1782,7 +1782,7 @@ class HttpGitClient(GitClient):
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
         if pack_data_count:
             write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
-        resp, read = self._smart_request("git-receive-pack", url,
+        resp, read = await self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())
         try:
             resp_proto = Protocol(read, None)
@@ -1809,7 +1809,7 @@ class HttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        refs, server_capabilities, url = self._discover_references(
+        refs, server_capabilities, url = await self._discover_references(
             b"git-upload-pack", url)
         negotiated_capabilities, symrefs, agent = (
                 self._negotiate_upload_pack_capabilities(
@@ -1826,7 +1826,7 @@ class HttpGitClient(GitClient):
         (new_shallow, new_unshallow) = self._handle_upload_pack_head(
                 req_proto, negotiated_capabilities, graph_walker, wants,
                 can_read=None, depth=depth)
-        resp, read = self._smart_request(
+        resp, read = await self._smart_request(
             "git-upload-pack", url, data=req_data.getvalue())
         try:
             resp_proto = Protocol(read, None)
@@ -1845,7 +1845,7 @@ class HttpGitClient(GitClient):
         """Retrieve the current refs from a git smart server.
         """
         url = self._get_url(path)
-        refs, _, _ = self._discover_references(
+        refs, _, _ = await self._discover_references(
             b"git-upload-pack", url)
         return refs
 

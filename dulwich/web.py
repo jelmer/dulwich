@@ -443,11 +443,8 @@ class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
     def log_exception(self, exc_info):
-        if sys.version_info < (2, 7):
-            logger.exception('Exception happened during processing of request')
-        else:
-            logger.exception('Exception happened during processing of request',
-                             exc_info=exc_info)
+        logger.exception('Exception happened during processing of request',
+                         exc_info=exc_info)
 
     def log_message(self, format, *args):
         logger.info(format, *args)

@@ -1607,11 +1607,10 @@ class HttpGitClient(GitClient):
         # Check if geturl() is available (urllib3 version >= 1.23)
         try:
             resp_url = resp.geturl()
+            resp.redirect_location = resp_url if resp_url != url else ''
         except AttributeError:
             # get_redirect_location() is available for urllib3 >= 1.1
-            resp_url = resp.get_redirect_location()
-        resp.redirect_location = resp_url if resp_url != url else ''
-
+            resp.redirect_location = resp.get_redirect_location()
         return resp, read
 
     def _discover_references(self, service, base_url):

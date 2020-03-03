@@ -1603,7 +1603,13 @@ class HttpGitClient(GitClient):
         read = BytesIO(resp.data).read
 
         resp.content_type = resp.getheader("Content-Type")
-        resp_url = resp.geturl()
+        resp_url = ''
+        # Check if geturl() is available (urllib3 version >= 1.23)
+        try:
+            resp_url = resp.geturl()
+        except AttributeError:
+            # get_redirect_location() is available for urllib3 >= 1.1
+            resp_url = resp.get_redirect_location()
         resp.redirect_location = resp_url if resp_url != url else ''
 
         return resp, read

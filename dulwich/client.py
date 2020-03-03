@@ -634,14 +634,14 @@ class GitClient(object):
                              b' '.join(sorted(capabilities)) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
-        if depth not in (0, None) or getattr(graph_walker, 'shallow', None):
+        if getattr(graph_walker, 'shallow', None):
             if CAPABILITY_SHALLOW not in capabilities:
                 raise GitProtocolError(
                     "server does not support shallow capability required for "
                     "depth")
             for sha in graph_walker.shallow:
                 proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha + b'\n')
-            if depth is not None:
+            if depth not in (0, None):
                 proto.write_pkt_line(COMMAND_DEEPEN + b' ' +
                                      str(depth).encode('ascii') + b'\n')
             proto.write_pkt_line(None)

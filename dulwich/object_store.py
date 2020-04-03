@@ -512,16 +512,18 @@ class PackBasedObjectStore(BaseObjectStore):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path):
+    def __init__(self, path, loose_compression_level=-1):
         """Open an object store.
 
         Args:
           path: Path of the object store.
+          loose_compression_level: zlib compression level for loose objects
         """
         super(DiskObjectStore, self).__init__()
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
+        self.loose_compression_level = loose_compression_level
 
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)
@@ -809,7 +811,8 @@ class DiskObjectStore(PackBasedObjectStore):
         if os.path.exists(path):
             return  # Already there, no need to write again
         with GitFile(path, 'wb') as f:
-            f.write(obj.as_legacy_object())
+            f.write(obj.as_legacy_object(
+                compression_level=self.loose_compression_level))
 
     @classmethod
     def init(cls, path):

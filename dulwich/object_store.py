@@ -551,12 +551,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 (b'core', ), b'looseCompression').decode())
         except KeyError:
             loose_compression_level = default_compression_level
-        try:
-            pack_compression_level = int(config.get(
-                (b'core', ), 'packCompression').decode())
-        except KeyError:
-            pack_compression_level = default_compression_level
-        return cls(path, loose_compression_level, pack_compression_level)
+        return cls(path, loose_compression_level)
 
     @property
     def alternates(self):

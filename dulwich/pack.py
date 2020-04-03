@@ -1546,7 +1546,7 @@ def write_pack_object(f, type, object, sha=None, compression_level=-1):
     else:
         delta_base = None
     header = bytes(pack_object_header(type, delta_base, len(object)))
-    comp_data = zlib.compress(object, level=compression_level)
+    comp_data = zlib.compress(object, compression_level)
     crc32 = 0
     for data in (header, comp_data):
         f.write(data)

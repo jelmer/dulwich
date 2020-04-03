@@ -282,21 +282,22 @@ class ShaFile(object):
             raise ObjectFormatException("Invalid object header, no \\0")
         self.set_raw_string(text[header_end+1:])
 
-    def as_legacy_object_chunks(self):
+    def as_legacy_object_chunks(self, compression_level=-1):
         """Return chunks representing the object in the experimental format.
 
         Returns: List of strings
         """
-        compobj = zlib.compressobj()
+        compobj = zlib.compressobj(level=compression_level)
         yield compobj.compress(self._header())
         for chunk in self.as_raw_chunks():
             yield compobj.compress(chunk)
         yield compobj.flush()
 
-    def as_legacy_object(self):
+    def as_legacy_object(self, compression_level=-1):
         """Return string representing the object in the experimental format.
         """
-        return b''.join(self.as_legacy_object_chunks())
+        return b''.join(self.as_legacy_object_chunks(
+            compression_level=compression_level))
 
     def as_raw_chunks(self):
         """Return chunks with serialization of the object.

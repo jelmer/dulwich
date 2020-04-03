@@ -935,8 +935,10 @@ class Repo(BaseRepo):
         else:
             self._commondir = self._controldir
         self.path = root
-        object_store = DiskObjectStore(
-            os.path.join(self.commondir(), OBJECTDIR))
+        config = self.get_config()
+        object_store = DiskObjectStore.from_config(
+            os.path.join(self.commondir(), OBJECTDIR),
+            config)
         refs = DiskRefsContainer(self.commondir(), self._controldir,
                                  logger=self._write_reflog)
         BaseRepo.__init__(self, object_store, refs)

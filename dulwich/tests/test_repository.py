@@ -864,6 +864,15 @@ class BuildRepoRootTests(TestCase):
             encoding=b"iso8859-1")
         self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
+    def test_compression_level(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(('core',), 'compression', '3')
+        c.set(('core',), 'looseCompression', '4')
+        c.write_to_path()
+        r = Repo(self._repo_dir)
+        self.assertEqual(r.object_store.loose_compression_level, 4)
+
     def test_commit_encoding_from_config(self):
         r = self._repo
         c = r.get_config()

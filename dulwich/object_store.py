@@ -528,6 +528,20 @@ class DiskObjectStore(PackBasedObjectStore):
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)
 
+    @classmethod
+    def from_config(cls, path, config):
+        try:
+            default_compression_level = int(config.get(
+                (b'core', ), b'compression').decode())
+        except KeyError:
+            default_compression_level = -1
+        try:
+            loose_compression_level = int(config.get(
+                (b'core', ), b'looseCompression').decode())
+        except KeyError:
+            loose_compression_level = default_compression_level
+        return cls(path, loose_compression_level)
+
     @property
     def alternates(self):
         if self._alternates is not None:

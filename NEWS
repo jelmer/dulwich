@@ -22,6 +22,10 @@
    loose objects through the "core.looseCompression" and
    "core.compression" settings. (Jelmer Vernooĳ)
 
+ * Support tweaking the compression level for
+   pack objects through the "core.packCompression" and
+   "core.compression" settings. (Jelmer Vernooĳ)
+
  * Add a "dulwich.contrib.diffstat" module.
    (Kevin Hendricks)
 

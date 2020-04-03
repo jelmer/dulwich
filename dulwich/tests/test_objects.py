@@ -132,6 +132,12 @@ class BlobReadTests(TestCase):
         b2 = b1.from_file(BytesIO(b_raw))
         self.assertEqual(b1, b2)
 
+    def test_legacy_from_file_compression_level(self):
+        b1 = Blob.from_string(b'foo')
+        b_raw = b1.as_legacy_object(compression_level=6)
+        b2 = b1.from_file(BytesIO(b_raw))
+        self.assertEqual(b1, b2)
+
     def test_chunks(self):
         string = b'test 5\n'
         b = Blob.from_string(string)

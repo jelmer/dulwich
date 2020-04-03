@@ -342,6 +342,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         TestCase.tearDown(self)
         PackBasedObjectStoreTests.tearDown(self)
 
+    def test_loose_compression_level(self):
+        alternate_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, alternate_dir)
+        alternate_store = DiskObjectStore(
+            alternate_dir, loose_compression_level=6)
+        b2 = make_object(Blob, data=b"yummy data")
+        alternate_store.add_object(b2)
+
     def test_alternates(self):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)

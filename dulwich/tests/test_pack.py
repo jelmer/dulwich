@@ -591,6 +591,18 @@ class WritePackTests(TestCase):
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
 
+    def test_write_pack_object_compression_level(self):
+        f = BytesIO()
+        f.write(b'header')
+        offset = f.tell()
+        sha_a = sha1(b'foo')
+        sha_b = sha_a.copy()
+        write_pack_object(
+            f, Blob.type_num, b'blob', sha=sha_a, compression_level=6)
+        self.assertNotEqual(sha_a.digest(), sha_b.digest())
+        sha_b.update(f.getvalue()[offset:])
+        self.assertEqual(sha_a.digest(), sha_b.digest())
+
 
 pack_checksum = hex_to_sha('721980e866af9a5f93ad674144e1459b8ba3e7b7')
 

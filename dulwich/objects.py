@@ -287,7 +287,7 @@ class ShaFile(object):
 
         Returns: List of strings
         """
-        compobj = zlib.compressobj(level=compression_level)
+        compobj = zlib.compressobj(compression_level)
         yield compobj.compress(self._header())
         for chunk in self.as_raw_chunks():
             yield compobj.compress(chunk)

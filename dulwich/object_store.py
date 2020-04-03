@@ -522,14 +522,12 @@ class PackBasedObjectStore(BaseObjectStore):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path, loose_compression_level=-1,
-                 pack_compression_level=-1):
+    def __init__(self, path, loose_compression_level=-1):
         """Open an object store.
 
         Args:
           path: Path of the object store.
           loose_compression_level: zlib compression level for loose objects
-          pack_compression_level: zlib compression level for pack objects
         """
         super(DiskObjectStore, self).__init__(
             pack_compression_level=pack_compression_level)

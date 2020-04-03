@@ -152,7 +152,9 @@ class BaseObjectStore(object):
             return
         f, commit, abort = self.add_pack()
         try:
-            write_pack_data(f, count, pack_data, progress)
+            write_pack_data(
+                f, count, pack_data, progress,
+                compression_level=self.pack_compression_level)
         except BaseException:
             abort()
             raise
@@ -512,18 +514,21 @@ class PackBasedObjectStore(BaseObjectStore):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path, loose_compression_level=-1):
+    def __init__(self, path, loose_compression_level=-1,
+                 pack_compression_level=-1):
         """Open an object store.
 
         Args:
           path: Path of the object store.
           loose_compression_level: zlib compression level for loose objects
+          pack_compression_level: zlib compression level for pack objects
         """
         super(DiskObjectStore, self).__init__()
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
         self.loose_compression_level = loose_compression_level
+        self.pack_compression_level = pack_compression_level
 
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)
@@ -540,7 +545,12 @@ class DiskObjectStore(PackBasedObjectStore):
                 (b'core', ), b'looseCompression').decode())
         except KeyError:
             loose_compression_level = default_compression_level
-        return cls(path, loose_compression_level)
+        try:
+            pack_compression_level = int(config.get(
+                (b'core', ), 'packCompression').decode())
+        except KeyError:
+            pack_compression_level = default_compression_level
+        return cls(path, loose_compression_level, pack_compression_level)
 
     @property
     def alternates(self):
@@ -694,7 +704,9 @@ class DiskObjectStore(PackBasedObjectStore):
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
-            crc32 = write_pack_object(f, type_num, data, sha=new_sha)
+            crc32 = write_pack_object(
+                f, type_num, data, sha=new_sha,
+                compression_level=self.pack_compression_level)
             entries.append((ext_sha, offset, crc32))
         pack_sha = new_sha.digest()
         f.write(pack_sha)
@@ -846,6 +858,7 @@ class MemoryObjectStore(BaseObjectStore):
     def __init__(self):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
+        self.pack_compression_level = -1
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:
@@ -945,7 +958,8 @@ class MemoryObjectStore(BaseObjectStore):
         for ext_sha in indexer.ext_refs():
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
-            write_pack_object(f, type_num, data, sha=new_sha)
+            write_pack_object(
+                f, type_num, data, sha=new_sha)
         pack_sha = new_sha.digest()
         f.write(pack_sha)
 

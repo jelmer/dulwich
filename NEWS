@@ -7,6 +7,10 @@
    loose objects through the "core.looseCompression" and
    "core.compression" settings. (Jelmer Vernooĳ)
 
+ * Support tweaking the compression level for
+   pack objects through the "core.packCompression" and
+   "core.compression" settings. (Jelmer Vernooĳ)
+
 0.19.15	2020-01-26
 
  * Properly handle files that are just executable for the

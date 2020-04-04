@@ -21,8 +21,6 @@
 
 """Fast export/import functionality."""
 
-import sys
-
 from dulwich.index import (
     commit_tree,
     )

@@ -27,7 +27,6 @@ from collections import namedtuple
 import os
 import posixpath
 import stat
-import sys
 import warnings
 import zlib
 from hashlib import sha1

@@ -312,8 +312,9 @@ class BaseObjectStore(object):
 
 class PackBasedObjectStore(BaseObjectStore):
 
-    def __init__(self):
+    def __init__(self, pack_compression_level=-1):
         self._pack_cache = {}
+        self.pack_compression_level = pack_compression_level
 
     @property
     def alternates(self):
@@ -523,12 +524,12 @@ class DiskObjectStore(PackBasedObjectStore):
           loose_compression_level: zlib compression level for loose objects
           pack_compression_level: zlib compression level for pack objects
         """
-        super(DiskObjectStore, self).__init__()
+        super(DiskObjectStore, self).__init__(
+            pack_compression_level=pack_compression_level)
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
         self.loose_compression_level = loose_compression_level
-        self.pack_compression_level = pack_compression_level
 
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)

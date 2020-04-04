@@ -19,7 +19,7 @@
 #
 
 """Utilities for diffing files and trees."""
-import sys
+
 from collections import (
     defaultdict,
     namedtuple,

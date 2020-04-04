@@ -31,7 +31,6 @@ try:
 except ImportError:
     from io import StringIO
 
-import sys
 from unittest import skipIf
 
 from dulwich.tests import (
@@ -40,18 +39,12 @@ from dulwich.tests import (
 from dulwich.tests.test_object_store import (
     ObjectStoreTests,
     )
-from dulwich.tests.utils import (
-    build_pack,
-    )
 from dulwich.objects import (
     Blob,
     Commit,
     Tree,
     Tag,
     parse_timezone,
-    )
-from dulwich.pack import (
-    REF_DELTA,
     )
 
 try:

@@ -2825,3 +2825,13 @@ class FindUniqueAbbrevTests(PorcelainTestCase):
         self.assertEqual(
             c1.id.decode('ascii')[:7],
             porcelain.find_unique_abbrev(self.repo.object_store, c1.id))
+        self.assertEqual(b'master', porcelain.active_branch(self.repo))
+
+
+class MergeBaseTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3, c4 = build_commit_graph(
+                self.repo.object_store, [[1], [2, 1], [3, 1, 2], [4, 1]])
+        self.assertEqual(
+            c1.id, porcelain.merge_base(self.repo, [c3.id, c4.id]))

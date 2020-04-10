@@ -15,7 +15,7 @@ Furthermore, triple-quotes should always be """, single quotes are ' unless
 using " would result in less escaping within the string.
 
 Public methods, functions and classes should all have doc strings. Please use
-epydoc style docstrings to document parameters and return values.
+Google style docstrings to document parameters and return values.
 You can generate the documentation by running "make doc".
 
 Running the tests

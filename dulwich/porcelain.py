@@ -37,6 +37,7 @@ Currently implemented:
  * ls-files
  * ls-remote
  * ls-tree
+ * merge-base
  * pull
  * push
  * rm
@@ -1617,3 +1618,19 @@ def write_tree(repo):
     """
     with open_repo_closing(repo) as r:
         return r.open_index().commit(r.object_store)
+
+
+def merge_base(repo, committishs):
+    """Find the merge base to use for a set of commits.
+
+    Args:
+      repo: Repository in which the commits live
+      committishs: List of committish entries
+    Returns:
+      common merge commit
+    """
+    from .merge import find_merge_base
+    with open_repo_closing(repo) as r:
+        commits = [parse_commit(r, committish).id
+                   for committish in committishs]
+        return find_merge_base(repo, commits)

@@ -22,3 +22,4 @@ dulwich.egg-info/
 .coverage
 htmlcov/
 docs/api/*.txt
+.mypy_cache/

@@ -11,6 +11,9 @@
    pack objects through the "core.packCompression" and
    "core.compression" settings. (Jelmer Vernooĳ)
 
+ * Add a "dulwich.contrib.diffstat" module.
+   (Kevin Hendricks)
+
 0.19.15	2020-01-26
 
  * Properly handle files that are just executable for the

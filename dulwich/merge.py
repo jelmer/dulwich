@@ -69,7 +69,7 @@ def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
     merged_text = file_merger(
         object_store[this_entry.sha].as_raw_string(),
         object_store[other_entry.sha].as_raw_string(),
-        object_store[other_entry.sha].as_raw_string())
+        object_store[base_entry.sha].as_raw_string())
     merged_text_blob = Blob.from_string(merged_text)
     object_store.add(merged_text_blob)
     # TODO(jelmer): Report conflicts, if any?

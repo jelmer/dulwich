@@ -15,7 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.19.16'
+dulwich_version_string = '0.19.17'
 
 include_dirs = []
 # Windows MSVC support

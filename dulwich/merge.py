@@ -71,7 +71,7 @@ def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
         object_store[other_entry.sha].as_raw_string(),
         object_store[base_entry.sha].as_raw_string())
     merged_text_blob = Blob.from_string(merged_text)
-    object_store.add(merged_text_blob)
+    object_store.add_object(merged_text_blob)
     # TODO(jelmer): Report conflicts, if any?
     if this_entry.mode in (base_entry.mode, other_entry.mode):
         mode = other_entry.mode
@@ -80,11 +80,11 @@ def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
             # TODO(jelmer): Add a mode conflict
             raise NotImplementedError
         mode = this_entry.mode
-    yield TreeEntry(new_path, mode, merged_text_blob.id)
+    return TreeEntry(new_path, mode, merged_text_blob.id)
 
 
-def merge_trees(object_store, this_tree, other_tree, common_tree,
-                rename_detector=None, file_merger=None):
+def merge_tree(object_store, this_tree, other_tree, common_tree,
+               rename_detector=None, file_merger=None):
     """Merge two trees.
 
     Args:
@@ -100,18 +100,18 @@ def merge_trees(object_store, this_tree, other_tree, common_tree,
     """
     changes_this = tree_changes(object_store, common_tree, this_tree)
     changes_this_by_common_path = {
-        change.old.name: change for change in changes_this if change.old}
+        change.old.path: change for change in changes_this if change.old}
     changes_this_by_this_path = {
-        change.new.name: change for change in changes_this if change.new}
+        change.new.path: change for change in changes_this if change.new}
     for other_change in tree_changes(object_store, common_tree, other_tree):
-        this_change = changes_this_by_common_path.get(other_change.old.name)
+        this_change = changes_this_by_common_path.get(other_change.old.path)
         if this_change == other_change:
             continue
         if other_change.type in (CHANGE_ADD, CHANGE_COPY):
             try:
-                this_entry = changes_this_by_this_path[other_change.new.name]
+                this_entry = changes_this_by_this_path[other_change.new.path]
             except KeyError:
-                yield other_change.new.name
+                yield other_change.new.path
             else:
                 if this_entry != other_change.new:
                     # TODO(jelmer): Three way merge instead, with empty common
@@ -119,40 +119,40 @@ def merge_trees(object_store, this_tree, other_tree, common_tree,
                     yield MergeConflict(
                         this_entry, other_change.new, other_change.old,
                         'Both this and other add new file %s' %
-                        other_change.new.name)
+                        other_change.new.path)
         elif other_change.type == CHANGE_DELETE:
             if this_change and this_change.type not in (
                     CHANGE_DELETE, CHANGE_UNCHANGED):
                 yield MergeConflict(
                     this_change.new, other_change.new, other_change.old,
                     '%s is deleted in other but modified in this' %
-                    other_change.old.name)
+                    other_change.old.path)
             else:
-                yield TreeEntry(other_change.old.name, None, None)
+                yield TreeEntry(other_change.old.path, None, None)
         elif other_change.type == CHANGE_RENAME:
             if this_change and this_change.type == CHANGE_RENAME:
-                if this_change.new.name != other_change.new.name:
+                if this_change.new.path != other_change.new.path:
                     # TODO(jelmer): Does this need to be a conflict?
                     yield MergeConflict(
                         this_change.new, other_change.new, other_change.old,
                         '%s was renamed by both sides (%s / %s)'
-                        % (other_change.old.name, other_change.new.name,
-                           this_change.new.name))
+                        % (other_change.old.path, other_change.new.path,
+                           this_change.new.path))
                 else:
                     yield _merge_entry(
-                        other_change.new.name,
+                        other_change.new.path,
                         object_store, this_change.new, other_change.new,
                         other_change.old, file_merger=file_merger)
             elif this_change and this_change.type == CHANGE_MODIFY:
                 yield _merge_entry(
-                    other_change.new.name,
+                    other_change.new.path,
                     object_store, this_change.new, other_change.new,
                     other_change.old, file_merger=file_merger)
             elif this_change and this_change.type == CHANGE_DELETE:
                 yield MergeConflict(
                     this_change.new, other_change.new, other_change.old,
                     '%s is deleted in this but renamed to %s in other' %
-                    (other_change.old.name, other_change.new.name))
+                    (other_change.old.path, other_change.new.path))
             elif this_change:
                 raise NotImplementedError(
                     '%r and %r' % (this_change, other_change))
@@ -163,11 +163,11 @@ def merge_trees(object_store, this_tree, other_tree, common_tree,
                 yield MergeConflict(
                     this_change.new, other_change.new, other_change.old,
                     '%s is deleted in this but modified in other' %
-                    other_change.old.name)
+                    other_change.old.path)
             elif this_change and this_change.type in (
                     CHANGE_MODIFY, CHANGE_RENAME):
                 yield _merge_entry(
-                    this_change.new.name,
+                    this_change.new.path,
                     object_store, this_change.new, other_change.new,
                     other_change.old, file_merger=file_merger)
             elif this_change:
@@ -194,7 +194,7 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
     [other_id] = commit_ids
     index = repo.open_index()
     this_id = index.commit(repo.object_store)
-    for entry in merge_trees(
+    for entry in merge_tree(
             repo.object_store,
             repo.object_store[this_id].tree,
             repo.object_store[other_id].tree,

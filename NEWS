@@ -1,4 +1,4 @@
-0.19.16	UNRELEASED
+0.19.16	2020-04-17
 
  * Don't send "deepen None" to server if graph walker
    supports shallow. (Jelmer Vernooĳ, #747)

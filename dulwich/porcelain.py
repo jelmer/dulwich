@@ -1903,4 +1903,4 @@ def merge_base(repo, committishs):
     with open_repo_closing(repo) as r:
         commits = [parse_commit(r, committish).id
                    for committish in committishs]
-        return find_merge_base(repo, commits)
+        return find_merge_base(r, commits)

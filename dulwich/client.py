@@ -361,7 +361,7 @@ class GitClient(object):
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, update_refs, generate_pack_data,
+    def send_pack(self, path, update_refs, shallow, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -370,6 +370,7 @@ class GitClient(object):
           update_refs: Function to determine changes to remote refs. Receive
             dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          shallow: Set of shallow commits generate_pack_data should skip
           generate_pack_data: Function that can return a tuple
             with number of objects and list of pack data to include
           progress: Optional progress function
@@ -772,7 +773,7 @@ class TraditionalGitClient(GitClient):
         """
         raise NotImplementedError()
 
-    def send_pack(self, path, update_refs, generate_pack_data,
+    def send_pack(self, path, update_refs, shallow, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -781,6 +782,7 @@ class TraditionalGitClient(GitClient):
           update_refs: Function to determine changes to remote refs.
         Receive dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          shallow: Set of shallow commits generate_pack_data should skip
           generate_pack_data: Function that can return a tuple with
         number of objects and pack data to upload.
           progress: Optional callback called with progress updates
@@ -842,7 +844,7 @@ class TraditionalGitClient(GitClient):
                     set(new_refs.items()).issubset(set(old_refs.items()))):
                 return new_refs
             pack_data_count, pack_data = generate_pack_data(
-                have, want,
+                have, want, shallow,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
 
             dowrite = bool(pack_data_count)
@@ -1116,7 +1118,7 @@ class LocalGitClient(GitClient):
             path = path.decode(sys.getfilesystemencoding())
         return closing(Repo(path))
 
-    def send_pack(self, path, update_refs, generate_pack_data,
+    def send_pack(self, path, update_refs, shallow, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
@@ -1125,6 +1127,7 @@ class LocalGitClient(GitClient):
           update_refs: Function to determine changes to remote refs.
         Receive dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          shallow: Set of shallow commits generate_pack_data should skip
           generate_pack_data: Function that can return a tuple
         with number of items and pack data to upload.
           progress: Optional progress function
@@ -1160,7 +1163,7 @@ class LocalGitClient(GitClient):
                 return new_refs
 
             target.object_store.add_pack_data(
-                *generate_pack_data(have, want, ofs_delta=True))
+                *generate_pack_data(have, want, shallow, ofs_delta=True))
 
             for refname, new_sha1 in new_refs.items():
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
@@ -1670,15 +1673,16 @@ class HttpGitClient(GitClient):
                                    % resp.content_type)
         return resp, read
 
-    def send_pack(self, path, update_refs, generate_pack_data,
+    def send_pack(self, path, update_refs, shallow, generate_pack_data,
                   progress=None):
         """Upload a pack to a remote repository.
 
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receive dict with existing remote refs, returns dict with
+        Receives dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+          shallow: Set of shallow commits generate_pack_data should skip
           generate_pack_data: Function that can return a tuple
         with number of elements and pack data to upload.
           progress: Optional progress function
@@ -1716,7 +1720,7 @@ class HttpGitClient(GitClient):
         if not want and set(new_refs.items()).issubset(set(old_refs.items())):
             return new_refs
         pack_data_count, pack_data = generate_pack_data(
-                have, want,
+                have, want, shallow,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
         if pack_data_count:
             write_pack_data(req_proto.write_file(), pack_data_count, pack_data)

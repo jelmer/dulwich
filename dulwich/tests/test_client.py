@@ -223,12 +223,12 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b'refs/foo/bar': commit.id, }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return pack_objects_to_data([(commit, None), (tree, ''), ])
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, "blah",
-                          update_refs, generate_pack_data)
+                          update_refs, set(), generate_pack_data)
 
     def test_send_pack_none(self):
         self.rin.write(
@@ -244,10 +244,10 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):
@@ -263,10 +263,10 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
             b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -285,10 +285,10 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
             b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
@@ -312,12 +312,12 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return 0, []
 
         f = BytesIO()
         write_pack_objects(f, {})
-        self.client.send_pack('/', update_refs, generate_pack_data)
+        self.client.send_pack('/', update_refs, set(), generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
             b'008b0000000000000000000000000000000000000000 '
@@ -351,12 +351,12 @@ class GitClientTests(TestCase):
                     b'310ca9477129b8586fa2afc779c1f57cf64bba6c'
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return pack_objects_to_data([(commit, None), (tree, b''), ])
 
         f = BytesIO()
-        write_pack_data(f, *generate_pack_data(None, None))
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        write_pack_data(f, *generate_pack_data(None, None, set()))
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
             b'008b0000000000000000000000000000000000000000 ' + commit.id +
@@ -378,12 +378,12 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b'refs/heads/master': b'0' * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, shallow, ofs_delta=False):
             return 0, []
 
         self.assertRaises(UpdateRefsError,
                           self.client.send_pack, b"/",
-                          update_refs, generate_pack_data)
+                          update_refs, set(), generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
 
@@ -873,6 +873,7 @@ class LocalGitClientTests(TestCase):
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
                                     lambda _: {ref_name: local.refs[ref_name]},
+                                    local.get_shallow(),
                                     local.object_store.generate_pack_data)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])

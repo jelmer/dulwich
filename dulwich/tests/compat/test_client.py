@@ -25,6 +25,7 @@ from io import BytesIO
 import os
 import select
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -106,7 +107,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_data)
+                        src.get_shallow(), src.object_store.generate_pack_data)
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -152,7 +153,7 @@ class DulwichClientTestBase(object):
                     tree=tree_id)
             sendrefs = dict(local.get_refs())
             del sendrefs[b'HEAD']
-            c.send_pack(remote_path, lambda _: sendrefs,
+            c.send_pack(remote_path, lambda _: sendrefs, local.get_shallow(),
                         local.object_store.generate_pack_data)
         with repo.Repo(server_new_path) as remote:
             self.assertEqual(remote.head(), commit_id)
@@ -165,7 +166,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_data)
+                        src.get_shallow(), src.object_store.generate_pack_data)
             self.assertDestEqualsSrc()
 
     def make_dummy_commit(self, dest):
@@ -202,8 +203,8 @@ class DulwichClientTestBase(object):
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
-                c.send_pack(self._build_path('/dest'),
-                            lambda _: sendrefs, gen_pack)
+                c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                            src.get_shallow(), gen_pack)
             except errors.UpdateRefsError as e:
                 self.assertEqual('refs/heads/master failed to update',
                                  e.args[0])
@@ -222,7 +223,7 @@ class DulwichClientTestBase(object):
             c = self._client()
             try:
                 c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                            gen_pack)
+                            src.get_shallow(), gen_pack)
             except errors.UpdateRefsError as e:
                 self.assertIn(
                         str(e),
@@ -315,12 +316,12 @@ class DulwichClientTestBase(object):
             sendrefs[b'refs/heads/abranch'] = b"00" * 20
             del sendrefs[b'HEAD']
 
-            def gen_pack(have, want, ofs_delta=False):
+            def gen_pack(have, want, shallow, ofs_delta=False):
                 return 0, []
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
             c.send_pack(
-                self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+                self._build_path('/dest'), lambda _: sendrefs, set(), gen_pack)
             self.assertFalse(b"refs/heads/abranch" in dest.refs)
 
     def test_get_refs(self):

@@ -468,8 +468,8 @@ class BaseRepo(object):
 
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(
-              haves, wants, progress,
-              get_tagged,
+              haves, wants, self.get_shallow(),
+              progress, get_tagged,
               get_parents=get_parents))
 
     def get_graph_walker(self, heads=None):

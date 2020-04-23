@@ -117,6 +117,29 @@ class DulwichClientTestBase(object):
         # nothing to send, but shouldn't raise either.
         self._do_send_pack()
 
+    def test_send_pack_from_shallow_clone(self):
+        c = self._client()
+        server_new_path = os.path.join(self.gitroot, 'server_new.export')
+        run_git_or_fail(['config', 'http.uploadpack', 'true'],
+                        cwd=server_new_path)
+        run_git_or_fail(['config', 'http.receivepack', 'true'],
+                        cwd=server_new_path)
+        remote_path = self._build_path('/server_new.export')
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+            commit_id = local.do_commit(
+                message=b"foo",
+                committer=b"Joe Example <joe@example.com>",
+                tree=local[local.head()].tree)
+            sendrefs = dict(local.get_refs())
+            del sendrefs[b'HEAD']
+            c.send_pack(remote_path, lambda _: sendrefs,
+                        local.object_store.generate_pack_data)
+        with repo.Repo(server_new_path) as remote:
+            self.assertEqual(remote.head(), commit_id)
+
     def test_send_without_report_status(self):
         c = self._client()
         c._send_capabilities.remove(b'report-status')

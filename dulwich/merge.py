@@ -199,7 +199,8 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
             repo.object_store[this_id].tree,
             repo.object_store[other_id].tree,
             repo.object_store[merge_base].tree,
-            rename_detector=rename_detector):
+            rename_detector=rename_detector,
+            file_merger=file_merger):
 
         if isinstance(entry, MergeConflict):
             conflicts.append(entry)

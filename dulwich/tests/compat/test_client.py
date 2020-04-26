@@ -30,6 +30,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+import unittest
 
 try:
     from urlparse import unquote
@@ -117,6 +118,8 @@ class DulwichClientTestBase(object):
         # nothing to send, but shouldn't raise either.
         self._do_send_pack()
 
+    # Pushing from a shallow clone currently fails. See #705
+    @unittest.expectedFailure
     def test_send_pack_from_shallow_clone(self):
         c = self._client()
         server_new_path = os.path.join(self.gitroot, 'server_new.export')

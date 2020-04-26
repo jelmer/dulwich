@@ -36,10 +36,7 @@ from wsgiref.simple_server import (
     make_server,
     )
 
-try:
-    from urlparse import parse_qs
-except ImportError:
-    from urllib.parse import parse_qs
+from urllib.parse import parse_qs
 
 
 from dulwich import log_utils

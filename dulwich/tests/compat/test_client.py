@@ -33,19 +33,9 @@ import tempfile
 import threading
 import unittest
 
-try:
-    from urlparse import unquote
-except ImportError:
-    from urllib.parse import unquote
+from urllib.parse import unquote
 
-
-try:
-    import BaseHTTPServer
-    import SimpleHTTPServer
-except ImportError:
-    import http.server
-    BaseHTTPServer = http.server
-    SimpleHTTPServer = http.server
+import http.server
 
 from dulwich import (
     client,
@@ -437,7 +427,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
-class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP Request handler that calls out to 'git http-backend'."""
 
     # Make rfile unbuffered -- we need to read one line and then pass
@@ -564,12 +554,12 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(stdout)
 
 
-class HTTPGitServer(BaseHTTPServer.HTTPServer):
+class HTTPGitServer(http.server.HTTPServer):
 
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path):
-        BaseHTTPServer.HTTPServer.__init__(
+        http.server.HTTPServer.__init__(
             self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"

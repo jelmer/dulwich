@@ -20,11 +20,7 @@
 
 """Tests for dulwich.porcelain."""
 
-from io import BytesIO
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import BytesIO, StringIO
 import errno
 import os
 import shutil

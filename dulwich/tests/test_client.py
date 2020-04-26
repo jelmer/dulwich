@@ -26,15 +26,10 @@ import shutil
 import tempfile
 import warnings
 
-try:
-    from urllib import quote as urlquote
-except ImportError:
-    from urllib.parse import quote as urlquote
-
-try:
-    import urlparse
-except ImportError:
-    import urllib.parse as urlparse
+from urllib.parse import (
+    quote as urlquote,
+    urlparse,
+    )
 
 import urllib3
 
@@ -951,7 +946,7 @@ class HttpGitClientTests(TestCase):
             password=quoted_password
         )
 
-        c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
+        c = HttpGitClient.from_parsedurl(urlparse(url))
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
 
@@ -962,7 +957,6 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_url_redirect_location(self):
-
         from urllib3.response import HTTPResponse
 
         test_data = {

@@ -43,6 +43,9 @@ check-noextensions:: clean
 
 check-all: check check-pypy check-noextensions
 
+typing:
+	mypy dulwich
+
 clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so

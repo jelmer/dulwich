@@ -54,6 +54,7 @@ from urllib.parse import (
     urljoin,
     urlunparse,
     urlunsplit,
+    urlunparse,
     )
 
 import dulwich

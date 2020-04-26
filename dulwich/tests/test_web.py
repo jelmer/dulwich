@@ -108,7 +108,7 @@ class TestHTTPGitRequest(HTTPGitRequest):
 class WebTestCase(TestCase):
     """Base TestCase with useful instance vars and utility functions."""
 
-    _req_class:Type[HTTPGitRequest] = TestHTTPGitRequest
+    _req_class: Type[HTTPGitRequest] = TestHTTPGitRequest
 
     def setUp(self):
         super(WebTestCase, self).setUp()

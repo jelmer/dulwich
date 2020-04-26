@@ -43,7 +43,7 @@ from dulwich.tests.utils import (
 try:
     from mock import patch
 except ImportError:
-    patch = None
+    patch = None   # type: ignore
 
 
 class ArchiveTests(TestCase):

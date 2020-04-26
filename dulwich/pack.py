@@ -43,12 +43,6 @@ import difflib
 import struct
 
 from itertools import chain
-try:
-    from itertools import imap, izip
-except ImportError:
-    # Python3
-    imap = map
-    izip = zip
 
 import os
 import sys
@@ -363,8 +357,8 @@ class PackIndex(object):
         if not isinstance(other, PackIndex):
             return False
 
-        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
-                                                 other.iterentries()):
+        for (name1, _, _), (name2, _, _) in zip(self.iterentries(),
+                                                other.iterentries()):
             if name1 != name2:
                 return False
         return True
@@ -378,7 +372,7 @@ class PackIndex(object):
 
     def __iter__(self):
         """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
+        return map(sha_to_hex, self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.
@@ -710,7 +704,7 @@ def chunks_length(chunks):
     if isinstance(chunks, bytes):
         return len(chunks)
     else:
-        return sum(imap(len, chunks))
+        return sum(map(len, chunks))
 
 
 def unpack_object(read_all, read_some=None, compute_crc32=False,
@@ -2094,6 +2088,9 @@ class Pack(object):
 
 
 try:
-    from dulwich._pack import apply_delta, bisect_find_sha  # noqa: F811
+    from dulwich._pack import (  # type: ignore # noqa: F811
+        apply_delta,
+        bisect_find_sha,
+        )
 except ImportError:
     pass

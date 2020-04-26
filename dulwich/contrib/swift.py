@@ -32,16 +32,10 @@ import zlib
 import tempfile
 import posixpath
 
-try:
-    import urlparse
-except ImportError:
-    import urllib.parse as urlparse
+import urllib.parse as urlparse
 
 from io import BytesIO
-try:
-    from ConfigParser import ConfigParser
-except ImportError:
-    from configparser import ConfigParser
+from configparser import ConfigParser
 from geventhttpclient import HTTPClient
 
 from dulwich.greenthreads import (
@@ -92,12 +86,7 @@ from dulwich.server import (
     TCPGitServer,
     )
 
-try:
-    from simplejson import loads as json_loads
-    from simplejson import dumps as json_dumps
-except ImportError:
-    from json import loads as json_loads
-    from json import dumps as json_dumps
+import json
 
 import sys
 
@@ -223,7 +212,7 @@ def pack_info_create(pack_data, pack_index):
         # Tag
         elif obj.type_num == Tag.type_num:
             info[obj.id] = (obj.type_num, obj.object[1])
-    return zlib.compress(json_dumps(info))
+    return zlib.compress(json.dumps(info))
 
 
 def load_pack_info(filename, scon=None, file=None):
@@ -234,7 +223,7 @@ def load_pack_info(filename, scon=None, file=None):
     if not f:
         return None
     try:
-        return json_loads(zlib.decompress(f.read()))
+        return json.loads(zlib.decompress(f.read()))
     finally:
         f.close()
 
@@ -323,7 +312,7 @@ class SwiftConnector(object):
                                  'password': self.password,
                              },
                              'tenantName': self.tenant}
-        auth_json = json_dumps(auth_dict)
+        auth_json = json.dumps(auth_dict)
         headers = {'Content-Type': 'application/json'}
         auth_httpclient = HTTPClient.from_url(
             self.auth_url,
@@ -343,7 +332,7 @@ class SwiftConnector(object):
                                  % (str(auth_httpclient.get_base_url()) +
                                     path, ret.status_code,
                                     str(ret.items())))
-        auth_ret_json = json_loads(ret.read())
+        auth_ret_json = json.loads(ret.read())
         token = auth_ret_json['access']['token']['id']
         catalogs = auth_ret_json['access']['serviceCatalog']
         object_store = [o_store for o_store in catalogs if
@@ -393,7 +382,7 @@ class SwiftConnector(object):
             raise SwiftException('GET request failed with error code %s'
                                  % ret.status_code)
         content = ret.read()
-        return json_loads(content)
+        return json.loads(content)
 
     def get_object_stat(self, name):
         """Retrieve object stat

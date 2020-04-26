@@ -25,11 +25,7 @@
 import posixpath
 
 from time import time
-from io import BytesIO
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import BytesIO, StringIO
 
 from unittest import skipIf
 
@@ -47,10 +43,7 @@ from dulwich.objects import (
     parse_timezone,
     )
 
-try:
-    from simplejson import dumps as json_dumps
-except ImportError:
-    from json import dumps as json_dumps
+import json
 
 missing_libs = []
 
@@ -151,7 +144,7 @@ def fake_auth_request_v2(*args, **kwargs):
                        ]
                        }
             }
-    ret = Response(status=200, content=json_dumps(resp))
+    ret = Response(status=200, content=json.dumps(resp))
     return ret
 
 
@@ -402,7 +395,7 @@ class TestSwiftConnector(TestCase):
 
     def test_get_container_objects(self):
         with patch('geventhttpclient.HTTPClient.request',
-                   lambda *args: Response(content=json_dumps(
+                   lambda *args: Response(content=json.dumps(
                        (({'name': 'a'}, {'name': 'b'}))))):
             self.assertEqual(len(self.conn.get_container_objects()), 2)
 

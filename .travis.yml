@@ -43,6 +43,7 @@ script:
 
   # Style
   - make style
+  - make typing
 
   - if [ $PURE = true ]; then SETUP_ARGS=--pure; fi
   - python setup.py $SETUP_ARGS bdist_wheel

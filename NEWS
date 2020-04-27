@@ -3,6 +3,9 @@
  * Don't break when encountering block devices.
    (Jelmer Vernooĳ)
 
+ * Fix pushing from a shallow clone.
+   (Brecht Machiels, #705)
+
 0.19.16	2020-04-17
 
  * Don't send "deepen None" to server if graph walker

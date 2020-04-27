@@ -118,6 +118,16 @@ class DulwichClientTestBase(object):
         # nothing to send, but shouldn't raise either.
         self._do_send_pack()
 
+    @staticmethod
+    def _add_file(repo, tree_id, filename, contents):
+        tree = repo[tree_id]
+        blob = objects.Blob()
+        blob.data = contents.encode('utf-8')
+        repo.object_store.add_object(blob)
+        tree.add(filename.encode('utf-8'), stat.S_IFREG | 0o644, blob.id)
+        repo.object_store.add_object(tree)
+        return tree.id
+
     # Pushing from a shallow clone currently fails. See #705
     @unittest.expectedFailure
     def test_send_pack_from_shallow_clone(self):
@@ -132,10 +142,14 @@ class DulwichClientTestBase(object):
             result = c.fetch(remote_path, local, depth=1)
             for r in result.refs.items():
                 local.refs.set_if_equals(r[0], None, r[1])
-            commit_id = local.do_commit(
-                message=b"foo",
-                committer=b"Joe Example <joe@example.com>",
-                tree=local[local.head()].tree)
+            tree_id = local[local.head()].tree
+            for filename, contents in [('bar', 'bar contents'),
+                                   ('zop', 'zop contents')]:
+                tree_id = self._add_file(local, tree_id, filename, contents)
+                commit_id = local.do_commit(
+                    message=b"add " + filename.encode('utf-8'),
+                    committer=b"Joe Example <joe@example.com>",
+                    tree=tree_id)
             sendrefs = dict(local.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(remote_path, lambda _: sendrefs,

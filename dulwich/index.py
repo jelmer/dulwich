@@ -591,11 +591,8 @@ def blob_from_path_and_stat(fs_path, st):
     """
     assert isinstance(fs_path, bytes)
     blob = Blob()
-    if not stat.S_ISLNK(st.st_mode):
-        with open(fs_path, 'rb') as f:
-            blob.data = f.read()
-    else:
-        if sys.platform == 'win32' and sys.version_info[0] == 3:
+    if stat.S_ISLNK(st.st_mode):
+        if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
             # TODO(jelmer): Don't assume tree_encoding == fs_encoding
             tree_encoding = sys.getfilesystemencoding()
@@ -603,6 +600,9 @@ def blob_from_path_and_stat(fs_path, st):
             blob.data = os.readlink(fs_path).encode(tree_encoding)
         else:
             blob.data = os.readlink(fs_path)
+    else:
+        with open(fs_path, 'rb') as f:
+            blob.data = f.read()
     return blob
 
 
@@ -679,6 +679,9 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
+        except BlockDevice:
+            # The file is now a block device
+            yield tree_path
         except EnvironmentError as e:
             if e.errno == errno.ENOENT:
                 # The file was removed, so we assume that counts as
@@ -755,6 +758,9 @@ def index_entry_from_path(path, object_store=None):
                 return None
             return index_entry_from_stat(
                 st, head, 0, mode=S_IFGITLINK)
+        return None
+
+    if stat.S_ISBLK(st.st_mode):
         return None
 
     blob = blob_from_path_and_stat(path, st)

@@ -760,13 +760,13 @@ def index_entry_from_path(path, object_store=None):
                 st, head, 0, mode=S_IFGITLINK)
         return None
 
-    if stat.S_ISBLK(st.st_mode):
-        return None
+    if stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode):
+        blob = blob_from_path_and_stat(path, st)
+        if object_store is not None:
+            object_store.add_object(blob)
+        return index_entry_from_stat(st, blob.id, 0)
 
-    blob = blob_from_path_and_stat(path, st)
-    if object_store is not None:
-        object_store.add_object(blob)
-    return index_entry_from_stat(st, blob.id, 0)
+    return None
 
 
 def iter_fresh_entries(paths, root_path, object_store=None):

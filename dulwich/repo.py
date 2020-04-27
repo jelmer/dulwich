@@ -1145,7 +1145,8 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                if stat.S_ISDIR(st.st_mode) or stat.S_ISBLK(st.st_mode):
+                if (not stat.S_ISREG(st.st_mode) and
+                        not stat.S_ISLNK(st.st_mode)):
                     try:
                         del index[tree_path]
                     except KeyError:

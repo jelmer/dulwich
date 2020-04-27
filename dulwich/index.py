@@ -675,13 +675,13 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
                     yield tree_path
                 continue
 
+            if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+                continue
+
             blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
-        except BlockDevice:
-            # The file is now a block device
-            yield tree_path
         except EnvironmentError as e:
             if e.errno == errno.ENOENT:
                 # The file was removed, so we assume that counts as

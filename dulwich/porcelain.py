@@ -911,8 +911,8 @@ def push(repo, remote_location, refspecs,
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
             client.send_pack(
-                path, update_refs, r.get_shallow(),
-                generate_pack_data=r.object_store.generate_pack_data,
+                path, update_refs,
+                generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")

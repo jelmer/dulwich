@@ -201,7 +201,7 @@ class BaseObjectStore(object):
                  not stat.S_ISDIR(entry.mode)) or include_trees):
                 yield entry
 
-    def find_missing_objects(self, haves, wants, shallow, progress=None,
+    def find_missing_objects(self, haves, wants, shallow=None, progress=None,
                              get_tagged=None,
                              get_parents=lambda commit: commit.parents,
                              depth=None):
@@ -239,7 +239,7 @@ class BaseObjectStore(object):
             sha = next(graphwalker)
         return haves
 
-    def generate_pack_contents(self, have, want, shallow, progress=None):
+    def generate_pack_contents(self, have, want, shallow=None, progress=None):
         """Iterate over the contents of a pack file.
 
         Args:
@@ -251,7 +251,7 @@ class BaseObjectStore(object):
         missing = self.find_missing_objects(have, want, shallow, progress)
         return self.iter_shas(missing)
 
-    def generate_pack_data(self, have, want, shallow, progress=None,
+    def generate_pack_data(self, have, want, shallow=None, progress=None,
                            ofs_delta=True):
         """Generate pack data objects for a set of wants/haves.
 
@@ -1169,9 +1169,11 @@ class MissingObjectFinder(object):
       tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
-    def __init__(self, object_store, haves, wants, shallow, progress=None,
+    def __init__(self, object_store, haves, wants, shallow=None, progress=None,
                  get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
+        if shallow is None:
+            shallow = set()
         self._get_parents = get_parents
         # process Commits and Tags differently
         # Note, while haves may list commits/tags not available locally,

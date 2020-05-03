@@ -3,6 +3,9 @@
  * Don't break when encountering block devices.
    (Jelmer Vernooĳ)
 
+ * Decode URL paths in HttpGitClient using utf-8 rather than file system
+   encoding. (Manuel Jacob)
+
 0.19.16	2020-04-17
 
  * Don't send "deepen None" to server if graph walker

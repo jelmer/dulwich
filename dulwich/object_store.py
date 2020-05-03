@@ -201,7 +201,7 @@ class BaseObjectStore(object):
                  not stat.S_ISDIR(entry.mode)) or include_trees):
                 yield entry
 
-    def find_missing_objects(self, haves, wants, progress=None,
+    def find_missing_objects(self, haves, wants, shallow=None, progress=None,
                              get_tagged=None,
                              get_parents=lambda commit: commit.parents,
                              depth=None):
@@ -210,6 +210,7 @@ class BaseObjectStore(object):
         Args:
           haves: Iterable over SHAs already in common.
           wants: Iterable over SHAs of objects to fetch.
+          shallow: Set of shallow commit SHA1s to skip
           progress: Simple progress function that will be called with
             updated progress strings.
           get_tagged: Function that returns a dict of pointed-to sha ->
@@ -218,8 +219,8 @@ class BaseObjectStore(object):
             commit.
         Returns: Iterator over (sha, path) pairs.
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged,
-                                     get_parents=get_parents)
+        finder = MissingObjectFinder(self, haves, wants, shallow, progress,
+                                     get_tagged, get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -238,28 +239,32 @@ class BaseObjectStore(object):
             sha = next(graphwalker)
         return haves
 
-    def generate_pack_contents(self, have, want, progress=None):
+    def generate_pack_contents(self, have, want, shallow=None, progress=None):
         """Iterate over the contents of a pack file.
 
         Args:
           have: List of SHA1s of objects that should not be sent
           want: List of SHA1s of objects that should be sent
+          shallow: Set of shallow commit SHA1s to skip
           progress: Optional progress reporting method
         """
-        return self.iter_shas(self.find_missing_objects(have, want, progress))
+        missing = self.find_missing_objects(have, want, shallow, progress)
+        return self.iter_shas(missing)
 
-    def generate_pack_data(self, have, want, progress=None, ofs_delta=True):
+    def generate_pack_data(self, have, want, shallow=None, progress=None,
+                           ofs_delta=True):
         """Generate pack data objects for a set of wants/haves.
 
         Args:
           have: List of SHA1s of objects that should not be sent
           want: List of SHA1s of objects that should be sent
+          shallow: Set of shallow commit SHA1s to skip
           ofs_delta: Whether OFS deltas can be included
           progress: Optional progress reporting method
         """
         # TODO(jelmer): More efficient implementation
         return pack_objects_to_data(
-            self.generate_pack_contents(have, want, progress))
+            self.generate_pack_contents(have, want, shallow, progress))
 
     def peel_sha(self, sha):
         """Peel all tags from a SHA.
@@ -277,7 +282,7 @@ class BaseObjectStore(object):
             obj = self[sha]
         return obj
 
-    def _collect_ancestors(self, heads, common=set(),
+    def _collect_ancestors(self, heads, common=set(), shallow=set(),
                            get_parents=lambda commit: commit.parents):
         """Collect all ancestors of heads up to (excluding) those in common.
 
@@ -301,6 +306,8 @@ class BaseObjectStore(object):
                 bases.add(e)
             elif e not in commits:
                 commits.add(e)
+                if e in shallow:
+                    continue
                 cmt = self[e]
                 queue.extend(get_parents(cmt))
         return (commits, bases)
@@ -1162,9 +1169,11 @@ class MissingObjectFinder(object):
       tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
-    def __init__(self, object_store, haves, wants, progress=None,
+    def __init__(self, object_store, haves, wants, shallow=None, progress=None,
                  get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
+        if shallow is None:
+            shallow = set()
         self._get_parents = get_parents
         # process Commits and Tags differently
         # Note, while haves may list commits/tags not available locally,
@@ -1178,12 +1187,13 @@ class MissingObjectFinder(object):
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-            have_commits, get_parents=self._get_parents)[0]
+            have_commits, shallow=shallow, get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
-            want_commits, all_ancestors, get_parents=self._get_parents)
+            want_commits, all_ancestors, shallow=shallow,
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally

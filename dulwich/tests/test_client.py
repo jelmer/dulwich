@@ -247,7 +247,7 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):
@@ -873,7 +873,7 @@ class LocalGitClientTests(TestCase):
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
                                     lambda _: {ref_name: local.refs[ref_name]},
-                                    local.object_store.generate_pack_data)
+                                    local.generate_pack_data)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])
 

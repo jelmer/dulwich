@@ -912,7 +912,7 @@ def push(repo, remote_location, refspecs,
         try:
             client.send_pack(
                 path, update_refs,
-                generate_pack_data=r.object_store.generate_pack_data,
+                generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")

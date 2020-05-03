@@ -30,10 +30,10 @@ The Dulwich client supports the following capabilities:
  * quiet
  * report-status
  * delete-refs
+ * shallow
 
 Known capabilities that are not supported:
 
- * shallow
  * no-progress
  * include-tag
 """
@@ -1125,7 +1125,6 @@ class LocalGitClient(GitClient):
           update_refs: Function to determine changes to remote refs.
         Receive dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-          generate_pack_data: Function that can return a tuple
         with number of items and pack data to upload.
           progress: Optional progress function
 
@@ -1676,7 +1675,7 @@ class HttpGitClient(GitClient):
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receive dict with existing remote refs, returns dict with
+        Receives dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
           generate_pack_data: Function that can return a tuple
         with number of elements and pack data to upload.

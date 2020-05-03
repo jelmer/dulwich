@@ -468,9 +468,22 @@ class BaseRepo(object):
 
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(
-              haves, wants, progress,
-              get_tagged,
+              haves, wants, self.get_shallow(),
+              progress, get_tagged,
               get_parents=get_parents))
+
+    def generate_pack_data(self, have, want, progress=None, ofs_delta=None):
+        """Generate pack data objects for a set of wants/haves.
+
+        Args:
+          have: List of SHA1s of objects that should not be sent
+          want: List of SHA1s of objects that should be sent
+          ofs_delta: Whether OFS deltas can be included
+          progress: Optional progress reporting method
+        """
+        return self.object_store.generate_pack_data(
+            have, want, shallow=self.get_shallow(),
+            progress=progress, ofs_delta=ofs_delta)
 
     def get_graph_walker(self, heads=None):
         """Retrieve a graph walker.

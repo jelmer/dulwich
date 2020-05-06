@@ -382,7 +382,7 @@ class ShaFile(object):
     def _parse_file(cls, f):
         map = f.read()
         if not map:
-            raise EmptyFileException('Corrupted empty file detected')
+            raise EmptyFileException('Corrupted empty file %r detected' % f)
 
         if cls._is_legacy_object(map):
             obj = cls._parse_legacy_object_header(map, f)

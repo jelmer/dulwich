@@ -213,7 +213,14 @@ class Protocol(object):
                 return None
             if self.report_activity:
                 self.report_activity(size, 'read')
-            pkt_contents = read(size-4)
+            have_to_read = size-4
+            pkt_contents = bytes()
+            while have_to_read > 0:
+                contens = read(have_to_read)
+                if not contens:
+                    break
+                have_to_read -= len(contens)
+                pkt_contents += contens
         except socket.error as e:
             raise GitProtocolError(e)
         else:

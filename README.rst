@@ -94,4 +94,4 @@ Supported versions of Python
 ----------------------------
 
 At the moment, Dulwich supports (and is tested on) CPython 2.7, 3.4, 3.5, 3.6,
-3.7 and Pypy.
+3.7 and PyPy.

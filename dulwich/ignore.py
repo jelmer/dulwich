@@ -26,6 +26,8 @@ import os.path
 import re
 import sys
 
+from dulwich.config import get_xdg_config_home_path
+
 
 def _translate_segment(segment):
     if segment == b"*":
@@ -271,8 +273,7 @@ def default_user_ignore_filter_path(config):
     except KeyError:
         pass
 
-    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "~/.config/")
-    return os.path.join(xdg_config_home, 'git', 'ignore')
+    return get_xdg_config_home_path('git', 'ignore')
 
 
 class IgnoreFilterManager(object):

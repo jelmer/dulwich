@@ -33,6 +33,7 @@ from .diff_tree import (
     CHANGE_RENAME,
     CHANGE_UNCHANGED,
     )
+from .merge_base import find_merge_base
 from .objects import Blob
 
 
@@ -40,21 +41,6 @@ class MergeConflict(namedtuple(
         'MergeConflict',
         ['this_entry', 'other_entry', 'base_entry', 'message'])):
     """A merge conflict."""
-
-
-def find_merge_base(repo, commit_ids):
-    """Find a reasonable merge base.
-
-    Args:
-      repo: Repository object
-      commit_ids: List of commit ids
-    """
-    # TODO(jelmer): replace with a pure-python implementation
-    import subprocess
-    return subprocess.check_output(
-        ['git', 'merge-base'] +
-        [x.decode('ascii') for x in commit_ids],
-        cwd=repo.path).rstrip(b'\n')
 
 
 def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
@@ -190,7 +176,7 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
     """Perform a merge.
     """
     conflicts = []
-    merge_base = find_merge_base(repo, [repo.head()] + commit_ids)
+    [merge_base] = find_merge_base(repo, [repo.head()] + commit_ids)
     [other_id] = commit_ids
     index = repo.open_index()
     this_tree = index.commit(repo.object_store)

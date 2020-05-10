@@ -76,10 +76,10 @@ class FindMergeBaseTests(TestCase):
         c1, c2, c3 = build_commit_graph(
                 self.repo.object_store, [[1], [2, 1], [3, 1]])
         self.assertEqual(
-            c1.id, find_merge_base(self.repo.object_store, [c2.id, c3.id]))
+            [c1.id], find_merge_base(self.repo.object_store, [c2.id, c3.id]))
 
     def test_fast_forward(self):
         c1, c2, c3 = build_commit_graph(
                 self.repo.object_store, [[1], [2, 1], [3, 2]])
         self.assertEqual(
-            c2.id, find_merge_base(self.repo.object_store, [c2.id, c3.id]))
+            [c2.id], find_merge_base(self.repo.object_store, [c2.id, c3.id]))

@@ -190,13 +190,13 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
     """Perform a merge.
     """
     conflicts = []
-    merge_base = find_merge_base(repo, commit_ids)
+    merge_base = find_merge_base(repo, [repo.head()] + commit_ids)
     [other_id] = commit_ids
     index = repo.open_index()
-    this_id = index.commit(repo.object_store)
+    this_tree = index.commit(repo.object_store)
     for entry in merge_tree(
             repo.object_store,
-            repo.object_store[this_id].tree,
+            this_tree,
             repo.object_store[other_id].tree,
             repo.object_store[merge_base].tree,
             rename_detector=rename_detector,
@@ -204,5 +204,7 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
 
         if isinstance(entry, MergeConflict):
             conflicts.append(entry)
+
+        # TODO(jelmer): apply the change to the tree
 
     return conflicts

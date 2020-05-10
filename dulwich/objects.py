@@ -39,7 +39,7 @@ from dulwich.errors import (
     NotTagError,
     NotTreeError,
     ObjectFormatException,
-    EmptyFileException,
+    FileFormatException,
     )
 from dulwich.file import GitFile
 
@@ -68,6 +68,11 @@ S_IFGITLINK = 0o160000
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
+
+
+class EmptyFileException(FileFormatException):
+    """An unexpectedly empty file was encountered."""
+
 
 
 def S_ISGITLINK(m):
@@ -382,7 +387,7 @@ class ShaFile(object):
     def _parse_file(cls, f):
         map = f.read()
         if not map:
-            raise EmptyFileException('Corrupted empty file %r detected' % f)
+            raise EmptyFileException('Corrupted empty file detected')
 
         if cls._is_legacy_object(map):
             obj = cls._parse_legacy_object_header(map, f)

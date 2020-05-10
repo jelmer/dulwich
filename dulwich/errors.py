@@ -162,10 +162,6 @@ class ObjectFormatException(FileFormatException):
     """Indicates an error parsing an object."""
 
 
-class EmptyFileException(FileFormatException):
-    """An unexpectedly empty file was encountered."""
-
-
 class NoIndexPresent(Exception):
     """No index is present."""
 

@@ -33,13 +33,13 @@ from dulwich.index import (
     )
 from dulwich.errors import (
     NotTreeError,
-    EmptyFileException,
     )
 from dulwich.objects import (
     sha_to_hex,
     Blob,
     Tree,
     TreeEntry,
+    EmptyFileException,
     )
 from dulwich.object_store import (
     DiskObjectStore,

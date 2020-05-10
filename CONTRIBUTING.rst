@@ -34,10 +34,10 @@ Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribe
 encoding for these strings, and although it is fairly common to use UTF-8, any
 raw byte strings are supported.
 
-For this reason, Dulwich internally treats git-based filenames as bytestrings.
-It is up to the Dulwich API user to encode and decode them if necessary. In the
-future, the porcelain may accept unicode strings and convert them to bytestrings
-as necessary on the fly (using sys.getfilesystemencoding()).
+For this reason, the lower levels in Dulwich treat git-based filenames as
+bytestrings. It is up to the Dulwich API user to encode and decode them if
+necessary. The porcelain may accept unicode strings and convert them to
+bytestrings as necessary on the fly (using sys.getfilesystemencoding()).
 
 * git-repository related filenames: bytes
 * object sha1 digests (20 bytes long): bytes

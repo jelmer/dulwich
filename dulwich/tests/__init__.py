@@ -116,6 +116,7 @@ def self_test_suite():
         'line_ending',
         'lru_cache',
         'mailmap',
+        'merge',
         'objects',
         'objectspec',
         'object_store',

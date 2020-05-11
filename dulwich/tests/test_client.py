@@ -1072,6 +1072,14 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertNotIsInstance(manager, urllib3.ProxyManager)
         self.assertIsInstance(manager, urllib3.PoolManager)
 
+    def test_config_no_proxy_custom_cls(self):
+        class CustomPoolManager(urllib3.PoolManager):
+            pass
+
+        manager = default_urllib3_manager(config=ConfigDict(),
+                                          pool_manager_cls=CustomPoolManager)
+        self.assertIsInstance(manager, CustomPoolManager)
+
     def test_config_ssl(self):
         config = ConfigDict()
         config.set(b'http', b'sslVerify', b'true')
@@ -1096,6 +1104,16 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager.proxy.scheme, 'http')
         self.assertEqual(manager.proxy.host, 'localhost')
         self.assertEqual(manager.proxy.port, 3128)
+
+    def test_config_proxy_custom_cls(self):
+        class CustomProxyManager(urllib3.ProxyManager):
+            pass
+
+        config = ConfigDict()
+        config.set(b'http', b'proxy', b'http://localhost:3128/')
+        manager = default_urllib3_manager(config=config,
+                                          proxy_manager_cls=CustomProxyManager)
+        self.assertIsInstance(manager, CustomProxyManager)
 
     def test_config_no_verify_ssl(self):
         manager = default_urllib3_manager(config=None, cert_reqs="CERT_NONE")

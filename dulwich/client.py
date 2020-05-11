@@ -1427,7 +1427,8 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(config, **override_kwargs):
+def default_urllib3_manager(config, pool_manager_cls=None,
+                            proxy_manager_cls=None, **override_kwargs):
     """Return `urllib3` connection pool manager.
 
     Honour detected proxy configurations.
@@ -1437,8 +1438,9 @@ def default_urllib3_manager(config, **override_kwargs):
       kwargs: Additional arguments for urllib3.ProxyManager
 
     Returns:
-      urllib3.ProxyManager` instance for proxy configurations,
-      `urllib3.PoolManager` otherwise.
+      `pool_manager_cls` (defaults to `urllib3.ProxyManager`) instance for
+      proxy configurations, `proxy_manager_cls` (defaults to
+      `urllib3.PoolManager`) instance otherwise.
 
     """
     proxy_server = user_agent = None
@@ -1495,14 +1497,17 @@ def default_urllib3_manager(config, **override_kwargs):
     import urllib3
 
     if proxy_server is not None:
+        if proxy_manager_cls is None:
+            proxy_manager_cls = urllib3.ProxyManager
         # `urllib3` requires a `str` object in both Python 2 and 3, while
         # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
-        manager = urllib3.ProxyManager(proxy_server, headers=headers,
-                                       **kwargs)
+        manager = proxy_manager_cls(proxy_server, headers=headers, **kwargs)
     else:
-        manager = urllib3.PoolManager(headers=headers, **kwargs)
+        if pool_manager_cls is None:
+            pool_manager_cls = urllib3.PoolManager
+        manager = pool_manager_cls(headers=headers, **kwargs)
 
     return manager
 

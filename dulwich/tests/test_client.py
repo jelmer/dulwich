@@ -1070,6 +1070,7 @@ class DefaultUrllib3ManagerTest(TestCase):
     def test_config_no_proxy(self):
         manager = default_urllib3_manager(config=ConfigDict())
         self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
 
     def test_config_ssl(self):
         config = ConfigDict()

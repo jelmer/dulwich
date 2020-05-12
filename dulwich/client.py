@@ -40,6 +40,8 @@ Known capabilities that are not supported:
 
 from contextlib import closing
 from io import BytesIO, BufferedReader
+import errno
+import os
 import select
 import socket
 import subprocess
@@ -58,6 +60,7 @@ except ImportError:
     import urllib.parse as urlparse
 
 import dulwich
+from dulwich.config import get_xdg_config_home_path
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -1873,3 +1876,26 @@ def get_transport_and_path(location, **kwargs):
         return default_local_git_client_cls(**kwargs), location
     else:
         return SSHGitClient(hostname, username=username, **kwargs), path
+
+
+DEFAULT_GIT_CREDENTIALS_PATHS = [
+    os.path.expanduser('~/.git-credentials'),
+    get_xdg_config_home_path('git', 'credentials')]
+
+def get_credentials_from_store(scheme, hostname, username=None,
+                               fnames=DEFAULT_GIT_CREDENTIALS_PATHS):
+    for fname in fnames:
+        try:
+            with open(fname, 'rb') as f:
+                for line in f:
+                    parsed_line = urlparse.urlparse(line)
+                    if (parsed_line.scheme == scheme and
+                            parsed_line.hostname == hostname and
+                            (username is None or
+                                parsed_line.username == username)):
+                        return parsed_line.username, parsed_line.password
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # If the file doesn't exist, try the next one.
+            continue

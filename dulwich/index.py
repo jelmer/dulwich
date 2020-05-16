@@ -454,7 +454,8 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
-def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
+def build_file_from_blob(blob, mode, target_path, honor_filemode=True,
+                         tree_encoding='utf-8'):
     """Build a file or symlink on disk based on a Git object.
 
     Args:
@@ -479,8 +480,6 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
             os.unlink(target_path)
         if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
-            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
-            tree_encoding = sys.getfilesystemencoding()
             contents = contents.decode(tree_encoding)
             target_path = target_path.decode(tree_encoding)
         os.symlink(contents, target_path)
@@ -581,7 +580,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     index.write()
 
 
-def blob_from_path_and_stat(fs_path, st):
+def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
     """Create a blob from a path and a stat object.
 
     Args:
@@ -594,9 +593,7 @@ def blob_from_path_and_stat(fs_path, st):
     if stat.S_ISLNK(st.st_mode):
         if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
-            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
-            tree_encoding = sys.getfilesystemencoding()
-            fs_path = fs_path.decode(tree_encoding)
+            fs_path = os.fsdecode(fs_path)
             blob.data = os.readlink(fs_path).encode(tree_encoding)
         else:
             blob.data = os.readlink(fs_path)

@@ -557,14 +557,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_non_ascii(self):
         try:
-            encoded_ref = u'refs/tags/schön'.encode(
-                    sys.getfilesystemencoding())
+            encoded_ref = os.fsencode(u'refs/tags/schön')
         except UnicodeEncodeError:
             raise SkipTest(
                     "filesystem encoding doesn't support special character")
-        p = os.path.join(
-                self._repo.path.encode(sys.getfilesystemencoding()),
-                encoded_ref)
+        p = os.path.join(os.fsencode(self._repo.path), encoded_ref)
         with open(p, 'w') as f:
             f.write('00' * 20)
 
@@ -582,8 +579,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
         encoded_ref = b'refs/heads/' + name
         with open(os.path.join(
-            self._repo.path.encode(
-                sys.getfilesystemencoding()), encoded_ref), 'w') as f:
+                os.fsencode(self._repo.path), encoded_ref), 'w') as f:
             f.write('00' * 20)
 
         expected_refs = set(_TEST_REFS.keys())

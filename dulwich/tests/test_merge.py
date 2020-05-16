@@ -62,6 +62,33 @@ class MergeTests(TestCase):
         conflicts = merge(self.repo1, [cid2])
         self.assertEqual([], conflicts)
 
+    def test_fast_forward(self):
+        # Other tree is ahead of us
+        cid1 = self.common_cid
+        cid2 = self._add_file(self.repo2, 'c')
+        self.repo2.fetch(self.repo1)
+        self.assertEqual(cid1, self.repo1.head())
+        conflicts = merge(self.repo1, [cid2])
+        self.assertEqual([], conflicts)
+
+    def test_already_ahead(self):
+        # We're ahead of the other tree
+        cid1 = self._add_file(self.repo1, 'b')
+        cid2 = self.common_cid
+        self.repo2.fetch(self.repo1)
+        self.assertEqual(cid1, self.repo1.head())
+        conflicts = merge(self.repo1, [cid2])
+        self.assertEqual([], conflicts)
+
+    def test_changed(self):
+        # Two trees both add a new file
+        cid1 = self._add_file(self.repo1, 'a', contents='a new line\n')
+        cid2 = self._add_file(self.repo2, 'c')
+        self.repo2.fetch(self.repo1)
+        self.assertEqual(cid1, self.repo1.head())
+        conflicts = merge(self.repo1, [cid2])
+        self.assertEqual([], conflicts)
+
 
 class FindMergeBaseTests(TestCase):
 

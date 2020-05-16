@@ -1111,7 +1111,7 @@ class LocalGitClient(GitClient):
     def _open_repo(cls, path):
         from dulwich.repo import Repo
         if not isinstance(path, str):
-            path = path.decode(sys.getfilesystemencoding())
+            path = os.fsdecode(path)
         return closing(Repo(path))
 
     def send_pack(self, path, update_refs, generate_pack_data,

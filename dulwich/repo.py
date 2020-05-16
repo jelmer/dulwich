@@ -264,7 +264,7 @@ def _set_filesystem_hidden(path):
             ("SetFileAttributesW", ctypes.windll.kernel32))
 
         if isinstance(path, bytes):
-            path = path.decode(sys.getfilesystemencoding())
+            path = os.fsdecode(path)
         if not SetFileAttributesW(path, FILE_ATTRIBUTE_HIDDEN):
             pass  # Could raise or log `ctypes.WinError()` here
 
@@ -943,8 +943,7 @@ class Repo(BaseRepo):
             with commondir:
                 self._commondir = os.path.join(
                     self.controldir(),
-                    commondir.read().rstrip(b"\r\n").decode(
-                        sys.getfilesystemencoding()))
+                    os.fsdecode(commondir.read().rstrip(b"\r\n")))
         else:
             self._commondir = self._controldir
         self.path = root
@@ -976,9 +975,7 @@ class Repo(BaseRepo):
     def _write_reflog(self, ref, old_sha, new_sha, committer, timestamp,
                       timezone, message):
         from .reflog import format_reflog_line
-        path = os.path.join(
-                self.controldir(), 'logs',
-                ref.decode(sys.getfilesystemencoding()))
+        path = os.path.join(self.controldir(), 'logs', os.fsdecode(ref))
         try:
             os.makedirs(os.path.dirname(path))
         except OSError as e:
@@ -1129,7 +1126,7 @@ class Repo(BaseRepo):
           fs_paths: List of paths, relative to the repository path
         """
 
-        root_path_bytes = self.path.encode(sys.getfilesystemencoding())
+        root_path_bytes = os.fsencode(self.path)
 
         if not isinstance(fs_paths, list):
             fs_paths = [fs_paths]
@@ -1142,7 +1139,7 @@ class Repo(BaseRepo):
         blob_normalizer = self.get_blob_normalizer()
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
-                fs_path = fs_path.encode(sys.getfilesystemencoding())
+                fs_path = os.fsencode(fs_path)
             if os.path.isabs(fs_path):
                 raise ValueError(
                     "path %r should be relative to "
@@ -1192,7 +1189,7 @@ class Repo(BaseRepo):
         self.fetch(target)
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
-            encoded_path = encoded_path.encode(sys.getfilesystemencoding())
+            encoded_path = os.fsencode(encoded_path)
         ref_message = b"clone: from " + encoded_path
         target.refs.import_refs(
             b'refs/remotes/' + origin, self.refs.as_dict(b'refs/heads'),
@@ -1341,9 +1338,7 @@ class Repo(BaseRepo):
         worktree_controldir = os.path.join(main_worktreesdir, identifier)
         gitdirfile = os.path.join(path, CONTROLDIR)
         with open(gitdirfile, 'wb') as f:
-            f.write(b'gitdir: ' +
-                    worktree_controldir.encode(sys.getfilesystemencoding()) +
-                    b'\n')
+            f.write(b'gitdir: ' + os.fsencode(worktree_controldir) + b'\n')
         try:
             os.mkdir(main_worktreesdir)
         except OSError as e:
@@ -1355,7 +1350,7 @@ class Repo(BaseRepo):
             if e.errno != errno.EEXIST:
                 raise
         with open(os.path.join(worktree_controldir, GITDIR), 'wb') as f:
-            f.write(gitdirfile.encode(sys.getfilesystemencoding()) + b'\n')
+            f.write(os.fsencode(gitdirfile) + b'\n')
         with open(os.path.join(worktree_controldir, COMMONDIR), 'wb') as f:
             f.write(b'../..\n')
         with open(os.path.join(worktree_controldir, 'HEAD'), 'wb') as f:

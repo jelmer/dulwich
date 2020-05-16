@@ -163,7 +163,7 @@ class Pattern(object):
         return self.pattern
 
     def __str__(self):
-        return self.pattern.decode(sys.getfilesystemencoding())
+        return os.fsdecode(self.pattern)
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -205,7 +205,7 @@ class IgnoreFilter(object):
           Iterator over  iterators
         """
         if not isinstance(path, bytes):
-            path = path.encode(sys.getfilesystemencoding())
+            path = os.fsencode(path)
         for pattern in self._patterns:
             if pattern.match(path):
                 yield pattern

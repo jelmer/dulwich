@@ -805,8 +805,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = posixpath.join(
             self.pack_dir,
-            'pack-' + iter_sha1(e[0] for e in entries).decode(
-                sys.getfilesystemencoding()))
+            'pack-' + os.fsdecode(iter_sha1(e[0] for e in entries)))
         self.scon.put_object(pack_base_name + '.pack', f)
 
         # Write the index.

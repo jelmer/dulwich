@@ -296,7 +296,7 @@ class RepositoryRootTests(TestCase):
     def test_init_mkdir_unicode(self):
         repo_name = u'\xa7'
         try:
-            repo_name.encode(sys.getfilesystemencoding())
+            os.fsencode(repo_name)
         except UnicodeEncodeError:
             self.skipTest('filesystem lacks unicode support')
         tmp_dir = self.mkdtemp()
@@ -361,9 +361,8 @@ class RepositoryRootTests(TestCase):
             c = t.get_config()
             encoded_path = r.path
             if not isinstance(encoded_path, bytes):
-                encoded_path = encoded_path.encode(sys.getfilesystemencoding())
-            self.assertEqual(encoded_path,
-                             c.get((b'remote', b'origin'), b'url'))
+                encoded_path = os.fsencode(encoded_path)
+            self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
             self.assertEqual(
                 b'+refs/heads/*:refs/remotes/origin/*',
                 c.get((b'remote', b'origin'), b'fetch'))
@@ -1094,7 +1093,7 @@ class BuildRepoRootTests(TestCase):
             'tries to implicitly decode as utf8')
     def test_commit_no_encode_decode(self):
         r = self._repo
-        repo_path_bytes = r.path.encode(sys.getfilesystemencoding())
+        repo_path_bytes = os.fsencode(r.path)
         encodings = ('utf8', 'latin1')
         names = [u'À'.encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):

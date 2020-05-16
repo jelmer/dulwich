@@ -583,10 +583,9 @@ class DiskObjectStore(PackBasedObjectStore):
                 if line[0] == b"#":
                     continue
                 if os.path.isabs(line):
-                    yield line.decode(sys.getfilesystemencoding())
+                    yield os.fsdecode(line)
                 else:
-                    yield os.path.join(self.path, line).decode(
-                        sys.getfilesystemencoding())
+                    yield os.fsdecode(os.path.join(self.path, line))
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
@@ -606,7 +605,7 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 with orig_f:
                     f.write(orig_f.read())
-            f.write(path.encode(sys.getfilesystemencoding()) + b"\n")
+            f.write(os.fsencode(path) + b"\n")
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)
@@ -652,7 +651,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield (base+rest).encode(sys.getfilesystemencoding())
+                yield os.fsencode(base+rest)
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
@@ -1425,4 +1424,4 @@ def read_packs_file(f):
         (kind, name) = line.split(b" ", 1)
         if kind != b"P":
             continue
-        yield name.decode(sys.getfilesystemencoding())
+        yield os.fsdecode(name)

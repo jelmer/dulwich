@@ -525,8 +525,7 @@ class DiskRefsContainer(RefsContainer):
         for root, unused_dirs, files in os.walk(path):
             dir = root[len(path):]
             if os.path.sep != '/':
-                dir = dir.replace(os.path.sep.encode(
-                    sys.getfilesystemencoding()), b"/")
+                dir = dir.replace(os.fsencode(os.path.sep), b"/")
             dir = dir.strip(b'/')
             for filename in files:
                 refname = b"/".join(([dir] if dir else []) + [filename])
@@ -548,8 +547,7 @@ class DiskRefsContainer(RefsContainer):
         for root, unused_dirs, files in os.walk(refspath):
             dir = root[len(path):]
             if os.path.sep != '/':
-                dir = dir.replace(
-                    os.path.sep.encode(sys.getfilesystemencoding()), b"/")
+                dir = dir.replace(os.fsencode(os.path.sep), b"/")
             for filename in files:
                 refname = b"/".join([dir, filename])
                 if check_ref_format(refname):
@@ -562,9 +560,7 @@ class DiskRefsContainer(RefsContainer):
 
         """
         if os.path.sep != "/":
-            name = name.replace(
-                    b"/",
-                    os.path.sep.encode(sys.getfilesystemencoding()))
+            name = name.replace(b"/", os.fsencode(os.path.sep))
         # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
         if name == b'HEAD':

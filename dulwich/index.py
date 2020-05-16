@@ -547,7 +547,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
 
     index = Index(index_path)
     if not isinstance(root_path, bytes):
-        root_path = root_path.encode(sys.getfilesystemencoding())
+        root_path = os.fsencode(root_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
@@ -618,7 +618,7 @@ def read_submodule_head(path):
     # Repo currently expects a "str", so decode if necessary.
     # TODO(jelmer): Perhaps move this into Repo() ?
     if not isinstance(path, str):
-        path = path.decode(sys.getfilesystemencoding())
+        path = os.fsdecode(path)
     try:
         repo = Repo(path)
     except NotGitRepository:
@@ -664,7 +664,7 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     """
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
-        root_path = root_path.encode(sys.getfilesystemencoding())
+        root_path = os.fsencode(root_path)
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
@@ -723,8 +723,6 @@ def _fs_to_tree_path(fs_path, fs_encoding=None):
 
     Returns:  Git tree path as bytes
     """
-    if fs_encoding is None:
-        fs_encoding = sys.getfilesystemencoding()
     if not isinstance(fs_path, bytes):
         fs_path_bytes = fs_path.encode(fs_encoding)
     else:

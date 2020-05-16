@@ -506,12 +506,12 @@ class DiskRefsContainer(RefsContainer):
     def __init__(self, path, worktree_path=None, logger=None):
         super(DiskRefsContainer, self).__init__(logger=logger)
         if getattr(path, 'encode', None) is not None:
-            path = path.encode(sys.getfilesystemencoding())
+            path = os.fsencode(path)
         self.path = path
         if worktree_path is None:
             worktree_path = path
         if getattr(worktree_path, 'encode', None) is not None:
-            worktree_path = worktree_path.encode(sys.getfilesystemencoding())
+            worktree_path = os.fsencode(worktree_path)
         self.worktree_path = worktree_path
         self._packed_refs = None
         self._peeled_refs = None

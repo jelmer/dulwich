@@ -1188,7 +1188,7 @@ def generate_objects_info_packs(repo):
     """Generate an index for for packs."""
     for pack in repo.object_store.packs:
         yield (
-            b'P ' + pack.data.filename.encode(sys.getfilesystemencoding()) +
+            b'P ' + os.fsencode(pack.data.filename) +
             b'\n')
 
 

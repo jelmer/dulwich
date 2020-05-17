@@ -1,4 +1,4 @@
-PYTHON = python3 -Werror
+PYTHON = python3
 PYFLAKES = pyflakes
 PEP8 = pep8
 FLAKE8 ?= flake8

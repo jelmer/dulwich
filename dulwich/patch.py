@@ -117,15 +117,15 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
             todate = '\t{}'.format(tofiledate) if tofiledate else ''
             yield '--- {}{}{}'.format(
-                fromfile.decode("ascii"),
+                fromfile.decode("utf8"),
                 fromdate,
                 lineterm
-                ).encode('ascii')
+                ).encode('utf8')
             yield '+++ {}{}{}'.format(
-                tofile.decode("ascii"),
+                tofile.decode("utf8"),
                 todate,
                 lineterm
-                ).encode('ascii')
+                ).encode('utf8')
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
@@ -134,7 +134,7 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             file1_range,
             file2_range,
             lineterm
-             ).encode('ascii')
+             ).encode('utf8')
 
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':

@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -24,6 +24,9 @@ jobs:
     - name: Style checks
       run: |
         python -m flake8
+    - name: Build
+      run: |
+        python setup.py build_ext -i
     - name: Coverage test suite run
       run: |
         python -m coverage run -p -m unittest dulwich.tests.test_suite

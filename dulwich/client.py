@@ -40,7 +40,6 @@ Known capabilities that are not supported:
 
 from contextlib import closing
 from io import BytesIO, BufferedReader
-import errno
 import os
 import select
 import socket
@@ -1889,8 +1888,6 @@ def get_credentials_from_store(scheme, hostname, username=None,
                             (username is None or
                                 parsed_line.username == username)):
                         return parsed_line.username, parsed_line.password
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
+        except FileNotFoundError:
             # If the file doesn't exist, try the next one.
             continue

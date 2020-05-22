@@ -22,7 +22,6 @@
 
 from __future__ import absolute_import
 
-import errno
 import os
 
 from dulwich.file import GitFile
@@ -52,10 +51,8 @@ class Stash(object):
         try:
             with GitFile(reflog_path, 'rb') as f:
                 return reversed(list(read_reflog(f)))
-        except EnvironmentError as e:
-            if e.errno == errno.ENOENT:
-                return []
-            raise
+        except FileNotFoundError:
+            return []
 
     @classmethod
     def from_repo(cls, repo):

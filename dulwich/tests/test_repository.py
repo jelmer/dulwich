@@ -362,7 +362,8 @@ class RepositoryRootTests(TestCase):
             encoded_path = r.path
             if not isinstance(encoded_path, bytes):
                 encoded_path = os.fsencode(encoded_path)
-            self.assertEqual(encoded_path, c.get((b'remote', b'origin'), b'url'))
+            self.assertEqual(
+                encoded_path, c.get((b'remote', b'origin'), b'url'))
             self.assertEqual(
                 b'+refs/heads/*:refs/remotes/origin/*',
                 c.get((b'remote', b'origin'), b'fetch'))

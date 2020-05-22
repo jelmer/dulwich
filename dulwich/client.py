@@ -52,7 +52,6 @@ from urllib.parse import (
     unquote as urlunquote,
     urlparse,
     urljoin,
-    urlunparse,
     urlunsplit,
     urlunparse,
     )

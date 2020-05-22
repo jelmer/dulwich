@@ -24,7 +24,6 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
-import sys
 
 from dulwich.config import get_xdg_config_home_path
 

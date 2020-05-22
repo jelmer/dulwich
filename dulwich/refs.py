@@ -24,7 +24,6 @@
 """
 import errno
 import os
-import sys
 
 from dulwich.errors import (
     PackedRefsException,

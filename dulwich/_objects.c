@@ -141,6 +141,11 @@ struct tree_item {
 	PyObject *tuple;
 };
 
+/* Not all environments define S_ISDIR */
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+
 int cmp_tree_item(const void *_a, const void *_b)
 {
 	const struct tree_item *a = _a, *b = _b;

@@ -22,7 +22,6 @@
 """Ref handling.
 
 """
-import errno
 import os
 
 from dulwich.errors import (
@@ -584,10 +583,8 @@ class DiskRefsContainer(RefsContainer):
             path = os.path.join(self.path, b'packed-refs')
             try:
                 f = GitFile(path, 'rb')
-            except IOError as e:
-                if e.errno == errno.ENOENT:
-                    return {}
-                raise
+            except FileNotFoundError:
+                return {}
             with f:
                 first_line = next(iter(f)).rstrip()
                 if (first_line.startswith(b'# pack-refs') and b' peeled' in
@@ -644,10 +641,8 @@ class DiskRefsContainer(RefsContainer):
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
-        except IOError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):
-                return None
-            raise
+        except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+            return None
 
     def _remove_packed_ref(self, name):
         if self._packed_refs is None:
@@ -723,8 +718,7 @@ class DiskRefsContainer(RefsContainer):
         packed_refs = self.get_packed_refs()
         while probe_ref:
             if packed_refs.get(probe_ref, None) is not None:
-                raise OSError(errno.ENOTDIR,
-                              'Not a directory: {}'.format(filename))
+                raise NotADirectoryError(filename)
             probe_ref = os.path.dirname(probe_ref)
 
         ensure_dir_exists(os.path.dirname(filename))
@@ -818,9 +812,8 @@ class DiskRefsContainer(RefsContainer):
             # remove the reference file itself
             try:
                 os.remove(filename)
-            except OSError as e:
-                if e.errno != errno.ENOENT:  # may only be packed
-                    raise
+            except FileNotFoundError:
+                pass  # may only be packed
 
             self._remove_packed_ref(name)
             self._log(name, old_ref, None, committer=committer,

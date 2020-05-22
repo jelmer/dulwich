@@ -1452,12 +1452,9 @@ def check_mailmap(repo, contact):
     """
     with open_repo_closing(repo) as r:
         from dulwich.mailmap import Mailmap
-        import errno
         try:
             mailmap = Mailmap.from_path(os.path.join(r.path, '.mailmap'))
-        except IOError as e:
-            if e.errno != errno.ENOENT:
-                raise
+        except FileNotFoundError:
             mailmap = Mailmap()
         return mailmap.lookup(contact)
 

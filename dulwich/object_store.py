@@ -23,7 +23,6 @@
 """Git object store interfaces and implementation."""
 
 from io import BytesIO
-import errno
 import os
 import stat
 import sys
@@ -573,10 +572,8 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, INFODIR, "alternates"), 'rb')
-        except (OSError, IOError) as e:
-            if e.errno == errno.ENOENT:
-                return
-            raise
+        except FileNotFoundError:
+            return
         with f:
             for line in f.readlines():
                 line = line.rstrip(b"\n")
@@ -592,16 +589,14 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         try:
             os.mkdir(os.path.join(self.path, INFODIR))
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         alternates_path = os.path.join(self.path, INFODIR, "alternates")
         with GitFile(alternates_path, 'wb') as f:
             try:
                 orig_f = open(alternates_path, 'rb')
-            except (OSError, IOError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
             else:
                 with orig_f:
                     f.write(orig_f.read())
@@ -615,11 +610,9 @@ class DiskObjectStore(PackBasedObjectStore):
         """Read and iterate over new pack files and cache them."""
         try:
             pack_dir_contents = os.listdir(self.pack_dir)
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                self.close()
-                return []
-            raise
+        except FileNotFoundError:
+            self.close()
+            return []
         pack_files = set()
         for name in pack_dir_contents:
             if name.startswith("pack-") and name.endswith(".pack"):
@@ -657,10 +650,8 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
-        except (OSError, IOError) as e:
-            if e.errno == errno.ENOENT:
-                return None
-            raise
+        except FileNotFoundError:
+            return None
 
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
@@ -729,9 +720,8 @@ class DiskObjectStore(PackBasedObjectStore):
             # removal, silently passing if the target does not exist.
             try:
                 os.remove(target_pack)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
         os.rename(path, target_pack)
 
         # Write the index.
@@ -796,9 +786,8 @@ class DiskObjectStore(PackBasedObjectStore):
             # removal, silently passing if the target does not exist.
             try:
                 os.remove(target_pack)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
         os.rename(path, target_pack)
         final_pack = Pack(basename)
         self._add_cached_pack(basename, final_pack)
@@ -839,9 +828,8 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         if os.path.exists(path):
             return  # Already there, no need to write again
         with GitFile(path, 'wb') as f:
@@ -852,9 +840,8 @@ class DiskObjectStore(PackBasedObjectStore):
     def init(cls, path):
         try:
             os.mkdir(path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         os.mkdir(os.path.join(path, "info"))
         os.mkdir(os.path.join(path, PACKDIR))
         return cls(path)

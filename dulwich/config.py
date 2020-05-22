@@ -26,7 +26,6 @@ TODO:
    subsections
 """
 
-import errno
 import os
 import sys
 
@@ -525,11 +524,8 @@ class StackedConfig(Config):
         for path in paths:
             try:
                 cf = ConfigFile.from_path(path)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                else:
-                    continue
+            except FileNotFoundError:
+                continue
             backends.append(cf)
         return backends
 

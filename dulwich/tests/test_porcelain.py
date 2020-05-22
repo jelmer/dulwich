@@ -21,7 +21,6 @@
 """Tests for dulwich.porcelain."""
 
 from io import BytesIO, StringIO
-import errno
 import os
 import shutil
 import tarfile
@@ -139,9 +138,8 @@ class CleanTests(PorcelainTestCase):
             parent_dir = os.path.dirname(abs_path)
             try:
                 os.makedirs(parent_dir)
-            except OSError as err:
-                if not err.errno == errno.EEXIST:
-                    raise err
+            except FileExistsError:
+                pass
             with open(abs_path, 'w') as f:
                 f.write('')
 

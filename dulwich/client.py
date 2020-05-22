@@ -1883,7 +1883,7 @@ def get_credentials_from_store(scheme, hostname, username=None,
         try:
             with open(fname, 'rb') as f:
                 for line in f:
-                    parsed_line = urlparse.urlparse(line)
+                    parsed_line = urlparse(line)
                     if (parsed_line.scheme == scheme and
                             parsed_line.hostname == hostname and
                             (username is None or

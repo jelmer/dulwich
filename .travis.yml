@@ -4,11 +4,10 @@ cache: pip
 
 
 python:
-  - 3.5
   - 3.6
   - 3.7
   - 3.8
-  - pypy3.5
+  - pypy3.6
 
 env:
   - PYTHONHASHSEED=random
@@ -35,7 +34,7 @@ matrix:
       env: PURE=true
 
 install:
-  - travis_retry pip install -U pip coverage codecov flake8 $TEST_REQUIRE
+  - travis_retry pip install -U pip coverage codecov flake8 mypy $TEST_REQUIRE
 
 script:
   - if [ $PURE = false ]; then python setup.py build_ext -i; fi

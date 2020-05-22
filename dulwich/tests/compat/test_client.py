@@ -31,7 +31,6 @@ import sys
 import tarfile
 import tempfile
 import threading
-import unittest
 
 try:
     from urlparse import unquote
@@ -143,7 +142,7 @@ class DulwichClientTestBase(object):
                 local.refs.set_if_equals(r[0], None, r[1])
             tree_id = local[local.head()].tree
             for filename, contents in [('bar', 'bar contents'),
-                                   ('zop', 'zop contents')]:
+                                       ('zop', 'zop contents')]:
                 tree_id = self._add_file(local, tree_id, filename, contents)
                 commit_id = local.do_commit(
                     message=b"add " + filename.encode('utf-8'),

@@ -21,7 +21,6 @@
 """Parser for the git index file format."""
 
 import collections
-import errno
 import os
 import stat
 import struct
@@ -468,11 +467,8 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True,
     """
     try:
         oldstat = os.lstat(target_path)
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            oldstat = None
-        else:
-            raise
+    except FileNotFoundError:
+        oldstat = None
     contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         # FIXME: This will fail on Windows. What should we do instead?
@@ -679,13 +675,10 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
-        except EnvironmentError as e:
-            if e.errno == errno.ENOENT:
-                # The file was removed, so we assume that counts as
-                # different from whatever file used to exist.
-                yield tree_path
-            else:
-                raise
+        except FileNotFoundError:
+            # The file was removed, so we assume that counts as
+            # different from whatever file used to exist.
+            yield tree_path
         else:
             if blob.id != entry.sha:
                 yield tree_path
@@ -777,11 +770,8 @@ def iter_fresh_entries(paths, root_path, object_store=None):
         p = _tree_to_fs_path(root_path, path)
         try:
             entry = index_entry_from_path(p, object_store=object_store)
-        except EnvironmentError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR):
-                entry = None
-            else:
-                raise
+        except (FileNotFoundError, IsADirectoryError):
+            entry = None
         yield path, entry
 
 

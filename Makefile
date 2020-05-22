@@ -1,7 +1,7 @@
 PYTHON = python3
-PYFLAKES = pyflakes
+PYFLAKES = $(PYTHON) -m pyflakes
 PEP8 = pep8
-FLAKE8 ?= flake8
+FLAKE8 ?= $(PYTHON) -m flake8
 SETUP = $(PYTHON) setup.py
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)

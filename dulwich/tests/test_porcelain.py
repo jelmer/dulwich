@@ -1291,7 +1291,7 @@ class ReceivePackTests(PorcelainTestCase):
             b'0091319b56ce3aee2d489f759736a79cc552c9bb86d9 HEAD\x00 report-status '  # noqa: E501
             b'delete-refs quiet ofs-delta side-band-64k '
             b'no-done symref=HEAD:refs/heads/master',
-           b'003f319b56ce3aee2d489f759736a79cc552c9bb86d9 refs/heads/master',
+            b'003f319b56ce3aee2d489f759736a79cc552c9bb86d9 refs/heads/master',
             b'0000'], outlines)
         self.assertEqual(0, exitcode)
 

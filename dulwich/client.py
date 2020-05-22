@@ -743,11 +743,11 @@ def check_wants(wants, refs):
 def remote_error_from_stderr(stderr):
     if stderr is None:
         return HangupException()
-    for l in stderr.readlines():
-        if l.startswith(b'ERROR: '):
+    for line in stderr.readlines():
+        if line.startswith(b'ERROR: '):
             return GitProtocolError(
-                l[len(b'ERROR: '):].decode('utf-8', 'replace'))
-        return GitProtocolError(l.decode('utf-8', 'replace'))
+                line[len(b'ERROR: '):].decode('utf-8', 'replace'))
+        return GitProtocolError(line.decode('utf-8', 'replace'))
     return HangupException()
 
 
@@ -1881,6 +1881,7 @@ def get_transport_and_path(location, **kwargs):
 DEFAULT_GIT_CREDENTIALS_PATHS = [
     os.path.expanduser('~/.git-credentials'),
     get_xdg_config_home_path('git', 'credentials')]
+
 
 def get_credentials_from_store(scheme, hostname, username=None,
                                fnames=DEFAULT_GIT_CREDENTIALS_PATHS):

@@ -22,7 +22,7 @@ jobs:
         pip install -U pip coverage codecov flake8 fastimport
     - name: Style checks
       run: |
-        make style
+        make style PYTHON=python
     - name: Coverage test suite run
       run: |
         python -m coverage run -p -m unittest dulwich.tests.test_suite

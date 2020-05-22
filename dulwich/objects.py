@@ -74,7 +74,6 @@ class EmptyFileException(FileFormatException):
     """An unexpectedly empty file was encountered."""
 
 
-
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 

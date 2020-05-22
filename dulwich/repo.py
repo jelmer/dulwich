@@ -212,8 +212,8 @@ def parse_graftpoints(graftpoints):
     https://git.wiki.kernel.org/index.php/GraftPoint
     """
     grafts = {}
-    for l in graftpoints:
-        raw_graft = l.split(None, 1)
+    for line in graftpoints:
+        raw_graft = line.split(None, 1)
 
         commit = raw_graft[0]
         if len(raw_graft) == 2:
@@ -605,7 +605,7 @@ class BaseRepo(object):
         if f is None:
             return set()
         with f:
-            return set(l.strip() for l in f)
+            return set(line.strip() for line in f)
 
     def update_shallow(self, new_shallow, new_unshallow):
         """Update the list of shallow objects.
@@ -769,7 +769,7 @@ class BaseRepo(object):
         if f is None:
             return []
         with f:
-            return [l.strip() for l in f.readlines() if l.strip()]
+            return [line.strip() for line in f.readlines() if line.strip()]
 
     def do_commit(self, message=None, committer=None,
                   author=None, commit_timestamp=None,

@@ -75,5 +75,5 @@ def read_reflog(f):
       f: File-like object
     Returns: Iterator over Entry objects
     """
-    for l in f:
-        yield parse_reflog_line(l)
+    for line in f:
+        yield parse_reflog_line(line)

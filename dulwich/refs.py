@@ -472,8 +472,8 @@ class InfoRefsContainer(RefsContainer):
     def __init__(self, f):
         self._refs = {}
         self._peeled = {}
-        for l in f.readlines():
-            sha, name = l.rstrip(b'\n').split(b'\t')
+        for line in f.readlines():
+            sha, name = line.rstrip(b'\n').split(b'\t')
             if name.endswith(ANNOTATED_TAG_SUFFIX):
                 name = name[:-3]
                 if not check_ref_format(name):
@@ -873,14 +873,14 @@ def read_packed_refs(f):
       f: file-like object to read from
     Returns: Iterator over tuples with SHA1s and ref names.
     """
-    for l in f:
-        if l.startswith(b'#'):
+    for line in f:
+        if line.startswith(b'#'):
             # Comment
             continue
-        if l.startswith(b'^'):
+        if line.startswith(b'^'):
             raise PackedRefsException(
               "found peeled ref in packed-refs without peeled")
-        yield _split_ref_line(l)
+        yield _split_ref_line(line)
 
 
 def read_packed_refs_with_peeled(f):
@@ -935,8 +935,8 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 
 def read_info_refs(f):
     ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip(b"\r\n").split(b"\t", 1)
+    for line in f.readlines():
+        (sha, name) = line.rstrip(b"\r\n").split(b"\t", 1)
         ret[name] = sha
     return ret
 

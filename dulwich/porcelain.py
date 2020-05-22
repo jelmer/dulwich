@@ -699,7 +699,7 @@ def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
             print_commit(entry.commit, decode, outstream)
             if name_status:
                 outstream.writelines(
-                    [l+'\n' for l in print_name_status(entry.changes())])
+                    [line+'\n' for line in print_name_status(entry.changes())])
 
 
 # TODO(jelmer): better default for encoding?

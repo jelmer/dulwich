@@ -82,7 +82,7 @@ def can_symlink():
     test_target = test_source + 'can_symlink'
     try:
         os.symlink(test_source, test_target)
-    except OSError:
+    except (NotImplementedError, OSError):
         return False
     return True
 

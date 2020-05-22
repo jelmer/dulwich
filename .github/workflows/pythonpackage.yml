@@ -9,6 +9,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [2.7, 3.6, 3.7, 3.8, pypy2, pypy3]
 
     steps:
     - uses: actions/checkout@v2
@@ -22,7 +23,7 @@ jobs:
         pip install -U pip coverage codecov flake8 fastimport
     - name: Style checks
       run: |
-        make style PYTHON=python
+        python -m flake8
     - name: Coverage test suite run
       run: |
         python -m coverage run -p -m unittest dulwich.tests.test_suite

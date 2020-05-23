@@ -31,8 +31,6 @@ from urllib.parse import (
     urlparse,
     )
 
-import urllib3
-
 import dulwich
 from dulwich import (
     client,
@@ -1056,11 +1054,13 @@ class DefaultUrllib3ManagerTest(TestCase):
                          'CERT_REQUIRED')
 
     def test_config_no_proxy(self):
+        import urllib3
         manager = default_urllib3_manager(config=ConfigDict())
         self.assertNotIsInstance(manager, urllib3.ProxyManager)
         self.assertIsInstance(manager, urllib3.PoolManager)
 
     def test_config_no_proxy_custom_cls(self):
+        import urllib3
         class CustomPoolManager(urllib3.PoolManager):
             pass
 
@@ -1083,6 +1083,7 @@ class DefaultUrllib3ManagerTest(TestCase):
                          'CERT_NONE')
 
     def test_config_proxy(self):
+        import urllib3
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
         manager = default_urllib3_manager(config=config)
@@ -1094,6 +1095,7 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager.proxy.port, 3128)
 
     def test_config_proxy_custom_cls(self):
+        import urllib3
         class CustomProxyManager(urllib3.ProxyManager):
             pass
 

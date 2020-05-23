@@ -37,8 +37,9 @@ raw byte strings are supported.
 For this reason, the lower levels in Dulwich treat git-based filenames as
 bytestrings. It is up to the Dulwich API user to encode and decode them if
 necessary. The porcelain may accept unicode strings and convert them to
-bytestrings as necessary on the fly (using sys.getfilesystemencoding()).
+bytestrings as necessary on the fly (using 'utf-8').
 
+* on-disk filenames: regular strings
 * git-repository related filenames: bytes
 * object sha1 digests (20 bytes long): bytes
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings

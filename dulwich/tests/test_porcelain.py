@@ -385,7 +385,9 @@ class AddTests(PorcelainTestCase):
         cwd = os.getcwd()
         try:
             os.chdir(self.repo.path)
-            porcelain.add(self.repo.path)
+            self.assertEqual(
+                (['foo', 'adir/afile'], set()),
+                porcelain.add(self.repo.path))
         finally:
             os.chdir(cwd)
 
@@ -449,7 +451,7 @@ class AddTests(PorcelainTestCase):
             porcelain.add, self.repo,
             paths=[os.path.join(self.test_dir, "foo")])
         self.assertRaises(
-            ValueError,
+            (ValueError, FileNotFoundError),
             porcelain.add, self.repo,
             paths=["../foo"])
         self.assertEqual([], list(self.repo.open_index()))

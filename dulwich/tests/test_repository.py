@@ -650,7 +650,7 @@ exit 1
             author_timestamp=12345, author_timezone=0)
         expected_warning = UserWarning(
             'post-commit hook failed: Hook post-commit exited with '
-            'non-zero status',)
+            'non-zero status 1',)
         for w in warnings_list:
             if (type(w) == type(expected_warning) and
                     w.args == expected_warning.args):

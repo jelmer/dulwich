@@ -39,3 +39,6 @@ jobs:
     - name: Coverage test suite run
       run: |
         python -m coverage run -p -m unittest dulwich.tests.test_suite
+    - name: Upload coverage details
+      run: |
+        codecov

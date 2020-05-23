@@ -705,17 +705,16 @@ def _tree_to_fs_path(root_path, tree_path):
     return os.path.join(root_path, sep_corrected_path)
 
 
-def _fs_to_tree_path(fs_path, fs_encoding=None):
+def _fs_to_tree_path(fs_path):
     """Convert a file system path to a git tree path.
 
     Args:
       fs_path: File system path.
-      fs_encoding: File system encoding
 
     Returns:  Git tree path as bytes
     """
     if not isinstance(fs_path, bytes):
-        fs_path_bytes = fs_path.encode(fs_encoding)
+        fs_path_bytes = os.fsencode(fs_path)
     else:
         fs_path_bytes = fs_path
     if os_sep_bytes != b'/':

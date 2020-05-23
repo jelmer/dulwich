@@ -23,6 +23,7 @@
 from io import BytesIO, StringIO
 import os
 import shutil
+import sys
 import tarfile
 import tempfile
 import time
@@ -386,7 +387,7 @@ class AddTests(PorcelainTestCase):
         try:
             os.chdir(self.repo.path)
             self.assertEqual(
-                (['foo', 'adir/afile'], set()),
+                (['foo', os.path.join('adir', 'afile')], set()),
                 porcelain.add(self.repo.path))
         finally:
             os.chdir(cwd)
@@ -1738,11 +1739,17 @@ class DescribeTests(PorcelainTestCase):
                 porcelain.describe(self.repo.path))
 
 
-class HelperTests(PorcelainTestCase):
+class PathToTreeTests(PorcelainTestCase):
+
+    def setUp(self):
+        super(PathToTreeTests, self).setUp()
+        self.fp = os.path.join(self.test_dir, 'bar')
+        with open(self.fp, 'w') as f:
+            f.write('something')
 
     def test_path_to_tree_path_base(self):
         self.assertEqual(
-            b'bar', porcelain.path_to_tree_path('/home/foo', '/home/foo/bar'))
+            b'bar', porcelain.path_to_tree_path(self.test_dir, self.fp))
         self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
         self.assertEqual(b'bar', porcelain.path_to_tree_path('.', 'bar'))
         cwd = os.getcwd()
@@ -1757,7 +1764,8 @@ class HelperTests(PorcelainTestCase):
 
     def test_path_to_tree_path_error(self):
         with self.assertRaises(ValueError):
-            porcelain.path_to_tree_path('/home/foo/', '/home/bar/baz')
+            with tempfile.TemporaryDirectory() as od:
+                porcelain.path_to_tree_path(od, self.fp)
 
     def test_path_to_tree_path_rel(self):
         cwd = os.getcwd()

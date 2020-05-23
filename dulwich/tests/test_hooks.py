@@ -20,9 +20,9 @@
 """Tests for executing hooks."""
 
 import os
-from pathlib import Path
 import stat
 import shutil
+import sys
 import tempfile
 
 from dulwich import errors
@@ -57,7 +57,7 @@ exit 1
 exit 0
 """
         pre_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" != '""" + str(Path(repo_dir).resolve()) + """' ]; then
+if [ "$(pwd)" != '""" + repo_dir + """' ]; then
     echo "Expected path '""" + repo_dir + """', got '$(pwd)'"
     exit 1
 fi
@@ -74,11 +74,14 @@ exit 0
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(pre_commit, 'w') as f:
-            f.write(pre_commit_cwd)
-        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(pre_commit, 'w') as f:
+                f.write(pre_commit_cwd)
+            os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute()
+            hook.execute()
 
         with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)

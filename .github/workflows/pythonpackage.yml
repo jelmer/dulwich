@@ -10,6 +10,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: [3.5, 3.6, 3.7, 3.8, pypy3]
+        exclude:
+          # sqlite3 exit handling seems to get in the way
+          - os: macos-latest
+            python-version: pypy3
+          # doesn't support passing in bytestrings to os.scandir
+          - os: windows-latest
+            python-version: pypy3
+          # path encoding
+          - os: windows-latest
+            python-version: 3.5
       fail-fast: false
 
     steps:

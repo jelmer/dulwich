@@ -1749,9 +1749,9 @@ class HelperTests(PorcelainTestCase):
         self.assertEqual(b'bar', porcelain.path_to_tree_path(cwd, 'bar'))
 
     def test_path_to_tree_path_syntax(self):
-        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', './bar'))
-        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', b'./bar'))
-        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', b'./bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
 
     def test_path_to_tree_path_error(self):
         with self.assertRaises(ValueError):

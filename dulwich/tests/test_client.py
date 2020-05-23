@@ -881,14 +881,6 @@ class LocalGitClientTests(TestCase):
 
 class HttpGitClientTests(TestCase):
 
-    @staticmethod
-    def b64encode(s):
-        """Python 2/3 compatible Base64 encoder. Returns string."""
-        try:
-            return base64.b64encode(s)
-        except TypeError:
-            return base64.b64encode(s.encode('latin1')).decode('ascii')
-
     def test_get_url(self):
         base_url = 'https://github.com/jelmer/dulwich'
         path = '/jelmer/dulwich'
@@ -922,8 +914,8 @@ class HttpGitClientTests(TestCase):
 
         basic_auth = c.pool_manager.headers['authorization']
         auth_string = '%s:%s' % ('user', 'passwd')
-        b64_credentials = self.b64encode(auth_string)
-        expected_basic_auth = 'Basic %s' % b64_credentials
+        b64_credentials = base64.b64encode(auth_string.encode('latin1'))
+        expected_basic_auth = 'Basic %s' % b64_credentials.decode('latin1')
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_no_username_passwd(self):
@@ -952,8 +944,8 @@ class HttpGitClientTests(TestCase):
 
         basic_auth = c.pool_manager.headers['authorization']
         auth_string = '%s:%s' % (original_username, original_password)
-        b64_credentials = self.b64encode(auth_string)
-        expected_basic_auth = 'Basic %s' % str(b64_credentials)
+        b64_credentials = base64.b64encode(auth_string.encode('latin1'))
+        expected_basic_auth = 'Basic %s' % b64_credentials.decode('latin1')
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_url_redirect_location(self):

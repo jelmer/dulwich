@@ -202,7 +202,7 @@ def path_to_tree_path(repopath, path):
     Returns: A path formatted for use in e.g. an index
     """
     if not isinstance(path, bytes):
-        path = os.fsencode(path)
+        path = os.path.normpath(os.fsencode(path))
     if not isinstance(repopath, bytes):
         repopath = os.fsencode(repopath)
     treepath = os.path.relpath(path, repopath)

@@ -20,6 +20,7 @@
 """Tests for executing hooks."""
 
 import os
+from pathlib import Path
 import stat
 import shutil
 import tempfile
@@ -56,7 +57,7 @@ exit 1
 exit 0
 """
         pre_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" != '""" + repo_dir + """' ]; then
+if [ "$(pwd)" != '""" + str(Path(repo_dir).resolve()) + """' ]; then
     echo "Expected path '""" + repo_dir + """', got '$(pwd)'"
     exit 1
 fi

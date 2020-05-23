@@ -401,10 +401,9 @@ def add(repo=".", paths=None):
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
+        repo_path = Path(r.path).resolve()
         for p in paths:
-            relpath = os.path.relpath(p, r.path)
-            if relpath.startswith('..' + os.path.sep):
-                raise ValueError('path %r is not in repo' % relpath)
+            relpath = str(Path(p).resolve().relative_to(repo_path))
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)

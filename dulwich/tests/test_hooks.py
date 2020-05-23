@@ -41,6 +41,7 @@ class ShellHookTests(TestCase):
         super(ShellHookTests, self).setUp()
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
+        self.assertTrue(os.path.exists('/bin/sh'))
 
     def test_hook_pre_commit(self):
         repo_dir = os.path.join(tempfile.mkdtemp())

@@ -385,7 +385,12 @@ class AddTests(PorcelainTestCase):
         cwd = os.getcwd()
         try:
             os.chdir(self.repo.path)
-            porcelain.add(self.repo.path)
+            self.assertEqual(
+                set(['foo', 'blah', 'adir', '.git']),
+                set(os.listdir('.')))
+            self.assertEqual(
+                (['foo', os.path.join('adir', 'afile')], set()),
+                porcelain.add(self.repo.path))
         finally:
             os.chdir(cwd)
 
@@ -449,7 +454,7 @@ class AddTests(PorcelainTestCase):
             porcelain.add, self.repo,
             paths=[os.path.join(self.test_dir, "foo")])
         self.assertRaises(
-            ValueError,
+            (ValueError, FileNotFoundError),
             porcelain.add, self.repo,
             paths=["../foo"])
         self.assertEqual([], list(self.repo.open_index()))
@@ -1736,11 +1741,20 @@ class DescribeTests(PorcelainTestCase):
                 porcelain.describe(self.repo.path))
 
 
-class HelperTests(PorcelainTestCase):
+class PathToTreeTests(PorcelainTestCase):
+
+    def setUp(self):
+        super(PathToTreeTests, self).setUp()
+        self.fp = os.path.join(self.test_dir, 'bar')
+        with open(self.fp, 'w') as f:
+            f.write('something')
+        oldcwd = os.getcwd()
+        self.addCleanup(os.chdir, oldcwd)
+        os.chdir(self.test_dir)
 
     def test_path_to_tree_path_base(self):
         self.assertEqual(
-            b'bar', porcelain.path_to_tree_path('/home/foo', '/home/foo/bar'))
+            b'bar', porcelain.path_to_tree_path(self.test_dir, self.fp))
         self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
         self.assertEqual(b'bar', porcelain.path_to_tree_path('.', 'bar'))
         cwd = os.getcwd()
@@ -1749,13 +1763,12 @@ class HelperTests(PorcelainTestCase):
         self.assertEqual(b'bar', porcelain.path_to_tree_path(cwd, 'bar'))
 
     def test_path_to_tree_path_syntax(self):
-        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', './bar'))
-        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', b'./bar'))
-        self.assertEqual(b'bar', porcelain.path_to_tree_path(b'.', b'./bar'))
+        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
 
     def test_path_to_tree_path_error(self):
         with self.assertRaises(ValueError):
-            porcelain.path_to_tree_path('/home/foo/', '/home/bar/baz')
+            with tempfile.TemporaryDirectory() as od:
+                porcelain.path_to_tree_path(od, self.fp)
 
     def test_path_to_tree_path_rel(self):
         cwd = os.getcwd()
@@ -1763,6 +1776,8 @@ class HelperTests(PorcelainTestCase):
         os.mkdir(os.path.join(self.repo.path, 'foo/bar'))
         try:
             os.chdir(os.path.join(self.repo.path, 'foo/bar'))
+            with open('baz', 'w') as f:
+                f.write('contents')
             self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
                 '..', 'baz'))
             self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(

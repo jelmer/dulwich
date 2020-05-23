@@ -25,14 +25,14 @@ jobs:
     - name: Install mypy
       run: |
         pip install -U mypy
-      if: 'matrix.python-version != "pypy3"'
+      if: "matrix.python-version != 'pypy3'"
     - name: Style checks
       run: |
         python -m flake8
     - name: Typing checks
       run: |
         python -m mypy dulwich
-      if: 'matrix.python-version != "pypy3"'
+      if: "matrix.python-version != 'pypy3'"
     - name: Build
       run: |
         python setup.py build_ext -i

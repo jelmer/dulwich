@@ -115,11 +115,14 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         self.assertRaises(errors.HookError, hook.execute, b'failed commit')
 
-        with open(commit_msg, 'w') as f:
-            f.write(commit_msg_cwd)
-        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(commit_msg, 'w') as f:
+                f.write(commit_msg_cwd)
+            os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute(b'cwd test commit')
+            hook.execute(b'cwd test commit')
 
         with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
@@ -155,11 +158,14 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(post_commit, 'w') as f:
-            f.write(post_commit_cwd)
-        os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(post_commit, 'w') as f:
+                f.write(post_commit_cwd)
+            os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute()
+            hook.execute()
 
         with open(post_commit, 'w') as f:
             f.write(post_commit_success)

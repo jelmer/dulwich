@@ -1061,6 +1061,7 @@ class DefaultUrllib3ManagerTest(TestCase):
 
     def test_config_no_proxy_custom_cls(self):
         import urllib3
+
         class CustomPoolManager(urllib3.PoolManager):
             pass
 
@@ -1096,6 +1097,7 @@ class DefaultUrllib3ManagerTest(TestCase):
 
     def test_config_proxy_custom_cls(self):
         import urllib3
+
         class CustomProxyManager(urllib3.ProxyManager):
             pass
 

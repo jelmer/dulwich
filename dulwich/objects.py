@@ -258,8 +258,8 @@ class ShaFile(object):
 
     __slots__ = ('_chunked_text', '_sha', '_needs_serialization')
 
-    type_name: bytes
-    type_num: int
+    type_name = None  # type: bytes
+    type_num = None  # type: int
 
     @staticmethod
     def _parse_legacy_object_header(magic, f):

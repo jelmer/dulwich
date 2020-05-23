@@ -386,6 +386,9 @@ class AddTests(PorcelainTestCase):
         try:
             os.chdir(self.repo.path)
             self.assertEqual(
+                set(['foo', 'blah', 'adir', '.git']),
+                set(os.listdir('.')))
+            self.assertEqual(
                 (['foo', os.path.join('adir', 'afile')], set()),
                 porcelain.add(self.repo.path))
         finally:
@@ -1773,6 +1776,8 @@ class PathToTreeTests(PorcelainTestCase):
         os.mkdir(os.path.join(self.repo.path, 'foo/bar'))
         try:
             os.chdir(os.path.join(self.repo.path, 'foo/bar'))
+            with open('baz', 'w') as f:
+                f.write('contents')
             self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(
                 '..', 'baz'))
             self.assertEqual(b'bar/baz', porcelain.path_to_tree_path(

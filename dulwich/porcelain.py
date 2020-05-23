@@ -204,7 +204,7 @@ def path_to_tree_path(repopath, path):
     if not isinstance(path, bytes):
         path = os.path.normpath(os.fsencode(path))
     if not isinstance(repopath, bytes):
-        repopath = os.fsencode(repopath)
+        repopath = os.path.normpath(os.fsencode(repopath))
     treepath = os.path.relpath(path, repopath)
     if treepath.startswith(b'..'):
         raise ValueError('Path %r not in repo path (%r)' % (path, repopath))

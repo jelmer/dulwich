@@ -449,7 +449,13 @@ class RepositoryRootTests(TestCase):
         repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
         shutil.copytree(os.path.join(repo_dir, 'a.git'),
                         os.path.join(temp_dir, 'a.git'), symlinks=True)
-        rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
+        try:
+            rel = os.path.relpath(
+                os.path.join(repo_dir, 'submodule'), temp_dir)
+        except ValueError:
+            # On windows, these two paths could be on different drives,
+            # making it impossible to determine a relative path.
+            rel = os.path.join(repo_dir, 'submodule')
         os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
         with Repo(temp_dir) as r:
             self.assertEqual(r.head(),

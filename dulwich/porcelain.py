@@ -394,14 +394,16 @@ def add(repo=".", paths=None):
     """
     ignored = set()
     with open_repo_closing(repo) as r:
+        repo_path = Path(r.path).resolve()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
             paths = list(
-                get_untracked_paths(os.getcwd(), r.path, r.open_index()))
+                get_untracked_paths(
+                    str(Path(os.getcwd()).resolve()),
+                    str(repo_path), r.open_index()))
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
-        repo_path = Path(r.path).resolve()
         for p in paths:
             relpath = str(Path(p).resolve().relative_to(repo_path))
             # FIXME: Support patterns, directories.

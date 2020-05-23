@@ -205,7 +205,7 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
     path = Path(path).resolve()
     repopath = Path(repopath).resolve()
     relpath = path.relative_to(repopath)
-    if sys.platform == 'nt':
+    if sys.platform == 'win32':
         return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
     else:
         return bytes(relpath)

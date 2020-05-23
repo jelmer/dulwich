@@ -64,6 +64,7 @@ from contextlib import (
 from io import BytesIO, RawIOBase
 import datetime
 import os
+from pathlib import Path
 import posixpath
 import shutil
 import stat
@@ -192,7 +193,7 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def path_to_tree_path(repopath, path):
+def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
     """Convert a path to a path usable in an index, e.g. bytes and relative to
     the repository root.
 
@@ -201,16 +202,13 @@ def path_to_tree_path(repopath, path):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    if not isinstance(path, bytes):
-        path = os.fsencode(path)
-    if not isinstance(repopath, bytes):
-        repopath = os.fsencode(repopath)
-    treepath = os.path.relpath(path, repopath)
-    if treepath.startswith(b'..'):
-        raise ValueError('Path %r not in repo path (%r)' % (path, repopath))
-    if os.path.sep != '/':
-        treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
-    return treepath
+    path = Path(path).resolve()
+    repopath = Path(repopath).resolve()
+    relpath = path.relative_to(repopath)
+    if sys.platform == 'win32':
+        return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+    else:
+        return bytes(relpath)
 
 
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
@@ -396,17 +394,18 @@ def add(repo=".", paths=None):
     """
     ignored = set()
     with open_repo_closing(repo) as r:
+        repo_path = Path(r.path).resolve()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
             paths = list(
-                get_untracked_paths(os.getcwd(), r.path, r.open_index()))
+                get_untracked_paths(
+                    str(Path(os.getcwd()).resolve()),
+                    str(repo_path), r.open_index()))
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            relpath = os.path.relpath(p, r.path)
-            if relpath.startswith('..' + os.path.sep):
-                raise ValueError('path %r is not in repo' % relpath)
+            relpath = str(Path(p).resolve().relative_to(repo_path))
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)

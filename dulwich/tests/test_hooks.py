@@ -56,7 +56,13 @@ exit 1
 exit 0
 """
         pre_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
+if [ "$(pwd)" != '""" + repo_dir + """' ]; then
+    echo "Expected path '""" + repo_dir + """', got '$(pwd)'"
+    exit 1
+fi
+
+exit 0
+"""
 
         pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)

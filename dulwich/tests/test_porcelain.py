@@ -23,7 +23,6 @@
 from io import BytesIO, StringIO
 import os
 import shutil
-import sys
 import tarfile
 import tempfile
 import time

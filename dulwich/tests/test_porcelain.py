@@ -1745,6 +1745,9 @@ class PathToTreeTests(PorcelainTestCase):
         self.fp = os.path.join(self.test_dir, 'bar')
         with open(self.fp, 'w') as f:
             f.write('something')
+        oldcwd = os.getcwd()
+        self.addCleanup(os.chdir, oldcwd)
+        os.chdir(self.test_dir)
 
     def test_path_to_tree_path_base(self):
         self.assertEqual(
@@ -1757,8 +1760,6 @@ class PathToTreeTests(PorcelainTestCase):
         self.assertEqual(b'bar', porcelain.path_to_tree_path(cwd, 'bar'))
 
     def test_path_to_tree_path_syntax(self):
-        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
-        self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
         self.assertEqual(b'bar', porcelain.path_to_tree_path('.', './bar'))
 
     def test_path_to_tree_path_error(self):

@@ -560,8 +560,19 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             # TODO(jelmer): record and return submodule paths
         else:
             obj = object_store[entry.sha]
-            st = build_file_from_blob(
-                obj, entry.mode, full_path, honor_filemode=honor_filemode)
+            try:
+                st = build_file_from_blob(
+                    obj, entry.mode, full_path, honor_filemode=honor_filemode)
+            except OSError as e:
+                if e.errno == 92 and sys.platform == 'darwin':
+                    # Our filename isn't supported by the platform :(
+                    import warnings
+                    warnings.warn(
+                        'Unable to write ile %s: %s', full_path, e.strerror)
+                    continue
+                else:
+                    raise
+
         # Add file to index
         if not honor_filemode or S_ISGITLINK(entry.mode):
             # we can not use tuple slicing to build a new tuple,

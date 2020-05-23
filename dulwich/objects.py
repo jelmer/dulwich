@@ -1425,7 +1425,7 @@ OBJECT_CLASSES = (
     Tag,
     )
 
-_TYPE_MAP: Dict[Union[bytes, int], Type[ShaFile]] = {}
+_TYPE_MAP = {}  # type: Dict[Union[bytes, int], Type[ShaFile]]
 
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls

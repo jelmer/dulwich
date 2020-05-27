@@ -47,6 +47,7 @@ from dulwich.objects import (
     hex_to_filename,
     S_ISGITLINK,
     object_class,
+    valid_hexsha,
     )
 from dulwich.pack import (
     Pack,
@@ -644,7 +645,10 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield os.fsencode(base+rest)
+                sha = os.fsencode(base+rest)
+                if not valid_hexsha(sha):
+                    continue
+                yield sha
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)

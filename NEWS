@@ -2,6 +2,9 @@
 
  * Drop support for Python 2. (Jelmer Vernooĳ)
 
+ * Only return files from the loose store that look like git objects.
+   (Nicolas Dandrimont)
+
 0.19.17	UNRELEASED
 
  * Don't break when encountering block devices.

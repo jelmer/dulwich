@@ -389,6 +389,22 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual([testobject.id],
                          list(self.store._iter_loose_objects()))
 
+    def test_tempfile_in_loose_store(self):
+        self.store.add_object(testobject)
+        self.assertEqual([testobject.id],
+                         list(self.store._iter_loose_objects()))
+
+        # add temporary files to the loose store
+        for i in range(256):
+            dirname = os.path.join(self.store_dir, "%02x" % i)
+            if not os.path.isdir(dirname):
+                os.makedirs(dirname)
+            fd, n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)
+            os.close(fd)
+
+        self.assertEqual([testobject.id],
+                         list(self.store._iter_loose_objects()))
+
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
         self.assertEqual([], list(store._read_alternate_paths()))

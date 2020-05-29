@@ -29,6 +29,7 @@ import os
 import re
 import sys
 import time
+from typing import List, Tuple, Optional
 from wsgiref.simple_server import (
     WSGIRequestHandler,
     ServerHandler,
@@ -44,6 +45,7 @@ from dulwich.protocol import (
     ReceivableProtocol,
     )
 from dulwich.repo import (
+    BaseRepo,
     NotGitRepository,
     Repo,
     )
@@ -65,7 +67,7 @@ HTTP_FORBIDDEN = '403 Forbidden'
 HTTP_ERROR = '500 Internal Server Error'
 
 
-def date_time_string(timestamp=None):
+def date_time_string(timestamp: Optional[float] = None) -> str:
     # From BaseHTTPRequestHandler.date_time_string in BaseHTTPServer.py in the
     # Python 2.6.5 standard library, following modifications:
     #  - Made a global rather than an instance method.
@@ -78,12 +80,12 @@ def date_time_string(timestamp=None):
               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     if timestamp is None:
         timestamp = time.time()
-    year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
+    year, month, day, hh, mm, ss, wd = time.gmtime(timestamp)[:7]
     return '%s, %02d %3s %4d %02d:%02d:%02d GMD' % (
             weekdays[wd], day, months[month], year, hh, mm, ss)
 
 
-def url_prefix(mat):
+def url_prefix(mat) -> str:
     """Extract the URL prefix from a regex match.
 
     Args:
@@ -95,7 +97,7 @@ def url_prefix(mat):
     return '/' + mat.string[:mat.start()].strip('/')
 
 
-def get_repo(backend, mat):
+def get_repo(backend, mat) -> BaseRepo:
     """Get a Repo instance for the given backend and URL regex match."""
     return backend.open_repository(url_prefix(mat))
 
@@ -260,19 +262,23 @@ class HTTPGitRequest(object):
     :ivar environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response, dumb=False, handlers=None):
+    def __init__(
+            self, environ, start_response, dumb: bool = False, handlers=None):
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
         self._start_response = start_response
-        self._cache_headers = []
-        self._headers = []
+        self._cache_headers: List[Tuple[str, str]] = []
+        self._headers: List[Tuple[str, str]] = []
 
     def add_header(self, name, value):
         """Add a header to the response."""
         self._headers.append((name, value))
 
-    def respond(self, status=HTTP_OK, content_type=None, headers=None):
+    def respond(
+            self, status: str = HTTP_OK,
+            content_type: Optional[str] = None,
+            headers: Optional[List[Tuple[str, str]]] = None):
         """Begin a response with the given status and other headers."""
         if headers:
             self._headers.extend(headers)
@@ -282,28 +288,28 @@ class HTTPGitRequest(object):
 
         return self._start_response(status, self._headers)
 
-    def not_found(self, message):
+    def not_found(self, message: str) -> bytes:
         """Begin a HTTP 404 response and return the text of a message."""
         self._cache_headers = []
         logger.info('Not found: %s', message)
         self.respond(HTTP_NOT_FOUND, 'text/plain')
         return message.encode('ascii')
 
-    def forbidden(self, message):
+    def forbidden(self, message: str) -> bytes:
         """Begin a HTTP 403 response and return the text of a message."""
         self._cache_headers = []
         logger.info('Forbidden: %s', message)
         self.respond(HTTP_FORBIDDEN, 'text/plain')
         return message.encode('ascii')
 
-    def error(self, message):
+    def error(self, message: str) -> bytes:
         """Begin a HTTP 500 response and return the text of a message."""
         self._cache_headers = []
         logger.error('Error: %s', message)
         self.respond(HTTP_ERROR, 'text/plain')
         return message.encode('ascii')
 
-    def nocache(self):
+    def nocache(self) -> None:
         """Set the response to never be cached by the client."""
         self._cache_headers = [
           ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
@@ -311,7 +317,7 @@ class HTTPGitRequest(object):
           ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
           ]
 
-    def cache_forever(self):
+    def cache_forever(self) -> None:
         """Set the response to be cached forever by the client."""
         now = time.time()
         self._cache_headers = [
@@ -344,7 +350,9 @@ class HTTPGitApplication(object):
       ('POST', re.compile('/git-receive-pack$')): handle_service_request,
     }
 
-    def __init__(self, backend, dumb=False, handlers=None, fallback_app=None):
+    def __init__(
+            self, backend, dumb: bool = False, handlers=None,
+            fallback_app=None):
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)

@@ -73,6 +73,7 @@ from dulwich.protocol import (  # noqa: F401
     BufferedPktLineWriter,
     capability_agent,
     CAPABILITIES_REF,
+    CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -258,6 +259,8 @@ class PackHandler(Handler):
         allowable_caps = set(self.innocuous_capabilities())
         allowable_caps.update(self.capabilities())
         for cap in caps:
+            if cap.startswith(CAPABILITY_AGENT + b'='):
+                continue
             if cap not in allowable_caps:
                 raise GitProtocolError('Client asked for capability %s that '
                                        'was not advertised.' % cap)

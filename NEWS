@@ -5,6 +5,9 @@
  * Only return files from the loose store that look like git objects.
    (Nicolas Dandrimont)
 
+ * Ignore agent= capability if sent by client.
+   (Jelmer Vernooĳ)
+
 0.19.17	UNRELEASED
 
  * Don't break when encountering block devices.

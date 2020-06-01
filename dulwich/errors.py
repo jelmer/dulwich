@@ -133,9 +133,10 @@ class UpdateRefsError(GitProtocolError):
 class HangupException(GitProtocolError):
     """Hangup exception."""
 
-    def __init__(self):
+    def __init__(self, stderr_lines=None):
         super(HangupException, self).__init__(
             "The remote server unexpectedly closed the connection.")
+        self.stderr_lines = stderr_lines
 
 
 class UnexpectedCommandError(GitProtocolError):

@@ -18,6 +18,10 @@ jobs:
         include:
           - os: ubuntu-latest
             python-version: '3.x'
+          # path encoding
+        exclude:
+          - os: windows-latest
+            python-version: 3.5
 
     steps:
     - uses: actions/checkout@v2

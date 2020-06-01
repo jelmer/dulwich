@@ -20,6 +20,7 @@ jobs:
         exclude:
           - os: windows-latest
             python-version: 3.5
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v2
@@ -50,7 +51,7 @@ jobs:
       run: |
         twine upload wheelhouse/*manylinux*
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish (Linux)
+    - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

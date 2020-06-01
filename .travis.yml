@@ -8,11 +8,11 @@ python:
   - 3.6
   - 3.7
   - 3.8
-  - pypy3
 
 env:
   - PYTHONHASHSEED=random
     TEST_REQUIRE="gevent greenlet geventhttpclient fastimport"
+    TYPING_REQUIRE=mypy
     PURE=false
 
 matrix:
@@ -31,9 +31,11 @@ matrix:
       sudo: true
     - python: 3.6
       env: PURE=true
+    - python: pypy3
+      env: MYPY_REQUIRE=
 
 install:
-  - travis_retry pip install -U pip coverage codecov flake8 mypy $TEST_REQUIRE
+  - travis_retry pip install -U pip coverage codecov flake8 $TYPING_REQUIRE $TEST_REQUIRE
 
 script:
   - if [ $PURE = false ]; then python setup.py build_ext -i; fi
@@ -41,7 +43,7 @@ script:
 
   # Style
   - make style
-  - make typing
+  - if [ $MYPY_REQUIRE != "" ]; then make typing; fi
 
   - if [ $PURE = true ]; then SETUP_ARGS=--pure; fi
   - python setup.py $SETUP_ARGS bdist_wheel

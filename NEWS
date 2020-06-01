@@ -1,3 +1,7 @@
+0.20.2	2020-06-01
+
+ * Brown bag release to fix uploads of Windows wheels.
+
 0.20.1	2020-06-01
 
  * Publish binary wheels for: Windows, Linux, Mac OS X.

@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - dulwich-*
-    branches:
-      - master
 
 jobs:
   deploy:
@@ -50,5 +48,4 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        ls wheelhouse
-        echo twine upload wheelhouse/*
+        twine upload wheelhouse/*

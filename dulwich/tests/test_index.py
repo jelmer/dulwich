@@ -82,7 +82,7 @@ def can_symlink():
     test_target = test_source + 'can_symlink'
     try:
         os.symlink(test_source, test_target)
-    except OSError:
+    except (NotImplementedError, OSError):
         return False
     return True
 
@@ -501,7 +501,7 @@ class BuildIndexTests(TestCase):
 
     def test_no_decode_encode(self):
         repo_dir = tempfile.mkdtemp()
-        repo_dir_bytes = repo_dir.encode(sys.getfilesystemencoding())
+        repo_dir_bytes = os.fsencode(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
 
@@ -520,15 +520,19 @@ class BuildIndexTests(TestCase):
                 [(o, None) for o in [file, tree]])
 
             try:
-                os.path.exists(latin1_path)
+                build_index_from_tree(
+                    repo.path, repo.index_path(),
+                    repo.object_store, tree.id)
+            except OSError as e:
+                if e.errno == 92 and sys.platform == 'darwin':
+                    # Our filename isn't supported by the platform :(
+                    self.skipTest('can not write filename %r' % e.filename)
+                else:
+                    raise
             except UnicodeDecodeError:
                 # This happens e.g. with python3.6 on Windows.
                 # It implicitly decodes using utf8, which doesn't work.
                 self.skipTest('can not implicitly convert as utf8')
-
-            build_index_from_tree(
-                repo.path, repo.index_path(),
-                repo.object_store, tree.id)
 
             # Verify index entries
             index = repo.open_index()
@@ -749,14 +753,14 @@ class TestTreeFSPathConversion(TestCase):
         fs_path = _tree_to_fs_path(b'/prefix/path', tree_path)
         self.assertEqual(
             fs_path,
-            os.path.join(u'/prefix/path', u'délwíçh', u'foo').encode('utf8'))
+            os.fsencode(os.path.join(u'/prefix/path', u'délwíçh', u'foo')))
 
     def test_fs_to_tree_path_str(self):
         fs_path = os.path.join(os.path.join(u'délwíçh', u'foo'))
-        tree_path = _fs_to_tree_path(fs_path, "utf-8")
-        self.assertEqual(tree_path, u'délwíçh/foo'.encode("utf-8"))
+        tree_path = _fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, u'délwíçh/foo'.encode('utf-8'))
 
     def test_fs_to_tree_path_bytes(self):
-        fs_path = os.path.join(os.path.join(u'délwíçh', u'foo').encode('utf8'))
-        tree_path = _fs_to_tree_path(fs_path, "utf-8")
-        self.assertEqual(tree_path, u'délwíçh/foo'.encode('utf8'))
+        fs_path = os.path.join(os.fsencode(os.path.join(u'délwíçh', u'foo')))
+        tree_path = _fs_to_tree_path(fs_path)
+        self.assertEqual(tree_path, u'délwíçh/foo'.encode('utf-8'))

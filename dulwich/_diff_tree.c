@@ -270,6 +270,11 @@ done:
 	return result;
 }
 
+/* Not all environments define S_ISDIR */
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+
 static PyObject *py_is_tree(PyObject *self, PyObject *args)
 {
 	PyObject *entry, *mode, *result;

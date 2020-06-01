@@ -25,25 +25,16 @@ from io import BytesIO
 import os
 import select
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
 import threading
 
-try:
-    from urlparse import unquote
-except ImportError:
-    from urllib.parse import unquote
+from urllib.parse import unquote
 
-
-try:
-    import BaseHTTPServer
-    import SimpleHTTPServer
-except ImportError:
-    import http.server
-    BaseHTTPServer = http.server
-    SimpleHTTPServer = http.server
+import http.server
 
 from dulwich import (
     client,
@@ -105,7 +96,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_data)
+                        src.generate_pack_data)
 
     def test_send_pack(self):
         self._do_send_pack()
@@ -117,6 +108,43 @@ class DulwichClientTestBase(object):
         # nothing to send, but shouldn't raise either.
         self._do_send_pack()
 
+    @staticmethod
+    def _add_file(repo, tree_id, filename, contents):
+        tree = repo[tree_id]
+        blob = objects.Blob()
+        blob.data = contents.encode('utf-8')
+        repo.object_store.add_object(blob)
+        tree.add(filename.encode('utf-8'), stat.S_IFREG | 0o644, blob.id)
+        repo.object_store.add_object(tree)
+        return tree.id
+
+    def test_send_pack_from_shallow_clone(self):
+        c = self._client()
+        server_new_path = os.path.join(self.gitroot, 'server_new.export')
+        run_git_or_fail(['config', 'http.uploadpack', 'true'],
+                        cwd=server_new_path)
+        run_git_or_fail(['config', 'http.receivepack', 'true'],
+                        cwd=server_new_path)
+        remote_path = self._build_path('/server_new.export')
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+            tree_id = local[local.head()].tree
+            for filename, contents in [('bar', 'bar contents'),
+                                       ('zop', 'zop contents')]:
+                tree_id = self._add_file(local, tree_id, filename, contents)
+                commit_id = local.do_commit(
+                    message=b"add " + filename.encode('utf-8'),
+                    committer=b"Joe Example <joe@example.com>",
+                    tree=tree_id)
+            sendrefs = dict(local.get_refs())
+            del sendrefs[b'HEAD']
+            c.send_pack(remote_path, lambda _: sendrefs,
+                        local.generate_pack_data)
+        with repo.Repo(server_new_path) as remote:
+            self.assertEqual(remote.head(), commit_id)
+
     def test_send_without_report_status(self):
         c = self._client()
         c._send_capabilities.remove(b'report-status')
@@ -125,7 +153,7 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b'HEAD']
             c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                        src.object_store.generate_pack_data)
+                        src.generate_pack_data)
             self.assertDestEqualsSrc()
 
     def make_dummy_commit(self, dest):
@@ -152,7 +180,7 @@ class DulwichClientTestBase(object):
     def compute_send(self, src):
         sendrefs = dict(src.get_refs())
         del sendrefs[b'HEAD']
-        return sendrefs, src.object_store.generate_pack_data
+        return sendrefs, src.generate_pack_data
 
     def test_send_pack_one_error(self):
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
@@ -162,8 +190,8 @@ class DulwichClientTestBase(object):
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
             try:
-                c.send_pack(self._build_path('/dest'),
-                            lambda _: sendrefs, gen_pack)
+                c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
+                            gen_pack)
             except errors.UpdateRefsError as e:
                 self.assertEqual('refs/heads/master failed to update',
                                  e.args[0])
@@ -398,7 +426,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
-class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP Request handler that calls out to 'git http-backend'."""
 
     # Make rfile unbuffered -- we need to read one line and then pass
@@ -525,12 +553,12 @@ class GitHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(stdout)
 
 
-class HTTPGitServer(BaseHTTPServer.HTTPServer):
+class HTTPGitServer(http.server.HTTPServer):
 
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path):
-        BaseHTTPServer.HTTPServer.__init__(
+        http.server.HTTPServer.__init__(
             self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"

@@ -43,12 +43,6 @@ import difflib
 import struct
 
 from itertools import chain
-try:
-    from itertools import imap, izip
-except ImportError:
-    # Python3
-    imap = map
-    izip = zip
 
 import os
 import sys
@@ -363,8 +357,8 @@ class PackIndex(object):
         if not isinstance(other, PackIndex):
             return False
 
-        for (name1, _, _), (name2, _, _) in izip(self.iterentries(),
-                                                 other.iterentries()):
+        for (name1, _, _), (name2, _, _) in zip(self.iterentries(),
+                                                other.iterentries()):
             if name1 != name2:
                 return False
         return True
@@ -378,7 +372,7 @@ class PackIndex(object):
 
     def __iter__(self):
         """Iterate over the SHAs in this pack."""
-        return imap(sha_to_hex, self._itersha())
+        return map(sha_to_hex, self._itersha())
 
     def iterentries(self):
         """Iterate over the entries in this pack index.
@@ -710,7 +704,7 @@ def chunks_length(chunks):
     if isinstance(chunks, bytes):
         return len(chunks)
     else:
-        return sum(imap(len, chunks))
+        return sum(map(len, chunks))
 
 
 def unpack_object(read_all, read_some=None, compute_crc32=False,
@@ -1531,13 +1525,14 @@ def pack_object_header(type_num, delta_base, size):
     return bytearray(header)
 
 
-def write_pack_object(f, type, object, sha=None):
+def write_pack_object(f, type, object, sha=None, compression_level=-1):
     """Write pack object to a file.
 
     Args:
       f: File to write to
       type: Numeric type of the object
       object: Object to write
+      compression_level: the zlib compression level
     Returns: Tuple with offset at which the object was written, and crc32
     """
     if type in DELTA_TYPES:
@@ -1545,7 +1540,7 @@ def write_pack_object(f, type, object, sha=None):
     else:
         delta_base = None
     header = bytes(pack_object_header(type, delta_base, len(object)))
-    comp_data = zlib.compress(object)
+    comp_data = zlib.compress(object, compression_level)
     crc32 = 0
     for data in (header, comp_data):
         f.write(data)
@@ -1555,7 +1550,8 @@ def write_pack_object(f, type, object, sha=None):
     return crc32 & 0xffffffff
 
 
-def write_pack(filename, objects, deltify=None, delta_window_size=None):
+def write_pack(filename, objects, deltify=None, delta_window_size=None,
+               compression_level=-1):
     """Write a new pack data file.
 
     Args:
@@ -1564,11 +1560,13 @@ def write_pack(filename, objects, deltify=None, delta_window_size=None):
         Should provide __len__
       window_size: Delta window size
       deltify: Whether to deltify pack objects
+      compression_level: the zlib compression level
     Returns: Tuple with checksum of pack file and index file
     """
     with GitFile(filename + '.pack', 'wb') as f:
         entries, data_sum = write_pack_objects(
-            f, objects, delta_window_size=delta_window_size, deltify=deltify)
+            f, objects, delta_window_size=delta_window_size, deltify=deltify,
+            compression_level=compression_level)
     entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + '.idx', 'wb') as f:
         return data_sum, write_pack_index_v2(f, entries, data_sum)
@@ -1632,7 +1630,8 @@ def pack_objects_to_data(objects):
              for (o, path) in objects))
 
 
-def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
+def write_pack_objects(f, objects, delta_window_size=None, deltify=None,
+                       compression_level=-1):
     """Write a new pack data file.
 
     Args:
@@ -1642,6 +1641,7 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
       window_size: Sliding window size for searching for deltas;
                         Set to None for default window size.
       deltify: Whether to deltify objects
+      compression_level: the zlib compression level to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     if deltify is None:
@@ -1654,10 +1654,13 @@ def write_pack_objects(f, objects, delta_window_size=None, deltify=None):
     else:
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
-    return write_pack_data(f, pack_contents_count, pack_contents)
+    return write_pack_data(
+        f, pack_contents_count, pack_contents,
+        compression_level=compression_level)
 
 
-def write_pack_data(f, num_records, records, progress=None):
+def write_pack_data(
+        f, num_records, records, progress=None, compression_level=-1):
     """Write a new pack data file.
 
     Args:
@@ -1665,6 +1668,7 @@ def write_pack_data(f, num_records, records, progress=None):
       num_records: Number of records
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
+      compression_level: the zlib compression level
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     # Write the pack
@@ -1686,7 +1690,8 @@ def write_pack_data(f, num_records, records, progress=None):
             else:
                 type_num = OFS_DELTA
                 raw = (offset - base_offset, raw)
-        crc32 = write_pack_object(f, type_num, raw)
+        crc32 = write_pack_object(
+            f, type_num, raw, compression_level=compression_level)
         entries[object_id] = (offset, crc32)
     return entries, f.write_sha()
 
@@ -2083,6 +2088,9 @@ class Pack(object):
 
 
 try:
-    from dulwich._pack import apply_delta, bisect_find_sha  # noqa: F811
+    from dulwich._pack import (  # type: ignore # noqa: F811
+        apply_delta,
+        bisect_find_sha,
+        )
 except ImportError:
     pass

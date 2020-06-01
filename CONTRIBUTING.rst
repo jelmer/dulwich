@@ -15,7 +15,7 @@ Furthermore, triple-quotes should always be """, single quotes are ' unless
 using " would result in less escaping within the string.
 
 Public methods, functions and classes should all have doc strings. Please use
-epydoc style docstrings to document parameters and return values.
+Google style docstrings to document parameters and return values.
 You can generate the documentation by running "make doc".
 
 Running the tests
@@ -34,11 +34,12 @@ Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribe
 encoding for these strings, and although it is fairly common to use UTF-8, any
 raw byte strings are supported.
 
-For this reason, Dulwich internally treats git-based filenames as bytestrings.
-It is up to the Dulwich API user to encode and decode them if necessary. In the
-future, the porcelain may accept unicode strings and convert them to bytestrings
-as necessary on the fly (using sys.getfilesystemencoding()).
+For this reason, the lower levels in Dulwich treat git-based filenames as
+bytestrings. It is up to the Dulwich API user to encode and decode them if
+necessary. The porcelain may accept unicode strings and convert them to
+bytestrings as necessary on the fly (using 'utf-8').
 
+* on-disk filenames: regular strings, or ideally, pathlib.Path instances
 * git-repository related filenames: bytes
 * object sha1 digests (20 bytes long): bytes
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings

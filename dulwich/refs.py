@@ -22,9 +22,7 @@
 """Ref handling.
 
 """
-import errno
 import os
-import sys
 
 from dulwich.errors import (
     PackedRefsException,
@@ -472,8 +470,8 @@ class InfoRefsContainer(RefsContainer):
     def __init__(self, f):
         self._refs = {}
         self._peeled = {}
-        for l in f.readlines():
-            sha, name = l.rstrip(b'\n').split(b'\t')
+        for line in f.readlines():
+            sha, name = line.rstrip(b'\n').split(b'\t')
             if name.endswith(ANNOTATED_TAG_SUFFIX):
                 name = name[:-3]
                 if not check_ref_format(name):
@@ -506,12 +504,12 @@ class DiskRefsContainer(RefsContainer):
     def __init__(self, path, worktree_path=None, logger=None):
         super(DiskRefsContainer, self).__init__(logger=logger)
         if getattr(path, 'encode', None) is not None:
-            path = path.encode(sys.getfilesystemencoding())
+            path = os.fsencode(path)
         self.path = path
         if worktree_path is None:
             worktree_path = path
         if getattr(worktree_path, 'encode', None) is not None:
-            worktree_path = worktree_path.encode(sys.getfilesystemencoding())
+            worktree_path = os.fsencode(worktree_path)
         self.worktree_path = worktree_path
         self._packed_refs = None
         self._peeled_refs = None
@@ -525,8 +523,7 @@ class DiskRefsContainer(RefsContainer):
         for root, unused_dirs, files in os.walk(path):
             dir = root[len(path):]
             if os.path.sep != '/':
-                dir = dir.replace(os.path.sep.encode(
-                    sys.getfilesystemencoding()), b"/")
+                dir = dir.replace(os.fsencode(os.path.sep), b"/")
             dir = dir.strip(b'/')
             for filename in files:
                 refname = b"/".join(([dir] if dir else []) + [filename])
@@ -548,8 +545,7 @@ class DiskRefsContainer(RefsContainer):
         for root, unused_dirs, files in os.walk(refspath):
             dir = root[len(path):]
             if os.path.sep != '/':
-                dir = dir.replace(
-                    os.path.sep.encode(sys.getfilesystemencoding()), b"/")
+                dir = dir.replace(os.fsencode(os.path.sep), b"/")
             for filename in files:
                 refname = b"/".join([dir, filename])
                 if check_ref_format(refname):
@@ -562,9 +558,7 @@ class DiskRefsContainer(RefsContainer):
 
         """
         if os.path.sep != "/":
-            name = name.replace(
-                    b"/",
-                    os.path.sep.encode(sys.getfilesystemencoding()))
+            name = name.replace(b"/", os.fsencode(os.path.sep))
         # TODO: as the 'HEAD' reference is working tree specific, it
         # should actually not be a part of RefsContainer
         if name == b'HEAD':
@@ -589,10 +583,8 @@ class DiskRefsContainer(RefsContainer):
             path = os.path.join(self.path, b'packed-refs')
             try:
                 f = GitFile(path, 'rb')
-            except IOError as e:
-                if e.errno == errno.ENOENT:
-                    return {}
-                raise
+            except FileNotFoundError:
+                return {}
             with f:
                 first_line = next(iter(f)).rstrip()
                 if (first_line.startswith(b'# pack-refs') and b' peeled' in
@@ -649,10 +641,8 @@ class DiskRefsContainer(RefsContainer):
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
-        except IOError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR, errno.ENOTDIR):
-                return None
-            raise
+        except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+            return None
 
     def _remove_packed_ref(self, name):
         if self._packed_refs is None:
@@ -728,8 +718,7 @@ class DiskRefsContainer(RefsContainer):
         packed_refs = self.get_packed_refs()
         while probe_ref:
             if packed_refs.get(probe_ref, None) is not None:
-                raise OSError(errno.ENOTDIR,
-                              'Not a directory: {}'.format(filename))
+                raise NotADirectoryError(filename)
             probe_ref = os.path.dirname(probe_ref)
 
         ensure_dir_exists(os.path.dirname(filename))
@@ -823,9 +812,8 @@ class DiskRefsContainer(RefsContainer):
             # remove the reference file itself
             try:
                 os.remove(filename)
-            except OSError as e:
-                if e.errno != errno.ENOENT:  # may only be packed
-                    raise
+            except FileNotFoundError:
+                pass  # may only be packed
 
             self._remove_packed_ref(name)
             self._log(name, old_ref, None, committer=committer,
@@ -877,14 +865,14 @@ def read_packed_refs(f):
       f: file-like object to read from
     Returns: Iterator over tuples with SHA1s and ref names.
     """
-    for l in f:
-        if l.startswith(b'#'):
+    for line in f:
+        if line.startswith(b'#'):
             # Comment
             continue
-        if l.startswith(b'^'):
+        if line.startswith(b'^'):
             raise PackedRefsException(
               "found peeled ref in packed-refs without peeled")
-        yield _split_ref_line(l)
+        yield _split_ref_line(line)
 
 
 def read_packed_refs_with_peeled(f):
@@ -939,8 +927,8 @@ def write_packed_refs(f, packed_refs, peeled_refs=None):
 
 def read_info_refs(f):
     ret = {}
-    for l in f.readlines():
-        (sha, name) = l.rstrip(b"\r\n").split(b"\t", 1)
+    for line in f.readlines():
+        (sha, name) = line.rstrip(b"\r\n").split(b"\t", 1)
         ret[name] = sha
     return ret
 

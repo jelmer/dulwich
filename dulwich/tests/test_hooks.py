@@ -22,6 +22,7 @@
 import os
 import stat
 import shutil
+import sys
 import tempfile
 
 from dulwich import errors
@@ -41,6 +42,7 @@ class ShellHookTests(TestCase):
         super(ShellHookTests, self).setUp()
         if os.name != 'posix':
             self.skipTest('shell hook tests requires POSIX shell')
+        self.assertTrue(os.path.exists('/bin/sh'))
 
     def test_hook_pre_commit(self):
         repo_dir = os.path.join(tempfile.mkdtemp())
@@ -55,7 +57,13 @@ exit 1
 exit 0
 """
         pre_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
+if [ "$(pwd)" != '""" + repo_dir + """' ]; then
+    echo "Expected path '""" + repo_dir + """', got '$(pwd)'"
+    exit 1
+fi
+
+exit 0
+"""
 
         pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
         hook = PreCommitShellHook(repo_dir)
@@ -66,11 +74,14 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(pre_commit, 'w') as f:
-            f.write(pre_commit_cwd)
-        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(pre_commit, 'w') as f:
+                f.write(pre_commit_cwd)
+            os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute()
+            hook.execute()
 
         with open(pre_commit, 'w') as f:
             f.write(pre_commit_success)
@@ -104,11 +115,14 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         self.assertRaises(errors.HookError, hook.execute, b'failed commit')
 
-        with open(commit_msg, 'w') as f:
-            f.write(commit_msg_cwd)
-        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(commit_msg, 'w') as f:
+                f.write(commit_msg_cwd)
+            os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute(b'cwd test commit')
+            hook.execute(b'cwd test commit')
 
         with open(commit_msg, 'w') as f:
             f.write(commit_msg_success)
@@ -144,11 +158,14 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        with open(post_commit, 'w') as f:
-            f.write(post_commit_cwd)
-        os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        if sys.platform != 'darwin':
+            # Don't bother running this test on darwin since path
+            # canonicalization messages with our simple string comparison.
+            with open(post_commit, 'w') as f:
+                f.write(post_commit_cwd)
+            os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute()
+            hook.execute()
 
         with open(post_commit, 'w') as f:
             f.write(post_commit_success)

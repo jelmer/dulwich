@@ -20,22 +20,16 @@
 
 from io import BytesIO
 import base64
+import os
 import sys
 import shutil
 import tempfile
 import warnings
 
-try:
-    from urllib import quote as urlquote
-except ImportError:
-    from urllib.parse import quote as urlquote
-
-try:
-    import urlparse
-except ImportError:
-    import urllib.parse as urlparse
-
-import urllib3
+from urllib.parse import (
+    quote as urlquote,
+    urlparse,
+    )
 
 import dulwich
 from dulwich import (
@@ -57,6 +51,7 @@ from dulwich.client import (
     UpdateRefsError,
     check_wants,
     default_urllib3_manager,
+    get_credentials_from_store,
     get_transport_and_path,
     get_transport_and_path_from_url,
     parse_rsync_url,
@@ -138,9 +133,10 @@ class GitClientTests(TestCase):
                               b'thin-pack', b'multi_ack_detailed', b'shallow',
                               agent_cap]),
                          set(self.client._fetch_capabilities))
-        self.assertEqual(set([b'ofs-delta', b'report-status', b'side-band-64k',
-                              agent_cap]),
-                         set(self.client._send_capabilities))
+        self.assertEqual(
+            set([b'delete-refs', b'ofs-delta', b'report-status',
+                 b'side-band-64k', agent_cap]),
+            set(self.client._send_capabilities))
 
     def test_archive_ack(self):
         self.rin.write(
@@ -246,7 +242,7 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, generate_pack_data)
+        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):
@@ -266,14 +262,11 @@ class GitClientTests(TestCase):
             return 0, []
 
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00report-status ofs-delta0000',
-             b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00ofs-delta report-status0000'])
+            b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'0000000000000000000000000000000000000000 '
+            b'refs/heads/master\x00delete-refs ofs-delta report-status0000')
 
     def test_send_pack_delete_only(self):
         self.rin.write(
@@ -291,14 +284,11 @@ class GitClientTests(TestCase):
             return 0, []
 
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00report-status ofs-delta0000',
-             b'007f310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'0000000000000000000000000000000000000000 '
-             b'refs/heads/master\x00ofs-delta report-status0000'])
+            b'008b310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'0000000000000000000000000000000000000000 '
+            b'refs/heads/master\x00delete-refs ofs-delta report-status0000')
 
     def test_send_pack_new_ref_only(self):
         self.rin.write(
@@ -323,16 +313,12 @@ class GitClientTests(TestCase):
         f = BytesIO()
         write_pack_objects(f, {})
         self.client.send_pack('/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f0000000000000000000000000000000000000000 '
-             b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'refs/heads/blah12\x00report-status ofs-delta0000' +
-             f.getvalue(),
-             b'007f0000000000000000000000000000000000000000 '
-             b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
-             b'refs/heads/blah12\x00ofs-delta report-status0000' +
-             f.getvalue()])
+            b'008b0000000000000000000000000000000000000000 '
+            b'310ca9477129b8586fa2afc779c1f57cf64bba6c '
+            b'refs/heads/blah12\x00delete-refs ofs-delta report-status0000' +
+            f.getvalue())
 
     def test_send_pack_new_ref(self):
         self.rin.write(
@@ -366,14 +352,11 @@ class GitClientTests(TestCase):
         f = BytesIO()
         write_pack_data(f, *generate_pack_data(None, None))
         self.client.send_pack(b'/', update_refs, generate_pack_data)
-        self.assertIn(
+        self.assertEqual(
             self.rout.getvalue(),
-            [b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00report-status ofs-delta0000' +
-             f.getvalue(),
-             b'007f0000000000000000000000000000000000000000 ' + commit.id +
-             b' refs/heads/blah12\x00ofs-delta report-status0000' +
-             f.getvalue()])
+            b'008b0000000000000000000000000000000000000000 ' + commit.id +
+            b' refs/heads/blah12\x00delete-refs ofs-delta report-status0000' +
+            f.getvalue())
 
     def test_send_pack_no_deleteref_delete_only(self):
         pkts = [b'310ca9477129b8586fa2afc779c1f57cf64bba6c refs/heads/master'
@@ -885,7 +868,7 @@ class LocalGitClientTests(TestCase):
         ref_name = b"refs/heads/" + branch
         new_refs = client.send_pack(target.path,
                                     lambda _: {ref_name: local.refs[ref_name]},
-                                    local.object_store.generate_pack_data)
+                                    local.generate_pack_data)
 
         self.assertEqual(local.refs[ref_name], new_refs[ref_name])
 
@@ -895,14 +878,6 @@ class LocalGitClientTests(TestCase):
 
 
 class HttpGitClientTests(TestCase):
-
-    @staticmethod
-    def b64encode(s):
-        """Python 2/3 compatible Base64 encoder. Returns string."""
-        try:
-            return base64.b64encode(s)
-        except TypeError:
-            return base64.b64encode(s.encode('latin1')).decode('ascii')
 
     def test_get_url(self):
         base_url = 'https://github.com/jelmer/dulwich'
@@ -937,8 +912,8 @@ class HttpGitClientTests(TestCase):
 
         basic_auth = c.pool_manager.headers['authorization']
         auth_string = '%s:%s' % ('user', 'passwd')
-        b64_credentials = self.b64encode(auth_string)
-        expected_basic_auth = 'Basic %s' % b64_credentials
+        b64_credentials = base64.b64encode(auth_string.encode('latin1'))
+        expected_basic_auth = 'Basic %s' % b64_credentials.decode('latin1')
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_no_username_passwd(self):
@@ -961,18 +936,17 @@ class HttpGitClientTests(TestCase):
             password=quoted_password
         )
 
-        c = HttpGitClient.from_parsedurl(urlparse.urlparse(url))
+        c = HttpGitClient.from_parsedurl(urlparse(url))
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
 
         basic_auth = c.pool_manager.headers['authorization']
         auth_string = '%s:%s' % (original_username, original_password)
-        b64_credentials = self.b64encode(auth_string)
-        expected_basic_auth = 'Basic %s' % str(b64_credentials)
+        b64_credentials = base64.b64encode(auth_string.encode('latin1'))
+        expected_basic_auth = 'Basic %s' % b64_credentials.decode('latin1')
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_url_redirect_location(self):
-
         from urllib3.response import HTTPResponse
 
         test_data = {
@@ -1080,8 +1054,20 @@ class DefaultUrllib3ManagerTest(TestCase):
                          'CERT_REQUIRED')
 
     def test_config_no_proxy(self):
+        import urllib3
         manager = default_urllib3_manager(config=ConfigDict())
         self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_config_no_proxy_custom_cls(self):
+        import urllib3
+
+        class CustomPoolManager(urllib3.PoolManager):
+            pass
+
+        manager = default_urllib3_manager(config=ConfigDict(),
+                                          pool_manager_cls=CustomPoolManager)
+        self.assertIsInstance(manager, CustomPoolManager)
 
     def test_config_ssl(self):
         config = ConfigDict()
@@ -1098,6 +1084,7 @@ class DefaultUrllib3ManagerTest(TestCase):
                          'CERT_NONE')
 
     def test_config_proxy(self):
+        import urllib3
         config = ConfigDict()
         config.set(b'http', b'proxy', b'http://localhost:3128/')
         manager = default_urllib3_manager(config=config)
@@ -1107,6 +1094,18 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager.proxy.scheme, 'http')
         self.assertEqual(manager.proxy.host, 'localhost')
         self.assertEqual(manager.proxy.port, 3128)
+
+    def test_config_proxy_custom_cls(self):
+        import urllib3
+
+        class CustomProxyManager(urllib3.ProxyManager):
+            pass
+
+        config = ConfigDict()
+        config.set(b'http', b'proxy', b'http://localhost:3128/')
+        manager = default_urllib3_manager(config=config,
+                                          proxy_manager_cls=CustomProxyManager)
+        self.assertIsInstance(manager, CustomProxyManager)
 
     def test_config_no_verify_ssl(self):
         manager = default_urllib3_manager(config=None, cert_reqs="CERT_NONE")
@@ -1305,3 +1304,46 @@ class FetchPackResultTests(TestCase):
                 {b'refs/heads/master':
                  b'2f3dc7a53fb752a6961d3a56683df46d4d3bf262'}, {},
                 b'user/agent'))
+
+
+class GitCredentialStoreTests(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(b'https://user:pass@example.org')
+        cls.fname = f.name
+
+    @classmethod
+    def tearDownClass(cls):
+        os.unlink(cls.fname)
+
+    def test_nonmatching_scheme(self):
+        self.assertEqual(
+            get_credentials_from_store(
+                b'http', b'example.org', fnames=[self.fname]),
+            None)
+
+    def test_nonmatching_hostname(self):
+        self.assertEqual(
+            get_credentials_from_store(
+                b'https', b'noentry.org', fnames=[self.fname]),
+            None)
+
+    def test_match_without_username(self):
+        self.assertEqual(
+            get_credentials_from_store(
+                b'https', b'example.org', fnames=[self.fname]),
+            (b'user', b'pass'))
+
+    def test_match_with_matching_username(self):
+        self.assertEqual(
+            get_credentials_from_store(
+                b'https', b'example.org', b'user', fnames=[self.fname]),
+            (b'user', b'pass'))
+
+    def test_no_match_with_nonmatching_username(self):
+        self.assertEqual(
+            get_credentials_from_store(
+                b'https', b'example.org', b'otheruser', fnames=[self.fname]),
+            None)

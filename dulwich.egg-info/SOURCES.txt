@@ -2,7 +2,6 @@
 .gitignore
 .mailmap
 .testr.conf
-.travis.yml
 AUTHORS
 CONTRIBUTING.rst
 COPYING
@@ -19,6 +18,8 @@ requirements.txt
 setup.cfg
 setup.py
 tox.ini
+.github/workflows/pythonpackage.yml
+.github/workflows/pythonpublish.yml
 bin/dul-receive-pack
 bin/dul-upload-pack
 bin/dulwich
@@ -59,6 +60,7 @@ dulwich/greenthreads.py
 dulwich/hooks.py
 dulwich/ignore.py
 dulwich/index.py
+dulwich/lfs.py
 dulwich/line_ending.py
 dulwich/log_utils.py
 dulwich/lru_cache.py
@@ -85,6 +87,7 @@ dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
 dulwich/contrib/README.md
 dulwich/contrib/__init__.py
+dulwich/contrib/diffstat.py
 dulwich/contrib/paramiko_vendor.py
 dulwich/contrib/release_robot.py
 dulwich/contrib/swift.py
@@ -104,6 +107,7 @@ dulwich/tests/test_greenthreads.py
 dulwich/tests/test_hooks.py
 dulwich/tests/test_ignore.py
 dulwich/tests/test_index.py
+dulwich/tests/test_lfs.py
 dulwich/tests/test_line_ending.py
 dulwich/tests/test_lru_cache.py
 dulwich/tests/test_mailmap.py

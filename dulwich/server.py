@@ -47,18 +47,17 @@ import os
 import socket
 import sys
 import time
+from typing import List, Tuple, Dict, Optional, Iterable
 import zlib
 
-try:
-    import SocketServer
-except ImportError:
-    import socketserver as SocketServer
+import socketserver
 
 from dulwich.archive import tar_stream
 from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
     GitProtocolError,
+    HookError,
     NotGitRepository,
     UnexpectedCommandError,
     ObjectFormatException,
@@ -75,6 +74,7 @@ from dulwich.protocol import (  # noqa: F401
     BufferedPktLineWriter,
     capability_agent,
     CAPABILITIES_REF,
+    CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -114,6 +114,7 @@ from dulwich.refs import (
     write_info_refs,
     )
 from dulwich.repo import (
+    BaseRepo,
     Repo,
     )
 
@@ -146,7 +147,7 @@ class BackendRepo(object):
     object_store = None
     refs = None
 
-    def get_refs(self):
+    def get_refs(self) -> Dict[bytes, bytes]:
         """
         Get all the refs in the repository
 
@@ -154,7 +155,7 @@ class BackendRepo(object):
         """
         raise NotImplementedError
 
-    def get_peeled(self, name):
+    def get_peeled(self, name: bytes) -> Optional[bytes]:
         """Return the cached peeled value of a ref, if available.
 
         Args:
@@ -185,7 +186,7 @@ class DictBackend(Backend):
     def __init__(self, repos):
         self.repos = repos
 
-    def open_repository(self, path):
+    def open_repository(self, path: str) -> BaseRepo:
         logger.debug('Opening repository at %s', path)
         try:
             return self.repos[path]
@@ -242,41 +243,43 @@ class PackHandler(Handler):
         return b"".join([b" " + c for c in capabilities])
 
     @classmethod
-    def capabilities(cls):
+    def capabilities(cls) -> Iterable[bytes]:
         raise NotImplementedError(cls.capabilities)
 
     @classmethod
-    def innocuous_capabilities(cls):
+    def innocuous_capabilities(cls) -> Iterable[bytes]:
         return [CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
                 CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA,
                 capability_agent()]
 
     @classmethod
-    def required_capabilities(cls):
+    def required_capabilities(cls) -> Iterable[bytes]:
         """Return a list of capabilities that we require the client to have."""
         return []
 
-    def set_client_capabilities(self, caps):
+    def set_client_capabilities(self, caps: Iterable[bytes]) -> None:
         allowable_caps = set(self.innocuous_capabilities())
         allowable_caps.update(self.capabilities())
         for cap in caps:
+            if cap.startswith(CAPABILITY_AGENT + b'='):
+                continue
             if cap not in allowable_caps:
-                raise GitProtocolError('Client asked for capability %s that '
+                raise GitProtocolError('Client asked for capability %r that '
                                        'was not advertised.' % cap)
         for cap in self.required_capabilities():
             if cap not in caps:
                 raise GitProtocolError('Client does not support required '
-                                       'capability %s.' % cap)
+                                       'capability %r.' % cap)
         self._client_capabilities = set(caps)
         logger.info('Client capabilities: %s', caps)
 
-    def has_capability(self, cap):
+    def has_capability(self, cap: bytes) -> bool:
         if self._client_capabilities is None:
-            raise GitProtocolError('Server attempted to access capability %s '
+            raise GitProtocolError('Server attempted to access capability %r '
                                    'before asking client' % cap)
         return cap in self._client_capabilities
 
-    def notify_done(self):
+    def notify_done(self) -> None:
         self._done_received = True
 
 
@@ -901,12 +904,14 @@ class ReceivePackHandler(PackHandler):
         self.advertise_refs = advertise_refs
 
     @classmethod
-    def capabilities(cls):
+    def capabilities(cls) -> Iterable[bytes]:
         return [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE]
 
-    def _apply_pack(self, refs):
+    def _apply_pack(
+            self, refs: List[Tuple[bytes, bytes, bytes]]
+            ) -> List[Tuple[bytes, bytes]]:
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
@@ -925,7 +930,8 @@ class ReceivePackHandler(PackHandler):
                 self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append((b'unpack', b'ok'))
             except all_exceptions as e:
-                status.append((b'unpack', str(e).replace('\n', '')))
+                status.append(
+                    (b'unpack', str(e).replace('\n', '').encode('utf-8')))
                 # The pack may still have been moved in, but it may contain
                 # broken objects. We trust a later GC to clean it up.
         else:
@@ -956,7 +962,7 @@ class ReceivePackHandler(PackHandler):
 
         return status
 
-    def _report_status(self, status):
+    def _report_status(self, status: List[Tuple[bytes, bytes]]) -> None:
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
               lambda d: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d))
@@ -981,7 +987,18 @@ class ReceivePackHandler(PackHandler):
         write(None)
         flush()
 
-    def handle(self):
+    def _on_post_receive(self, client_refs):
+        hook = self.repo.hooks.get('post-receive', None)
+        if not hook:
+            return
+        try:
+            output = hook.execute(client_refs)
+            if output:
+                self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, output)
+        except HookError as err:
+            self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, repr(err))
+
+    def handle(self) -> None:
         if self.advertise_refs or not self.http_req:
             refs = sorted(self.repo.get_refs().items())
             symrefs = sorted(self.repo.refs.get_symrefs().items())
@@ -1017,6 +1034,8 @@ class ReceivePackHandler(PackHandler):
 
         # backend can now deal with this refs and read a pack using self.read
         status = self._apply_pack(client_refs)
+
+        self._on_post_receive(client_refs)
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it
@@ -1071,11 +1090,11 @@ DEFAULT_HANDLERS = {
 }
 
 
-class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
+class TCPGitRequestHandler(socketserver.StreamRequestHandler):
 
     def __init__(self, handlers, *args, **kwargs):
         self.handlers = handlers
-        SocketServer.StreamRequestHandler.__init__(self, *args, **kwargs)
+        socketserver.StreamRequestHandler.__init__(self, *args, **kwargs)
 
     def handle(self):
         proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
@@ -1089,10 +1108,10 @@ class TCPGitRequestHandler(SocketServer.StreamRequestHandler):
         h.handle()
 
 
-class TCPGitServer(SocketServer.TCPServer):
+class TCPGitServer(socketserver.TCPServer):
 
     allow_reuse_address = True
-    serve = SocketServer.TCPServer.serve_forever
+    serve = socketserver.TCPServer.serve_forever
 
     def _make_handler(self, *args, **kwargs):
         return TCPGitRequestHandler(self.handlers, *args, **kwargs)
@@ -1104,7 +1123,7 @@ class TCPGitServer(SocketServer.TCPServer):
         self.backend = backend
         logger.info('Listening for TCP connections on %s:%d',
                     listen_addr, port)
-        SocketServer.TCPServer.__init__(self, (listen_addr, port),
+        socketserver.TCPServer.__init__(self, (listen_addr, port),
                                         self._make_handler)
 
     def verify_request(self, request, client_address):
@@ -1177,7 +1196,7 @@ def generate_objects_info_packs(repo):
     """Generate an index for for packs."""
     for pack in repo.object_store.packs:
         yield (
-            b'P ' + pack.data.filename.encode(sys.getfilesystemencoding()) +
+            b'P ' + os.fsencode(pack.data.filename) +
             b'\n')
 
 

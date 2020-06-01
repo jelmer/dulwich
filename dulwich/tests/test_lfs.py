@@ -1,6 +1,5 @@
-#!/usr/bin/python3 -u
-# dul-receive-pack - git-receive-pack in python
-# Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
+# test_lfs.py -- tests for LFS
+# Copyright (C) 2020 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -19,12 +18,27 @@
 # License, Version 2.0.
 #
 
-from dulwich.porcelain import receive_pack
-import os
-import sys
+"""Tests for LFS support."""
 
-if len(sys.argv) < 2:
-    sys.stderr.write("usage: %s <git-dir>\n" % os.path.basename(sys.argv[0]))
-    sys.exit(1)
+from . import TestCase
+from ..lfs import LFSStore
+import shutil
+import tempfile
 
-sys.exit(receive_pack(sys.argv[1]))
+
+class LFSTests(TestCase):
+
+    def setUp(self):
+        super(LFSTests, self).setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.lfs = LFSStore.create(self.test_dir)
+
+    def test_create(self):
+        sha = self.lfs.write_object([b'a', b'b'])
+        with self.lfs.open_object(sha) as f:
+            self.assertEqual(b'ab', f.read())
+
+    def test_missing(self):
+        self.assertRaises(
+            KeyError, self.lfs.open_object, 'abcdeabcdeabcdeabcde')

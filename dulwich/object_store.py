@@ -23,7 +23,6 @@
 """Git object store interfaces and implementation."""
 
 from io import BytesIO
-import errno
 import os
 import stat
 import sys
@@ -48,6 +47,7 @@ from dulwich.objects import (
     hex_to_filename,
     S_ISGITLINK,
     object_class,
+    valid_hexsha,
     )
 from dulwich.pack import (
     Pack,
@@ -152,7 +152,9 @@ class BaseObjectStore(object):
             return
         f, commit, abort = self.add_pack()
         try:
-            write_pack_data(f, count, pack_data, progress)
+            write_pack_data(
+                f, count, pack_data, progress,
+                compression_level=self.pack_compression_level)
         except BaseException:
             abort()
             raise
@@ -199,7 +201,7 @@ class BaseObjectStore(object):
                  not stat.S_ISDIR(entry.mode)) or include_trees):
                 yield entry
 
-    def find_missing_objects(self, haves, wants, progress=None,
+    def find_missing_objects(self, haves, wants, shallow=None, progress=None,
                              get_tagged=None,
                              get_parents=lambda commit: commit.parents,
                              depth=None):
@@ -208,6 +210,7 @@ class BaseObjectStore(object):
         Args:
           haves: Iterable over SHAs already in common.
           wants: Iterable over SHAs of objects to fetch.
+          shallow: Set of shallow commit SHA1s to skip
           progress: Simple progress function that will be called with
             updated progress strings.
           get_tagged: Function that returns a dict of pointed-to sha ->
@@ -216,8 +219,8 @@ class BaseObjectStore(object):
             commit.
         Returns: Iterator over (sha, path) pairs.
         """
-        finder = MissingObjectFinder(self, haves, wants, progress, get_tagged,
-                                     get_parents=get_parents)
+        finder = MissingObjectFinder(self, haves, wants, shallow, progress,
+                                     get_tagged, get_parents=get_parents)
         return iter(finder.next, None)
 
     def find_common_revisions(self, graphwalker):
@@ -236,28 +239,32 @@ class BaseObjectStore(object):
             sha = next(graphwalker)
         return haves
 
-    def generate_pack_contents(self, have, want, progress=None):
+    def generate_pack_contents(self, have, want, shallow=None, progress=None):
         """Iterate over the contents of a pack file.
 
         Args:
           have: List of SHA1s of objects that should not be sent
           want: List of SHA1s of objects that should be sent
+          shallow: Set of shallow commit SHA1s to skip
           progress: Optional progress reporting method
         """
-        return self.iter_shas(self.find_missing_objects(have, want, progress))
+        missing = self.find_missing_objects(have, want, shallow, progress)
+        return self.iter_shas(missing)
 
-    def generate_pack_data(self, have, want, progress=None, ofs_delta=True):
+    def generate_pack_data(self, have, want, shallow=None, progress=None,
+                           ofs_delta=True):
         """Generate pack data objects for a set of wants/haves.
 
         Args:
           have: List of SHA1s of objects that should not be sent
           want: List of SHA1s of objects that should be sent
+          shallow: Set of shallow commit SHA1s to skip
           ofs_delta: Whether OFS deltas can be included
           progress: Optional progress reporting method
         """
         # TODO(jelmer): More efficient implementation
         return pack_objects_to_data(
-            self.generate_pack_contents(have, want, progress))
+            self.generate_pack_contents(have, want, shallow, progress))
 
     def peel_sha(self, sha):
         """Peel all tags from a SHA.
@@ -275,7 +282,7 @@ class BaseObjectStore(object):
             obj = self[sha]
         return obj
 
-    def _collect_ancestors(self, heads, common=set(),
+    def _collect_ancestors(self, heads, common=set(), shallow=set(),
                            get_parents=lambda commit: commit.parents):
         """Collect all ancestors of heads up to (excluding) those in common.
 
@@ -299,6 +306,8 @@ class BaseObjectStore(object):
                 bases.add(e)
             elif e not in commits:
                 commits.add(e)
+                if e in shallow:
+                    continue
                 cmt = self[e]
                 queue.extend(get_parents(cmt))
         return (commits, bases)
@@ -310,8 +319,9 @@ class BaseObjectStore(object):
 
 class PackBasedObjectStore(BaseObjectStore):
 
-    def __init__(self):
+    def __init__(self, pack_compression_level=-1):
         self._pack_cache = {}
+        self.pack_compression_level = pack_compression_level
 
     @property
     def alternates(self):
@@ -512,19 +522,44 @@ class PackBasedObjectStore(BaseObjectStore):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path):
+    def __init__(self, path, loose_compression_level=-1,
+                 pack_compression_level=-1):
         """Open an object store.
 
         Args:
           path: Path of the object store.
+          loose_compression_level: zlib compression level for loose objects
+          pack_compression_level: zlib compression level for pack objects
         """
-        super(DiskObjectStore, self).__init__()
+        super(DiskObjectStore, self).__init__(
+            pack_compression_level=pack_compression_level)
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
+        self.loose_compression_level = loose_compression_level
+        self.pack_compression_level = pack_compression_level
 
     def __repr__(self):
         return "<%s(%r)>" % (self.__class__.__name__, self.path)
+
+    @classmethod
+    def from_config(cls, path, config):
+        try:
+            default_compression_level = int(config.get(
+                (b'core', ), b'compression').decode())
+        except KeyError:
+            default_compression_level = -1
+        try:
+            loose_compression_level = int(config.get(
+                (b'core', ), b'looseCompression').decode())
+        except KeyError:
+            loose_compression_level = default_compression_level
+        try:
+            pack_compression_level = int(config.get(
+                (b'core', ), 'packCompression').decode())
+        except KeyError:
+            pack_compression_level = default_compression_level
+        return cls(path, loose_compression_level, pack_compression_level)
 
     @property
     def alternates(self):
@@ -538,40 +573,35 @@ class DiskObjectStore(PackBasedObjectStore):
     def _read_alternate_paths(self):
         try:
             f = GitFile(os.path.join(self.path, INFODIR, "alternates"), 'rb')
-        except (OSError, IOError) as e:
-            if e.errno == errno.ENOENT:
-                return
-            raise
+        except FileNotFoundError:
+            return
         with f:
             for line in f.readlines():
                 line = line.rstrip(b"\n")
                 if line[0] == b"#":
                     continue
                 if os.path.isabs(line):
-                    yield line.decode(sys.getfilesystemencoding())
+                    yield os.fsdecode(line)
                 else:
-                    yield os.path.join(self.path, line).decode(
-                        sys.getfilesystemencoding())
+                    yield os.fsdecode(os.path.join(self.path, line))
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.
         """
         try:
             os.mkdir(os.path.join(self.path, INFODIR))
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         alternates_path = os.path.join(self.path, INFODIR, "alternates")
         with GitFile(alternates_path, 'wb') as f:
             try:
                 orig_f = open(alternates_path, 'rb')
-            except (OSError, IOError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
             else:
                 with orig_f:
                     f.write(orig_f.read())
-            f.write(path.encode(sys.getfilesystemencoding()) + b"\n")
+            f.write(os.fsencode(path) + b"\n")
 
         if not os.path.isabs(path):
             path = os.path.join(self.path, path)
@@ -581,11 +611,9 @@ class DiskObjectStore(PackBasedObjectStore):
         """Read and iterate over new pack files and cache them."""
         try:
             pack_dir_contents = os.listdir(self.pack_dir)
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                self.close()
-                return []
-            raise
+        except FileNotFoundError:
+            self.close()
+            return []
         pack_files = set()
         for name in pack_dir_contents:
             if name.startswith("pack-") and name.endswith(".pack"):
@@ -617,16 +645,17 @@ class DiskObjectStore(PackBasedObjectStore):
             if len(base) != 2:
                 continue
             for rest in os.listdir(os.path.join(self.path, base)):
-                yield (base+rest).encode(sys.getfilesystemencoding())
+                sha = os.fsencode(base+rest)
+                if not valid_hexsha(sha):
+                    continue
+                yield sha
 
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
-        except (OSError, IOError) as e:
-            if e.errno == errno.ENOENT:
-                return None
-            raise
+        except FileNotFoundError:
+            return None
 
     def _remove_loose_object(self, sha):
         os.remove(self._get_shafile_path(sha))
@@ -678,7 +707,9 @@ class DiskObjectStore(PackBasedObjectStore):
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
-            crc32 = write_pack_object(f, type_num, data, sha=new_sha)
+            crc32 = write_pack_object(
+                f, type_num, data, sha=new_sha,
+                compression_level=self.pack_compression_level)
             entries.append((ext_sha, offset, crc32))
         pack_sha = new_sha.digest()
         f.write(pack_sha)
@@ -693,9 +724,8 @@ class DiskObjectStore(PackBasedObjectStore):
             # removal, silently passing if the target does not exist.
             try:
                 os.remove(target_pack)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
         os.rename(path, target_pack)
 
         # Write the index.
@@ -760,9 +790,8 @@ class DiskObjectStore(PackBasedObjectStore):
             # removal, silently passing if the target does not exist.
             try:
                 os.remove(target_pack)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
+            except FileNotFoundError:
+                pass
         os.rename(path, target_pack)
         final_pack = Pack(basename)
         self._add_cached_pack(basename, final_pack)
@@ -803,21 +832,20 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         if os.path.exists(path):
             return  # Already there, no need to write again
         with GitFile(path, 'wb') as f:
-            f.write(obj.as_legacy_object())
+            f.write(obj.as_legacy_object(
+                compression_level=self.loose_compression_level))
 
     @classmethod
     def init(cls, path):
         try:
             os.mkdir(path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        except FileExistsError:
+            pass
         os.mkdir(os.path.join(path, "info"))
         os.mkdir(os.path.join(path, PACKDIR))
         return cls(path)
@@ -829,6 +857,7 @@ class MemoryObjectStore(BaseObjectStore):
     def __init__(self):
         super(MemoryObjectStore, self).__init__()
         self._data = {}
+        self.pack_compression_level = -1
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:
@@ -928,7 +957,8 @@ class MemoryObjectStore(BaseObjectStore):
         for ext_sha in indexer.ext_refs():
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
-            write_pack_object(f, type_num, data, sha=new_sha)
+            write_pack_object(
+                f, type_num, data, sha=new_sha)
         pack_sha = new_sha.digest()
         f.write(pack_sha)
 
@@ -1130,9 +1160,11 @@ class MissingObjectFinder(object):
       tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
-    def __init__(self, object_store, haves, wants, progress=None,
+    def __init__(self, object_store, haves, wants, shallow=None, progress=None,
                  get_tagged=None, get_parents=lambda commit: commit.parents):
         self.object_store = object_store
+        if shallow is None:
+            shallow = set()
         self._get_parents = get_parents
         # process Commits and Tags differently
         # Note, while haves may list commits/tags not available locally,
@@ -1146,12 +1178,13 @@ class MissingObjectFinder(object):
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
         all_ancestors = object_store._collect_ancestors(
-            have_commits, get_parents=self._get_parents)[0]
+            have_commits, shallow=shallow, get_parents=self._get_parents)[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
-            want_commits, all_ancestors, get_parents=self._get_parents)
+            want_commits, all_ancestors, shallow=shallow,
+            get_parents=self._get_parents)
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -1382,4 +1415,4 @@ def read_packs_file(f):
         (kind, name) = line.split(b" ", 1)
         if kind != b"P":
             continue
-        yield name.decode(sys.getfilesystemencoding())
+        yield os.fsdecode(name)

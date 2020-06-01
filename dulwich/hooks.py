@@ -22,7 +22,6 @@
 
 import os
 import subprocess
-import sys
 import tempfile
 
 from dulwich.errors import (
@@ -82,11 +81,6 @@ class ShellHook(Hook):
 
         self.cwd = cwd
 
-        if sys.version_info[0] == 2 and sys.platform == 'win32':
-            # Python 2 on windows does not support unicode file paths
-            # http://bugs.python.org/issue1759845
-            self.filepath = self.filepath.encode(sys.getfilesystemencoding())
-
     def execute(self, *args):
         """Execute the hook with given args"""
 
@@ -103,8 +97,8 @@ class ShellHook(Hook):
             if ret != 0:
                 if (self.post_exec_callback is not None):
                     self.post_exec_callback(0, *args)
-                raise HookError("Hook %s exited with non-zero status"
-                                % (self.name))
+                raise HookError("Hook %s exited with non-zero status %d"
+                                % (self.name, ret))
             if (self.post_exec_callback is not None):
                 return self.post_exec_callback(1, *args)
         except OSError:  # no file. silent failure.
@@ -160,3 +154,43 @@ class CommitMsgShellHook(ShellHook):
 
         ShellHook.__init__(self, 'commit-msg', filepath, 1,
                            prepare_msg, clean_msg, controldir)
+
+
+class PostReceiveShellHook(ShellHook):
+    """post-receive shell hook"""
+
+    def __init__(self, controldir):
+        self.controldir = controldir
+        filepath = os.path.join(controldir, 'hooks', 'post-receive')
+        ShellHook.__init__(self, 'post-receive', filepath, 0)
+
+    def execute(self, client_refs):
+        # do nothing if the script doesn't exist
+        if not os.path.exists(self.filepath):
+            return None
+
+        try:
+            env = os.environ.copy()
+            env['GIT_DIR'] = self.controldir
+
+            p = subprocess.Popen(
+                self.filepath,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env
+            )
+
+            # client_refs is a list of (oldsha, newsha, ref)
+            in_data = '\n'.join([' '.join(ref) for ref in client_refs])
+
+            out_data, err_data = p.communicate(in_data)
+
+            if (p.returncode != 0) or err_data:
+                err_fmt = "post-receive exit code: %d\n" \
+                    + "stdout:\n%s\nstderr:\n%s"
+                err_msg = err_fmt % (p.returncode, out_data, err_data)
+                raise HookError(err_msg)
+            return out_data
+        except OSError as err:
+            raise HookError(repr(err))

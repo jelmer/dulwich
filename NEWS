@@ -1,3 +1,47 @@
+0.20.2	2020-06-01
+
+ * Brown bag release to fix uploads of Windows wheels.
+
+0.20.1	2020-06-01
+
+ * Publish binary wheels for: Windows, Linux, Mac OS X.
+   (Jelmer Vernooĳ, #711, #710, #629)
+
+0.20.0	2020-06-01
+
+ * Drop support for Python 2. (Jelmer Vernooĳ)
+
+ * Only return files from the loose store that look like git objects.
+   (Nicolas Dandrimont)
+
+ * Ignore agent= capability if sent by client.
+   (Jelmer Vernooĳ)
+
+ * Don't break when encountering block devices.
+   (Jelmer Vernooĳ)
+
+ * Decode URL paths in HttpGitClient using utf-8 rather than file system
+   encoding. (Manuel Jacob)
+
+ * Fix pushing from a shallow clone.
+   (Brecht Machiels, #705)
+
+0.19.16	2020-04-17
+
+ * Don't send "deepen None" to server if graph walker
+   supports shallow. (Jelmer Vernooĳ, #747)
+
+ * Support tweaking the compression level for
+   loose objects through the "core.looseCompression" and
+   "core.compression" settings. (Jelmer Vernooĳ)
+
+ * Support tweaking the compression level for
+   pack objects through the "core.packCompression" and
+   "core.compression" settings. (Jelmer Vernooĳ)
+
+ * Add a "dulwich.contrib.diffstat" module.
+   (Kevin Hendricks)
+
 0.19.15	2020-01-26
 
  * Properly handle files that are just executable for the

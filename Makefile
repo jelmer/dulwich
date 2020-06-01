@@ -1,7 +1,7 @@
-PYTHON = python -Werror
-PYFLAKES = pyflakes
+PYTHON = python3
+PYFLAKES = $(PYTHON) -m pyflakes
 PEP8 = pep8
-FLAKE8 ?= flake8
+FLAKE8 ?= $(PYTHON) -m flake8
 SETUP = $(PYTHON) setup.py
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
@@ -42,6 +42,9 @@ check-noextensions:: clean
 	$(RUNTEST) dulwich.tests.test_suite
 
 check-all: check check-pypy check-noextensions
+
+typing:
+	mypy dulwich
 
 clean::
 	$(SETUP) clean --all

@@ -43,9 +43,17 @@ jobs:
     - name: Build and publish (Linux)
       uses: RalfG/python-wheels-manylinux-build@v0.2.2
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish
+    - name: Publish (Linux)
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        twine upload wheelhouse/*manylinux*
+      if: "matrix.os == 'ubuntu-latest'"
+    - name: Publish (Linux)
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         twine upload wheelhouse/*
+      if: "matrix.os != 'ubuntu-latest'"

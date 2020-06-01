@@ -47,6 +47,7 @@ import os
 import socket
 import sys
 import time
+from typing import List, Tuple
 import zlib
 
 import socketserver
@@ -902,12 +903,14 @@ class ReceivePackHandler(PackHandler):
         self.advertise_refs = advertise_refs
 
     @classmethod
-    def capabilities(cls):
+    def capabilities(cls) -> List[str]:
         return [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE]
 
-    def _apply_pack(self, refs):
+    def _apply_pack(
+            self, refs: List[Tuple[bytes, bytes, bytes]]
+            ) -> List[Tuple[bytes, bytes]]:
         all_exceptions = (IOError, OSError, ChecksumMismatch, ApplyDeltaError,
                           AssertionError, socket.error, zlib.error,
                           ObjectFormatException)
@@ -926,7 +929,8 @@ class ReceivePackHandler(PackHandler):
                 self.repo.object_store.add_thin_pack(self.proto.read, recv)
                 status.append((b'unpack', b'ok'))
             except all_exceptions as e:
-                status.append((b'unpack', str(e).replace('\n', '')))
+                status.append(
+                    (b'unpack', str(e).replace('\n', '').encode('utf-8')))
                 # The pack may still have been moved in, but it may contain
                 # broken objects. We trust a later GC to clean it up.
         else:
@@ -957,7 +961,7 @@ class ReceivePackHandler(PackHandler):
 
         return status
 
-    def _report_status(self, status):
+    def _report_status(self, status: List[Tuple[bytes, bytes]]) -> None:
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
               lambda d: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d))
@@ -993,7 +997,7 @@ class ReceivePackHandler(PackHandler):
         except HookError as err:
             self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, repr(err))
 
-    def handle(self):
+    def handle(self) -> None:
         if self.advertise_refs or not self.http_req:
             refs = sorted(self.repo.get_refs().items())
             symrefs = sorted(self.repo.refs.get_symrefs().items())

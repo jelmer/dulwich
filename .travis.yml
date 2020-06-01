@@ -8,7 +8,7 @@ python:
   - 3.6
   - 3.7
   - 3.8
-  - pypy3.6
+  - pypy3
 
 env:
   - PYTHONHASHSEED=random
@@ -17,8 +17,6 @@ env:
 
 matrix:
   include:
-    - python: pypy
-      env: TEST_REQUIRE=fastimport
     - python: 3.7
       env: TEST_REQUIRE=fastimport
       dist: xenial

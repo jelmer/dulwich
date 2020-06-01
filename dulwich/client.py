@@ -736,15 +736,16 @@ def check_wants(wants, refs):
         raise InvalidWants(missing)
 
 
-def remote_error_from_stderr(stderr):
+def _remote_error_from_stderr(stderr):
     if stderr is None:
-        return HangupException()
+        raise HangupException()
+    lines = list(stderr.readlines())
     for line in stderr.readlines():
         if line.startswith(b'ERROR: '):
-            return GitProtocolError(
+            raise GitProtocolError(
                 line[len(b'ERROR: '):].decode('utf-8', 'replace'))
-        return GitProtocolError(line.decode('utf-8', 'replace'))
-    return HangupException()
+        raise GitProtocolError(line.decode('utf-8', 'replace'))
+    raise HangupException(lines)
 
 
 class TraditionalGitClient(GitClient):
@@ -799,7 +800,7 @@ class TraditionalGitClient(GitClient):
             try:
                 old_refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             negotiated_capabilities = \
                 self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
@@ -878,7 +879,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             negotiated_capabilities, symrefs, agent = (
                     self._negotiate_upload_pack_capabilities(
                             server_capabilities))
@@ -915,7 +916,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, _ = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             proto.write_pkt_line(None)
             return refs
 
@@ -935,7 +936,7 @@ class TraditionalGitClient(GitClient):
             try:
                 pkt = proto.read_pkt_line()
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             if pkt == b"NACK\n":
                 return
             elif pkt == b"ACK\n":

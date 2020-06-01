@@ -1,4 +1,4 @@
-0.20.1	UNRELEASED
+0.20.1	2020-06-01
 
  * Publish binary wheels for: Windows, Linux, Mac OS X.
    (Jelmer Vernooĳ, #711, #710, #629)

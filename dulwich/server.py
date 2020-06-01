@@ -47,7 +47,7 @@ import os
 import socket
 import sys
 import time
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional, Iterable
 import zlib
 
 import socketserver
@@ -114,6 +114,7 @@ from dulwich.refs import (
     write_info_refs,
     )
 from dulwich.repo import (
+    BaseRepo,
     Repo,
     )
 
@@ -146,7 +147,7 @@ class BackendRepo(object):
     object_store = None
     refs = None
 
-    def get_refs(self):
+    def get_refs(self) -> Dict[bytes, bytes]:
         """
         Get all the refs in the repository
 
@@ -154,7 +155,7 @@ class BackendRepo(object):
         """
         raise NotImplementedError
 
-    def get_peeled(self, name):
+    def get_peeled(self, name: bytes) -> Optional[bytes]:
         """Return the cached peeled value of a ref, if available.
 
         Args:
@@ -185,7 +186,7 @@ class DictBackend(Backend):
     def __init__(self, repos):
         self.repos = repos
 
-    def open_repository(self, path):
+    def open_repository(self, path: str) -> BaseRepo:
         logger.debug('Opening repository at %s', path)
         try:
             return self.repos[path]
@@ -242,43 +243,43 @@ class PackHandler(Handler):
         return b"".join([b" " + c for c in capabilities])
 
     @classmethod
-    def capabilities(cls):
+    def capabilities(cls) -> Iterable[bytes]:
         raise NotImplementedError(cls.capabilities)
 
     @classmethod
-    def innocuous_capabilities(cls):
+    def innocuous_capabilities(cls) -> Iterable[bytes]:
         return [CAPABILITY_INCLUDE_TAG, CAPABILITY_THIN_PACK,
                 CAPABILITY_NO_PROGRESS, CAPABILITY_OFS_DELTA,
                 capability_agent()]
 
     @classmethod
-    def required_capabilities(cls):
+    def required_capabilities(cls) -> Iterable[bytes]:
         """Return a list of capabilities that we require the client to have."""
         return []
 
-    def set_client_capabilities(self, caps):
+    def set_client_capabilities(self, caps: Iterable[bytes]) -> None:
         allowable_caps = set(self.innocuous_capabilities())
         allowable_caps.update(self.capabilities())
         for cap in caps:
             if cap.startswith(CAPABILITY_AGENT + b'='):
                 continue
             if cap not in allowable_caps:
-                raise GitProtocolError('Client asked for capability %s that '
+                raise GitProtocolError('Client asked for capability %r that '
                                        'was not advertised.' % cap)
         for cap in self.required_capabilities():
             if cap not in caps:
                 raise GitProtocolError('Client does not support required '
-                                       'capability %s.' % cap)
+                                       'capability %r.' % cap)
         self._client_capabilities = set(caps)
         logger.info('Client capabilities: %s', caps)
 
-    def has_capability(self, cap):
+    def has_capability(self, cap: bytes) -> bool:
         if self._client_capabilities is None:
-            raise GitProtocolError('Server attempted to access capability %s '
+            raise GitProtocolError('Server attempted to access capability %r '
                                    'before asking client' % cap)
         return cap in self._client_capabilities
 
-    def notify_done(self):
+    def notify_done(self) -> None:
         self._done_received = True
 
 
@@ -903,7 +904,7 @@ class ReceivePackHandler(PackHandler):
         self.advertise_refs = advertise_refs
 
     @classmethod
-    def capabilities(cls) -> List[str]:
+    def capabilities(cls) -> Iterable[bytes]:
         return [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS,
                 CAPABILITY_QUIET, CAPABILITY_OFS_DELTA,
                 CAPABILITY_SIDE_BAND_64K, CAPABILITY_NO_DONE]

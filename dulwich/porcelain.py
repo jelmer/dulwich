@@ -64,6 +64,7 @@ from contextlib import (
 from io import BytesIO, RawIOBase
 import datetime
 import os
+from pathlib import Path
 import posixpath
 import shutil
 import stat
@@ -156,14 +157,10 @@ class NoneStream(RawIOBase):
         return None
 
 
-if sys.version_info[0] == 2:
-    default_bytes_out_stream = sys.stdout or NoneStream()
-    default_bytes_err_stream = sys.stderr or NoneStream()
-else:
-    default_bytes_out_stream = (
-        getattr(sys.stdout, 'buffer', None) or NoneStream())
-    default_bytes_err_stream = (
-        getattr(sys.stderr, 'buffer', None) or NoneStream())
+default_bytes_out_stream = (
+    getattr(sys.stdout, 'buffer', None) or NoneStream())
+default_bytes_err_stream = (
+    getattr(sys.stderr, 'buffer', None) or NoneStream())
 
 
 DEFAULT_ENCODING = 'utf-8'
@@ -196,7 +193,7 @@ def open_repo_closing(path_or_repo):
     return closing(Repo(path_or_repo))
 
 
-def path_to_tree_path(repopath, path):
+def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
     """Convert a path to a path usable in an index, e.g. bytes and relative to
     the repository root.
 
@@ -205,16 +202,13 @@ def path_to_tree_path(repopath, path):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    if not isinstance(path, bytes):
-        path = path.encode(sys.getfilesystemencoding())
-    if not isinstance(repopath, bytes):
-        repopath = repopath.encode(sys.getfilesystemencoding())
-    treepath = os.path.relpath(path, repopath)
-    if treepath.startswith(b'..'):
-        raise ValueError('Path not in repo')
-    if os.path.sep != '/':
-        treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
-    return treepath
+    path = Path(path).resolve()
+    repopath = Path(repopath).resolve()
+    relpath = path.relative_to(repopath)
+    if sys.platform == 'win32':
+        return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+    else:
+        return bytes(relpath)
 
 
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
@@ -400,17 +394,18 @@ def add(repo=".", paths=None):
     """
     ignored = set()
     with open_repo_closing(repo) as r:
+        repo_path = Path(r.path).resolve()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
             paths = list(
-                get_untracked_paths(os.getcwd(), r.path, r.open_index()))
+                get_untracked_paths(
+                    str(Path(os.getcwd()).resolve()),
+                    str(repo_path), r.open_index()))
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            relpath = os.path.relpath(p, r.path)
-            if relpath.startswith('..' + os.path.sep):
-                raise ValueError('path %r is not in repo' % relpath)
+            relpath = str(Path(p).resolve().relative_to(repo_path))
             # FIXME: Support patterns, directories.
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
@@ -482,7 +477,7 @@ def remove(repo=".", paths=None, cached=False):
     with open_repo_closing(repo) as r:
         index = r.open_index()
         for p in paths:
-            full_path = os.path.abspath(p).encode(sys.getfilesystemencoding())
+            full_path = os.fsencode(os.path.abspath(p))
             tree_path = path_to_tree_path(r.path, p)
             try:
                 index_sha = index[tree_path].sha
@@ -703,7 +698,7 @@ def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
             print_commit(entry.commit, decode, outstream)
             if name_status:
                 outstream.writelines(
-                    [l+'\n' for l in print_name_status(entry.changes())])
+                    [line+'\n' for line in print_name_status(entry.changes())])
 
 
 # TODO(jelmer): better default for encoding?
@@ -912,14 +907,17 @@ def push(repo, remote_location, refspecs,
         try:
             client.send_pack(
                 path, update_refs,
-                generate_pack_data=r.object_store.generate_pack_data,
+                generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
-        except (UpdateRefsError, SendPackError) as e:
+        except UpdateRefsError as e:
             errstream.write(b"Push to " + remote_location_bytes +
                             b" failed -> " + e.message.encode(err_encoding) +
                             b"\n")
+        except SendPackError as e:
+            errstream.write(b"Push to " + remote_location_bytes +
+                            b" failed -> " + e.args[0] + b"\n")
 
 
 def pull(repo, remote_location=None, refspecs=None,
@@ -937,9 +935,14 @@ def pull(repo, remote_location=None, refspecs=None,
     # Open the repo
     with open_repo_closing(repo) as r:
         if remote_location is None:
-            # TODO(jelmer): Lookup 'remote' for current branch in config
-            raise NotImplementedError(
-                "looking up remote from branch config not supported yet")
+            config = r.get_config()
+            remote_name = get_branch_remote(r.path)
+            section = (b'remote', remote_name)
+
+            if config.has_section(section):
+                url = config.get(section, 'url')
+                remote_location = url.decode()
+
         if refspecs is None:
             refspecs = [b"HEAD"]
         selected_refs = []
@@ -1234,6 +1237,26 @@ def active_branch(repo):
         return active_ref[len(LOCAL_BRANCH_PREFIX):]
 
 
+def get_branch_remote(repo):
+    """Return the active branch's remote name, if any.
+
+    Args:
+      repo: Repository to open
+    Returns:
+      remote name
+    Raises:
+      KeyError: if the repository does not have a working tree
+    """
+    with open_repo_closing(repo) as r:
+        branch_name = active_branch(r.path)
+        config = r.get_config()
+        try:
+            remote_name = config.get((b'branch', branch_name), 'remote')
+        except KeyError:
+            remote_name = b'origin'
+    return remote_name
+
+
 def fetch(repo, remote_location, remote_name=b'origin', outstream=sys.stdout,
           errstream=default_bytes_err_stream, message=None, depth=None,
           prune=False, prune_tags=False, **kwargs):
@@ -1428,12 +1451,9 @@ def check_mailmap(repo, contact):
     """
     with open_repo_closing(repo) as r:
         from dulwich.mailmap import Mailmap
-        import errno
         try:
             mailmap = Mailmap.from_path(os.path.join(r.path, '.mailmap'))
-        except IOError as e:
-            if e.errno != errno.ENOENT:
-                raise
+        except FileNotFoundError:
             mailmap = Mailmap()
         return mailmap.lookup(contact)
 

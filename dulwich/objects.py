@@ -27,7 +27,12 @@ from collections import namedtuple
 import os
 import posixpath
 import stat
-import sys
+from typing import (
+    Optional,
+    Dict,
+    Union,
+    Type,
+    )
 import warnings
 import zlib
 from hashlib import sha1
@@ -39,7 +44,7 @@ from dulwich.errors import (
     NotTagError,
     NotTreeError,
     ObjectFormatException,
-    EmptyFileException,
+    FileFormatException,
     )
 from dulwich.file import GitFile
 
@@ -68,6 +73,10 @@ S_IFGITLINK = 0o160000
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
+
+
+class EmptyFileException(FileFormatException):
+    """An unexpectedly empty file was encountered."""
 
 
 def S_ISGITLINK(m):
@@ -142,13 +151,13 @@ def filename_to_hex(filename):
     return hex
 
 
-def object_header(num_type, length):
+def object_header(num_type: int, length: int) -> bytes:
     """Return an object header for the given numeric type and text length."""
     return (object_class(num_type).type_name +
             b' ' + str(length).encode('ascii') + b'\0')
 
 
-def serializable_property(name, docstring=None):
+def serializable_property(name: str, docstring: Optional[str] = None):
     """A property that helps tracking whether serialization is necessary.
     """
     def set(obj, value):
@@ -249,6 +258,9 @@ class ShaFile(object):
 
     __slots__ = ('_chunked_text', '_sha', '_needs_serialization')
 
+    type_name = None  # type: bytes
+    type_num = None  # type: int
+
     @staticmethod
     def _parse_legacy_object_header(magic, f):
         """Parse a legacy object, creating it but not reading the file."""
@@ -282,21 +294,22 @@ class ShaFile(object):
             raise ObjectFormatException("Invalid object header, no \\0")
         self.set_raw_string(text[header_end+1:])
 
-    def as_legacy_object_chunks(self):
+    def as_legacy_object_chunks(self, compression_level=-1):
         """Return chunks representing the object in the experimental format.
 
         Returns: List of strings
         """
-        compobj = zlib.compressobj()
+        compobj = zlib.compressobj(compression_level)
         yield compobj.compress(self._header())
         for chunk in self.as_raw_chunks():
             yield compobj.compress(chunk)
         yield compobj.flush()
 
-    def as_legacy_object(self):
+    def as_legacy_object(self, compression_level=-1):
         """Return string representing the object in the experimental format.
         """
-        return b''.join(self.as_legacy_object_chunks())
+        return b''.join(self.as_legacy_object_chunks(
+            compression_level=compression_level))
 
     def as_raw_chunks(self):
         """Return chunks with serialization of the object.
@@ -316,14 +329,9 @@ class ShaFile(object):
         """
         return b''.join(self.as_raw_chunks())
 
-    if sys.version_info[0] >= 3:
-        def __bytes__(self):
-            """Return raw string serialization of this object."""
-            return self.as_raw_string()
-    else:
-        def __str__(self):
-            """Return raw string serialization of this object."""
-            return self.as_raw_string()
+    def __bytes__(self):
+        """Return raw string serialization of this object."""
+        return self.as_raw_string()
 
     def __hash__(self):
         """Return unique hash for this object."""
@@ -586,7 +594,7 @@ class Blob(ShaFile):
         self.set_raw_string(data)
 
     data = property(_get_data, _set_data,
-                    "The text contained within the blob object.")
+                    doc="The text contained within the blob object.")
 
     def _get_chunked(self):
         return self._chunked_text
@@ -602,7 +610,7 @@ class Blob(ShaFile):
 
     chunked = property(
         _get_chunked, _set_chunked,
-        "The text within the blob object, as chunks (not necessarily lines).")
+        doc="The text in the blob object, as chunks (not necessarily lines)")
 
     @classmethod
     def from_path(cls, path):
@@ -1417,7 +1425,7 @@ OBJECT_CLASSES = (
     Tag,
     )
 
-_TYPE_MAP = {}
+_TYPE_MAP = {}  # type: Dict[Union[bytes, int], Type[ShaFile]]
 
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls
@@ -1429,6 +1437,6 @@ _parse_tree_py = parse_tree
 _sorted_tree_items_py = sorted_tree_items
 try:
     # Try to import C versions
-    from dulwich._objects import parse_tree, sorted_tree_items
+    from dulwich._objects import parse_tree, sorted_tree_items  # type: ignore
 except ImportError:
     pass

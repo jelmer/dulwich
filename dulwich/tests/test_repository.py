@@ -296,7 +296,7 @@ class RepositoryRootTests(TestCase):
     def test_init_mkdir_unicode(self):
         repo_name = u'\xa7'
         try:
-            repo_name.encode(sys.getfilesystemencoding())
+            os.fsencode(repo_name)
         except UnicodeEncodeError:
             self.skipTest('filesystem lacks unicode support')
         tmp_dir = self.mkdtemp()
@@ -361,9 +361,9 @@ class RepositoryRootTests(TestCase):
             c = t.get_config()
             encoded_path = r.path
             if not isinstance(encoded_path, bytes):
-                encoded_path = encoded_path.encode(sys.getfilesystemencoding())
-            self.assertEqual(encoded_path,
-                             c.get((b'remote', b'origin'), b'url'))
+                encoded_path = os.fsencode(encoded_path)
+            self.assertEqual(
+                encoded_path, c.get((b'remote', b'origin'), b'url'))
             self.assertEqual(
                 b'+refs/heads/*:refs/remotes/origin/*',
                 c.get((b'remote', b'origin'), b'fetch'))
@@ -441,19 +441,6 @@ class RepositoryRootTests(TestCase):
     def test_get_config_stack(self):
         r = self.open_repo('ooo_merge.git')
         self.assertIsInstance(r.get_config_stack(), Config)
-
-    @skipIf(not getattr(os, 'symlink', None), 'Requires symlink support')
-    def test_submodule(self):
-        temp_dir = self.mkdtemp()
-        self.addCleanup(shutil.rmtree, temp_dir)
-        repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos')
-        shutil.copytree(os.path.join(repo_dir, 'a.git'),
-                        os.path.join(temp_dir, 'a.git'), symlinks=True)
-        rel = os.path.relpath(os.path.join(repo_dir, 'submodule'), temp_dir)
-        os.symlink(os.path.join(rel, 'dotgit'), os.path.join(temp_dir, '.git'))
-        with Repo(temp_dir) as r:
-            self.assertEqual(r.head(),
-                             b'a90fa2d900a17e99b433217e988c4eb4a2e9a097')
 
     def test_common_revisions(self):
         """
@@ -644,7 +631,7 @@ exit 1
             author_timestamp=12345, author_timezone=0)
         expected_warning = UserWarning(
             'post-commit hook failed: Hook post-commit exited with '
-            'non-zero status',)
+            'non-zero status 1',)
         for w in warnings_list:
             if (type(w) == type(expected_warning) and
                     w.args == expected_warning.args):
@@ -864,6 +851,15 @@ class BuildRepoRootTests(TestCase):
             encoding=b"iso8859-1")
         self.assertEqual(b"iso8859-1", r[commit_sha].encoding)
 
+    def test_compression_level(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(('core',), 'compression', '3')
+        c.set(('core',), 'looseCompression', '4')
+        c.write_to_path()
+        r = Repo(self._repo_dir)
+        self.assertEqual(r.object_store.loose_compression_level, 4)
+
     def test_commit_encoding_from_config(self):
         r = self._repo
         c = r.get_config()
@@ -1081,11 +1077,11 @@ class BuildRepoRootTests(TestCase):
         r.stage(['c'])
         self.assertEqual([b'a'], list(r.open_index()))
 
-    @skipIf(sys.platform == 'win32' and sys.version_info[:2] >= (3, 6),
+    @skipIf(sys.platform in ('win32', 'darwin'),
             'tries to implicitly decode as utf8')
     def test_commit_no_encode_decode(self):
         r = self._repo
-        repo_path_bytes = r.path.encode(sys.getfilesystemencoding())
+        repo_path_bytes = os.fsencode(r.path)
         encodings = ('utf8', 'latin1')
         names = [u'À'.encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):

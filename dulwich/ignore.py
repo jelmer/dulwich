@@ -24,7 +24,8 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
-import sys
+
+from dulwich.config import get_xdg_config_home_path
 
 
 def _translate_segment(segment):
@@ -161,7 +162,7 @@ class Pattern(object):
         return self.pattern
 
     def __str__(self):
-        return self.pattern.decode(sys.getfilesystemencoding())
+        return os.fsdecode(self.pattern)
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -203,7 +204,7 @@ class IgnoreFilter(object):
           Iterator over  iterators
         """
         if not isinstance(path, bytes):
-            path = path.encode(sys.getfilesystemencoding())
+            path = os.fsencode(path)
         for pattern in self._patterns:
             if pattern.match(path):
                 yield pattern
@@ -271,8 +272,7 @@ def default_user_ignore_filter_path(config):
     except KeyError:
         pass
 
-    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "~/.config/")
-    return os.path.join(xdg_config_home, 'git', 'ignore')
+    return get_xdg_config_home_path('git', 'ignore')
 
 
 class IgnoreFilterManager(object):

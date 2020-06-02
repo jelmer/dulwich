@@ -506,8 +506,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         refs_data = f.read()
         f.close()
         f = GitFile(refs_file, 'wb')
-        f.write(b'\n'.join(l for l in refs_data.split(b'\n')
-                           if not l or l[0] not in b'#^'))
+        f.write(b'\n'.join(line for line in refs_data.split(b'\n')
+                           if not line or line[0] not in b'#^'))
         f.close()
         self._repo = Repo(self._repo.path)
         refs = self._repo.refs
@@ -557,14 +557,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_non_ascii(self):
         try:
-            encoded_ref = u'refs/tags/schön'.encode(
-                    sys.getfilesystemencoding())
+            encoded_ref = os.fsencode(u'refs/tags/schön')
         except UnicodeEncodeError:
             raise SkipTest(
                     "filesystem encoding doesn't support special character")
-        p = os.path.join(
-                self._repo.path.encode(sys.getfilesystemencoding()),
-                encoded_ref)
+        p = os.path.join(os.fsencode(self._repo.path), encoded_ref)
         with open(p, 'w') as f:
             f.write('00' * 20)
 
@@ -575,15 +572,14 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(expected_refs, self._repo.get_refs())
 
     def test_cyrillic(self):
-        if sys.platform == 'win32':
+        if sys.platform in ('darwin', 'win32'):
             raise SkipTest(
                     "filesystem encoding doesn't support arbitrary bytes")
         # reported in https://github.com/dulwich/dulwich/issues/608
         name = b'\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01'
         encoded_ref = b'refs/heads/' + name
         with open(os.path.join(
-            self._repo.path.encode(
-                sys.getfilesystemencoding()), encoded_ref), 'w') as f:
+                os.fsencode(self._repo.path), encoded_ref), 'w') as f:
             f.write('00' * 20)
 
         expected_refs = set(_TEST_REFS.keys())

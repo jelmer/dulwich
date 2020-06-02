@@ -1,62 +1,26 @@
 #!/usr/bin/make -f
 
-CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
-LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
-
-# Callable functions to determine the correct PYTHONPATH
-pythonpath = $$(ls -d $(CURDIR)/build/lib.*-$(1))
-pythonpath_dbg = $$(ls -d $(CURDIR)/build/lib_d.*-$(1) 2>/dev/null || ls -d $(CURDIR)/build/lib.*$(1)-pydebug)
-
-pyflavours = python3$(shell which pypy >/dev/null && echo -n ,pypy)
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
 
 %:
-	dh $* --with $(pyflavours) --buildsystem=pybuild
+	dh $* --with python3 --buildsystem=pybuild
 
-override_dh_auto_build:
-	dh_auto_build
+override_dh_auto_test:
+ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+	$(MAKE) check PYTHON=python3
+endif
 
 override_dh_auto_clean:
 	dh_auto_clean
 	rm -rf build*
 	rm -f dulwich/*.so dulwich/*.o
 
-override_dh_auto_test:
-ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
-	$(MAKE) check PYTHON=python3
-ifneq (,$(findstring pypy,$(pyflavours)))
-	$(MAKE) check PYTHON=pypy
-endif
-endif
-
-override_dh_auto_install:
-	dh_auto_install
-	set -ex; for python in $(shell py3versions -r); do \
-	  $$python setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb; \
-	done;
-ifneq (,$(findstring pypy,$(pyflavours)))
-	pypy setup.py build -b build-pypy install --root=$(CURDIR)/debian/tmp --install-layout deb
-	rm -rf debian/tmp/usr/lib/pypy/bin
-endif
-	# Install everything excluding the *_d.so debug extensions to python-dulwich and python3-dulwich
-	dh_install -p python3-dulwich -X"*_d.so" -Xpypy "debian/tmp/usr/lib/python3*/*-packages"
-ifneq (,$(findstring pypy,$(pyflavours)))
-	# Install the pypy files to pypy-dulwich
-	dh_install -p pypy-dulwich "debian/tmp/usr/lib/pypy/"
-endif
-
 override_dh_installdocs:
 	dh_installdocs -ppython3-dulwich docs/tutorial -X.gitignore -XMakefile
-ifneq (,$(findstring pypy,$(pyflavours)))
-	dh_installdocs -ppypy-dulwich docs/tutorial -X.gitignore -XMakefile
-endif
 
 override_dh_strip:
 	dh_strip -p python3-dulwich --dbgsym-migration='python3-dulwich-dbg (<< 0.16.4-1)'
-ifneq (,$(findstring pypy,$(pyflavours)))
-	dh_strip -p pypy-dulwich
-endif
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS

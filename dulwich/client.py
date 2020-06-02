@@ -30,34 +30,33 @@ The Dulwich client supports the following capabilities:
  * quiet
  * report-status
  * delete-refs
+ * shallow
 
 Known capabilities that are not supported:
 
- * shallow
  * no-progress
  * include-tag
 """
 
 from contextlib import closing
 from io import BytesIO, BufferedReader
+import os
 import select
 import socket
 import subprocess
 import sys
 
-try:
-    from urllib import quote as urlquote
-    from urllib import unquote as urlunquote
-except ImportError:
-    from urllib.parse import quote as urlquote
-    from urllib.parse import unquote as urlunquote
-
-try:
-    import urlparse
-except ImportError:
-    import urllib.parse as urlparse
+from urllib.parse import (
+    quote as urlquote,
+    unquote as urlunquote,
+    urlparse,
+    urljoin,
+    urlunsplit,
+    urlunparse,
+    )
 
 import dulwich
+from dulwich.config import get_xdg_config_home_path
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -72,6 +71,7 @@ from dulwich.protocol import (
     extract_capability_names,
     CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_OFS_DELTA,
@@ -144,7 +144,9 @@ COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
 UPLOAD_CAPABILITIES = ([CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK,
                         CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_SHALLOW]
                        + COMMON_CAPABILITIES)
-RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS] + COMMON_CAPABILITIES
+RECEIVE_CAPABILITIES = (
+    [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS]
+    + COMMON_CAPABILITIES)
 
 
 class ReportStatusParser(object):
@@ -310,13 +312,16 @@ def _read_shallow_updates(proto):
 class GitClient(object):
     """Git smart server client."""
 
-    def __init__(self, thin_packs=True, report_activity=None, quiet=False):
+    def __init__(self, thin_packs=True, report_activity=None, quiet=False,
+                 include_tags=False):
         """Create a new GitClient instance.
 
         Args:
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          include_tags: send annotated tags when sending the objects they point
+            to
         """
         self._report_activity = report_activity
         self._report_status_parser = None
@@ -328,6 +333,8 @@ class GitClient(object):
             self._send_capabilities.add(CAPABILITY_QUIET)
         if not thin_packs:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
+        if include_tags:
+            self._fetch_capabilities.add(CAPABILITY_INCLUDE_TAG)
 
     def get_url(self, path):
         """Retrieves full url to given path.
@@ -346,7 +353,7 @@ class GitClient(object):
         """Create an instance of this client from a urlparse.parsed object.
 
         Args:
-          parsedurl: Result of urlparse.urlparse()
+          parsedurl: Result of urlparse()
 
         Returns:
           A `GitClient` object
@@ -549,7 +556,7 @@ class GitClient(object):
                 else:
                     proto.write_pkt_line(
                         old_sha1 + b' ' + new_sha1 + b' ' + refname + b'\0' +
-                        b' '.join(capabilities))
+                        b' '.join(sorted(capabilities)))
                     sent_capabilities = True
             if new_sha1 not in have and new_sha1 != ZERO_SHA:
                 want.append(new_sha1)
@@ -629,7 +636,7 @@ class GitClient(object):
         """
         assert isinstance(wants, list) and isinstance(wants[0], bytes)
         proto.write_pkt_line(COMMAND_WANT + b' ' + wants[0] + b' ' +
-                             b' '.join(capabilities) + b'\n')
+                             b' '.join(sorted(capabilities)) + b'\n')
         for want in wants[1:]:
             proto.write_pkt_line(COMMAND_WANT + b' ' + want + b'\n')
         if depth not in (0, None) or getattr(graph_walker, 'shallow', None):
@@ -639,8 +646,9 @@ class GitClient(object):
                     "depth")
             for sha in graph_walker.shallow:
                 proto.write_pkt_line(COMMAND_SHALLOW + b' ' + sha + b'\n')
-            proto.write_pkt_line(COMMAND_DEEPEN + b' ' +
-                                 str(depth).encode('ascii') + b'\n')
+            if depth is not None:
+                proto.write_pkt_line(COMMAND_DEEPEN + b' ' +
+                                     str(depth).encode('ascii') + b'\n')
             proto.write_pkt_line(None)
             if can_read is not None:
                 (new_shallow, new_unshallow) = _read_shallow_updates(proto)
@@ -731,11 +739,11 @@ def check_wants(wants, refs):
 def remote_error_from_stderr(stderr):
     if stderr is None:
         return HangupException()
-    for l in stderr.readlines():
-        if l.startswith(b'ERROR: '):
+    for line in stderr.readlines():
+        if line.startswith(b'ERROR: '):
             return GitProtocolError(
-                l[len(b'ERROR: '):].decode('utf-8', 'replace'))
-        return GitProtocolError(l.decode('utf-8', 'replace'))
+                line[len(b'ERROR: '):].decode('utf-8', 'replace'))
+        return GitProtocolError(line.decode('utf-8', 'replace'))
     return HangupException()
 
 
@@ -964,7 +972,7 @@ class TCPGitClient(TraditionalGitClient):
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
             netloc += ":%d" % self._port
-        return urlparse.urlunsplit(("git", netloc, path, '', ''))
+        return urlunsplit(("git", netloc, path, '', ''))
 
     def _connect(self, cmd, path):
         if not isinstance(cmd, bytes):
@@ -1013,10 +1021,7 @@ class SubprocessWrapper(object):
 
     def __init__(self, proc):
         self.proc = proc
-        if sys.version_info[0] == 2:
-            self.read = proc.stdout.read
-        else:
-            self.read = BufferedReader(proc.stdout).read
+        self.read = BufferedReader(proc.stdout).read
         self.write = proc.stdin.write
 
     @property
@@ -1094,7 +1099,7 @@ class LocalGitClient(GitClient):
         # Ignore the thin_packs argument
 
     def get_url(self, path):
-        return urlparse.urlunsplit(('file', '', path, '', ''))
+        return urlunsplit(('file', '', path, '', ''))
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
@@ -1104,7 +1109,7 @@ class LocalGitClient(GitClient):
     def _open_repo(cls, path):
         from dulwich.repo import Repo
         if not isinstance(path, str):
-            path = path.decode(sys.getfilesystemencoding())
+            path = os.fsdecode(path)
         return closing(Repo(path))
 
     def send_pack(self, path, update_refs, generate_pack_data,
@@ -1116,7 +1121,6 @@ class LocalGitClient(GitClient):
           update_refs: Function to determine changes to remote refs.
         Receive dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-          generate_pack_data: Function that can return a tuple
         with number of items and pack data to upload.
           progress: Optional progress function
 
@@ -1379,7 +1383,7 @@ class SSHGitClient(TraditionalGitClient):
         if self.username is not None:
             netloc = urlquote(self.username, '@/:') + "@" + netloc
 
-        return urlparse.urlunsplit(('ssh', netloc, path, '', ''))
+        return urlunsplit(('ssh', netloc, path, '', ''))
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
@@ -1419,7 +1423,8 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(config, **override_kwargs):
+def default_urllib3_manager(config, pool_manager_cls=None,
+                            proxy_manager_cls=None, **override_kwargs):
     """Return `urllib3` connection pool manager.
 
     Honour detected proxy configurations.
@@ -1429,8 +1434,9 @@ def default_urllib3_manager(config, **override_kwargs):
       kwargs: Additional arguments for urllib3.ProxyManager
 
     Returns:
-      urllib3.ProxyManager` instance for proxy configurations,
-      `urllib3.PoolManager` otherwise.
+      `pool_manager_cls` (defaults to `urllib3.ProxyManager`) instance for
+      proxy configurations, `proxy_manager_cls` (defaults to
+      `urllib3.PoolManager`) instance otherwise.
 
     """
     proxy_server = user_agent = None
@@ -1487,14 +1493,17 @@ def default_urllib3_manager(config, **override_kwargs):
     import urllib3
 
     if proxy_server is not None:
+        if proxy_manager_cls is None:
+            proxy_manager_cls = urllib3.ProxyManager
         # `urllib3` requires a `str` object in both Python 2 and 3, while
         # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
-        manager = urllib3.ProxyManager(proxy_server, headers=headers,
-                                       **kwargs)
+        manager = proxy_manager_cls(proxy_server, headers=headers, **kwargs)
     else:
-        manager = urllib3.PoolManager(headers=headers, **kwargs)
+        if pool_manager_cls is None:
+            pool_manager_cls = urllib3.PoolManager
+        manager = pool_manager_cls(headers=headers, **kwargs)
 
     return manager
 
@@ -1540,7 +1549,7 @@ class HttpGitClient(GitClient):
         if parsedurl.username:
             netloc = "%s@%s" % (parsedurl.username, netloc)
         parsedurl = parsedurl._replace(netloc=netloc)
-        return cls(urlparse.urlunparse(parsedurl), **kwargs)
+        return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):
         return "%s(%r, dumb=%r)" % (
@@ -1548,11 +1557,10 @@ class HttpGitClient(GitClient):
 
     def _get_url(self, path):
         if not isinstance(path, str):
-            # TODO(jelmer): this is unrelated to the local filesystem;
-            # This is not necessarily the right encoding to decode the path
-            # with.
-            path = path.decode(sys.getfilesystemencoding())
-        return urlparse.urljoin(self._base_url, path).rstrip("/") + "/"
+            # urllib3.util.url._encode_invalid_chars() converts the path back
+            # to bytes using the utf-8 codec.
+            path = path.decode('utf-8')
+        return urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers=None, data=None,
                       allow_compression=False):
@@ -1600,9 +1608,14 @@ class HttpGitClient(GitClient):
         read = BytesIO(resp.data).read
 
         resp.content_type = resp.getheader("Content-Type")
-        resp_url = resp.geturl()
-        resp.redirect_location = resp_url if resp_url != url else ''
-
+        # Check if geturl() is available (urllib3 version >= 1.23)
+        try:
+            resp_url = resp.geturl()
+        except AttributeError:
+            # get_redirect_location() is available for urllib3 >= 1.1
+            resp.redirect_location = resp.get_redirect_location()
+        else:
+            resp.redirect_location = resp_url if resp_url != url else ''
         return resp, read
 
     def _discover_references(self, service, base_url):
@@ -1611,7 +1624,7 @@ class HttpGitClient(GitClient):
         headers = {"Accept": "*/*"}
         if self.dumb is not True:
             tail += "?service=%s" % service.decode('ascii')
-        url = urlparse.urljoin(base_url, tail)
+        url = urljoin(base_url, tail)
         resp, read = self._http_request(url, headers, allow_compression=True)
 
         if resp.redirect_location:
@@ -1643,7 +1656,7 @@ class HttpGitClient(GitClient):
 
     def _smart_request(self, service, url, data):
         assert url[-1] == "/"
-        url = urlparse.urljoin(url, service)
+        url = urljoin(url, service)
         result_content_type = "application/x-%s-result" % service
         headers = {
             "Content-Type": "application/x-%s-request" % service,
@@ -1663,7 +1676,7 @@ class HttpGitClient(GitClient):
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receive dict with existing remote refs, returns dict with
+        Receives dict with existing remote refs, returns dict with
         changed refs (name -> sha, where sha=ZERO_SHA for deletions)
           generate_pack_data: Function that can return a tuple
         with number of elements and pack data to upload.
@@ -1788,7 +1801,7 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
       Tuple with client instance and relative path.
 
     """
-    parsed = urlparse.urlparse(url)
+    parsed = urlparse(url)
     if parsed.scheme == 'git':
         return (TCPGitClient.from_parsedurl(parsed, **kwargs),
                 parsed.path)
@@ -1856,3 +1869,25 @@ def get_transport_and_path(location, **kwargs):
         return default_local_git_client_cls(**kwargs), location
     else:
         return SSHGitClient(hostname, username=username, **kwargs), path
+
+
+DEFAULT_GIT_CREDENTIALS_PATHS = [
+    os.path.expanduser('~/.git-credentials'),
+    get_xdg_config_home_path('git', 'credentials')]
+
+
+def get_credentials_from_store(scheme, hostname, username=None,
+                               fnames=DEFAULT_GIT_CREDENTIALS_PATHS):
+    for fname in fnames:
+        try:
+            with open(fname, 'rb') as f:
+                for line in f:
+                    parsed_line = urlparse(line)
+                    if (parsed_line.scheme == scheme and
+                            parsed_line.hostname == hostname and
+                            (username is None or
+                                parsed_line.username == username)):
+                        return parsed_line.username, parsed_line.password
+        except FileNotFoundError:
+            # If the file doesn't exist, try the next one.
+            continue

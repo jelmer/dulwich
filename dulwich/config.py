@@ -26,7 +26,6 @@ TODO:
    subsections
 """
 
-import errno
 import os
 import sys
 
@@ -487,6 +486,13 @@ class ConfigFile(ConfigDict):
                 f.write(b"\t" + key + b" = " + value + b"\n")
 
 
+def get_xdg_config_home_path(*path_segments):
+    xdg_config_home = os.environ.get(
+        "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
+    )
+    return os.path.join(xdg_config_home, *path_segments)
+
+
 class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
@@ -509,11 +515,7 @@ class StackedConfig(Config):
         """
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))
-
-        xdg_config_home = os.environ.get(
-            "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
-        )
-        paths.append(os.path.join(xdg_config_home, "git", "config"))
+        paths.append(get_xdg_config_home_path("git", "config"))
 
         if "GIT_CONFIG_NOSYSTEM" not in os.environ:
             paths.append("/etc/gitconfig")
@@ -522,11 +524,8 @@ class StackedConfig(Config):
         for path in paths:
             try:
                 cf = ConfigFile.from_path(path)
-            except (IOError, OSError) as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                else:
-                    continue
+            except FileNotFoundError:
+                continue
             backends.append(cf)
         return backends
 

@@ -21,7 +21,6 @@
 """Parser for the git index file format."""
 
 import collections
-import errno
 import os
 import stat
 import struct
@@ -454,7 +453,8 @@ def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
             stat_val.st_gid, stat_val.st_size, hex_sha, flags)
 
 
-def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
+def build_file_from_blob(blob, mode, target_path, honor_filemode=True,
+                         tree_encoding='utf-8'):
     """Build a file or symlink on disk based on a Git object.
 
     Args:
@@ -467,20 +467,15 @@ def build_file_from_blob(blob, mode, target_path, honor_filemode=True):
     """
     try:
         oldstat = os.lstat(target_path)
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            oldstat = None
-        else:
-            raise
+    except FileNotFoundError:
+        oldstat = None
     contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         # FIXME: This will fail on Windows. What should we do instead?
         if oldstat:
             os.unlink(target_path)
-        if sys.platform == 'win32' and sys.version_info[0] == 3:
+        if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
-            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
-            tree_encoding = sys.getfilesystemencoding()
             contents = contents.decode(tree_encoding)
             target_path = target_path.decode(tree_encoding)
         os.symlink(contents, target_path)
@@ -547,7 +542,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
 
     index = Index(index_path)
     if not isinstance(root_path, bytes):
-        root_path = root_path.encode(sys.getfilesystemencoding())
+        root_path = os.fsencode(root_path)
 
     for entry in object_store.iter_tree_contents(tree_id):
         if not validate_path(entry.path, validate_path_element):
@@ -567,6 +562,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
             obj = object_store[entry.sha]
             st = build_file_from_blob(
                 obj, entry.mode, full_path, honor_filemode=honor_filemode)
+
         # Add file to index
         if not honor_filemode or S_ISGITLINK(entry.mode):
             # we can not use tuple slicing to build a new tuple,
@@ -581,7 +577,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     index.write()
 
 
-def blob_from_path_and_stat(fs_path, st):
+def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
     """Create a blob from a path and a stat object.
 
     Args:
@@ -591,18 +587,16 @@ def blob_from_path_and_stat(fs_path, st):
     """
     assert isinstance(fs_path, bytes)
     blob = Blob()
-    if not stat.S_ISLNK(st.st_mode):
-        with open(fs_path, 'rb') as f:
-            blob.data = f.read()
-    else:
-        if sys.platform == 'win32' and sys.version_info[0] == 3:
+    if stat.S_ISLNK(st.st_mode):
+        if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
-            # TODO(jelmer): Don't assume tree_encoding == fs_encoding
-            tree_encoding = sys.getfilesystemencoding()
-            fs_path = fs_path.decode(tree_encoding)
+            fs_path = os.fsdecode(fs_path)
             blob.data = os.readlink(fs_path).encode(tree_encoding)
         else:
             blob.data = os.readlink(fs_path)
+    else:
+        with open(fs_path, 'rb') as f:
+            blob.data = f.read()
     return blob
 
 
@@ -618,7 +612,7 @@ def read_submodule_head(path):
     # Repo currently expects a "str", so decode if necessary.
     # TODO(jelmer): Perhaps move this into Repo() ?
     if not isinstance(path, str):
-        path = path.decode(sys.getfilesystemencoding())
+        path = os.fsdecode(path)
     try:
         repo = Repo(path)
     except NotGitRepository:
@@ -664,7 +658,7 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
     """
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
-        root_path = root_path.encode(sys.getfilesystemencoding())
+        root_path = os.fsencode(root_path)
 
     for tree_path, entry in index.iteritems():
         full_path = _tree_to_fs_path(root_path, tree_path)
@@ -675,17 +669,17 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
                     yield tree_path
                 continue
 
+            if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+                continue
+
             blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
                 blob = filter_blob_callback(blob, tree_path)
-        except EnvironmentError as e:
-            if e.errno == errno.ENOENT:
-                # The file was removed, so we assume that counts as
-                # different from whatever file used to exist.
-                yield tree_path
-            else:
-                raise
+        except FileNotFoundError:
+            # The file was removed, so we assume that counts as
+            # different from whatever file used to exist.
+            yield tree_path
         else:
             if blob.id != entry.sha:
                 yield tree_path
@@ -711,19 +705,16 @@ def _tree_to_fs_path(root_path, tree_path):
     return os.path.join(root_path, sep_corrected_path)
 
 
-def _fs_to_tree_path(fs_path, fs_encoding=None):
+def _fs_to_tree_path(fs_path):
     """Convert a file system path to a git tree path.
 
     Args:
       fs_path: File system path.
-      fs_encoding: File system encoding
 
     Returns:  Git tree path as bytes
     """
-    if fs_encoding is None:
-        fs_encoding = sys.getfilesystemencoding()
     if not isinstance(fs_path, bytes):
-        fs_path_bytes = fs_path.encode(fs_encoding)
+        fs_path_bytes = os.fsencode(fs_path)
     else:
         fs_path_bytes = fs_path
     if os_sep_bytes != b'/':
@@ -757,10 +748,13 @@ def index_entry_from_path(path, object_store=None):
                 st, head, 0, mode=S_IFGITLINK)
         return None
 
-    blob = blob_from_path_and_stat(path, st)
-    if object_store is not None:
-        object_store.add_object(blob)
-    return index_entry_from_stat(st, blob.id, 0)
+    if stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode):
+        blob = blob_from_path_and_stat(path, st)
+        if object_store is not None:
+            object_store.add_object(blob)
+        return index_entry_from_stat(st, blob.id, 0)
+
+    return None
 
 
 def iter_fresh_entries(paths, root_path, object_store=None):
@@ -776,11 +770,8 @@ def iter_fresh_entries(paths, root_path, object_store=None):
         p = _tree_to_fs_path(root_path, path)
         try:
             entry = index_entry_from_path(p, object_store=object_store)
-        except EnvironmentError as e:
-            if e.errno in (errno.ENOENT, errno.EISDIR):
-                entry = None
-            else:
-                raise
+        except (FileNotFoundError, IsADirectoryError):
+            entry = None
         yield path, entry
 
 

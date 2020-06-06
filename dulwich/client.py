@@ -519,6 +519,11 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
+    @staticmethod
+    def _should_send_pack(new_refs):
+        # The packfile MUST NOT be sent if the only command used is delete.
+        return any(sha != ZERO_SHA for sha in new_refs.values())
+
     def _handle_receive_pack_head(self, proto, capabilities, old_refs,
                                   new_refs):
         """Handle the head of a 'git-receive-pack' request.
@@ -530,8 +535,7 @@ class GitClient(object):
           new_refs: Refs to change
 
         Returns:
-          have, want) tuple
-
+          (have, want) tuple
         """
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
@@ -813,6 +817,10 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 raise
 
+            if set(new_refs.items()).issubset(set(old_refs.items())):
+                proto.write_pkt_line(None)
+                return new_refs
+
             if CAPABILITY_DELETE_REFS not in server_capabilities:
                 # Server does not support deletions. Fail later.
                 new_refs = dict(orig_new_refs)
@@ -838,18 +846,12 @@ class TraditionalGitClient(GitClient):
 
             (have, want) = self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
-            if (not want and
-                    set(new_refs.items()).issubset(set(old_refs.items()))):
-                return new_refs
+
             pack_data_count, pack_data = generate_pack_data(
                 have, want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
 
-            dowrite = bool(pack_data_count)
-            dowrite = dowrite or any(old_refs.get(ref) != sha
-                                     for (ref, sha) in new_refs.items()
-                                     if sha != ZERO_SHA)
-            if dowrite:
+            if self._should_send_pack(new_refs):
                 write_pack_data(proto.write_file(), pack_data_count, pack_data)
 
             self._handle_receive_pack_tail(
@@ -1707,18 +1709,18 @@ class HttpGitClient(GitClient):
         if new_refs is None:
             # Determine wants function is aborting the push.
             return old_refs
+        if set(new_refs.items()).issubset(set(old_refs.items())):
+            return new_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
-        if not want and set(new_refs.items()).issubset(set(old_refs.items())):
-            return new_refs
         pack_data_count, pack_data = generate_pack_data(
                 have, want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
-        if pack_data_count:
+        if self._should_send_pack(new_refs):
             write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())

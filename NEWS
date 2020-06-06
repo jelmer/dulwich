@@ -6,6 +6,10 @@
  * Support passing tree and output encoding to
    dulwich.patch.unified_diff. (Jelmer Vernooĳ, #763)
 
+ * Fix pushing of new refs over HTTP(S) when there are
+   no new objects to be sent.
+   (Jelmer Vernooĳ, #739)
+
 0.20.2	2020-06-01
 
  * Brown bag release to fix uploads of Windows wheels.

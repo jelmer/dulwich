@@ -226,6 +226,7 @@ class GitClientTests(TestCase):
                           update_refs, generate_pack_data)
 
     def test_send_pack_none(self):
+        # Set ref to current value
         self.rin.write(
             b'0078310ca9477129b8586fa2afc779c1f57cf64bba6c '
             b'refs/heads/master\x00 report-status delete-refs '
@@ -242,7 +243,7 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.client.send_pack(b'/', update_refs, set(), generate_pack_data)
+        self.client.send_pack(b'/', update_refs, generate_pack_data)
         self.assertEqual(self.rout.getvalue(), b'0000')
 
     def test_send_pack_keep_and_delete(self):

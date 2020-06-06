@@ -33,6 +33,7 @@ import sys
 from getopt import getopt
 import optparse
 import signal
+from typing import Dict
 
 def signal_int(signal, frame):
     sys.exit(1)
@@ -536,7 +537,7 @@ class cmd_remote_add(Command):
 
 class SuperCommand(Command):
 
-    subcommands = {}
+    subcommands: Dict[str, Command]  = {}
 
     def run(self, args):
         if not args:

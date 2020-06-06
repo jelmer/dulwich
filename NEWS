@@ -14,8 +14,11 @@
    back a 401. The client can then retry with credentials.
    (Jelmer Vernooĳ, #691)
 
- * Install dulwich script from entry_points, making it slightly easier
-   to use on Windows. (Jelmer Vernooĳ, #540)
+ * Move the guts of bin/dulwich to dulwich.cli, so it is easier to
+   test or import. (Jelmer Vernooĳ)
+
+ * Install dulwich script from entry_points when setuptools is available,
+   making it slightly easier to use on Windows. (Jelmer Vernooĳ, #540)
 
 0.20.2	2020-06-01
 

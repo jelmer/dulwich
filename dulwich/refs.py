@@ -146,15 +146,19 @@ class RefsContainer(object):
         else:
             to_delete = set()
         for name, value in other.items():
-            self.set_if_equals(b'/'.join((base, name)), None, value,
-                               message=message)
+            if value is None:
+                to_delete.add(name)
+            else:
+                self.set_if_equals(b'/'.join((base, name)), None, value,
+                                   message=message)
             if to_delete:
                 try:
                     to_delete.remove(name)
                 except KeyError:
                     pass
         for ref in to_delete:
-            self.remove_if_equals(b'/'.join((base, ref)), None)
+            self.remove_if_equals(
+                b'/'.join((base, ref)), None, message=message)
 
     def allkeys(self):
         """All refs present in this container."""

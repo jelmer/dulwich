@@ -23,3 +23,5 @@ dulwich.egg-info/
 htmlcov/
 docs/api/*.txt
 .mypy_cache/
+.eggs
+dulwich.dist-info

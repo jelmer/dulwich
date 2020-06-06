@@ -42,10 +42,6 @@ def signal_quit(signal, frame):
     import pdb
     pdb.set_trace()
 
-if 'DULWICH_PDB' in os.environ:
-    signal.signal(signal.SIGQUIT, signal_quit)
-signal.signal(signal.SIGINT, signal_int)
-
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
@@ -702,15 +698,25 @@ commands = {
     "write-tree": cmd_write_tree,
     }
 
-if len(sys.argv) < 2:
-    print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
-    sys.exit(1)
 
-cmd = sys.argv[1]
-try:
-    cmd_kls = commands[cmd]
-except KeyError:
-    print("No such subcommand: %s" % cmd)
-    sys.exit(1)
-# TODO(jelmer): Return non-0 on errors
-cmd_kls().run(sys.argv[2:])
+def main(argv=None):
+    if len(argv) < 1:
+        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        return 1
+
+    cmd = argv[0]
+    try:
+        cmd_kls = commands[cmd]
+    except KeyError:
+        print("No such subcommand: %s" % cmd)
+        return 1
+    # TODO(jelmer): Return non-0 on errors
+    return cmd_kls().run(sys.argv[1:])
+
+
+if __name__ == '__main__':
+    if 'DULWICH_PDB' in os.environ:
+        signal.signal(signal.SIGQUIT, signal_quit)
+    signal.signal(signal.SIGINT, signal_int)
+
+    sys.exit(main(sys.argv[1:]))

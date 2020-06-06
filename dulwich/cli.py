@@ -35,14 +35,6 @@ import optparse
 import signal
 from typing import Dict
 
-def signal_int(signal, frame):
-    sys.exit(1)
-
-
-def signal_quit(signal, frame):
-    import pdb
-    pdb.set_trace()
-
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
@@ -50,6 +42,15 @@ from dulwich.index import Index
 from dulwich.pack import Pack, sha_to_hex
 from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
+
+
+def signal_int(signal, frame):
+    sys.exit(1)
+
+
+def signal_quit(signal, frame):
+    import pdb
+    pdb.set_trace()
 
 
 class Command(object):
@@ -70,10 +71,12 @@ class cmd_archive(Command):
         committish = args.pop(0)
         if options.remote:
             client, path = get_transport_and_path(options.remote)
-            client.archive(path, committish, sys.stdout.write,
-                    write_error=sys.stderr.write)
+            client.archive(
+                path, committish, sys.stdout.write,
+                write_error=sys.stderr.write)
         else:
-            porcelain.archive('.', committish, outstream=sys.stdout,
+            porcelain.archive(
+                '.', committish, outstream=sys.stdout,
                 errstream=sys.stderr)
 
 
@@ -103,7 +106,8 @@ class cmd_fetch_pack(Command):
         if "--all" in opts:
             determine_wants = r.object_store.determine_wants_all
         else:
-            determine_wants = lambda x: [y for y in args if not y in r.object_store]
+            def determine_wants(x):
+                return [y for y in args if y not in r.object_store]
         client.fetch(path, r, determine_wants)
 
 
@@ -114,8 +118,6 @@ class cmd_fetch(Command):
         opts = dict(opts)
         client, path = get_transport_and_path(args.pop(0))
         r = Repo(".")
-        if "--all" in opts:
-            determine_wants = r.object_store.determine_wants_all
         refs = client.fetch(path, r, progress=sys.stdout.write)
         print("Remote refs:")
         for item in refs.items():
@@ -137,7 +139,8 @@ class cmd_log(Command):
         parser = optparse.OptionParser()
         parser.add_option("--reverse", dest="reverse", action="store_true",
                           help="Reverse order in which entries are printed")
-        parser.add_option("--name-status", dest="name_status", action="store_true",
+        parser.add_option("--name-status", dest="name_status",
+                          action="store_true",
                           help="Print name/status for each changed file")
         options, args = parser.parse_args(args)
 
@@ -159,7 +162,8 @@ class cmd_diff(Command):
         commit_id = args[0]
         commit = r[commit_id]
         parent_commit = r[commit.parents[0]]
-        write_tree_diff(sys.stdout, r.object_store, parent_commit.tree, commit.tree)
+        write_tree_diff(
+            sys.stdout, r.object_store, parent_commit.tree, commit.tree)
 
 
 class cmd_dump_pack(Command):
@@ -309,8 +313,12 @@ class cmd_tag(Command):
 
     def run(self, args):
         parser = optparse.OptionParser()
-        parser.add_option("-a", "--annotated", help="Create an annotated tag.", action="store_true")
-        parser.add_option("-s", "--sign", help="Sign the annotated tag.", action="store_true")
+        parser.add_option(
+            "-a", "--annotated", help="Create an annotated tag.",
+            action="store_true")
+        parser.add_option(
+            "-s", "--sign", help="Sign the annotated tag.",
+            action="store_true")
         options, args = parser.parse_args(args)
         porcelain.tag_create(
             '.', args[0], annotated=options.annotated,
@@ -439,8 +447,8 @@ class cmd_status(Command):
         if status.unstaged:
             sys.stdout.write("Changes not staged for commit:\n\n")
             for name in status.unstaged:
-                sys.stdout.write("\t%s\n" %
-                        name.decode(sys.getfilesystemencoding()))
+                sys.stdout.write(
+                    "\t%s\n" % name.decode(sys.getfilesystemencoding()))
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
@@ -484,10 +492,10 @@ class cmd_pack_objects(Command):
     def run(self, args):
         opts, args = getopt(args, '', ['stdout'])
         opts = dict(opts)
-        if len(args) < 1 and not '--stdout' in args:
+        if len(args) < 1 and '--stdout' not in args:
             print('Usage: dulwich pack-objects basename')
             sys.exit(1)
-        object_ids = [l.strip() for l in sys.stdin.readlines()]
+        object_ids = [line.strip() for line in sys.stdin.readlines()]
         basename = args[0]
         if '--stdout' in opts:
             packf = getattr(sys.stdout, 'buffer', sys.stdout)
@@ -537,11 +545,12 @@ class cmd_remote_add(Command):
 
 class SuperCommand(Command):
 
-    subcommands: Dict[str, Command]  = {}
+    subcommands = {}  # type: Dict[str, Command]
 
     def run(self, args):
         if not args:
-            print("Supported subcommands: %s" % ', '.join(self.subcommands.keys()))
+            print("Supported subcommands: %s" %
+                  ', '.join(self.subcommands.keys()))
             return False
         cmd = args[0]
         try:
@@ -702,7 +711,7 @@ commands = {
 
 def main(argv=None):
     if len(argv) < 1:
-        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        print("Usage: dulwich <%s> [OPTIONS...]" % ("|".join(commands.keys())))
         return 1
 
     cmd = argv[0]

@@ -317,6 +317,7 @@ class DulwichClientTestBase(object):
             dest.refs[b'refs/heads/master'] = dummy_commit
             dest.refs[b'refs/heads/abranch'] = dummy_commit
             sendrefs = {b'refs/heads/bbranch': dummy_commit}
+
             def gen_pack(have, want, ofs_delta=False):
                 return 0, []
             c = self._client()

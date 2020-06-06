@@ -245,7 +245,7 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
         self.assertEqual(0, len(target_repo.open_index()))
-        self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'])
+        self.assertEqual(c3.id, target_repo.refs[b'refs/tags/foo'], target_repo.refs.as_dict())
         self.assertTrue(b'f1' not in os.listdir(target_path))
         self.assertTrue(b'f2' not in os.listdir(target_path))
         c = r.get_config()
@@ -900,8 +900,12 @@ class PushTests(PorcelainTestCase):
         self.repo.refs[refs_path] = new_id
 
         # Push to the remote
-        porcelain.push(clone_path, self.repo.path, b"HEAD:" + refs_path,
+        porcelain.push(clone_path, 'origin', b"HEAD:" + refs_path,
                        outstream=outstream, errstream=errstream)
+
+        self.assertEqual(
+            target_repo.refs[b'refs/remotes/origin/foo'],
+            target_repo.refs[b'HEAD'])
 
         # Check that the target and source
         with Repo(clone_path) as r_clone:
@@ -1378,7 +1382,7 @@ class FetchTests(PorcelainTestCase):
         target_repo.close()
 
         # Fetch changes into the cloned repo
-        porcelain.fetch(target_path, self.repo.path,
+        porcelain.fetch(target_path, 'origin',
                         outstream=outstream, errstream=errstream)
 
         # Assert that fetch updated the local image of the remote
@@ -1390,7 +1394,7 @@ class FetchTests(PorcelainTestCase):
             self.assertTrue(self.repo[b'HEAD'].id in r)
 
     def test_with_remote_name(self):
-        remote_name = b'origin'
+        remote_name = 'origin'
         outstream = BytesIO()
         errstream = BytesIO()
 
@@ -1420,10 +1424,14 @@ class FetchTests(PorcelainTestCase):
                          committer=b'test2 <email>')
 
         self.assertFalse(self.repo[b'HEAD'].id in target_repo)
+
+        target_config = target_repo.get_config()
+        target_config.set(
+            (b'remote', remote_name.encode()), b'url', self.repo.path.encode())
         target_repo.close()
 
         # Fetch changes into the cloned repo
-        porcelain.fetch(target_path, self.repo.path, remote_name=remote_name,
+        porcelain.fetch(target_path, remote_name,
                         outstream=outstream, errstream=errstream)
 
         # Assert that fetch updated the local image of the remote

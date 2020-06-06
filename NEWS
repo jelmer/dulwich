@@ -3,6 +3,9 @@
  * Add support for remembering remote refs after push/pull.
    (Jelmer Vernooĳ, #752)
 
+ * Support passing tree and output encoding to
+   dulwich.patch.unified_diff. (Jelmer Vernooĳ, #763)
+
 0.20.2	2020-06-01
 
  * Brown bag release to fix uploads of Windows wheels.

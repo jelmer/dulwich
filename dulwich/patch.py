@@ -105,7 +105,7 @@ def _format_range_unified(start, stop):
 
 def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
                  tofiledate='', n=3, lineterm='\n', tree_encoding='utf-8',
-                 output_encoding=None):
+                 output_encoding='utf-8'):
     """difflib.unified_diff that can detect "No newline at end of file" as
     original "git diff" does.
 

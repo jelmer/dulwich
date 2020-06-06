@@ -10,6 +10,10 @@
    no new objects to be sent.
    (Jelmer Vernooĳ, #739)
 
+ * Raise new error HTTPUnauthorized when the server sends
+   back a 401. The client can then retry with credentials.
+   (Jelmer Vernooĳ, #691)
+
 0.20.2	2020-06-01
 
  * Brown bag release to fix uploads of Windows wheels.

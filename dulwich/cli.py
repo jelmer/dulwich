@@ -725,7 +725,7 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    if 'DULWICH_PDB' in os.environ:
+    if 'DULWICH_PDB' in os.environ and getattr(signal, 'SIGQUIT', None):
         signal.signal(signal.SIGQUIT, signal_quit)
     signal.signal(signal.SIGINT, signal_int)
 

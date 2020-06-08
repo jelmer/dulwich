@@ -33,7 +33,7 @@ import sys
 from getopt import getopt
 import optparse
 import signal
-from typing import Dict
+from typing import Dict, Type
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
@@ -545,7 +545,7 @@ class cmd_remote_add(Command):
 
 class SuperCommand(Command):
 
-    subcommands = {}  # type: Dict[str, Command]
+    subcommands = {}  # type: Dict[str, Type[Command]]
 
     def run(self, args):
         if not args:

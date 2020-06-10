@@ -721,7 +721,7 @@ def main(argv=None):
         print("No such subcommand: %s" % cmd)
         return 1
     # TODO(jelmer): Return non-0 on errors
-    return cmd_kls().run(sys.argv[1:])
+    return cmd_kls().run(argv[1:])
 
 
 if __name__ == '__main__':

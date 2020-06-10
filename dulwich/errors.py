@@ -134,8 +134,14 @@ class HangupException(GitProtocolError):
     """Hangup exception."""
 
     def __init__(self, stderr_lines=None):
-        super(HangupException, self).__init__(
-            "The remote server unexpectedly closed the connection.")
+        if stderr_lines:
+            super(HangupException, self).__init__(
+                '\n'.join(
+                    [line.decode('utf-8', 'surrogateescape')
+                     for line in stderr_lines]))
+        else:
+            super(HangupException, self).__init__(
+                "The remote server unexpectedly closed the connection.")
         self.stderr_lines = stderr_lines
 
 

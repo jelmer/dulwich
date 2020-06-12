@@ -751,8 +751,8 @@ def check_wants(wants, refs):
 def _remote_error_from_stderr(stderr):
     if stderr is None:
         raise HangupException()
-    lines = list(stderr.readlines())
-    for line in stderr.readlines():
+    lines = [line.rstrip(b'\n') for line in stderr.readlines()]
+    for line in lines:
         if line.startswith(b'ERROR: '):
             raise GitProtocolError(
                 line[len(b'ERROR: '):].decode('utf-8', 'replace'))

@@ -15,7 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.20.2'
+dulwich_version_string = '0.20.3'
 
 
 class DulwichDistribution(Distribution):

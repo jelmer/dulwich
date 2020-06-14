@@ -1,4 +1,4 @@
-0.21.0	UNRELEASED
+0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.
    (Jelmer Vernooĳ, #752)

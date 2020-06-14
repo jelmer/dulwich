@@ -79,6 +79,7 @@ if has_setuptools:
         "console_scripts": [
             "dulwich=dulwich.cli:main",
         ]}
+    setup_kwargs['python_requires'] = '>=3.5'
 else:
     scripts.append('bin/dulwich')
 

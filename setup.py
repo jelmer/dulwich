@@ -15,7 +15,7 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.20.2'
+dulwich_version_string = '0.20.3'
 
 
 class DulwichDistribution(Distribution):
@@ -64,7 +64,7 @@ ext_modules = [
 ]
 
 setup_kwargs = {}
-
+scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
@@ -75,6 +75,14 @@ if has_setuptools:
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
     setup_kwargs['tests_require'] = tests_require
+    setup_kwargs['entry_points'] = {
+        "console_scripts": [
+            "dulwich=dulwich.cli:main",
+        ]}
+    setup_kwargs['python_requires'] = '>=3.5'
+else:
+    scripts.append('bin/dulwich')
+
 
 with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
              encoding="utf-8") as f:
@@ -97,7 +105,7 @@ setup(name='dulwich',
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
                 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt']},
-      scripts=['bin/dulwich', 'bin/dul-receive-pack', 'bin/dul-upload-pack'],
+      scripts=scripts,
       ext_modules=ext_modules,
       distclass=DulwichDistribution,
       classifiers=[

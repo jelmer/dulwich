@@ -11,7 +11,6 @@ NEWS
 README.rst
 README.swift.rst
 TODO
-appveyor.yml
 build.cmd
 dulwich.cfg
 requirements.txt
@@ -50,6 +49,7 @@ dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c
 dulwich/archive.py
+dulwich/cli.py
 dulwich/client.py
 dulwich/config.py
 dulwich/diff_tree.py
@@ -83,6 +83,7 @@ dulwich/web.py
 dulwich.egg-info/PKG-INFO
 dulwich.egg-info/SOURCES.txt
 dulwich.egg-info/dependency_links.txt
+dulwich.egg-info/entry_points.txt
 dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
 dulwich/contrib/README.md

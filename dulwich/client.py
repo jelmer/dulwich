@@ -120,6 +120,14 @@ class InvalidWants(Exception):
             "requested wants not in server provided refs: %r" % wants)
 
 
+class HTTPUnauthorized(Exception):
+    """Raised when authentication fails."""
+
+    def __init__(self, www_authenticate):
+        Exception.__init__(self, "No valid credentials provided")
+        self.www_authenticate = www_authenticate
+
+
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable.
     """
@@ -519,6 +527,11 @@ class GitClient(object):
                 if cb is not None:
                     cb(pkt)
 
+    @staticmethod
+    def _should_send_pack(new_refs):
+        # The packfile MUST NOT be sent if the only command used is delete.
+        return any(sha != ZERO_SHA for sha in new_refs.values())
+
     def _handle_receive_pack_head(self, proto, capabilities, old_refs,
                                   new_refs):
         """Handle the head of a 'git-receive-pack' request.
@@ -530,8 +543,7 @@ class GitClient(object):
           new_refs: Refs to change
 
         Returns:
-          have, want) tuple
-
+          (have, want) tuple
         """
         want = []
         have = [x for x in old_refs.values() if not x == ZERO_SHA]
@@ -736,15 +748,16 @@ def check_wants(wants, refs):
         raise InvalidWants(missing)
 
 
-def remote_error_from_stderr(stderr):
+def _remote_error_from_stderr(stderr):
     if stderr is None:
-        return HangupException()
-    for line in stderr.readlines():
+        raise HangupException()
+    lines = [line.rstrip(b'\n') for line in stderr.readlines()]
+    for line in lines:
         if line.startswith(b'ERROR: '):
-            return GitProtocolError(
+            raise GitProtocolError(
                 line[len(b'ERROR: '):].decode('utf-8', 'replace'))
-        return GitProtocolError(line.decode('utf-8', 'replace'))
-    return HangupException()
+        raise GitProtocolError(line.decode('utf-8', 'replace'))
+    raise HangupException(lines)
 
 
 class TraditionalGitClient(GitClient):
@@ -799,7 +812,7 @@ class TraditionalGitClient(GitClient):
             try:
                 old_refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             negotiated_capabilities = \
                 self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
@@ -811,6 +824,10 @@ class TraditionalGitClient(GitClient):
             except BaseException:
                 proto.write_pkt_line(None)
                 raise
+
+            if set(new_refs.items()).issubset(set(old_refs.items())):
+                proto.write_pkt_line(None)
+                return new_refs
 
             if CAPABILITY_DELETE_REFS not in server_capabilities:
                 # Server does not support deletions. Fail later.
@@ -837,18 +854,12 @@ class TraditionalGitClient(GitClient):
 
             (have, want) = self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
-            if (not want and
-                    set(new_refs.items()).issubset(set(old_refs.items()))):
-                return new_refs
+
             pack_data_count, pack_data = generate_pack_data(
                 have, want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
 
-            dowrite = bool(pack_data_count)
-            dowrite = dowrite or any(old_refs.get(ref) != sha
-                                     for (ref, sha) in new_refs.items()
-                                     if sha != ZERO_SHA)
-            if dowrite:
+            if self._should_send_pack(new_refs):
                 write_pack_data(proto.write_file(), pack_data_count, pack_data)
 
             self._handle_receive_pack_tail(
@@ -878,7 +889,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             negotiated_capabilities, symrefs, agent = (
                     self._negotiate_upload_pack_capabilities(
                             server_capabilities))
@@ -915,7 +926,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, _ = read_pkt_refs(proto)
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             proto.write_pkt_line(None)
             return refs
 
@@ -935,7 +946,7 @@ class TraditionalGitClient(GitClient):
             try:
                 pkt = proto.read_pkt_line()
             except HangupException:
-                raise remote_error_from_stderr(stderr)
+                _remote_error_from_stderr(stderr)
             if pkt == b"NACK\n":
                 return
             elif pkt == b"ACK\n":
@@ -1596,6 +1607,8 @@ class HttpGitClient(GitClient):
 
         if resp.status == 404:
             raise NotGitRepository()
+        elif resp.status == 401:
+            raise HTTPUnauthorized(resp.getheader('WWW-Authenticate'))
         elif resp.status != 200:
             raise GitProtocolError("unexpected http resp %d for %s" %
                                    (resp.status, url))
@@ -1706,18 +1719,18 @@ class HttpGitClient(GitClient):
         if new_refs is None:
             # Determine wants function is aborting the push.
             return old_refs
+        if set(new_refs.items()).issubset(set(old_refs.items())):
+            return new_refs
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (have, want) = self._handle_receive_pack_head(
             req_proto, negotiated_capabilities, old_refs, new_refs)
-        if not want and set(new_refs.items()).issubset(set(old_refs.items())):
-            return new_refs
         pack_data_count, pack_data = generate_pack_data(
                 have, want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities))
-        if pack_data_count:
+        if self._should_send_pack(new_refs):
             write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
         resp, read = self._smart_request("git-receive-pack", url,
                                          data=req_data.getvalue())

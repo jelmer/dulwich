@@ -104,7 +104,8 @@ def _format_range_unified(start, stop):
 
 
 def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
-                 tofiledate='', n=3, lineterm='\n'):
+                 tofiledate='', n=3, lineterm='\n', tree_encoding='utf-8',
+                 output_encoding='utf-8'):
     """difflib.unified_diff that can detect "No newline at end of file" as
     original "git diff" does.
 
@@ -117,15 +118,15 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
             todate = '\t{}'.format(tofiledate) if tofiledate else ''
             yield '--- {}{}{}'.format(
-                fromfile.decode("ascii"),
+                fromfile.decode(tree_encoding),
                 fromdate,
                 lineterm
-                ).encode('ascii')
+                ).encode(output_encoding)
             yield '+++ {}{}{}'.format(
-                tofile.decode("ascii"),
+                tofile.decode(tree_encoding),
                 todate,
                 lineterm
-                ).encode('ascii')
+                ).encode(output_encoding)
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
@@ -134,7 +135,7 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
             file1_range,
             file2_range,
             lineterm
-             ).encode('ascii')
+             ).encode(output_encoding)
 
         for tag, i1, i2, j1, j2 in group:
             if tag == 'equal':

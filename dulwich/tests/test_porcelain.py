@@ -512,6 +512,20 @@ class RemoveTests(PorcelainTestCase):
         finally:
             os.chdir(cwd)
 
+    def test_remove_file_removed_on_disk(self):
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            os.remove(fullpath)
+            porcelain.remove(self.repo.path, paths=["foo"])
+        finally:
+            os.chdir(cwd)
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, 'foo')))
+
 
 class LogTests(PorcelainTestCase):
 

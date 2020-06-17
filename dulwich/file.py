@@ -23,7 +23,6 @@
 import io
 import os
 import sys
-import tempfile
 
 
 def ensure_dir_exists(dirname):
@@ -43,6 +42,8 @@ def _fancy_rename(oldname, newname):
             raise
         return
 
+    # Defer the tempfile import since it pulls in a lot of other things.
+    import tempfile
     # destination file exists
     try:
         (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")

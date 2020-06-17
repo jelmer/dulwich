@@ -314,7 +314,7 @@ def _count_blocks(obj):
     block_truncate = block.truncate
     block_getvalue = block.getvalue
 
-    for c in chain(*obj.as_raw_chunks()):
+    for c in chain.from_iterable(obj.as_raw_chunks()):
         c = c.to_bytes(1, 'big')
         block_write(c)
         n += 1

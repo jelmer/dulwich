@@ -22,7 +22,6 @@
 
 import os
 import subprocess
-import tempfile
 
 from dulwich.errors import (
     HookError,
@@ -137,6 +136,7 @@ class CommitMsgShellHook(ShellHook):
         filepath = os.path.join(controldir, 'hooks', 'commit-msg')
 
         def prepare_msg(*args):
+            import tempfile
             (fd, path) = tempfile.mkstemp()
 
             with os.fdopen(fd, 'wb') as f:

@@ -26,7 +26,6 @@ from io import BytesIO
 import os
 import stat
 import sys
-import tempfile
 
 from dulwich.diff_tree import (
     tree_changes,
@@ -757,6 +756,7 @@ class DiskObjectStore(PackBasedObjectStore):
         Returns: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
         """
+        import tempfile
         fd, path = tempfile.mkstemp(dir=self.path, prefix='tmp_pack_')
         with os.fdopen(fd, 'w+b') as f:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
@@ -804,6 +804,7 @@ class DiskObjectStore(PackBasedObjectStore):
             call when the pack is finished and an abort
             function.
         """
+        import tempfile
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, 'wb')
 

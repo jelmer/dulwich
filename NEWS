@@ -1,3 +1,8 @@
+0.20.4	UNRELEASED
+
+ * Print a clearer exception when setup.py is executed on Python < 3.5.
+   (Jelmer Vernooĳ, #783)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

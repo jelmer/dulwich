@@ -178,6 +178,8 @@ class ParseReftupleTests(TestCase):
                          parse_reftuple(r, r, b"+foo"))
         self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
                          parse_reftuple(r, {}, b"+foo"))
+        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
+                         parse_reftuple(r, {}, b"foo", True))
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
@@ -216,6 +218,9 @@ class ParseReftuplesTests(TestCase):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
                          parse_reftuples(r, r, b"refs/heads/foo"))
+        r = {b"refs/heads/foo": "bla"}
+        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", True)],
+                         parse_reftuples(r, r, b"refs/heads/foo", True))
 
 
 class ParseTreeTests(TestCase):

@@ -190,7 +190,7 @@ def get_info_refs(req, backend, mat):
             HTTP_OK, 'application/x-%s-advertisement' % service)
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(backend, [url_prefix(mat)], proto,
-                              http_req=req, advertise_refs=True)
+                              stateless_rpc=req, advertise_refs=True)
         handler.proto.write_pkt_line(
             b'# service=' + service.encode('ascii') + b'\n')
         handler.proto.write_pkt_line(None)
@@ -252,7 +252,7 @@ def handle_service_request(req, backend, mat):
     proto = ReceivableProtocol(req.environ['wsgi.input'].read, write)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
-    handler = handler_cls(backend, [url_prefix(mat)], proto, http_req=req)
+    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=req)
     handler.handle()
 
 

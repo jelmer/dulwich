@@ -327,11 +327,11 @@ class DumbHandlersTestCase(WebTestCase):
 class SmartHandlersTestCase(WebTestCase):
 
     class _TestUploadPackHandler(object):
-        def __init__(self, backend, args, proto, http_req=None,
+        def __init__(self, backend, args, proto, stateless_rpc=None,
                      advertise_refs=False):
             self.args = args
             self.proto = proto
-            self.http_req = http_req
+            self.stateless_rpc = stateless_rpc
             self.advertise_refs = advertise_refs
 
         def handle(self):
@@ -368,7 +368,7 @@ class SmartHandlersTestCase(WebTestCase):
         self.assertEqual(b'handled input: foo', write_output)
         self.assertContentTypeEquals('application/x-git-upload-pack-result')
         self.assertFalse(self._handler.advertise_refs)
-        self.assertTrue(self._handler.http_req)
+        self.assertTrue(self._handler.stateless_rpc)
         self.assertFalse(self._req.cached)
 
     def test_handle_service_request(self):
@@ -412,7 +412,7 @@ class SmartHandlersTestCase(WebTestCase):
         # Ensure all output was written via the write callback.
         self.assertEqual(b'', handler_output)
         self.assertTrue(self._handler.advertise_refs)
-        self.assertTrue(self._handler.http_req)
+        self.assertTrue(self._handler.stateless_rpc)
         self.assertFalse(self._req.cached)
 
 

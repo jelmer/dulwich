@@ -534,7 +534,7 @@ class TestProtocolGraphWalker(object):
         self.acks = []
         self.lines = []
         self.wants_satisified = False
-        self.http_req = None
+        self.stateless_rpc = None
         self.advertise_refs = False
         self._impl = None
         self.done_required = True
@@ -957,7 +957,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_stateless(self):
         # transmission ends with a flush-pkt
         self._walker.lines[-1] = (None, None)
-        self._walker.http_req = True
+        self._walker.stateless_rpc = True
 
         self.assertNextEquals(TWO)
         self.assertNoAck()
@@ -980,7 +980,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self._walker.done_required = False
         # transmission ends with a flush-pkt
         self._walker.lines[-1] = (None, None)
-        self._walker.http_req = True
+        self._walker.stateless_rpc = True
 
         self.assertNextEquals(TWO)
         self.assertNoAck()

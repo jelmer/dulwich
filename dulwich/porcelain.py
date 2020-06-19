@@ -209,13 +209,28 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    path = Path(path).resolve()
-    repopath = Path(repopath).resolve()
-    relpath = path.relative_to(repopath)
-    if sys.platform == 'win32':
-        return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+    # Pathlib resolve before Python 3.6 could raises FileNotFoundError in case
+    # there is no file matching the path so we reuse the old implementation for
+    # Python 3.5
+    if sys.version_info < (3, 6):
+        if not isinstance(path, bytes):
+            path = os.fsencode(path)
+        if not isinstance(repopath, bytes):
+            repopath = os.fsencode(repopath)
+        treepath = os.path.relpath(path, repopath)
+        if treepath.startswith(b'..'):
+            raise ValueError('Path %r not in repo path (%r)' % (path, repopath))
+        if os.path.sep != '/':
+            treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
+        return treepath
     else:
-        return bytes(relpath)
+        path = Path(path).resolve()
+        repopath = Path(repopath).resolve()
+        relpath = path.relative_to(repopath)
+        if sys.platform == 'win32':
+            return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+        else:
+            return bytes(relpath)
 
 
 def archive(repo, committish=None, outstream=default_bytes_out_stream,

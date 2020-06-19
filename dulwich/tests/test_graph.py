@@ -19,11 +19,11 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 
-"""Tests for merge_base."""
+"""Tests for dulwich.graph."""
 
 from dulwich.tests import TestCase
 
-from dulwich.merge_base import _find_lcas
+from dulwich.graph import _find_lcas
 
 
 class FindMergeBaseTests(TestCase):

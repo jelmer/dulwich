@@ -7,6 +7,8 @@
    already have those objects. Thanks to Martijn Pieters for
    the detailed bug report. (Jelmer Vernooĳ, #781)
 
+ * Add functionality for finding the merge base. (Kevin Hendricks)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

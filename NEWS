@@ -3,6 +3,10 @@
  * Print a clearer exception when setup.py is executed on Python < 3.5.
    (Jelmer Vernooĳ, #783)
 
+ * Send an empty pack to clients if they requested objects, even if they
+   already have those objects. Thanks to Martijn Pieters for
+   the detailed bug report. (Jelmer Vernooĳ, #781)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

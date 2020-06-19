@@ -984,7 +984,9 @@ def pull(repo, remote_location=None, refspecs=None,
         def determine_wants(remote_refs):
             selected_refs.extend(
                 parse_reftuples(remote_refs, r.refs, refspecs))
-            return [remote_refs[lh] for (lh, rh, force) in selected_refs]
+            return [
+                remote_refs[lh] for (lh, rh, force) in selected_refs
+                if remote_refs[lh] not in r.object_store]
         client, path = get_transport_and_path(
                 remote_location, config=r.get_config_stack(), **kwargs)
         fetch_result = client.fetch(

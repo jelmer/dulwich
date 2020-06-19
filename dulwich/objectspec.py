@@ -137,7 +137,7 @@ def parse_reftuples(
     # TODO: Support * in refspecs
     for refspec in refspecs:
         ret.append(parse_reftuple(
-        lh_container, rh_container, refspec, force=force))
+            lh_container, rh_container, refspec, force=force))
     return ret
 
 

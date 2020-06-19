@@ -269,6 +269,7 @@ class DulwichClientTestBase(object):
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
+
             def dw(refs):
                 return list(refs.values())
             result = c.fetch(

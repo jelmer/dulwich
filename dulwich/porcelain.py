@@ -219,7 +219,8 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
             repopath = os.fsencode(repopath)
         treepath = os.path.relpath(path, repopath)
         if treepath.startswith(b'..'):
-            raise ValueError('Path %r not in repo path (%r)' % (path, repopath))
+            err_msg = 'Path %r not in repo path (%r)' % (path, repopath)
+            raise ValueError(err_msg)
         if os.path.sep != '/':
             treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
         return treepath

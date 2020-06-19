@@ -355,8 +355,14 @@ class UploadPackHandler(PackHandler):
         graph_walker = _ProtocolGraphWalker(
                 self, self.repo.object_store, self.repo.get_peeled,
                 self.repo.refs.get_symrefs)
+        wants = []
+
+        def wants_wrapper(refs):
+            wants.extend(graph_walker.determine_wants(refs))
+            return wants
+
         objects_iter = self.repo.fetch_objects(
-            graph_walker.determine_wants, graph_walker, self.progress,
+            wants_wrapper, graph_walker, self.progress,
             get_tagged=self.get_tagged)
 
         # Note the fact that client is only processing responses related
@@ -370,7 +376,7 @@ class UploadPackHandler(PackHandler):
         # with a graph walker with an implementation that talks over the
         # wire (which is this instance of this class) this will actually
         # iterate through everything and write things out to the wire.
-        if len(objects_iter) == 0:
+        if len(wants) == 0:
             return
 
         # The provided haves are processed, and it is safe to send side-
@@ -548,7 +554,7 @@ class _ProtocolGraphWalker(object):
         """Determine the wants for a set of heads.
 
         The given heads are advertised to the client, who then specifies which
-        refs he wants using 'want' lines. This portion of the protocol is the
+        refs they want using 'want' lines. This portion of the protocol is the
         same regardless of ack type, and in fact is used to set the ack type of
         the ProtocolGraphWalker.
 

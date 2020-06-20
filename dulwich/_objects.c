@@ -23,15 +23,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#if PY_MAJOR_VERSION >= 3
-#define PyInt_Check(obj) 0
-#define PyInt_CheckExact(obj) 0
-#define PyInt_AsLong PyLong_AsLong
-#define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_Check PyBytes_Check
-#define PyString_FromStringAndSize PyBytes_FromStringAndSize
-#endif
-
 #if defined(__MINGW32_VERSION) || defined(__APPLE__)
 size_t rep_strnlen(char *text, size_t maxlen);
 size_t rep_strnlen(char *text, size_t maxlen)
@@ -56,7 +47,7 @@ static PyObject *sha_to_pyhex(const unsigned char *sha)
 		hexsha[i*2+1] = bytehex(sha[i] & 0x0F);
 	}
 
-	return PyString_FromStringAndSize(hexsha, 40);
+	return PyBytes_FromStringAndSize(hexsha, 40);
 }
 
 static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
@@ -67,13 +58,8 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 	PyObject *ret, *item, *name, *sha, *py_strict = NULL;
 	static char *kwlist[] = {"text", "strict", NULL};
 
-#if PY_MAJOR_VERSION >= 3
 	if (!PyArg_ParseTupleAndKeywords(args, kw, "y#|O", kwlist,
 	                                 &text, &len, &py_strict))
-#else
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "s#|O", kwlist,
-	                                 &text, &len, &py_strict))
-#endif
 		return NULL;
 	strict = py_strict ?  PyObject_IsTrue(py_strict) : 0;
 	/* TODO: currently this returns a list; if memory usage is a concern,
@@ -100,7 +86,7 @@ static PyObject *py_parse_tree(PyObject *self, PyObject *args, PyObject *kw)
 		}
 		text++;
 		namelen = strnlen(text, len - (text - start));
-		name = PyString_FromStringAndSize(text, namelen);
+		name = PyBytes_FromStringAndSize(text, namelen);
 		if (name == NULL) {
 			Py_DECREF(ret);
 			return NULL;
@@ -207,7 +193,7 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 	}
 
 	while (PyDict_Next(entries, &pos, &key, &value)) {
-		if (!PyString_Check(key)) {
+		if (!PyBytes_Check(key)) {
 			PyErr_SetString(PyExc_TypeError, "Name is not a string");
 			goto error;
 		}
@@ -218,18 +204,18 @@ static PyObject *py_sorted_tree_items(PyObject *self, PyObject *args)
 		}
 
 		py_mode = PyTuple_GET_ITEM(value, 0);
-		if (!PyInt_Check(py_mode) && !PyLong_Check(py_mode)) {
+		if (!PyLong_Check(py_mode)) {
 			PyErr_SetString(PyExc_TypeError, "Mode is not an integral type");
 			goto error;
 		}
 
 		py_sha = PyTuple_GET_ITEM(value, 1);
-		if (!PyString_Check(py_sha)) {
+		if (!PyBytes_Check(py_sha)) {
 			PyErr_SetString(PyExc_TypeError, "SHA is not a string");
 			goto error;
 		}
-		qsort_entries[n].name = PyString_AS_STRING(key);
-		qsort_entries[n].mode = PyInt_AsLong(py_mode);
+		qsort_entries[n].name = PyBytes_AS_STRING(key);
+		qsort_entries[n].mode = PyLong_AsLong(py_mode);
 
 		qsort_entries[n].tuple = PyObject_CallFunctionObjArgs(
 		                tree_entry_cls, key, py_mode, py_sha, NULL);
@@ -272,7 +258,6 @@ moduleinit(void)
 {
 	PyObject *m, *objects_mod, *errors_mod;
 
-#if PY_MAJOR_VERSION >= 3
 	static struct PyModuleDef moduledef = {
 		PyModuleDef_HEAD_INIT,
 		"_objects",         /* m_name */
@@ -285,9 +270,6 @@ moduleinit(void)
 		NULL,               /* m_free */
 	};
 	m = PyModule_Create(&moduledef);
-#else
-	m = Py_InitModule3("_objects", py_objects_methods, NULL);
-#endif
 	if (m == NULL) {
 		return NULL;
 	}
@@ -320,16 +302,8 @@ moduleinit(void)
 	return m;
 }
 
-#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
 PyInit__objects(void)
 {
 	return moduleinit();
 }
-#else
-PyMODINIT_FUNC
-init_objects(void)
-{
-	moduleinit();
-}
-#endif

@@ -26,25 +26,6 @@
 typedef unsigned short mode_t;
 #endif
 
-#if PY_MAJOR_VERSION < 3
-typedef long Py_hash_t;
-#endif
-
-#if PY_MAJOR_VERSION >= 3
-#define PyInt_FromLong PyLong_FromLong
-#define PyInt_AsLong PyLong_AsLong
-#define PyInt_AS_LONG PyLong_AS_LONG
-#define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_AsStringAndSize PyBytes_AsStringAndSize
-#define PyString_Check PyBytes_Check
-#define PyString_CheckExact PyBytes_CheckExact
-#define PyString_FromStringAndSize PyBytes_FromStringAndSize
-#define PyString_FromString PyBytes_FromString
-#define PyString_GET_SIZE PyBytes_GET_SIZE
-#define PyString_Size PyBytes_Size
-#define _PyString_Join _PyBytes_Join
-#endif
-
 static PyObject *tree_entry_cls = NULL, *null_entry = NULL,
 	*defaultdict_cls = NULL, *int_cls = NULL;
 static int block_size;
@@ -118,7 +99,7 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 		if (!sha)
 			goto error;
 		name = PyTuple_GET_ITEM(old_entry, 0);
-		name_len = PyString_Size(name);
+		name_len = PyBytes_Size(name);
 		if (PyErr_Occurred())
 			goto error;
 
@@ -133,18 +114,13 @@ static PyObject **tree_entries(char *path, Py_ssize_t path_len, PyObject *tree,
 		if (path_len) {
 			memcpy(new_path, path, path_len);
 			new_path[path_len] = '/';
-			memcpy(new_path + path_len + 1, PyString_AS_STRING(name), name_len);
+			memcpy(new_path + path_len + 1, PyBytes_AS_STRING(name), name_len);
 		} else {
-			memcpy(new_path, PyString_AS_STRING(name), name_len);
+			memcpy(new_path, PyBytes_AS_STRING(name), name_len);
 		}
 
-#if PY_MAJOR_VERSION >= 3
 		result[i] = PyObject_CallFunction(tree_entry_cls, "y#OO", new_path,
 			new_path_len, PyTuple_GET_ITEM(old_entry, 1), sha);
-#else
-		result[i] = PyObject_CallFunction(tree_entry_cls, "s#OO", new_path,
-			new_path_len, PyTuple_GET_ITEM(old_entry, 1), sha);
-#endif
 		PyMem_Free(new_path);
 		if (!result[i]) {
 			goto error;
@@ -172,7 +148,7 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	if (!path1)
 		goto done;
 
-	if (!PyString_Check(path1)) {
+	if (!PyBytes_Check(path1)) {
 		PyErr_SetString(PyExc_TypeError, "path is not a (byte)string");
 		goto done;
 	}
@@ -181,12 +157,12 @@ static int entry_path_cmp(PyObject *entry1, PyObject *entry2)
 	if (!path2)
 		goto done;
 
-	if (!PyString_Check(path2)) {
+	if (!PyBytes_Check(path2)) {
 		PyErr_SetString(PyExc_TypeError, "path is not a (byte)string");
 		goto done;
 	}
 
-	result = strcmp(PyString_AS_STRING(path1), PyString_AS_STRING(path2));
+	result = strcmp(PyBytes_AS_STRING(path1), PyBytes_AS_STRING(path2));
 
 done:
 	Py_XDECREF(path1);
@@ -202,11 +178,7 @@ static PyObject *py_merge_entries(PyObject *self, PyObject *args)
 	char *path_str;
 	int cmp;
 
-#if PY_MAJOR_VERSION >= 3
 	if (!PyArg_ParseTuple(args, "y#OO", &path_str, &path_len, &tree1, &tree2))
-#else
-	if (!PyArg_ParseTuple(args, "s#OO", &path_str, &path_len, &tree1, &tree2))
-#endif
 		return NULL;
 
 	entries1 = tree_entries(path_str, path_len, tree1, &n1);
@@ -291,7 +263,7 @@ static PyObject *py_is_tree(PyObject *self, PyObject *args)
 		result = Py_False;
 		Py_INCREF(result);
 	} else {
-		lmode = PyInt_AsLong(mode);
+		lmode = PyLong_AsLong(mode);
 		if (lmode == -1 && PyErr_Occurred()) {
 			Py_DECREF(mode);
 			return NULL;
@@ -310,13 +282,13 @@ static Py_hash_t add_hash(PyObject *get, PyObject *set, char *str, int n)
 
 	/* It would be nice to hash without copying str into a PyString, but that
 	 * isn't exposed by the API. */
-	str_obj = PyString_FromStringAndSize(str, n);
+	str_obj = PyBytes_FromStringAndSize(str, n);
 	if (!str_obj)
 		goto error;
 	hash = PyObject_Hash(str_obj);
 	if (hash == -1)
 		goto error;
-	hash_obj = PyInt_FromLong(hash);
+	hash_obj = PyLong_FromLong(hash);
 	if (!hash_obj)
 		goto error;
 
@@ -324,7 +296,7 @@ static Py_hash_t add_hash(PyObject *get, PyObject *set, char *str, int n)
 	if (!value)
 		goto error;
 	set_value = PyObject_CallFunction(set, "(Ol)", hash_obj,
-		PyInt_AS_LONG(value) + n);
+		PyLong_AS_LONG(value) + n);
 	if (!set_value)
 		goto error;
 
@@ -377,11 +349,11 @@ static PyObject *py_count_blocks(PyObject *self, PyObject *args)
 
 	for (i = 0; i < num_chunks; i++) {
 		chunk = PyList_GET_ITEM(chunks, i);
-		if (!PyString_Check(chunk)) {
+		if (!PyBytes_Check(chunk)) {
 			PyErr_SetString(PyExc_TypeError, "chunk is not a string");
 			goto error;
 		}
-		if (PyString_AsStringAndSize(chunk, &chunk_str, &chunk_len) == -1)
+		if (PyBytes_AsStringAndSize(chunk, &chunk_str, &chunk_len) == -1)
 			goto error;
 
 		for (j = 0; j < chunk_len; j++) {
@@ -425,7 +397,6 @@ moduleinit(void)
 	PyObject *m, *objects_mod = NULL, *diff_tree_mod = NULL;
 	PyObject *block_size_obj = NULL;
 
-#if PY_MAJOR_VERSION >= 3
 	static struct PyModuleDef moduledef = {
 		PyModuleDef_HEAD_INIT,
 		"_diff_tree",         /* m_name */
@@ -438,9 +409,6 @@ moduleinit(void)
 		NULL,                 /* m_free */
 	};
 	m = PyModule_Create(&moduledef);
-#else
-	m = Py_InitModule("_diff_tree", py_diff_tree_methods);
-#endif
 	if (!m)
 		goto error;
 
@@ -464,7 +432,7 @@ moduleinit(void)
 	block_size_obj = PyObject_GetAttrString(diff_tree_mod, "_BLOCK_SIZE");
 	if (!block_size_obj)
 		goto error;
-	block_size = (int)PyInt_AsLong(block_size_obj);
+	block_size = (int)PyLong_AsLong(block_size_obj);
 
 	if (PyErr_Occurred())
 		goto error;
@@ -495,16 +463,8 @@ error:
 	return NULL;
 }
 
-#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
 PyInit__diff_tree(void)
 {
 	return moduleinit();
 }
-#else
-PyMODINIT_FUNC
-init_diff_tree(void)
-{
-	moduleinit();
-}
-#endif

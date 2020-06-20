@@ -98,6 +98,9 @@ from dulwich.errors import (
     SendPackError,
     UpdateRefsError,
     )
+from dulwich.graph import (
+    can_fast_forward,
+    )
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
     blob_from_path_and_stat,
@@ -230,9 +233,12 @@ def check_diverged(store, current_sha, new_sha):
       current_sha: Current head sha
       new_sha: New head sha
     """
-    return
-    # TODO(jelmer): check for diverged branches. See bug #666, #494
-    raise DivergedBranches(current_sha, new_sha)
+    try:
+        can = can_fast_forward(store, current_sha, new_sha)
+    except KeyError:
+        can = False
+    if not can:
+        raise DivergedBranches(current_sha, new_sha)
 
 
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
@@ -996,9 +1002,6 @@ def pull(repo, remote_location=None, refspecs=None,
       outstream: A stream file to write to output
       errstream: A stream file to write to errors
     """
-    if not fast_forward:
-        raise NotImplementedError('no-ff pull is not yet supported')
-
     # Open the repo
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
@@ -1018,9 +1021,14 @@ def pull(repo, remote_location=None, refspecs=None,
         fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
         for (lh, rh, force_ref) in selected_refs:
-            if fast_forward:
+            try:
                 check_diverged(
                     r.object_store, r.refs[rh], fetch_result.refs[lh])
+            except DivergedBranches:
+                if fast_forward:
+                    raise
+                else:
+                    raise NotImplementedError('merge is not yet supported')
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b'HEAD'] = fetch_result.refs[selected_refs[0][1]]

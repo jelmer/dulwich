@@ -469,43 +469,6 @@ class GitClient(object):
         """
         raise NotImplementedError(self.get_refs)
 
-    def _parse_status_report(self, proto):
-        unpack = proto.read_pkt_line().strip()
-        if unpack != b'unpack ok':
-            st = True
-            # flush remaining error data
-            while st is not None:
-                st = proto.read_pkt_line()
-            raise SendPackError(unpack)
-        statuses = []
-        errs = False
-        ref_status = proto.read_pkt_line()
-        while ref_status:
-            ref_status = ref_status.strip()
-            statuses.append(ref_status)
-            if not ref_status.startswith(b'ok '):
-                errs = True
-            ref_status = proto.read_pkt_line()
-
-        if errs:
-            ref_status = {}
-            ok = set()
-            for status in statuses:
-                if b' ' not in status:
-                    # malformed response, move on to the next one
-                    continue
-                status, ref = status.split(b' ', 1)
-
-                if status == b'ng':
-                    if b' ' in ref:
-                        ref, status = ref.split(b' ', 1)
-                else:
-                    ok.add(ref)
-                ref_status[ref] = status
-            raise UpdateRefsError(', '.join([
-                refname for refname in ref_status if refname not in ok]) +
-                b' failed to update', ref_status=ref_status)
-
     def _read_side_band64k_data(self, proto, channel_callbacks):
         """Read per-channel data.
 

@@ -955,6 +955,52 @@ class PushTests(PorcelainTestCase):
             b'refs/heads/master': new_id,
             }, self.repo.get_refs())
 
+    def test_diverged(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        porcelain.commit(repo=self.repo.path, message=b'init',
+                         author=b'author <email>',
+                         committer=b'committer <email>')
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(self.repo.path, target=clone_path,
+                                      errstream=errstream)
+        target_repo.close()
+
+        remote_id = porcelain.commit(
+            repo=self.repo.path, message=b'remote change',
+            author=b'author <email>',
+            committer=b'committer <email>')
+
+        local_id = porcelain.commit(
+            repo=clone_path, message=b'local change',
+            author=b'author <email>',
+            committer=b'committer <email>')
+
+        # Push to the remote
+        self.assertRaises(
+            porcelain.DivergedBranches,
+            porcelain.push, clone_path, self.repo.path, b'refs/heads/master',
+            outstream=outstream, errstream=errstream)
+
+        self.assertEqual({
+            b'HEAD': remote_id,
+            b'refs/heads/master': remote_id,
+            }, self.repo.get_refs())
+
+        # Push to the remote with --force
+        porcelain.push(
+            clone_path, self.repo.path, b'refs/heads/master',
+            outstream=outstream, errstream=errstream, force=True)
+
+        self.assertEqual({
+            b'HEAD': local_id,
+            b'refs/heads/master': local_id,
+            }, self.repo.get_refs())
+
 
 class PullTests(PorcelainTestCase):
 
@@ -983,8 +1029,8 @@ class PullTests(PorcelainTestCase):
                          author=b'test2 <email>',
                          committer=b'test2 <email>')
 
-        self.assertTrue(b'refs/heads/master' in self.repo.refs)
-        self.assertTrue(b'refs/heads/master' in target_repo.refs)
+        self.assertIn(b'refs/heads/master', self.repo.refs)
+        self.assertIn(b'refs/heads/master', target_repo.refs)
 
     def test_simple(self):
         outstream = BytesIO()
@@ -997,6 +1043,40 @@ class PullTests(PorcelainTestCase):
         # Check the target repo for pushed changes
         with Repo(self.target_path) as r:
             self.assertEqual(r[b'HEAD'].id, self.repo[b'HEAD'].id)
+
+    def test_diverged(self):
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        c3a = porcelain.commit(
+            repo=self.target_path, message=b'test3a',
+            author=b'test2 <email>',
+            committer=b'test2 <email>')
+
+        porcelain.commit(
+            repo=self.repo.path, message=b'test3b',
+            author=b'test2 <email>',
+            committer=b'test2 <email>')
+
+        # Pull changes into the cloned repo
+        self.assertRaises(
+            porcelain.DivergedBranches, porcelain.pull, self.target_path,
+            self.repo.path, b'refs/heads/master', outstream=outstream,
+            errstream=errstream)
+
+        # Check the target repo for pushed changes
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b'refs/heads/master'].id, c3a)
+
+        self.assertRaises(
+            NotImplementedError, porcelain.pull,
+            self.target_path, self.repo.path,
+            b'refs/heads/master', outstream=outstream, errstream=errstream,
+            fast_forward=False)
+
+        # Check the target repo for pushed changes
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b'refs/heads/master'].id, c3a)
 
     def test_no_refspec(self):
         outstream = BytesIO()

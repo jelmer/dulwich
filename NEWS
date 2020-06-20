@@ -7,7 +7,14 @@
    already have those objects. Thanks to Martijn Pieters for
    the detailed bug report. (Jelmer Vernooĳ, #781)
 
+ * Add LCA implementation. (Kevin Hendricks)
+
  * Add functionality for finding the merge base. (Kevin Hendricks)
+
+ * Check for diverged branches during push.
+   (Jelmer Vernooĳ, #494)
+
+ * Check for fast-forward during pull. (Jelmer Vernooĳ, #666)
 
 0.20.3	2020-06-14
 

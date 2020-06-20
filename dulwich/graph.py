@@ -131,3 +131,22 @@ def find_octopus_base(object_store, commit_ids):
             next_lcas.extend(res)
         lcas = next_lcas[:]
     return lcas
+
+
+def can_fast_forward(object_store, c1, c2):
+    """Is it possible to fast-forward from c1 to c2?
+
+    Args:
+      object_store: Store to retrieve objects from
+      c1: Commit id for first commit
+      c2: Commit id for second commit
+    """
+    if c1 == c2:
+        return True
+
+    def lookup_parents(commit_id):
+        return object_store[commit_id].parents
+
+    # Algorithm: Find the common ancestor
+    lcas = _find_lcas(lookup_parents, c1, [c2])
+    return lcas == [c1]

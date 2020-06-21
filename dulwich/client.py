@@ -246,8 +246,8 @@ class FetchPackResult(object):
     """
 
     _FORWARDED_ATTRS = [
-            'clear', 'copy', 'fromkeys', 'get', 'has_key', 'items',
-            'iteritems', 'iterkeys', 'itervalues', 'keys', 'pop', 'popitem',
+            'clear', 'copy', 'fromkeys', 'get', 'items',
+            'keys', 'pop', 'popitem',
             'setdefault', 'update', 'values', 'viewitems', 'viewkeys',
             'viewvalues']
 
@@ -298,6 +298,63 @@ class FetchPackResult(object):
     def __repr__(self):
         return "%s(%r, %r, %r)" % (
                 self.__class__.__name__, self.refs, self.symrefs, self.agent)
+
+
+class SendPackResult(object):
+    """Result of a upload-pack operation.
+
+    Attributes:
+      refs: Dictionary with all remote refs
+      agent: User agent string
+    """
+
+    _FORWARDED_ATTRS = [
+            'clear', 'copy', 'fromkeys', 'get', 'items',
+            'keys', 'pop', 'popitem',
+            'setdefault', 'update', 'values', 'viewitems', 'viewkeys',
+            'viewvalues']
+
+    def __init__(self, refs, agent=None):
+        self.refs = refs
+        self.agent = agent
+
+    def _warn_deprecated(self):
+        import warnings
+        warnings.warn(
+            "Use SendPackResult.refs instead.",
+            DeprecationWarning, stacklevel=3)
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            self._warn_deprecated()
+            return self.refs == other
+        return self.refs == other.refs and self.agent == other.agent
+
+    def __contains__(self, name):
+        self._warn_deprecated()
+        return name in self.refs
+
+    def __getitem__(self, name):
+        self._warn_deprecated()
+        return self.refs[name]
+
+    def __len__(self):
+        self._warn_deprecated()
+        return len(self.refs)
+
+    def __iter__(self):
+        self._warn_deprecated()
+        return iter(self.refs)
+
+    def __getattribute__(self, name):
+        if name in type(self)._FORWARDED_ATTRS:
+            self._warn_deprecated()
+            return getattr(self.refs, name)
+        return super(SendPackResult, self).__getattribute__(name)
+
+    def __repr__(self):
+        return "%s(%r, %r)" % (
+                self.__class__.__name__, self.refs, self.agent)
 
 
 def _read_shallow_updates(proto):
@@ -382,8 +439,7 @@ class GitClient(object):
           progress: Optional progress function
 
         Returns:
-          new_refs dictionary containing the changes that were made
-            {refname: new_ref}, including deleted refs.
+          SendPackResult object
 
         Raises:
           SendPackError: if server rejects the pack data
@@ -541,11 +597,16 @@ class GitClient(object):
     def _negotiate_receive_pack_capabilities(self, server_capabilities):
         negotiated_capabilities = (
             self._send_capabilities & server_capabilities)
+        agent = None
+        for capability in server_capabilities:
+            k, v = parse_capability(capability)
+            if k == CAPABILITY_AGENT:
+                agent = v
         unknown_capabilities = (  # noqa: F841
             extract_capability_names(server_capabilities) -
             KNOWN_RECEIVE_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
-        return negotiated_capabilities
+        return negotiated_capabilities, agent
 
     def _handle_receive_pack_tail(self, proto, capabilities, progress=None):
         """Handle the tail of a 'git-receive-pack' request.
@@ -761,8 +822,7 @@ class TraditionalGitClient(GitClient):
           progress: Optional callback called with progress updates
 
         Returns:
-          new_refs dictionary containing the changes that were made
-          {refname: new_ref}, including deleted refs.
+          SendPackResult
 
         Raises:
           SendPackError: if server rejects the pack data
@@ -776,7 +836,7 @@ class TraditionalGitClient(GitClient):
                 old_refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
                 _remote_error_from_stderr(stderr)
-            negotiated_capabilities = \
+            negotiated_capabilities, agent = \
                 self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
@@ -790,7 +850,7 @@ class TraditionalGitClient(GitClient):
 
             if set(new_refs.items()).issubset(set(old_refs.items())):
                 proto.write_pkt_line(None)
-                return new_refs
+                return SendPackResult(new_refs, agent=agent)
 
             if CAPABILITY_DELETE_REFS not in server_capabilities:
                 # Server does not support deletions. Fail later.
@@ -806,14 +866,14 @@ class TraditionalGitClient(GitClient):
 
             if new_refs is None:
                 proto.write_pkt_line(None)
-                return old_refs
+                return SendPackResult(old_refs, agent=agent)
 
             if len(new_refs) == 0 and len(orig_new_refs):
                 # NOOP - Original new refs filtered out by policy
                 proto.write_pkt_line(None)
                 if report_status_parser is not None:
                     report_status_parser.check()
-                return old_refs
+                return SendPackResult(old_refs, agent=agent)
 
             (have, want) = self._handle_receive_pack_head(
                 proto, negotiated_capabilities, old_refs, new_refs)
@@ -827,7 +887,7 @@ class TraditionalGitClient(GitClient):
 
             self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress)
-            return new_refs
+            return SendPackResult(new_refs, agent=agent)
 
     def fetch_pack(self, path, determine_wants, graph_walker, pack_data,
                    progress=None, depth=None):
@@ -1099,8 +1159,7 @@ class LocalGitClient(GitClient):
           progress: Optional progress function
 
         Returns:
-          new_refs dictionary containing the changes that were made
-          {refname: new_ref}, including deleted refs.
+          SendPackResult
 
         Raises:
           SendPackError: if server rejects the pack data
@@ -1126,7 +1185,7 @@ class LocalGitClient(GitClient):
 
             if (not want and
                     set(new_refs.items()).issubset(set(old_refs.items()))):
-                return new_refs
+                return SendPackResult(new_refs)
 
             target.object_store.add_pack_data(
                 *generate_pack_data(have, want, ofs_delta=True))
@@ -1142,7 +1201,7 @@ class LocalGitClient(GitClient):
                     if not target.refs.remove_if_equals(refname, old_sha1):
                         progress('unable to remove %s' % refname)
 
-        return new_refs
+        return SendPackResult(new_refs)
 
     def fetch(self, path, target, determine_wants=None, progress=None,
               depth=None):
@@ -1659,8 +1718,7 @@ class HttpGitClient(GitClient):
           progress: Optional progress function
 
         Returns:
-          new_refs dictionary containing the changes that were made
-          {refname: new_ref}, including deleted refs.
+          SendPackResult
 
         Raises:
           SendPackError: if server rejects the pack data
@@ -1671,7 +1729,7 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         old_refs, server_capabilities, url = self._discover_references(
             b"git-receive-pack", url)
-        negotiated_capabilities = self._negotiate_receive_pack_capabilities(
+        negotiated_capabilities, agent = self._negotiate_receive_pack_capabilities(
                 server_capabilities)
         negotiated_capabilities.add(capability_agent())
 
@@ -1681,9 +1739,9 @@ class HttpGitClient(GitClient):
         new_refs = update_refs(dict(old_refs))
         if new_refs is None:
             # Determine wants function is aborting the push.
-            return old_refs
+            return SendPackResult(old_refs, agent=agent)
         if set(new_refs.items()).issubset(set(old_refs.items())):
-            return new_refs
+            return SendPackResult(new_refs, agent=agent)
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
@@ -1701,7 +1759,7 @@ class HttpGitClient(GitClient):
             resp_proto = Protocol(read, None)
             self._handle_receive_pack_tail(
                 resp_proto, negotiated_capabilities, progress)
-            return new_refs
+            return SendPackResult(new_refs, agent=agent)
         finally:
             resp.close()
 
@@ -1733,7 +1791,7 @@ class HttpGitClient(GitClient):
         if not wants:
             return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
-            raise NotImplementedError(self.send_pack)
+            raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (new_shallow, new_unshallow) = self._handle_upload_pack_head(

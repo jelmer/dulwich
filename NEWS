@@ -16,6 +16,9 @@
 
  * Check for fast-forward during pull. (Jelmer Vernooĳ, #666)
 
+ * Return a SendPackResult object from
+   GitClient.send_pack(). (Jelmer Vernooĳ)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

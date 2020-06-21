@@ -38,7 +38,6 @@ import http.server
 
 from dulwich import (
     client,
-    errors,
     file,
     index,
     protocol,

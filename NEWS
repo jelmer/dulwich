@@ -28,6 +28,9 @@
    if any of the refs failed to update.
    (Jelmer Vernooĳ, #780)
 
+ * Add a ``porcelain.Error`` object that most errors in porcelain
+   derive from. (Jelmer Vernooĳ)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

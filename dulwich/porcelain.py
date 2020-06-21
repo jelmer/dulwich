@@ -175,7 +175,15 @@ default_bytes_err_stream = (
 DEFAULT_ENCODING = 'utf-8'
 
 
-class RemoteExists(Exception):
+class Error(Exception):
+    """Porcelain-based error. """
+
+    def __init__(self, msg, inner=None):
+        super(Error, self).__init__(msg)
+        self.inner = inner
+
+
+class RemoteExists(Error):
     """Raised when the remote already exists."""
 
 
@@ -220,7 +228,7 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
         return bytes(relpath)
 
 
-class DivergedBranches(Exception):
+class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
 
@@ -282,7 +290,7 @@ def symbolic_ref(repo, ref_name, force=False):
     with open_repo_closing(repo) as repo_obj:
         ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
-            raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
+            raise Error('fatal: ref `%s` is not a ref' % ref_name)
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
@@ -368,7 +376,7 @@ def clone(source, target=None, bare=False, checkout=None,
     if checkout is None:
         checkout = (not bare)
     if checkout and bare:
-        raise ValueError("checkout and bare are incompatible")
+        raise Error("checkout and bare are incompatible")
 
     if target is None:
         target = source.split("/")[-1]
@@ -470,7 +478,7 @@ def clean(repo=".", target_dir=None):
 
     with open_repo_closing(repo) as r:
         if not _is_subdir(target_dir, r.path):
-            raise ValueError("target_dir must be in the repo's working dir")
+            raise Error("target_dir must be in the repo's working dir")
 
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
@@ -511,7 +519,7 @@ def remove(repo=".", paths=None, cached=False):
             try:
                 index_sha = index[tree_path].sha
             except KeyError:
-                raise Exception('%s did not match any files' % p)
+                raise Error('%s did not match any files' % p)
 
             if not cached:
                 try:
@@ -531,12 +539,12 @@ def remove(repo=".", paths=None, cached=False):
                             committed_sha = None
 
                         if blob.id != index_sha and index_sha != committed_sha:
-                            raise Exception(
+                            raise Error(
                                 'file has staged content differing '
                                 'from both the file and head: %s' % p)
 
                         if index_sha != committed_sha:
-                            raise Exception(
+                            raise Error(
                                 'file has staged changes: %s' % p)
                         os.remove(full_path)
             del index[tree_path]
@@ -876,7 +884,7 @@ def tag_delete(repo, name):
         elif isinstance(name, list):
             names = name
         else:
-            raise TypeError("Unexpected tag name type %r" % name)
+            raise Error("Unexpected tag name type %r" % name)
         for name in names:
             del r.refs[_make_tag_ref(name)]
 
@@ -891,7 +899,7 @@ def reset(repo, mode, treeish="HEAD"):
     """
 
     if mode != "hard":
-        raise ValueError("hard is the only mode currently supported")
+        raise Error("hard is the only mode currently supported")
 
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)
@@ -977,10 +985,9 @@ def push(repo, remote_location=None, refspecs=None,
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
         except SendPackError as e:
-            # TODO(jelmer): Perhaps raise a PorcelainError ?
-            errstream.write(b"Push to " + remote_location_bytes +
-                            b" failed -> " + e.args[0] + b"\n")
-            return 1
+            raise Error(
+                "Push to " + remote_location_bytes +
+                " failed -> " + e.args[0].decode(), inner=e)
 
         for ref, error in (result.ref_status or {}).items():
             if status is not None:
@@ -1149,7 +1156,7 @@ def get_tree_changes(repo):
             elif change[0][0] == change[0][1]:
                 tracked_changes['modify'].append(change[0][0])
             else:
-                raise AssertionError('git mv ops not yet supported')
+                raise NotImplementedError('git mv ops not yet supported')
         return tracked_changes
 
 
@@ -1286,7 +1293,8 @@ def branch_create(repo, name, objectish=None, force=False):
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
-                raise KeyError("Branch with name %s already exists." % name)
+                raise Error(
+                    "Branch with name %s already exists." % name)
 
 
 def branch_list(repo):

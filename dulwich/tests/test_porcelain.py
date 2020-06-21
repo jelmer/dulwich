@@ -314,7 +314,7 @@ class CloneTests(PorcelainTestCase):
         errstream = BytesIO()
         self.addCleanup(shutil.rmtree, target_path)
         self.assertRaises(
-            ValueError, porcelain.clone, self.repo.path,
+            porcelain.Error, porcelain.clone, self.repo.path,
             target_path, checkout=True, bare=True, errstream=errstream)
 
     def test_no_head_no_checkout(self):
@@ -660,8 +660,9 @@ class SymbolicRefTests(PorcelainTestCase):
                 self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
 
-        self.assertRaises(ValueError, porcelain.symbolic_ref, self.repo.path,
-                          b'foobar')
+        self.assertRaises(
+            porcelain.Error, porcelain.symbolic_ref, self.repo.path,
+            b'foobar')
 
     def test_set_force_wrong_symbolic_ref(self):
         c1, c2, c3 = build_commit_graph(
@@ -1399,7 +1400,9 @@ class BranchCreateTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
-        self.assertRaises(KeyError, porcelain.branch_create, self.repo, b"foo")
+        self.assertRaises(
+            porcelain.Error, porcelain.branch_create,
+            self.repo, b"foo")
         porcelain.branch_create(self.repo, b"foo", force=True)
 
     def test_new_branch(self):

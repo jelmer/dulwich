@@ -48,7 +48,6 @@ from dulwich.client import (
     StrangeHostname,
     SubprocessSSHVendor,
     PLinkSSHVendor,
-    UpdateRefsError,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
@@ -221,9 +220,11 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return pack_objects_to_data([(commit, None), (tree, ''), ])
 
-        self.assertRaises(UpdateRefsError,
-                          self.client.send_pack, "blah",
-                          update_refs, generate_pack_data)
+        result = self.client.send_pack("blah", update_refs, generate_pack_data)
+        self.assertEqual(
+            {b'refs/foo/bar': 'pre-receive hook declined'},
+            result.ref_status)
+        self.assertEqual({b'refs/foo/bar': commit.id}, result.refs)
 
     def test_send_pack_none(self):
         # Set ref to current value
@@ -377,9 +378,14 @@ class GitClientTests(TestCase):
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
 
-        self.assertRaises(UpdateRefsError,
-                          self.client.send_pack, b"/",
-                          update_refs, generate_pack_data)
+        result = self.client.send_pack(b"/", update_refs, generate_pack_data)
+        self.assertEqual(
+            result.ref_status,
+            {b'refs/heads/master': 'remote does not support deleting refs'})
+        self.assertEqual(
+            result.refs,
+            {b'refs/heads/master':
+                    b'310ca9477129b8586fa2afc779c1f57cf64bba6c'})
         self.assertEqual(self.rout.getvalue(), b'0000')
 
 
@@ -759,21 +765,22 @@ class ReportStatusParserTests(TestCase):
         parser.handle_packet(b"unpack error - foo bar")
         parser.handle_packet(b"ok refs/foo/bar")
         parser.handle_packet(None)
-        self.assertRaises(SendPackError, parser.check)
+        self.assertRaises(SendPackError, list, parser.check())
 
     def test_update_refs_error(self):
         parser = ReportStatusParser()
         parser.handle_packet(b"unpack ok")
         parser.handle_packet(b"ng refs/foo/bar need to pull")
         parser.handle_packet(None)
-        self.assertRaises(UpdateRefsError, parser.check)
+        self.assertEqual(
+            [(b'refs/foo/bar', 'need to pull')], list(parser.check()))
 
     def test_ok(self):
         parser = ReportStatusParser()
         parser.handle_packet(b"unpack ok")
         parser.handle_packet(b"ok refs/foo/bar")
         parser.handle_packet(None)
-        parser.check()
+        self.assertEqual([(b'refs/foo/bar', None)], list(parser.check()))
 
 
 class LocalGitClientTests(TestCase):
@@ -872,6 +879,8 @@ class LocalGitClientTests(TestCase):
                                   local.generate_pack_data)
 
         self.assertEqual(local.refs[ref_name], result.refs[ref_name])
+        self.assertIs(None, result.agent)
+        self.assertEqual({}, result.ref_status)
 
         obj_local = local.get_object(result.refs[ref_name])
         obj_target = target.get_object(result.refs[ref_name])

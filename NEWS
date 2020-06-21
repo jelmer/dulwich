@@ -7,6 +7,9 @@
    already have those objects. Thanks to Martijn Pieters for
    the detailed bug report. (Jelmer Vernooĳ, #781)
 
+ * porcelain.pull: Don't ask for objects that we already have.
+   (Jelmer Vernooĳ, #782)
+
  * Add LCA implementation. (Kevin Hendricks)
 
  * Add functionality for finding the merge base. (Kevin Hendricks)

@@ -122,6 +122,9 @@ class SendPackError(GitProtocolError):
     """An error occurred during send_pack."""
 
 
+# N.B.: UpdateRefsError is no longer used and will be result in
+# Dulwich 0.21.
+# remove: >= 0.21
 class UpdateRefsError(GitProtocolError):
     """The server reported errors updating refs."""
 

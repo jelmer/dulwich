@@ -96,7 +96,6 @@ from dulwich.diff_tree import (
     )
 from dulwich.errors import (
     SendPackError,
-    UpdateRefsError,
     )
 from dulwich.graph import (
     can_fast_forward,
@@ -971,19 +970,25 @@ def push(repo, remote_location=None, refspecs=None,
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
-            client.send_pack(
+            result = client.send_pack(
                 path, update_refs,
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
-        except UpdateRefsError as e:
-            errstream.write(b"Push to " + remote_location_bytes +
-                            b" failed -> " + e.message.encode(err_encoding) +
-                            b"\n")
         except SendPackError as e:
+            # TODO(jelmer): Perhaps raise a PorcelainError ?
             errstream.write(b"Push to " + remote_location_bytes +
                             b" failed -> " + e.args[0] + b"\n")
+            return 1
+
+        for ref, error in (result.ref_status or {}).items():
+            if status is not None:
+                errstream.write(
+                    b"Push of ref %s failed: %s" %
+                    (ref, error.encode(err_encoding)))
+            else:
+                errstream.write(b'Ref %s updated' % ref)
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)

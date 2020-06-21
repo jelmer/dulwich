@@ -385,7 +385,7 @@ class GitClientTests(TestCase):
         self.assertEqual(
             result.refs,
             {b'refs/heads/master':
-                    b'310ca9477129b8586fa2afc779c1f57cf64bba6c'})
+             b'310ca9477129b8586fa2afc779c1f57cf64bba6c'})
         self.assertEqual(self.rout.getvalue(), b'0000')
 
 

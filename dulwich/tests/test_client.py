@@ -867,14 +867,14 @@ class LocalGitClientTests(TestCase):
         """Send branch from local to remote repository and verify it worked."""
         client = LocalGitClient()
         ref_name = b"refs/heads/" + branch
-        new_refs = client.send_pack(target.path,
-                                    lambda _: {ref_name: local.refs[ref_name]},
-                                    local.generate_pack_data)
+        result = client.send_pack(target.path,
+                                  lambda _: {ref_name: local.refs[ref_name]},
+                                  local.generate_pack_data)
 
-        self.assertEqual(local.refs[ref_name], new_refs[ref_name])
+        self.assertEqual(local.refs[ref_name], result.refs[ref_name])
 
-        obj_local = local.get_object(new_refs[ref_name])
-        obj_target = target.get_object(new_refs[ref_name])
+        obj_local = local.get_object(result.refs[ref_name])
+        obj_target = target.get_object(result.refs[ref_name])
         self.assertEqual(obj_local, obj_target)
 
 

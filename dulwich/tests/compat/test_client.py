@@ -189,15 +189,11 @@ class DulwichClientTestBase(object):
         with repo.Repo(repo_dir) as src:
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
-            try:
-                c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                            gen_pack)
-            except errors.UpdateRefsError as e:
-                self.assertEqual('refs/heads/master failed to update',
-                                 e.args[0])
-                self.assertEqual({b'refs/heads/branch': b'ok',
-                                  b'refs/heads/master': b'non-fast-forward'},
-                                 e.ref_status)
+            result = c.send_pack(
+                self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+            self.assertEqual({b'refs/heads/branch': None,
+                              b'refs/heads/master': 'non-fast-forward'},
+                             result.ref_status)
 
     def test_send_pack_multiple_errors(self):
         dest, dummy = self.disable_ff_and_make_dummy_commit()
@@ -208,19 +204,11 @@ class DulwichClientTestBase(object):
         with repo.Repo(repo_dir) as src:
             sendrefs, gen_pack = self.compute_send(src)
             c = self._client()
-            try:
-                c.send_pack(self._build_path('/dest'), lambda _: sendrefs,
-                            gen_pack)
-            except errors.UpdateRefsError as e:
-                self.assertIn(
-                        str(e),
-                        ['{0}, {1} failed to update'.format(
-                            branch.decode('ascii'), master.decode('ascii')),
-                         '{1}, {0} failed to update'.format(
-                             branch.decode('ascii'), master.decode('ascii'))])
-                self.assertEqual({branch: b'non-fast-forward',
-                                  master: b'non-fast-forward'},
-                                 e.ref_status)
+            result = c.send_pack(
+                self._build_path('/dest'), lambda _: sendrefs, gen_pack)
+            self.assertEqual({branch: 'non-fast-forward',
+                              master: 'non-fast-forward'},
+                             result.ref_status)
 
     def test_archive(self):
         c = self._client()

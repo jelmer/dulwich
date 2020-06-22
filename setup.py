@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # encoding: utf-8
 # Setup file for dulwich
 # Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
@@ -15,7 +15,14 @@ import io
 import os
 import sys
 
-dulwich_version_string = '0.20.3'
+
+if sys.version_info < (3, 5):
+    raise Exception(
+        'Dulwich only supports Python 3.5 and later. '
+        'For 2.7 support, please install a version prior to 0.20')
+
+
+dulwich_version_string = '0.20.5'
 
 
 class DulwichDistribution(Distribution):

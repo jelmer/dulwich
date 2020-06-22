@@ -96,7 +96,9 @@ from dulwich.diff_tree import (
     )
 from dulwich.errors import (
     SendPackError,
-    UpdateRefsError,
+    )
+from dulwich.graph import (
+    can_fast_forward,
     )
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
@@ -173,7 +175,15 @@ default_bytes_err_stream = (
 DEFAULT_ENCODING = 'utf-8'
 
 
-class RemoteExists(Exception):
+class Error(Exception):
+    """Porcelain-based error. """
+
+    def __init__(self, msg, inner=None):
+        super(Error, self).__init__(msg)
+        self.inner = inner
+
+
+class RemoteExists(Error):
     """Raised when the remote already exists."""
 
 
@@ -218,6 +228,26 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
         return bytes(relpath)
 
 
+class DivergedBranches(Error):
+    """Branches have diverged and fast-forward is not possible."""
+
+
+def check_diverged(store, current_sha, new_sha):
+    """Check if updating to a sha can be done with fast forwarding.
+
+    Args:
+      store: Object store
+      current_sha: Current head sha
+      new_sha: New head sha
+    """
+    try:
+        can = can_fast_forward(store, current_sha, new_sha)
+    except KeyError:
+        can = False
+    if not can:
+        raise DivergedBranches(current_sha, new_sha)
+
+
 def archive(repo, committish=None, outstream=default_bytes_out_stream,
             errstream=default_bytes_err_stream):
     """Create an archive.
@@ -260,7 +290,7 @@ def symbolic_ref(repo, ref_name, force=False):
     with open_repo_closing(repo) as repo_obj:
         ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
-            raise ValueError('fatal: ref `%s` is not a ref' % ref_name)
+            raise Error('fatal: ref `%s` is not a ref' % ref_name)
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
@@ -346,7 +376,7 @@ def clone(source, target=None, bare=False, checkout=None,
     if checkout is None:
         checkout = (not bare)
     if checkout and bare:
-        raise ValueError("checkout and bare are incompatible")
+        raise Error("checkout and bare are incompatible")
 
     if target is None:
         target = source.split("/")[-1]
@@ -448,7 +478,7 @@ def clean(repo=".", target_dir=None):
 
     with open_repo_closing(repo) as r:
         if not _is_subdir(target_dir, r.path):
-            raise ValueError("target_dir must be in the repo's working dir")
+            raise Error("target_dir must be in the repo's working dir")
 
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
@@ -489,7 +519,7 @@ def remove(repo=".", paths=None, cached=False):
             try:
                 index_sha = index[tree_path].sha
             except KeyError:
-                raise Exception('%s did not match any files' % p)
+                raise Error('%s did not match any files' % p)
 
             if not cached:
                 try:
@@ -509,12 +539,12 @@ def remove(repo=".", paths=None, cached=False):
                             committed_sha = None
 
                         if blob.id != index_sha and index_sha != committed_sha:
-                            raise Exception(
+                            raise Error(
                                 'file has staged content differing '
                                 'from both the file and head: %s' % p)
 
                         if index_sha != committed_sha:
-                            raise Exception(
+                            raise Error(
                                 'file has staged changes: %s' % p)
                         os.remove(full_path)
             del index[tree_path]
@@ -854,7 +884,7 @@ def tag_delete(repo, name):
         elif isinstance(name, list):
             names = name
         else:
-            raise TypeError("Unexpected tag name type %r" % name)
+            raise Error("Unexpected tag name type %r" % name)
         for name in names:
             del r.refs[_make_tag_ref(name)]
 
@@ -869,7 +899,7 @@ def reset(repo, mode, treeish="HEAD"):
     """
 
     if mode != "hard":
-        raise ValueError("hard is the only mode currently supported")
+        raise Error("hard is the only mode currently supported")
 
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)
@@ -905,7 +935,8 @@ def get_remote_repo(
 
 def push(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream, **kwargs):
+         errstream=default_bytes_err_stream,
+         force=False, **kwargs):
     """Remote push with dulwich via dulwich.client
 
     Args:
@@ -914,6 +945,7 @@ def push(repo, remote_location=None, refspecs=None,
       refspecs: Refs to push to remote
       outstream: A stream file to write output
       errstream: A stream file to write errors
+      force: Force overwriting refs
     """
 
     # Open the repo
@@ -928,14 +960,17 @@ def push(repo, remote_location=None, refspecs=None,
         remote_changed_refs = {}
 
         def update_refs(refs):
-            selected_refs.extend(parse_reftuples(r.refs, refs, refspecs))
+            selected_refs.extend(parse_reftuples(
+                r.refs, refs, refspecs, force=force))
             new_refs = {}
             # TODO: Handle selected_refs == {None: None}
-            for (lh, rh, force) in selected_refs:
+            for (lh, rh, force_ref) in selected_refs:
                 if lh is None:
                     new_refs[rh] = ZERO_SHA
                     remote_changed_refs[rh] = None
                 else:
+                    if not force_ref:
+                        check_diverged(r.object_store, refs[rh], r.refs[lh])
                     new_refs[rh] = r.refs[lh]
                     remote_changed_refs[rh] = r.refs[lh]
             return new_refs
@@ -943,19 +978,24 @@ def push(repo, remote_location=None, refspecs=None,
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
         remote_location_bytes = client.get_url(path).encode(err_encoding)
         try:
-            client.send_pack(
+            result = client.send_pack(
                 path, update_refs,
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
             errstream.write(
                 b"Push to " + remote_location_bytes + b" successful.\n")
-        except UpdateRefsError as e:
-            errstream.write(b"Push to " + remote_location_bytes +
-                            b" failed -> " + e.message.encode(err_encoding) +
-                            b"\n")
         except SendPackError as e:
-            errstream.write(b"Push to " + remote_location_bytes +
-                            b" failed -> " + e.args[0] + b"\n")
+            raise Error(
+                "Push to " + remote_location_bytes +
+                " failed -> " + e.args[0].decode(), inner=e)
+
+        for ref, error in (result.ref_status or {}).items():
+            if status is not None:
+                errstream.write(
+                    b"Push of ref %s failed: %s" %
+                    (ref, error.encode(err_encoding)))
+            else:
+                errstream.write(b'Ref %s updated' % ref)
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
@@ -963,7 +1003,8 @@ def push(repo, remote_location=None, refspecs=None,
 
 def pull(repo, remote_location=None, refspecs=None,
          outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream, **kwargs):
+         errstream=default_bytes_err_stream, fast_forward=True,
+         force=False, **kwargs):
     """Pull from remote via dulwich.client
 
     Args:
@@ -983,13 +1024,23 @@ def pull(repo, remote_location=None, refspecs=None,
 
         def determine_wants(remote_refs):
             selected_refs.extend(
-                parse_reftuples(remote_refs, r.refs, refspecs))
-            return [remote_refs[lh] for (lh, rh, force) in selected_refs]
+                parse_reftuples(remote_refs, r.refs, refspecs, force=force))
+            return [
+                remote_refs[lh] for (lh, rh, force_ref) in selected_refs
+                if remote_refs[lh] not in r.object_store]
         client, path = get_transport_and_path(
                 remote_location, config=r.get_config_stack(), **kwargs)
         fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants)
-        for (lh, rh, force) in selected_refs:
+        for (lh, rh, force_ref) in selected_refs:
+            try:
+                check_diverged(
+                    r.object_store, r.refs[rh], fetch_result.refs[lh])
+            except DivergedBranches:
+                if fast_forward:
+                    raise
+                else:
+                    raise NotImplementedError('merge is not yet supported')
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b'HEAD'] = fetch_result.refs[selected_refs[0][1]]
@@ -1105,7 +1156,7 @@ def get_tree_changes(repo):
             elif change[0][0] == change[0][1]:
                 tracked_changes['modify'].append(change[0][0])
             else:
-                raise AssertionError('git mv ops not yet supported')
+                raise NotImplementedError('git mv ops not yet supported')
         return tracked_changes
 
 
@@ -1242,7 +1293,8 @@ def branch_create(repo, name, objectish=None, force=False):
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
-                raise KeyError("Branch with name %s already exists." % name)
+                raise Error(
+                    "Branch with name %s already exists." % name)
 
 
 def branch_list(repo):
@@ -1315,7 +1367,8 @@ def _import_remote_refs(
 
 def fetch(repo, remote_location=None,
           outstream=sys.stdout, errstream=default_bytes_err_stream,
-          message=None, depth=None, prune=False, prune_tags=False, **kwargs):
+          message=None, depth=None, prune=False, prune_tags=False, force=False,
+          **kwargs):
     """Fetch objects from a remote server.
 
     Args:

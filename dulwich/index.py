@@ -577,7 +577,7 @@ def build_index_from_tree(root_path, index_path, object_store, tree_id,
     index.write()
 
 
-def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
+def blob_from_path_and_mode(fs_path, mode, tree_encoding='utf-8'):
     """Create a blob from a path and a stat object.
 
     Args:
@@ -587,7 +587,7 @@ def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
     """
     assert isinstance(fs_path, bytes)
     blob = Blob()
-    if stat.S_ISLNK(st.st_mode):
+    if stat.S_ISLNK(mode):
         if sys.platform == 'win32':
             # os.readlink on Python3 on Windows requires a unicode string.
             fs_path = os.fsdecode(fs_path)
@@ -598,6 +598,17 @@ def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
         with open(fs_path, 'rb') as f:
             blob.data = f.read()
     return blob
+
+
+def blob_from_path_and_stat(fs_path, st, tree_encoding='utf-8'):
+    """Create a blob from a path and a stat object.
+
+    Args:
+      fs_path: Full file system path to file
+      st: A stat object
+    Returns: A `Blob` object
+    """
+    return blob_from_path_and_mode(fs_path, st.st_mode, tree_encoding)
 
 
 def read_submodule_head(path):

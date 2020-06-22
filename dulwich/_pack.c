@@ -22,27 +22,14 @@
 #include <Python.h>
 #include <stdint.h>
 
-#if PY_MAJOR_VERSION >= 3
-#define PyInt_FromLong PyLong_FromLong
-#define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_AS_STRING PyBytes_AS_STRING
-#define PyString_Check PyBytes_Check
-#define PyString_CheckExact PyBytes_CheckExact
-#define PyString_FromStringAndSize PyBytes_FromStringAndSize
-#define PyString_FromString PyBytes_FromString
-#define PyString_GET_SIZE PyBytes_GET_SIZE
-#define PyString_Size PyBytes_Size
-#define _PyString_Join _PyBytes_Join
-#endif
-
 static PyObject *PyExc_ApplyDeltaError = NULL;
 
 static int py_is_sha(PyObject *sha)
 {
-	if (!PyString_CheckExact(sha))
+	if (!PyBytes_CheckExact(sha))
 		return 0;
 
-	if (PyString_Size(sha) != 20)
+	if (PyBytes_Size(sha) != 20)
 		return 0;
 
 	return 1;
@@ -67,18 +54,18 @@ static size_t get_delta_header_size(uint8_t *delta, size_t *index, size_t length
 static PyObject *py_chunked_as_string(PyObject *py_buf)
 {
 	if (PyList_Check(py_buf)) {
-		PyObject *sep = PyString_FromString("");
+		PyObject *sep = PyBytes_FromString("");
 		if (sep == NULL) {
 			PyErr_NoMemory();
 			return NULL;
 		}
-		py_buf = _PyString_Join(sep, py_buf);
+		py_buf = _PyBytes_Join(sep, py_buf);
 		Py_DECREF(sep);
 		if (py_buf == NULL) {
 			PyErr_NoMemory();
 			return NULL;
 		}
-	} else if (PyString_Check(py_buf)) {
+	} else if (PyBytes_Check(py_buf)) {
 		Py_INCREF(py_buf);
 	} else {
 		PyErr_SetString(PyExc_TypeError,
@@ -111,11 +98,11 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	src_buf = (uint8_t *)PyString_AS_STRING(py_src_buf);
-	src_buf_len = (size_t)PyString_GET_SIZE(py_src_buf);
+	src_buf = (uint8_t *)PyBytes_AS_STRING(py_src_buf);
+	src_buf_len = (size_t)PyBytes_GET_SIZE(py_src_buf);
 
-	delta = (uint8_t *)PyString_AS_STRING(py_delta);
-	delta_len = (size_t)PyString_GET_SIZE(py_delta);
+	delta = (uint8_t *)PyBytes_AS_STRING(py_delta);
+	delta_len = (size_t)PyBytes_GET_SIZE(py_delta);
 
 	index = 0;
 	src_size = get_delta_header_size(delta, &index, delta_len);
@@ -127,14 +114,14 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 		return NULL;
 	}
 	dest_size = get_delta_header_size(delta, &index, delta_len);
-	ret = PyString_FromStringAndSize(NULL, dest_size);
+	ret = PyBytes_FromStringAndSize(NULL, dest_size);
 	if (ret == NULL) {
 		PyErr_NoMemory();
 		Py_DECREF(py_src_buf);
 		Py_DECREF(py_delta);
 		return NULL;
 	}
-	out = (uint8_t *)PyString_AS_STRING(ret);
+	out = (uint8_t *)PyBytes_AS_STRING(ret);
 	while (index < delta_len) {
 		uint8_t cmd = delta[index];
 		index++;
@@ -208,13 +195,8 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 	char *sha;
 	Py_ssize_t sha_len;
 	int start, end;
-#if PY_MAJOR_VERSION >= 3
 	if (!PyArg_ParseTuple(args, "iiy#O", &start, &end,
 			      &sha, &sha_len, &unpack_name))
-#else
-	if (!PyArg_ParseTuple(args, "iis#O", &start, &end,
-			      &sha, &sha_len, &unpack_name))
-#endif
 		return NULL;
 
 	if (sha_len != 20) {
@@ -239,14 +221,14 @@ static PyObject *py_bisect_find_sha(PyObject *self, PyObject *args)
 			Py_DECREF(file_sha);
 			return NULL;
 		}
-		cmp = memcmp(PyString_AS_STRING(file_sha), sha, 20);
+		cmp = memcmp(PyBytes_AS_STRING(file_sha), sha, 20);
 		Py_DECREF(file_sha);
 		if (cmp < 0)
 			start = i + 1;
 		else if (cmp > 0)
 			end = i - 1;
 		else {
-			return PyInt_FromLong(i);
+			return PyLong_FromLong(i);
 		}
 	}
 	Py_RETURN_NONE;
@@ -265,7 +247,6 @@ moduleinit(void)
 	PyObject *m;
 	PyObject *errors_module;
 
-#if PY_MAJOR_VERSION >= 3
 	static struct PyModuleDef moduledef = {
 	  PyModuleDef_HEAD_INIT,
 	  "_pack",         /* m_name */
@@ -277,7 +258,6 @@ moduleinit(void)
 	  NULL,            /* m_clear*/
 	  NULL,            /* m_free */
 	};
-#endif
 
 	errors_module = PyImport_ImportModule("dulwich.errors");
 	if (errors_module == NULL)
@@ -288,27 +268,15 @@ moduleinit(void)
 	if (PyExc_ApplyDeltaError == NULL)
 		return NULL;
 
-#if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
-#else
-	m = Py_InitModule3("_pack", py_pack_methods, NULL);
-#endif
 	if (m == NULL)
 		return NULL;
 
 	return m;
 }
 
-#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
 PyInit__pack(void)
 {
 	return moduleinit();
 }
-#else
-PyMODINIT_FUNC
-init_pack(void)
-{
-	moduleinit();
-}
-#endif

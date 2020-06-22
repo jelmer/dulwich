@@ -33,6 +33,7 @@ from dulwich.errors import (
     UnexpectedCommandError,
     HangupException,
     )
+from dulwich.objects import Tree
 from dulwich.object_store import (
     MemoryObjectStore,
     )
@@ -215,6 +216,35 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.set_client_capabilities(caps)
         self.assertEqual({}, self._handler.get_tagged(refs, repo=self._repo))
 
+    def test_nothing_to_do_but_wants(self):
+        # Just the fact that the client claims to want an object is enough
+        # for sending a pack. Even if there turns out to be nothing.
+        refs = {b'refs/tags/tag1': ONE}
+        tree = Tree()
+        self._repo.object_store.add_object(tree)
+        self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
+        self._repo.refs._update(refs)
+        self._handler.proto.set_output(
+            [b'want ' + ONE + b' side-band-64k thin-pack ofs-delta',
+             None, b'have ' + ONE, b'done', None])
+        self._handler.handle()
+        # The server should always send a pack, even if it's empty.
+        self.assertTrue(
+            self._handler.proto.get_received_line(1).startswith(b'PACK'))
+
+    def test_nothing_to_do_no_wants(self):
+        # Don't send a pack if the client didn't ask for anything.
+        refs = {b'refs/tags/tag1': ONE}
+        tree = Tree()
+        self._repo.object_store.add_object(tree)
+        self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
+        self._repo.refs._update(refs)
+        self._handler.proto.set_output([None])
+        self._handler.handle()
+        # The server should not send a pack, since the client didn't ask for
+        # anything.
+        self.assertEqual([], self._handler.proto._received[1])
+
 
 class FindShallowTests(TestCase):
 
@@ -320,6 +350,7 @@ class ReceivePackHandlerTestCase(TestCase):
 
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):
+
     def setUp(self):
         super(ProtocolGraphWalkerEmptyTestCase, self).setUp()
         self._repo = MemoryRepo.init_bare([], {})
@@ -534,7 +565,7 @@ class TestProtocolGraphWalker(object):
         self.acks = []
         self.lines = []
         self.wants_satisified = False
-        self.http_req = None
+        self.stateless_rpc = None
         self.advertise_refs = False
         self._impl = None
         self.done_required = True
@@ -957,7 +988,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
     def test_multi_ack_stateless(self):
         # transmission ends with a flush-pkt
         self._walker.lines[-1] = (None, None)
-        self._walker.http_req = True
+        self._walker.stateless_rpc = True
 
         self.assertNextEquals(TWO)
         self.assertNoAck()
@@ -980,7 +1011,7 @@ class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
         self._walker.done_required = False
         # transmission ends with a flush-pkt
         self._walker.lines[-1] = (None, None)
-        self._walker.http_req = True
+        self._walker.stateless_rpc = True
 
         self.assertNextEquals(TWO)
         self.assertNoAck()

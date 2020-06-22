@@ -117,8 +117,10 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def test_packed_objects(self):
         expected_shas = self._get_all_shas() - self._get_loose_shas()
-        self.assertShasMatch(expected_shas,
-                             chain(*self._repo.object_store.packs))
+        self.assertShasMatch(
+            expected_shas,
+            chain.from_iterable(self._repo.object_store.packs)
+        )
 
     def test_all_objects(self):
         expected_shas = self._get_all_shas()

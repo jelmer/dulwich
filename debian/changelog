@@ -1,8 +1,8 @@
-dulwich (0.20.5-1) UNRELEASED; urgency=medium
+dulwich (0.20.5-1) unstable; urgency=medium
 
   * New upstream release.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 22 Jun 2020 01:54:05 +0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 22 Jun 2020 01:55:55 +0000
 
 dulwich (0.20.2-1) unstable; urgency=medium
 

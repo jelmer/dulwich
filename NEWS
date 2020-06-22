@@ -1,4 +1,4 @@
-0.20.4	2020-06-22
+0.20.5	2020-06-22
 
  * Print a clearer exception when setup.py is executed on Python < 3.5.
    (Jelmer Vernooĳ, #783)

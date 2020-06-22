@@ -22,7 +22,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.4'
+dulwich_version_string = '0.20.5'
 
 
 class DulwichDistribution(Distribution):

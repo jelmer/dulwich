@@ -22,6 +22,7 @@
 
 from io import BytesIO, StringIO
 import os
+import re
 import shutil
 import tarfile
 import tempfile
@@ -981,6 +982,9 @@ class PushTests(PorcelainTestCase):
             author=b'author <email>',
             committer=b'committer <email>')
 
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Push to the remote
         self.assertRaises(
             porcelain.DivergedBranches,
@@ -992,6 +996,12 @@ class PushTests(PorcelainTestCase):
             b'refs/heads/master': remote_id,
             }, self.repo.get_refs())
 
+        self.assertEqual(b'', outstream.getvalue())
+        self.assertEqual(b'', errstream.getvalue())
+
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Push to the remote with --force
         porcelain.push(
             clone_path, self.repo.path, b'refs/heads/master',
@@ -1001,6 +1011,10 @@ class PushTests(PorcelainTestCase):
             b'HEAD': local_id,
             b'refs/heads/master': local_id,
             }, self.repo.get_refs())
+
+        self.assertEqual(b'', outstream.getvalue())
+        self.assertTrue(
+            re.match(b'Push to .* successful.\n', errstream.getvalue()))
 
 
 class PullTests(PorcelainTestCase):

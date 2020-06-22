@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # encoding: utf-8
 # Setup file for dulwich
 # Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
@@ -22,7 +22,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.3'
+dulwich_version_string = '0.20.4'
 
 
 class DulwichDistribution(Distribution):

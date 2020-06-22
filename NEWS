@@ -31,6 +31,9 @@
  * Add a ``porcelain.Error`` object that most errors in porcelain
    derive from. (Jelmer Vernooĳ)
 
+ * Fix argument parsing in dulwich command-line app.
+   (Jelmer Vernooĳ, #784)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

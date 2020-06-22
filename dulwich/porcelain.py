@@ -990,7 +990,7 @@ def push(repo, remote_location=None, refspecs=None,
                 " failed -> " + e.args[0].decode(), inner=e)
 
         for ref, error in (result.ref_status or {}).items():
-            if status is not None:
+            if error is not None:
                 errstream.write(
                     b"Push of ref %s failed: %s" %
                     (ref, error.encode(err_encoding)))

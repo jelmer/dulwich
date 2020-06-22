@@ -976,26 +976,28 @@ def push(repo, remote_location=None, refspecs=None,
             return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
-        remote_location_bytes = client.get_url(path).encode(err_encoding)
+        remote_location = client.get_url(path)
         try:
             result = client.send_pack(
                 path, update_refs,
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
-            errstream.write(
-                b"Push to " + remote_location_bytes + b" successful.\n")
         except SendPackError as e:
             raise Error(
-                "Push to " + remote_location_bytes +
+                "Push to " + remote_location +
                 " failed -> " + e.args[0].decode(), inner=e)
+        else:
+            errstream.write(
+                b"Push to " +
+                remote_location.encode(err_encoding) + b" successful.\n")
 
         for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
-                    b"Push of ref %s failed: %s" %
+                    b"Push of ref %s failed: %s\n" %
                     (ref, error.encode(err_encoding)))
             else:
-                errstream.write(b'Ref %s updated' % ref)
+                errstream.write(b'Ref %s updated\n' % ref)
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)

@@ -1,14 +1,14 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.3
+Version: 0.20.5
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
 Author-email: jelmer@jelmer.uk
 License: Apachev2 or later or GPLv2
 Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
-Project-URL: GitHub, https://github.com/dulwich/dulwich
 Project-URL: Repository, https://www.dulwich.io/code/
+Project-URL: GitHub, https://github.com/dulwich/dulwich
 Description: .. image:: https://travis-ci.org/dulwich/dulwich.png?branch=master
           :alt: Build Status
           :target: https://travis-ci.org/dulwich/dulwich

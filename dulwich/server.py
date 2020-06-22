@@ -219,10 +219,10 @@ class FileSystemBackend(Backend):
 class Handler(object):
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, proto, http_req=None):
+    def __init__(self, backend, proto, stateless_rpc=None):
         self.backend = backend
         self.proto = proto
-        self.http_req = http_req
+        self.stateless_rpc = stateless_rpc
 
     def handle(self):
         raise NotImplementedError(self.handle)
@@ -231,8 +231,8 @@ class Handler(object):
 class PackHandler(Handler):
     """Protocol handler for packs."""
 
-    def __init__(self, backend, proto, http_req=None):
-        super(PackHandler, self).__init__(backend, proto, http_req)
+    def __init__(self, backend, proto, stateless_rpc=None):
+        super(PackHandler, self).__init__(backend, proto, stateless_rpc)
         self._client_capabilities = None
         # Flags needed for the no-done capability
         self._done_received = False
@@ -286,10 +286,10 @@ class PackHandler(Handler):
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
-    def __init__(self, backend, args, proto, http_req=None,
+    def __init__(self, backend, args, proto, stateless_rpc=None,
                  advertise_refs=False):
         super(UploadPackHandler, self).__init__(
-                backend, proto, http_req=http_req)
+                backend, proto, stateless_rpc=stateless_rpc)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
@@ -355,8 +355,14 @@ class UploadPackHandler(PackHandler):
         graph_walker = _ProtocolGraphWalker(
                 self, self.repo.object_store, self.repo.get_peeled,
                 self.repo.refs.get_symrefs)
+        wants = []
+
+        def wants_wrapper(refs):
+            wants.extend(graph_walker.determine_wants(refs))
+            return wants
+
         objects_iter = self.repo.fetch_objects(
-            graph_walker.determine_wants, graph_walker, self.progress,
+            wants_wrapper, graph_walker, self.progress,
             get_tagged=self.get_tagged)
 
         # Note the fact that client is only processing responses related
@@ -370,7 +376,7 @@ class UploadPackHandler(PackHandler):
         # with a graph walker with an implementation that talks over the
         # wire (which is this instance of this class) this will actually
         # iterate through everything and write things out to the wire.
-        if len(objects_iter) == 0:
+        if len(wants) == 0:
             return
 
         # The provided haves are processed, and it is safe to send side-
@@ -533,7 +539,7 @@ class _ProtocolGraphWalker(object):
         self.get_peeled = get_peeled
         self.get_symrefs = get_symrefs
         self.proto = handler.proto
-        self.http_req = handler.http_req
+        self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
         self._wants = []
         self.shallow = set()
@@ -548,7 +554,7 @@ class _ProtocolGraphWalker(object):
         """Determine the wants for a set of heads.
 
         The given heads are advertised to the client, who then specifies which
-        refs he wants using 'want' lines. This portion of the protocol is the
+        refs they want using 'want' lines. This portion of the protocol is the
         same regardless of ack type, and in fact is used to set the ack type of
         the ProtocolGraphWalker.
 
@@ -564,7 +570,7 @@ class _ProtocolGraphWalker(object):
         """
         symrefs = self.get_symrefs()
         values = set(heads.values())
-        if self.advertise_refs or not self.http_req:
+        if self.advertise_refs or not self.stateless_rpc:
             for i, (ref, sha) in enumerate(sorted(heads.items())):
                 try:
                     peeled_sha = self.get_peeled(ref)
@@ -613,7 +619,7 @@ class _ProtocolGraphWalker(object):
             self.unread_proto_line(command, sha)
             self._handle_shallow_request(want_revs)
 
-        if self.http_req and self.proto.eof():
+        if self.stateless_rpc and self.proto.eof():
             # The client may close the socket at this point, expecting a
             # flush-pkt from the server. We might be ready to send a packfile
             # at this point, so we need to explicitly short-circuit in this
@@ -638,7 +644,7 @@ class _ProtocolGraphWalker(object):
 
     def next(self):
         if not self._cached:
-            if not self._impl and self.http_req:
+            if not self._impl and self.stateless_rpc:
                 return None
             return next(self._impl)
         self._cache_index += 1
@@ -847,7 +853,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 if self.walker.all_wants_satisfied(self._common):
                     self.walker.send_ack(self._common[-1], b'ready')
                 self.walker.send_nak()
-                if self.walker.http_req:
+                if self.walker.stateless_rpc:
                     # The HTTP version of this request a flush-pkt always
                     # signifies an end of request, so we also return
                     # nothing here as if we are done (but not really, as
@@ -896,10 +902,10 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto, http_req=None,
+    def __init__(self, backend, args, proto, stateless_rpc=None,
                  advertise_refs=False):
         super(ReceivePackHandler, self).__init__(
-                backend, proto, http_req=http_req)
+                backend, proto, stateless_rpc=stateless_rpc)
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
@@ -999,7 +1005,7 @@ class ReceivePackHandler(PackHandler):
             self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, repr(err))
 
     def handle(self) -> None:
-        if self.advertise_refs or not self.http_req:
+        if self.advertise_refs or not self.stateless_rpc:
             refs = sorted(self.repo.get_refs().items())
             symrefs = sorted(self.repo.refs.get_symrefs().items())
 
@@ -1045,8 +1051,9 @@ class ReceivePackHandler(PackHandler):
 
 class UploadArchiveHandler(Handler):
 
-    def __init__(self, backend, args, proto, http_req=None):
-        super(UploadArchiveHandler, self).__init__(backend, proto, http_req)
+    def __init__(self, backend, args, proto, stateless_rpc=None):
+        super(UploadArchiveHandler, self).__init__(
+            backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 
     def handle(self):

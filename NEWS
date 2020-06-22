@@ -1,3 +1,39 @@
+0.20.5	2020-06-22
+
+ * Print a clearer exception when setup.py is executed on Python < 3.5.
+   (Jelmer Vernooĳ, #783)
+
+ * Send an empty pack to clients if they requested objects, even if they
+   already have those objects. Thanks to Martijn Pieters for
+   the detailed bug report. (Jelmer Vernooĳ, #781)
+
+ * porcelain.pull: Don't ask for objects that we already have.
+   (Jelmer Vernooĳ, #782)
+
+ * Add LCA implementation. (Kevin Hendricks)
+
+ * Add functionality for finding the merge base. (Kevin Hendricks)
+
+ * Check for diverged branches during push.
+   (Jelmer Vernooĳ, #494)
+
+ * Check for fast-forward during pull. (Jelmer Vernooĳ, #666)
+
+ * Return a SendPackResult object from
+   GitClient.send_pack(). (Jelmer Vernooĳ)
+
+ * ``GitClient.send_pack`` now sets the ``ref_status`` attribute
+   on its return value to a dictionary mapping ref names
+   to error messages. Previously, it raised UpdateRefsError
+   if any of the refs failed to update.
+   (Jelmer Vernooĳ, #780)
+
+ * Add a ``porcelain.Error`` object that most errors in porcelain
+   derive from. (Jelmer Vernooĳ)
+
+ * Fix argument parsing in dulwich command-line app.
+   (Jelmer Vernooĳ, #784)
+
 0.20.3	2020-06-14
 
  * Add support for remembering remote refs after push/pull.

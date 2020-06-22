@@ -108,6 +108,7 @@ def self_test_suite():
         'fastexport',
         'file',
         'grafts',
+        'graph',
         'greenthreads',
         'hooks',
         'ignore',

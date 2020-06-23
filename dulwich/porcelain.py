@@ -928,7 +928,6 @@ def get_remote_repo(
         encoded_location = url
     else:
         remote_name = None
-        config = None
 
     return (remote_name, encoded_location.decode())
 

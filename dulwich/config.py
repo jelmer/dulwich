@@ -29,6 +29,8 @@ TODO:
 import os
 import sys
 
+from typing import BinaryIO, Tuple, Optional
+
 from collections import (
     OrderedDict,
     )
@@ -380,12 +382,17 @@ class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig.
     """
 
+    def __init__(self, values=None, encoding=None):
+        super(ConfigFile, self).__init__(values=values, encoding=encoding)
+        self.path = None
+
     @classmethod
-    def from_file(cls, f):
+    def from_file(cls, f: BinaryIO) -> 'ConfigFile':
         """Read configuration from a file-like object."""
         ret = cls()
-        section = None
+        section = None  # type: Optional[Tuple[bytes, ...]]
         setting = None
+        continuation = None
         for lineno, line in enumerate(f.readlines()):
             line = line.lstrip()
             if setting is None:
@@ -429,7 +436,7 @@ class ConfigFile(ConfigDict):
                     value = b"true"
                 setting = setting.strip()
                 if not _check_variable_name(setting):
-                    raise ValueError("invalid variable name %s" % setting)
+                    raise ValueError("invalid variable name %r" % setting)
                 if value.endswith(b"\\\n"):
                     continuation = value[:-2]
                 else:
@@ -449,21 +456,21 @@ class ConfigFile(ConfigDict):
         return ret
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path) -> 'ConfigFile':
         """Read configuration from a file on disk."""
         with GitFile(path, 'rb') as f:
             ret = cls.from_file(f)
             ret.path = path
             return ret
 
-    def write_to_path(self, path=None):
+    def write_to_path(self, path=None) -> None:
         """Write configuration to a file on disk."""
         if path is None:
             path = self.path
         with GitFile(path, 'wb') as f:
             self.write_to_file(f)
 
-    def write_to_file(self, f):
+    def write_to_file(self, f: BinaryIO) -> None:
         """Write configuration to a file-like object."""
         for section, values in self._values.items():
             try:

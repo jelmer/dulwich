@@ -82,18 +82,15 @@ def _find_lcas(lookup_parents, c1, c2s):
     return results
 
 
-def find_merge_base(object_store, commit_ids):
+def find_merge_base(repo, commit_ids):
     """Find lowest common ancestors of commit_ids[0] and *any* of commits_ids[1:]
 
     Args:
-      object_store: object store
-      commit_ids:  list of commit ids
+      repo: Repository object
+      commit_ids: list of commit ids
     Returns:
       list of lowest common ancestor commit_ids
     """
-    def lookup_parents(commit_id):
-        return object_store[commit_id].parents
-
     if not commit_ids:
         return []
     c1 = commit_ids[0]
@@ -102,51 +99,45 @@ def find_merge_base(object_store, commit_ids):
     c2s = commit_ids[1:]
     if c1 in c2s:
         return [c1]
-    return _find_lcas(lookup_parents, c1, c2s)
+    return _find_lcas(repo.get_parents, c1, c2s)
 
 
-def find_octopus_base(object_store, commit_ids):
+def find_octopus_base(repo, commit_ids):
     """Find lowest common ancestors of *all* provided commit_ids
 
     Args:
-      object_store: Object store
+      repo: Repository
       commit_ids:  list of commit ids
     Returns:
       list of lowest common ancestor commit_ids
     """
 
-    def lookup_parents(commit_id):
-        return object_store[commit_id].parents
-
     if not commit_ids:
         return []
     if len(commit_ids) <= 2:
-        return find_merge_base(object_store, commit_ids)
+        return find_merge_base(repo, commit_ids)
     lcas = [commit_ids[0]]
     others = commit_ids[1:]
     for cmt in others:
         next_lcas = []
         for ca in lcas:
-            res = _find_lcas(lookup_parents, cmt, [ca])
+            res = _find_lcas(repo.get_parents, cmt, [ca])
             next_lcas.extend(res)
         lcas = next_lcas[:]
     return lcas
 
 
-def can_fast_forward(object_store, c1, c2):
+def can_fast_forward(repo, c1, c2):
     """Is it possible to fast-forward from c1 to c2?
 
     Args:
-      object_store: Store to retrieve objects from
+      repo: Repository to retrieve objects from
       c1: Commit id for first commit
       c2: Commit id for second commit
     """
     if c1 == c2:
         return True
 
-    def lookup_parents(commit_id):
-        return object_store[commit_id].parents
-
     # Algorithm: Find the common ancestor
-    lcas = _find_lcas(lookup_parents, c1, [c2])
+    lcas = _find_lcas(repo.get_parents, c1, [c2])
     return lcas == [c1]

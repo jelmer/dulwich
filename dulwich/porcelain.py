@@ -232,16 +232,16 @@ class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
 
-def check_diverged(store, current_sha, new_sha):
+def check_diverged(repo, current_sha, new_sha):
     """Check if updating to a sha can be done with fast forwarding.
 
     Args:
-      store: Object store
+      repo: Repository object
       current_sha: Current head sha
       new_sha: New head sha
     """
     try:
-        can = can_fast_forward(store, current_sha, new_sha)
+        can = can_fast_forward(repo, current_sha, new_sha)
     except KeyError:
         can = False
     if not can:
@@ -969,7 +969,7 @@ def push(repo, remote_location=None, refspecs=None,
                     remote_changed_refs[rh] = None
                 else:
                     if not force_ref:
-                        check_diverged(r.object_store, refs[rh], r.refs[lh])
+                        check_diverged(r, refs[rh], r.refs[lh])
                     new_refs[rh] = r.refs[lh]
                     remote_changed_refs[rh] = r.refs[lh]
             return new_refs
@@ -1036,7 +1036,7 @@ def pull(repo, remote_location=None, refspecs=None,
         for (lh, rh, force_ref) in selected_refs:
             try:
                 check_diverged(
-                    r.object_store, r.refs[rh], fetch_result.refs[lh])
+                    r, r.refs[rh], fetch_result.refs[lh])
             except DivergedBranches:
                 if fast_forward:
                     raise

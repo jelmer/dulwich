@@ -779,7 +779,6 @@ def _remote_error_from_stderr(stderr):
         if line.startswith(b'ERROR: '):
             raise GitProtocolError(
                 line[len(b'ERROR: '):].decode('utf-8', 'replace'))
-        raise GitProtocolError(line.decode('utf-8', 'replace'))
     raise HangupException(lines)
 
 

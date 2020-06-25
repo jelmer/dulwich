@@ -48,6 +48,8 @@ from dulwich.client import (
     StrangeHostname,
     SubprocessSSHVendor,
     PLinkSSHVendor,
+    HangupException,
+    GitProtocolError,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
@@ -1363,7 +1365,8 @@ class GitCredentialStoreTests(TestCase):
 class RemoteErrorFromStderrTests(TestCase):
 
     def test_nothing(self):
-        self.assertIs(_remote_error_from_stderr(None), None)
+        self.assertEqual(
+            _remote_error_from_stderr(None), HangupException())
 
     def test_error_line(self):
         b = BytesIO(b"""\
@@ -1373,7 +1376,7 @@ with a tail
 """)
         self.assertEqual(
             _remote_error_from_stderr(b),
-            "This is the actual error")
+            GitProtocolError("This is the actual error"))
 
     def test_no_error_line(self):
         b = BytesIO(b"""\

@@ -25,6 +25,21 @@ import os
 import stat
 import struct
 import sys
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Iterable,
+    Iterator,
+    Tuple,
+    )
+
+if TYPE_CHECKING:
+    from dulwich.object_store import BaseObjectStore
 
 from dulwich.file import GitFile
 from dulwich.objects import (
@@ -168,20 +183,21 @@ def read_index_dict(f):
     return ret
 
 
-def write_index(f, entries):
+def write_index(f: BinaryIO, entries: List[Any], version: int = 4):
     """Write an index file.
 
     Args:
       f: File-like object to write to
+      version: Version number to write
       entries: Iterable over the entries to write
     """
     f.write(b'DIRC')
-    f.write(struct.pack(b'>LL', 2, len(entries)))
+    f.write(struct.pack(b'>LL', version, len(entries)))
     for x in entries:
         write_cache_entry(f, x)
 
 
-def write_index_dict(f, entries):
+def write_index_dict(f: BinaryIO, entries: Dict[bytes, IndexEntry]) -> None:
     """Write an index file based on the contents of a dictionary.
 
     """
@@ -191,13 +207,15 @@ def write_index_dict(f, entries):
     write_index(f, entries_list)
 
 
-def cleanup_mode(mode):
+def cleanup_mode(mode: int) -> int:
     """Cleanup a mode value.
 
     This will return a mode that can be stored in a tree object.
 
     Args:
       mode: Mode to clean up.
+    Returns:
+      mode
     """
     if stat.S_ISLNK(mode):
         return stat.S_IFLNK
@@ -231,7 +249,7 @@ class Index(object):
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._filename)
 
-    def write(self):
+    def write(self) -> None:
         """Write current contents of index to disk."""
         f = GitFile(self._filename, 'wb')
         try:
@@ -255,11 +273,11 @@ class Index(object):
         finally:
             f.close()
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Number of entries in this index file."""
         return len(self._byname)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: bytes) -> IndexEntry:
         """Retrieve entry by relative path.
 
         Returns: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha,
@@ -267,19 +285,19 @@ class Index(object):
         """
         return self._byname[name]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes]:
         """Iterate over the paths in this index."""
         return iter(self._byname)
 
-    def get_sha1(self, path):
+    def get_sha1(self, path: bytes) -> bytes:
         """Return the (git object) SHA1 for the object at a path."""
         return self[path].sha
 
-    def get_mode(self, path):
+    def get_mode(self, path: bytes) -> int:
         """Return the POSIX file mode for the object at a path."""
         return self[path].mode
 
-    def iterobjects(self):
+    def iterobjects(self) -> Iterable[Tuple[bytes, bytes, int]]:
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
@@ -343,7 +361,9 @@ class Index(object):
         return commit_tree(object_store, self.iterobjects())
 
 
-def commit_tree(object_store, blobs):
+def commit_tree(
+        object_store: BaseObjectStore,
+        blobs: Iterable[Tuple[bytes, bytes, int]]) -> bytes:
     """Commit a new tree.
 
     Args:
@@ -353,7 +373,7 @@ def commit_tree(object_store, blobs):
       SHA1 of the created tree.
     """
 
-    trees = {b'': {}}
+    trees: Dict[bytes, Any] = {b'': {}}
 
     def add_tree(path):
         if path in trees:
@@ -385,7 +405,7 @@ def commit_tree(object_store, blobs):
     return build_tree(b'')
 
 
-def commit_index(object_store, index):
+def commit_index(object_store: BaseObjectStore, index: Index) -> bytes:
     """Create a new tree from an index.
 
     Args:
@@ -397,8 +417,15 @@ def commit_index(object_store, index):
     return commit_tree(object_store, index.iterobjects())
 
 
-def changes_from_tree(names, lookup_entry, object_store, tree,
-                      want_unchanged=False):
+def changes_from_tree(
+        names: Iterable[bytes],
+        lookup_entry: Callable[[bytes], Tuple[bytes, int]],
+        object_store: BaseObjectStore, tree: Optional[bytes],
+        want_unchanged=False) -> Iterable[
+            Tuple[
+                Tuple[Optional[bytes], Optional[bytes]],
+                Tuple[Optional[int], Optional[int]],
+                Tuple[Optional[bytes], Optional[bytes]]]]:
     """Find the differences between the contents of a tree and
     a working copy.
 
@@ -436,7 +463,9 @@ def changes_from_tree(names, lookup_entry, object_store, tree,
             yield ((None, name), (None, other_mode), (None, other_sha))
 
 
-def index_entry_from_stat(stat_val, hex_sha, flags, mode=None):
+def index_entry_from_stat(
+        stat_val, hex_sha: bytes, flags: int,
+        mode: Optional[int] = None):
     """Create a new index entry from a stat value.
 
     Args:
@@ -659,7 +688,7 @@ def _has_directory_changed(tree_path, entry):
     return False
 
 
-def get_unstaged_changes(index, root_path, filter_blob_callback=None):
+def get_unstaged_changes(index: Index, root_path, filter_blob_callback=None):
     """Walk through an index and check for differences against working tree.
 
     Args:
@@ -699,7 +728,7 @@ def get_unstaged_changes(index, root_path, filter_blob_callback=None):
 os_sep_bytes = os.sep.encode('ascii')
 
 
-def _tree_to_fs_path(root_path, tree_path):
+def _tree_to_fs_path(root_path, tree_path: bytes):
     """Convert a git tree path to a file system path.
 
     Args:
@@ -768,7 +797,8 @@ def index_entry_from_path(path, object_store=None):
     return None
 
 
-def iter_fresh_entries(paths, root_path, object_store=None):
+def iter_fresh_entries(
+        paths, root_path, object_store: Optional[BaseObjectStore] = None):
     """Iterate over current versions of index entries on disk.
 
     Args:
@@ -814,7 +844,6 @@ def iter_fresh_objects(paths, root_path, include_deleted=False,
     """Iterate over versions of objecs on disk referenced by index.
 
     Args:
-      index: Index file
       root_path: Root path to access from
       include_deleted: Include deleted entries with sha and
         mode set to None

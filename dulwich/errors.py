@@ -117,6 +117,9 @@ class GitProtocolError(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
+    def __eq__(self, other):
+        return isinstance(self, type(other)) and self.args == other.args
+
 
 class SendPackError(GitProtocolError):
     """An error occurred during send_pack."""
@@ -146,6 +149,11 @@ class HangupException(GitProtocolError):
             super(HangupException, self).__init__(
                 "The remote server unexpectedly closed the connection.")
         self.stderr_lines = stderr_lines
+
+    def __eq__(self, other):
+        return (
+            isinstance(self, type(other)) and
+            self.stderr_lines == other.stderr_lines)
 
 
 class UnexpectedCommandError(GitProtocolError):

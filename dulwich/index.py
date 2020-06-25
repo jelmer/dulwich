@@ -67,6 +67,9 @@ FLAG_VALID = 0x8000
 FLAG_EXTENDED = 0x4000
 
 
+DEFAULT_VERSION = 2
+
+
 def pathsplit(path):
     """Split a /-delimited path into a directory part and a basename.
 
@@ -160,7 +163,7 @@ def write_cache_entry(f, entry):
     f.write(b'\0' * ((beginoffset + real_size) - f.tell()))
 
 
-def read_index(f):
+def read_index(f: BinaryIO):
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
     if header != b'DIRC':
@@ -183,7 +186,9 @@ def read_index_dict(f):
     return ret
 
 
-def write_index(f: BinaryIO, entries: List[Any], version: int = 4):
+def write_index(
+        f: BinaryIO,
+        entries: List[Any], version: Optional[int] = None):
     """Write an index file.
 
     Args:
@@ -191,20 +196,24 @@ def write_index(f: BinaryIO, entries: List[Any], version: int = 4):
       version: Version number to write
       entries: Iterable over the entries to write
     """
+    if version is None:
+        version = DEFAULT_VERSION
     f.write(b'DIRC')
     f.write(struct.pack(b'>LL', version, len(entries)))
     for x in entries:
         write_cache_entry(f, x)
 
 
-def write_index_dict(f: BinaryIO, entries: Dict[bytes, IndexEntry]) -> None:
+def write_index_dict(
+        f: BinaryIO, entries: Dict[bytes, IndexEntry],
+        version: Optional[int] = None) -> None:
     """Write an index file based on the contents of a dictionary.
 
     """
     entries_list = []
     for name in sorted(entries):
         entries_list.append((name,) + tuple(entries[name]))
-    write_index(f, entries_list)
+    write_index(f, entries_list, version=version)
 
 
 def cleanup_mode(mode: int) -> int:
@@ -239,6 +248,8 @@ class Index(object):
           filename: Path to the index file
         """
         self._filename = filename
+        # TODO(jelmer): Store the version returned by read_index
+        self._version = None
         self.clear()
         self.read()
 
@@ -254,7 +265,7 @@ class Index(object):
         f = GitFile(self._filename, 'wb')
         try:
             f = SHA1Writer(f)
-            write_index_dict(f, self._byname)
+            write_index_dict(f, self._byname, version=self._version)
         finally:
             f.close()
 
@@ -362,7 +373,7 @@ class Index(object):
 
 
 def commit_tree(
-        object_store: BaseObjectStore,
+        object_store: 'BaseObjectStore',
         blobs: Iterable[Tuple[bytes, bytes, int]]) -> bytes:
     """Commit a new tree.
 
@@ -372,7 +383,6 @@ def commit_tree(
     Returns:
       SHA1 of the created tree.
     """
-
     trees: Dict[bytes, Any] = {b'': {}}
 
     def add_tree(path):
@@ -405,7 +415,7 @@ def commit_tree(
     return build_tree(b'')
 
 
-def commit_index(object_store: BaseObjectStore, index: Index) -> bytes:
+def commit_index(object_store: 'BaseObjectStore', index: Index) -> bytes:
     """Create a new tree from an index.
 
     Args:
@@ -420,7 +430,7 @@ def commit_index(object_store: BaseObjectStore, index: Index) -> bytes:
 def changes_from_tree(
         names: Iterable[bytes],
         lookup_entry: Callable[[bytes], Tuple[bytes, int]],
-        object_store: BaseObjectStore, tree: Optional[bytes],
+        object_store: 'BaseObjectStore', tree: Optional[bytes],
         want_unchanged=False) -> Iterable[
             Tuple[
                 Tuple[Optional[bytes], Optional[bytes]],
@@ -798,7 +808,7 @@ def index_entry_from_path(path, object_store=None):
 
 
 def iter_fresh_entries(
-        paths, root_path, object_store: Optional[BaseObjectStore] = None):
+        paths, root_path, object_store: Optional['BaseObjectStore'] = None):
     """Iterate over current versions of index entries on disk.
 
     Args:

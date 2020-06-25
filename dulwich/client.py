@@ -773,13 +773,13 @@ def check_wants(wants, refs):
 
 def _remote_error_from_stderr(stderr):
     if stderr is None:
-        raise HangupException()
+        return HangupException()
     lines = [line.rstrip(b'\n') for line in stderr.readlines()]
     for line in lines:
         if line.startswith(b'ERROR: '):
-            raise GitProtocolError(
+            return GitProtocolError(
                 line[len(b'ERROR: '):].decode('utf-8', 'replace'))
-    raise HangupException(lines)
+    return HangupException(lines)
 
 
 class TraditionalGitClient(GitClient):
@@ -831,7 +831,7 @@ class TraditionalGitClient(GitClient):
             try:
                 old_refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                _remote_error_from_stderr(stderr)
+                raise _remote_error_from_stderr(stderr)
             negotiated_capabilities, agent = \
                 self._negotiate_receive_pack_capabilities(server_capabilities)
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
@@ -911,7 +911,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, server_capabilities = read_pkt_refs(proto)
             except HangupException:
-                _remote_error_from_stderr(stderr)
+                raise _remote_error_from_stderr(stderr)
             negotiated_capabilities, symrefs, agent = (
                     self._negotiate_upload_pack_capabilities(
                             server_capabilities))
@@ -948,7 +948,7 @@ class TraditionalGitClient(GitClient):
             try:
                 refs, _ = read_pkt_refs(proto)
             except HangupException:
-                _remote_error_from_stderr(stderr)
+                raise _remote_error_from_stderr(stderr)
             proto.write_pkt_line(None)
             return refs
 
@@ -968,7 +968,7 @@ class TraditionalGitClient(GitClient):
             try:
                 pkt = proto.read_pkt_line()
             except HangupException:
-                _remote_error_from_stderr(stderr)
+                raise _remote_error_from_stderr(stderr)
             if pkt == b"NACK\n":
                 return
             elif pkt == b"ACK\n":

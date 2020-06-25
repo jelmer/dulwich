@@ -480,6 +480,12 @@ def clean(repo=".", target_dir=None):
         if not _is_subdir(target_dir, r.path):
             raise Error("target_dir must be in the repo's working dir")
 
+        config = r.get_config_stack()
+        require_force = config.get_boolean((b'clean',), b'requireForce', True)
+
+        # TODO(jelmer): if require_force is set, then make sure that -f, -i or
+        # -n is specified.
+
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
 

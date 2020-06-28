@@ -323,6 +323,32 @@ class RefsContainerTests(object):
         self.assertNotIn(
             b'refs/remotes/origin/other', self._refs)
 
+    def test_watch(self):
+        try:
+            watcher = self._refs.watch()
+        except NotImplementedError:
+            self.skipTest('watching not supported')
+        with watcher:
+            self._refs[b'refs/remotes/origin/other'] = (
+                b'48d01bd4b77fed026b154d16493e5deab78f02ec')
+            change = next(watcher)
+            self.assertEqual(
+                (b'refs/remotes/origin/other', None,
+                 b'48d01bd4b77fed026b154d16493e5deab78f02ec'), change)
+            self._refs[b'refs/remotes/origin/other'] = (
+                b'48d01bd4b77fed026b154d16493e5deab78f02ed')
+            change = next(watcher)
+            self.assertEqual(
+                (b'refs/remotes/origin/other',
+                 b'48d01bd4b77fed026b154d16493e5deab78f02ec',
+                 b'48d01bd4b77fed026b154d16493e5deab78f02ed'), change)
+            del self._refs[b'refs/remotes/origin/other']
+            change = next(watcher)
+            self.assertEqual(
+                (b'refs/remotes/origin/other',
+                 b'48d01bd4b77fed026b154d16493e5deab78f02ed',
+                 None), change)
+
 
 class DictRefsContainerTests(RefsContainerTests, TestCase):
 

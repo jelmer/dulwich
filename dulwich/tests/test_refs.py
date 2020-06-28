@@ -326,7 +326,7 @@ class RefsContainerTests(object):
     def test_watch(self):
         try:
             watcher = self._refs.watch()
-        except NotImplementedError:
+        except (NotImplementedError, ImportError):
             self.skipTest('watching not supported')
         with watcher:
             self._refs[b'refs/remotes/origin/other'] = (

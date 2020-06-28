@@ -415,8 +415,9 @@ class DictRefsContainer(RefsContainer):
     def set_symbolic_ref(self, name, other, committer=None,
                          timestamp=None, timezone=None, message=None):
         old = self.follow(name)[-1]
-        self._refs[name] = SYMREF + other
-        self._log(name, old, old, committer=committer, timestamp=timestamp,
+        new = SYMREF + other
+        self._refs[name] = new
+        self._log(name, old, new, committer=committer, timestamp=timestamp,
                   timezone=timezone, message=message)
 
     def set_if_equals(self, name, old_ref, new_ref, committer=None,
@@ -461,7 +462,8 @@ class DictRefsContainer(RefsContainer):
         """Update multiple refs; intended only for testing."""
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
-        self._refs.update(refs)
+        for ref, sha in refs.items():
+            self._refs[ref] = sha
 
     def _update_peeled(self, peeled):
         """Update cached peeled refs; intended only for testing."""

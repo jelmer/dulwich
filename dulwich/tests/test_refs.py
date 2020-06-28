@@ -333,20 +333,18 @@ class RefsContainerTests(object):
                 b'48d01bd4b77fed026b154d16493e5deab78f02ec')
             change = next(watcher)
             self.assertEqual(
-                (b'refs/remotes/origin/other', None,
+                (b'refs/remotes/origin/other',
                  b'48d01bd4b77fed026b154d16493e5deab78f02ec'), change)
             self._refs[b'refs/remotes/origin/other'] = (
                 b'48d01bd4b77fed026b154d16493e5deab78f02ed')
             change = next(watcher)
             self.assertEqual(
                 (b'refs/remotes/origin/other',
-                 b'48d01bd4b77fed026b154d16493e5deab78f02ec',
                  b'48d01bd4b77fed026b154d16493e5deab78f02ed'), change)
             del self._refs[b'refs/remotes/origin/other']
             change = next(watcher)
             self.assertEqual(
                 (b'refs/remotes/origin/other',
-                 b'48d01bd4b77fed026b154d16493e5deab78f02ed',
                  None), change)
 
 

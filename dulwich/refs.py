@@ -390,6 +390,36 @@ class RefsContainer(object):
                 ret[src] = dst
         return ret
 
+    def watch(self):
+        """Watch for changes to the refs in this container.
+
+        Returns a context manager that yields tuples with (refname, old_sha,
+        new_sha)
+        """
+        raise NotImplementedError(self.watch)
+
+
+class _DictRefsWatcher(object):
+
+    def __init__(self, refs):
+        self._refs = refs
+
+    def __enter__(self):
+        from queue import Queue
+        self.queue = Queue()
+        self._refs._watchers.add(self)
+        return self
+
+    def __next__(self):
+        return self.queue.get()
+
+    def _notify(self, entry):
+        self.queue.put_nowait(entry)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._refs._watchers.remove(self)
+        return False
+
 
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.
@@ -402,6 +432,7 @@ class DictRefsContainer(RefsContainer):
         super(DictRefsContainer, self).__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
+        self._watchers = set()
 
     def allkeys(self):
         return self._refs.keys()
@@ -412,11 +443,19 @@ class DictRefsContainer(RefsContainer):
     def get_packed_refs(self):
         return {}
 
+    def _notify(self, ref, oldsha, newsha):
+        for watcher in self._watchers:
+            watcher._notify((ref, oldsha, newsha))
+
+    def watch(self):
+        return _DictRefsWatcher(self)
+
     def set_symbolic_ref(self, name, other, committer=None,
                          timestamp=None, timezone=None, message=None):
         old = self.follow(name)[-1]
         new = SYMREF + other
         self._refs[name] = new
+        self._notify(name, old, new)
         self._log(name, old, new, committer=committer, timestamp=timestamp,
                   timezone=timezone, message=message)
 
@@ -429,6 +468,7 @@ class DictRefsContainer(RefsContainer):
             self._check_refname(realname)
             old = self._refs.get(realname)
             self._refs[realname] = new_ref
+            self._notify(realname, old, new_ref)
             self._log(realname, old, new_ref, committer=committer,
                       timestamp=timestamp, timezone=timezone, message=message)
         return True
@@ -438,6 +478,7 @@ class DictRefsContainer(RefsContainer):
         if name in self._refs:
             return False
         self._refs[name] = ref
+        self._notify(name, None, ref)
         self._log(name, None, ref, committer=committer, timestamp=timestamp,
                   timezone=timezone, message=message)
         return True
@@ -451,6 +492,7 @@ class DictRefsContainer(RefsContainer):
         except KeyError:
             pass
         else:
+            self._notify(name, old, None)
             self._log(name, old, None, committer=committer,
                       timestamp=timestamp, timezone=timezone, message=message)
         return True
@@ -463,7 +505,7 @@ class DictRefsContainer(RefsContainer):
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
         for ref, sha in refs.items():
-            self._refs[ref] = sha
+            self.set_if_equal(ref, None, sha)
 
     def _update_peeled(self, peeled):
         """Update cached peeled refs; intended only for testing."""

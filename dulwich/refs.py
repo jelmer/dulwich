@@ -504,7 +504,7 @@ class DictRefsContainer(RefsContainer):
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
         for ref, sha in refs.items():
-            self.set_if_equal(ref, None, sha)
+            self.set_if_equals(ref, None, sha)
 
     def _update_peeled(self, peeled):
         """Update cached peeled refs; intended only for testing."""

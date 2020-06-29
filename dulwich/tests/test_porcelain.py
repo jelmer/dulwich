@@ -925,6 +925,53 @@ class PushTests(PorcelainTestCase):
             self.assertEqual(os.path.basename(fullpath),
                              change.new.path.decode('ascii'))
 
+    def test_local_missing(self):
+        """Pushing a new branch."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.init(clone_path)
+        target_repo.close()
+
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.push, self.repo, clone_path,
+            b"HEAD:refs/heads/master",
+            outstream=outstream, errstream=errstream)
+
+    def test_new(self):
+        """Pushing a new branch."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.init(clone_path)
+        target_repo.close()
+
+        # create a second file to be pushed back to origin
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        new_id = porcelain.commit(
+            repo=self.repo, message=b'push',
+            author=b'author <email>',
+            committer=b'committer <email>')
+
+        # Push to the remote
+        porcelain.push(self.repo, clone_path, b"HEAD:refs/heads/master",
+                       outstream=outstream, errstream=errstream)
+
+        with Repo(clone_path) as r_clone:
+            self.assertEqual({
+                b'HEAD': new_id,
+                b'refs/heads/master': new_id,
+                }, r_clone.get_refs())
+
     def test_delete(self):
         """Basic test of porcelain push, removing a branch.
         """

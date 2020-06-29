@@ -975,10 +975,15 @@ def push(repo, remote_location=None, refspecs=None,
                     new_refs[rh] = ZERO_SHA
                     remote_changed_refs[rh] = None
                 else:
-                    if not force_ref:
-                        check_diverged(r, refs[rh], r.refs[lh])
-                    new_refs[rh] = r.refs[lh]
-                    remote_changed_refs[rh] = r.refs[lh]
+                    try:
+                        localsha = r.refs[lh]
+                    except KeyError:
+                        raise Error(
+                            'No valid ref %s in local repository' % lh)
+                    if not force_ref and rh in refs:
+                        check_diverged(r, refs[rh], localsha)
+                    new_refs[rh] = localsha
+                    remote_changed_refs[rh] = localsha
             return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING

@@ -24,11 +24,23 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
+from typing import (
+    BinaryIO,
+    Iterable,
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Dict,
+    Union,
+    )
 
-from dulwich.config import get_xdg_config_home_path
+if TYPE_CHECKING:
+    from dulwich.repo import Repo
+
+from dulwich.config import get_xdg_config_home_path, Config
 
 
-def _translate_segment(segment):
+def _translate_segment(segment: bytes) -> bytes:
     if segment == b"*":
         return b'[^/]+'
     res = b""
@@ -63,7 +75,7 @@ def _translate_segment(segment):
     return res
 
 
-def translate(pat):
+def translate(pat: bytes) -> bytes:
     """Translate a shell PATTERN to a regular expression.
 
     There is no way to quote meta-characters.
@@ -100,7 +112,7 @@ def translate(pat):
     return res + b'\\Z'
 
 
-def read_ignore_patterns(f):
+def read_ignore_patterns(f: BinaryIO) -> Iterable[bytes]:
     """Read a git ignore file.
 
     Args:
@@ -127,7 +139,8 @@ def read_ignore_patterns(f):
         yield line
 
 
-def match_pattern(path, pattern, ignorecase=False):
+def match_pattern(
+        path: bytes, pattern: bytes, ignorecase: bool = False) -> bool:
     """Match a gitignore-style pattern against a path.
 
     Args:
@@ -143,7 +156,7 @@ def match_pattern(path, pattern, ignorecase=False):
 class Pattern(object):
     """A single ignore pattern."""
 
-    def __init__(self, pattern, ignorecase=False):
+    def __init__(self, pattern: bytes, ignorecase: bool = False):
         self.pattern = pattern
         self.ignorecase = ignorecase
         if pattern[0:1] == b'!':
@@ -158,22 +171,22 @@ class Pattern(object):
             flags = re.IGNORECASE
         self._re = re.compile(translate(pattern), flags)
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.pattern
 
-    def __str__(self):
+    def __str__(self) -> str:
         return os.fsdecode(self.pattern)
 
-    def __eq__(self, other):
-        return (type(self) == type(other) and
+    def __eq__(self, other: object) -> bool:
+        return (isinstance(other, type(self)) and
                 self.pattern == other.pattern and
                 self.ignorecase == other.ignorecase)
 
-    def __repr__(self):
-        return "%s(%s, %r)" % (
+    def __repr__(self) -> str:
+        return "%s(%r, %r)" % (
             type(self).__name__, self.pattern, self.ignorecase)
 
-    def match(self, path):
+    def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.
 
         Args:
@@ -185,23 +198,25 @@ class Pattern(object):
 
 class IgnoreFilter(object):
 
-    def __init__(self, patterns, ignorecase=False):
-        self._patterns = []
+    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False,
+                 path=None):
+        self._patterns = []  # type: List[Pattern]
         self._ignorecase = ignorecase
+        self._path = path
         for pattern in patterns:
             self.append_pattern(pattern)
 
-    def append_pattern(self, pattern):
+    def append_pattern(self, pattern: bytes) -> None:
         """Add a pattern to the set."""
         self._patterns.append(Pattern(pattern, self._ignorecase))
 
-    def find_matching(self, path):
+    def find_matching(self, path: Union[bytes, str]) -> Iterable[Pattern]:
         """Yield all matching patterns for path.
 
         Args:
           path: Path to match
         Returns:
-          Iterator over  iterators
+          Iterator over iterators
         """
         if not isinstance(path, bytes):
             path = os.fsencode(path)
@@ -209,7 +224,7 @@ class IgnoreFilter(object):
             if pattern.match(path):
                 yield pattern
 
-    def is_ignored(self, path):
+    def is_ignored(self, path: bytes) -> Optional[bool]:
         """Check whether a path is ignored.
 
         For directories, include a trailing slash.
@@ -223,17 +238,17 @@ class IgnoreFilter(object):
         return status
 
     @classmethod
-    def from_path(cls, path, ignorecase=False):
+    def from_path(cls, path, ignorecase: bool = False) -> 'IgnoreFilter':
         with open(path, 'rb') as f:
-            ret = cls(read_ignore_patterns(f), ignorecase)
-            ret._path = path
-            return ret
+            return cls(read_ignore_patterns(f), ignorecase, path=path)
 
-    def __repr__(self):
-        if getattr(self, '_path', None) is None:
-            return "<%s>" % (type(self).__name__)
+    def __repr__(self) -> str:
+        path = getattr(self, '_path', None)
+        if path is not None:
+            return "%s.from_path(%r)" % (
+                type(self).__name__, path)
         else:
-            return "%s.from_path(%r)" % (type(self).__name__, self._path)
+            return "<%s>" % (type(self).__name__)
 
 
 class IgnoreFilterStack(object):
@@ -242,7 +257,7 @@ class IgnoreFilterStack(object):
     def __init__(self, filters):
         self._filters = filters
 
-    def is_ignored(self, path):
+    def is_ignored(self, path: str) -> Optional[bool]:
         """Check whether a path is explicitly included or excluded in ignores.
 
         Args:
@@ -259,7 +274,7 @@ class IgnoreFilterStack(object):
         return status
 
 
-def default_user_ignore_filter_path(config):
+def default_user_ignore_filter_path(config: Config) -> str:
     """Return default user ignore filter path.
 
     Args:
@@ -278,19 +293,21 @@ def default_user_ignore_filter_path(config):
 class IgnoreFilterManager(object):
     """Ignore file manager."""
 
-    def __init__(self, top_path, global_filters, ignorecase):
-        self._path_filters = {}
+    def __init__(
+            self, top_path: str, global_filters: List[IgnoreFilter],
+            ignorecase: bool):
+        self._path_filters = {}  # type: Dict[str, Optional[IgnoreFilter]]
         self._top_path = top_path
         self._global_filters = global_filters
         self._ignorecase = ignorecase
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "%s(%s, %r, %r)" % (
             type(self).__name__, self._top_path,
             self._global_filters,
             self._ignorecase)
 
-    def _load_path(self, path):
+    def _load_path(self, path: str) -> Optional[IgnoreFilter]:
         try:
             return self._path_filters[path]
         except KeyError:
@@ -304,7 +321,7 @@ class IgnoreFilterManager(object):
             self._path_filters[path] = None
         return self._path_filters[path]
 
-    def find_matching(self, path):
+    def find_matching(self, path: str) -> Iterable[Pattern]:
         """Find matching patterns for path.
 
         Stops after the first ignore file with matches.
@@ -336,7 +353,7 @@ class IgnoreFilterManager(object):
                 filters.insert(0, (i, ignore_filter))
         return iter([])
 
-    def is_ignored(self, path):
+    def is_ignored(self, path: str) -> Optional[bool]:
         """Check whether a path is explicitly included or excluded in ignores.
 
         Args:
@@ -351,7 +368,7 @@ class IgnoreFilterManager(object):
         return None
 
     @classmethod
-    def from_repo(cls, repo):
+    def from_repo(cls, repo: 'Repo') -> 'IgnoreFilterManager':
         """Create a IgnoreFilterManager from a repository.
 
         Args:

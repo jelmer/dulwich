@@ -64,6 +64,7 @@ from dulwich.object_store import (
     )
 from dulwich.objects import (
     check_hexsha,
+    valid_hexsha,
     Blob,
     Commit,
     ShaFile,
@@ -726,7 +727,7 @@ class BaseRepo(object):
         Args:
           name: Git object SHA1 or ref name
         """
-        if len(name) in (20, 40):
+        if len(name) == 20 or (len(name) == 40 and valid_hexsha(name)):
             return name in self.object_store or name in self.refs
         else:
             return name in self.refs

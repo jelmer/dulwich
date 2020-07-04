@@ -207,6 +207,7 @@ class RepositoryRootTests(TestCase):
     def test_contains_object(self):
         r = self.open_repo('a.git')
         self.assertTrue(r.head() in r)
+        self.assertFalse(b"z" * 40 in r)
 
     def test_contains_ref(self):
         r = self.open_repo('a.git')

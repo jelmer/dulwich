@@ -516,9 +516,9 @@ class FilePackIndex(PackIndex):
         return super(FilePackIndex, self).__eq__(other)
 
     def close(self):
-        self._file.close()
         if getattr(self._contents, "close", None) is not None:
             self._contents.close()
+        self._file.close()
 
     def __len__(self):
         """Return the number of entries in this pack index."""
@@ -1934,8 +1934,8 @@ class Pack(object):
     def from_objects(self, data, idx):
         """Create a new pack object from pack data and index objects."""
         ret = Pack('')
-        ret._data_load = lambda: data
-        ret._idx_load = lambda: idx
+        ret._data = data
+        ret._idx = idx
         return ret
 
     def name(self):

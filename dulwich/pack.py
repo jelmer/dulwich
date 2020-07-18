@@ -516,9 +516,9 @@ class FilePackIndex(PackIndex):
         return super(FilePackIndex, self).__eq__(other)
 
     def close(self):
+        self._file.close()
         if getattr(self._contents, "close", None) is not None:
             self._contents.close()
-        self._file.close()
 
     def __len__(self):
         """Return the number of entries in this pack index."""
@@ -1922,20 +1922,24 @@ class Pack(object):
         self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
-    def from_lazy_objects(self, data_fn, idx_fn):
+    def from_lazy_objects(cls, data_fn, idx_fn):
         """Create a new pack object from callables to load pack data and
         index objects."""
-        ret = Pack('')
+        ret = cls('')
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
 
     @classmethod
-    def from_objects(self, data, idx):
+    def from_objects(cls, data, idx):
         """Create a new pack object from pack data and index objects."""
-        ret = Pack('')
+        ret = cls('')
         ret._data = data
+        ret._data.pack = ret
+        ret._data_load = None
         ret._idx = idx
+        ret._idx_load = None
+        ret.check_length_and_checksum()
         return ret
 
     def name(self):

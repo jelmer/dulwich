@@ -14,6 +14,7 @@ from distutils.core import Distribution
 import io
 import os
 import sys
+from typing import Dict, Any
 
 
 if sys.version_info < (3, 5):
@@ -70,7 +71,7 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
-setup_kwargs = {}
+setup_kwargs: Dict[str, Any] = {}
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {

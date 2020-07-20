@@ -252,6 +252,17 @@ class RepositoryRootTests(TestCase):
         r = self.open_repo('a.git')
         self.assertEqual(r.get_peeled(b'HEAD'), r.head())
 
+    def test_get_parents(self):
+        r = self.open_repo('a.git')
+        self.assertEqual(
+            [b'2a72d929692c41d8554c07f6301757ba18a65d91'],
+            r.get_parents(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'))
+        r.update_shallow(
+                [b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'],
+                None)
+        self.assertEqual(
+            [], r.get_parents(b'a90fa2d900a17e99b433217e988c4eb4a2e9a097'))
+
     def test_get_walker(self):
         r = self.open_repo('a.git')
         # include defaults to [r.head()]

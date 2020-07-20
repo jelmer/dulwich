@@ -6,6 +6,9 @@
  * Fix pushing of new branches from porcelain.push.
    (Jelmer Vernooĳ, #788)
 
+ * Honor shallows when pushing from a shallow clone.
+   (Jelmer Vernooĳ, #794)
+
 0.20.5	2020-06-22
 
  * Print a clearer exception when setup.py is executed on Python < 3.5.

@@ -71,7 +71,7 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
-setup_kwargs: Dict[str, Any] = {}
+setup_kwargs = {}  # type: Dict[str, Any]
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {

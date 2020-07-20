@@ -297,6 +297,25 @@ def _set_filesystem_hidden(path):
     # Could implement other platform specific filesytem hiding here
 
 
+class ParentsProvider(object):
+
+    def __init__(self, store, grafts={}, shallows=[]):
+        self.store = store
+        self.grafts = grafts
+        self.shallows = set(shallows)
+
+    def get_parents(self, commit_id, commit=None):
+        try:
+            return self.grafts[commit_id]
+        except KeyError:
+            pass
+        if commit_id in self.shallows:
+            return []
+        if commit is None:
+            commit = self.store[commit_id]
+        return commit.parents
+
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -487,10 +506,11 @@ class BaseRepo(object):
             # commits aren't missing.
             haves = []
 
+        parents_provider = ParentsProvider(
+            self.object_store, shallows=shallows)
+
         def get_parents(commit):
-            if commit.id in shallows:
-                return []
-            return self.get_parents(commit.id, commit)
+            return parents_provider.get_parents(commit.id, commit)
 
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(
@@ -525,8 +545,9 @@ class BaseRepo(object):
             heads = [
                 sha for sha in self.refs.as_dict(b'refs/heads').values()
                 if sha in self.object_store]
+        parents_provider = ParentsProvider(self.object_store)
         return ObjectStoreGraphWalker(
-            heads, self.get_parents, shallow=self.get_shallow())
+            heads, parents_provider.get_parents, shallow=self.get_shallow())
 
     def get_refs(self) -> Dict[bytes, bytes]:
         """Get dictionary with all refs.
@@ -567,6 +588,11 @@ class BaseRepo(object):
         """
         return self.object_store[sha]
 
+    def parents_provider(self):
+        return ParentsProvider(
+            self.object_store, grafts=self._graftpoints,
+            shallows=self.get_shallow())
+
     def get_parents(self, sha: bytes, commit: Commit = None) -> List[bytes]:
         """Retrieve the parents of a specific commit.
 
@@ -578,12 +604,7 @@ class BaseRepo(object):
           commit: Optional commit matching the sha
         Returns: List of parents
         """
-        try:
-            return self._graftpoints[sha]
-        except KeyError:
-            if commit is None:
-                commit = self[sha]
-            return commit.parents
+        return self.parents_provider().get_parents(sha, commit)
 
     def get_config(self):
         """Retrieve the config object.

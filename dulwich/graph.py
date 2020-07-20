@@ -99,7 +99,8 @@ def find_merge_base(repo, commit_ids):
     c2s = commit_ids[1:]
     if c1 in c2s:
         return [c1]
-    return _find_lcas(repo.get_parents, c1, c2s)
+    parents_provider = repo.parents_provider()
+    return _find_lcas(parents_provider.get_parents, c1, c2s)
 
 
 def find_octopus_base(repo, commit_ids):
@@ -116,12 +117,13 @@ def find_octopus_base(repo, commit_ids):
         return []
     if len(commit_ids) <= 2:
         return find_merge_base(repo, commit_ids)
+    parents_provider = repo.parents_provider()
     lcas = [commit_ids[0]]
     others = commit_ids[1:]
     for cmt in others:
         next_lcas = []
         for ca in lcas:
-            res = _find_lcas(repo.get_parents, cmt, [ca])
+            res = _find_lcas(parents_provider.get_parents, cmt, [ca])
             next_lcas.extend(res)
         lcas = next_lcas[:]
     return lcas
@@ -139,5 +141,6 @@ def can_fast_forward(repo, c1, c2):
         return True
 
     # Algorithm: Find the common ancestor
-    lcas = _find_lcas(repo.get_parents, c1, [c2])
+    parents_provider = repo.parents_provider()
+    lcas = _find_lcas(parents_provider.get_parents, c1, [c2])
     return lcas == [c1]

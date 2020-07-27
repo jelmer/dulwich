@@ -232,9 +232,9 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
             path = Path(os.path.abspath(path))
 
         repopath = Path(repopath).resolve()
-        # Resolve and abspath seems to behave differently regarding symlinks, as
-        # we are doing abspath on the file path, we need to do the same on the
-        # repo path or they might not match
+        # Resolve and abspath seems to behave differently regarding symlinks,
+        # as we are doing abspath on the file path, we need to do the same on
+        # the repo path or they might not match
         if sys.platform == 'win32':
             repopath = Path(os.path.abspath(repopath))
 

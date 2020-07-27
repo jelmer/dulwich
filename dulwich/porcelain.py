@@ -226,6 +226,10 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
         return treepath
     else:
         path = Path(path).resolve()
+        # Resolve might returns a relative path on Windows
+        # https://bugs.python.org/issue38671
+        if sys.platform == 'win32':
+            path = Path(os.path.abspath(path))
         repopath = Path(repopath).resolve()
         relpath = path.relative_to(repopath)
         if sys.platform == 'win32':

@@ -9,6 +9,9 @@
  * Honor shallows when pushing from a shallow clone.
    (Jelmer Vernooĳ, #794)
 
+ * Fix porcelain.path_to_tree_path for Python 3.5.
+   (Boris Feld, #777)
+
 0.20.5	2020-06-22
 
  * Print a clearer exception when setup.py is executed on Python < 3.5.

@@ -20,6 +20,9 @@ jobs:
           # path encoding
           - os: windows-latest
             python-version: 3.5
+          # path encoding
+          - os: macos-latest
+            python-version: 3.5
       fail-fast: false
 
     steps:

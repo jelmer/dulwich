@@ -1,11 +1,3 @@
-.. image:: https://travis-ci.org/dulwich/dulwich.png?branch=master
-  :alt: Build Status
-  :target: https://travis-ci.org/dulwich/dulwich
-
-.. image:: https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true
-  :alt: Windows Build Status
-  :target: https://ci.appveyor.com/project/jelmer/dulwich/branch/master
-
 This is the Dulwich project.
 
 It aims to provide an interface to git repos (both local and remote) that

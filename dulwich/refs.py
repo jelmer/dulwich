@@ -390,6 +390,35 @@ class RefsContainer(object):
                 ret[src] = dst
         return ret
 
+    def watch(self):
+        """Watch for changes to the refs in this container.
+
+        Returns a context manager that yields tuples with (refname, new_sha)
+        """
+        raise NotImplementedError(self.watch)
+
+
+class _DictRefsWatcher(object):
+
+    def __init__(self, refs):
+        self._refs = refs
+
+    def __enter__(self):
+        from queue import Queue
+        self.queue = Queue()
+        self._refs._watchers.add(self)
+        return self
+
+    def __next__(self):
+        return self.queue.get()
+
+    def _notify(self, entry):
+        self.queue.put_nowait(entry)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._refs._watchers.remove(self)
+        return False
+
 
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.
@@ -402,6 +431,7 @@ class DictRefsContainer(RefsContainer):
         super(DictRefsContainer, self).__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
+        self._watchers = set()
 
     def allkeys(self):
         return self._refs.keys()
@@ -412,11 +442,20 @@ class DictRefsContainer(RefsContainer):
     def get_packed_refs(self):
         return {}
 
+    def _notify(self, ref, newsha):
+        for watcher in self._watchers:
+            watcher._notify((ref, newsha))
+
+    def watch(self):
+        return _DictRefsWatcher(self)
+
     def set_symbolic_ref(self, name, other, committer=None,
                          timestamp=None, timezone=None, message=None):
         old = self.follow(name)[-1]
-        self._refs[name] = SYMREF + other
-        self._log(name, old, old, committer=committer, timestamp=timestamp,
+        new = SYMREF + other
+        self._refs[name] = new
+        self._notify(name, new)
+        self._log(name, old, new, committer=committer, timestamp=timestamp,
                   timezone=timezone, message=message)
 
     def set_if_equals(self, name, old_ref, new_ref, committer=None,
@@ -428,6 +467,7 @@ class DictRefsContainer(RefsContainer):
             self._check_refname(realname)
             old = self._refs.get(realname)
             self._refs[realname] = new_ref
+            self._notify(realname, new_ref)
             self._log(realname, old, new_ref, committer=committer,
                       timestamp=timestamp, timezone=timezone, message=message)
         return True
@@ -437,6 +477,7 @@ class DictRefsContainer(RefsContainer):
         if name in self._refs:
             return False
         self._refs[name] = ref
+        self._notify(name, ref)
         self._log(name, None, ref, committer=committer, timestamp=timestamp,
                   timezone=timezone, message=message)
         return True
@@ -450,6 +491,7 @@ class DictRefsContainer(RefsContainer):
         except KeyError:
             pass
         else:
+            self._notify(name, None)
             self._log(name, old, None, committer=committer,
                       timestamp=timestamp, timezone=timezone, message=message)
         return True
@@ -461,7 +503,8 @@ class DictRefsContainer(RefsContainer):
         """Update multiple refs; intended only for testing."""
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
-        self._refs.update(refs)
+        for ref, sha in refs.items():
+            self.set_if_equals(ref, None, sha)
 
     def _update_peeled(self, peeled):
         """Update cached peeled refs; intended only for testing."""
@@ -500,6 +543,47 @@ class InfoRefsContainer(RefsContainer):
             return self._peeled[name]
         except KeyError:
             return self._refs[name]
+
+
+class _InotifyRefsWatcher(object):
+
+    def __init__(self, path):
+        import pyinotify
+        from queue import Queue
+        self.path = os.fsdecode(path)
+        self.manager = pyinotify.WatchManager()
+        self.manager.add_watch(
+            self.path, pyinotify.IN_DELETE |
+            pyinotify.IN_CLOSE_WRITE | pyinotify.IN_MOVED_TO, rec=True,
+            auto_add=True)
+
+        self.notifier = pyinotify.ThreadedNotifier(
+            self.manager, default_proc_fun=self._notify)
+        self.queue = Queue()
+
+    def _notify(self, event):
+        if event.dir:
+            return
+        if event.pathname.endswith('.lock'):
+            return
+        ref = os.fsencode(os.path.relpath(event.pathname, self.path))
+        if event.maskname == 'IN_DELETE':
+            self.queue.put_nowait((ref, None))
+        elif event.maskname in ('IN_CLOSE_WRITE', 'IN_MOVED_TO'):
+            with open(event.pathname, 'rb') as f:
+                sha = f.readline().rstrip(b'\n\r')
+                self.queue.put_nowait((ref, sha))
+
+    def __next__(self):
+        return self.queue.get()
+
+    def __enter__(self):
+        self.notifier.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.notifier.stop()
+        return False
 
 
 class DiskRefsContainer(RefsContainer):
@@ -847,6 +931,10 @@ class DiskRefsContainer(RefsContainer):
                 break
 
         return True
+
+    def watch(self):
+        import pyinotify  # noqa: F401
+        return _InotifyRefsWatcher(self.path)
 
 
 def _split_ref_line(line):

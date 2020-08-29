@@ -219,29 +219,58 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    path = Path(path).resolve()
-    repopath = Path(repopath).resolve()
-    relpath = path.relative_to(repopath)
-    if sys.platform == 'win32':
-        return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+    # Pathlib resolve before Python 3.6 could raises FileNotFoundError in case
+    # there is no file matching the path so we reuse the old implementation for
+    # Python 3.5
+    if sys.version_info < (3, 6):
+        if not isinstance(path, bytes):
+            path = os.fsencode(path)
+        if not isinstance(repopath, bytes):
+            repopath = os.fsencode(repopath)
+        treepath = os.path.relpath(path, repopath)
+        if treepath.startswith(b'..'):
+            err_msg = 'Path %r not in repo path (%r)' % (path, repopath)
+            raise ValueError(err_msg)
+        if os.path.sep != '/':
+            treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
+        return treepath
     else:
-        return bytes(relpath)
+        # Resolve might returns a relative path on Windows
+        # https://bugs.python.org/issue38671
+        if sys.platform == 'win32':
+            path = os.path.abspath(path)
+
+        path = Path(path).resolve()
+
+        # Resolve and abspath seems to behave differently regarding symlinks,
+        # as we are doing abspath on the file path, we need to do the same on
+        # the repo path or they might not match
+        if sys.platform == 'win32':
+            repopath = os.path.abspath(repopath)
+
+        repopath = Path(repopath).resolve()
+
+        relpath = path.relative_to(repopath)
+        if sys.platform == 'win32':
+            return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+        else:
+            return bytes(relpath)
 
 
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
 
-def check_diverged(store, current_sha, new_sha):
+def check_diverged(repo, current_sha, new_sha):
     """Check if updating to a sha can be done with fast forwarding.
 
     Args:
-      store: Object store
+      repo: Repository object
       current_sha: Current head sha
       new_sha: New head sha
     """
     try:
-        can = can_fast_forward(store, current_sha, new_sha)
+        can = can_fast_forward(repo, current_sha, new_sha)
     except KeyError:
         can = False
     if not can:
@@ -479,6 +508,13 @@ def clean(repo=".", target_dir=None):
     with open_repo_closing(repo) as r:
         if not _is_subdir(target_dir, r.path):
             raise Error("target_dir must be in the repo's working dir")
+
+        config = r.get_config_stack()
+        require_force = config.get_boolean(   # noqa: F841
+            (b'clean',), b'requireForce', True)
+
+        # TODO(jelmer): if require_force is set, then make sure that -f, -i or
+        # -n is specified.
 
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
@@ -928,7 +964,6 @@ def get_remote_repo(
         encoded_location = url
     else:
         remote_name = None
-        config = None
 
     return (remote_name, encoded_location.decode())
 
@@ -969,33 +1004,40 @@ def push(repo, remote_location=None, refspecs=None,
                     new_refs[rh] = ZERO_SHA
                     remote_changed_refs[rh] = None
                 else:
-                    if not force_ref:
-                        check_diverged(r.object_store, refs[rh], r.refs[lh])
-                    new_refs[rh] = r.refs[lh]
-                    remote_changed_refs[rh] = r.refs[lh]
+                    try:
+                        localsha = r.refs[lh]
+                    except KeyError:
+                        raise Error(
+                            'No valid ref %s in local repository' % lh)
+                    if not force_ref and rh in refs:
+                        check_diverged(r, refs[rh], localsha)
+                    new_refs[rh] = localsha
+                    remote_changed_refs[rh] = localsha
             return new_refs
 
         err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
-        remote_location_bytes = client.get_url(path).encode(err_encoding)
+        remote_location = client.get_url(path)
         try:
             result = client.send_pack(
                 path, update_refs,
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write)
-            errstream.write(
-                b"Push to " + remote_location_bytes + b" successful.\n")
         except SendPackError as e:
             raise Error(
-                "Push to " + remote_location_bytes +
+                "Push to " + remote_location +
                 " failed -> " + e.args[0].decode(), inner=e)
+        else:
+            errstream.write(
+                b"Push to " +
+                remote_location.encode(err_encoding) + b" successful.\n")
 
         for ref, error in (result.ref_status or {}).items():
-            if status is not None:
+            if error is not None:
                 errstream.write(
-                    b"Push of ref %s failed: %s" %
+                    b"Push of ref %s failed: %s\n" %
                     (ref, error.encode(err_encoding)))
             else:
-                errstream.write(b'Ref %s updated' % ref)
+                errstream.write(b'Ref %s updated\n' % ref)
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
@@ -1035,7 +1077,7 @@ def pull(repo, remote_location=None, refspecs=None,
         for (lh, rh, force_ref) in selected_refs:
             try:
                 check_diverged(
-                    r.object_store, r.refs[rh], fetch_result.refs[lh])
+                    r, r.refs[rh], fetch_result.refs[lh])
             except DivergedBranches:
                 if fast_forward:
                     raise

@@ -9,3 +9,6 @@ urllib3[secure]>=1.24.1
 
 [pgp]
 gpg
+
+[watch]
+pyinotify

@@ -33,6 +33,14 @@ import os
 import sys
 import stat
 import time
+from typing import Optional, Tuple, TYPE_CHECKING, List, Dict, Union, Iterable
+
+if TYPE_CHECKING:
+    # There are no circular imports here, but we try to defer imports as long
+    # as possible to reduce start-up time for anything that doesn't need
+    # these imports.
+    from dulwich.config import StackedConfig, ConfigFile
+    from dulwich.index import Index
 
 from dulwich.errors import (
     NoIndexPresent,
@@ -51,10 +59,12 @@ from dulwich.file import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    BaseObjectStore,
     ObjectStoreGraphWalker,
     )
 from dulwich.objects import (
     check_hexsha,
+    valid_hexsha,
     Blob,
     Commit,
     ShaFile,
@@ -66,6 +76,7 @@ from dulwich.pack import (
     )
 
 from dulwich.hooks import (
+    Hook,
     PreCommitShellHook,
     PostCommitShellHook,
     CommitMsgShellHook,
@@ -120,7 +131,7 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
-def _get_default_identity():
+def _get_default_identity() -> Tuple[str, str]:
     import getpass
     import socket
     username = getpass.getuser()
@@ -143,19 +154,38 @@ def _get_default_identity():
     return (fullname, email)
 
 
-def get_user_identity(config, kind=None):
+def get_user_identity(
+        config: 'StackedConfig',
+        kind: Optional[str] = None) -> bytes:
     """Determine the identity to use for new commits.
+
+    If kind is set, this first checks
+    GIT_${KIND}_NAME and GIT_${KIND}_EMAIL.
+
+    If those variables are not set, then it will fall back
+    to reading the user.name and user.email settings from
+    the specified configuration.
+
+    If that also fails, then it will fall back to using
+    the current users' identity as obtained from the host
+    system (e.g. the gecos field, $EMAIL, $USER@$(hostname -f).
+
+    Args:
+      kind: Optional kind to return identity for,
+        usually either "AUTHOR" or "COMMITTER".
+
+    Returns:
+      A user identity
     """
+    user = None  # type: Optional[bytes]
+    email = None  # type: Optional[bytes]
     if kind:
-        user = os.environ.get("GIT_" + kind + "_NAME")
-        if user is not None:
-            user = user.encode('utf-8')
-        email = os.environ.get("GIT_" + kind + "_EMAIL")
-        if email is not None:
-            email = email.encode('utf-8')
-    else:
-        user = None
-        email = None
+        user_uc = os.environ.get("GIT_" + kind + "_NAME")
+        if user_uc is not None:
+            user = user_uc.encode('utf-8')
+        email_uc = os.environ.get("GIT_" + kind + "_EMAIL")
+        if email_uc is not None:
+            email = email_uc.encode('utf-8')
     if user is None:
         try:
             user = config.get(("user", ), "name")
@@ -168,16 +198,12 @@ def get_user_identity(config, kind=None):
             email = None
     default_user, default_email = _get_default_identity()
     if user is None:
-        user = default_user
-        if not isinstance(user, bytes):
-            user = user.encode('utf-8')
+        user = default_user.encode('utf-8')
     if email is None:
-        email = default_email
-        if not isinstance(email, bytes):
-            email = email.encode('utf-8')
+        email = default_email.encode('utf-8')
     if email.startswith(b'<') and email.endswith(b'>'):
         email = email[1:-1]
-    return (user + b" <" + email + b">")
+    return user + b" <" + email + b">"
 
 
 def check_user_identity(identity):
@@ -196,7 +222,8 @@ def check_user_identity(identity):
         raise InvalidUserIdentity(identity)
 
 
-def parse_graftpoints(graftpoints):
+def parse_graftpoints(
+        graftpoints: Iterable[bytes]) -> Dict[bytes, List[bytes]]:
     """Convert a list of graftpoints into a dict
 
     Args:
@@ -227,7 +254,7 @@ def parse_graftpoints(graftpoints):
     return grafts
 
 
-def serialize_graftpoints(graftpoints):
+def serialize_graftpoints(graftpoints: Dict[bytes, List[bytes]]) -> bytes:
     """Convert a dictionary of grafts into string
 
     The graft dictionary is:
@@ -270,6 +297,25 @@ def _set_filesystem_hidden(path):
     # Could implement other platform specific filesytem hiding here
 
 
+class ParentsProvider(object):
+
+    def __init__(self, store, grafts={}, shallows=[]):
+        self.store = store
+        self.grafts = grafts
+        self.shallows = set(shallows)
+
+    def get_parents(self, commit_id, commit=None):
+        try:
+            return self.grafts[commit_id]
+        except KeyError:
+            pass
+        if commit_id in self.shallows:
+            return []
+        if commit is None:
+            commit = self.store[commit_id]
+        return commit.parents
+
+
 class BaseRepo(object):
     """Base class for a git repository.
 
@@ -279,7 +325,7 @@ class BaseRepo(object):
         repository
     """
 
-    def __init__(self, object_store, refs):
+    def __init__(self, object_store: BaseObjectStore, refs: RefsContainer):
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -292,17 +338,17 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
-        self._graftpoints = {}
-        self.hooks = {}
+        self._graftpoints = {}  # type: Dict[bytes, List[bytes]]
+        self.hooks = {}  # type: Dict[str, Hook]
 
-    def _determine_file_mode(self):
+    def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.
         """
         raise NotImplementedError(self._determine_file_mode)
 
-    def _init_files(self, bare):
+    def _init_files(self, bare: bool) -> None:
         """Initialize a default set of named files."""
         from dulwich.config import ConfigFile
         self._put_named_file('description', b"Unnamed repository")
@@ -460,10 +506,11 @@ class BaseRepo(object):
             # commits aren't missing.
             haves = []
 
+        parents_provider = ParentsProvider(
+            self.object_store, shallows=shallows)
+
         def get_parents(commit):
-            if commit.id in shallows:
-                return []
-            return self.get_parents(commit.id, commit)
+            return parents_provider.get_parents(commit.id, commit)
 
         return self.object_store.iter_shas(
           self.object_store.find_missing_objects(
@@ -498,17 +545,18 @@ class BaseRepo(object):
             heads = [
                 sha for sha in self.refs.as_dict(b'refs/heads').values()
                 if sha in self.object_store]
+        parents_provider = ParentsProvider(self.object_store)
         return ObjectStoreGraphWalker(
-            heads, self.get_parents, shallow=self.get_shallow())
+            heads, parents_provider.get_parents, shallow=self.get_shallow())
 
-    def get_refs(self):
+    def get_refs(self) -> Dict[bytes, bytes]:
         """Get dictionary with all refs.
 
         Returns: A ``dict`` mapping ref names to SHA1s
         """
         return self.refs.as_dict()
 
-    def head(self):
+    def head(self) -> bytes:
         """Return the SHA1 pointed at by HEAD."""
         return self.refs[b'HEAD']
 
@@ -529,7 +577,7 @@ class BaseRepo(object):
                   ret.type_name, cls.type_name))
         return ret
 
-    def get_object(self, sha):
+    def get_object(self, sha: bytes) -> ShaFile:
         """Retrieve the object with the specified SHA.
 
         Args:
@@ -540,7 +588,12 @@ class BaseRepo(object):
         """
         return self.object_store[sha]
 
-    def get_parents(self, sha, commit=None):
+    def parents_provider(self):
+        return ParentsProvider(
+            self.object_store, grafts=self._graftpoints,
+            shallows=self.get_shallow())
+
+    def get_parents(self, sha: bytes, commit: Commit = None) -> List[bytes]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -551,13 +604,7 @@ class BaseRepo(object):
           commit: Optional commit matching the sha
         Returns: List of parents
         """
-
-        try:
-            return self._graftpoints[sha]
-        except KeyError:
-            if commit is None:
-                commit = self[sha]
-            return commit.parents
+        return self.parents_provider().get_parents(sha, commit)
 
     def get_config(self):
         """Retrieve the config object.
@@ -582,7 +629,7 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.set_description)
 
-    def get_config_stack(self):
+    def get_config_stack(self) -> 'StackedConfig':
         """Return a config stack for this repository.
 
         This stack accesses the configuration for both this repository
@@ -695,18 +742,18 @@ class BaseRepo(object):
         except RefFormatError:
             raise KeyError(name)
 
-    def __contains__(self, name):
+    def __contains__(self, name: bytes) -> bool:
         """Check if a specific Git object or ref is present.
 
         Args:
           name: Git object SHA1 or ref name
         """
-        if len(name) in (20, 40):
+        if len(name) == 20 or (len(name) == 40 and valid_hexsha(name)):
             return name in self.object_store or name in self.refs
         else:
             return name in self.refs
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name: bytes, value: Union[ShaFile, bytes]):
         """Set a ref.
 
         Args:
@@ -723,7 +770,7 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: bytes):
         """Remove a ref.
 
         Args:
@@ -734,13 +781,14 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self, config, kind=None):
+    def _get_user_identity(
+            self, config: 'StackedConfig', kind: str = None) -> bytes:
         """Determine the identity to use for new commits.
         """
         # TODO(jelmer): Deprecate this function in favor of get_user_identity
         return get_user_identity(config)
 
-    def _add_graftpoints(self, updated_graftpoints):
+    def _add_graftpoints(self, updated_graftpoints: Dict[bytes, List[bytes]]):
         """Add or modify graftpoints
 
         Args:
@@ -754,7 +802,7 @@ class BaseRepo(object):
 
         self._graftpoints.update(updated_graftpoints)
 
-    def _remove_graftpoints(self, to_remove=[]):
+    def _remove_graftpoints(self, to_remove: List[bytes] = []) -> None:
         """Remove graftpoints
 
         Args:
@@ -777,10 +825,14 @@ class BaseRepo(object):
                   ref=b'HEAD', merge_heads=None):
         """Create a new commit.
 
+        If not specified, `committer` and `author` default to
+        get_user_identity(..., 'COMMITTER')
+        and get_user_identity(..., 'AUTHOR') respectively.
+
         Args:
           message: Commit message
           committer: Committer fullname
-          author: Author fullname (defaults to committer)
+          author: Author fullname
           commit_timestamp: Commit timestamp (defaults to now)
           commit_timezone: Commit timestamp timezone (defaults to GMT)
           author_timestamp: Author timestamp (defaults to commit
@@ -792,7 +844,9 @@ class BaseRepo(object):
           encoding: Encoding
           ref: Optional ref to commit to (defaults to current branch)
           merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
-        Returns: New commit SHA1
+
+        Returns:
+          New commit SHA1
         """
         import time
         c = Commit()
@@ -1093,7 +1147,7 @@ class Repo(BaseRepo):
         """Return path to the index file."""
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
-    def open_index(self):
+    def open_index(self) -> 'Index':
         """Open the index for this repository.
 
         Raises:
@@ -1241,7 +1295,7 @@ class Repo(BaseRepo):
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element)
 
-    def get_config(self):
+    def get_config(self) -> 'ConfigFile':
         """Retrieve the config object.
 
         Returns: `ConfigFile` object for the ``.git/config`` file.

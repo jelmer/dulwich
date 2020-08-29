@@ -1,4 +1,4 @@
-0.20.6	UNRELEASED
+0.20.6	2020-08-29
 
  * Add a ``RefsContainer.watch`` interface.
    (Jelmer Vernooĳ, #751)

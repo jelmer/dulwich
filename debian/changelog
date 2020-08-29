@@ -2,6 +2,7 @@ dulwich (0.20.6-1) UNRELEASED; urgency=medium
 
   * New upstream release.
    + Fixes broken branch removal test. Closes: #956876
+  * Bump standards version to 4.5.0.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 29 Aug 2020 22:07:27 +0000
 

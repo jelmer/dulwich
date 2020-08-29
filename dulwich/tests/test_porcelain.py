@@ -22,6 +22,7 @@
 
 from io import BytesIO, StringIO
 import os
+import re
 import shutil
 import tarfile
 import tempfile
@@ -512,6 +513,20 @@ class RemoveTests(PorcelainTestCase):
         finally:
             os.chdir(cwd)
 
+    def test_remove_file_removed_on_disk(self):
+        fullpath = os.path.join(self.repo.path, 'foo')
+        with open(fullpath, 'w') as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            os.remove(fullpath)
+            porcelain.remove(self.repo.path, paths=["foo"])
+        finally:
+            os.chdir(cwd)
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, 'foo')))
+
 
 class LogTests(PorcelainTestCase):
 
@@ -924,6 +939,53 @@ class PushTests(PorcelainTestCase):
             self.assertEqual(os.path.basename(fullpath),
                              change.new.path.decode('ascii'))
 
+    def test_local_missing(self):
+        """Pushing a new branch."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.init(clone_path)
+        target_repo.close()
+
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.push, self.repo, clone_path,
+            b"HEAD:refs/heads/master",
+            outstream=outstream, errstream=errstream)
+
+    def test_new(self):
+        """Pushing a new branch."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.init(clone_path)
+        target_repo.close()
+
+        # create a second file to be pushed back to origin
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        new_id = porcelain.commit(
+            repo=self.repo, message=b'push',
+            author=b'author <email>',
+            committer=b'committer <email>')
+
+        # Push to the remote
+        porcelain.push(self.repo, clone_path, b"HEAD:refs/heads/master",
+                       outstream=outstream, errstream=errstream)
+
+        with Repo(clone_path) as r_clone:
+            self.assertEqual({
+                b'HEAD': new_id,
+                b'refs/heads/master': new_id,
+                }, r_clone.get_refs())
+
     def test_delete(self):
         """Basic test of porcelain push, removing a branch.
         """
@@ -981,6 +1043,9 @@ class PushTests(PorcelainTestCase):
             author=b'author <email>',
             committer=b'committer <email>')
 
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Push to the remote
         self.assertRaises(
             porcelain.DivergedBranches,
@@ -992,6 +1057,12 @@ class PushTests(PorcelainTestCase):
             b'refs/heads/master': remote_id,
             }, self.repo.get_refs())
 
+        self.assertEqual(b'', outstream.getvalue())
+        self.assertEqual(b'', errstream.getvalue())
+
+        outstream = BytesIO()
+        errstream = BytesIO()
+
         # Push to the remote with --force
         porcelain.push(
             clone_path, self.repo.path, b'refs/heads/master',
@@ -1001,6 +1072,10 @@ class PushTests(PorcelainTestCase):
             b'HEAD': local_id,
             b'refs/heads/master': local_id,
             }, self.repo.get_refs())
+
+        self.assertEqual(b'', outstream.getvalue())
+        self.assertTrue(
+            re.match(b'Push to .* successful.\n', errstream.getvalue()))
 
 
 class PullTests(PorcelainTestCase):

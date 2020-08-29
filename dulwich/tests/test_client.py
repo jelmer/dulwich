@@ -48,12 +48,15 @@ from dulwich.client import (
     StrangeHostname,
     SubprocessSSHVendor,
     PLinkSSHVendor,
+    HangupException,
+    GitProtocolError,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
     get_transport_and_path,
     get_transport_and_path_from_url,
     parse_rsync_url,
+    _remote_error_from_stderr,
     )
 from dulwich.config import (
     ConfigDict,
@@ -1357,3 +1360,31 @@ class GitCredentialStoreTests(TestCase):
             get_credentials_from_store(
                 b'https', b'example.org', b'otheruser', fnames=[self.fname]),
             None)
+
+
+class RemoteErrorFromStderrTests(TestCase):
+
+    def test_nothing(self):
+        self.assertEqual(
+            _remote_error_from_stderr(None), HangupException())
+
+    def test_error_line(self):
+        b = BytesIO(b"""\
+This is some random output.
+ERROR: This is the actual error
+with a tail
+""")
+        self.assertEqual(
+            _remote_error_from_stderr(b),
+            GitProtocolError("This is the actual error"))
+
+    def test_no_error_line(self):
+        b = BytesIO(b"""\
+This is output without an error line.
+And this line is just random noise, too.
+""")
+        self.assertEqual(
+            _remote_error_from_stderr(b),
+            HangupException([
+                b"This is output without an error line.",
+                b"And this line is just random noise, too."]))

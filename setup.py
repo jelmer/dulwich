@@ -14,6 +14,7 @@ from distutils.core import Distribution
 import io
 import os
 import sys
+from typing import Dict, Any
 
 
 if sys.version_info < (3, 5):
@@ -22,7 +23,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.5'
+dulwich_version_string = '0.20.6'
 
 
 class DulwichDistribution(Distribution):
@@ -70,13 +71,14 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
-setup_kwargs = {}
+setup_kwargs = {}  # type: Dict[str, Any]
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.24.1'],
         'pgp': ['gpg'],
+        'watch': ['pyinotify'],
         }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True

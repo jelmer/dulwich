@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.5
+Version: 0.20.6
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -9,15 +9,7 @@ License: Apachev2 or later or GPLv2
 Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
 Project-URL: Repository, https://www.dulwich.io/code/
 Project-URL: GitHub, https://github.com/dulwich/dulwich
-Description: .. image:: https://travis-ci.org/dulwich/dulwich.png?branch=master
-          :alt: Build Status
-          :target: https://travis-ci.org/dulwich/dulwich
-        
-        .. image:: https://ci.appveyor.com/api/projects/status/mob7g4vnrfvvoweb?svg=true
-          :alt: Windows Build Status
-          :target: https://ci.appveyor.com/project/jelmer/dulwich/branch/master
-        
-        This is the Dulwich project.
+Description: This is the Dulwich project.
         
         It aims to provide an interface to git repos (both local and remote) that
         doesn't call out to git directly but instead uses pure Python.
@@ -127,3 +119,4 @@ Requires-Python: >=3.5
 Provides-Extra: fastimport
 Provides-Extra: https
 Provides-Extra: pgp
+Provides-Extra: watch

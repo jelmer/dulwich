@@ -3,6 +3,7 @@
 .mailmap
 .testr.conf
 AUTHORS
+CODE_OF_CONDUCT.md
 CONTRIBUTING.rst
 COPYING
 MANIFEST.in
@@ -16,6 +17,7 @@ dulwich.cfg
 requirements.txt
 setup.cfg
 setup.py
+status.yaml
 tox.ini
 .github/workflows/pythonpackage.yml
 .github/workflows/pythonpublish.yml

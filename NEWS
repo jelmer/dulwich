@@ -12,6 +12,9 @@
  * Fix porcelain.path_to_tree_path for Python 3.5.
    (Boris Feld, #777)
 
+ * Add support for honor proxy environment variables for HTTP.
+   (Aurélien Campéas, #797)
+
 0.20.5	2020-06-22
 
  * Print a clearer exception when setup.py is executed on Python < 3.5.

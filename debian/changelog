@@ -3,6 +3,8 @@ dulwich (0.20.6-2) UNRELEASED; urgency=medium
   * Update fields Vcs-Browser, Vcs-Git for maintainer Debian Python Modules
     Team.
   * Update maintainer email for merge of DPMT and PAPT.
+  * Remove constraints unnecessary since buster:
+    + Build-Depends: Drop versioned constraint on git.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 25 Sep 2020 14:28:56 -0000
 

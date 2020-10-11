@@ -41,6 +41,7 @@ from dulwich.repo import (
     Repo,
     MemoryRepo,
     check_user_identity,
+    UnsupportedVersion,
     )
 from dulwich.tests import (
     TestCase,
@@ -871,6 +872,13 @@ class BuildRepoRootTests(TestCase):
         c.write_to_path()
         r = Repo(self._repo_dir)
         self.assertEqual(r.object_store.loose_compression_level, 4)
+
+    def test_repositoryformatversion(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(('core',), 'repositoryformatversion', '2')
+        c.write_to_path()
+        self.assertRaises(UnsupportedVersion, Repo, self._repo_dir)
 
     def test_commit_encoding_from_config(self):
         r = self._repo

@@ -963,6 +963,13 @@ def read_gitfile(f):
     return cs[len("gitdir: "):].rstrip("\n")
 
 
+class UnsupportedVersion(Exception):
+    """Unsupported repository version."""
+
+    def __init__(self, version):
+        self.version = version
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -1001,6 +1008,12 @@ class Repo(BaseRepo):
             self._commondir = self._controldir
         self.path = root
         config = self.get_config()
+        try:
+            format_version = int(config.get("core", "repositoryformatversion"))
+        except KeyError:
+            format_version = 0
+        if format_version != 0:
+            raise UnsupportedVersion(format_version)
         object_store = DiskObjectStore.from_config(
             os.path.join(self.commondir(), OBJECTDIR),
             config)

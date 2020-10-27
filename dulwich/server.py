@@ -1081,7 +1081,7 @@ class UploadArchiveHandler(Handler):
                 commit_sha = self.repo.refs[argument]
                 tree = store[store[commit_sha].tree]
             i += 1
-        self.proto.write_pkt_line(b'ACK\n')
+        self.proto.write_pkt_line(b'ACK')
         self.proto.write_pkt_line(None)
         for chunk in tar_stream(
                 store, tree, mtime=time.time(), prefix=prefix, format=format):

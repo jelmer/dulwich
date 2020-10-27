@@ -2,6 +2,9 @@
 
  * Check core.repositoryformatversion. (Jelmer Vernooĳ, #803)
 
+ * Fix ACK/NACK handling in archive command handling in dulwich.client.
+   (DzmitrySudnik, #805)
+
 0.20.6	2020-08-29
 
  * Add a ``RefsContainer.watch`` interface.

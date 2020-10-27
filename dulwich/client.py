@@ -969,9 +969,9 @@ class TraditionalGitClient(GitClient):
                 pkt = proto.read_pkt_line()
             except HangupException:
                 raise _remote_error_from_stderr(stderr)
-            if pkt == b"NACK\n":
+            if pkt == b"NACK\n" or pkt == b"NACK":
                 return
-            elif pkt == b"ACK\n":
+            elif pkt == b"ACK\n" or pkt == b"ACK":
                 pass
             elif pkt.startswith(b"ERR "):
                 raise GitProtocolError(

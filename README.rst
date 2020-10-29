@@ -85,8 +85,8 @@ file and `list of open issues <https://github.com/dulwich/dulwich/issues>`_.
 Supported versions of Python
 ----------------------------
 
-At the moment, Dulwich supports (and is tested on) CPython 3.5, 3.6,
-3.7, 3.8 and Pypy.
+At the moment, Dulwich supports (and is tested on) CPython 3.5 and later and
+Pypy.
 
 The latest release series to support Python 2.x was the 0.19 series. See
 the 0.19 branch in the Dulwich git repository.

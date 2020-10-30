@@ -1,8 +1,12 @@
 dulwich (0.20.6-2) UNRELEASED; urgency=medium
 
-  * Update fields Vcs-Browser, Vcs-Git for maintainer Debian Python Modules
-    Team.
-  * Update maintainer email for merge of DPMT and PAPT.
+  [ Ondřej Nový ]
+  * d/control: Update Maintainer field with new Debian Python Team
+    contact address.
+  * d/control: Update Vcs-* fields with new Debian Python Team Salsa
+    layout.
+
+  [ Jelmer Vernooij ]
   * Remove constraints unnecessary since buster:
     + Build-Depends: Drop versioned constraint on git.
 

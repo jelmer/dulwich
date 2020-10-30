@@ -1,4 +1,4 @@
-dulwich (0.20.6-2) UNRELEASED; urgency=medium
+dulwich (0.20.8-1) UNRELEASED; urgency=medium
 
   [ Ondřej Nový ]
   * d/control: Update Maintainer field with new Debian Python Team
@@ -10,7 +10,10 @@ dulwich (0.20.6-2) UNRELEASED; urgency=medium
   * Remove constraints unnecessary since buster:
     + Build-Depends: Drop versioned constraint on git.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 25 Sep 2020 14:28:56 -0000
+  [ Jelmer Vernooĳ ]
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 30 Oct 2020 02:31:13 +0000
 
 dulwich (0.20.6-1) unstable; urgency=medium
 

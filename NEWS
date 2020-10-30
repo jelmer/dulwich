@@ -1,3 +1,7 @@
+0.20.9	2020-10-30
+
+ * Fix wheels build on Linux. (Ruslan Kuprieiev)
+
 0.20.8	2020-10-29
 
  * Build wheels on Mac OS X / Windows for Python 3.9.

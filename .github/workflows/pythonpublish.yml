@@ -42,7 +42,7 @@ jobs:
         mv dist/*.whl wheelhouse
       if: "matrix.os != 'ubuntu-latest'"
     - name: Build and publish (Linux)
-      uses: RalfG/python-wheels-manylinux-build@v0.2.2
+      uses: RalfG/python-wheels-manylinux-build@v0.3.1
       if: "matrix.os == 'ubuntu-latest'"
     - name: Publish (Linux)
       env:

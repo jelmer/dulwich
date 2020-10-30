@@ -45,6 +45,10 @@ jobs:
       if: "matrix.os != 'ubuntu-latest'"
     - name: Build and publish (Linux)
       uses: RalfG/python-wheels-manylinux-build@v0.3.1
+      env:
+        # Temporary fix for LD_LIBRARY_PATH issue. See
+        # https://github.com/RalfG/python-wheels-manylinux-build/issues/26
+        LD_LIBRARY_PATH: /usr/local/lib:${{ env.LD_LIBRARY_PATH }}
       if: "matrix.os == 'ubuntu-latest'"
     - name: Publish (Linux)
       env:

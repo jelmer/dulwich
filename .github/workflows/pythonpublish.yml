@@ -55,6 +55,8 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
+        mkdir wheelhouse
+        mv dist/*.whl wheelhouse
         twine upload wheelhouse/*manylinux*
       if: "matrix.os == 'ubuntu-latest'"
     - name: Publish

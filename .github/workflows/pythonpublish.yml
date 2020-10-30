@@ -48,17 +48,10 @@ jobs:
         # https://github.com/RalfG/python-wheels-manylinux-build/issues/26
         LD_LIBRARY_PATH: /usr/local/lib:${{ env.LD_LIBRARY_PATH }}
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish (Linux)
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*manylinux*
-      if: "matrix.os == 'ubuntu-latest'"
     - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        twine upload wheelhouse/*
-      if: "matrix.os != 'ubuntu-latest'"
+        twine upload dist/*.whl
+      if: "matrix.os == 'ubuntu-latest'"

@@ -969,9 +969,9 @@ class TraditionalGitClient(GitClient):
                 pkt = proto.read_pkt_line()
             except HangupException:
                 raise _remote_error_from_stderr(stderr)
-            if pkt == b"NACK\n":
+            if pkt == b"NACK\n" or pkt == b"NACK":
                 return
-            elif pkt == b"ACK\n":
+            elif pkt == b"ACK\n" or pkt == b"ACK":
                 pass
             elif pkt.startswith(b"ERR "):
                 raise GitProtocolError(
@@ -1476,11 +1476,18 @@ def default_urllib3_manager(config, pool_manager_cls=None,
     proxy_server = user_agent = None
     ca_certs = ssl_verify = None
 
+    if proxy_server is None:
+        for proxyname in ('https_proxy', 'http_proxy', 'all_proxy'):
+            proxy_server = os.environ.get(proxyname)
+            if proxy_server is not None:
+                break
+
     if config is not None:
-        try:
-            proxy_server = config.get(b"http", b"proxy")
-        except KeyError:
-            pass
+        if proxy_server is None:
+            try:
+                proxy_server = config.get(b"http", b"proxy")
+            except KeyError:
+                pass
         try:
             user_agent = config.get(b"http", b"useragent")
         except KeyError:

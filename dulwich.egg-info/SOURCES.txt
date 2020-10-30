@@ -11,6 +11,7 @@ Makefile
 NEWS
 README.rst
 README.swift.rst
+SECURITY.md
 TODO
 build.cmd
 dulwich.cfg

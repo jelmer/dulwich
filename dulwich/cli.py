@@ -710,6 +710,9 @@ commands = {
 
 
 def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
     if len(argv) < 1:
         print("Usage: dulwich <%s> [OPTIONS...]" % ("|".join(commands.keys())))
         return 1

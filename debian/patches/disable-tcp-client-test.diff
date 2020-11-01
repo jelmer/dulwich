@@ -1,0 +1,10 @@
+--- a/dulwich/tests/compat/test_client.py
++++ b/dulwich/tests/compat/test_client.py
+@@ -344,6 +344,7 @@ class DulwichTCPClientTest(CompatTestCas
+     def setUp(self):
+         CompatTestCase.setUp(self)
+         DulwichClientTestBase.setUp(self)
++        raise SkipTest('skipped for a first build')
+         if check_for_daemon(limit=1):
+             raise SkipTest('git-daemon was already running on port %s' %
+                            protocol.TCP_GIT_PORT)

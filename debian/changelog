@@ -15,6 +15,13 @@ dulwich (0.20.8-1) UNRELEASED; urgency=medium
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 30 Oct 2020 02:31:13 +0000
 
+dulwich (0.20.6-1.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Skip DulwichTCPClientTest for a first build with Python 3.9. See #971118.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 22 Oct 2020 12:28:19 +0200
+
 dulwich (0.20.6-1) unstable; urgency=medium
 
   * New upstream release.

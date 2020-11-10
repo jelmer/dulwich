@@ -1,31 +1,3 @@
-_trial_temp
-build
-build-pypy
-MANIFEST
-dist
-apidocs
-*,cover
-.testrepository
-*.pyc
-*.pyd
-*.pyo
-*.so
-*~
-*.swp
-*.swh
-*.swn
-*.swo
-docs/tutorial/index.html
-dulwich.egg-info/
-.tox/
-.idea/
-.coverage
-htmlcov/
-docs/api/*.txt
-.mypy_cache/
-.eggs
-dulwich.dist-info
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -34,10 +6,38 @@ __pycache__/
 # C extensions
 *.so
 
+# I don't konw.
+_trial_temp
+apidocs
+*,cover
+.testrepository
+*~
+*.sw[phno]
+docs/tutorial/index.html
+dulwich.egg-info/
+docs/api/*.txt
+dulwich.dist-info
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.idea/
+.coverage
+
 # Distribution / packaging
 .Python
+build
 build/
 develop-eggs/
+dist
 dist/
 downloads/
 eggs/
@@ -63,30 +63,9 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
 # Translations
 *.mo
 *.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-
-# Flask stuff:
-instance/
-.webassets-cache
 
 # Scrapy stuff:
 .scrapy
@@ -130,3 +109,4 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+build-pypy

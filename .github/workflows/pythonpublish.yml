@@ -32,8 +32,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel twine fastimport
+        python -m pip install -r requirements.txt --upgrade
     - name: Run test suite
       run: |
         python -m unittest dulwich.tests.test_suite

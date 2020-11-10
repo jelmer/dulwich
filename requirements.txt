@@ -1,1 +1,12 @@
+pip
 urllib3[secure]>=1.23
+coverage
+codecov
+flake8
+pylint
+fastimport
+mypy
+setuptools
+wheel
+twine
+fastimport

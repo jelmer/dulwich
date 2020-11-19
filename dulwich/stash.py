@@ -47,7 +47,7 @@ class Stash(object):
 
     def stashes(self):
         reflog_path = os.path.join(
-            self._repo.commondir(), 'logs', self._ref)
+            self._repo.commondir(), 'logs', os.fsdecode(self._ref))
         try:
             with GitFile(reflog_path, 'rb') as f:
                 return reversed(list(read_reflog(f)))
@@ -93,7 +93,7 @@ class Stash(object):
         stash_tree_id = commit_tree(
                 self._repo.object_store,
                 iter_fresh_objects(
-                    index, self._repo.path,
+                    index, os.fsencode(self._repo.path),
                     object_store=self._repo.object_store))
 
         if message is None:

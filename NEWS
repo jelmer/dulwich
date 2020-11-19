@@ -2,6 +2,9 @@
 
  * Add py.typed to allow type checking. (David Caro)
 
+ * Add tests demonstrating a bug in the walker code.
+   (Doug Hellman)
+
 0.20.11	2020-10-30
 
  * Fix wheels build on Linux. (Ruslan Kuprieiev)

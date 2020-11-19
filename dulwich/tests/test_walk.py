@@ -23,6 +23,7 @@
 from itertools import (
     permutations,
     )
+from unittest import expectedFailure
 
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
@@ -164,6 +165,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c3, c2, c1], [c3.id])
         self.assertWalkYields([c2, c1], [c2.id])
 
+    @expectedFailure
     def test_merge_of_old_branch(self):
         # The commit on the branch was made at a time before any of
         # the commits on master, but it was merged into master after

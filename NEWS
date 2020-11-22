@@ -1,4 +1,4 @@
-0.20.12	UNRELEASED
+0.20.12	2020-11-22
 
  * Add py.typed to allow type checking. (David Caro)
 

@@ -114,4 +114,4 @@ class Stash(object):
         return list(self.stashes())[index]
 
     def __len__(self):
-        return len(self._stashes())
+        return len(list(self.stashes()))

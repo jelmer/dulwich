@@ -111,7 +111,7 @@ class Stash(object):
         return cid
 
     def __getitem__(self, index):
-        return self._stashes()[index]
+        return list(self.stashes())[index]
 
     def __len__(self):
         return len(self._stashes())

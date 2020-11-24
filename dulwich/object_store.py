@@ -577,7 +577,7 @@ class DiskObjectStore(PackBasedObjectStore):
         with f:
             for line in f.readlines():
                 line = line.rstrip(b"\n")
-                if line[0] == b"#":
+                if line.startswith(b"#"):
                     continue
                 if os.path.isabs(line):
                     yield os.fsdecode(line)

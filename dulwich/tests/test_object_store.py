@@ -362,6 +362,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
 
+    def test_read_alternate_paths(self):
+        store = DiskObjectStore(self.store_dir)
+
+        abs_path = os.path.abspath(os.path.normpath('/abspath'))
+        # ensures in particular existence of the alternates file
+        store.add_alternate_path(abs_path)
+        self.assertEqual(set(store._read_alternate_paths()), {abs_path})
+
     def test_corrupted_object_raise_exception(self):
         """Corrupted sha1 disk file should raise specific exception"""
         self.store.add_object(testobject)

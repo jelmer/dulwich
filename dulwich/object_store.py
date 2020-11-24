@@ -582,7 +582,8 @@ class DiskObjectStore(PackBasedObjectStore):
                 if os.path.isabs(line):
                     yield os.fsdecode(line)
                 else:
-                    yield os.fsdecode(os.path.join(self.path, line))
+                    yield os.fsdecode(os.path.join(os.fsencode(self.path),
+                                                   line))
 
     def add_alternate_path(self, path):
         """Add an alternate path to this object store.

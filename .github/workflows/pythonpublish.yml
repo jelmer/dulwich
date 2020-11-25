@@ -58,6 +58,8 @@ jobs:
         # Only include *manylinux* wheels; the other wheels files are built but
         # rejected by pip.
         twine upload dist/*manylinux*.whl
+        # also upload sdist
+        twine upload dist/*tar.gz
       if: "matrix.os == 'ubuntu-latest'"
     - name: Publish
       env:

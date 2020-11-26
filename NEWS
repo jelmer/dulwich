@@ -1,12 +1,16 @@
+0.20.14	2020-11-26
+
+ * Fix some stash functions on Python 3. (Peter Rowlands)
+
+ * Fix handling of relative paths in alternates files on Python 3.
+   (Georges Racinet)
+
 0.20.13	2020-11-22
 
  * Add py.typed to allow type checking. (David Caro)
 
  * Add tests demonstrating a bug in the walker code.
    (Doug Hellman)
-
- * Fix handling of relative paths in alternates files on Python 3.
-   (Georges Racinet)
 
 0.20.11	2020-10-30
 

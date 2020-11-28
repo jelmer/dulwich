@@ -1,20 +1,33 @@
 #!/usr/bin/python3
 # encoding: utf-8
+"""Setup file for dulwich.
+
+Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
+"""
+
 # Setup file for dulwich
 # Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
-    has_setuptools = False
-else:
-    has_setuptools = True
-from distutils.core import Distribution
 import io
+
 import os
+
 import sys
-from typing import Dict, Any
+
+try:
+    from setuptools import Extension
+    from setuptools import setup
+except ImportError:
+    from distutils.core import Extension
+    from distutils.core import setup
+    HAS_SETUPTOOLS = False
+else:
+    HAS_SETUPTOOLS = True
+from distutils.core import Distribution
+
+from typing import Dict
+
+from typing import Any
 
 
 if sys.version_info < (3, 6):
@@ -27,12 +40,16 @@ dulwich_version_string = '0.20.26'
 
 
 class DulwichDistribution(Distribution):
+    """Dulwich Distribution."""
 
     def is_pure(self):
+        """Is pure."""
         if self.pure:
             return True
+        return None
 
     def has_ext_modules(self):
+        """Has ext modules."""
         return not self.pure
 
     global_options = Distribution.global_options + [
@@ -73,7 +90,7 @@ ext_modules = [
 
 setup_kwargs = {}  # type: Dict[str, Any]
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
-if has_setuptools:
+if HAS_SETUPTOOLS:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.24.1'],
@@ -103,7 +120,7 @@ setup(name='dulwich',
       url="https://www.dulwich.io/",
       long_description=description,
       description="Python Git Library",
-      version=dulwich_version_string,
+      version=DULWICH_VERSION_STRING,
       license='Apachev2 or later or GPLv2',
       project_urls={
           "Bug Tracker": "https://github.com/dulwich/dulwich/issues",

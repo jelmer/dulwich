@@ -47,6 +47,9 @@ jobs:
       run: |
         python -m mypy dulwich
       if: "matrix.python-version != 'pypy3'"
+    - name: Style checks pylint
+      run: |
+        python -m pylint dulwich examples
     - name: Build
       run: |
         python setup.py build_ext -i
@@ -56,9 +59,3 @@ jobs:
     - name: Upload coverage details
       run: |
         codecov
-    - name: Style checks pylint
-      run: |
-        python -m pylint dulwich examples
-    - name: Test unittest
-      run: |
-        python -m unittest dulwich.tests.test_suite

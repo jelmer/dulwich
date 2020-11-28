@@ -1,6 +1,7 @@
 dulwich (0.20.8-2) UNRELEASED; urgency=medium
 
   * Re-export upstream signing key without extra signatures.
+  * Remove 3 unused lintian overrides.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sat, 28 Nov 2020 14:21:47 -0000
 

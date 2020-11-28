@@ -1056,7 +1056,7 @@ class PackData(object):
         return self._filename
 
     @classmethod
-    def from_file(cls, file, size):
+    def from_file(cls, file, size=None):
         return cls(str(file), file=file, size=size)
 
     @classmethod

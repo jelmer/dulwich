@@ -1,3 +1,8 @@
+0.20.15	UNRELEASED
+
+ * Add some functions for parsing and writing bundles.
+   (Jelmer Vernooĳ)
+
 0.20.14	2020-11-26
 
  * Fix some stash functions on Python 3. (Peter Rowlands)

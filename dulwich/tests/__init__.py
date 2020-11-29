@@ -102,6 +102,7 @@ def self_test_suite():
     names = [
         'archive',
         'blackbox',
+        'bundle',
         'client',
         'config',
         'diff_tree',

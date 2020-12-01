@@ -1,8 +1,9 @@
-#!/usr/bin/python
-# Example printing the last author of a specified file
+"""Example printing the last author of a specified file."""
 
 import sys
+
 import time
+
 from dulwich.repo import Repo
 
 if len(sys.argv) < 2:

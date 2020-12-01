@@ -1,8 +1,8 @@
-#!/usr/bin/python
-# Read the config file for a git repository.
-#
-# Example usage:
-#  python examples/config.py
+"""Read the config file for a git repository.
+
+Example usage:
+    python examples/config.py
+"""
 
 from dulwich.repo import Repo
 

@@ -1,15 +1,20 @@
-#!/usr/bin/python
-# This script creates a clone of a remote repository in local memory,
-# then adds a single file and pushes the result back.
-#
-# Example usage:
-#  python examples/memoryrepo.py git+ssh://github.com/jelmer/testrepo
+"""Menoryrepo.
+
+This script creates a clone of a remote repository in local memory,
+then adds a single file and pushes the result back.
+
+Example usage:
+    python examples/memoryrepo.py git+ssh://github.com/jelmer/testrepo
+"""
 
 import stat
+
 import sys
 
 from dulwich import porcelain
+
 from dulwich.objects import Blob
+
 from dulwich.repo import MemoryRepo
 
 local_repo = MemoryRepo()
@@ -17,7 +22,7 @@ local_repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/master')
 print(local_repo.refs.as_dict())
 
 porcelain.fetch(local_repo, sys.argv[1])
-local_repo['refs/heads/master'] = local_repo['refs/remotes/origin/master']
+local_repo[b'refs/heads/master'] = local_repo[b'refs/remotes/origin/master']
 
 last_tree = local_repo[local_repo['HEAD'].tree]
 new_blob = Blob.from_string(b'Some contents')

@@ -41,7 +41,7 @@ from dulwich.tests.utils import (
     )
 
 try:
-    from mock import patch
+    from unittest.mock import patch
 except ImportError:
     patch = None   # type: ignore
 

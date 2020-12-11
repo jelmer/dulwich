@@ -24,12 +24,14 @@ from io import BytesIO, StringIO
 import os
 import re
 import shutil
+import stat
 import tarfile
 import tempfile
 import time
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
+from dulwich.errors import CommitError
 from dulwich.objects import (
     Blob,
     Tag,
@@ -122,6 +124,52 @@ class CommitTests(PorcelainTestCase):
                 self.repo.path, message="Some message",
                 author="Joe <joe@example.com>",
                 committer="Bob <bob@example.com>")
+        self.assertTrue(isinstance(sha, bytes))
+        self.assertEqual(len(sha), 40)
+
+    def test_no_verify(self):
+        if os.name != 'posix':
+            self.skipTest('shell hook tests requires POSIX shell')
+        self.assertTrue(os.path.exists('/bin/sh'))
+
+        hooks_dir = os.path.join(self.repo.controldir(), "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, hooks_dir)
+
+        c1, c2, c3 = build_commit_graph(
+                self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
+
+        hook_fail = "#!/bin/sh\nexit 1"
+
+        # hooks are executed in pre-commit, commit-msg order
+        # test commit-msg failure first, then pre-commit failure, then
+        # no_verify to skip both hooks
+        commit_msg = os.path.join(hooks_dir, "commit-msg")
+        with open(commit_msg, 'w') as f:
+            f.write(hook_fail)
+        os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        with self.assertRaises(CommitError):
+            porcelain.commit(
+                    self.repo.path, message="Some message",
+                    author="Joe <joe@example.com>",
+                    committer="Bob <bob@example.com>")
+
+        pre_commit = os.path.join(hooks_dir, "pre-commit")
+        with open(pre_commit, 'w') as f:
+            f.write(hook_fail)
+        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        with self.assertRaises(CommitError):
+            porcelain.commit(
+                    self.repo.path, message="Some message",
+                    author="Joe <joe@example.com>",
+                    committer="Bob <bob@example.com>")
+
+        sha = porcelain.commit(
+                self.repo.path, message="Some message",
+                author="Joe <joe@example.com>",
+                committer="Bob <bob@example.com>", no_verify=True)
         self.assertTrue(isinstance(sha, bytes))
         self.assertEqual(len(sha), 40)
 

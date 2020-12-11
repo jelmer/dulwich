@@ -822,7 +822,7 @@ class BaseRepo(object):
                   author=None, commit_timestamp=None,
                   commit_timezone=None, author_timestamp=None,
                   author_timezone=None, tree=None, encoding=None,
-                  ref=b'HEAD', merge_heads=None):
+                  ref=b'HEAD', merge_heads=None, no_verify=False):
         """Create a new commit.
 
         If not specified, `committer` and `author` default to
@@ -844,6 +844,7 @@ class BaseRepo(object):
           encoding: Encoding
           ref: Optional ref to commit to (defaults to current branch)
           merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
+          no_verify: Skip pre-commit and commit-msg hooks
 
         Returns:
           New commit SHA1
@@ -859,7 +860,8 @@ class BaseRepo(object):
             c.tree = tree
 
         try:
-            self.hooks['pre-commit'].execute()
+            if not no_verify:
+                self.hooks['pre-commit'].execute()
         except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, silent fallthrough
@@ -903,9 +905,12 @@ class BaseRepo(object):
             raise ValueError("No commit message specified")
 
         try:
-            c.message = self.hooks['commit-msg'].execute(message)
-            if c.message is None:
+            if no_verify:
                 c.message = message
+            else:
+                c.message = self.hooks['commit-msg'].execute(message)
+                if c.message is None:
+                    c.message = message
         except HookError as e:
             raise CommitError(e)
         except KeyError:  # no hook defined, message not modified

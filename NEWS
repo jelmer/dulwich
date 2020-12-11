@@ -6,6 +6,9 @@
  * Add ``no_verify`` flag to ``porcelain.commit`` and ``Repo.do_commit``.
    (Peter Rowlands)
 
+ * Remove dependency on external mock module.
+   (Matěj Cepl, #820)
+
 0.20.14	2020-11-26
 
  * Fix some stash functions on Python 3. (Peter Rowlands)

@@ -3,6 +3,9 @@
  * Add some functions for parsing and writing bundles.
    (Jelmer Vernooĳ)
 
+ * Add ``no_verify`` flag to ``porcelain.commit`` and ``Repo.do_commit``.
+   (Peter Rowlands)
+
 0.20.14	2020-11-26
 
  * Fix some stash functions on Python 3. (Peter Rowlands)

@@ -123,9 +123,10 @@ class InvalidWants(Exception):
 class HTTPUnauthorized(Exception):
     """Raised when authentication fails."""
 
-    def __init__(self, www_authenticate):
+    def __init__(self, www_authenticate, url):
         Exception.__init__(self, "No valid credentials provided")
         self.www_authenticate = www_authenticate
+        self.url = url
 
 
 def _fileno_can_read(fileno):
@@ -1637,9 +1638,9 @@ class HttpGitClient(GitClient):
 
         if resp.status == 404:
             raise NotGitRepository()
-        elif resp.status == 401:
-            raise HTTPUnauthorized(resp.getheader('WWW-Authenticate'))
-        elif resp.status != 200:
+        if resp.status == 401:
+            raise HTTPUnauthorized(resp.getheader('WWW-Authenticate'), url)
+        if resp.status != 200:
             raise GitProtocolError("unexpected http resp %d for %s" %
                                    (resp.status, url))
 

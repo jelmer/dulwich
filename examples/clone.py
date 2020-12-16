@@ -28,7 +28,10 @@ if len(args) < 2:
 elif len(args) < 3:
     target_path = basename(args[1].split(":")[-1])
     if target_path[-4:] == ".git":
-        target_path = target_path[:-4]
+        porcelain.clone(args[1], target_path[:-4])
+    else:
+        porcelain.clone(args[1], target_path)
+
 else:
     target_path = args[2]
 

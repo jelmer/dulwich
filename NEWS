@@ -1,4 +1,4 @@
-0.20.15	UNRELEASED
+0.20.15	2020-12-23
 
  * Add some functions for parsing and writing bundles.
    (Jelmer Vernooĳ)

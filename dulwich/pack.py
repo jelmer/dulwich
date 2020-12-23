@@ -1056,7 +1056,7 @@ class PackData(object):
         return self._filename
 
     @classmethod
-    def from_file(cls, file, size):
+    def from_file(cls, file, size=None):
         return cls(str(file), file=file, size=size)
 
     @classmethod
@@ -1071,6 +1071,18 @@ class PackData(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def __eq__(self, other):
+        if isinstance(other, PackData):
+            return self.get_stored_checksum() == other.get_stored_checksum()
+        if isinstance(other, list):
+            if len(self) != len(other):
+                return False
+            for o1, o2 in zip(self.iterobjects(), other):
+                if o1 != o2:
+                    return False
+            return True
+        return False
 
     def _get_size(self):
         if self._size is not None:

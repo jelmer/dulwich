@@ -23,7 +23,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.8'
+dulwich_version_string = '0.20.15'
 
 
 class DulwichDistribution(Distribution):
@@ -62,7 +62,7 @@ tests_require = ['fastimport']
 
 if '__pypy__' not in sys.modules and not sys.platform == 'win32':
     tests_require.extend([
-        'gevent', 'geventhttpclient', 'mock', 'setuptools>=17.1'])
+        'gevent', 'geventhttpclient', 'setuptools>=17.1'])
 
 
 ext_modules = [
@@ -113,7 +113,7 @@ setup(name='dulwich',
       keywords="git vcs",
       packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
                 'dulwich.contrib'],
-      package_data={'': ['../docs/tutorial/*.txt']},
+      package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
       distclass=DulwichDistribution,

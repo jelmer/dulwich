@@ -52,6 +52,7 @@ dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c
 dulwich/archive.py
+dulwich/bundle.py
 dulwich/cli.py
 dulwich/client.py
 dulwich/config.py
@@ -76,6 +77,7 @@ dulwich/pack.py
 dulwich/patch.py
 dulwich/porcelain.py
 dulwich/protocol.py
+dulwich/py.typed
 dulwich/reflog.py
 dulwich/refs.py
 dulwich/repo.py
@@ -102,6 +104,7 @@ dulwich/contrib/test_swift_smoke.py
 dulwich/tests/__init__.py
 dulwich/tests/test_archive.py
 dulwich/tests/test_blackbox.py
+dulwich/tests/test_bundle.py
 dulwich/tests/test_client.py
 dulwich/tests/test_config.py
 dulwich/tests/test_diff_tree.py

@@ -23,6 +23,7 @@
 from itertools import (
     permutations,
     )
+from unittest import expectedFailure
 
 from dulwich.diff_tree import (
     CHANGE_MODIFY,
@@ -150,6 +151,34 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2, c1], [c2.id])
         self.assertWalkYields([c4, c3], [c4.id], exclude=[c2.id])
         self.assertWalkYields([c4, c2], [c4.id], exclude=[c3.id])
+
+    def test_merge_of_new_branch_from_old_base(self):
+        # The commit on the branch was made at a time after any of the
+        # commits on master, but the branch was from an older commit.
+        # See also test_merge_of_old_branch
+        self.maxDiff = None
+        c1, c2, c3, c4, c5 = self.make_commits(
+            [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]],
+            times=[1, 2, 3, 4, 5],
+        )
+        self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id])
+        self.assertWalkYields([c3, c2, c1], [c3.id])
+        self.assertWalkYields([c2, c1], [c2.id])
+
+    @expectedFailure
+    def test_merge_of_old_branch(self):
+        # The commit on the branch was made at a time before any of
+        # the commits on master, but it was merged into master after
+        # those commits.
+        # See also test_merge_of_new_branch_from_old_base
+        self.maxDiff = None
+        c1, c2, c3, c4, c5 = self.make_commits(
+            [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]],
+            times=[1, 3, 4, 2, 5],
+        )
+        self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id])
+        self.assertWalkYields([c3, c2, c1], [c3.id])
+        self.assertWalkYields([c2, c1], [c2.id])
 
     def test_reverse(self):
         c1, c2, c3 = self.make_linear_commits(3)

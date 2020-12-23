@@ -1,3 +1,34 @@
+0.20.15	2020-12-23
+
+ * Add some functions for parsing and writing bundles.
+   (Jelmer Vernooĳ)
+
+ * Add ``no_verify`` flag to ``porcelain.commit`` and ``Repo.do_commit``.
+   (Peter Rowlands)
+
+ * Remove dependency on external mock module.
+   (Matěj Cepl, #820)
+
+0.20.14	2020-11-26
+
+ * Fix some stash functions on Python 3. (Peter Rowlands)
+
+ * Fix handling of relative paths in alternates files on Python 3.
+   (Georges Racinet)
+
+0.20.13	2020-11-22
+
+ * Add py.typed to allow type checking. (David Caro)
+
+ * Add tests demonstrating a bug in the walker code.
+   (Doug Hellman)
+
+0.20.11	2020-10-30
+
+ * Fix wheels build on Linux. (Ruslan Kuprieiev)
+
+ * Enable wheels build for Python 3.9 on Linux. (Jelmer Vernooĳ)
+
 0.20.8	2020-10-29
 
  * Build wheels on Mac OS X / Windows for Python 3.9.

@@ -58,7 +58,7 @@ except ImportError:
     missing_libs.append("geventhttpclient")
 
 try:
-    from mock import patch
+    from unittest.mock import patch
 except ImportError:
     missing_libs.append("mock")
 

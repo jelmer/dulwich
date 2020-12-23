@@ -8,6 +8,7 @@ include CONTRIBUTING.rst
 include TODO
 include setup.cfg
 include dulwich/stdint.h
+include dulwich/py.typed
 recursive-include docs conf.py *.txt Makefile make.bat
 recursive-include examples *.py
 graft dulwich/tests/data

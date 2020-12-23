@@ -323,7 +323,8 @@ def symbolic_ref(repo, ref_name, force=False):
         repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None, encoding=None):
+def commit(repo=".", message=None, author=None, committer=None, encoding=None,
+           no_verify=False):
     """Create a new commit.
 
     Args:
@@ -331,6 +332,7 @@ def commit(repo=".", message=None, author=None, committer=None, encoding=None):
       message: Optional commit message
       author: Optional author name and email
       committer: Optional committer name and email
+      no_verify: Skip pre-commit and commit-msg hooks
     Returns: SHA1 of the new commit
     """
     # FIXME: Support --all argument
@@ -344,7 +346,7 @@ def commit(repo=".", message=None, author=None, committer=None, encoding=None):
     with open_repo_closing(repo) as r:
         return r.do_commit(
                 message=message, author=author, committer=committer,
-                encoding=encoding)
+                encoding=encoding, no_verify=no_verify)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):

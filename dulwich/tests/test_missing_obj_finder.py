@@ -188,7 +188,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
         # have 3, want 7. Shall not report rev2 and its tree, because
         # haves(3) means has parents, i.e. rev2, too
         # BUT shall report any changes descending rev2 (excluding rev3)
-        # Shall NOT report f1_7 as it's techically == f1_2
+        # Shall NOT report f1_7 as it's technically == f1_2
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(7).id], [
               self.cmt(7).id, self.cmt(6).id, self.cmt(4).id,
               self.cmt(7).tree, self.cmt(6).tree, self.cmt(4).tree,

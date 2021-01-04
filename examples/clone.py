@@ -4,7 +4,8 @@ This trivial script demonstrates how to clone or lock a remote repository.
 
 Example usage:
   1. python examples/clone.py git://github.com/jelmer/dulwich
-  2. python examples/clone.py git://github.com/jelmer/dulwich.git dulwich
+  2. python examples/clone.py git://github.com/jelmer/dulwich.git
+  3. python examples/clone.py git://github.com/jelmer/dulwich.git dulwich
 """
 
 

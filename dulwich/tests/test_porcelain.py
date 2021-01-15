@@ -1466,7 +1466,9 @@ class StatusTests(PorcelainTestCase):
             set(porcelain.get_untracked_paths(subrepo.path, subrepo.path,
                                               subrepo.open_index())))
         self.assertEqual(
-            set(['nested/ignored', 'nested/with', 'nested/manager']),
+            set([os.path.join('nested', 'ignored'),
+                os.path.join('nested', 'with'),
+                os.path.join('nested', 'manager')]),
             set(porcelain.get_untracked_paths(self.repo.path, subrepo.path,
                                               self.repo.open_index(),
                                               exclude_ignored=False)))

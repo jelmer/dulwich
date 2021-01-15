@@ -20,6 +20,7 @@
 
 """Tests for dulwich.porcelain."""
 
+from dulwich.ignore import IgnoreFilterManager
 from io import BytesIO, StringIO
 import os
 import re
@@ -1444,20 +1445,35 @@ class StatusTests(PorcelainTestCase):
                              .untracked))
 
     def test_get_untracked_paths_nested(self):
+        with open(os.path.join(self.repo.path, '.gitignore'), 'w') as f:
+            f.write('nested/\n')
         with open(os.path.join(self.repo.path, 'notignored'), 'w') as f:
             f.write('blah\n')
+
         subrepo = Repo.init(os.path.join(self.repo.path, 'nested'), mkdir=True)
-        with open(os.path.join(subrepo.path, 'another'), 'w') as f:
-            f.write('foo\n')
+        with open(os.path.join(subrepo.path, 'ignored'), 'w') as f:
+            f.write('bleep\n')
+        with open(os.path.join(subrepo.path, 'with'), 'w') as f:
+            f.write('bloop\n')            
+        with open(os.path.join(subrepo.path, 'manager'), 'w') as f:
+            f.write('blop\n')
 
         self.assertEqual(
-            set(['notignored']),
+            set(['.gitignore','notignored']),
             set(porcelain.get_untracked_paths(self.repo.path, self.repo.path,
                                               self.repo.open_index())))
         self.assertEqual(
-            set(['another']),
+            set(['ignored','with', 'manager']),
             set(porcelain.get_untracked_paths(subrepo.path, subrepo.path,
-                                              subrepo.open_index())))
+                                              subrepo.open_index())))                                          
+        self.assertEqual(
+            set(['nested/ignored','nested/with','nested/manager']),
+            set(porcelain.get_untracked_paths(self.repo.path, subrepo.path,
+                                              self.repo.open_index(),exclude_ignored=False)))
+        self.assertEqual(
+            set([]),
+            set(porcelain.get_untracked_paths(self.repo.path, subrepo.path,
+                                              self.repo.open_index(),exclude_ignored=True)))
 
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon

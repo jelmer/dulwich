@@ -1117,14 +1117,10 @@ def status(repo=".", ignored=False):
         unstaged_changes = list(
             get_unstaged_changes(index, r.path, filter_callback)
         )
-        ignore_manager = IgnoreFilterManager.from_repo(r)
-        untracked_paths = get_untracked_paths(r.path, r.path, index)
-        if ignored:
-            untracked_changes = list(untracked_paths)
-        else:
-            untracked_changes = [
-                    p for p in untracked_paths
-                    if not ignore_manager.is_ignored(p)]
+
+        untracked_paths = get_untracked_paths(r.path, r.path, index, exclude_ignored = not ignored)
+        untracked_changes = list(untracked_paths)
+
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
@@ -1154,7 +1150,7 @@ def _walk_working_dir_paths(frompath, basepath):
             yield filepath, False
 
 
-def get_untracked_paths(frompath, basepath, index):
+def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     """Get untracked paths.
 
     Args:
@@ -1162,11 +1158,24 @@ def get_untracked_paths(frompath, basepath, index):
       basepath: Path to compare to
       index: Index to check against
     """
+    ignore_manager = _get_ignore_manager(frompath,exclude_ignored)
+    
     for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
+        if (exclude_ignored
+            and ignore_manager.is_ignored(os.path.relpath(ap,frompath))):
+            continue
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
                 yield os.path.relpath(ap, frompath)
+
+
+def _get_ignore_manager(frompath, exclude_ignored):
+    if exclude_ignored:
+        with open_repo_closing(frompath) as r:
+            ignore_manager = IgnoreFilterManager.from_repo(r)
+
+        return ignore_manager
 
 
 def get_tree_changes(repo):

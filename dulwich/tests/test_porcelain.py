@@ -20,7 +20,6 @@
 
 """Tests for dulwich.porcelain."""
 
-from dulwich.ignore import IgnoreFilterManager
 from io import BytesIO, StringIO
 import os
 import re
@@ -1454,26 +1453,28 @@ class StatusTests(PorcelainTestCase):
         with open(os.path.join(subrepo.path, 'ignored'), 'w') as f:
             f.write('bleep\n')
         with open(os.path.join(subrepo.path, 'with'), 'w') as f:
-            f.write('bloop\n')            
+            f.write('bloop\n')
         with open(os.path.join(subrepo.path, 'manager'), 'w') as f:
             f.write('blop\n')
 
         self.assertEqual(
-            set(['.gitignore','notignored']),
+            set(['.gitignore', 'notignored']),
             set(porcelain.get_untracked_paths(self.repo.path, self.repo.path,
                                               self.repo.open_index())))
         self.assertEqual(
-            set(['ignored','with', 'manager']),
+            set(['ignored', 'with', 'manager']),
             set(porcelain.get_untracked_paths(subrepo.path, subrepo.path,
-                                              subrepo.open_index())))                                          
+                                              subrepo.open_index())))
         self.assertEqual(
-            set(['nested/ignored','nested/with','nested/manager']),
+            set(['nested/ignored', 'nested/with', 'nested/manager']),
             set(porcelain.get_untracked_paths(self.repo.path, subrepo.path,
-                                              self.repo.open_index(),exclude_ignored=False)))
+                                              self.repo.open_index(),
+                                              exclude_ignored=False)))
         self.assertEqual(
             set([]),
             set(porcelain.get_untracked_paths(self.repo.path, subrepo.path,
-                                              self.repo.open_index(),exclude_ignored=True)))
+                                              self.repo.open_index(),
+                                              exclude_ignored=True)))
 
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon

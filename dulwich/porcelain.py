@@ -1118,7 +1118,8 @@ def status(repo=".", ignored=False):
             get_unstaged_changes(index, r.path, filter_callback)
         )
 
-        untracked_paths = get_untracked_paths(r.path, r.path, index, exclude_ignored = not ignored)
+        untracked_paths = get_untracked_paths(r.path, r.path, index,
+                                              exclude_ignored=not ignored)
         untracked_changes = list(untracked_paths)
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
@@ -1158,11 +1159,11 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       basepath: Path to compare to
       index: Index to check against
     """
-    ignore_manager = _get_ignore_manager(frompath,exclude_ignored)
-    
+    ignore_manager = _get_ignore_manager(frompath, exclude_ignored)
+
     for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
-        if (exclude_ignored
-            and ignore_manager.is_ignored(os.path.relpath(ap,frompath))):
+        if (exclude_ignored and
+                ignore_manager.is_ignored(os.path.relpath(ap, frompath))):
             continue
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)

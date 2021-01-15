@@ -950,13 +950,16 @@ def tag_create(
             tag_obj.tag_timezone = tag_timezone
             if sign:
                 import gpg
+                c = gpg.Context(armor=True)
                 if isinstance(sign, str):
-                    c = gpg.Context(armor=True, signers=[sign])
-                else:
-                    c = gpg.Context(armor=True)
-                with c:
-                    tag_obj.signature, unused_result = c.sign(
+                    key = c.get_key(sign)
+                    ctx = gpg.Context(armor=True, signers=[key])
+                    tag_obj.signature, unused_result = ctx.sign(
                         tag_obj.as_raw_string())
+                else:
+                    tag_obj.signature, unused_result = ctx.sign(
+                        tag_obj.as_raw_string())
+
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:

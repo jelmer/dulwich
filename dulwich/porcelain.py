@@ -1155,7 +1155,7 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     """Get untracked paths.
 
     Args:
-    ;param frompath: Path to walk
+      frompath: Path to walk
       basepath: Path to compare to
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
@@ -1176,7 +1176,7 @@ def _get_ignore_manager(frompath, exclude_ignored):
     """Get a repo's IgnoreFilterManager from a path if required.
 
     Args:
-    ;param frompath: The path of the repo
+      frompath: The path of the repo
       exclude_ignored: Whether to return the IgnoreFilterManager
     """
     if exclude_ignored:

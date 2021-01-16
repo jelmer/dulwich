@@ -1,3 +1,8 @@
+0.20.16	2021-01-16
+
+ * Add flag to only attempt to fetch ignored untracked files when specifically requested.
+   (Matt Seddon)
+
 0.20.15	2020-12-23
 
  * Add some functions for parsing and writing bundles.

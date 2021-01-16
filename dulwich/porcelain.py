@@ -1160,30 +1160,20 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
     """
-    ignore_manager = _get_ignore_manager(frompath, exclude_ignored)
+    if exclude_ignored:
+        with open_repo_closing(frompath) as r:
+            ignore_manager = IgnoreFilterManager.from_repo(r)
+    else:
+        ignore_manager = None
 
     for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
-        if (exclude_ignored and
+        if (ignore_manager is not None and
                 ignore_manager.is_ignored(os.path.relpath(ap, frompath))):
             continue
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
                 yield os.path.relpath(ap, frompath)
-
-
-def _get_ignore_manager(frompath, exclude_ignored):
-    """Get a repo's IgnoreFilterManager from a path if required.
-
-    Args:
-      frompath: The path of the repo
-      exclude_ignored: Whether to return the IgnoreFilterManager
-    """
-    if exclude_ignored:
-        with open_repo_closing(frompath) as r:
-            ignore_manager = IgnoreFilterManager.from_repo(r)
-
-        return ignore_manager
 
 
 def get_tree_changes(repo):

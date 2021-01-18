@@ -957,7 +957,7 @@ def tag_create(
                     tag_obj.signature, unused_result = ctx.sign(
                         tag_obj.as_raw_string())
                 else:
-                    tag_obj.signature, unused_result = ctx.sign(
+                    tag_obj.signature, unused_result = c.sign(
                         tag_obj.as_raw_string())
 
             r.object_store.add_object(tag_obj)

@@ -1336,7 +1336,7 @@ class GitCredentialStoreTests(TestCase):
     @classmethod
     def setUpClass(cls):
         with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(b'https://user:pass@example.org')
+            f.write(b'https://user:pass@example.org\n')
         cls.fname = f.name
 
     @classmethod

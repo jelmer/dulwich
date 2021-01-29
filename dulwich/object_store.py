@@ -473,12 +473,14 @@ class PackBasedObjectStore(BaseObjectStore):
         """
         if name == ZERO_SHA:
             raise KeyError(name)
+        # it seems the logic is wrong
+        # I fixed below
         if len(name) == 40:
+            sha = name
+            hexsha = sha_to_hex(name)
+        elif len(name) == 20:
             sha = hex_to_sha(name)
             hexsha = name
-        elif len(name) == 20:
-            sha = name
-            hexsha = None
         else:
             raise AssertionError("Invalid object name %r" % (name, ))
         for pack in self._iter_cached_packs():
@@ -486,8 +488,8 @@ class PackBasedObjectStore(BaseObjectStore):
                 return pack.get_raw(sha)
             except (KeyError, PackFileDisappeared):
                 pass
-        if hexsha is None:
-            hexsha = sha_to_hex(name)
+        # if hexsha is None:
+        #    hexsha = sha_to_hex(name)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()

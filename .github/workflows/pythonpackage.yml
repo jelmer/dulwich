@@ -33,23 +33,26 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python -m pip install pip --upgrade
         pip install -r requirements.txt --upgrade
-        pip install pip coverage codecov flake8 fastimport pylint --upgrade
+        pip install pip coverage codecov flake8 fastimport pylint pytest --upgrade
     - name: Install mypy
       run: |
         pip install -U mypy
       if: "matrix.python-version != 'pypy3'"
-    - name: Style checks
+    - name: Style checks flake8
       run: |
         python -m flake8
     - name: Typing checks
       run: |
-        python -m mypy dulwich
+        python -m mypy dulwich examples
       if: "matrix.python-version != 'pypy3'"
     - name: Style checks pylint
       run: |
         python -m pylint dulwich examples
+    - name: Test Function Pytest
+      run: |
+        python -m pytest dulwich/tests/
     - name: Build
       run: |
         python setup.py build_ext -i

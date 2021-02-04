@@ -1,3 +1,13 @@
+0.20.17	UNRELEASED
+
+ * credentials: ignore end-of-line character. (Georges Racinet)
+
+ * Fix failure in get_untracked_paths when the repository contains symlinks.
+   (#830, #793, mattseddon)
+
+ * docs: Clarify that Git objects are created on `git add`.
+   (Utku Gultopu)
+
 0.20.16	2021-01-16
 
  * Add flag to only attempt to fetch ignored untracked files when specifically requested.

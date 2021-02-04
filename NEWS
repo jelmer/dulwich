@@ -1,3 +1,9 @@
+0.20.18	UNRELEASED
+
+ * Fix formatting in setup.py. (Jelmer Vernooĳ)
+
+ * Add release configuration. (Jelmer Vernooĳ)
+
 0.20.17	2021-02-04
 
  * credentials: ignore end-of-line character. (Georges Racinet)

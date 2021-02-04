@@ -25,6 +25,7 @@ if sys.version_info < (3, 5):
 
 dulwich_version_string = '0.20.17'
 
+
 class DulwichDistribution(Distribution):
 
     def is_pure(self):

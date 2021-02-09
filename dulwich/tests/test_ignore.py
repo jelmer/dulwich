@@ -217,12 +217,13 @@ class IgnoreFilterManagerTests(TestCase):
         with open(os.path.join(repo.path, 'dir', 'blie'), 'wb') as f:
             f.write(b'IGNORED')
 
-        os.makedirs(os.path.join(repo.path, 'dir4' ,'foo'))
+        os.makedirs(os.path.join(repo.path, 'dir4', 'foo'))
         with open(os.path.join(repo.path, 'dir4', '.gitignore'), 'wb') as f:
             f.write(b'/*\n')
             f.write(b'!/foo\n')
 
-        with open(os.path.join(repo.path, 'dir4', 'foo', '.gitignore'), 'wb') as f:
+        with open(os.path.join(repo.path,
+                               'dir4', 'foo', '.gitignore'), 'wb') as f:
             f.write(b'/bar\n')
 
         with open(os.path.join(repo.path, 'dir4', 'foo', 'bar'), 'wb') as f:

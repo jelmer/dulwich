@@ -698,7 +698,13 @@ class TestSSHVendor(object):
         self.key_filename = None
 
     def run_command(
-        self, host, command, username=None, port=None, password=None, key_filename=None
+        self,
+        host,
+        command,
+        username=None,
+        port=None,
+        password=None,
+        key_filename=None,
     ):
         self.host = host
         self.command = command
@@ -751,7 +757,8 @@ class SSHGitClientTests(TestCase):
     def test_alternative_command_path(self):
         self.client.alternative_paths[b"upload-pack"] = b"/usr/lib/git/git-upload-pack"
         self.assertEqual(
-            b"/usr/lib/git/git-upload-pack", self.client._get_cmd_path(b"upload-pack")
+            b"/usr/lib/git/git-upload-pack",
+            self.client._get_cmd_path(b"upload-pack"),
         )
 
     def test_alternative_command_path_spaces(self):
@@ -1171,7 +1178,10 @@ class SubprocessSSHVendorTests(TestCase):
     def test_run_command_dashes(self):
         vendor = SubprocessSSHVendor()
         self.assertRaises(
-            StrangeHostname, vendor.run_command, "--weird-host", "git-clone-url"
+            StrangeHostname,
+            vendor.run_command,
+            "--weird-host",
+            "git-clone-url",
         )
 
     def test_run_command_password(self):
@@ -1233,7 +1243,10 @@ class PLinkSSHVendorTests(TestCase):
     def test_run_command_dashes(self):
         vendor = PLinkSSHVendor()
         self.assertRaises(
-            StrangeHostname, vendor.run_command, "--weird-host", "git-clone-url"
+            StrangeHostname,
+            vendor.run_command,
+            "--weird-host",
+            "git-clone-url",
         )
 
     def test_run_command_password_and_privkey(self):
@@ -1245,7 +1258,10 @@ class PLinkSSHVendorTests(TestCase):
         self.addCleanup(restore_warnings)
 
         command = vendor.run_command(
-            "host", "git-clone-url", password="12345", key_filename="/tmp/id_rsa"
+            "host",
+            "git-clone-url",
+            password="12345",
+            key_filename="/tmp/id_rsa",
         )
 
         expected_warning = UserWarning(
@@ -1451,7 +1467,8 @@ with a tail
 """
         )
         self.assertEqual(
-            _remote_error_from_stderr(b), GitProtocolError("This is the actual error")
+            _remote_error_from_stderr(b),
+            GitProtocolError("This is the actual error"),
         )
 
     def test_no_error_line(self):

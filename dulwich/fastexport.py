@@ -106,7 +106,12 @@ class GitFastExporter(object):
             ref,
             marker,
             (author, author_email, commit.author_time, commit.author_timezone),
-            (committer, committer_email, commit.commit_time, commit.commit_timezone),
+            (
+                committer,
+                committer_email,
+                commit.commit_time,
+                commit.commit_timezone,
+            ),
             commit.message,
             from_,
             merges,
@@ -223,9 +228,11 @@ class GitImportProcessor(processor.ImportProcessor):
         self.last_commit = commit_id
         if commit_id != ZERO_SHA:
             tree_id = self.repo[commit_id].tree
-            for (path, mode, hexsha) in self.repo.object_store.iter_tree_contents(
-                tree_id
-            ):
+            for (
+                path,
+                mode,
+                hexsha,
+            ) in self.repo.object_store.iter_tree_contents(tree_id):
                 self._contents[path] = (mode, hexsha)
 
     def reset_handler(self, cmd):

@@ -327,7 +327,12 @@ def symbolic_ref(repo, ref_name, force=False):
 
 
 def commit(
-    repo=".", message=None, author=None, committer=None, encoding=None, no_verify=False
+    repo=".",
+    message=None,
+    author=None,
+    committer=None,
+    encoding=None,
+    no_verify=False,
 ):
     """Create a new commit.
 
@@ -494,7 +499,9 @@ def add(repo=".", paths=None):
         if not paths:
             paths = list(
                 get_untracked_paths(
-                    str(Path(os.getcwd()).resolve()), str(repo_path), r.open_index()
+                    str(Path(os.getcwd()).resolve()),
+                    str(repo_path),
+                    r.open_index(),
                 )
             )
         relpaths = []
@@ -815,7 +822,10 @@ def log(
 
 # TODO(jelmer): better default for encoding?
 def show(
-    repo=".", objects=None, outstream=sys.stdout, default_encoding=DEFAULT_ENCODING
+    repo=".",
+    objects=None,
+    outstream=sys.stdout,
+    default_encoding=DEFAULT_ENCODING,
 ):
     """Print the changes in a commit.
 
@@ -945,7 +955,8 @@ def list_tags(*args, **kwargs):
     import warnings
 
     warnings.warn(
-        "list_tags has been deprecated in favour of tag_list.", DeprecationWarning
+        "list_tags has been deprecated in favour of tag_list.",
+        DeprecationWarning,
     )
     return tag_list(*args, **kwargs)
 
@@ -1487,7 +1498,10 @@ def _import_remote_refs(
         if n.startswith(LOCAL_BRANCH_PREFIX)
     }
     refs_container.import_refs(
-        b"refs/remotes/" + remote_name.encode(), branches, message=message, prune=prune
+        b"refs/remotes/" + remote_name.encode(),
+        branches,
+        message=message,
+        prune=prune,
     )
     tags = {
         n[len(b"refs/tags/") :]: v
@@ -1591,7 +1605,11 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
 
 
 def ls_tree(
-    repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False, name_only=False
+    repo,
+    treeish=b"HEAD",
+    outstream=sys.stdout,
+    recursive=False,
+    name_only=False,
 ):
     """List contents of a tree.
 
@@ -1817,7 +1835,9 @@ def describe(repo):
                         return tag_name
                     else:
                         return "{}-{}-g{}".format(
-                            tag_name, commit_count, latest_commit.id.decode("ascii")[:7]
+                            tag_name,
+                            commit_count,
+                            latest_commit.id.decode("ascii")[:7],
                         )
 
             commit_count += 1

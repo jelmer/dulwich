@@ -119,7 +119,10 @@ class WalkEntry(object):
         return self._changes[path_prefix]
 
     def __repr__(self):
-        return "<WalkEntry commit=%s, changes=%r>" % (self.commit.id, self.changes())
+        return "<WalkEntry commit=%s, changes=%r>" % (
+            self.commit.id,
+            self.changes(),
+        )
 
 
 class _CommitTimeQueue(object):

@@ -329,7 +329,12 @@ class DumbHandlersTestCase(WebTestCase):
 class SmartHandlersTestCase(WebTestCase):
     class _TestUploadPackHandler(object):
         def __init__(
-            self, backend, args, proto, stateless_rpc=None, advertise_refs=False
+            self,
+            backend,
+            args,
+            proto,
+            stateless_rpc=None,
+            advertise_refs=False,
         ):
             self.args = args
             self.proto = proto
@@ -567,7 +572,9 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         """
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(
-            self.example_text, MinimalistWSGIInputStream(zstream.read()), zlength
+            self.example_text,
+            MinimalistWSGIInputStream(zstream.read()),
+            zlength,
         )
 
     def test_call_no_working_seek(self):
@@ -577,5 +584,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         """
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(
-            self.example_text, MinimalistWSGIInputStream2(zstream.read()), zlength
+            self.example_text,
+            MinimalistWSGIInputStream2(zstream.read()),
+            zlength,
         )

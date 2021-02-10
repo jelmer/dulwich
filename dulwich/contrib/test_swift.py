@@ -260,7 +260,8 @@ class TestSwiftRepo(TestCase):
 
     def test_init_no_data(self):
         with patch(
-            "dulwich.contrib.swift.SwiftConnector", new_callable=create_swift_connector
+            "dulwich.contrib.swift.SwiftConnector",
+            new_callable=create_swift_connector,
         ):
             self.assertRaises(Exception, swift.SwiftRepo, "fakerepo", self.conf)
 
@@ -324,7 +325,9 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.fsc.store = self.store
         irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         irc.set_if_equals(
-            b"refs/heads/dev", b"cca703b0e1399008b53a1a236d6b4584737649e4", b"1" * 40
+            b"refs/heads/dev",
+            b"cca703b0e1399008b53a1a236d6b4584737649e4",
+            b"1" * 40,
         )
         self.assertEqual(irc[b"refs/heads/dev"], b"1" * 40)
 
@@ -378,20 +381,23 @@ class TestSwiftConnector(TestCase):
 
     def test_root_not_exists(self):
         with patch(
-            "geventhttpclient.HTTPClient.request", lambda *args: Response(status=404)
+            "geventhttpclient.HTTPClient.request",
+            lambda *args: Response(status=404),
         ):
             self.assertEqual(self.conn.test_root_exists(), None)
 
     def test_create_root(self):
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.test_root_exists", lambda *args: None
+            "dulwich.contrib.swift.SwiftConnector.test_root_exists",
+            lambda *args: None,
         ):
             with patch("geventhttpclient.HTTPClient.request", lambda *args: Response()):
                 self.assertEqual(self.conn.create_root(), None)
 
     def test_create_root_fails(self):
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.test_root_exists", lambda *args: None
+            "dulwich.contrib.swift.SwiftConnector.test_root_exists",
+            lambda *args: None,
         ):
             with patch(
                 "geventhttpclient.HTTPClient.request",
@@ -410,7 +416,8 @@ class TestSwiftConnector(TestCase):
 
     def test_get_container_objects_fails(self):
         with patch(
-            "geventhttpclient.HTTPClient.request", lambda *args: Response(status=404)
+            "geventhttpclient.HTTPClient.request",
+            lambda *args: Response(status=404),
         ):
             self.assertEqual(self.conn.get_container_objects(), None)
 
@@ -423,13 +430,15 @@ class TestSwiftConnector(TestCase):
 
     def test_get_object_stat_fails(self):
         with patch(
-            "geventhttpclient.HTTPClient.request", lambda *args: Response(status=404)
+            "geventhttpclient.HTTPClient.request",
+            lambda *args: Response(status=404),
         ):
             self.assertEqual(self.conn.get_object_stat("a"), None)
 
     def test_put_object(self):
         with patch(
-            "geventhttpclient.HTTPClient.request", lambda *args, **kwargs: Response()
+            "geventhttpclient.HTTPClient.request",
+            lambda *args, **kwargs: Response(),
         ):
             self.assertEqual(self.conn.put_object("a", BytesIO(b"content")), None)
 
@@ -468,14 +477,16 @@ class TestSwiftConnector(TestCase):
 
     def test_del_root(self):
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.del_object", lambda *args: None
+            "dulwich.contrib.swift.SwiftConnector.del_object",
+            lambda *args: None,
         ):
             with patch(
                 "dulwich.contrib.swift.SwiftConnector." "get_container_objects",
                 lambda *args: ({"name": "a"}, {"name": "b"}),
             ):
                 with patch(
-                    "geventhttpclient.HTTPClient.request", lambda *args: Response()
+                    "geventhttpclient.HTTPClient.request",
+                    lambda *args: Response(),
                 ):
                     self.assertEqual(self.conn.del_root(), None)
 

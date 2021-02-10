@@ -312,9 +312,21 @@ class TestPackData(PackTests):
             self.assertEqual(
                 set(
                     [
-                        (b"6f670c0fb53f9463760b7295fbb814e965fb20c8", 178, 1373561701),
-                        (b"b2a2766a2879c209ab1176e7e778b81ae422eeaa", 138, 912998690),
-                        (b"f18faa16531ac570a3fdc8c7ca16682548dafd12", 12, 3775879613),
+                        (
+                            b"6f670c0fb53f9463760b7295fbb814e965fb20c8",
+                            178,
+                            1373561701,
+                        ),
+                        (
+                            b"b2a2766a2879c209ab1176e7e778b81ae422eeaa",
+                            138,
+                            912998690,
+                        ),
+                        (
+                            b"f18faa16531ac570a3fdc8c7ca16682548dafd12",
+                            12,
+                            3775879613,
+                        ),
                     ]
                 ),
                 entries,
@@ -346,10 +358,12 @@ class TestPackData(PackTests):
             compute_file_sha(f, buffer_size=5).hexdigest(),
         )
         self.assertEqual(
-            sha1(b"abcd1234").hexdigest(), compute_file_sha(f, end_ofs=-4).hexdigest()
+            sha1(b"abcd1234").hexdigest(),
+            compute_file_sha(f, end_ofs=-4).hexdigest(),
         )
         self.assertEqual(
-            sha1(b"1234wxyz").hexdigest(), compute_file_sha(f, start_ofs=4).hexdigest()
+            sha1(b"1234wxyz").hexdigest(),
+            compute_file_sha(f, start_ofs=4).hexdigest(),
         )
         self.assertEqual(
             sha1(b"1234").hexdigest(),
@@ -905,7 +919,8 @@ class TestPackStreamReader(TestCase):
         self.assertEqual(OFS_DELTA, unpacked_delta.pack_type_num)
         self.assertEqual(None, unpacked_delta.obj_type_num)
         self.assertEqual(
-            unpacked_delta.offset - unpacked_blob.offset, unpacked_delta.delta_base
+            unpacked_delta.offset - unpacked_blob.offset,
+            unpacked_delta.delta_base,
         )
         delta = create_delta(b"blob", b"blob1")
         self.assertEqual(delta, b"".join(unpacked_delta.decomp_chunks))
@@ -974,7 +989,8 @@ class DeltaChainIteratorTests(TestCase):
         """Wrapper around store.get_raw that doesn't allow repeat lookups."""
         hex_sha = sha_to_hex(bin_sha)
         self.assertFalse(
-            hex_sha in self.fetched, "Attempted to re-fetch object %s" % hex_sha
+            hex_sha in self.fetched,
+            "Attempted to re-fetch object %s" % hex_sha,
         )
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)

@@ -111,7 +111,15 @@ class _GitFile(object):
     """
 
     PROXY_PROPERTIES = set(
-        ["closed", "encoding", "errors", "mode", "name", "newlines", "softspace"]
+        [
+            "closed",
+            "encoding",
+            "errors",
+            "mode",
+            "name",
+            "newlines",
+            "softspace",
+        ]
     )
     PROXY_METHODS = (
         "__iter__",

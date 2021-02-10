@@ -66,14 +66,19 @@ class cmd_archive(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         parser.add_option(
-            "--remote", type=str, help="Retrieve archive from specified remote repo"
+            "--remote",
+            type=str,
+            help="Retrieve archive from specified remote repo",
         )
         options, args = parser.parse_args(args)
         committish = args.pop(0)
         if options.remote:
             client, path = get_transport_and_path(options.remote)
             client.archive(
-                path, committish, sys.stdout.write, write_error=sys.stderr.write
+                path,
+                committish,
+                sys.stdout.write,
+                write_error=sys.stderr.write,
             )
         else:
             porcelain.archive(
@@ -312,7 +317,10 @@ class cmd_tag(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         parser.add_option(
-            "-a", "--annotated", help="Create an annotated tag.", action="store_true"
+            "-a",
+            "--annotated",
+            help="Create an annotated tag.",
+            action="store_true",
         )
         parser.add_option(
             "-s", "--sign", help="Sign the annotated tag.", action="store_true"
@@ -650,7 +658,11 @@ class cmd_help(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         parser.add_option(
-            "-a", "--all", dest="all", action="store_true", help="List all commands."
+            "-a",
+            "--all",
+            dest="all",
+            action="store_true",
+            help="List all commands.",
         )
         options, args = parser.parse_args(args)
 

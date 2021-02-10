@@ -595,7 +595,8 @@ class SwiftPackData(PackData):
         pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
         self._offset_cache = LRUSizeCache(
-            1024 * 1024 * self.scon.cache_length, compute_size=_compute_object_size
+            1024 * 1024 * self.scon.cache_length,
+            compute_size=_compute_object_size,
         )
         self.pack = None
 
@@ -736,7 +737,8 @@ class SwiftObjectStore(PackBasedObjectStore):
             entries = pack.sorted_entries()
             if len(entries):
                 basename = posixpath.join(
-                    self.pack_dir, "pack-%s" % iter_sha1(entry[0] for entry in entries)
+                    self.pack_dir,
+                    "pack-%s" % iter_sha1(entry[0] for entry in entries),
                 )
                 index = BytesIO()
                 write_pack_index_v2(index, entries, pack.get_stored_checksum())
@@ -816,7 +818,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = posixpath.join(
-            self.pack_dir, "pack-" + os.fsdecode(iter_sha1(e[0] for e in entries))
+            self.pack_dir,
+            "pack-" + os.fsdecode(iter_sha1(e[0] for e in entries)),
         )
         self.scon.put_object(pack_base_name + ".pack", f)
 

@@ -174,7 +174,9 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         remote_shas = {}
         for branch in ("master", "mybranch", "pullr-108"):
             local_shas[branch] = local_repo.do_commit(
-                "Test commit %s" % branch, "fbo@localhost", ref="refs/heads/%s" % branch
+                "Test commit %s" % branch,
+                "fbo@localhost",
+                ref="refs/heads/%s" % branch,
             )
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)

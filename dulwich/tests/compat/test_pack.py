@@ -89,14 +89,17 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack), _git_verify_pack_object_list(output)
+            set(x[0].id for x in all_to_pack),
+            _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 3
         # non-delta objects:
         got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            3, got_non_delta, "Expected 3 non-delta objects, got %d" % got_non_delta
+            3,
+            got_non_delta,
+            "Expected 3 non-delta objects, got %d" % got_non_delta,
         )
 
     def test_delta_medium_object(self):
@@ -116,14 +119,17 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack), _git_verify_pack_object_list(output)
+            set(x[0].id for x in all_to_pack),
+            _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 3
         # non-delta objects:
         got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            3, got_non_delta, "Expected 3 non-delta objects, got %d" % got_non_delta
+            3,
+            got_non_delta,
+            "Expected 3 non-delta objects, got %d" % got_non_delta,
         )
         # We expect one object to have a delta chain length of two
         # (new_blob_2), so let's verify that actually happens:
@@ -152,12 +158,15 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack), _git_verify_pack_object_list(output)
+            set(x[0].id for x in all_to_pack),
+            _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 4
         # non-delta objects:
         got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            4, got_non_delta, "Expected 4 non-delta objects, got %d" % got_non_delta
+            4,
+            got_non_delta,
+            "Expected 4 non-delta objects, got %d" % got_non_delta,
         )

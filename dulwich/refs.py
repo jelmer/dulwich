@@ -115,7 +115,13 @@ class RefsContainer(object):
         self._logger(ref, old_sha, new_sha, committer, timestamp, timezone, message)
 
     def set_symbolic_ref(
-        self, name, other, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        other,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         """Make a ref point at another ref.
 
@@ -368,7 +374,13 @@ class RefsContainer(object):
         self.set_if_equals(name, None, ref)
 
     def remove_if_equals(
-        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        old_ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         """Remove a refname only if it currently equals old_ref.
 
@@ -475,7 +487,13 @@ class DictRefsContainer(RefsContainer):
         return _DictRefsWatcher(self)
 
     def set_symbolic_ref(
-        self, name, other, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        other,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         old = self.follow(name)[-1]
         new = SYMREF + other
@@ -521,7 +539,13 @@ class DictRefsContainer(RefsContainer):
         return True
 
     def add_if_new(
-        self, name, ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         if name in self._refs:
             return False
@@ -539,7 +563,13 @@ class DictRefsContainer(RefsContainer):
         return True
 
     def remove_if_equals(
-        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        old_ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
@@ -818,7 +848,13 @@ class DiskRefsContainer(RefsContainer):
             f.abort()
 
     def set_symbolic_ref(
-        self, name, other, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        other,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         """Make a ref point at another ref.
 
@@ -919,7 +955,13 @@ class DiskRefsContainer(RefsContainer):
         return True
 
     def add_if_new(
-        self, name, ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         """Add a new reference only if it does not already exist.
 
@@ -964,7 +1006,13 @@ class DiskRefsContainer(RefsContainer):
         return True
 
     def remove_if_equals(
-        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name,
+        old_ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
     ):
         """Remove a refname only if it currently equals old_ref.
 

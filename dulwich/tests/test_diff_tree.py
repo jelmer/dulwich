@@ -184,7 +184,9 @@ class TreeChangesTest(DiffTestCase):
             [
                 TreeChange(CHANGE_UNCHANGED, (b"a", F, blob.id), (b"a", F, blob.id)),
                 TreeChange(
-                    CHANGE_UNCHANGED, (b"b/c", F, blob.id), (b"b/c", F, blob.id)
+                    CHANGE_UNCHANGED,
+                    (b"b/c", F, blob.id),
+                    (b"b/c", F, blob.id),
                 ),
             ],
             tree,
@@ -318,7 +320,9 @@ class TreeChangesTest(DiffTestCase):
         self.assertChangesEqual(
             [
                 TreeChange(
-                    CHANGE_MODIFY, (b"a", F, blob_a_1.id), (b"a", F, blob_a_2.id)
+                    CHANGE_MODIFY,
+                    (b"a", F, blob_a_1.id),
+                    (b"a", F, blob_a_2.id),
                 ),
                 TreeChange.delete((b"b/x/2", F, blob_bx2_1.id)),
                 TreeChange.add((b"b/y", F, blob_by_2.id)),
@@ -386,7 +390,9 @@ class TreeChangesTest(DiffTestCase):
             [
                 TreeChange.delete((b"a", F, blob_a1.id)),
                 TreeChange(
-                    CHANGE_UNCHANGED, (b"b", F, blob_b.id), (b"b", F, blob_b.id)
+                    CHANGE_UNCHANGED,
+                    (b"b", F, blob_b.id),
+                    (b"b", F, blob_b.id),
                 ),
                 TreeChange.add((b"c", F, blob_a2.id)),
             ],
@@ -404,7 +410,9 @@ class TreeChangesTest(DiffTestCase):
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob_a1.id), (b"c", F, blob_a2.id)),
                 TreeChange(
-                    CHANGE_UNCHANGED, (b"b", F, blob_b.id), (b"b", F, blob_b.id)
+                    CHANGE_UNCHANGED,
+                    (b"b", F, blob_b.id),
+                    (b"b", F, blob_b.id),
                 ),
             ],
             tree1,
@@ -655,7 +663,8 @@ class RenameDetectionTest(DiffTestCase):
         data = a + b"xxx\ny\n" + a + b"zzz\n"
         blob = make_object(Blob, data=data)
         self.assertBlockCountEqual(
-            {b"a" * 64: 128, b"xxx\n": 4, b"y\n": 2, b"zzz\n": 4}, _count_blocks(blob)
+            {b"a" * 64: 128, b"xxx\n": 4, b"y\n": 2, b"zzz\n": 4},
+            _count_blocks(blob),
         )
 
     test_count_blocks_long_lines = functest_builder(
@@ -705,7 +714,9 @@ class RenameDetectionTest(DiffTestCase):
         expected_entries = [
             TreeChange.add(TreeEntry(b"aaa", F, sha)),
             TreeChange(
-                CHANGE_COPY, TreeEntry(b"bbb", F, sha), TreeEntry(b"aab", F, sha)
+                CHANGE_COPY,
+                TreeEntry(b"bbb", F, sha),
+                TreeEntry(b"aab", F, sha),
             ),
             TreeChange(
                 CHANGE_MODIFY,
@@ -713,7 +724,9 @@ class RenameDetectionTest(DiffTestCase):
                 TreeEntry(b"bbb", F, b"dabc" * 10),
             ),
             TreeChange(
-                CHANGE_RENAME, TreeEntry(b"bbc", F, sha), TreeEntry(b"ddd", F, sha)
+                CHANGE_RENAME,
+                TreeEntry(b"bbc", F, sha),
+                TreeEntry(b"ddd", F, sha),
             ),
             TreeChange.delete(TreeEntry(b"ccc", F, sha)),
         ]
@@ -833,7 +846,9 @@ class RenameDetectionTest(DiffTestCase):
         self.assertEqual(
             [
                 TreeChange(
-                    CHANGE_MODIFY, (b"a", F, blob.id), (b"a", 0o100755, blob.id)
+                    CHANGE_MODIFY,
+                    (b"a", F, blob.id),
+                    (b"a", 0o100755, blob.id),
                 ),
                 TreeChange(CHANGE_COPY, (b"a", F, blob.id), (b"b", F, blob.id)),
             ],
@@ -1065,7 +1080,8 @@ class RenameDetectionTest(DiffTestCase):
         tree1 = self.commit_tree([(b"a", blob)])
         tree2 = self.commit_tree([(b"a", blob), (b"b", blob)])
         self.assertEqual(
-            [TreeChange.add((b"b", F, blob.id))], self.detect_renames(tree1, tree2)
+            [TreeChange.add((b"b", F, blob.id))],
+            self.detect_renames(tree1, tree2),
         )
         self.assertEqual(
             [TreeChange(CHANGE_COPY, (b"a", F, blob.id), (b"b", F, blob.id))],
@@ -1078,7 +1094,8 @@ class RenameDetectionTest(DiffTestCase):
         tree1 = self.commit_tree([(b"a", blob1)])
         tree2 = self.commit_tree([(b"a", blob1), (b"b", blob2)])
         self.assertEqual(
-            [TreeChange.add((b"b", F, blob2.id))], self.detect_renames(tree1, tree2)
+            [TreeChange.add((b"b", F, blob2.id))],
+            self.detect_renames(tree1, tree2),
         )
         self.assertEqual(
             [TreeChange(CHANGE_COPY, (b"a", F, blob1.id), (b"b", F, blob2.id))],
@@ -1131,7 +1148,9 @@ class RenameDetectionTest(DiffTestCase):
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob_a1.id), (b"c", F, blob_c2.id)),
                 TreeChange(
-                    CHANGE_UNCHANGED, (b"b", F, blob_b.id), (b"b", F, blob_b.id)
+                    CHANGE_UNCHANGED,
+                    (b"b", F, blob_b.id),
+                    (b"b", F, blob_b.id),
                 ),
             ],
             self.detect_renames(tree1, tree2, want_unchanged=True),

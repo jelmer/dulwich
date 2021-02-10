@@ -221,7 +221,9 @@ def check_user_identity(identity):
         raise InvalidUserIdentity(identity)
 
 
-def parse_graftpoints(graftpoints: Iterable[bytes]) -> Dict[bytes, List[bytes]]:
+def parse_graftpoints(
+    graftpoints: Iterable[bytes],
+) -> Dict[bytes, List[bytes]]:
     """Convert a list of graftpoints into a dict
 
     Args:
@@ -414,13 +416,21 @@ class BaseRepo(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         count, pack_data = self.fetch_pack_data(
-            determine_wants, target.get_graph_walker(), progress=progress, depth=depth
+            determine_wants,
+            target.get_graph_walker(),
+            progress=progress,
+            depth=depth,
         )
         target.object_store.add_pack_data(count, pack_data, progress)
         return self.get_refs()
 
     def fetch_pack_data(
-        self, determine_wants, graph_walker, progress, get_tagged=None, depth=None
+        self,
+        determine_wants,
+        graph_walker,
+        progress,
+        get_tagged=None,
+        depth=None,
     ):
         """Fetch the pack data required for a set of revisions.
 
@@ -444,7 +454,12 @@ class BaseRepo(object):
         return pack_objects_to_data(objects)
 
     def fetch_objects(
-        self, determine_wants, graph_walker, progress, get_tagged=None, depth=None
+        self,
+        determine_wants,
+        graph_walker,
+        progress,
+        get_tagged=None,
+        depth=None,
     ):
         """Fetch the missing objects required for a set of revisions.
 
@@ -605,7 +620,9 @@ class BaseRepo(object):
 
     def parents_provider(self):
         return ParentsProvider(
-            self.object_store, grafts=self._graftpoints, shallows=self.get_shallow()
+            self.object_store,
+            grafts=self._graftpoints,
+            shallows=self.get_shallow(),
         )
 
     def get_parents(self, sha: bytes, commit: Commit = None) -> List[bytes]:
@@ -831,7 +848,7 @@ class BaseRepo(object):
         with f:
             return [line.strip() for line in f.readlines() if line.strip()]
 
-    def do_commit(
+    def do_commit(  # noqa: C901
         self,
         message=None,
         committer=None,
@@ -1041,7 +1058,8 @@ class Repo(BaseRepo):
         if commondir is not None:
             with commondir:
                 self._commondir = os.path.join(
-                    self.controldir(), os.fsdecode(commondir.read().rstrip(b"\r\n"))
+                    self.controldir(),
+                    os.fsdecode(commondir.read().rstrip(b"\r\n")),
                 )
         else:
             self._commondir = self._controldir
@@ -1276,7 +1294,12 @@ class Repo(BaseRepo):
         index.write()
 
     def clone(
-        self, target_path, mkdir=True, bare=False, origin=b"origin", checkout=None
+        self,
+        target_path,
+        mkdir=True,
+        bare=False,
+        origin=b"origin",
+        checkout=None,
     ):
         """Clone this repository.
 
@@ -1316,7 +1339,9 @@ class Repo(BaseRepo):
         target_config = target.get_config()
         target_config.set(("remote", "origin"), "url", encoded_path)
         target_config.set(
-            ("remote", "origin"), "fetch", "+refs/heads/*:refs/remotes/origin/*"
+            ("remote", "origin"),
+            "fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
         )
         target_config.write_to_path()
 

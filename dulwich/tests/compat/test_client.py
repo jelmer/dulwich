@@ -96,7 +96,9 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b"HEAD"]
             c.send_pack(
-                self._build_path("/dest"), lambda _: sendrefs, src.generate_pack_data
+                self._build_path("/dest"),
+                lambda _: sendrefs,
+                src.generate_pack_data,
             )
 
     def test_send_pack(self):
@@ -154,7 +156,9 @@ class DulwichClientTestBase(object):
             sendrefs = dict(src.get_refs())
             del sendrefs[b"HEAD"]
             c.send_pack(
-                self._build_path("/dest"), lambda _: sendrefs, src.generate_pack_data
+                self._build_path("/dest"),
+                lambda _: sendrefs,
+                src.generate_pack_data,
             )
             self.assertDestEqualsSrc()
 
@@ -196,7 +200,10 @@ class DulwichClientTestBase(object):
                 self._build_path("/dest"), lambda _: sendrefs, gen_pack
             )
             self.assertEqual(
-                {b"refs/heads/branch": None, b"refs/heads/master": "non-fast-forward"},
+                {
+                    b"refs/heads/branch": None,
+                    b"refs/heads/master": "non-fast-forward",
+                },
                 result.ref_status,
             )
 
@@ -273,7 +280,9 @@ class DulwichClientTestBase(object):
                 return list(refs.values())
 
             result = c.fetch(
-                self._build_path("/server_new.export"), dest, determine_wants=dw
+                self._build_path("/server_new.export"),
+                dest,
+                determine_wants=dw,
             )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
@@ -380,7 +389,10 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             self.gitroot,
         ]
         self.process = subprocess.Popen(
-            args, cwd=self.gitroot, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            args,
+            cwd=self.gitroot,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         if not check_for_daemon():
             raise SkipTest("git-daemon failed to start")
@@ -421,7 +433,12 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
 class TestSSHVendor(object):
     @staticmethod
     def run_command(
-        host, command, username=None, port=None, password=None, key_filename=None
+        host,
+        command,
+        username=None,
+        port=None,
+        password=None,
+        key_filename=None,
     ):
         cmd, path = command.split(" ")
         cmd = cmd.split("-", 1)
@@ -491,7 +508,7 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Let's be quiet, the test suite is noisy enough already
         pass
 
-    def run_backend(self):
+    def run_backend(self):  # noqa: C901
         """Call out to git http-backend."""
         # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
         # Copyright (c) 2001-2010 Python Software Foundation;

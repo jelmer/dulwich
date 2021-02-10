@@ -57,7 +57,10 @@ class TestWalkEntry(object):
         self.changes = changes
 
     def __repr__(self):
-        return "<TestWalkEntry commit=%s, changes=%r>" % (self.commit.id, self.changes)
+        return "<TestWalkEntry commit=%s, changes=%r>" % (
+            self.commit.id,
+            self.changes,
+        )
 
     def __eq__(self, other):
         if not isinstance(other, WalkEntry) or self.commit != other.commit:
@@ -192,7 +195,11 @@ class WalkerTest(TestCase):
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b2 = make_object(Blob, data=b"b2")
         c1, c2 = self.make_linear_commits(
-            2, trees={1: [(b"a", blob_a1)], 2: [(b"a", blob_a2), (b"b", blob_b2)]}
+            2,
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a2), (b"b", blob_b2)],
+            },
         )
         e1 = TestWalkEntry(c1, [TreeChange.add((b"a", F, blob_a1.id))])
         e2 = TestWalkEntry(
@@ -315,10 +322,15 @@ class WalkerTest(TestCase):
         )
         entry_a = (b"a", F, blob.id)
         entry_b = (b"b", F, blob.id)
-        changes_without_renames = [TreeChange.delete(entry_a), TreeChange.add(entry_b)]
+        changes_without_renames = [
+            TreeChange.delete(entry_a),
+            TreeChange.add(entry_b),
+        ]
         changes_with_renames = [TreeChange(CHANGE_RENAME, entry_a, entry_b)]
         self.assertWalkYields(
-            [TestWalkEntry(c2, changes_without_renames)], [c2.id], max_entries=1
+            [TestWalkEntry(c2, changes_without_renames)],
+            [c2.id],
+            max_entries=1,
         )
         detector = RenameDetector(self.store)
         self.assertWalkYields(
@@ -473,7 +485,8 @@ class WalkerTest(TestCase):
         #    \-y3--y4-/--y5
         # Due to skew, y5 is the oldest commit.
         c1, x2, y3, y4, y5, m6 = self.make_commits(
-            [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]], times=[2, 3, 4, 5, 1, 6]
+            [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]],
+            times=[2, 3, 4, 5, 1, 6],
         )
         self.assertWalkYields([m6, y4, y3, x2, c1], [m6.id])
         # Ensure that c1..y4 get excluded even though they're popped from the

@@ -772,7 +772,10 @@ def unpack_object(
 
     unpacked = UnpackedObject(type_num, delta_base, size, crc32)
     unused = read_zlib_chunks(
-        read_some, unpacked, buffer_size=zlib_bufsize, include_comp=include_comp
+        read_some,
+        unpacked,
+        buffer_size=zlib_bufsize,
+        include_comp=include_comp,
     )
     return unpacked, unused
 
@@ -1187,7 +1190,12 @@ class PackData(object):
             )
             if progress is not None:
                 progress(i, self._num_objects)
-            yield (offset, unpacked.pack_type_num, unpacked._obj(), unpacked.crc32)
+            yield (
+                offset,
+                unpacked.pack_type_num,
+                unpacked._obj(),
+                unpacked.crc32,
+            )
             # Back up over unused data.
             self._file.seek(-len(unused), SEEK_CUR)
 
@@ -1295,7 +1303,11 @@ class PackData(object):
         assert offset >= self._header_size
         self._file.seek(offset)
         unpacked, _ = unpack_object(self._file.read, include_comp=True)
-        return (unpacked.pack_type_num, unpacked.delta_base, unpacked.comp_chunks)
+        return (
+            unpacked.pack_type_num,
+            unpacked.delta_base,
+            unpacked.comp_chunks,
+        )
 
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
@@ -1576,7 +1588,11 @@ def write_pack_object(f, type, object, sha=None, compression_level=-1):
 
 
 def write_pack(
-    filename, objects, deltify=None, delta_window_size=None, compression_level=-1
+    filename,
+    objects,
+    deltify=None,
+    delta_window_size=None,
+    compression_level=-1,
 ):
     """Write a new pack data file.
 
@@ -1690,7 +1706,10 @@ def write_pack_objects(
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
     return write_pack_data(
-        f, pack_contents_count, pack_contents, compression_level=compression_level
+        f,
+        pack_contents_count,
+        pack_contents,
+        compression_level=compression_level,
     )
 
 
@@ -2032,7 +2051,8 @@ class Pack(object):
         data_stored_checksum = self.data.get_stored_checksum()
         if idx_stored_checksum != data_stored_checksum:
             raise ChecksumMismatch(
-                sha_to_hex(idx_stored_checksum), sha_to_hex(data_stored_checksum)
+                sha_to_hex(idx_stored_checksum),
+                sha_to_hex(data_stored_checksum),
             )
 
     def check(self):

@@ -702,7 +702,9 @@ class GetUnstagedChangesTests(TestCase):
 
             repo.stage(["foo1", "foo2"])
             repo.do_commit(
-                b"test status", author=b"author <email>", committer=b"committer <email>"
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
             )
 
             with open(foo1_fullpath, "wb") as f:
@@ -729,7 +731,9 @@ class GetUnstagedChangesTests(TestCase):
 
             repo.stage(["foo1"])
             repo.do_commit(
-                b"test status", author=b"author <email>", committer=b"committer <email>"
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
             )
 
             os.unlink(foo1_fullpath)
@@ -752,7 +756,9 @@ class GetUnstagedChangesTests(TestCase):
 
             repo.stage(["foo1"])
             repo.do_commit(
-                b"test status", author=b"author <email>", committer=b"committer <email>"
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
             )
 
             os.remove(foo1_fullpath)
@@ -777,7 +783,9 @@ class GetUnstagedChangesTests(TestCase):
 
             repo.stage(["foo1"])
             repo.do_commit(
-                b"test status", author=b"author <email>", committer=b"committer <email>"
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
             )
 
             os.remove(foo1_fullpath)
@@ -811,7 +819,8 @@ class TestTreeFSPathConversion(TestCase):
         tree_path = u"délwíçh/foo".encode("utf8")
         fs_path = _tree_to_fs_path(b"/prefix/path", tree_path)
         self.assertEqual(
-            fs_path, os.fsencode(os.path.join(u"/prefix/path", u"délwíçh", u"foo"))
+            fs_path,
+            os.fsencode(os.path.join(u"/prefix/path", u"délwíçh", u"foo")),
         )
 
     def test_fs_to_tree_path_str(self):

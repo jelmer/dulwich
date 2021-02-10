@@ -44,7 +44,8 @@ class MissingObjectFinderTest(TestCase):
     def assertMissingMatch(self, haves, wants, expected):
         for sha, path in self.store.find_missing_objects(haves, wants, set()):
             self.assertTrue(
-                sha in expected, "(%s,%s) erroneously reported as missing" % (sha, path)
+                sha in expected,
+                "(%s,%s) erroneously reported as missing" % (sha, path),
             )
             expected.remove(sha)
 

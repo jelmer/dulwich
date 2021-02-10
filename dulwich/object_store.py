@@ -243,7 +243,13 @@ class BaseObjectStore(object):
         Returns: Iterator over (sha, path) pairs.
         """
         finder = MissingObjectFinder(
-            self, haves, wants, shallow, progress, get_tagged, get_parents=get_parents
+            self,
+            haves,
+            wants,
+            shallow,
+            progress,
+            get_tagged,
+            get_parents=get_parents,
         )
         return iter(finder.next, None)
 
@@ -1229,7 +1235,10 @@ class MissingObjectFinder(object):
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
         missing_commits, common_commits = object_store._collect_ancestors(
-            want_commits, all_ancestors, shallow=shallow, get_parents=self._get_parents
+            want_commits,
+            all_ancestors,
+            shallow=shallow,
+            get_parents=self._get_parents,
         )
         self.sha_done = set()
         # Now, fill sha_done with commits and revisions of

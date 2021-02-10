@@ -317,7 +317,11 @@ class UploadPackHandler(PackHandler):
 
     @classmethod
     def required_capabilities(cls):
-        return (CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK, CAPABILITY_OFS_DELTA)
+        return (
+            CAPABILITY_SIDE_BAND_64K,
+            CAPABILITY_THIN_PACK,
+            CAPABILITY_OFS_DELTA,
+        )
 
     def progress(self, message):
         if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
@@ -373,7 +377,10 @@ class UploadPackHandler(PackHandler):
             return wants
 
         objects_iter = self.repo.fetch_objects(
-            wants_wrapper, graph_walker, self.progress, get_tagged=self.get_tagged
+            wants_wrapper,
+            graph_walker,
+            self.progress,
+            get_tagged=self.get_tagged,
         )
 
         # Note the fact that client is only processing responses related
@@ -436,7 +443,12 @@ def _split_proto_line(line, allowed):
     if len(fields) == 1 and command in (COMMAND_DONE, None):
         return (command, None)
     elif len(fields) == 2:
-        if command in (COMMAND_WANT, COMMAND_HAVE, COMMAND_SHALLOW, COMMAND_UNSHALLOW):
+        if command in (
+            COMMAND_WANT,
+            COMMAND_HAVE,
+            COMMAND_SHALLOW,
+            COMMAND_UNSHALLOW,
+        ):
             if not valid_hexsha(fields[1]):
                 raise GitProtocolError("Invalid sha")
             return tuple(fields)
@@ -1166,7 +1178,8 @@ class TCPGitServer(socketserver.TCPServer):
 
     def handle_error(self, request, client_address):
         logger.exception(
-            "Exception happened during processing of request " "from %s", client_address
+            "Exception happened during processing of request " "from %s",
+            client_address,
         )
 
 

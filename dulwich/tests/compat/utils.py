@@ -38,12 +38,13 @@ from dulwich.protocol import TCP_GIT_PORT
 from dulwich.tests import (
     SkipTest,
     TestCase,
-    )
+)
 
-_DEFAULT_GIT = 'git'
+_DEFAULT_GIT = "git"
 _VERSION_LEN = 4
-_REPOS_DATA_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), os.pardir, 'data', 'repos'))
+_REPOS_DATA_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, "data", "repos")
+)
 
 
 def git_version(git_path=_DEFAULT_GIT):
@@ -56,14 +57,14 @@ def git_version(git_path=_DEFAULT_GIT):
         None if no git installation was found.
     """
     try:
-        output = run_git_or_fail(['--version'], git_path=git_path)
+        output = run_git_or_fail(["--version"], git_path=git_path)
     except OSError:
         return None
-    version_prefix = b'git version '
+    version_prefix = b"git version "
     if not output.startswith(version_prefix):
         return None
 
-    parts = output[len(version_prefix):].split(b'.')
+    parts = output[len(version_prefix) :].split(b".")
     nums = []
     for part in parts:
         try:
@@ -90,12 +91,15 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     """
     found_version = git_version(git_path=git_path)
     if found_version is None:
-        raise SkipTest('Test requires git >= %s, but c git not found' %
-                       (required_version, ))
+        raise SkipTest(
+            "Test requires git >= %s, but c git not found" % (required_version,)
+        )
 
     if len(required_version) > _VERSION_LEN:
-        raise ValueError('Invalid version tuple %s, expected %i parts' %
-                         (required_version, _VERSION_LEN))
+        raise ValueError(
+            "Invalid version tuple %s, expected %i parts"
+            % (required_version, _VERSION_LEN)
+        )
 
     required_version = list(required_version)
     while len(found_version) < len(required_version):
@@ -103,14 +107,16 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     required_version = tuple(required_version)
 
     if found_version < required_version:
-        required_version = '.'.join(map(str, required_version))
-        found_version = '.'.join(map(str, found_version))
-        raise SkipTest('Test requires git >= %s, found %s' %
-                       (required_version, found_version))
+        required_version = ".".join(map(str, required_version))
+        found_version = ".".join(map(str, found_version))
+        raise SkipTest(
+            "Test requires git >= %s, found %s" % (required_version, found_version)
+        )
 
 
-def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
-            **popen_kwargs):
+def run_git(
+    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False, **popen_kwargs
+):
     """Run a git command.
 
     Input is piped from the input parameter and output is sent to the standard
@@ -129,15 +135,15 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
       OSError: if the git executable was not found.
     """
 
-    env = popen_kwargs.pop('env', {})
-    env['LC_ALL'] = env['LANG'] = 'C'
+    env = popen_kwargs.pop("env", {})
+    env["LC_ALL"] = env["LANG"] = "C"
 
     args = [git_path] + args
-    popen_kwargs['stdin'] = subprocess.PIPE
+    popen_kwargs["stdin"] = subprocess.PIPE
     if capture_stdout:
-        popen_kwargs['stdout'] = subprocess.PIPE
+        popen_kwargs["stdout"] = subprocess.PIPE
     else:
-        popen_kwargs.pop('stdout', None)
+        popen_kwargs.pop("stdout", None)
     p = subprocess.Popen(args, env=env, **popen_kwargs)
     stdout, stderr = p.communicate(input=input)
     return (p.returncode, stdout)
@@ -145,13 +151,15 @@ def run_git(args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
 
 def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     """Run a git command, capture stdout/stderr, and fail if git fails."""
-    if 'stderr' not in popen_kwargs:
-        popen_kwargs['stderr'] = subprocess.STDOUT
-    returncode, stdout = run_git(args, git_path=git_path, input=input,
-                                 capture_stdout=True, **popen_kwargs)
+    if "stderr" not in popen_kwargs:
+        popen_kwargs["stderr"] = subprocess.STDOUT
+    returncode, stdout = run_git(
+        args, git_path=git_path, input=input, capture_stdout=True, **popen_kwargs
+    )
     if returncode != 0:
-        raise AssertionError("git with args %r failed with %d: %r" % (
-            args, returncode, stdout))
+        raise AssertionError(
+            "git with args %r failed with %d: %r" % (args, returncode, stdout)
+        )
     return stdout
 
 
@@ -169,10 +177,9 @@ def import_repo_to_dir(name):
     temp_dir = tempfile.mkdtemp()
     export_path = os.path.join(_REPOS_DATA_DIR, name)
     temp_repo_dir = os.path.join(temp_dir, name)
-    export_file = open(export_path, 'rb')
-    run_git_or_fail(['init', '--quiet', '--bare', temp_repo_dir])
-    run_git_or_fail(['fast-import'], input=export_file.read(),
-                    cwd=temp_repo_dir)
+    export_file = open(export_path, "rb")
+    run_git_or_fail(["init", "--quiet", "--bare", temp_repo_dir])
+    run_git_or_fail(["fast-import"], input=export_file.read(), cwd=temp_repo_dir)
     export_file.close()
     return temp_repo_dir
 
@@ -195,12 +202,12 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(delay)
         try:
-            s.connect(('localhost', port))
+            s.connect(("localhost", port))
             return True
         except socket.timeout:
             pass
         except socket.error as e:
-            if getattr(e, 'errno', False) and e.errno != errno.ECONNREFUSED:
+            if getattr(e, "errno", False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
                 raise
@@ -251,11 +258,13 @@ class CompatTestCase(TestCase):
         def cleanup():
             repo.close()
             rmtree_ro(os.path.dirname(path.rstrip(os.sep)))
+
         self.addCleanup(cleanup)
         return repo
 
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
+
     def remove_ro(action, name, exc):
         os.chmod(name, stat.S_IWRITE)
         os.remove(name)

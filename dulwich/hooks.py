@@ -52,9 +52,15 @@ class ShellHook(Hook):
     [0] http://www.kernel.org/pub/software/scm/git/docs/githooks.html
     """
 
-    def __init__(self, name, path, numparam,
-                 pre_exec_callback=None, post_exec_callback=None,
-                 cwd=None):
+    def __init__(
+        self,
+        name,
+        path,
+        numparam,
+        pre_exec_callback=None,
+        post_exec_callback=None,
+        cwd=None,
+    ):
         """Setup shell hook definition
 
         Args:
@@ -84,24 +90,27 @@ class ShellHook(Hook):
         """Execute the hook with given args"""
 
         if len(args) != self.numparam:
-            raise HookError("Hook %s executed with wrong number of args. \
+            raise HookError(
+                "Hook %s executed with wrong number of args. \
                             Expected %d. Saw %d. args: %s"
-                            % (self.name, self.numparam, len(args), args))
+                % (self.name, self.numparam, len(args), args)
+            )
 
-        if (self.pre_exec_callback is not None):
+        if self.pre_exec_callback is not None:
             args = self.pre_exec_callback(*args)
 
         try:
             ret = subprocess.call([self.filepath] + list(args), cwd=self.cwd)
             if ret != 0:
-                if (self.post_exec_callback is not None):
+                if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)
-                raise HookError("Hook %s exited with non-zero status %d"
-                                % (self.name, ret))
-            if (self.post_exec_callback is not None):
+                raise HookError(
+                    "Hook %s exited with non-zero status %d" % (self.name, ret)
+                )
+            if self.post_exec_callback is not None:
                 return self.post_exec_callback(1, *args)
         except OSError:  # no file. silent failure.
-            if (self.post_exec_callback is not None):
+            if self.post_exec_callback is not None:
                 self.post_exec_callback(0, *args)
 
 
@@ -109,18 +118,18 @@ class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'pre-commit')
+        filepath = os.path.join(controldir, "hooks", "pre-commit")
 
-        ShellHook.__init__(self, 'pre-commit', filepath, 0, cwd=controldir)
+        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=controldir)
 
 
 class PostCommitShellHook(ShellHook):
     """post-commit shell hook"""
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'post-commit')
+        filepath = os.path.join(controldir, "hooks", "post-commit")
 
-        ShellHook.__init__(self, 'post-commit', filepath, 0, cwd=controldir)
+        ShellHook.__init__(self, "post-commit", filepath, 0, cwd=controldir)
 
 
 class CommitMsgShellHook(ShellHook):
@@ -133,27 +142,29 @@ class CommitMsgShellHook(ShellHook):
     """
 
     def __init__(self, controldir):
-        filepath = os.path.join(controldir, 'hooks', 'commit-msg')
+        filepath = os.path.join(controldir, "hooks", "commit-msg")
 
         def prepare_msg(*args):
             import tempfile
+
             (fd, path) = tempfile.mkstemp()
 
-            with os.fdopen(fd, 'wb') as f:
+            with os.fdopen(fd, "wb") as f:
                 f.write(args[0])
 
             return (path,)
 
         def clean_msg(success, *args):
             if success:
-                with open(args[0], 'rb') as f:
+                with open(args[0], "rb") as f:
                     new_msg = f.read()
                 os.unlink(args[0])
                 return new_msg
             os.unlink(args[0])
 
-        ShellHook.__init__(self, 'commit-msg', filepath, 1,
-                           prepare_msg, clean_msg, controldir)
+        ShellHook.__init__(
+            self, "commit-msg", filepath, 1, prepare_msg, clean_msg, controldir
+        )
 
 
 class PostReceiveShellHook(ShellHook):
@@ -161,8 +172,8 @@ class PostReceiveShellHook(ShellHook):
 
     def __init__(self, controldir):
         self.controldir = controldir
-        filepath = os.path.join(controldir, 'hooks', 'post-receive')
-        ShellHook.__init__(self, 'post-receive', filepath, 0)
+        filepath = os.path.join(controldir, "hooks", "post-receive")
+        ShellHook.__init__(self, "post-receive", filepath, 0)
 
     def execute(self, client_refs):
         # do nothing if the script doesn't exist
@@ -171,24 +182,23 @@ class PostReceiveShellHook(ShellHook):
 
         try:
             env = os.environ.copy()
-            env['GIT_DIR'] = self.controldir
+            env["GIT_DIR"] = self.controldir
 
             p = subprocess.Popen(
                 self.filepath,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=env
+                env=env,
             )
 
             # client_refs is a list of (oldsha, newsha, ref)
-            in_data = '\n'.join([' '.join(ref) for ref in client_refs])
+            in_data = "\n".join([" ".join(ref) for ref in client_refs])
 
             out_data, err_data = p.communicate(in_data)
 
             if (p.returncode != 0) or err_data:
-                err_fmt = "post-receive exit code: %d\n" \
-                    + "stdout:\n%s\nstderr:\n%s"
+                err_fmt = "post-receive exit code: %d\n" + "stdout:\n%s\nstderr:\n%s"
                 err_msg = err_fmt % (p.returncode, out_data, err_data)
                 raise HookError(err_msg)
             return out_data

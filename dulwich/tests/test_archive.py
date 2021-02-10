@@ -28,31 +28,30 @@ from unittest import skipUnless
 from dulwich.archive import tar_stream
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
     Tree,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.tests.utils import (
     build_commit_graph,
-    )
+)
 
 try:
     from unittest.mock import patch
 except ImportError:
-    patch = None   # type: ignore
+    patch = None  # type: ignore
 
 
 class ArchiveTests(TestCase):
-
     def test_empty(self):
         store = MemoryObjectStore()
         c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]
-        stream = b''.join(tar_stream(store, tree, 10))
+        stream = b"".join(tar_stream(store, tree, 10))
         out = BytesIO(stream)
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
@@ -65,8 +64,7 @@ class ArchiveTests(TestCase):
         t1 = Tree()
         t1.add(b"somename", 0o100644, b1.id)
         store.add_object(t1)
-        stream = b''.join(
-            tar_stream(store, t1, *tar_stream_args, **tar_stream_kwargs))
+        stream = b"".join(tar_stream(store, t1, *tar_stream_args, **tar_stream_kwargs))
         return BytesIO(stream)
 
     def test_simple(self):
@@ -76,27 +74,26 @@ class ArchiveTests(TestCase):
         self.assertEqual(["somename"], tf.getnames())
 
     def test_prefix(self):
-        stream = self._get_example_tar_stream(mtime=0, prefix=b'blah')
+        stream = self._get_example_tar_stream(mtime=0, prefix=b"blah")
         tf = tarfile.TarFile(fileobj=stream)
         self.addCleanup(tf.close)
         self.assertEqual(["blah/somename"], tf.getnames())
 
     def test_gzip_mtime(self):
-        stream = self._get_example_tar_stream(mtime=1234, format='gz')
-        expected_mtime = struct.pack('<L', 1234)
+        stream = self._get_example_tar_stream(mtime=1234, format="gz")
+        expected_mtime = struct.pack("<L", 1234)
         self.assertEqual(stream.getvalue()[4:8], expected_mtime)
 
     @skipUnless(patch, "Required mock.patch")
     def test_same_file(self):
         contents = [None, None]
-        for format in ['', 'gz', 'bz2']:
+        for format in ["", "gz", "bz2"]:
             for i in [0, 1]:
-                with patch('time.time', return_value=i):
-                    stream = self._get_example_tar_stream(
-                        mtime=0, format=format)
+                with patch("time.time", return_value=i):
+                    stream = self._get_example_tar_stream(mtime=0, format=format)
                     contents[i] = stream.getvalue()
             self.assertEqual(
                 contents[0],
                 contents[1],
-                "Different file contents for format %r" % format
-                )
+                "Different file contents for format %r" % format,
+            )

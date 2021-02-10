@@ -22,7 +22,7 @@
 
 from itertools import (
     permutations,
-    )
+)
 from unittest import expectedFailure
 
 from dulwich.diff_tree import (
@@ -30,41 +30,34 @@ from dulwich.diff_tree import (
     CHANGE_RENAME,
     TreeChange,
     RenameDetector,
-    )
+)
 from dulwich.errors import (
     MissingCommitError,
-    )
+)
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Commit,
     Blob,
-    )
-from dulwich.walk import (
-    ORDER_TOPO,
-    WalkEntry,
-    Walker,
-    _topo_reorder
-    )
+)
+from dulwich.walk import ORDER_TOPO, WalkEntry, Walker, _topo_reorder
 from dulwich.tests import TestCase
 from dulwich.tests.utils import (
     F,
     make_object,
     make_tag,
     build_commit_graph,
-    )
+)
 
 
 class TestWalkEntry(object):
-
     def __init__(self, commit, changes):
         self.commit = commit
         self.changes = changes
 
     def __repr__(self):
-        return '<TestWalkEntry commit=%s, changes=%r>' % (
-          self.commit.id, self.changes)
+        return "<TestWalkEntry commit=%s, changes=%r>" % (self.commit.id, self.changes)
 
     def __eq__(self, other):
         if not isinstance(other, WalkEntry) or self.commit != other.commit:
@@ -75,18 +68,16 @@ class TestWalkEntry(object):
 
 
 class WalkerTest(TestCase):
-
     def setUp(self):
         super(WalkerTest, self).setUp()
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):
-        times = kwargs.pop('times', [])
-        attrs = kwargs.pop('attrs', {})
+        times = kwargs.pop("times", [])
+        attrs = kwargs.pop("attrs", {})
         for i, t in enumerate(times):
-            attrs.setdefault(i + 1, {})['commit_time'] = t
-        return build_commit_graph(self.store, commit_spec, attrs=attrs,
-                                  **kwargs)
+            attrs.setdefault(i + 1, {})["commit_time"] = t
+        return build_commit_graph(self.store, commit_spec, attrs=attrs, **kwargs)
 
     def make_linear_commits(self, num_commits, **kwargs):
         commit_spec = []
@@ -192,164 +183,201 @@ class WalkerTest(TestCase):
 
     def test_reverse_after_max_entries(self):
         c1, c2, c3 = self.make_linear_commits(3)
-        self.assertWalkYields([c1, c2, c3], [c3.id], max_entries=3,
-                              reverse=True)
+        self.assertWalkYields([c1, c2, c3], [c3.id], max_entries=3, reverse=True)
         self.assertWalkYields([c2, c3], [c3.id], max_entries=2, reverse=True)
         self.assertWalkYields([c3], [c3.id], max_entries=1, reverse=True)
 
     def test_changes_one_parent(self):
-        blob_a1 = make_object(Blob, data=b'a1')
-        blob_a2 = make_object(Blob, data=b'a2')
-        blob_b2 = make_object(Blob, data=b'b2')
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_b2 = make_object(Blob, data=b"b2")
         c1, c2 = self.make_linear_commits(
-            2, trees={1: [(b'a', blob_a1)],
-                      2: [(b'a', blob_a2), (b'b', blob_b2)]})
-        e1 = TestWalkEntry(c1, [TreeChange.add((b'a', F, blob_a1.id))])
+            2, trees={1: [(b"a", blob_a1)], 2: [(b"a", blob_a2), (b"b", blob_b2)]}
+        )
+        e1 = TestWalkEntry(c1, [TreeChange.add((b"a", F, blob_a1.id))])
         e2 = TestWalkEntry(
-                c2,
-                [TreeChange(CHANGE_MODIFY, (b'a', F, blob_a1.id),
-                                           (b'a', F, blob_a2.id)),
-                 TreeChange.add((b'b', F, blob_b2.id))])
+            c2,
+            [
+                TreeChange(CHANGE_MODIFY, (b"a", F, blob_a1.id), (b"a", F, blob_a2.id)),
+                TreeChange.add((b"b", F, blob_b2.id)),
+            ],
+        )
         self.assertWalkYields([e2, e1], [c2.id])
 
     def test_changes_multiple_parents(self):
-        blob_a1 = make_object(Blob, data=b'a1')
-        blob_b2 = make_object(Blob, data=b'b2')
-        blob_a3 = make_object(Blob, data=b'a3')
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_b2 = make_object(Blob, data=b"b2")
+        blob_a3 = make_object(Blob, data=b"a3")
         c1, c2, c3 = self.make_commits(
             [[1], [2], [3, 1, 2]],
-            trees={1: [(b'a', blob_a1)], 2: [(b'b', blob_b2)],
-                   3: [(b'a', blob_a3), (b'b', blob_b2)]})
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"b", blob_b2)],
+                3: [(b"a", blob_a3), (b"b", blob_b2)],
+            },
+        )
         # a is a modify/add conflict and b is not conflicted.
-        changes = [[
-                TreeChange(CHANGE_MODIFY,
-                           (b'a', F, blob_a1.id), (b'a', F, blob_a3.id)),
-                TreeChange.add((b'a', F, blob_a3.id)),
-        ]]
-        self.assertWalkYields([TestWalkEntry(c3, changes)], [c3.id],
-                              exclude=[c1.id, c2.id])
+        changes = [
+            [
+                TreeChange(CHANGE_MODIFY, (b"a", F, blob_a1.id), (b"a", F, blob_a3.id)),
+                TreeChange.add((b"a", F, blob_a3.id)),
+            ]
+        ]
+        self.assertWalkYields(
+            [TestWalkEntry(c3, changes)], [c3.id], exclude=[c1.id, c2.id]
+        )
 
     def test_path_matches(self):
-        walker = Walker(None, [], paths=[b'foo', b'bar', b'baz/quux'])
-        self.assertTrue(walker._path_matches(b'foo'))
-        self.assertTrue(walker._path_matches(b'foo/a'))
-        self.assertTrue(walker._path_matches(b'foo/a/b'))
-        self.assertTrue(walker._path_matches(b'bar'))
-        self.assertTrue(walker._path_matches(b'baz/quux'))
-        self.assertTrue(walker._path_matches(b'baz/quux/a'))
+        walker = Walker(None, [], paths=[b"foo", b"bar", b"baz/quux"])
+        self.assertTrue(walker._path_matches(b"foo"))
+        self.assertTrue(walker._path_matches(b"foo/a"))
+        self.assertTrue(walker._path_matches(b"foo/a/b"))
+        self.assertTrue(walker._path_matches(b"bar"))
+        self.assertTrue(walker._path_matches(b"baz/quux"))
+        self.assertTrue(walker._path_matches(b"baz/quux/a"))
 
         self.assertFalse(walker._path_matches(None))
-        self.assertFalse(walker._path_matches(b'oops'))
-        self.assertFalse(walker._path_matches(b'fool'))
-        self.assertFalse(walker._path_matches(b'baz'))
-        self.assertFalse(walker._path_matches(b'baz/quu'))
+        self.assertFalse(walker._path_matches(b"oops"))
+        self.assertFalse(walker._path_matches(b"fool"))
+        self.assertFalse(walker._path_matches(b"baz"))
+        self.assertFalse(walker._path_matches(b"baz/quu"))
 
     def test_paths(self):
-        blob_a1 = make_object(Blob, data=b'a1')
-        blob_b2 = make_object(Blob, data=b'b2')
-        blob_a3 = make_object(Blob, data=b'a3')
-        blob_b3 = make_object(Blob, data=b'b3')
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_b2 = make_object(Blob, data=b"b2")
+        blob_a3 = make_object(Blob, data=b"a3")
+        blob_b3 = make_object(Blob, data=b"b3")
         c1, c2, c3 = self.make_linear_commits(
-            3, trees={1: [(b'a', blob_a1)],
-                      2: [(b'a', blob_a1), (b'x/b', blob_b2)],
-                      3: [(b'a', blob_a3), (b'x/b', blob_b3)]})
+            3,
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a1), (b"x/b", blob_b2)],
+                3: [(b"a", blob_a3), (b"x/b", blob_b3)],
+            },
+        )
 
         self.assertWalkYields([c3, c2, c1], [c3.id])
-        self.assertWalkYields([c3, c1], [c3.id], paths=[b'a'])
-        self.assertWalkYields([c3, c2], [c3.id], paths=[b'x/b'])
+        self.assertWalkYields([c3, c1], [c3.id], paths=[b"a"])
+        self.assertWalkYields([c3, c2], [c3.id], paths=[b"x/b"])
 
         # All changes are included, not just for requested paths.
         changes = [
-            TreeChange(CHANGE_MODIFY, (b'a', F, blob_a1.id),
-                       (b'a', F, blob_a3.id)),
-            TreeChange(CHANGE_MODIFY, (b'x/b', F, blob_b2.id),
-                       (b'x/b', F, blob_b3.id)),
+            TreeChange(CHANGE_MODIFY, (b"a", F, blob_a1.id), (b"a", F, blob_a3.id)),
+            TreeChange(CHANGE_MODIFY, (b"x/b", F, blob_b2.id), (b"x/b", F, blob_b3.id)),
         ]
-        self.assertWalkYields([TestWalkEntry(c3, changes)], [c3.id],
-                              max_entries=1, paths=[b'a'])
+        self.assertWalkYields(
+            [TestWalkEntry(c3, changes)], [c3.id], max_entries=1, paths=[b"a"]
+        )
 
     def test_paths_subtree(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
         c1, c2, c3 = self.make_linear_commits(
-            3, trees={1: [(b'x/a', blob_a)],
-                      2: [(b'b', blob_b), (b'x/a', blob_a)],
-                      3: [(b'b', blob_b), (b'x/a', blob_a), (b'x/b', blob_b)]})
-        self.assertWalkYields([c2], [c3.id], paths=[b'b'])
-        self.assertWalkYields([c3, c1], [c3.id], paths=[b'x'])
+            3,
+            trees={
+                1: [(b"x/a", blob_a)],
+                2: [(b"b", blob_b), (b"x/a", blob_a)],
+                3: [(b"b", blob_b), (b"x/a", blob_a), (b"x/b", blob_b)],
+            },
+        )
+        self.assertWalkYields([c2], [c3.id], paths=[b"b"])
+        self.assertWalkYields([c3, c1], [c3.id], paths=[b"x"])
 
     def test_paths_max_entries(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
         c1, c2 = self.make_linear_commits(
-            2, trees={1: [(b'a', blob_a)],
-                      2: [(b'a', blob_a), (b'b', blob_b)]})
-        self.assertWalkYields([c2], [c2.id], paths=[b'b'], max_entries=1)
-        self.assertWalkYields([c1], [c1.id], paths=[b'a'], max_entries=1)
+            2, trees={1: [(b"a", blob_a)], 2: [(b"a", blob_a), (b"b", blob_b)]}
+        )
+        self.assertWalkYields([c2], [c2.id], paths=[b"b"], max_entries=1)
+        self.assertWalkYields([c1], [c1.id], paths=[b"a"], max_entries=1)
 
     def test_paths_merge(self):
-        blob_a1 = make_object(Blob, data=b'a1')
-        blob_a2 = make_object(Blob, data=b'a2')
-        blob_a3 = make_object(Blob, data=b'a3')
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_a3 = make_object(Blob, data=b"a3")
         x1, y2, m3, m4 = self.make_commits(
             [[1], [2], [3, 1, 2], [4, 1, 2]],
-            trees={1: [(b'a', blob_a1)],
-                   2: [(b'a', blob_a2)],
-                   3: [(b'a', blob_a3)],
-                   4: [(b'a', blob_a1)]})  # Non-conflicting
-        self.assertWalkYields([m3, y2, x1], [m3.id], paths=[b'a'])
-        self.assertWalkYields([y2, x1], [m4.id], paths=[b'a'])
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a2)],
+                3: [(b"a", blob_a3)],
+                4: [(b"a", blob_a1)],
+            },
+        )  # Non-conflicting
+        self.assertWalkYields([m3, y2, x1], [m3.id], paths=[b"a"])
+        self.assertWalkYields([y2, x1], [m4.id], paths=[b"a"])
 
     def test_changes_with_renames(self):
-        blob = make_object(Blob, data=b'blob')
+        blob = make_object(Blob, data=b"blob")
         c1, c2 = self.make_linear_commits(
-            2, trees={1: [(b'a', blob)], 2: [(b'b', blob)]})
-        entry_a = (b'a', F, blob.id)
-        entry_b = (b'b', F, blob.id)
-        changes_without_renames = [TreeChange.delete(entry_a),
-                                   TreeChange.add(entry_b)]
+            2, trees={1: [(b"a", blob)], 2: [(b"b", blob)]}
+        )
+        entry_a = (b"a", F, blob.id)
+        entry_b = (b"b", F, blob.id)
+        changes_without_renames = [TreeChange.delete(entry_a), TreeChange.add(entry_b)]
         changes_with_renames = [TreeChange(CHANGE_RENAME, entry_a, entry_b)]
         self.assertWalkYields(
-          [TestWalkEntry(c2, changes_without_renames)], [c2.id], max_entries=1)
+            [TestWalkEntry(c2, changes_without_renames)], [c2.id], max_entries=1
+        )
         detector = RenameDetector(self.store)
         self.assertWalkYields(
-          [TestWalkEntry(c2, changes_with_renames)], [c2.id], max_entries=1,
-          rename_detector=detector)
+            [TestWalkEntry(c2, changes_with_renames)],
+            [c2.id],
+            max_entries=1,
+            rename_detector=detector,
+        )
 
     def test_follow_rename(self):
-        blob = make_object(Blob, data=b'blob')
-        names = [b'a', b'a', b'b', b'b', b'c', b'c']
+        blob = make_object(Blob, data=b"blob")
+        names = [b"a", b"a", b"b", b"b", b"c", b"c"]
 
         trees = dict((i + 1, [(n, blob, F)]) for i, n in enumerate(names))
         c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
-        self.assertWalkYields([c5], [c6.id], paths=[b'c'])
+        self.assertWalkYields([c5], [c6.id], paths=[b"c"])
 
         def e(n):
             return (n, F, blob.id)
+
         self.assertWalkYields(
-            [TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e(b'b'), e(b'c'))]),
-             TestWalkEntry(c3, [TreeChange(CHANGE_RENAME, e(b'a'), e(b'b'))]),
-             TestWalkEntry(c1, [TreeChange.add(e(b'a'))])],
-            [c6.id], paths=[b'c'], follow=True)
+            [
+                TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e(b"b"), e(b"c"))]),
+                TestWalkEntry(c3, [TreeChange(CHANGE_RENAME, e(b"a"), e(b"b"))]),
+                TestWalkEntry(c1, [TreeChange.add(e(b"a"))]),
+            ],
+            [c6.id],
+            paths=[b"c"],
+            follow=True,
+        )
 
     def test_follow_rename_remove_path(self):
-        blob = make_object(Blob, data=b'blob')
+        blob = make_object(Blob, data=b"blob")
         _, _, _, c4, c5, c6 = self.make_linear_commits(
-            6, trees={1: [(b'a', blob), (b'c', blob)],
-                      2: [],
-                      3: [],
-                      4: [(b'b', blob)],
-                      5: [(b'a', blob)],
-                      6: [(b'c', blob)]})
+            6,
+            trees={
+                1: [(b"a", blob), (b"c", blob)],
+                2: [],
+                3: [],
+                4: [(b"b", blob)],
+                5: [(b"a", blob)],
+                6: [(b"c", blob)],
+            },
+        )
 
         def e(n):
             return (n, F, blob.id)
+
         # Once the path changes to b, we aren't interested in a or c anymore.
         self.assertWalkYields(
-            [TestWalkEntry(c6, [TreeChange(CHANGE_RENAME, e(b'a'), e(b'c'))]),
-             TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e(b'b'), e(b'a'))]),
-             TestWalkEntry(c4, [TreeChange.add(e(b'b'))])],
-            [c6.id], paths=[b'c'], follow=True)
+            [
+                TestWalkEntry(c6, [TreeChange(CHANGE_RENAME, e(b"a"), e(b"c"))]),
+                TestWalkEntry(c5, [TreeChange(CHANGE_RENAME, e(b"b"), e(b"a"))]),
+                TestWalkEntry(c4, [TreeChange.add(e(b"b"))]),
+            ],
+            [c6.id],
+            paths=[b"c"],
+            follow=True,
+        )
 
     def test_since(self):
         c1, c2, c3 = self.make_linear_commits(3)
@@ -385,8 +413,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c3.id], since=50, until=150)
 
     def test_since_over_scan(self):
-        commits = self.make_linear_commits(
-          11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
+        commits = self.make_linear_commits(11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
         c8, _, c10, c11 = commits[-4:]
         del self.store[commits[0].id]
         # c9 is older than we want to walk, but is out of order with its
@@ -434,8 +461,8 @@ class WalkerTest(TestCase):
 
     def test_out_of_order_children(self):
         c1, c2, c3, c4, c5 = self.make_commits(
-          [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]],
-          times=[2, 1, 3, 4, 5])
+            [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]], times=[2, 1, 3, 4, 5]
+        )
         self.assertWalkYields([c5, c4, c3, c1, c2], [c5.id])
         self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id], order=ORDER_TOPO)
 
@@ -446,8 +473,8 @@ class WalkerTest(TestCase):
         #    \-y3--y4-/--y5
         # Due to skew, y5 is the oldest commit.
         c1, x2, y3, y4, y5, m6 = self.make_commits(
-          [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]],
-          times=[2, 3, 4, 5, 1, 6])
+            [[1], [2, 1], [3, 1], [4, 3], [5, 4], [6, 2, 4]], times=[2, 3, 4, 5, 1, 6]
+        )
         self.assertWalkYields([m6, y4, y3, x2, c1], [m6.id])
         # Ensure that c1..y4 get excluded even though they're popped from the
         # priority queue long before y5.
@@ -459,18 +486,16 @@ class WalkerTest(TestCase):
 
 
 class WalkEntryTest(TestCase):
-
     def setUp(self):
         super(WalkEntryTest, self).setUp()
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):
-        times = kwargs.pop('times', [])
-        attrs = kwargs.pop('attrs', {})
+        times = kwargs.pop("times", [])
+        attrs = kwargs.pop("attrs", {})
         for i, t in enumerate(times):
-            attrs.setdefault(i + 1, {})['commit_time'] = t
-        return build_commit_graph(self.store, commit_spec, attrs=attrs,
-                                  **kwargs)
+            attrs.setdefault(i + 1, {})["commit_time"] = t
+        return build_commit_graph(self.store, commit_spec, attrs=attrs, **kwargs)
 
     def make_linear_commits(self, num_commits, **kwargs):
         commit_spec = []
@@ -483,11 +508,11 @@ class WalkEntryTest(TestCase):
 
     def test_all_changes(self):
         # Construct a commit with 2 files in different subdirectories.
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
         c1 = self.make_linear_commits(
             1,
-            trees={1: [(b'x/a', blob_a), (b'y/b', blob_b)]},
+            trees={1: [(b"x/a", blob_a), (b"y/b", blob_b)]},
         )[0]
 
         # Get the WalkEntry for the commit.
@@ -496,24 +521,26 @@ class WalkEntryTest(TestCase):
         changes = walker_entry.changes()
 
         # Compare the changes with the expected values.
-        entry_a = (b'x/a', F, blob_a.id)
-        entry_b = (b'y/b', F, blob_b.id)
+        entry_a = (b"x/a", F, blob_a.id)
+        entry_b = (b"y/b", F, blob_b.id)
         self.assertEqual(
-            [TreeChange.add(entry_a),
-             TreeChange.add(entry_b)],
+            [TreeChange.add(entry_a), TreeChange.add(entry_b)],
             changes,
         )
 
     def test_all_with_merge(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_a2 = make_object(Blob, data=b'a2')
-        blob_b = make_object(Blob, data=b'b')
-        blob_b2 = make_object(Blob, data=b'b2')
+        blob_a = make_object(Blob, data=b"a")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_b = make_object(Blob, data=b"b")
+        blob_b2 = make_object(Blob, data=b"b2")
         x1, y2, m3 = self.make_commits(
             [[1], [2], [3, 1, 2]],
-            trees={1: [(b'x/a', blob_a)],
-                   2: [(b'y/b', blob_b)],
-                   3: [(b'x/a', blob_a2), (b'y/b', blob_b2)]})
+            trees={
+                1: [(b"x/a", blob_a)],
+                2: [(b"y/b", blob_b)],
+                3: [(b"x/a", blob_a2), (b"y/b", blob_b2)],
+            },
+        )
 
         # Get the WalkEntry for the merge commit.
         walker = Walker(self.store, m3.id)
@@ -523,60 +550,69 @@ class WalkEntryTest(TestCase):
         changes = walker_entry.changes()
         self.assertEqual(2, len(changes))
 
-        entry_a = (b'x/a', F, blob_a.id)
-        entry_a2 = (b'x/a', F, blob_a2.id)
-        entry_b = (b'y/b', F, blob_b.id)
-        entry_b2 = (b'y/b', F, blob_b2.id)
+        entry_a = (b"x/a", F, blob_a.id)
+        entry_a2 = (b"x/a", F, blob_a2.id)
+        entry_b = (b"y/b", F, blob_b.id)
+        entry_b2 = (b"y/b", F, blob_b2.id)
         self.assertEqual(
-                [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2),
-                  TreeChange.add(entry_a2)],
-                 [TreeChange.add(entry_b2),
-                  TreeChange(CHANGE_MODIFY, entry_b, entry_b2)]],
-                changes,
+            [
+                [
+                    TreeChange(CHANGE_MODIFY, entry_a, entry_a2),
+                    TreeChange.add(entry_a2),
+                ],
+                [
+                    TreeChange.add(entry_b2),
+                    TreeChange(CHANGE_MODIFY, entry_b, entry_b2),
+                ],
+            ],
+            changes,
         )
 
     def test_filter_changes(self):
         # Construct a commit with 2 files in different subdirectories.
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
         c1 = self.make_linear_commits(
             1,
-            trees={1: [(b'x/a', blob_a), (b'y/b', blob_b)]},
+            trees={1: [(b"x/a", blob_a), (b"y/b", blob_b)]},
         )[0]
 
         # Get the WalkEntry for the commit.
         walker = Walker(self.store, c1.id)
         walker_entry = list(walker)[0]
-        changes = walker_entry.changes(path_prefix=b'x')
+        changes = walker_entry.changes(path_prefix=b"x")
 
         # Compare the changes with the expected values.
-        entry_a = (b'a', F, blob_a.id)
+        entry_a = (b"a", F, blob_a.id)
         self.assertEqual(
             [TreeChange.add(entry_a)],
             changes,
         )
 
     def test_filter_with_merge(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_a2 = make_object(Blob, data=b'a2')
-        blob_b = make_object(Blob, data=b'b')
-        blob_b2 = make_object(Blob, data=b'b2')
+        blob_a = make_object(Blob, data=b"a")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_b = make_object(Blob, data=b"b")
+        blob_b2 = make_object(Blob, data=b"b2")
         x1, y2, m3 = self.make_commits(
             [[1], [2], [3, 1, 2]],
-            trees={1: [(b'x/a', blob_a)],
-                   2: [(b'y/b', blob_b)],
-                   3: [(b'x/a', blob_a2), (b'y/b', blob_b2)]})
+            trees={
+                1: [(b"x/a", blob_a)],
+                2: [(b"y/b", blob_b)],
+                3: [(b"x/a", blob_a2), (b"y/b", blob_b2)],
+            },
+        )
 
         # Get the WalkEntry for the merge commit.
         walker = Walker(self.store, m3.id)
         entries = list(walker)
         walker_entry = entries[0]
         self.assertEqual(walker_entry.commit.id, m3.id)
-        changes = walker_entry.changes(b'x')
+        changes = walker_entry.changes(b"x")
         self.assertEqual(1, len(changes))
 
-        entry_a = (b'a', F, blob_a.id)
-        entry_a2 = (b'a', F, blob_a2.id)
+        entry_a = (b"a", F, blob_a.id)
+        entry_a2 = (b"a", F, blob_a2.id)
         self.assertEqual(
             [[TreeChange(CHANGE_MODIFY, entry_a, entry_a2)]],
             changes,

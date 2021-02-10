@@ -225,7 +225,6 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertTrue(m.is_ignored("dir3/"))
         self.assertTrue(m.is_ignored("dir3/bla"))
 
-    @unittest.expectedFailure
     def test_nested_gitignores(self):
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)

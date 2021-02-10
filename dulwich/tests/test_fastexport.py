@@ -270,8 +270,16 @@ M 100644 :1 a
         commit = self.make_file_commit([commands.FileCopyCommand(b"path", b"new_path")])
         self.assertEqual(
             [
-                (b"new_path", 0o100644, b"6320cd248dd8aeaab759d5871f8781b5c0505172"),
-                (b"path", 0o100644, b"6320cd248dd8aeaab759d5871f8781b5c0505172"),
+                (
+                    b"new_path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
+                (
+                    b"path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
             ],
             self.repo[commit.tree].items(),
         )
@@ -285,7 +293,11 @@ M 100644 :1 a
         )
         self.assertEqual(
             [
-                (b"new_path", 0o100644, b"6320cd248dd8aeaab759d5871f8781b5c0505172"),
+                (
+                    b"new_path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
             ],
             self.repo[commit.tree].items(),
         )

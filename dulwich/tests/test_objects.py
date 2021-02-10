@@ -930,13 +930,19 @@ class TreeTests(ShaFileCheckTests):
         self.assertEqual(
             [
                 TreeEntry(
-                    b"a", stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"
+                    b"a",
+                    stat.S_IFDIR,
+                    b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
                 TreeEntry(
-                    b"a.c", 0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"
+                    b"a.c",
+                    0o100755,
+                    b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
                 TreeEntry(
-                    b"a/c", stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"
+                    b"a/c",
+                    stat.S_IFDIR,
+                    b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
             ],
             list(sorted_tree_items(_TREE_ITEMS, True)),
@@ -1198,12 +1204,16 @@ class CheckTests(TestCase):
             ObjectFormatException, check_hexsha, b"1" * 41, "sha too long"
         )
         self.assertRaises(
-            ObjectFormatException, check_hexsha, b"x" * 40, "invalid characters"
+            ObjectFormatException,
+            check_hexsha,
+            b"x" * 40,
+            "invalid characters",
         )
 
     def test_check_identity(self):
         check_identity(
-            b"Dave Borowitz <dborowitz@google.com>", "failed to check good identity"
+            b"Dave Borowitz <dborowitz@google.com>",
+            "failed to check good identity",
         )
         check_identity(b"<dborowitz@google.com>", "failed to check good identity")
         self.assertRaises(

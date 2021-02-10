@@ -70,7 +70,8 @@ testobject = make_object(Blob, data=b"yummy data")
 class ObjectStoreTests(object):
     def test_determine_wants_all(self):
         self.assertEqual(
-            [b"1" * 40], self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40})
+            [b"1" * 40],
+            self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40}),
         )
 
     def test_determine_wants_all_zero(self):
@@ -135,10 +136,17 @@ class ObjectStoreTests(object):
         tree1_id = commit_tree(self.store, blobs_1)
         blobs_2 = [(b"a", blob_a2.id, 0o100644), (b"b", blob_b.id, 0o100644)]
         tree2_id = commit_tree(self.store, blobs_2)
-        change_a = ((b"a", b"a"), (0o100644, 0o100644), (blob_a1.id, blob_a2.id))
+        change_a = (
+            (b"a", b"a"),
+            (0o100644, 0o100644),
+            (blob_a1.id, blob_a2.id),
+        )
         self.assertEqual([change_a], list(self.store.tree_changes(tree1_id, tree2_id)))
         self.assertEqual(
-            [change_a, ((b"b", b"b"), (0o100644, 0o100644), (blob_b.id, blob_b.id))],
+            [
+                change_a,
+                ((b"b", b"b"), (0o100644, 0o100644), (blob_b.id, blob_b.id)),
+            ],
             list(self.store.tree_changes(tree1_id, tree2_id, want_unchanged=True)),
         )
 
@@ -483,7 +491,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                 self.assertTrue(o.contains_packed(packed_blob_sha))
                 self.assertTrue(o.contains_packed(blob.id))
                 self.assertEqual(
-                    (Blob.type_num, b"more yummy data"), o.get_raw(packed_blob_sha)
+                    (Blob.type_num, b"more yummy data"),
+                    o.get_raw(packed_blob_sha),
                 )
         finally:
             o.close()
@@ -537,7 +546,11 @@ class TreeLookupPathTests(TestCase):
 
     def test_lookup_not_tree(self):
         self.assertRaises(
-            NotTreeError, tree_lookup_path, self.get_object, self.tree_id, b"ad/b/j"
+            NotTreeError,
+            tree_lookup_path,
+            self.get_object,
+            self.tree_id,
+            b"ad/b/j",
         )
 
 
@@ -653,13 +666,16 @@ class CommitTreeChangesTests(TestCase):
             self.store, self.store[self.tree_id], [(b"d", 0o100644, blob_d.id)]
         )
         self.assertEqual(
-            new_tree[b"d"], (33188, b"c59d9b6344f1af00e504ba698129f07a34bbed8d")
+            new_tree[b"d"],
+            (33188, b"c59d9b6344f1af00e504ba698129f07a34bbed8d"),
         )
 
     def test_add_blob_in_dir(self):
         blob_d = make_object(Blob, data=b"d")
         new_tree = commit_tree_changes(
-            self.store, self.store[self.tree_id], [(b"e/f/d", 0o100644, blob_d.id)]
+            self.store,
+            self.store[self.tree_id],
+            [(b"e/f/d", 0o100644, blob_d.id)],
         )
         self.assertEqual(
             new_tree.items(),

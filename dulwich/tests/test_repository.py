@@ -163,7 +163,10 @@ class RepositoryRootTests(TestCase):
             assertRaisesRegexp = self.assertRaisesRegexp
         for k, _ in test_keys:
             assertRaisesRegexp(
-                TypeError, "'name' must be bytestring, not int", r.__getitem__, 12
+                TypeError,
+                "'name' must be bytestring, not int",
+                r.__getitem__,
+                12,
             )
 
     def test_delitem(self):
@@ -709,13 +712,16 @@ exit 1
     def test_as_dict(self):
         def check(repo):
             self.assertEqual(
-                repo.refs.subkeys(b"refs/tags"), repo.refs.subkeys(b"refs/tags/")
+                repo.refs.subkeys(b"refs/tags"),
+                repo.refs.subkeys(b"refs/tags/"),
             )
             self.assertEqual(
-                repo.refs.as_dict(b"refs/tags"), repo.refs.as_dict(b"refs/tags/")
+                repo.refs.as_dict(b"refs/tags"),
+                repo.refs.as_dict(b"refs/tags/"),
             )
             self.assertEqual(
-                repo.refs.as_dict(b"refs/heads"), repo.refs.as_dict(b"refs/heads/")
+                repo.refs.as_dict(b"refs/heads"),
+                repo.refs.as_dict(b"refs/heads/"),
             )
 
         bare = self.open_repo("a.git")
@@ -801,7 +807,8 @@ class BuildRepoRootTests(TestCase):
         with open(os.path.join(self._repo.path, ".git", "shallow"), "wb") as f:
             f.write(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097\n")
         self.assertEqual(
-            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"}, self._repo.get_shallow()
+            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
+            self._repo.get_shallow(),
         )
 
     def test_update_shallow(self):
@@ -809,14 +816,16 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual(set(), self._repo.get_shallow())
         self._repo.update_shallow([b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"], None)
         self.assertEqual(
-            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"}, self._repo.get_shallow()
+            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
+            self._repo.get_shallow(),
         )
         self._repo.update_shallow(
             [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             [b"f9e39b120c68182a4ba35349f832d0e4e61f485c"],
         )
         self.assertEqual(
-            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"}, self._repo.get_shallow()
+            {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
+            self._repo.get_shallow(),
         )
 
     def test_build_repo(self):
@@ -896,7 +905,8 @@ class BuildRepoRootTests(TestCase):
             author_timezone=0,
         )
         self.assertEqual(
-            [c1, b"c27a2d21dd136312d7fa9e8baabb82561a1727d0"], r[commit_sha].parents
+            [c1, b"c27a2d21dd136312d7fa9e8baabb82561a1727d0"],
+            r[commit_sha].parents,
         )
 
     def test_commit_deleted(self):
@@ -1192,7 +1202,10 @@ class BuildRepoRootTests(TestCase):
         r.stage(["c"])
         self.assertEqual([b"a"], list(r.open_index()))
 
-    @skipIf(sys.platform in ("win32", "darwin"), "tries to implicitly decode as utf8")
+    @skipIf(
+        sys.platform in ("win32", "darwin"),
+        "tries to implicitly decode as utf8",
+    )
     def test_commit_no_encode_decode(self):
         r = self._repo
         repo_path_bytes = os.fsencode(r.path)

@@ -328,8 +328,6 @@ class IgnoreFilterManager(object):
     def find_matching(self, path: str) -> Iterable[Pattern]:
         """Find matching patterns for path.
 
-        Stops after the first ignore file with matches.
-
         Args:
           path: Path to check
         Returns:
@@ -341,6 +339,7 @@ class IgnoreFilterManager(object):
         if os.path.sep != "/":
             path = path.replace(os.path.sep, "/")
         parts = path.split("/")
+        matches = []
         for i in range(len(parts) + 1):
             dirname = "/".join(parts[:i])
             for s, f in filters:
@@ -349,13 +348,11 @@ class IgnoreFilterManager(object):
                     # Paths leading up to the final part are all directories,
                     # so need a trailing slash.
                     relpath += "/"
-                matches = list(f.find_matching(relpath))
-                if matches:
-                    return iter(matches)
+                matches += list(f.find_matching(relpath))
             ignore_filter = self._load_path(dirname)
             if ignore_filter is not None:
                 filters.insert(0, (i, ignore_filter))
-        return iter([])
+        return iter(matches)
 
     def is_ignored(self, path: str) -> Optional[bool]:
         """Check whether a path is explicitly included or excluded in ignores.

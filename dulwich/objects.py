@@ -1161,7 +1161,10 @@ def parse_timezone(text):
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = offset % 100
-    return (signum * (hours * 3600 + minutes * 60), unnecessary_negative_timezone)
+    return (
+        signum * (hours * 3600 + minutes * 60),
+        unnecessary_negative_timezone,
+    )
 
 
 def format_timezone(offset, unnecessary_negative_timezone=False):
@@ -1349,9 +1352,15 @@ class Commit(ShaFile):
         for field, _ in _parse_message(self._chunked_text):
             if field == _TREE_HEADER and last is not None:
                 raise ObjectFormatException("unexpected tree")
-            elif field == _PARENT_HEADER and last not in (_PARENT_HEADER, _TREE_HEADER):
+            elif field == _PARENT_HEADER and last not in (
+                _PARENT_HEADER,
+                _TREE_HEADER,
+            ):
                 raise ObjectFormatException("unexpected parent")
-            elif field == _AUTHOR_HEADER and last not in (_TREE_HEADER, _PARENT_HEADER):
+            elif field == _AUTHOR_HEADER and last not in (
+                _TREE_HEADER,
+                _PARENT_HEADER,
+            ):
                 raise ObjectFormatException("unexpected author")
             elif field == _COMMITTER_HEADER and last != _AUTHOR_HEADER:
                 raise ObjectFormatException("unexpected committer")
@@ -1421,7 +1430,9 @@ class Commit(ShaFile):
         self._parents = value
 
     parents = property(
-        _get_parents, _set_parents, doc="Parents of this commit, by their SHA1."
+        _get_parents,
+        _set_parents,
+        doc="Parents of this commit, by their SHA1.",
     )
 
     def _get_extra(self):

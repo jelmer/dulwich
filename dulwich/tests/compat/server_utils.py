@@ -100,7 +100,8 @@ class ServerTests(object):
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(
-            ["push", self.url(port)] + self.branch_args(), cwd=self._new_repo.path
+            ["push", self.url(port)] + self.branch_args(),
+            cwd=self._new_repo.path,
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
 
@@ -111,7 +112,8 @@ class ServerTests(object):
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(
-            ["push", self.url(port)] + self.branch_args(), cwd=self._new_repo.path
+            ["push", self.url(port)] + self.branch_args(),
+            cwd=self._new_repo.path,
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
 
@@ -131,7 +133,8 @@ class ServerTests(object):
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(
-            ["fetch", self.url(port)] + self.branch_args(), cwd=self._old_repo.path
+            ["fetch", self.url(port)] + self.branch_args(),
+            cwd=self._old_repo.path,
         )
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache_time = 0
@@ -144,7 +147,8 @@ class ServerTests(object):
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(
-            ["fetch", self.url(port)] + self.branch_args(), cwd=self._old_repo.path
+            ["fetch", self.url(port)] + self.branch_args(),
+            cwd=self._old_repo.path,
         )
         # flush the pack cache so any new packs are picked up
         self._old_repo.object_store._pack_cache_time = 0

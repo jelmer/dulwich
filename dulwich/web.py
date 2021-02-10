@@ -213,7 +213,11 @@ def get_info_refs(req, backend, mat):
         write = req.respond(HTTP_OK, "application/x-%s-advertisement" % service)
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(
-            backend, [url_prefix(mat)], proto, stateless_rpc=req, advertise_refs=True
+            backend,
+            [url_prefix(mat)],
+            proto,
+            stateless_rpc=req,
+            advertise_refs=True,
         )
         handler.proto.write_pkt_line(b"# service=" + service.encode("ascii") + b"\n")
         handler.proto.write_pkt_line(None)
@@ -363,9 +367,18 @@ class HTTPGitApplication(object):
         ("GET", re.compile("/objects/info/alternates$")): get_text_file,
         ("GET", re.compile("/objects/info/http-alternates$")): get_text_file,
         ("GET", re.compile("/objects/info/packs$")): get_info_packs,
-        ("GET", re.compile("/objects/([0-9a-f]{2})/([0-9a-f]{38})$")): get_loose_object,
-        ("GET", re.compile("/objects/pack/pack-([0-9a-f]{40})\\.pack$")): get_pack_file,
-        ("GET", re.compile("/objects/pack/pack-([0-9a-f]{40})\\.idx$")): get_idx_file,
+        (
+            "GET",
+            re.compile("/objects/([0-9a-f]{2})/([0-9a-f]{38})$"),
+        ): get_loose_object,
+        (
+            "GET",
+            re.compile("/objects/pack/pack-([0-9a-f]{40})\\.pack$"),
+        ): get_pack_file,
+        (
+            "GET",
+            re.compile("/objects/pack/pack-([0-9a-f]{40})\\.idx$"),
+        ): get_idx_file,
         ("POST", re.compile("/git-upload-pack$")): handle_service_request,
         ("POST", re.compile("/git-receive-pack$")): handle_service_request,
     }
@@ -470,7 +483,8 @@ class ServerHandlerLogger(ServerHandler):
 
     def log_exception(self, exc_info):
         logger.exception(
-            "Exception happened during processing of request", exc_info=exc_info
+            "Exception happened during processing of request",
+            exc_info=exc_info,
         )
 
     def log_message(self, format, *args):
@@ -485,7 +499,8 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 
     def log_exception(self, exc_info):
         logger.exception(
-            "Exception happened during processing of request", exc_info=exc_info
+            "Exception happened during processing of request",
+            exc_info=exc_info,
         )
 
     def log_message(self, format, *args):
@@ -530,7 +545,12 @@ def main(argv=sys.argv):
         help="Binding IP address.",
     )
     parser.add_option(
-        "-p", "--port", dest="port", type=int, default=8000, help="Port to listen on."
+        "-p",
+        "--port",
+        dest="port",
+        type=int,
+        default=8000,
+        help="Port to listen on.",
     )
     options, args = parser.parse_args(argv)
 
@@ -550,7 +570,9 @@ def main(argv=sys.argv):
         server_class=WSGIServerLogger,
     )
     logger.info(
-        "Listening for HTTP connections on %s:%d", options.listen_address, options.port
+        "Listening for HTTP connections on %s:%d",
+        options.listen_address,
+        options.port,
     )
     server.serve_forever()
 

@@ -176,13 +176,16 @@ class ParseReftupleTests(TestCase):
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual(
-            (b"refs/heads/foo", b"refs/heads/foo", False), parse_reftuple(r, r, b"foo")
+            (b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"foo"),
         )
         self.assertEqual(
-            (b"refs/heads/foo", b"refs/heads/foo", True), parse_reftuple(r, r, b"+foo")
+            (b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, r, b"+foo"),
         )
         self.assertEqual(
-            (b"refs/heads/foo", b"refs/heads/foo", True), parse_reftuple(r, {}, b"+foo")
+            (b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, {}, b"+foo"),
         )
         self.assertEqual(
             (b"refs/heads/foo", b"refs/heads/foo", True),
@@ -199,19 +202,22 @@ class ParseReftupleTests(TestCase):
     def test_no_left_ref(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual(
-            (None, b"refs/heads/foo", False), parse_reftuple(r, r, b":refs/heads/foo")
+            (None, b"refs/heads/foo", False),
+            parse_reftuple(r, r, b":refs/heads/foo"),
         )
 
     def test_no_right_ref(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual(
-            (b"refs/heads/foo", None, False), parse_reftuple(r, r, b"refs/heads/foo:")
+            (b"refs/heads/foo", None, False),
+            parse_reftuple(r, r, b"refs/heads/foo:"),
         )
 
     def test_default_with_string(self):
         r = {b"refs/heads/foo": "bla"}
         self.assertEqual(
-            (b"refs/heads/foo", b"refs/heads/foo", False), parse_reftuple(r, r, "foo")
+            (b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, "foo"),
         )
 
 

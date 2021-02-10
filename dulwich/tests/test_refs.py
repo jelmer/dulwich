@@ -92,7 +92,9 @@ class PackedRefsFileTests(TestCase):
         self.assertRaises(errors.PackedRefsException, _split_ref_line, b"singlefield")
         self.assertRaises(errors.PackedRefsException, _split_ref_line, b"badsha name")
         self.assertRaises(
-            errors.PackedRefsException, _split_ref_line, ONES + b" bad/../refname"
+            errors.PackedRefsException,
+            _split_ref_line,
+            ONES + b" bad/../refname",
         )
 
     def test_read_without_peeled(self):
@@ -108,7 +110,12 @@ class PackedRefsFileTests(TestCase):
     def test_read_with_peeled(self):
         f = BytesIO(
             b"\n".join(
-                [ONES + b" ref/1", TWOS + b" ref/2", b"^" + THREES, FOURS + b" ref/4"]
+                [
+                    ONES + b" ref/1",
+                    TWOS + b" ref/2",
+                    b"^" + THREES,
+                    FOURS + b" ref/4",
+                ]
             )
         )
         self.assertEqual(
@@ -147,7 +154,8 @@ class PackedRefsFileTests(TestCase):
         f = BytesIO()
         write_packed_refs(f, {b"ref/1": ONES, b"ref/2": TWOS})
         self.assertEqual(
-            b"\n".join([ONES + b" ref/1", TWOS + b" ref/2"]) + b"\n", f.getvalue()
+            b"\n".join([ONES + b" ref/1", TWOS + b" ref/2"]) + b"\n",
+            f.getvalue(),
         )
 
 
@@ -206,7 +214,8 @@ class RefsContainerTests(object):
     def test_setitem(self):
         self._refs[b"refs/some/ref"] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"
         self.assertEqual(
-            b"42d06bd4b77fed026b154d16493e5deab78f02ec", self._refs[b"refs/some/ref"]
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            self._refs[b"refs/some/ref"],
         )
         self.assertRaises(
             errors.RefFormatError,
@@ -255,7 +264,8 @@ class RefsContainerTests(object):
     def test_set_symbolic_ref(self):
         self._refs.set_symbolic_ref(b"refs/heads/symbolic", b"refs/heads/master")
         self.assertEqual(
-            b"ref: refs/heads/master", self._refs.read_loose_ref(b"refs/heads/symbolic")
+            b"ref: refs/heads/master",
+            self._refs.read_loose_ref(b"refs/heads/symbolic"),
         )
         self.assertEqual(
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
@@ -269,7 +279,8 @@ class RefsContainerTests(object):
         self.assertEqual(nines, self._refs.read_loose_ref(b"refs/heads/symbolic"))
         self._refs.set_symbolic_ref(b"refs/heads/symbolic", b"refs/heads/master")
         self.assertEqual(
-            b"ref: refs/heads/master", self._refs.read_loose_ref(b"refs/heads/symbolic")
+            b"ref: refs/heads/master",
+            self._refs.read_loose_ref(b"refs/heads/symbolic"),
         )
         self.assertEqual(
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
@@ -305,7 +316,8 @@ class RefsContainerTests(object):
         )
         self.assertTrue(
             self._refs.remove_if_equals(
-                b"refs/tags/refs-0.2", b"3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8"
+                b"refs/tags/refs-0.2",
+                b"3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8",
             )
         )
         self.assertTrue(self._refs.remove_if_equals(b"refs/tags/refs-0.2", ZERO_SHA))
@@ -525,7 +537,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             self._refs.follow(b"HEAD"),
         )
         self.assertEqual(
-            ([b"refs/heads/master"], b"42d06bd4b77fed026b154d16493e5deab78f02ec"),
+            (
+                [b"refs/heads/master"],
+                b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            ),
             self._refs.follow(b"refs/heads/master"),
         )
         self.assertRaises(KeyError, self._refs.follow, b"refs/heads/loop")
@@ -555,7 +570,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         )
         self.assertTrue(
             self._refs.remove_if_equals(
-                b"refs/heads/master", b"42d06bd4b77fed026b154d16493e5deab78f02ec"
+                b"refs/heads/master",
+                b"42d06bd4b77fed026b154d16493e5deab78f02ec",
             )
         )
         self.assertRaises(KeyError, lambda: self._refs[b"refs/heads/master"])
@@ -589,7 +605,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         refs = self._repo.refs
         self.assertTrue(
             refs.remove_if_equals(
-                b"refs/heads/packed", b"42d06bd4b77fed026b154d16493e5deab78f02ec"
+                b"refs/heads/packed",
+                b"42d06bd4b77fed026b154d16493e5deab78f02ec",
             )
         )
 
@@ -601,7 +618,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         )
         self.assertTrue(
             self._refs.remove_if_equals(
-                b"refs/tags/refs-0.1", b"df6800012397fb85c56e7418dd4eb9405dee075c"
+                b"refs/tags/refs-0.1",
+                b"df6800012397fb85c56e7418dd4eb9405dee075c",
             )
         )
         self.assertRaises(KeyError, lambda: self._refs[b"refs/tags/refs-0.1"])
@@ -727,7 +745,8 @@ class InfoRefsContainerTests(TestCase):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
         # refs/heads/loop does not show up even if it exists
         self.assertEqual(
-            _TEST_REFS[b"refs/heads/master"], refs.get_peeled(b"refs/heads/master")
+            _TEST_REFS[b"refs/heads/master"],
+            refs.get_peeled(b"refs/heads/master"),
         )
 
 

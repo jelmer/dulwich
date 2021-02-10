@@ -248,7 +248,11 @@ def build_pack(f, objects_spec, store=None):
                 base_type_num, _, _ = full_objects[base]
             else:
                 base_type_num, _ = store.get_raw(base)
-            full_objects[i] = (base_type_num, data, obj_sha(base_type_num, [data]))
+            full_objects[i] = (
+                base_type_num,
+                data,
+                obj_sha(base_type_num, [data]),
+            )
 
     for i, (type_num, obj) in enumerate(objects_spec):
         offset = f.tell()

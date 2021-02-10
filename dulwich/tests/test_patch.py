@@ -298,7 +298,9 @@ class DiffTests(TestCase):
     def test_blob_add(self):
         f = BytesIO()
         write_blob_diff(
-            f, (None, None, None), (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n"))
+            f,
+            (None, None, None),
+            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
         )
         self.assertEqual(
             [
@@ -317,7 +319,9 @@ class DiffTests(TestCase):
     def test_blob_remove(self):
         f = BytesIO()
         write_blob_diff(
-            f, (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")), (None, None, None)
+            f,
+            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame\n")),
+            (None, None, None),
         )
         self.assertEqual(
             [
@@ -352,7 +356,15 @@ class DiffTests(TestCase):
         store.add_objects(
             [
                 (o, None)
-                for o in [tree1, tree2, added, removed, changed1, changed2, unchanged]
+                for o in [
+                    tree1,
+                    tree2,
+                    added,
+                    removed,
+                    changed1,
+                    changed2,
+                    unchanged,
+                ]
             ]
         )
         write_tree_diff(f, store, tree1.id, tree2.id)
@@ -389,11 +401,15 @@ class DiffTests(TestCase):
         store = MemoryObjectStore()
         tree1 = Tree()
         tree1.add(
-            b"asubmodule", S_IFGITLINK, b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"
+            b"asubmodule",
+            S_IFGITLINK,
+            b"06d0bdd9e2e20377b3180e4986b14c8549b393e4",
         )
         tree2 = Tree()
         tree2.add(
-            b"asubmodule", S_IFGITLINK, b"cc975646af69f279396d4d5e1379ac6af80ee637"
+            b"asubmodule",
+            S_IFGITLINK,
+            b"cc975646af69f279396d4d5e1379ac6af80ee637",
         )
         store.add_objects([(o, None) for o in [tree1, tree2]])
         write_tree_diff(f, store, tree1.id, tree2.id)
@@ -597,7 +613,11 @@ class DiffTests(TestCase):
             f,
             store,
             (b"bar.txt", 0o644, b1.id),
-            (b"bar.txt", 0o160000, b"06d0bdd9e2e20377b3180e4986b14c8549b393e4"),
+            (
+                b"bar.txt",
+                0o160000,
+                b"06d0bdd9e2e20377b3180e4986b14c8549b393e4",
+            ),
         )
         self.assertEqual(
             [

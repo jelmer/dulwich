@@ -128,7 +128,8 @@ class GraftsInRepositoryBase(object):
         r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
 
         self.assertEqual(
-            [e.commit.id for e in r.get_walker()], [self._shas[-1], self._shas[0]]
+            [e.commit.id for e in r.get_walker()],
+            [self._shas[-1], self._shas[0]],
         )
 
     def test_remove_graft(self):
@@ -177,7 +178,8 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
     def test_init_with_info_grafts(self):
         r = self._repo
         r._put_named_file(
-            os.path.join("info", "grafts"), self._shas[-1] + b" " + self._shas[0]
+            os.path.join("info", "grafts"),
+            self._shas[-1] + b" " + self._shas[0],
         )
 
         r = Repo(self._repo_dir)

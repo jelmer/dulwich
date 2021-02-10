@@ -352,6 +352,12 @@ class SubmodulesTests(TestCase):
         )
         got = list(parse_submodules(cf))
         self.assertEqual(
-            [(b"core/lib", b"https://github.com/phhusson/QuasselC.git", b"core/lib")],
+            [
+                (
+                    b"core/lib",
+                    b"https://github.com/phhusson/QuasselC.git",
+                    b"core/lib",
+                )
+            ],
             got,
         )

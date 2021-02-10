@@ -58,7 +58,18 @@ from dulwich.pack import (
 
 IndexEntry = collections.namedtuple(
     "IndexEntry",
-    ["ctime", "mtime", "dev", "ino", "mode", "uid", "gid", "size", "sha", "flags"],
+    [
+        "ctime",
+        "mtime",
+        "dev",
+        "ino",
+        "mode",
+        "uid",
+        "gid",
+        "size",
+        "sha",
+        "flags",
+    ],
 )
 
 
@@ -230,7 +241,9 @@ def write_index(f: BinaryIO, entries: List[Any], version: Optional[int] = None):
 
 
 def write_index_dict(
-    f: BinaryIO, entries: Dict[bytes, IndexEntry], version: Optional[int] = None
+    f: BinaryIO,
+    entries: Dict[bytes, IndexEntry],
+    version: Optional[int] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary."""
     entries_list = []

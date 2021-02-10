@@ -37,7 +37,8 @@ class ChecksumMismatch(Exception):
         self.extra = extra
         if self.extra is None:
             Exception.__init__(
-                self, "Checksum mismatch: Expected %s, got %s" % (expected, got)
+                self,
+                "Checksum mismatch: Expected %s, got %s" % (expected, got),
             )
         else:
             Exception.__init__(

@@ -30,7 +30,8 @@ from dulwich.objects import (
 )
 
 Entry = collections.namedtuple(
-    "Entry", ["old_sha", "new_sha", "committer", "timestamp", "timezone", "message"]
+    "Entry",
+    ["old_sha", "new_sha", "committer", "timestamp", "timezone", "message"],
 )
 
 

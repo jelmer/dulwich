@@ -183,7 +183,11 @@ class Pattern(object):
         )
 
     def __repr__(self) -> str:
-        return "%s(%r, %r)" % (type(self).__name__, self.pattern, self.ignorecase)
+        return "%s(%r, %r)" % (
+            type(self).__name__,
+            self.pattern,
+            self.ignorecase,
+        )
 
     def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.
@@ -290,7 +294,10 @@ class IgnoreFilterManager(object):
     """Ignore file manager."""
 
     def __init__(
-        self, top_path: str, global_filters: List[IgnoreFilter], ignorecase: bool
+        self,
+        top_path: str,
+        global_filters: List[IgnoreFilter],
+        ignorecase: bool,
     ):
         self._path_filters = {}  # type: Dict[str, Optional[IgnoreFilter]]
         self._top_path = top_path

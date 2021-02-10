@@ -276,10 +276,12 @@ class FindShallowTests(TestCase):
             (set([c3.id]), set([])), _find_shallow(self._store, [c3.id], 1)
         )
         self.assertEqual(
-            (set([c2.id]), set([c3.id])), _find_shallow(self._store, [c3.id], 2)
+            (set([c2.id]), set([c3.id])),
+            _find_shallow(self._store, [c3.id], 2),
         )
         self.assertEqual(
-            (set([c1.id]), set([c2.id, c3.id])), _find_shallow(self._store, [c3.id], 3)
+            (set([c1.id]), set([c2.id, c3.id])),
+            _find_shallow(self._store, [c3.id], 3),
         )
         self.assertEqual(
             (set([]), set([c1.id, c2.id, c3.id])),
@@ -318,7 +320,8 @@ class FindShallowTests(TestCase):
         c3 = self.make_commit(parents=[c1.id, c2.id])
 
         self.assertEqual(
-            (set([c1.id, c2.id]), set([c3.id])), _find_shallow(self._store, [c3.id], 2)
+            (set([c1.id, c2.id]), set([c3.id])),
+            _find_shallow(self._store, [c3.id], 2),
         )
 
     def test_tag(self):
@@ -327,7 +330,8 @@ class FindShallowTests(TestCase):
         self._store.add_object(tag)
 
         self.assertEqual(
-            (set([c1.id]), set([c2.id])), _find_shallow(self._store, [tag.id], 2)
+            (set([c1.id]), set([c2.id])),
+            _find_shallow(self._store, [tag.id], 2),
         )
 
 
@@ -449,10 +453,16 @@ class ProtocolGraphWalkerTestCase(TestCase):
         )
         self.assertRaises(GitProtocolError, _split_proto_line, b"want xxxx\n", allowed)
         self.assertRaises(
-            UnexpectedCommandError, _split_proto_line, b"have " + THREE + b"\n", allowed
+            UnexpectedCommandError,
+            _split_proto_line,
+            b"have " + THREE + b"\n",
+            allowed,
         )
         self.assertRaises(
-            GitProtocolError, _split_proto_line, b"foo " + FOUR + b"\n", allowed
+            GitProtocolError,
+            _split_proto_line,
+            b"foo " + FOUR + b"\n",
+            allowed,
         )
         self.assertRaises(GitProtocolError, _split_proto_line, b"bar", allowed)
         self.assertEqual((b"done", None), _split_proto_line(b"done\n", allowed))
@@ -1064,7 +1074,9 @@ class FileSystemBackendTests(TestCase):
 
     def test_nonexistant(self):
         self.assertRaises(
-            NotGitRepository, self.backend.open_repository, "/does/not/exist/unless/foo"
+            NotGitRepository,
+            self.backend.open_repository,
+            "/does/not/exist/unless/foo",
         )
 
     def test_absolute(self):
@@ -1095,7 +1107,9 @@ class DictBackendTests(TestCase):
         repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": repo})
         self.assertRaises(
-            NotGitRepository, backend.open_repository, "/does/not/exist/unless/foo"
+            NotGitRepository,
+            backend.open_repository,
+            "/does/not/exist/unless/foo",
         )
 
     def test_bad_repo_path(self):
@@ -1114,7 +1128,11 @@ class ServeCommandTests(TestCase):
 
     def serve_command(self, handler_cls, args, inf, outf):
         return serve_command(
-            handler_cls, [b"test"] + args, backend=self.backend, inf=inf, outf=outf
+            handler_cls,
+            [b"test"] + args,
+            backend=self.backend,
+            inf=inf,
+            outf=outf,
         )
 
     def test_receive_pack(self):

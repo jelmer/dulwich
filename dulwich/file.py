@@ -44,6 +44,7 @@ def _fancy_rename(oldname, newname):
 
     # Defer the tempfile import since it pulls in a lot of other things.
     import tempfile
+
     # destination file exists
     try:
         (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
@@ -56,7 +57,7 @@ def _fancy_rename(oldname, newname):
     try:
         os.rename(newname, tmpfile)
     except OSError:
-        raise   # no rename occurred
+        raise  # no rename occurred
     try:
         os.rename(oldname, newname)
     except OSError:
@@ -65,7 +66,7 @@ def _fancy_rename(oldname, newname):
     os.remove(tmpfile)
 
 
-def GitFile(filename, mode='rb', bufsize=-1):
+def GitFile(filename, mode="rb", bufsize=-1):
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -77,13 +78,13 @@ def GitFile(filename, mode='rb', bufsize=-1):
     the fact that opening a file for write does not actually open the file you
     request.
     """
-    if 'a' in mode:
-        raise IOError('append mode not supported for Git files')
-    if '+' in mode:
-        raise IOError('read/write mode not supported for Git files')
-    if 'b' not in mode:
-        raise IOError('text mode not supported for Git files')
-    if 'w' in mode:
+    if "a" in mode:
+        raise IOError("append mode not supported for Git files")
+    if "+" in mode:
+        raise IOError("read/write mode not supported for Git files")
+    if "b" not in mode:
+        raise IOError("text mode not supported for Git files")
+    if "w" in mode:
         return _GitFile(filename, mode, bufsize)
     else:
         return io.open(filename, mode, bufsize)
@@ -109,23 +110,35 @@ class _GitFile(object):
         released. Typically this will happen in a finally block.
     """
 
-    PROXY_PROPERTIES = set(['closed', 'encoding', 'errors', 'mode', 'name',
-                            'newlines', 'softspace'])
-    PROXY_METHODS = ('__iter__', 'flush', 'fileno', 'isatty', 'read',
-                     'readline', 'readlines', 'seek', 'tell',
-                     'truncate', 'write', 'writelines')
+    PROXY_PROPERTIES = set(
+        ["closed", "encoding", "errors", "mode", "name", "newlines", "softspace"]
+    )
+    PROXY_METHODS = (
+        "__iter__",
+        "flush",
+        "fileno",
+        "isatty",
+        "read",
+        "readline",
+        "readlines",
+        "seek",
+        "tell",
+        "truncate",
+        "write",
+        "writelines",
+    )
 
     def __init__(self, filename, mode, bufsize):
         self._filename = filename
         if isinstance(self._filename, bytes):
-            self._lockfilename = self._filename + b'.lock'
+            self._lockfilename = self._filename + b".lock"
         else:
-            self._lockfilename = self._filename + '.lock'
+            self._lockfilename = self._filename + ".lock"
         try:
             fd = os.open(
                 self._lockfilename,
-                os.O_RDWR | os.O_CREAT | os.O_EXCL |
-                getattr(os, "O_BINARY", 0))
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+            )
         except FileExistsError:
             raise FileLocked(filename, self._lockfilename)
         self._file = os.fdopen(fd, mode, bufsize)
@@ -166,10 +179,10 @@ class _GitFile(object):
         os.fsync(self._file.fileno())
         self._file.close()
         try:
-            if getattr(os, 'replace', None) is not None:
+            if getattr(os, "replace", None) is not None:
                 os.replace(self._lockfilename, self._filename)
             else:
-                if sys.platform != 'win32':
+                if sys.platform != "win32":
                     os.rename(self._lockfilename, self._filename)
                 else:
                     # Windows versions prior to Vista don't support atomic

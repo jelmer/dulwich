@@ -27,15 +27,14 @@ from dulwich.objects import (
     format_timezone,
     parse_timezone,
     ZERO_SHA,
-    )
+)
 
 Entry = collections.namedtuple(
-    'Entry', ['old_sha', 'new_sha', 'committer', 'timestamp', 'timezone',
-              'message'])
+    "Entry", ["old_sha", "new_sha", "committer", "timestamp", "timezone", "message"]
+)
 
 
-def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
-                       message):
+def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message):
     """Generate a single reflog line.
 
     Args:
@@ -48,9 +47,19 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone,
     """
     if old_sha is None:
         old_sha = ZERO_SHA
-    return (old_sha + b' ' + new_sha + b' ' + committer + b' ' +
-            str(int(timestamp)).encode('ascii') + b' ' +
-            format_timezone(timezone) + b'\t' + message)
+    return (
+        old_sha
+        + b" "
+        + new_sha
+        + b" "
+        + committer
+        + b" "
+        + str(int(timestamp)).encode("ascii")
+        + b" "
+        + format_timezone(timezone)
+        + b"\t"
+        + message
+    )
 
 
 def parse_reflog_line(line):
@@ -61,11 +70,17 @@ def parse_reflog_line(line):
     Returns: Tuple of (old_sha, new_sha, committer, timestamp, timezone,
         message)
     """
-    (begin, message) = line.split(b'\t', 1)
-    (old_sha, new_sha, rest) = begin.split(b' ', 2)
-    (committer, timestamp_str, timezone_str) = rest.rsplit(b' ', 2)
-    return Entry(old_sha, new_sha, committer, int(timestamp_str),
-                 parse_timezone(timezone_str)[0], message)
+    (begin, message) = line.split(b"\t", 1)
+    (old_sha, new_sha, rest) = begin.split(b" ", 2)
+    (committer, timestamp_str, timezone_str) = rest.rsplit(b" ", 2)
+    return Entry(
+        old_sha,
+        new_sha,
+        committer,
+        int(timestamp_str),
+        parse_timezone(timezone_str)[0],
+        message,
+    )
 
 
 def read_reflog(f):

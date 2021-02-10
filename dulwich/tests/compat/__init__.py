@@ -25,15 +25,15 @@ import unittest
 
 def test_suite():
     names = [
-        'client',
-        'pack',
-        'patch',
-        'repository',
-        'server',
-        'utils',
-        'web',
-        ]
-    module_names = ['dulwich.tests.compat.test_' + name for name in names]
+        "client",
+        "pack",
+        "patch",
+        "repository",
+        "server",
+        "utils",
+        "web",
+    ]
+    module_names = ["dulwich.tests.compat.test_" + name for name in names]
     result = unittest.TestSuite()
     loader = unittest.TestLoader()
     suite = loader.loadTestsFromNames(module_names)

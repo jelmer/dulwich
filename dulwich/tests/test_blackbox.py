@@ -25,10 +25,10 @@ import shutil
 
 from dulwich.repo import (
     Repo,
-    )
+)
 from dulwich.tests import (
     BlackboxTestCase,
-    )
+)
 
 
 class GitReceivePackTests(BlackboxTestCase):
@@ -43,16 +43,16 @@ class GitReceivePackTests(BlackboxTestCase):
     def test_basic(self):
         process = self.run_command("dul-receive-pack", [self.path])
         (stdout, stderr) = process.communicate(b"0000")
-        self.assertEqual(b'0000', stdout[-4:])
+        self.assertEqual(b"0000", stdout[-4:])
         self.assertEqual(0, process.returncode)
 
     def test_missing_arg(self):
         process = self.run_command("dul-receive-pack", [])
         (stdout, stderr) = process.communicate()
         self.assertEqual(
-            [b'usage: dul-receive-pack <git-dir>'],
-            stderr.splitlines()[-1:])
-        self.assertEqual(b'', stdout)
+            [b"usage: dul-receive-pack <git-dir>"], stderr.splitlines()[-1:]
+        )
+        self.assertEqual(b"", stdout)
         self.assertEqual(1, process.returncode)
 
 
@@ -69,7 +69,7 @@ class GitUploadPackTests(BlackboxTestCase):
         process = self.run_command("dul-upload-pack", [])
         (stdout, stderr) = process.communicate()
         self.assertEqual(
-            [b'usage: dul-upload-pack <git-dir>'],
-            stderr.splitlines()[-1:])
-        self.assertEqual(b'', stdout)
+            [b"usage: dul-upload-pack <git-dir>"], stderr.splitlines()[-1:]
+        )
+        self.assertEqual(b"", stdout)
         self.assertEqual(1, process.returncode)

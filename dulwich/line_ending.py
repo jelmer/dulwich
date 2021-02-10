@@ -156,8 +156,7 @@ def convert_lf_to_crlf(text_hunk):
 
 
 def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
-    """ Returns the correct checkout filter based on the passed arguments
-    """
+    """Returns the correct checkout filter based on the passed arguments"""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkout_filter_autocrlf function with the autocrlf value
@@ -165,8 +164,7 @@ def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
-    """ Returns the correct checkin filter based on the passed arguments
-    """
+    """Returns the correct checkin filter based on the passed arguments"""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkin_filter_autocrlf function with the autocrlf value
@@ -174,7 +172,7 @@ def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkout_filter_autocrlf(core_autocrlf):
-    """ Returns the correct checkout filter base on autocrlf value
+    """Returns the correct checkout filter base on autocrlf value
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -190,7 +188,7 @@ def get_checkout_filter_autocrlf(core_autocrlf):
 
 
 def get_checkin_filter_autocrlf(core_autocrlf):
-    """ Returns the correct checkin filter base on autocrlf value
+    """Returns the correct checkin filter base on autocrlf value
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -207,7 +205,7 @@ def get_checkin_filter_autocrlf(core_autocrlf):
 
 
 class BlobNormalizer(object):
-    """ An object to store computation result of which filter to apply based
+    """An object to store computation result of which filter to apply based
     on configuration, gitattributes, path and operation (checkin or checkout)
     """
 
@@ -234,8 +232,7 @@ class BlobNormalizer(object):
         )
 
     def checkin_normalize(self, blob, tree_path):
-        """ Normalize a blob during a checkin operation
-        """
+        """Normalize a blob during a checkin operation"""
         if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
@@ -244,8 +241,7 @@ class BlobNormalizer(object):
         return blob
 
     def checkout_normalize(self, blob, tree_path):
-        """ Normalize a blob during a checkout operation
-        """
+        """Normalize a blob during a checkout operation"""
         if self.fallback_read_filter is not None:
             return normalize_blob(
                 blob, self.fallback_read_filter, binary_detection=True
@@ -255,7 +251,7 @@ class BlobNormalizer(object):
 
 
 def normalize_blob(blob, conversion, binary_detection):
-    """ Takes a blob as input returns either the original blob if
+    """Takes a blob as input returns either the original blob if
     binary_detection is True and the blob content looks like binary, else
     return a new blob with converted data
     """
